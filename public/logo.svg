@@ -1,0 +1,6 @@
+<!-- PLACEHOLDER LOGO: replace this file with the real Hup Up Attractions logo (keep the name logo.svg). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="16" fill="#FF5A4E"/>
+  <path d="M14 46 L14 26 L22 18 L30 26 L38 18 L46 26 L50 22 L50 46 Z" fill="#FFC93C"/>
+  <text x="32" y="42" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="15" fill="#1B2A49">HUP</text>
+</svg>

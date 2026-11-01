@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #1b2a49;
+  --color-coral: #ff5a4e;
+  --color-coral-dark: #e8463b;
+  --color-sky: #1fa2ff;
+  --color-sun: #ffc93c;
+  --color-mint: #2bc48a;
+  --color-bg: #f6f8fc;
+  --color-line: #e3e8f2;
+  --color-muted: #6b7895;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+
+html {
+  color: var(--color-navy);
+  background: #fff;
+}
+
+.card {
+  @apply rounded-2xl border border-line bg-white;
+}
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-full bg-coral px-5 py-2.5 font-bold text-white transition hover:bg-coral-dark disabled:opacity-50;
+}
+.btn-dark {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-navy px-4 py-2.5 font-bold text-white transition hover:opacity-90 disabled:opacity-50;
+}
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-white px-3.5 py-2 font-semibold text-navy transition hover:bg-bg;
+}
+.input {
+  @apply w-full rounded-xl border border-line bg-white px-3 py-2 text-navy outline-none focus:border-sky focus:ring-2 focus:ring-sky/20;
+}
+.label {
+  @apply mb-1 block text-sm font-semibold text-muted;
+}
+.th {
+  @apply border-b border-line px-2 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted;
+}
+.td {
+  @apply border-b border-line px-2 py-3 align-top;
+}

@@ -1,0 +1,138 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { availabilityFor, createBookingAction, type PosResult } from "./actions";
+
+type P = { id: number; categoryId: number; name: string; priceCents: number; quantity: number };
+
+const money = (c: number) => (c / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+
+export default function PosForm(props: {
+  today: string;
+  initialDate: string;
+  initialProduct: number | null;
+  categories: { id: number; name: string }[];
+  products: P[];
+}) {
+  const [date, setDate] = useState(props.initialDate);
+  const [avail, setAvail] = useState<Record<string, number>>({});
+  const [qty, setQty] = useState<Record<string, number>>(props.initialProduct ? { [props.initialProduct]: 1 } : {});
+  const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", deliveryTime: "", notes: "", amountPaid: "" });
+  const [payment, setPayment] = useState<"link" | "cash" | "check" | "later">("link");
+  const [result, setResult] = useState<PosResult | null>(null);
+  const [pending, start] = useTransition();
+
+  useEffect(() => {
+    if (!date) return;
+    let live = true;
+    availabilityFor(date).then((a) => live && setAvail(a));
+    return () => {
+      live = false;
+    };
+  }, [date, result]);
+
+  const total = useMemo(
+    () => props.products.reduce((s, p) => s + (qty[p.id] || 0) * p.priceCents, 0),
+    [qty, props.products],
+  );
+
+  useEffect(() => {
+    if (payment === "cash" || payment === "check") setForm((f) => ({ ...f, amountPaid: (total / 100).toFixed(2) }));
+  }, [payment, total]);
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
+
+  const submit = () =>
+    start(async () => {
+      const r = await createBookingAction({ date, items: qty, ...form, payment });
+      setResult(r);
+      if (r.ok) {
+        setQty({});
+        setForm({ name: "", phone: "", email: "", address: "", deliveryTime: "", notes: "", amountPaid: "" });
+      }
+    });
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
+      <div className="card p-5">
+        <label className="label">Event (delivery) date — pickup is the next day</label>
+        <input type="date" min={props.today} value={date} onChange={(e) => setDate(e.target.value)} className="input mb-5 max-w-xs" />
+        {!date && <p className="text-muted">Pick a date to see what&apos;s available.</p>}
+        {date &&
+          props.categories.map((c) => {
+            const items = props.products.filter((p) => p.categoryId === c.id);
+            if (!items.length) return null;
+            return (
+              <div key={c.id} className="mb-4">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{c.name}</div>
+                {items.map((p) => {
+                  const free = avail[p.id] ?? 0;
+                  const q = qty[p.id] || 0;
+                  return (
+                    <div key={p.id} className="flex items-center gap-3 border-b border-line py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold">{p.name}</div>
+                        <div className="text-sm text-muted">
+                          {money(p.priceCents)} ·{" "}
+                          <span className={free ? "font-semibold text-[#13895C]" : "font-semibold text-coral"}>
+                            {free ? `${free} of ${p.quantity} available` : "Fully booked"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button type="button" className="btn-ghost h-9 w-9 !p-0" disabled={!q} onClick={() => setQty({ ...qty, [p.id]: q - 1 })}>−</button>
+                        <span className="w-6 text-center font-bold">{q}</span>
+                        <button type="button" className="btn-ghost h-9 w-9 !p-0" disabled={q >= free} onClick={() => setQty({ ...qty, [p.id]: q + 1 })}>+</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+      </div>
+
+      <div className="card space-y-3 p-5">
+        <h2 className="font-bold">Customer</h2>
+        <input className="input" placeholder="Full name *" value={form.name} onChange={set("name")} />
+        <input className="input" placeholder="Mobile phone" inputMode="tel" value={form.phone} onChange={set("phone")} />
+        <input className="input" placeholder="Email (optional)" type="email" value={form.email} onChange={set("email")} />
+        <input className="input" placeholder="Delivery address" value={form.address} onChange={set("address")} />
+        <input className="input" placeholder="Delivery time (optional, e.g. 9:00 AM)" value={form.deliveryTime} onChange={set("deliveryTime")} />
+        <textarea className="input" placeholder="Notes" rows={2} value={form.notes} onChange={set("notes")} />
+
+        <h2 className="pt-2 font-bold">Payment</h2>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            ["link", "💬 Text Sola pay link"],
+            ["cash", "💵 Paid cash"],
+            ["check", "🧾 Paid check"],
+            ["later", "⏳ Pay on delivery"],
+          ] as const).map(([v, l]) => (
+            <button key={v} type="button" onClick={() => setPayment(v)} className={`btn-ghost text-sm ${payment === v ? "!border-navy !bg-bg" : ""}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        {(payment === "cash" || payment === "check") && (
+          <input className="input" placeholder="Amount received" inputMode="decimal" value={form.amountPaid} onChange={set("amountPaid")} />
+        )}
+
+        <div className="flex items-center justify-between border-t border-line pt-3">
+          <span className="text-muted">Total</span>
+          <span className="text-2xl font-black">{money(total)}</span>
+        </div>
+        <button className="btn w-full py-3.5" disabled={pending || !date || total === 0} onClick={submit}>
+          {pending ? "Booking…" : "Book it"}
+        </button>
+        {result && (
+          <p className={`rounded-xl p-3 text-sm font-semibold ${result.ok ? "bg-mint/15 text-[#13895C]" : "bg-coral/10 text-coral-dark"}`}>
+            {result.message}{" "}
+            {result.orderId && <Link className="underline" href={`/admin/orders/${result.orderId}`}>Open order</Link>}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
