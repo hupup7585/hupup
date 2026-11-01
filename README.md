@@ -57,7 +57,7 @@ Main code:
 7. **Sola Payments**: in the Sola portal, create a **PaymentSITE** and add the Amount, Invoice, Name, Email and Phone fields so the link can pre-fill them. Set `SOLA_PAYMENTSITE_NAME`. Under webhooks, point transaction notifications to `https://hupupattractions.com/api/sola/webhook`, set a webhook PIN (15+ letters and numbers), and put the same PIN in `SOLA_WEBHOOK_PIN`. **Run one sandbox payment** to confirm the order flips to *Confirmed*: the field names follow Sola's published docs, which I couldn't reach while building this.
 8. **Email codes**: create a Resend account, verify `hupupattractions.com`, and set `RESEND_API_KEY` and `EMAIL_FROM`.
 9. **Admin sign-in**: set `ADMIN_EMAIL`, `ADMIN_PHONE` and a long random `AUTH_SECRET`.
-10. **Cron**: `vercel.json` runs the hold sweep every 5 minutes, which needs the Vercel Pro plan. On Hobby, change it to once a day. Holds are still released when the call ends and ignored once expired.
+10. **Cron**: `vercel.json` runs the hold sweep once a day (the most the Vercel Hobby plan allows). Holds are still released the moment a call ends and are ignored once expired, so stock stays correct. On Vercel Pro you can change the schedule to `*/5 * * * *`.
 
 Then open **/admin/settings**, which shows a green check for each service that's configured.
 
