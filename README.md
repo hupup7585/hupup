@@ -33,21 +33,7 @@ Main code:
 1. **Logo**: replace `public/logo.svg` with the real logo (keep the file name).
 2. **Database**: create a Neon Postgres database (Vercel → Storage → Neon) and copy the pooled connection string into `DATABASE_URL`.
 3. **Vercel project**: import this repo and add the environment variables from `.env.example`.
-4. **Create tables and starter catalog** (run once, from your computer, with `DATABASE_URL` set):
-
-   ```bash
-   npm install
-   ```
-
-   ```bash
-   npm run db:migrate
-   ```
-
-   ```bash
-   npm run db:seed
-   ```
-
-   The seed adds sample items and prices. Edit them in `/admin/catalog`.
+4. **Tables and starter catalog are automatic.** Every Vercel build runs `vercel-build`, which applies database migrations and loads the starter catalog the first time (it never overwrites existing data). The seed adds sample items and prices. Edit them in `/admin/catalog`.
 5. **Domain**: in Vercel → Domains, add `hupupattractions.com` and set the DNS records Vercel shows.
 6. **Twilio**: buy a local 845 number. In its Voice settings:
    - *A call comes in* → Webhook `https://hupupattractions.com/api/voice/incoming` (HTTP POST)

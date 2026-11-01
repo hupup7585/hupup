@@ -6,6 +6,10 @@ import { getDb, closeDb, schema } from "../src/lib/db";
  * Safe to run once on an empty database; it skips if categories already exist.
  */
 async function main() {
+  if (!process.env.DATABASE_URL) {
+    console.log("No DATABASE_URL set - skipping seed.");
+    return;
+  }
   const db = getDb();
   const existing = await db.select().from(schema.categories).limit(1);
   if (existing.length) {

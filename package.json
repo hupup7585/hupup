@@ -12,7 +12,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "simulate-call": "tsx scripts/simulate-call.ts"
+    "simulate-call": "tsx scripts/simulate-call.ts",
+    "vercel-build": "tsx scripts/migrate.ts && tsx scripts/seed.ts && next build"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",
