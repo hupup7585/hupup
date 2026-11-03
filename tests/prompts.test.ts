@@ -43,3 +43,14 @@ describe("hotline prompts", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("hotline voice", () => {
+  it("defaults to Google Chirp3-HD Fenrir when IVR_VOICE is not set", async () => {
+    const saved = process.env.IVR_VOICE;
+    delete process.env.IVR_VOICE;
+    const { config, DEFAULT_VOICE } = await import("@/lib/config");
+    expect(DEFAULT_VOICE).toBe("Google.en-US-Chirp3-HD-Fenrir");
+    expect(config.voice()).toBe("Google.en-US-Chirp3-HD-Fenrir");
+    process.env.IVR_VOICE = saved;
+  });
+});

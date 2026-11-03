@@ -84,6 +84,6 @@ npm test
 ## Changing things later
 
 - **New category or product**: `/admin/catalog`. Give a category a *phone key* (1–8) and the hotline menu says it automatically. Up to 9 items per category on the phone.
-- **Voice**: `IVR_VOICE` (default `Polly.Matthew-Neural`; alternatives: `Polly.Stephen-Neural`, `Polly.Gregory-Neural`, or the newer `Polly.Matthew-Generative`).
+- **Voice**: `IVR_VOICE` (default `Google.en-US-Chirp3-HD-Fenrir`, a young, friendly male voice). Chirp3-HD voices don't support SSML, so every prompt is plain text; punctuation creates the pauses. Prompt wording is editable at `/admin/phone/prompts`.
 - **Press 0** forwards to `FORWARD_PHONE` (defaults to `ADMIN_PHONE`).
 - **Speech hints** for local street names live in `src/lib/ivr/flow.ts` (`FIELDS.address.hints`).
