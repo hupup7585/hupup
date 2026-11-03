@@ -20,6 +20,7 @@ import { paymentLink } from "@/lib/sola";
 import { sendSms } from "@/lib/notify";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
+import { loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
 
 const { categories, products, orders } = schema;
 type VR = InstanceType<typeof twilio.twiml.VoiceResponse>;
@@ -32,6 +33,7 @@ export type Ctx = {
   callSid: string;
   from: string | null;
   session: CallSession | null;
+  prompts: PromptOverrides;
 };
 
 /* ------------------------------------------------------------------ helpers */
@@ -51,6 +53,13 @@ export function url(action: string, params: Record<string, string | number | und
 
 function say(target: VR | Gather, text: string) {
   target.say(voice(), text);
+}
+
+/** Speak a catalog prompt: uploaded recording if there is one, otherwise the (editable) text. */
+function sp(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptKey, vars?: Record<string, string | number>) {
+  const audio = promptAudio(ctx.prompts, key);
+  if (audio) target.play(audio);
+  else say(target, promptText(ctx.prompts, key, vars));
 }
 
 function pause(target: VR | Gather, seconds = 1) {
@@ -91,11 +100,11 @@ function speech(vr: VR, action: string, hints: string, opts: { dtmf?: boolean; n
 function noInput(vr: VR, ctx: Ctx, retryAction: string, retryParams: Record<string, string | number | undefined> = {}) {
   const n = Number(ctx.query.get("n") || 0) + 1;
   if (n >= MAX_NO_INPUT) {
-    say(vr, `Sorry, I'm having trouble hearing you. Please call us back any time. Thank you for calling ${BUSINESS_NAME}. Goodbye.`);
+    sp(vr, ctx, "no_input_final");
     vr.hangup();
     return vr;
   }
-  say(vr, "Sorry, I didn't catch that.");
+  sp(vr, ctx, "no_input");
   vr.redirect({ method: "POST" }, url(retryAction, { ...retryParams, n }));
   return vr;
 }
@@ -147,7 +156,7 @@ type Handler = (ctx: Ctx, vr: VR) => Promise<VR> | VR;
 const handlers: Record<string, Handler> = {
   async incoming(ctx, vr) {
     await ensureSession(ctx.callSid, ctx.from);
-    say(vr, `Thank you for calling ${BUSINESS_NAME}! Bounce houses, laser tag, and paddle boats, delivered right to your door.`);
+    sp(vr, ctx, "greeting");
     return back(vr, "menu");
   },
 
@@ -155,11 +164,11 @@ const handlers: Record<string, Handler> = {
     const cats = await phoneCategories();
     const order = await currentOrder(ctx);
     const g = keypad(vr, url("menu-choice"));
-    if (!cats.length) say(g, "We're updating our rental catalog right now.");
-    for (const c of cats) say(g, `For ${c.spokenName || c.name}, press ${c.ivrDigit}.`);
-    if (order?.items.length) say(g, "To review your cart and check out, press 9.");
-    if (config.forwardPhone()) say(g, "To speak with someone, press 0.");
-    say(g, "To hear these options again, press star.");
+    if (!cats.length) sp(g, ctx, "menu_empty");
+    for (const c of cats) sp(g, ctx, "menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
+    if (order?.items.length) sp(g, ctx, "menu_cart");
+    if (config.forwardPhone()) sp(g, ctx, "menu_operator");
+    sp(g, ctx, "menu_repeat");
     return noInput(vr, ctx, "menu");
   },
 
@@ -172,7 +181,7 @@ const handlers: Record<string, Handler> = {
     const cats = await phoneCategories();
     const cat = cats.find((c) => String(c.ivrDigit) === d);
     if (!cat) {
-      say(vr, "Sorry, that's not one of the options.");
+      sp(vr, ctx, "invalid");
       return back(vr, "menu");
     }
     return back(vr, "category", { c: cat.id });
@@ -183,13 +192,13 @@ const handlers: Record<string, Handler> = {
     const [cat] = await db.select().from(categories).where(eq(categories.id, c));
     const items = cat ? await phoneProducts(c) : [];
     if (!cat || !items.length) {
-      say(vr, "Sorry, there are no items available in that category right now.");
+      sp(vr, ctx, "category_empty");
       return back(vr, "menu");
     }
     const g = keypad(vr, url("category-choice", { c }));
-    say(g, `${cat.spokenName || cat.name}.`);
-    items.forEach((p, i) => say(g, `For the ${p.name}, press ${i + 1}.`));
-    say(g, "To go back to the main menu, press star.");
+    sp(g, ctx, "category_intro", { category: cat.spokenName || cat.name });
+    items.forEach((p, i) => sp(g, ctx, "category_item", { item: p.name, key: i + 1 }));
+    sp(g, ctx, "back_to_menu");
     return noInput(vr, ctx, "category", { c });
   },
 
@@ -201,7 +210,7 @@ const handlers: Record<string, Handler> = {
     const items = await phoneProducts(c);
     const p = items[Number(d) - 1];
     if (!p) {
-      say(vr, "Sorry, that's not one of the options.");
+      sp(vr, ctx, "invalid");
       return back(vr, "category", { c });
     }
     return back(vr, "product", { p: p.id });
@@ -211,8 +220,8 @@ const handlers: Record<string, Handler> = {
     const p = await getProduct(Number(ctx.query.get("p")));
     if (!p || !p.active) return back(vr, "menu");
     const g = keypad(vr, url("product-choice", { p: p.id }));
-    if (!ctx.query.get("again")) say(g, `The ${p.name}. ${spokenMoney(p.priceCents)}, with delivery and next-day pickup.`);
-    say(g, "To hear a description, press 1. To add it to your cart, press 2. To go back, press star.");
+    if (!ctx.query.get("again")) sp(g, ctx, "product_intro", { item: p.name, price: spokenMoney(p.priceCents) });
+    sp(g, ctx, "product_options");
     return noInput(vr, ctx, "product", { p: p.id, again: 1 });
   },
 
@@ -223,7 +232,8 @@ const handlers: Record<string, Handler> = {
     if (!d) return noInput(vr, ctx, "product", { p: p.id, again: 1 });
     if (d === "*") return back(vr, "category", { c: p.categoryId });
     if (d === "1") {
-      say(vr, p.spokenDescription || p.description || `The ${p.name} is one of our most popular rentals.`);
+      if (p.spokenDescription || p.description) say(vr, p.spokenDescription || p.description);
+      else sp(vr, ctx, "product_default_desc", { item: p.name });
       pause(vr);
       return back(vr, "product", { p: p.id, again: 1 });
     }
@@ -232,14 +242,14 @@ const handlers: Record<string, Handler> = {
       if (order) return back(vr, "qty", { p: p.id, d: order.order.eventDate });
       return back(vr, "date", { p: p.id });
     }
-    say(vr, "Sorry, that's not one of the options.");
+    sp(vr, ctx, "invalid");
     return back(vr, "product", { p: p.id, again: 1 });
   },
 
   date(ctx, vr) {
     const p = ctx.query.get("p")!;
     const g = speech(vr, url("date-heard", { p, n: ctx.query.get("n") ?? undefined }), "today, tomorrow, Sunday, Monday, January, February, March, April, May, June, July, August, September, October, November, December", { dtmf: true, numDigits: 4 });
-    say(g, "What date is your event? You can say the date, like November 8th, or enter the month and day on your keypad as four digits. For example, for November 8th, press 1 1 0 8.");
+    sp(g, ctx, "date_prompt");
     return vr;
   },
 
@@ -251,17 +261,11 @@ const handlers: Record<string, Handler> = {
     const today = todayISO();
     const r = parseDateInput({ digits, speech: speechResult }, today);
     if (!r.ok) {
-      const why =
-        r.reason === "past"
-          ? "That date has already passed."
-          : r.reason === "too_far"
-            ? "We can only book up to one year ahead."
-            : "Sorry, I didn't understand that date.";
-      say(vr, why);
+      sp(vr, ctx, r.reason === "past" ? "date_past" : r.reason === "too_far" ? "date_too_far" : "date_unclear");
       return back(vr, "date", { p, n: Number(ctx.query.get("n") || 0) + 1 });
     }
     const g = keypad(vr, url("date-confirm", { p, d: r.date }));
-    say(g, `That's ${longDate(r.date)}. We deliver that day and pick up on ${longDate(addDays(r.date, 1))}. To confirm, press 1. To choose a different date, press 2.`);
+    sp(g, ctx, "date_confirm", { date: longDate(r.date), pickup: longDate(addDays(r.date, 1)) });
     return noInput(vr, ctx, "date", { p });
   },
 
@@ -281,17 +285,15 @@ const handlers: Record<string, Handler> = {
     const free = await checkBookable(p.id, p.quantity, date);
     if (free <= 0) {
       const g = keypad(vr, url("soldout-choice", { p: p.id }));
-      say(g, `Sorry, the ${p.name} is fully booked for ${longDate(date)}.`);
+      sp(g, ctx, "sold_out", { item: p.name, date: longDate(date) });
       const order = await currentOrder(ctx);
-      if (order) say(g, "To hear other items, press 1. To review your cart, press 9.");
-      else say(g, "To choose a different date, press 1. To hear other items, press 2.");
-      say(g, "For the main menu, press star.");
+      sp(g, ctx, order ? "sold_out_options_cart" : "sold_out_options");
       return noInput(vr, ctx, "menu");
     }
     if (free === 1) return back(vr, "add", { p: p.id, d: date, q: 1 });
     const max = Math.min(free, 9);
     const g = keypad(vr, url("add", { p: p.id, d: date }));
-    say(g, `Good news, we have ${free} available for ${longDate(date)}. How many would you like? Enter a number from 1 to ${max}.`);
+    sp(g, ctx, "qty_prompt", { count: free, date: longDate(date), max });
     return noInput(vr, ctx, "qty", { p: p.id, d: date });
   },
 
@@ -311,7 +313,7 @@ const handlers: Record<string, Handler> = {
     if (!p) return back(vr, "menu");
     const q = Number(ctx.query.get("q") || ctx.body.Digits || 0);
     if (!q || q < 1 || q > 9) {
-      say(vr, "Sorry, please enter a number from 1 to 9.");
+      sp(vr, ctx, "qty_invalid");
       return back(vr, "qty", { p: p.id, d: date });
     }
     const session = ctx.session ?? (await ensureSession(ctx.callSid, ctx.from));
@@ -327,16 +329,17 @@ const handlers: Record<string, Handler> = {
     });
     if (!r.ok) {
       if (r.reason === "unavailable") {
-        say(vr, r.free > 0 ? `Sorry, only ${r.free} are available for that date.` : `Sorry, the ${p.name} was just booked for that date.`);
+        if (r.free > 0) sp(vr, ctx, "only_some_left", { count: r.free });
+        else sp(vr, ctx, "just_booked", { item: p.name });
         return back(vr, r.free > 0 ? "qty" : "menu", r.free > 0 ? { p: p.id, d: date } : {});
       }
-      say(vr, "Sorry, something went wrong adding that item.");
+      sp(vr, ctx, "went_wrong");
       return back(vr, "menu");
     }
     await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted" }, session);
     const g = keypad(vr, url("after-add"));
-    say(g, `Great! I've added ${itemPhrase(q, p.name)} to your cart for ${longDate(date)}. It's reserved for you while we're on the call.`);
-    say(g, "To keep shopping, press 1. To check out, press 9.");
+    sp(g, ctx, "added", { items: itemPhrase(q, p.name), date: longDate(date) });
+    sp(g, ctx, "after_add");
     return noInput(vr, ctx, "cart");
   },
 
@@ -350,13 +353,13 @@ const handlers: Record<string, Handler> = {
   async cart(ctx, vr) {
     const order = await currentOrder(ctx);
     if (!order || !order.items.length) {
-      say(vr, "Your cart is empty.");
+      sp(vr, ctx, "cart_empty");
       return back(vr, "menu");
     }
     const list = order.items.map((i) => itemPhrase(i.qty, i.name)).join(", ");
     const g = keypad(vr, url("cart-choice"));
-    say(g, `Your cart has ${list}, for ${longDate(order.order.eventDate)}. Your total is ${spokenMoney(order.order.subtotalCents)}.`);
-    say(g, "To check out, press 1. To keep shopping, press 2. To empty your cart and start over, press 3.");
+    sp(g, ctx, "cart_summary", { items: list, date: longDate(order.order.eventDate), total: spokenMoney(order.order.subtotalCents) });
+    sp(g, ctx, "cart_options");
     return noInput(vr, ctx, "cart");
   },
 
@@ -367,7 +370,7 @@ const handlers: Record<string, Handler> = {
     if (d === "3") {
       if (ctx.session?.orderId) await cancelHold(ctx.session.orderId);
       await updateSession(ctx.callSid, { orderId: null, outcome: "browsing" }, ctx.session);
-      say(vr, "Okay, your cart is now empty.");
+      sp(vr, ctx, "cart_cleared");
       return back(vr, "menu");
     }
     return noInput(vr, ctx, "cart");
@@ -377,14 +380,14 @@ const handlers: Record<string, Handler> = {
 
   async ask(ctx, vr) {
     if (!(await currentOrder(ctx))) {
-      say(vr, "Your cart is empty.");
+      sp(vr, ctx, "cart_empty");
       return back(vr, "menu");
     }
     const f = ctx.query.get("f") as Field;
     const n = ctx.query.get("n") ?? undefined;
     const spec = FIELDS[f];
     const g = speech(vr, url("heard", { f, n }), spec.hints, { dtmf: f === "email" });
-    say(g, spec.prompt);
+    sp(g, ctx, spec.prompt);
     return vr;
   },
 
@@ -398,19 +401,19 @@ const handlers: Record<string, Handler> = {
     if (!value) {
       const n = Number(ctx.query.get("n") || 0) + 1;
       if (f === "email" && n >= 2) {
-        say(vr, "No problem, we'll skip the email.");
+        sp(vr, ctx, "email_skip");
         return back(vr, "phone");
       }
       if (n >= MAX_NO_INPUT) {
-        say(vr, "Sorry, I'm having trouble understanding.");
+        sp(vr, ctx, "field_trouble");
         return back(vr, config.forwardPhone() ? "operator" : "phone");
       }
-      say(vr, f === "email" ? "Sorry, I couldn't make out that email address." : "Sorry, I didn't catch that.");
+      sp(vr, ctx, f === "email" ? "email_unclear" : "field_unclear");
       return back(vr, "ask", { f, n });
     }
     await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
     const g = keypad(vr, url("confirm", { f }));
-    say(g, `I heard: ${spec.readBack(value)}. If that's correct, press 1. To try again, press 2.`);
+    sp(g, ctx, "heard", { value: spec.readBack(value) });
     return noInput(vr, ctx, "ask", { f });
   },
 
@@ -428,7 +431,7 @@ const handlers: Record<string, Handler> = {
     const from = toE164(ctx.from);
     if (!from) return back(vr, "phone-enter");
     const g = keypad(vr, url("phone-choice"));
-    say(g, `We'll text your secure payment link to the number you're calling from, ending in ${spokenDigits(last4(from))}. To use this number, press 1. To enter a different mobile number, press 2.`);
+    sp(g, ctx, "phone_confirm", { last4: spokenDigits(last4(from)).replace(/ /g, ", ") });
     return noInput(vr, ctx, "phone");
   },
 
@@ -444,19 +447,19 @@ const handlers: Record<string, Handler> = {
 
   "phone-enter"(ctx, vr) {
     const g = keypad(vr, url("phone-heard"), { numDigits: 10, timeout: 10, finishOnKey: "#" });
-    say(g, "Please enter your 10-digit mobile number, starting with the area code.");
+    sp(g, ctx, "phone_enter");
     return noInput(vr, ctx, "phone-enter");
   },
 
   async "phone-heard"(ctx, vr) {
     const e164 = toE164(ctx.body.Digits);
     if (!e164) {
-      say(vr, "Sorry, that doesn't look like a 10-digit number.");
+      sp(vr, ctx, "phone_bad");
       return back(vr, "phone-enter");
     }
     await updateSession(ctx.callSid, { data: { heard: e164 } }, ctx.session);
     const g = keypad(vr, url("phone-confirm"));
-    say(g, `I have ${spokenDigits(e164.slice(2, 5))}, ${spokenDigits(e164.slice(5, 8))}, ${spokenDigits(e164.slice(8))}. If that's correct, press 1. To re-enter it, press 2.`);
+    sp(g, ctx, "phone_heard", { number: `${spokenDigits(e164.slice(2, 5))}, ${spokenDigits(e164.slice(5, 8))}, ${spokenDigits(e164.slice(8))}` });
     return noInput(vr, ctx, "phone-enter");
   },
 
@@ -470,7 +473,7 @@ const handlers: Record<string, Handler> = {
     const order = await currentOrder(ctx);
     const data = ctx.session?.data ?? {};
     if (!order || !order.items.length) {
-      say(vr, "Sorry, your cart has expired.");
+      sp(vr, ctx, "cart_expired");
       return back(vr, "menu");
     }
     if (!data.name || !data.address) return back(vr, "ask", { f: !data.name ? "name" : "address" });
@@ -513,13 +516,10 @@ const handlers: Record<string, Handler> = {
     }
 
     const first = data.name.split(" ")[0];
-    say(vr, `Thank you, ${first}! Your order number is ${spokenDigits(num)}.`);
-    if (texted) {
-      say(vr, `We just texted you a secure payment link. Your items are reserved for ${PAYMENT_HOLD_MINUTES} minutes while you complete payment, and you'll get a text as soon as it's confirmed.`);
-    } else {
-      say(vr, "We weren't able to text you a payment link, so we'll call you back shortly to complete your booking.");
-    }
-    say(vr, `We'll deliver on ${longDate(order.order.eventDate)} and pick up on ${longDate(order.order.pickupDate)}. Thank you for choosing ${BUSINESS_NAME}. Goodbye!`);
+    sp(vr, ctx, "thanks_order", { name: first, number: spokenDigits(num) });
+    if (texted) sp(vr, ctx, "link_sent", { minutes: PAYMENT_HOLD_MINUTES });
+    else sp(vr, ctx, "link_failed");
+    sp(vr, ctx, "goodbye_order", { date: longDate(order.order.eventDate), pickup: longDate(order.order.pickupDate) });
     vr.hangup();
     return vr;
   },
@@ -527,13 +527,13 @@ const handlers: Record<string, Handler> = {
   async operator(ctx, vr) {
     const to = config.forwardPhone();
     if (!to) {
-      say(vr, "Sorry, no one is available right now.");
+      sp(vr, ctx, "operator_unavailable");
       return back(vr, "menu");
     }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "forwarded" }, ctx.session);
-    say(vr, "Please hold while I connect you.");
+    sp(vr, ctx, "transfer_connecting");
     vr.dial({ callerId: process.env.TWILIO_PHONE_NUMBER || undefined, timeout: 25 }, to);
-    say(vr, "Sorry, no one could take your call. Please try again later, or continue with our automated booking.");
+    sp(vr, ctx, "transfer_failed");
     return back(vr, "menu");
   },
 };
@@ -543,24 +543,24 @@ const handlers: Record<string, Handler> = {
 type Field = "name" | "address" | "email";
 const FIELDS: Record<
   Field,
-  { prompt: string; hints: string; normalize: (s: string) => string | null; readBack: (v: string) => string; next: string }
+  { prompt: PromptKey; hints: string; normalize: (s: string) => string | null; readBack: (v: string) => string; next: string }
 > = {
   name: {
-    prompt: "Let's get your details. Please say your first and last name.",
+    prompt: "ask_name",
     hints: "Friedman, Weiss, Schwartz, Klein, Gross, Teitelbaum, Goldberger, Weinberger, Rosenberg, Stein",
     normalize: (s) => normalizeSpokenName(s) || null,
     readBack: (v) => v,
     next: "ask?f=address",
   },
   address: {
-    prompt: "Please say the full delivery address, including the house number, street, and town.",
+    prompt: "ask_address",
     hints: "Kiryas Joel, Monroe, Palm Tree, Forest Road, Garfield Road, Bakertown Road, Mountain Road, Acres Road, Schunnemunk, Quickway Road, Seven Springs Road, Harriman, Chester, Blooming Grove",
     normalize: (s) => normalizeSpokenAddress(s) || null,
     readBack: (v) => v,
     next: "ask?f=email",
   },
   email: {
-    prompt: "Please say your email address for your receipt, for example, john at gmail dot com. Or press pound to skip.",
+    prompt: "ask_email",
     hints: "at, dot, gmail dot com, yahoo dot com, outlook dot com, hotmail dot com, aol dot com, icloud dot com",
     normalize: normalizeSpokenEmail,
     readBack: (v) => {
@@ -573,11 +573,13 @@ const FIELDS: Record<
 
 /* ------------------------------------------------------------------ dispatcher */
 
-export async function handleVoice(ctx: Omit<Ctx, "session">): Promise<string> {
+export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Promise<string> {
   const vr = new twilio.twiml.VoiceResponse();
+  const prompts = await loadPromptOverrides();
+  const ctx = { ...input, prompts };
   const handler = handlers[ctx.action];
   if (!handler) {
-    say(vr, "Sorry, something went wrong.");
+    sp(vr, ctx, "went_wrong");
     vr.redirect({ method: "POST" }, url("menu"));
     return vr.toString();
   }
@@ -588,7 +590,7 @@ export async function handleVoice(ctx: Omit<Ctx, "session">): Promise<string> {
   } catch (e) {
     console.error("IVR handler error", ctx.action, e);
     const err = new twilio.twiml.VoiceResponse();
-    say(err, "Sorry, we're having a technical problem. Please call back in a few minutes.");
+    sp(err, ctx, "tech_error");
     err.hangup();
     return err.toString();
   }

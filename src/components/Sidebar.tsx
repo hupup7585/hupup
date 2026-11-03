@@ -11,6 +11,7 @@ const NAV = [
   ["/admin/pos", "➕", "New booking"],
   ["/admin/catalog", "📦", "Catalog"],
   ["/admin/calls", "📞", "Call log"],
+  ["/admin/phone/prompts", "🎙️", "Hotline prompts"],
   ["/admin/settings", "⚙️", "Settings"],
 ] as const;
 
