@@ -1,29 +1,12 @@
-import twilio from "twilio";
 import { BUSINESS_NAME, config } from "@/lib/config";
-
-let client: ReturnType<typeof twilio> | null = null;
-export function twilioClient() {
-  if (!config.twilioConfigured()) return null;
-  client ??= twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
-  return client;
-}
+import { sendMessage, type SendInput } from "@/lib/sms";
 
 export type SendResult = { sent: boolean; dev?: boolean; error?: string };
 
-export async function sendSms(to: string, body: string): Promise<SendResult> {
-  const c = twilioClient();
-  if (!c || !process.env.TWILIO_PHONE_NUMBER) {
-    if (config.isProd()) return { sent: false, error: "Twilio is not configured" };
-    console.log(`[dev SMS to ${to}] ${body}`);
-    return { sent: true, dev: true };
-  }
-  try {
-    await c.messages.create({ to, from: process.env.TWILIO_PHONE_NUMBER, body });
-    return { sent: true };
-  } catch (e) {
-    console.error("SMS failed", e);
-    return { sent: false, error: (e as Error).message };
-  }
+/** Send a text. All texts go through sendMessage (logged, opt-out aware). */
+export async function sendSms(to: string, body: string, opts: Omit<SendInput, "to" | "body"> = {}): Promise<SendResult> {
+  const r = await sendMessage({ to, body, ...opts });
+  return { sent: r.sent, dev: r.dev, error: r.error };
 }
 
 export async function sendEmail(to: string, subject: string, text: string): Promise<SendResult> {

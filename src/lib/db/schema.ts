@@ -8,6 +8,7 @@ import {
   date,
   jsonb,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 export const categories = pgTable("categories", {
@@ -51,14 +52,21 @@ export const customers = pgTable(
   "customers",
   {
     id: serial("id").primaryKey(),
-    name: text("name").notNull(),
+    /** Null until the caller tells us (records are auto-created from caller ID). */
+    name: text("name"),
     phone: text("phone"),
     email: text("email"),
     address: text("address"),
+    notes: text("notes"),
+    /** Replied STOP: Twilio blocks every message from our number until START. */
+    smsOptOut: boolean("sms_opt_out").notNull().default(false),
+    marketingOptIn: boolean("marketing_opt_in").notNull().default(false),
+    marketingOptInAt: timestamp("marketing_opt_in_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("customers_phone_idx").on(t.phone)],
 );
+
 
 export const ORDER_STATUSES = [
   "HOLD",
@@ -150,6 +158,7 @@ export const callSessions = pgTable("call_sessions", {
 
 export const loginCodes = pgTable("login_codes", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   channel: text("channel").notNull(),
   codeHash: text("code_hash").notNull(),
   attempts: integer("attempts").notNull().default(0),
@@ -160,13 +169,134 @@ export const loginCodes = pgTable("login_codes", {
 
 export const adminSessions = pgTable("admin_sessions", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
+  method: text("method"),
   tokenHash: text("token_hash").notNull().unique(),
   userAgent: text("user_agent"),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ------------------------------------------------------------- staff & permissions */
+
+export const ROLES = ["owner", "secretary", "delivery"] as const;
+export type Role = (typeof ROLES)[number];
+
+export const adminUsers = pgTable("admin_users", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  phone: text("phone").notNull().unique(),
+  email: text("email"),
+  role: text("role").$type<Role>().notNull(),
+  active: boolean("active").notNull().default(true),
+  passwordHash: text("password_hash"),
+  passwordSetAt: timestamp("password_set_at", { withTimezone: true }),
+  failedLogins: integer("failed_logins").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const userPermissionOverrides = pgTable(
+  "user_permission_overrides",
+  {
+    userId: integer("user_id").notNull().references(() => adminUsers.id),
+    permission: text("permission").notNull(),
+    allowed: boolean("allowed").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.permission] })],
+);
+
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id"),
+    action: text("action").notNull(),
+    entityType: text("entity_type"),
+    entityId: text("entity_id"),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("audit_created_idx").on(t.createdAt), index("audit_entity_idx").on(t.entityType, t.entityId)],
+);
+
+/* ------------------------------------------------------------- messaging */
+
+export const messages = pgTable(
+  "messages",
+  {
+    id: serial("id").primaryKey(),
+    direction: text("direction").$type<"in" | "out">().notNull(),
+    fromNumber: text("from_number"),
+    toNumber: text("to_number"),
+    /** The customer's number (other party), for threading. */
+    contactPhone: text("contact_phone").notNull(),
+    body: text("body").notNull().default(""),
+    mediaUrls: jsonb("media_urls").$type<string[]>().notNull().default([]),
+    /** transactional | marketing | system | inbound */
+    kind: text("kind").notNull().default("transactional"),
+    /** e.g. booking_confirmation, payment_link, delivery_completed, staff_reply, keyword_stop */
+    event: text("event"),
+    twilioSid: text("twilio_sid").unique(),
+    status: text("status").notNull().default("queued"),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    customerId: integer("customer_id").references(() => customers.id),
+    orderId: integer("order_id").references(() => orders.id),
+    callSid: text("call_sid"),
+    userId: integer("user_id"),
+    templateId: integer("template_id"),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("messages_contact_idx").on(t.contactPhone, t.createdAt), index("messages_customer_idx").on(t.customerId)],
+);
+
+export const smsConsents = pgTable(
+  "sms_consents",
+  {
+    id: serial("id").primaryKey(),
+    customerId: integer("customer_id").references(() => customers.id),
+    phone: text("phone").notNull(),
+    /** transactional | marketing */
+    scope: text("scope").notNull(),
+    /** opt_in | opt_out | declined */
+    action: text("action").notNull(),
+    /** phone | pos | staff | keyword */
+    source: text("source").notNull(),
+    wording: text("wording"),
+    keyword: text("keyword"),
+    callSid: text("call_sid"),
+    userId: integer("user_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("sms_consents_phone_idx").on(t.phone)],
+);
+
+/* ------------------------------------------------------------- settings & prompts */
+
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: integer("updated_by"),
+});
+
+export const voicePrompts = pgTable("voice_prompts", {
+  key: text("key").primaryKey(),
+  text: text("text"),
+  audioUrl: text("audio_url"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: integer("updated_by"),
+});
+
 export type Category = typeof categories.$inferSelect;
 export type Product = typeof products.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type Customer = typeof customers.$inferSelect;
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type Message = typeof messages.$inferSelect;
