@@ -19,9 +19,9 @@ async function main() {
   const [bounce, laser, paddle] = await db
     .insert(schema.categories)
     .values([
-      { name: "Bounce Houses", spokenName: "Bounce Houses", ivrDigit: 1, emoji: "🏰", sortOrder: 1, description: "Castles, combos and slides — cleaned, safe, and set up by our crew." },
-      { name: "Laser Tag & Inflatable Mazes", spokenName: "Laser Tag and Inflatable Mazes", ivrDigit: 2, emoji: "🎯", sortOrder: 2, description: "Full laser tag kits with giant inflatable arenas — perfect for groups." },
-      { name: "Paddle Boats", spokenName: "Paddle Boats", ivrDigit: 3, emoji: "🚣", sortOrder: 3, description: "Pool-ready paddle boats for summer splash days." },
+      { name: "Bounce Houses", spokenName: "Bounce Houses", ivrDigit: 1, emoji: "🏰", sortOrder: 1, description: "Bring excitement to your event with our bounce house rentals. Perfect for parties, celebrations, school events, and special occasions." },
+      { name: "Laser Tag and Inflatable Mazes", spokenName: "Laser Tag and Inflatable Mazes", ivrDigit: 2, emoji: "🎯", sortOrder: 2, description: "Create an unforgettable experience with our laser tag and inflatable maze attractions. A great addition to events, parties, and group activities." },
+      { name: "Paddle Boats", spokenName: "Paddle Boats", ivrDigit: 3, emoji: "🚣", sortOrder: 3, description: "Add something special to your event with our paddle boat rentals. An exciting attraction for outdoor events and special occasions." },
     ])
     .returning();
 

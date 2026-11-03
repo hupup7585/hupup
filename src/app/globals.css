@@ -11,6 +11,13 @@
   --color-line: #e3e8f2;
   --color-muted: #6b7895;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+
+  /* Website brand palette (keep in sync with src/lib/theme.ts) */
+  --color-hu-yellow: #ffd84d;
+  --color-hu-sky: #8ccbff;
+  --color-hu-deep: #123d73;
+  --color-hu-tint: #eef7ff;
+  --font-display: var(--font-poppins), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
 html {
@@ -41,4 +48,17 @@ html {
 }
 .td {
   @apply border-b border-line px-2 py-3 align-top;
+}
+
+/* ---------- public website (components layer so utilities like `hidden` can override) ---------- */
+@layer components {
+.hu-btn {
+  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-hu-yellow px-6 py-3 text-base font-bold tracking-wide text-hu-deep transition-colors hover:bg-[#ffcf1f] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-hu-deep;
+}
+.hu-btn-outline {
+  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-full border-2 border-hu-deep bg-white px-6 py-3 text-base font-bold tracking-wide text-hu-deep transition-colors hover:bg-hu-tint focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-hu-deep;
+}
+.hu-sticker {
+  @apply inline-block rounded-full border-2 border-hu-deep bg-hu-yellow px-4 py-1.5 text-sm font-extrabold uppercase tracking-wide text-hu-deep;
+}
 }

@@ -1,146 +1,249 @@
-import { asc, eq } from "drizzle-orm";
-import { db, schema } from "@/lib/db";
-import { BUSINESS_NAME, config } from "@/lib/config";
+import type { Metadata } from "next";
+import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Truck } from "lucide-react";
+import { getSiteContent } from "@/lib/site-content";
+import { FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY } from "@/lib/site-copy";
+import { theme } from "@/lib/theme";
+import SiteHeader from "@/components/site/SiteHeader";
+import SiteFooter from "@/components/site/SiteFooter";
+import { CallButton, ICON_STROKE, IconTile, SectionTitle, Wave, categoryIcon } from "@/components/site/parts";
 
 export const revalidate = 300;
 
-type Cat = { id: number; name: string; description: string; emoji: string; imageUrl: string | null };
+export const metadata: Metadata = {
+  title: "Hup Up Attractions | Bounce House, Laser Tag and Paddle Boat Rentals",
+  description:
+    "Hup Up Attractions offers bounce house rentals, laser tag rentals, inflatable maze rentals, and paddle boat rentals for parties, schools, and events. Call (845) 415-7585 to book.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "Hup Up Attractions | Party and Event Rentals",
+    description: "Bounce houses, laser tag, inflatable mazes, and paddle boats for parties, schools, celebrations, and special occasions. Call to book.",
+    type: "website",
+    siteName: "Hup Up Attractions",
+  },
+};
 
-const FALLBACK: Cat[] = [
-  { id: 1, name: "Bounce Houses", emoji: "🏰", imageUrl: null, description: "Castles, combos and slides — cleaned, safe, and set up by our crew." },
-  { id: 2, name: "Laser Tag & Inflatable Mazes", emoji: "🎯", imageUrl: null, description: "Full laser tag kits with giant inflatable arenas — perfect for groups." },
-  { id: 3, name: "Paddle Boats", emoji: "🚣", imageUrl: null, description: "Pool-ready paddle boats for summer splash days." },
-];
+const WHY_ICONS = [PartyPopper, ListChecks, PhoneCall, Headset, Truck, ClipboardCheck];
+const STEP_ICONS = [Search, PhoneCall, CalendarCheck];
 
-const TINTS = ["bg-[#FFE1DD]", "bg-[#DDF0FF]", "bg-[#FFF0C9]", "bg-[#E3F8EF]", "bg-[#EEE6FF]"];
+export default async function Home() {
+  const c = await getSiteContent();
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    name: "Hup Up Attractions",
+    description: "Bounce house, laser tag, inflatable maze, and paddle boat rentals for parties and events.",
+    telephone: c.phoneE164,
+    email: c.email,
+    url: process.env.PUBLIC_BASE_URL || "https://hupup.vercel.app",
+    ...(c.logoUrl ? { logo: c.logoUrl } : {}),
+    ...(c.serviceArea ? { areaServed: c.serviceArea } : {}),
+    ...(c.hours ? { openingHours: c.hours } : {}),
+  };
 
-async function loadCategories(): Promise<Cat[]> {
-  try {
-    const rows = await db
-      .select()
-      .from(schema.categories)
-      .where(eq(schema.categories.active, true))
-      .orderBy(asc(schema.categories.sortOrder), asc(schema.categories.id));
-    return rows.length ? rows : FALLBACK;
-  } catch {
-    return FALLBACK;
-  }
-}
-
-function Phone({ className = "" }: { className?: string }) {
   return (
-    <a href={`tel:${config.hotlineE164}`} className={className}>
-      📞 Call to book
-    </a>
-  );
-}
+    <div id="top" className="font-display text-hu-deep">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <SiteHeader logoUrl={c.logoUrl} phoneDisplay={c.phoneDisplay} phoneE164={c.phoneE164} />
 
-export default async function Landing() {
-  const cats = await loadCategories();
-  const year = new Date().getFullYear();
-  return (
-    <main className="overflow-x-hidden">
-      {/* Nav */}
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-8">
-        <a href="/" className="flex items-center gap-3 text-lg font-black sm:text-2xl">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt={`${BUSINESS_NAME} logo`} className="h-11 w-auto" />
-          <span>{BUSINESS_NAME}</span>
-        </a>
-        <div className="hidden gap-8 font-semibold text-muted md:flex">
-          <a href="#rentals" className="hover:text-navy">Rentals</a>
-          <a href="#how" className="hover:text-navy">How it works</a>
-          <a href="#area" className="hover:text-navy">Service area</a>
-        </div>
-        <Phone className="btn hidden sm:inline-flex" />
-      </nav>
-
-      {/* Hero */}
-      <section className="bg-gradient-to-b from-white to-[#FFF6E5]">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-8 sm:px-8 lg:grid-cols-[1.25fr_1fr]">
-          <div>
-            <span className="inline-block rounded-full bg-[#E8F5FF] px-4 py-2 text-sm font-bold text-sky">
-              📍 Proudly serving Kiryas Joel &amp; the surrounding area
-            </span>
-            <h1 className="mt-5 text-4xl font-black leading-[1.03] sm:text-6xl">
-              Bounce, battle &amp; <span className="text-coral">splash</span> — delivered to your door.
-            </h1>
-            <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted sm:text-xl">
-              Bounce houses, laser tag with inflatable mazes, and paddle boats for simchas, school events and backyard
-              fun. We deliver on your day and pick up the next.
-            </p>
-            <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
-              <a href={`tel:${config.hotlineE164}`} className="btn whitespace-nowrap px-7 py-4 text-lg">
-                📞 Call our booking line
-              </a>
-              <div>
-                <a href={`tel:${config.hotlineE164}`} className="whitespace-nowrap text-3xl font-black sm:text-4xl">
-                  {config.hotlineDisplay}
+      <main>
+        {/* HERO: big type on the left, a bold "call to book" board on the right */}
+        <section className="bg-hu-sky">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-8 pt-10 sm:px-6 lg:grid-cols-[1.25fr_1fr] lg:gap-14 lg:pb-12 lg:pt-16">
+            <div>
+              <span className="hu-sticker -rotate-2">Reservations by phone</span>
+              <h1 className="mt-5 text-[2.5rem] font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-[4.1rem]">{SLOGAN}</h1>
+              <p className="mt-5 max-w-xl text-lg font-medium leading-relaxed sm:text-xl">{INTRO}</p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <CallButton phone={c.phoneE164} label="CALL NOW TO BOOK" className="!min-h-14 !px-8 text-lg" />
+                <a href="#rentals" className="hu-btn-outline !min-h-14 !px-8 text-lg">
+                  EXPLORE OUR RENTALS
                 </a>
-                <div className="text-muted">Book by phone, 24/7 — fully automated</div>
               </div>
             </div>
-          </div>
-          <div className="relative mx-auto hidden h-[420px] w-full max-w-[520px] lg:block" aria-hidden>
-            <div className="absolute left-4 top-2 grid h-60 w-64 place-items-center rounded-[40px] bg-[#FFE1DD] text-8xl shadow-xl shadow-navy/10">🏰</div>
-            <div className="absolute right-0 top-14 grid h-48 w-52 place-items-center rounded-[40px] bg-[#DDF0FF] text-8xl shadow-xl shadow-navy/10">🎯</div>
-            <div className="absolute bottom-0 left-32 grid h-48 w-72 place-items-center rounded-[40px] bg-[#FFF0C9] text-8xl shadow-xl shadow-navy/10">🚣</div>
-          </div>
-        </div>
-      </section>
 
-      {/* Categories */}
-      <section id="rentals" className="mx-auto max-w-6xl px-4 py-16 sm:px-8">
-        <h2 className="mb-8 text-3xl font-black">Our rentals</h2>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {cats.map((c, i) => (
-            <div key={c.id} className="card p-6">
-              <div className={`mb-5 grid h-44 place-items-center overflow-hidden rounded-2xl text-7xl ${TINTS[i % TINTS.length]}`}>
-                {c.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.imageUrl} alt={c.name} className="h-full w-full object-cover" />
-                ) : (
-                  c.emoji
-                )}
+            <div className="relative">
+              <div className="rounded-[2rem] border-[3px] border-hu-deep bg-white p-6 shadow-[8px_8px_0_#123D73] sm:p-8">
+                <p className="text-sm font-extrabold uppercase tracking-[0.18em] opacity-75">Call to book</p>
+                <a href={`tel:${c.phoneE164}`} className="mt-1 flex items-center gap-3 whitespace-nowrap text-[1.7rem] font-extrabold leading-tight min-[400px]:text-[2rem] sm:text-[2.6rem]">
+                  <Phone className="h-7 w-7 shrink-0 sm:h-9 sm:w-9" strokeWidth={ICON_STROKE} aria-hidden />
+                  {c.phoneDisplay}
+                </a>
+                <ul className="mt-6 divide-y-2 divide-hu-deep/10 border-t-2 border-hu-deep/10">
+                  {c.categories.map((cat) => (
+                    <li key={cat.id}>
+                      <a href={`#${cat.slug}`} className="flex items-center gap-4 py-3.5 text-lg font-bold hover:underline">
+                        <IconTile icon={categoryIcon(cat.name)} tone="sky" />
+                        {cat.name}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <h3 className="text-2xl font-bold">{c.name}</h3>
-              <p className="mt-2 leading-relaxed text-muted">{c.description}</p>
+              <span className="absolute -top-6 right-3 grid h-20 w-20 rotate-12 text-xs sm:h-24 sm:w-24 sm:text-sm lg:-right-6 lg:h-28 lg:w-28 place-items-center rounded-full border-2 border-hu-deep bg-hu-yellow text-center font-extrabold uppercase leading-tight">
+                <Truck className="mb-0.5 h-6 w-6" strokeWidth={ICON_STROKE} aria-hidden />
+                We deliver
+              </span>
             </div>
-          ))}
-        </div>
-      </section>
+          </div>
+          <Wave fill={theme.white} />
+        </section>
 
-      {/* How it works */}
-      <section id="how" className="bg-navy text-white">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 sm:px-8 md:grid-cols-3">
-          {[
-            ["Call the hotline", "Pick a category with your keypad, hear the details, and add items to your cart."],
-            ["Choose your date", "Live availability — if it's free, it's held for you while you finish your call."],
-            ["We deliver & pick up", "Set up on your day, picked up the next. Pay securely by text link."],
-          ].map(([t, d], i) => (
-            <div key={t}>
-              <div className="mb-3 grid h-11 w-11 place-items-center rounded-full bg-sun text-xl font-black text-navy">{i + 1}</div>
-              <h3 className="text-xl font-bold">{t}</h3>
-              <p className="mt-1 text-white/75">{d}</p>
+        {/* OUR RENTALS: full-width numbered rows (not a card grid) */}
+        <section id="rentals" className="scroll-mt-20 bg-white py-14 sm:py-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <SectionTitle kicker="What we rent" title="Our Rentals" />
+            <div className="mt-10 border-t-[3px] border-hu-deep">
+              {c.categories.map((cat, i) => (
+                <article
+                  id={cat.slug}
+                  key={cat.id}
+                  className="grid scroll-mt-24 gap-5 border-b-2 border-hu-deep/15 py-8 sm:grid-cols-[auto_1fr] sm:gap-8 lg:grid-cols-[auto_1fr_auto] lg:items-center lg:py-10"
+                >
+                  <div className="flex items-center gap-4 sm:block">
+                    <IconTile icon={categoryIcon(cat.name)} tone={i % 2 === 0 ? "yellow" : "sky"} size="lg" />
+                    <span className="text-sm font-extrabold tracking-[0.18em] opacity-60 sm:mt-3 sm:block">{String(i + 1).padStart(2, "0")}</span>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-extrabold leading-tight sm:text-4xl">{cat.name}</h3>
+                    <p className="mt-3 max-w-2xl text-lg leading-relaxed text-hu-deep/85">{cat.description}</p>
+                  </div>
+                  <CallButton phone={c.phoneE164} className="w-full sm:col-start-2 sm:w-fit lg:col-start-auto" />
+                </article>
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
+          </div>
+        </section>
 
-      {/* Service area + CTA */}
-      <section id="area" className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-8">
-        <h2 className="text-3xl font-black">Serving Kiryas Joel &amp; nearby</h2>
-        <p className="mx-auto mt-3 max-w-2xl text-lg text-muted">
-          We deliver throughout Kiryas Joel, Monroe, Harriman, Chester, Blooming Grove and the surrounding Orange County
-          area. Not sure if we reach you? Just call.
-        </p>
-        <Phone className="btn mt-8 px-8 py-4 text-lg" />
-      </section>
+        {/* WHY CHOOSE: split layout, icon checklist */}
+        <section className="bg-hu-tint py-14 sm:py-20">
+          <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr_1.3fr] lg:items-center">
+            <div>
+              <SectionTitle title="Why Choose Hup Up Attractions" />
+              <a href={`tel:${c.phoneE164}`} className="mt-6 inline-flex items-center gap-2 text-2xl font-extrabold underline decoration-hu-yellow decoration-[6px] underline-offset-[6px]">
+                {c.phoneDisplay}
+              </a>
+            </div>
+            <ul className="grid gap-x-10 sm:grid-cols-2">
+              {WHY.map((w, i) => (
+                <li key={w} className="flex items-center gap-4 border-b-2 border-hu-deep/10 py-4 text-lg font-semibold">
+                  <IconTile icon={WHY_ICONS[i]} tone="white" />
+                  {w}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
 
-      <footer className="mx-auto flex max-w-6xl flex-col gap-2 border-t border-line px-4 py-6 text-sm text-muted sm:flex-row sm:justify-between sm:px-8">
-        <span>© {year} {BUSINESS_NAME} · hupupattractions.com</span>
-        <span>Kiryas Joel, NY · {config.hotlineDisplay}</span>
-      </footer>
-    </main>
+        {/* HOW IT WORKS: numbered timeline */}
+        <section id="how-it-works" className="scroll-mt-20 bg-white py-14 sm:py-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <SectionTitle kicker="Booking is easy" title="How It Works" />
+            <ol className="relative mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
+              <span className="absolute bottom-0 left-[2.2rem] top-0 w-1 rounded bg-hu-sky md:hidden" aria-hidden />
+              <span className="absolute left-0 right-0 top-[2.2rem] hidden h-1 rounded bg-hu-sky md:block" aria-hidden />
+              {STEPS.map(([step, word, text], i) => {
+                const Icon = STEP_ICONS[i];
+                return (
+                  <li key={step} className="relative flex gap-5 md:block">
+                    <span className="relative z-10 grid h-[4.4rem] w-[4.4rem] shrink-0 place-items-center rounded-full border-[3px] border-hu-deep bg-hu-yellow">
+                      <Icon className="h-8 w-8" strokeWidth={ICON_STROKE} aria-hidden />
+                    </span>
+                    <div className="md:mt-5">
+                      <p className="text-sm font-extrabold tracking-[0.18em] text-hu-deep/70">{step}</p>
+                      <h3 className="text-2xl font-extrabold">{word}</h3>
+                      <p className="mt-2 max-w-xs text-lg leading-relaxed text-hu-deep/85">{text}</p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </section>
+
+        {/* SERVICE AREA */}
+        <section id="service-area" className="scroll-mt-20 bg-hu-sky">
+          <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-12 sm:px-6 md:flex-row md:items-center md:justify-between">
+            <div className="flex gap-5">
+              <IconTile icon={MapPin} tone="white" size="lg" />
+              <div>
+                <h2 className="text-3xl font-extrabold sm:text-4xl">Service Area</h2>
+                <p className="mt-2 max-w-2xl whitespace-pre-line text-lg font-medium">
+                  {c.serviceArea ?? "Call to check your area. We'll let you know right away if we deliver to you."}
+                </p>
+              </div>
+            </div>
+            <CallButton phone={c.phoneE164} label="CALL TO CHECK YOUR AREA" className="shrink-0" />
+          </div>
+        </section>
+
+        {/* FINAL CTA */}
+        <section className="bg-hu-yellow">
+          <div className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 sm:py-20">
+            <h2 className="text-3xl font-extrabold leading-tight sm:text-5xl">{FINAL_CTA_TITLE}</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-lg font-medium sm:text-xl">{FINAL_CTA_TEXT}</p>
+            <a href={`tel:${c.phoneE164}`} className="mt-8 inline-flex min-h-14 items-center gap-3 rounded-full bg-hu-deep px-9 py-4 text-lg font-bold tracking-wide text-white hover:bg-[#0d2f5a]">
+              <Phone className="h-5 w-5" strokeWidth={ICON_STROKE} aria-hidden /> CALL NOW TO BOOK
+            </a>
+            <p className="mt-4 text-2xl font-extrabold">{c.phoneDisplay}</p>
+          </div>
+        </section>
+
+        {/* CONTACT */}
+        <section id="contact" className="scroll-mt-20 bg-white py-14 sm:py-20">
+          <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 md:grid-cols-2">
+            <SectionTitle kicker="Get in touch" title="Contact Us" />
+            <dl className="divide-y-2 divide-hu-deep/10 border-y-2 border-hu-deep/10 text-lg">
+              <div className="flex items-center gap-4 py-4">
+                <IconTile icon={PartyPopper} tone="sky" />
+                <div>
+                  <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Business</dt>
+                  <dd className="font-semibold">Hup Up Attractions</dd>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 py-4">
+                <IconTile icon={Phone} tone="yellow" />
+                <div>
+                  <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Phone</dt>
+                  <dd>
+                    <a href={`tel:${c.phoneE164}`} className="text-xl font-extrabold underline underline-offset-4">
+                      {c.phoneDisplay}
+                    </a>
+                  </dd>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 py-4">
+                <IconTile icon={Mail} tone="sky" />
+                <div className="min-w-0">
+                  <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Email</dt>
+                  <dd className="break-all">
+                    <a href={`mailto:${c.email}`} className="font-semibold underline underline-offset-4">
+                      {c.email}
+                    </a>
+                  </dd>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 py-4">
+                <IconTile icon={MapPin} tone="sky" />
+                <div>
+                  <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Service area</dt>
+                  <dd className="font-semibold">{c.serviceArea ?? "Call to check your area"}</dd>
+                </div>
+              </div>
+              {c.hours && (
+                <div className="flex items-center gap-4 py-4">
+                  <IconTile icon={CalendarCheck} tone="sky" />
+                  <div>
+                    <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Hours</dt>
+                    <dd className="whitespace-pre-line font-semibold">{c.hours}</dd>
+                  </div>
+                </div>
+              )}
+            </dl>
+          </div>
+        </section>
+      </main>
+
+      <SiteFooter c={c} />
+    </div>
   );
 }

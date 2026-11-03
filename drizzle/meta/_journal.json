@@ -15,6 +15,13 @@
       "when": 1793736446345,
       "tag": "0001_staff_messaging",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793738810879,
+      "tag": "0002_website_category_copy",
+      "breakpoints": true
     }
   ]
 }
