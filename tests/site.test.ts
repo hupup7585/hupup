@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
-import { categoryIcon } from "@/components/site/parts";
+import { categoryIcon } from "@/lib/category-icons";
 import { Castle, Crosshair, PartyPopper, Sailboat } from "lucide-react";
 
 describe("website copy and brand", () => {
