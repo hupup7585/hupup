@@ -202,8 +202,7 @@ export default async function Home() {
               <h2 className="text-3xl font-extrabold sm:text-4xl lg:text-5xl">Service Area</h2>
             </div>
             <div className="mt-8 grid gap-6">
-              <div className="rounded-[2rem] border-[3px] border-hu-deep bg-white p-6 shadow-[6px_6px_0_#123D73] sm:p-8 lg:flex lg:items-center lg:justify-between lg:gap-8">
-                <div>
+              <div className="rounded-[2rem] border-[3px] border-hu-deep bg-white p-6 shadow-[6px_6px_0_#123D73] sm:p-8">
                 <p className="text-base font-extrabold uppercase tracking-[0.14em] text-hu-deep/75">{c.serviceArea.mainLabel}</p>
                 <p className="mt-2 text-4xl font-extrabold leading-tight sm:text-5xl">{c.serviceArea.main}</p>
                 <p className="mt-2 text-base font-medium text-hu-deep/80">{c.serviceArea.mainSub}</p>
@@ -211,8 +210,7 @@ export default async function Home() {
                   <Truck className="h-5 w-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
                   {DELIVERY_FEE_NOTE}
                 </p>
-                </div>
-                <CallButton phone={c.phoneE164} className="mt-6 shrink-0 lg:mt-0 lg:!min-h-14 lg:!px-8 lg:text-lg" />
+                <CallButton phone={c.phoneE164} className="mt-6" />
               </div>
               <div className="rounded-3xl bg-hu-tint p-4 min-[360px]:p-5 sm:p-7">
                 <h3 className="text-lg font-bold">{c.serviceArea.alsoTitle}</h3>
