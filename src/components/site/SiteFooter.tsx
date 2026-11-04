@@ -12,7 +12,7 @@ export default function SiteFooter({ c }: { c: SiteContent }) {
         <div>
           <Wordmark logoUrl={c.logoUrl} light />
           <p className="mt-4 max-w-xs leading-relaxed text-white/85">
-            Bounce houses, laser tag, inflatable mazes, and paddle boats for parties, schools, celebrations, and special occasions. Reservations by phone.
+            Jumping balloons, laser tag, inflatable mazes, and paddle boats for parties, schools, celebrations, and special occasions. Reservations by phone.
           </p>
         </div>
         <div>

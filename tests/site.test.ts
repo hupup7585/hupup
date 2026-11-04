@@ -29,6 +29,7 @@ describe("website copy and brand", () => {
     expect(page).not.toMatch(/<img|PhotoSlot|Gallery/);
     expect(page).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(page).not.toMatch(/gradient|backdrop-blur|blur-/);
+    expect(categoryIcon("Jumping Balloons")).toBe(Castle);
     expect(categoryIcon("Bounce Houses")).toBe(Castle);
     expect(categoryIcon("Laser Tag and Inflatable Mazes")).toBe(Crosshair);
     expect(categoryIcon("Paddle Boats")).toBe(Sailboat);
@@ -67,12 +68,12 @@ describe("public phone number", () => {
 });
 
 describe("service area", () => {
-  it("uses Abram's exact towns with Kiryas Joel / Town of Palm Tree as the main area", async () => {
+  it("uses Abram's exact towns with Kiryas Joel and Town of Palm Tree as the main area", async () => {
     const { SERVICE_AREA, serviceAreaPlaces } = await import("@/lib/site-copy");
     expect(SERVICE_AREA.mainLabel).toBe("Our main service area:");
-    expect(SERVICE_AREA.main).toBe("Kiryas Joel / Town of Palm Tree");
+    expect(SERVICE_AREA.main).toBe("Kiryas Joel and Town of Palm Tree");
     expect(SERVICE_AREA.alsoTitle).toBe("We also deliver to these nearby towns:");
-    expect([...SERVICE_AREA.also]).toEqual(["Monroe", "Blooming Grove", "Woodbury / Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville"]);
+    expect([...SERVICE_AREA.also]).toEqual(["Monroe", "Blooming Grove", "Woodbury and Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville"]);
     expect(SERVICE_AREA.region).toBe("Orange County, NY");
     expect(serviceAreaPlaces()).toEqual([
       "Kiryas Joel", "Town of Palm Tree", "Monroe", "Blooming Grove", "Woodbury", "Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville",
@@ -85,7 +86,7 @@ describe("service area", () => {
     expect(header).toContain('["Service Area", "/#service-area"]');
     expect(page.indexOf("serviceArea.mainLabel")).toBeLessThan(page.indexOf("serviceArea.alsoTitle"));
     expect(page).toContain("areaServed");
-    expect(page).toMatch(/Kiryas Joel \/ Town of Palm Tree/);
+    expect(page).toMatch(/Kiryas Joel and Town of Palm Tree/);
     expect(page).not.toMatch(/Call to check your area/);
   });
 });
@@ -145,5 +146,28 @@ describe("business name never splits across lines", () => {
     expect(page).toContain("{keepName(INTRO)}");
     expect(page).toContain("{keepName(FINAL_CTA_TEXT)}");
     expect(readFileSync("src/components/site/SiteFooter.tsx", "utf8")).toContain("{BUSINESS_NAME_NB}");
+  });
+});
+
+describe("Jumping Balloons and no slashes", () => {
+  const visible = ["src/app/page.tsx", "src/components/site/SiteFooter.tsx", "src/components/site/SiteHeader.tsx", "src/lib/site-copy.ts", "src/lib/site-content.ts", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/app/layout.tsx"];
+  it("'bounce house' appears only as the search-engine hint (meta description + structured data)", () => {
+    const all = visible.map((f) => readFileSync(f, "utf8")).join("\n");
+    expect(all).not.toMatch(/Bounce Houses/);
+    const hits = all.match(/bounce house/gi) ?? [];
+    expect(hits).toHaveLength(2);
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain("Jumping Balloons (bounce houses)");
+    expect(page).toContain("Jumping Balloon (bounce house)");
+  });
+  it("starter category data uses the new name and description", async () => {
+    const sql = readFileSync("drizzle/0003_rename_jumping_balloons.sql", "utf8");
+    expect(sql).toContain("SET \"name\" = 'Jumping Balloons'");
+    expect(sql).toContain("Bring excitement to your event with our jumping balloon rentals. Perfect for parties, celebrations, school events, and special occasions.");
+  });
+  it("visible service area text has no slashes", async () => {
+    const { SERVICE_AREA } = await import("@/lib/site-copy");
+    for (const t of [SERVICE_AREA.main, ...SERVICE_AREA.also]) expect(t).not.toContain("/");
+    expect(readFileSync("src/app/page.tsx", "utf8")).not.toMatch(/ \/ /);
   });
 });

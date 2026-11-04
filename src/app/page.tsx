@@ -10,13 +10,13 @@ import { CallButton, ICON_STROKE, IconTile, SectionTitle, Wave, categoryIcon } f
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Hup Up Attractions | Bounce House, Laser Tag and Paddle Boat Rentals",
+  title: "Hup Up Attractions | Jumping Balloon, Laser Tag and Paddle Boat Rentals",
   description:
-    "Hup Up Attractions offers bounce house, laser tag, inflatable maze, and paddle boat rentals for parties and events in Kiryas Joel / Town of Palm Tree, Monroe, Chester, and nearby Orange County, NY towns. Delivery available for an additional fee. Call (845) 777-7585 to book.",
+    "Hup Up Attractions offers Jumping Balloons (bounce houses), laser tag, inflatable maze, and paddle boat rentals for parties and events in Kiryas Joel and Town of Palm Tree, Monroe, Chester, and nearby Orange County, NY towns. Delivery available for an additional fee. Call (845) 777-7585 to book.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Hup Up Attractions | Party and Event Rentals",
-    description: "Bounce houses, laser tag, inflatable mazes, and paddle boats for parties, schools, celebrations, and special occasions. Call to book.",
+    description: "Jumping balloons, laser tag, inflatable mazes, and paddle boats for parties, schools, celebrations, and special occasions. Call to book.",
     type: "website",
     siteName: "Hup Up Attractions",
   },
@@ -31,7 +31,7 @@ export default async function Home() {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     name: "Hup Up Attractions",
-    description: "Bounce house, laser tag, inflatable maze, and paddle boat rentals for parties and events.",
+    description: "Jumping Balloon (bounce house), laser tag, inflatable maze, and paddle boat rentals for parties and events.",
     telephone: c.phoneE164,
     email: c.email,
     url: process.env.PUBLIC_BASE_URL || "https://hupup.vercel.app",
@@ -185,9 +185,9 @@ export default async function Home() {
               <div className="rounded-[2rem] border-[3px] border-hu-deep bg-white p-6 shadow-[6px_6px_0_#123D73] sm:p-8">
                 <p className="text-base font-extrabold uppercase tracking-[0.14em] text-hu-deep/75">{c.serviceArea.mainLabel}</p>
                 <p className="mt-2 text-[1.55rem] font-extrabold leading-tight min-[370px]:text-3xl sm:text-4xl">
-                  {c.serviceArea.main.split(" / ").map((part, i) => (
+                  {c.serviceArea.main.split(" and ").map((part, i) => (
                     <span key={part}>
-                      {i > 0 && " / "}
+                      {i > 0 && " and "}
                       <span className="whitespace-nowrap">{part}</span>
                     </span>
                   ))}
@@ -203,7 +203,7 @@ export default async function Home() {
                 <h3 className="text-lg font-bold">{c.serviceArea.alsoTitle}</h3>
                 <ul className="mt-4 flex flex-wrap gap-2">
                   {c.serviceArea.also.map((town) => (
-                    <li key={town} className="rounded-full border-2 border-hu-deep/20 bg-white px-3.5 py-1.5 text-base font-semibold">
+                    <li key={town} className="rounded-2xl border-2 border-hu-deep/20 bg-white px-3.5 py-1.5 text-base font-semibold">
                       {town}
                     </li>
                   ))}

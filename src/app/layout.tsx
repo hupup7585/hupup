@@ -6,9 +6,9 @@ const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.PUBLIC_BASE_URL || "https://hupup.vercel.app"),
-  title: "Hup Up Attractions | Bounce House, Laser Tag and Paddle Boat Rentals",
+  title: "Hup Up Attractions | Jumping Balloon, Laser Tag and Paddle Boat Rentals",
   description:
-    "Hup Up Attractions offers bounce house, laser tag, inflatable maze, and paddle boat rentals for parties and events. Call to book.",
+    "Hup Up Attractions offers jumping balloon, laser tag, inflatable maze, and paddle boat rentals for parties and events. Call to book.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
