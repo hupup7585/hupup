@@ -214,11 +214,12 @@ export default async function Home() {
                 <p className="text-base font-extrabold uppercase tracking-[0.14em] text-hu-deep/75">{c.serviceArea.mainLabel}</p>
                 <p className="mt-2 text-4xl font-extrabold leading-tight sm:text-5xl">{c.serviceArea.main}</p>
                 <p className="mt-2 text-base font-medium text-hu-deep/80">{c.serviceArea.mainSub}</p>
-                <p className="mt-2 flex items-center gap-2 text-base font-semibold">
-                  <Truck className="h-5 w-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
-                  {DELIVERY_FEE_NOTE}
+                {/* Calm note: regular weight, slightly smaller, 16px+ clear above and below, icon aligned to the first line */}
+                <p data-sa-delivery-note className="mt-4 flex items-start gap-2 text-[15px] font-normal leading-6 text-hu-deep">
+                  <Truck className="mt-[3px] h-[18px] w-[18px] shrink-0 overflow-visible" strokeWidth={ICON_STROKE} aria-hidden />
+                  <span className="[text-wrap:balance]">{noLonelyWord(DELIVERY_FEE_NOTE)}</span>
                 </p>
-                <CallButton phone={c.phoneE164} className="mt-6" />
+                <CallButton phone={c.phoneE164} className="mt-5" />
               </div>
               <div className="rounded-3xl bg-hu-tint p-4 min-[360px]:p-5 sm:p-7">
                 <h3 className="text-lg font-bold">{c.serviceArea.alsoTitle}</h3>

@@ -114,7 +114,7 @@ describe("contact list", () => {
 describe("delivery fee wording", () => {
   it("delivery is always described as an additional fee, never free, with no amount", async () => {
     const { DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, WHY } = await import("@/lib/site-copy");
-    expect(DELIVERY_FEE_NOTE).toBe("Delivery available for an additional fee. Call for pricing.");
+    expect(DELIVERY_FEE_NOTE).toBe("Delivery available. Call for pricing.");
     expect(DELIVERY_FEE_SHORT).toBe("Delivery fee applies, call for pricing.");
     expect(WHY).toContain("Delivery arrangements for an additional fee");
     expect(WHY).toContain("Options for all types of events");
@@ -132,7 +132,7 @@ describe("delivery fee wording", () => {
     expect(page).toContain('aria-label="Option for delivery"');
     expect(page).not.toContain("fee applies");
     expect(page).not.toMatch(/rounded-full bg-white px-1\.5/);
-    expect(page).toContain("Delivery available for an additional fee");
+    expect(page).toContain("Delivery available for an additional fee"); // meta description
     expect(page.match(/DELIVERY_FEE_NOTE/g)!.length).toBeGreaterThanOrEqual(3); // import + How It Works + Service Area
   });
 });
@@ -222,5 +222,24 @@ describe("Why Choose layout and badge (Abram 10:25-10:30 PM)", () => {
     expect(page).toContain("data-badge-group");
     expect(page).toContain("h-[6.5rem] w-[6.5rem]");
     expect(page).toContain("items-center justify-center rounded-full");
+  });
+});
+
+describe("Service Area delivery note (Abram 10:36 + 10:38 PM)", () => {
+  it("reads exactly 'Delivery available. Call for pricing.' as a calm regular-weight note", async () => {
+    const { DELIVERY_FEE_NOTE } = await import("@/lib/site-copy");
+    expect(DELIVERY_FEE_NOTE).toBe("Delivery available. Call for pricing.");
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toMatch(/data-sa-delivery-note className="mt-4 flex items-start gap-2 text-\[15px\] font-normal leading-6 text-hu-deep"/);
+    expect(page).toContain("overflow-visible");
+    expect(page).not.toContain("Delivery available for an additional fee. Call for pricing.");
+  });
+});
+
+describe("nearby-towns footnote stays exactly as Abram approved (10:39 PM)", () => {
+  it("wording and styling unchanged", async () => {
+    const { DELIVERY_FEE_SHORT } = await import("@/lib/site-copy");
+    expect(DELIVERY_FEE_SHORT).toBe("Delivery fee applies, call for pricing.");
+    expect(readFileSync("src/app/page.tsx", "utf8")).toContain('<p className="mt-4 text-base">All in {c.serviceArea.region}. {DELIVERY_FEE_SHORT}</p>');
   });
 });

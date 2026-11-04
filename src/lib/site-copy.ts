@@ -16,7 +16,7 @@ export const STEPS = [
   ["STEP 3", "CONFIRM", "Complete your reservation over the phone with our team."],
 ] as const;
 /** Delivery always costs extra. Never state an amount (not supplied yet) or suggest it costs nothing. */
-export const DELIVERY_FEE_NOTE = "Delivery available for an additional fee. Call for pricing.";
+export const DELIVERY_FEE_NOTE = "Delivery available. Call for pricing.";
 export const DELIVERY_FEE_SHORT = "Delivery fee applies, call for pricing.";
 
 export const FINAL_CTA_TITLE = "READY TO MAKE YOUR EVENT SPECIAL?";
