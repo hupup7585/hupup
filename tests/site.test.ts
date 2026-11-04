@@ -65,3 +65,27 @@ describe("public phone number", () => {
     }
   });
 });
+
+describe("service area", () => {
+  it("uses Abram's exact towns with Kiryas Joel / Town of Palm Tree as the main area", async () => {
+    const { SERVICE_AREA, serviceAreaPlaces } = await import("@/lib/site-copy");
+    expect(SERVICE_AREA.mainLabel).toBe("Our main service area:");
+    expect(SERVICE_AREA.main).toBe("Kiryas Joel / Town of Palm Tree");
+    expect(SERVICE_AREA.alsoTitle).toBe("We also deliver to these nearby towns:");
+    expect([...SERVICE_AREA.also]).toEqual(["Monroe", "Blooming Grove", "Woodbury / Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville"]);
+    expect(SERVICE_AREA.region).toBe("Orange County, NY");
+    expect(serviceAreaPlaces()).toEqual([
+      "Kiryas Joel", "Town of Palm Tree", "Monroe", "Blooming Grove", "Woodbury", "Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville",
+    ]);
+  });
+  it("homepage shows the section and nav link, main area before the secondary list, and no placeholder text", () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    const header = readFileSync("src/components/site/SiteHeader.tsx", "utf8");
+    expect(page).toContain('id="service-area"');
+    expect(header).toContain('["Service Area", "/#service-area"]');
+    expect(page.indexOf("serviceArea.mainLabel")).toBeLessThan(page.indexOf("serviceArea.alsoTitle"));
+    expect(page).toContain("areaServed");
+    expect(page).toMatch(/Kiryas Joel \/ Town of Palm Tree/);
+    expect(page).not.toMatch(/Call to check your area/);
+  });
+});

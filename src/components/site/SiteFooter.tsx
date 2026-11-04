@@ -47,7 +47,13 @@ export default function SiteFooter({ c }: { c: SiteContent }) {
             <Mail className="h-5 w-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
             {c.email}
           </a>
-          {c.serviceArea && <p className="mt-2 text-white/85">{c.serviceArea}</p>}
+          <p className="mt-3 text-white/85">
+            <span className="font-semibold text-white">Main area:</span> {c.serviceArea.main}
+            <br />
+            <a href="/#service-area" className="underline underline-offset-4 hover:text-hu-yellow">
+              Plus nearby {c.serviceArea.region} towns
+            </a>
+          </p>
           {c.hours && <p className="mt-2 whitespace-pre-line text-white/85">{c.hours}</p>}
         </div>
       </div>

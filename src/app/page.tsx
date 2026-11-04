@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
-import { FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY } from "@/lib/site-copy";
+import { FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -12,7 +12,7 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Hup Up Attractions | Bounce House, Laser Tag and Paddle Boat Rentals",
   description:
-    "Hup Up Attractions offers bounce house rentals, laser tag rentals, inflatable maze rentals, and paddle boat rentals for parties, schools, and events. Call (845) 777-7585 to book.",
+    "Hup Up Attractions offers bounce house, laser tag, inflatable maze, and paddle boat rentals for parties and events in Kiryas Joel / Town of Palm Tree, Monroe, Chester, and nearby Orange County, NY towns. Call (845) 777-7585 to book.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Hup Up Attractions | Party and Event Rentals",
@@ -36,7 +36,10 @@ export default async function Home() {
     email: c.email,
     url: process.env.PUBLIC_BASE_URL || "https://hupup.vercel.app",
     ...(c.logoUrl ? { logo: c.logoUrl } : {}),
-    ...(c.serviceArea ? { areaServed: c.serviceArea } : {}),
+    areaServed: [
+      ...serviceAreaPlaces().map((name) => ({ "@type": "Place", name: `${name}, NY` })),
+      { "@type": "AdministrativeArea", name: c.serviceArea.region.replace(", NY", ", New York") },
+    ],
     ...(c.hours ? { openingHours: c.hours } : {}),
   };
 
@@ -167,19 +170,39 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* SERVICE AREA */}
-        <section id="service-area" className="scroll-mt-20 bg-hu-sky">
-          <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-12 sm:px-6 md:flex-row md:items-center md:justify-between">
-            <div className="flex gap-5">
+        {/* SERVICE AREA: main area first and prominent, nearby towns clearly secondary */}
+        <section id="service-area" className="scroll-mt-20 bg-hu-sky py-14 sm:py-16">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="flex items-center gap-4">
               <IconTile icon={MapPin} tone="white" size="lg" />
-              <div>
-                <h2 className="text-3xl font-extrabold sm:text-4xl">Service Area</h2>
-                <p className="mt-2 max-w-2xl whitespace-pre-line text-lg font-medium">
-                  {c.serviceArea ?? "Call to check your area. We'll let you know right away if we deliver to you."}
+              <h2 className="text-3xl font-extrabold sm:text-4xl lg:text-5xl">Service Area</h2>
+            </div>
+            <div className="mt-8 grid gap-6 lg:grid-cols-[1.15fr_1fr] lg:items-start">
+              <div className="rounded-[2rem] border-[3px] border-hu-deep bg-white p-6 shadow-[6px_6px_0_#123D73] sm:p-8">
+                <p className="text-base font-extrabold uppercase tracking-[0.14em] text-hu-deep/75">{c.serviceArea.mainLabel}</p>
+                <p className="mt-2 text-[1.55rem] font-extrabold leading-tight min-[370px]:text-3xl sm:text-4xl">
+                  {c.serviceArea.main.split(" / ").map((part, i) => (
+                    <span key={part}>
+                      {i > 0 && " / "}
+                      <span className="whitespace-nowrap">{part}</span>
+                    </span>
+                  ))}
                 </p>
+                <p className="mt-3 text-lg font-medium">{c.serviceArea.region}</p>
+                <CallButton phone={c.phoneE164} className="mt-6" />
+              </div>
+              <div className="rounded-3xl bg-hu-tint p-6 sm:p-7">
+                <h3 className="text-lg font-bold">{c.serviceArea.alsoTitle}</h3>
+                <ul className="mt-4 flex flex-wrap gap-2">
+                  {c.serviceArea.also.map((town) => (
+                    <li key={town} className="rounded-full border-2 border-hu-deep/20 bg-white px-3.5 py-1.5 text-base font-semibold">
+                      {town}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-4 text-base">All in {c.serviceArea.region}.</p>
               </div>
             </div>
-            <CallButton phone={c.phoneE164} label="CALL TO CHECK YOUR AREA" className="shrink-0" />
           </div>
         </section>
 
@@ -233,7 +256,12 @@ export default async function Home() {
                 <IconTile icon={MapPin} tone="sky" />
                 <div>
                   <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Service area</dt>
-                  <dd className="font-semibold">{c.serviceArea ?? "Call to check your area"}</dd>
+                  <dd className="font-semibold">
+                    {c.serviceArea.main}
+                    <a href="#service-area" className="block text-base font-medium underline underline-offset-4">
+                      Plus nearby {c.serviceArea.region} towns
+                    </a>
+                  </dd>
                 </div>
               </div>
               {c.hours && (

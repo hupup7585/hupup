@@ -1,11 +1,11 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
+import { SERVICE_AREA } from "@/lib/site-copy";
 
 export type SiteContent = {
   logoUrl: string | null;
-  /** Service area text; null = not set yet (section shows "Call to check your area"). */
-  serviceArea: string | null;
+  serviceArea: { mainLabel: string; main: string; alsoTitle: string; also: readonly string[]; region: string };
   /** Business hours; null = hidden until set. */
   hours: string | null;
   email: string;
@@ -17,7 +17,6 @@ export type SiteContent = {
 /** Website content keys in app_settings (edited from /admin/website). */
 export const SITE_KEYS = {
   logoUrl: "site.logoUrl",
-  serviceArea: "site.serviceArea",
   hours: "site.hours",
   email: "site.email",
 } as const;
@@ -59,7 +58,7 @@ export async function getSiteContent(): Promise<SiteContent> {
   }
   return {
     logoUrl: str(settings.get(SITE_KEYS.logoUrl)),
-    serviceArea: str(settings.get(SITE_KEYS.serviceArea)),
+    serviceArea: SERVICE_AREA,
     hours: str(settings.get(SITE_KEYS.hours)),
     email: str(settings.get(SITE_KEYS.email)) ?? config.publicEmail,
     phoneDisplay: config.hotlineDisplay,

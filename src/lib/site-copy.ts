@@ -17,3 +17,17 @@ export const STEPS = [
 ] as const;
 export const FINAL_CTA_TITLE = "READY TO MAKE YOUR EVENT SPECIAL?";
 export const FINAL_CTA_TEXT = "Contact Hup Up Attractions today to explore our rental options and reserve your attraction.";
+
+/** Service area from Abram (exact wording). Main area first; the rest are secondary. */
+export const SERVICE_AREA = {
+  mainLabel: "Our main service area:",
+  main: "Kiryas Joel / Town of Palm Tree",
+  alsoTitle: "We also deliver to these nearby towns:",
+  also: ["Monroe", "Blooming Grove", "Woodbury / Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville"],
+  region: "Orange County, NY",
+} as const;
+
+/** Individual place names for search engines (combined names split, nothing added). */
+export function serviceAreaPlaces(): string[] {
+  return [SERVICE_AREA.main, ...SERVICE_AREA.also].flatMap((n) => n.split("/").map((s) => s.trim()));
+}
