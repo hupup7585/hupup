@@ -20,6 +20,7 @@ import { paymentLink } from "@/lib/sola";
 import { sendSms } from "@/lib/notify";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
+import { matchMenuSpeech, menuSpeechHints } from "./category-speech";
 import { loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
 
 const { categories, products, orders } = schema;
@@ -163,17 +164,40 @@ const handlers: Record<string, Handler> = {
   async menu(ctx, vr) {
     const cats = await phoneCategories();
     const order = await currentOrder(ctx);
-    const g = keypad(vr, url("menu-choice"));
+    // Keypad OR speech: callers can press a key or just say what they want ("bounce house" works too).
+    const g = vr.gather({
+      input: ["dtmf", "speech"],
+      numDigits: 1,
+      timeout: 6,
+      action: url("menu-choice"),
+      method: "POST",
+      language: "en-US",
+      speechModel: "phone_call",
+      enhanced: true,
+      speechTimeout: "auto",
+      hints: menuSpeechHints(cats),
+    });
     if (!cats.length) sp(g, ctx, "menu_empty");
     for (const c of cats) sp(g, ctx, "menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
     if (order?.items.length) sp(g, ctx, "menu_cart");
     if (config.forwardPhone()) sp(g, ctx, "menu_operator");
+    if (cats.length) sp(g, ctx, "menu_speech");
     sp(g, ctx, "menu_repeat");
     return noInput(vr, ctx, "menu");
   },
 
   async "menu-choice"(ctx, vr) {
     const d = ctx.body.Digits;
+    const said = (ctx.body.SpeechResult || "").trim();
+    if (!d && said) {
+      const choice = matchMenuSpeech(said, await phoneCategories());
+      if (choice?.kind === "category") return back(vr, "category", { c: choice.categoryId });
+      if (choice?.kind === "cart") return back(vr, "cart");
+      if (choice?.kind === "operator") return back(vr, "operator");
+      if (choice?.kind === "repeat") return back(vr, "menu");
+      sp(vr, ctx, "invalid");
+      return back(vr, "menu");
+    }
     if (!d) return noInput(vr, ctx, "menu", {});
     if (d === "*") return back(vr, "menu");
     if (d === "9") return back(vr, "cart");

@@ -6,7 +6,7 @@ import { PROMPTS, fill, promptAudio, promptText, type PromptDef } from "@/lib/iv
 describe("hotline prompts", () => {
   it("greeting is warm and uses the exact business name", () => {
     expect(PROMPTS.greeting.text).toBe(
-      "Hi, thanks for calling Hup Up Attractions, where the party starts! We bring bounce houses, laser tag, and paddle boats right to your door.",
+      "Hi, thanks for calling Hup Up Attractions, where the party starts! We bring jumping balloons, laser tag, and paddle boats right to your door.",
     );
   });
   it("are plain text (no SSML/markup) for Chirp3-HD voices", () => {
@@ -24,7 +24,7 @@ describe("hotline prompts", () => {
   it("admin overrides replace the default; empty override falls back", () => {
     expect(promptText({ greeting: { text: "Hello from Hup Up Attractions!", audioUrl: null } }, "greeting")).toBe("Hello from Hup Up Attractions!");
     expect(promptText({ greeting: { text: "  ", audioUrl: null } }, "greeting")).toBe(PROMPTS.greeting.text);
-    expect(promptText({}, "menu_category", { category: "Bounce Houses", key: 1 })).toBe("For Bounce Houses, press 1.");
+    expect(promptText({}, "menu_category", { category: "Jumping Balloons", key: 1 })).toBe("For Jumping Balloons, press 1.");
     expect(fill("{a} and {b}", { a: 1 })).toBe("1 and {b}");
   });
   it("recordings only replace prompts without placeholders", () => {
@@ -52,5 +52,19 @@ describe("hotline voice", () => {
     expect(DEFAULT_VOICE).toBe("Google.en-US-Chirp3-HD-Fenrir");
     expect(config.voice()).toBe("Google.en-US-Chirp3-HD-Fenrir");
     process.env.IVR_VOICE = saved;
+  });
+});
+
+describe("delivery is an additional fee on the phone", () => {
+  it("no prompt says the price includes delivery", () => {
+    for (const [k, def] of Object.entries(PROMPTS) as [string, PromptDef][]) {
+      expect(def.text, k).not.toMatch(/includes delivery|free delivery|delivery is free/i);
+    }
+    expect(PROMPTS.product_intro.text).toBe("Great choice! The {item} is {price}. Delivery is available for an additional fee, and our team will give you the delivery price.");
+    expect(PROMPTS.cart_summary.text).toContain("plus the delivery fee");
+  });
+  it("greeting says jumping balloons, not bounce houses", () => {
+    expect(PROMPTS.greeting.text).toContain("jumping balloons");
+    expect(PROMPTS.greeting.text).not.toMatch(/bounce/i);
   });
 });
