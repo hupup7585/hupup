@@ -109,9 +109,8 @@ export default async function Home() {
                   key={cat.id}
                   className="grid scroll-mt-24 gap-5 border-b-2 border-hu-deep/15 py-8 sm:grid-cols-[auto_1fr] sm:gap-8 lg:grid-cols-[auto_1fr_auto] lg:items-center lg:py-10"
                 >
-                  <div className="flex items-center gap-4 sm:block">
+                  <div className="sm:self-start lg:self-center">
                     <IconTile icon={categoryIcon(cat.name)} tone={i % 2 === 0 ? "yellow" : "sky"} size="lg" />
-                    <span className="text-sm font-extrabold tracking-[0.18em] opacity-60 sm:mt-3 sm:block">{String(i + 1).padStart(2, "0")}</span>
                   </div>
                   <div>
                     <h3 className="text-2xl font-extrabold leading-tight sm:text-4xl">{cat.name}</h3>

@@ -89,3 +89,9 @@ describe("service area", () => {
     expect(page).not.toMatch(/Call to check your area/);
   });
 });
+
+describe("rentals list", () => {
+  it("has no 01/02/03 number labels", () => {
+    expect(readFileSync("src/app/page.tsx", "utf8")).not.toMatch(/padStart\(2/);
+  });
+});
