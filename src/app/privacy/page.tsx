@@ -26,7 +26,7 @@ export default function Privacy() {
       <h2>Sharing</h2>
       <p>We share information only with service providers that help us run our business, such as our phone, text messaging, and payment providers, and only as needed to provide our services.</p>
       <h2>Contact</h2>
-      <p>Questions about this policy? Call us at (845) 415-7585 or email hupupattractions@gmail.com.</p>
+      <p>Questions about this policy? Call us at (845) 777-7585 or email hupupattractions@gmail.com.</p>
     </LegalPage>
   );
 }

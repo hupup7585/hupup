@@ -12,7 +12,7 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Hup Up Attractions | Bounce House, Laser Tag and Paddle Boat Rentals",
   description:
-    "Hup Up Attractions offers bounce house rentals, laser tag rentals, inflatable maze rentals, and paddle boat rentals for parties, schools, and events. Call (845) 415-7585 to book.",
+    "Hup Up Attractions offers bounce house rentals, laser tag rentals, inflatable maze rentals, and paddle boat rentals for parties, schools, and events. Call (845) 777-7585 to book.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Hup Up Attractions | Party and Event Rentals",

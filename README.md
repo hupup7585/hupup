@@ -39,7 +39,7 @@ Main code:
    - *A call comes in* → Webhook `https://hupupattractions.com/api/voice/incoming` (HTTP POST)
    - *Call status changes* → `https://hupupattractions.com/api/voice/status`
 
-   Then set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, and the `NEXT_PUBLIC_HOTLINE_*` values. For texting US customers, register the number for A2P 10DLC in the Twilio console.
+   Then set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, and the `NEXT_PUBLIC_HOTLINE_*` values (the public website number, currently (845) 777-7585, which forwards to the Twilio hotline; display only, the IVR and SMS use `TWILIO_PHONE_NUMBER`). For texting US customers, register the number for A2P 10DLC in the Twilio console.
 7. **Sola Payments**: in the Sola portal, create a **PaymentSITE** and add the Amount, Invoice, Name, Email and Phone fields so the link can pre-fill them. Set `SOLA_PAYMENTSITE_NAME`. Under webhooks, point transaction notifications to `https://hupupattractions.com/api/sola/webhook`, set a webhook PIN (15+ letters and numbers), and put the same PIN in `SOLA_WEBHOOK_PIN`. **Run one sandbox payment** to confirm the order flips to *Confirmed*: the field names follow Sola's published docs, which I couldn't reach while building this.
 8. **Email codes**: create a Resend account, verify `hupupattractions.com`, and set `RESEND_API_KEY` and `EMAIL_FROM`.
 9. **Admin sign-in**: set `ADMIN_EMAIL`, `ADMIN_PHONE` and a long random `AUTH_SECRET`.

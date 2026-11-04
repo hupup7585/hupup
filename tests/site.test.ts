@@ -39,3 +39,29 @@ describe("website copy and brand", () => {
     expect(page).not.toMatch(/add to cart|checkout/i);
   });
 });
+
+describe("public phone number", () => {
+  it("website shows (845) 777-7585 / +18457777585, while the Twilio hotline stays separate", async () => {
+    const { PUBLIC_PHONE_DISPLAY, PUBLIC_PHONE_E164 } = await import("@/lib/config");
+    expect(PUBLIC_PHONE_DISPLAY).toBe("(845) 777-7585");
+    expect(PUBLIC_PHONE_E164).toBe("+18457777585");
+    for (const f of ["src/app/page.tsx", "src/app/opengraph-image.tsx", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/SiteFooter.tsx", "src/lib/site-content.ts"]) {
+      expect(readFileSync(f, "utf8"), f).not.toMatch(/415-?7585|4157585/);
+    }
+  });
+  it("defaults to the public number when the env var is not set", async () => {
+    const saved = { e: process.env.NEXT_PUBLIC_HOTLINE_E164, d: process.env.NEXT_PUBLIC_HOTLINE_DISPLAY };
+    delete process.env.NEXT_PUBLIC_HOTLINE_E164;
+    delete process.env.NEXT_PUBLIC_HOTLINE_DISPLAY;
+    const { config } = await import("@/lib/config");
+    expect(config.hotlineE164).toBe("+18457777585");
+    expect(config.hotlineDisplay).toBe("(845) 777-7585");
+    process.env.NEXT_PUBLIC_HOTLINE_E164 = saved.e;
+    process.env.NEXT_PUBLIC_HOTLINE_DISPLAY = saved.d;
+  });
+  it("IVR and SMS code never use the public display number", () => {
+    for (const f of ["src/lib/ivr/flow.ts", "src/lib/sms.ts", "src/lib/sms-inbound.ts", "src/lib/notify.ts"]) {
+      expect(readFileSync(f, "utf8"), f).not.toMatch(/hotlineE164|hotlineDisplay|NEXT_PUBLIC_HOTLINE|7777585/);
+    }
+  });
+});

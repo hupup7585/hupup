@@ -13,7 +13,7 @@ export default function OgImage() {
           Hup Up <span style={{ background: theme.yellow, padding: "0 12px", marginLeft: 12, borderRadius: 10 }}>Attractions</span>
         </div>
         <div style={{ fontSize: 76, fontWeight: 800, lineHeight: 1.05, marginTop: 36, maxWidth: 1000 }}>BRINGING SOMETHING SPECIAL TO EVERY OCCASION</div>
-        <div style={{ fontSize: 36, marginTop: 36, fontWeight: 700 }}>Call to book (845) 415-7585</div>
+        <div style={{ fontSize: 36, marginTop: 36, fontWeight: 700 }}>Call to book (845) 777-7585</div>
       </div>
     ),
     size,

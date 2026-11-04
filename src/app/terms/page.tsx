@@ -16,7 +16,7 @@ export default function Terms() {
       <h2>Text messages</h2>
       <p>By giving us your mobile number for a booking, you agree to receive texts about that booking. Promotional texts are sent only if you opt in, up to 5 per year. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help.</p>
       <h2>Contact</h2>
-      <p>Call (845) 415-7585 or email hupupattractions@gmail.com.</p>
+      <p>Call (845) 777-7585 or email hupupattractions@gmail.com.</p>
     </LegalPage>
   );
 }
