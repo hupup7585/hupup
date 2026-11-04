@@ -149,13 +149,13 @@ export default async function Home() {
           <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[min-content_minmax(0,1fr)] lg:items-center lg:gap-16">
             <div>
               <SectionTitle title="Why Choose Hup Up Attractions" compactLg />
-              {/* Secondary line under the heading: ~40-45% of the heading size from sm up; stays readable and tappable on phones */}
+              {/* Secondary line under the heading: 60% of the heading size at every width (Abram 10:52 PM); icon scales with the text */}
               <a
                 data-why-phone
                 href={`tel:${c.phoneE164}`}
-                className="mt-8 inline-flex items-center gap-2 text-base font-bold underline decoration-hu-yellow decoration-[3px] underline-offset-[5px] xl:text-xl"
+                className="mt-8 inline-flex items-center gap-[0.4em] text-[1.02rem] font-bold underline decoration-hu-yellow decoration-[3px] underline-offset-[5px] min-[370px]:text-[1.125rem] sm:text-[1.35rem] xl:text-[1.8rem]"
               >
-                <Phone className="h-4 w-4 shrink-0 xl:h-5 xl:w-5" strokeWidth={ICON_STROKE} aria-hidden />
+                <Phone className="h-[0.9em] w-[0.9em] shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
                 {c.phoneDisplay}
               </a>
             </div>

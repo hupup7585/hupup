@@ -293,3 +293,11 @@ describe("'Options for / all types of events' break (Abram 10:51 PM)", () => {
     expect(whyLabel("Friendly customer service")).toBe("Friendly customer\u00A0service");
   });
 });
+
+describe("Why Choose phone line size (Abram 10:52 PM)", () => {
+  it("is about 60% of the heading at each breakpoint, icon scales with it, thin underline kept", () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain("text-[1.02rem] font-bold underline decoration-hu-yellow decoration-[3px] underline-offset-[5px] min-[370px]:text-[1.125rem] sm:text-[1.35rem] xl:text-[1.8rem]");
+    expect(page).toContain('<Phone className="h-[0.9em] w-[0.9em] shrink-0"');
+  });
+});
