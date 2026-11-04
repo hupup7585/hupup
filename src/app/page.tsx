@@ -91,9 +91,9 @@ export default async function Home() {
                   <Phone className="h-7 w-7 shrink-0 sm:h-9 sm:w-9" strokeWidth={ICON_STROKE} aria-hidden />
                   {c.phoneDisplay}
                 </a>
-                <ul className="mt-6 divide-y-2 divide-hu-deep/10 border-t-2 border-hu-deep/10 pr-24 sm:pr-28">
+                <ul className="mt-6 divide-y-2 divide-hu-deep/10 border-t-2 border-hu-deep/10">
                   {c.categories.map((cat) => (
-                    <li key={cat.id}>
+                    <li key={cat.id} className="last:pr-24 sm:last:pr-28">
                       <a href={`#${cat.slug}`} className="flex items-center gap-4 py-3.5 text-lg font-bold hover:underline">
                         <IconTile icon={categoryIcon(cat.name)} tone="sky" />
                         {cat.name}
@@ -104,14 +104,14 @@ export default async function Home() {
               </div>
               {/* Sticker sits on the board's bottom-right corner, clear of the phone number at every width */}
               <span
-                data-sticker="we-deliver"
+                data-sticker="delivery-option"
                 className="absolute -bottom-10 right-2 grid h-24 w-24 rotate-12 place-items-center rounded-full border-2 border-hu-deep bg-hu-yellow text-center text-[11px] font-extrabold uppercase leading-tight sm:-bottom-12 sm:right-3 sm:h-28 sm:w-28 sm:text-[13px]"
-                aria-label="We deliver, delivery fee applies"
+                aria-label="Option for delivery"
               >
-                <span className="flex flex-col items-center">
+                <span className="flex flex-col items-center text-hu-deep">
                   <Truck className="mb-0.5 h-5 w-5 sm:h-6 sm:w-6" strokeWidth={ICON_STROKE} aria-hidden />
-                  <span>We deliver</span>
-                  <span className="mt-1 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold normal-case leading-none sm:text-[11px]">fee applies</span>
+                  <span>Option</span>
+                  <span>for delivery</span>
                 </span>
               </span>
             </div>

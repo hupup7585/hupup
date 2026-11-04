@@ -128,7 +128,10 @@ describe("delivery fee wording", () => {
       expect(t, f).not.toMatch(/delivery[^.\n]{0,40}\$\d/i);
     }
     const page = readFileSync("src/app/page.tsx", "utf8");
-    expect(page).toContain("fee applies");
+    // Hero badge (Abram 9:58 PM): solid yellow, "OPTION FOR DELIVERY", no white pill
+    expect(page).toContain('aria-label="Option for delivery"');
+    expect(page).not.toContain("fee applies");
+    expect(page).not.toMatch(/rounded-full bg-white px-1\.5/);
     expect(page).toContain("Delivery available for an additional fee");
     expect(page.match(/DELIVERY_FEE_NOTE/g)!.length).toBeGreaterThanOrEqual(3); // import + How It Works + Service Area
   });
