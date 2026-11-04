@@ -5,7 +5,7 @@ import { SERVICE_AREA } from "@/lib/site-copy";
 
 export type SiteContent = {
   logoUrl: string | null;
-  serviceArea: { mainLabel: string; main: string; alsoTitle: string; also: readonly string[]; region: string };
+  serviceArea: { mainLabel: string; main: string; mainSub: string; officialName: string; alsoTitle: string; also: readonly string[]; region: string };
   /** Business hours; null = hidden until set. */
   hours: string | null;
   email: string;

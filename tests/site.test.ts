@@ -68,15 +68,16 @@ describe("public phone number", () => {
 });
 
 describe("service area", () => {
-  it("uses Abram's exact towns with Kiryas Joel and Town of Palm Tree as the main area", async () => {
+  it("uses Abram's exact towns with Kiryas Joel (Town of Palm Tree) as the single main area", async () => {
     const { SERVICE_AREA, serviceAreaPlaces } = await import("@/lib/site-copy");
     expect(SERVICE_AREA.mainLabel).toBe("Our main service area:");
-    expect(SERVICE_AREA.main).toBe("Kiryas Joel and Town of Palm Tree");
+    expect(SERVICE_AREA.main).toBe("Kiryas Joel");
+    expect(SERVICE_AREA.mainSub).toBe("Town of Palm Tree, Orange County, NY");
     expect(SERVICE_AREA.alsoTitle).toBe("We also deliver to these nearby towns:");
     expect([...SERVICE_AREA.also]).toEqual(["Monroe", "Blooming Grove", "Woodbury and Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville"]);
     expect(SERVICE_AREA.region).toBe("Orange County, NY");
     expect(serviceAreaPlaces()).toEqual([
-      "Kiryas Joel", "Town of Palm Tree", "Monroe", "Blooming Grove", "Woodbury", "Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville",
+      "Kiryas Joel", "Monroe", "Blooming Grove", "Woodbury", "Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville",
     ]);
   });
   it("homepage shows the section and nav link, main area before the secondary list, and no placeholder text", () => {
@@ -86,7 +87,8 @@ describe("service area", () => {
     expect(header).toContain('["Service Area", "/#service-area"]');
     expect(page.indexOf("serviceArea.mainLabel")).toBeLessThan(page.indexOf("serviceArea.alsoTitle"));
     expect(page).toContain("areaServed");
-    expect(page).toMatch(/Kiryas Joel and Town of Palm Tree/);
+    expect(page).not.toMatch(/Kiryas Joel and Town of Palm Tree/);
+    expect(page).toContain("Kiryas Joel (Town of Palm Tree)");
     expect(page).not.toMatch(/Call to check your area/);
   });
 });
@@ -169,5 +171,13 @@ describe("Jumping Balloons and no slashes", () => {
     const { SERVICE_AREA } = await import("@/lib/site-copy");
     for (const t of [SERVICE_AREA.main, ...SERVICE_AREA.also]) expect(t).not.toContain("/");
     expect(readFileSync("src/app/page.tsx", "utf8")).not.toMatch(/ \/ /);
+  });
+});
+
+describe("Kiryas Joel is one place", () => {
+  it("never shows 'Kiryas Joel and Town of Palm Tree' or a slash between them anywhere", () => {
+    for (const f of ["src/app/page.tsx", "src/components/site/SiteFooter.tsx", "src/lib/site-copy.ts", "src/app/privacy/page.tsx", "src/app/terms/page.tsx"]) {
+      expect(readFileSync(f, "utf8"), f).not.toMatch(/Kiryas Joel (and|\/) Town of Palm Tree/);
+    }
   });
 });

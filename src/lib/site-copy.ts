@@ -25,7 +25,10 @@ export const FINAL_CTA_TEXT = "Contact Hup Up Attractions today to explore our r
 /** Service area from Abram (exact wording). Main area first; the rest are secondary. */
 export const SERVICE_AREA = {
   mainLabel: "Our main service area:",
-  main: "Kiryas Joel and Town of Palm Tree",
+  main: "Kiryas Joel",
+  /** Town of Palm Tree is the same place as Kiryas Joel (the town's official name), not a second area. */
+  mainSub: "Town of Palm Tree, Orange County, NY",
+  officialName: "Town of Palm Tree",
   alsoTitle: "We also deliver to these nearby towns:",
   also: ["Monroe", "Blooming Grove", "Woodbury and Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville"],
   region: "Orange County, NY",
@@ -33,7 +36,7 @@ export const SERVICE_AREA = {
 
 /** Individual place names for search engines (combined names split, nothing added). */
 export function serviceAreaPlaces(): string[] {
-  return [SERVICE_AREA.main, ...SERVICE_AREA.also].flatMap((n) => n.split(" and ").map((s) => s.trim()));
+  return [SERVICE_AREA.main, ...SERVICE_AREA.also.flatMap((n) => n.split(" and ").map((s) => s.trim()))];
 }
 
 /** Keep the business name on one line wherever text wraps ("Why Choose / Hup Up Attractions"). */

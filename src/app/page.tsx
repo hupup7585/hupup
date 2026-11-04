@@ -12,7 +12,7 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Hup Up Attractions | Jumping Balloon, Laser Tag and Paddle Boat Rentals",
   description:
-    "Hup Up Attractions offers Jumping Balloons (bounce houses), laser tag, inflatable maze, and paddle boat rentals for parties and events in Kiryas Joel and Town of Palm Tree, Monroe, Chester, and nearby Orange County, NY towns. Delivery available for an additional fee. Call (845) 777-7585 to book.",
+    "Hup Up Attractions offers Jumping Balloons (bounce houses), laser tag, inflatable maze, and paddle boat rentals for parties and events in Kiryas Joel (Town of Palm Tree), Monroe, Chester, and nearby Orange County, NY towns. Delivery available for an additional fee. Call (845) 777-7585 to book.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Hup Up Attractions | Party and Event Rentals",
@@ -37,7 +37,10 @@ export default async function Home() {
     url: process.env.PUBLIC_BASE_URL || "https://hupup.vercel.app",
     ...(c.logoUrl ? { logo: c.logoUrl } : {}),
     areaServed: [
-      ...serviceAreaPlaces().map((name) => ({ "@type": "Place", name: `${name}, NY` })),
+      { "@type": "Place", name: `${c.serviceArea.main}, NY`, alternateName: `${c.serviceArea.officialName}, NY` },
+      ...serviceAreaPlaces()
+        .slice(1)
+        .map((name) => ({ "@type": "Place", name: `${name}, NY` })),
       { "@type": "AdministrativeArea", name: c.serviceArea.region.replace(", NY", ", New York") },
     ],
     ...(c.hours ? { openingHours: c.hours } : {}),
@@ -184,15 +187,8 @@ export default async function Home() {
             <div className="mt-8 grid gap-6 lg:grid-cols-[1.15fr_1fr] lg:items-start">
               <div className="rounded-[2rem] border-[3px] border-hu-deep bg-white p-6 shadow-[6px_6px_0_#123D73] sm:p-8">
                 <p className="text-base font-extrabold uppercase tracking-[0.14em] text-hu-deep/75">{c.serviceArea.mainLabel}</p>
-                <p className="mt-2 text-[1.55rem] font-extrabold leading-tight min-[370px]:text-3xl sm:text-4xl">
-                  {c.serviceArea.main.split(" and ").map((part, i) => (
-                    <span key={part}>
-                      {i > 0 && " and "}
-                      <span className="whitespace-nowrap">{part}</span>
-                    </span>
-                  ))}
-                </p>
-                <p className="mt-3 text-lg font-medium">{c.serviceArea.region}</p>
+                <p className="mt-2 text-4xl font-extrabold leading-tight sm:text-5xl">{c.serviceArea.main}</p>
+                <p className="mt-2 text-base font-medium text-hu-deep/80">{c.serviceArea.mainSub}</p>
                 <p className="mt-2 flex items-center gap-2 text-base font-semibold">
                   <Truck className="h-5 w-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
                   {DELIVERY_FEE_NOTE}
