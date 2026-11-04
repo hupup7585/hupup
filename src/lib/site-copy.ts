@@ -44,3 +44,9 @@ export const BUSINESS_NAME_NB = "Hup Up Attractions";
 export function keepName(text: string): string {
   return text.replaceAll("Hup Up Attractions", BUSINESS_NAME_NB);
 }
+
+/** Keep the last two words of a label together so a wrapped label never ends with one lonely word. */
+export function noLonelyWord(text: string): string {
+  const i = text.lastIndexOf(" ");
+  return i > 0 ? `${text.slice(0, i)} ${text.slice(i + 1)}` : text;
+}

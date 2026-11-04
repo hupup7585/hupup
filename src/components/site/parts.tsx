@@ -51,11 +51,11 @@ export function Wave({ fill = "#FFFFFF", className = "" }: { fill?: string; clas
   );
 }
 
-export function SectionTitle({ kicker, title, className = "" }: { kicker?: string; title: string; className?: string }) {
+export function SectionTitle({ kicker, title, className = "", compactLg = false }: { kicker?: string; title: string; className?: string; compactLg?: boolean }) {
   return (
     <div className={className}>
       {kicker && <p className="mb-2 text-sm font-extrabold uppercase tracking-[0.18em] text-hu-deep/70">{keepName(kicker)}</p>}
-      <h2 className="font-display text-[1.7rem] font-extrabold leading-tight text-hu-deep min-[370px]:text-3xl sm:text-4xl lg:text-5xl">{keepName(title)}</h2>
+      <h2 className={`font-display text-[1.7rem] font-extrabold leading-tight text-hu-deep min-[370px]:text-3xl sm:text-4xl ${compactLg ? "lg:text-4xl xl:text-5xl" : "lg:text-5xl"}`}>{keepName(title)}</h2>
     </div>
   );
 }

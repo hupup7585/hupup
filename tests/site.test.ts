@@ -193,3 +193,34 @@ describe("nearby towns grid", () => {
     expect(page).not.toMatch(/flex flex-wrap gap-2/);
   });
 });
+
+describe("Why Choose layout and badge (Abram 10:25-10:30 PM)", () => {
+  it("labels never end on one lonely word and wrap balanced", async () => {
+    const { noLonelyWord } = await import("@/lib/site-copy");
+    expect(noLonelyWord("Friendly customer service")).toBe("Friendly customer service");
+    expect(noLonelyWord("Options for all types of events")).toBe("Options for all types of events");
+    expect(noLonelyWord("Single")).toBe("Single");
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain("[text-wrap:balance]\">{noLonelyWord(w)}");
+    expect(page).toContain("grid auto-rows-fr gap-x-10 sm:grid-cols-2");
+  });
+  it("heading column is sized to the business name with a 64px gap", () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain("lg:grid-cols-[min-content_minmax(0,1fr)] lg:items-center lg:gap-16");
+  });
+  it("phone line under the heading is a smaller, thin-underlined tap-to-call link", () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toMatch(/data-why-phone[\s\S]{0,80}href=\{`tel:\$\{c\.phoneE164\}`\}/);
+    expect(page).toContain("decoration-[3px] underline-offset-[5px]");
+    expect(page).not.toContain("text-2xl font-extrabold underline decoration-hu-yellow decoration-[6px]");
+  });
+  it("delivery note is centered under the steps", () => {
+    expect(readFileSync("src/app/page.tsx", "utf8")).toContain('<div className="mt-10 flex justify-center">');
+  });
+  it("delivery badge centers one group (truck + two lines) in a slightly larger circle", () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain("data-badge-group");
+    expect(page).toContain("h-[6.5rem] w-[6.5rem]");
+    expect(page).toContain("items-center justify-center rounded-full");
+  });
+});

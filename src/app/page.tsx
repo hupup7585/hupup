@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
-import { BUSINESS_NAME_NB, keepName, DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
+import { BUSINESS_NAME_NB, keepName, noLonelyWord, DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -93,7 +93,7 @@ export default async function Home() {
                 </a>
                 <ul className="mt-6 divide-y-2 divide-hu-deep/10 border-t-2 border-hu-deep/10">
                   {c.categories.map((cat) => (
-                    <li key={cat.id} className="last:pr-24 sm:last:pr-28">
+                    <li key={cat.id} className="last:pr-[6.75rem] sm:last:pr-[7.75rem]">
                       <a href={`#${cat.slug}`} className="flex items-center gap-4 py-3.5 text-lg font-bold hover:underline">
                         <IconTile icon={categoryIcon(cat.name)} tone="sky" />
                         {cat.name}
@@ -105,11 +105,11 @@ export default async function Home() {
               {/* Sticker sits on the board's bottom-right corner, clear of the phone number at every width */}
               <span
                 data-sticker="delivery-option"
-                className="absolute -bottom-10 right-2 grid h-24 w-24 rotate-12 place-items-center rounded-full border-2 border-hu-deep bg-hu-yellow text-center text-[11px] font-extrabold uppercase leading-tight sm:-bottom-12 sm:right-3 sm:h-28 sm:w-28 sm:text-[13px]"
+                className="absolute -bottom-12 right-2 flex h-[6.5rem] w-[6.5rem] rotate-12 items-center justify-center rounded-full border-2 border-hu-deep bg-hu-yellow text-center text-[10px] font-extrabold uppercase leading-[1.15] sm:-bottom-14 sm:right-3 sm:h-[7.5rem] sm:w-[7.5rem] sm:text-[11.5px]"
                 aria-label="Option for delivery"
               >
-                <span className="flex flex-col items-center text-hu-deep">
-                  <Truck className="mb-0.5 h-5 w-5 sm:h-6 sm:w-6" strokeWidth={ICON_STROKE} aria-hidden />
+                <span data-badge-group className="flex flex-col items-center gap-0.5 text-hu-deep">
+                  <Truck className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={ICON_STROKE} aria-hidden />
                   <span>Option</span>
                   <span>for delivery</span>
                 </span>
@@ -146,18 +146,24 @@ export default async function Home() {
 
         {/* WHY CHOOSE: split layout, icon checklist */}
         <section className="bg-hu-tint py-14 sm:py-20">
-          <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr_1.3fr] lg:items-center">
+          <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[min-content_minmax(0,1fr)] lg:items-center lg:gap-16">
             <div>
-              <SectionTitle title="Why Choose Hup Up Attractions" />
-              <a href={`tel:${c.phoneE164}`} className="mt-6 inline-flex items-center gap-2 text-2xl font-extrabold underline decoration-hu-yellow decoration-[6px] underline-offset-[6px]">
+              <SectionTitle title="Why Choose Hup Up Attractions" compactLg />
+              {/* Secondary line under the heading: ~40-45% of the heading size from sm up; stays readable and tappable on phones */}
+              <a
+                data-why-phone
+                href={`tel:${c.phoneE164}`}
+                className="mt-8 inline-flex items-center gap-2 text-base font-bold underline decoration-hu-yellow decoration-[3px] underline-offset-[5px] xl:text-xl"
+              >
+                <Phone className="h-4 w-4 shrink-0 xl:h-5 xl:w-5" strokeWidth={ICON_STROKE} aria-hidden />
                 {c.phoneDisplay}
               </a>
             </div>
-            <ul className="grid gap-x-10 sm:grid-cols-2">
+            <ul className="grid auto-rows-fr gap-x-10 sm:grid-cols-2">
               {WHY.map((w, i) => (
-                <li key={w} className="flex items-center gap-4 border-b-2 border-hu-deep/10 py-4 text-lg font-semibold">
+                <li key={w} className="flex w-full items-center gap-4 border-b-2 border-hu-deep/10 py-4 text-lg font-semibold">
                   <IconTile icon={WHY_ICONS[i]} tone="white" />
-                  {w}
+                  <span className="min-w-0 flex-1 [text-wrap:balance]">{noLonelyWord(w)}</span>
                 </li>
               ))}
             </ul>
@@ -187,10 +193,12 @@ export default async function Home() {
                 );
               })}
             </ol>
-            <p className="mt-10 inline-flex items-center gap-3 rounded-2xl bg-hu-tint px-4 py-3 text-base font-semibold">
-              <Truck className="h-5 w-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
-              {DELIVERY_FEE_NOTE}
-            </p>
+            <div className="mt-10 flex justify-center">
+              <p data-delivery-note className="inline-flex items-center gap-3 rounded-2xl bg-hu-tint px-4 py-3 text-center text-base font-semibold">
+                <Truck className="h-5 w-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
+                <span className="[text-wrap:balance]">{DELIVERY_FEE_NOTE}</span>
+              </p>
+            </div>
           </div>
         </section>
 
