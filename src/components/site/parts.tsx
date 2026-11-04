@@ -51,11 +51,27 @@ export function Wave({ fill = "#FFFFFF", className = "" }: { fill?: string; clas
   );
 }
 
-export function SectionTitle({ kicker, title, className = "", compactLg = false }: { kicker?: string; title: string; className?: string; compactLg?: boolean }) {
+export function SectionTitle({
+  kicker,
+  title,
+  className = "",
+  compactLg = false,
+  kickerSpacing = "mb-2",
+  titleAlign = "",
+}: {
+  kicker?: string;
+  title: string;
+  className?: string;
+  compactLg?: boolean;
+  /** Margin classes for the small label above the heading (default mb-2). */
+  kickerSpacing?: string;
+  /** Extra alignment class for the heading only, e.g. "text-center". */
+  titleAlign?: string;
+}) {
   return (
     <div className={className}>
-      {kicker && <p className="mb-2 text-sm font-extrabold uppercase tracking-[0.18em] text-hu-deep/70">{keepName(kicker)}</p>}
-      <h2 className={`font-display text-[1.7rem] font-extrabold leading-tight text-hu-deep min-[370px]:text-3xl sm:text-4xl ${compactLg ? "lg:text-4xl xl:text-5xl" : "lg:text-5xl"}`}>{keepName(title)}</h2>
+      {kicker && <p className={`${kickerSpacing} text-sm font-extrabold uppercase tracking-[0.18em] text-hu-deep/70`}>{keepName(kicker)}</p>}
+      <h2 className={`font-display text-[1.7rem] font-extrabold leading-tight text-hu-deep min-[370px]:text-3xl sm:text-4xl ${compactLg ? "lg:text-4xl xl:text-5xl" : "lg:text-5xl"} ${titleAlign}`.trim()}>{keepName(title)}</h2>
     </div>
   );
 }

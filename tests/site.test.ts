@@ -315,3 +315,14 @@ describe("Why Choose phone line size (Abram 10:52 PM)", () => {
     expect(page).toContain('<Phone className="h-[0.9em] w-[0.9em] shrink-0"');
   });
 });
+
+describe("Contact Us heading (Abram)", () => {
+  it("centers the heading and lifts the GET IN TOUCH label 8px; other titles unchanged", () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain('<SectionTitle kicker="Get in touch" title="Contact Us" kickerSpacing="-mt-2 mb-4" titleAlign="text-center" />');
+    expect(page.match(/titleAlign=/g)).toHaveLength(1);
+    expect(page.match(/kickerSpacing=/g)).toHaveLength(1);
+    const parts = readFileSync("src/components/site/parts.tsx", "utf8");
+    expect(parts).toContain('kickerSpacing = "mb-2"');
+  });
+});
