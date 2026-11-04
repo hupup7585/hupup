@@ -1,4 +1,5 @@
 import type { SiteContent } from "@/lib/site-content";
+import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 import { NAV } from "./SiteHeader";
 import { Mail, Phone } from "lucide-react";
 import { ICON_STROKE, Wordmark } from "./parts";
@@ -59,7 +60,7 @@ export default function SiteFooter({ c }: { c: SiteContent }) {
       </div>
       <div className="border-t border-white/15">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-5 text-sm text-white/75 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span>© {year} Hup Up Attractions</span>
+          <span>© {year} {BUSINESS_NAME_NB}</span>
           <span className="flex gap-5">
             <a href="/privacy" className="hover:text-hu-yellow">Privacy Policy</a>
             <a href="/terms" className="hover:text-hu-yellow">Terms and Conditions</a>

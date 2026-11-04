@@ -35,3 +35,9 @@ export const SERVICE_AREA = {
 export function serviceAreaPlaces(): string[] {
   return [SERVICE_AREA.main, ...SERVICE_AREA.also].flatMap((n) => n.split("/").map((s) => s.trim()));
 }
+
+/** Keep the business name on one line wherever text wraps ("Why Choose / Hup Up Attractions"). */
+export const BUSINESS_NAME_NB = "Hup Up Attractions";
+export function keepName(text: string): string {
+  return text.replaceAll("Hup Up Attractions", BUSINESS_NAME_NB);
+}

@@ -130,3 +130,20 @@ describe("delivery fee wording", () => {
     expect(page.match(/DELIVERY_FEE_NOTE/g)!.length).toBeGreaterThanOrEqual(3); // import + How It Works + Service Area
   });
 });
+
+describe("business name never splits across lines", () => {
+  it("keepName joins the name with non-breaking spaces and leaves other text alone", async () => {
+    const { keepName, BUSINESS_NAME_NB } = await import("@/lib/site-copy");
+    expect(BUSINESS_NAME_NB).toBe("Hup Up Attractions");
+    expect(keepName("Why Choose Hup Up Attractions")).toBe("Why Choose Hup Up Attractions");
+    expect(keepName("Our Rentals")).toBe("Our Rentals");
+  });
+  it("headings, intro, CTA, contact, footer and legal pages use it", () => {
+    const parts = readFileSync("src/components/site/parts.tsx", "utf8");
+    expect(parts).toContain("{keepName(title)}");
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain("{keepName(INTRO)}");
+    expect(page).toContain("{keepName(FINAL_CTA_TEXT)}");
+    expect(readFileSync("src/components/site/SiteFooter.tsx", "utf8")).toContain("{BUSINESS_NAME_NB}");
+  });
+});

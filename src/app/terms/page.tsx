@@ -1,4 +1,5 @@
 import LegalPage from "@/components/site/LegalPage";
+import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 
 export const metadata = { title: "Terms and Conditions | Hup Up Attractions" };
 export const revalidate = 3600;
@@ -6,7 +7,7 @@ export const revalidate = 3600;
 export default function Terms() {
   return (
     <LegalPage title="Terms and Conditions" updated="November 2026">
-      <p>These terms apply to rentals booked with Hup Up Attractions by phone or with our team.</p>
+      <p>These terms apply to rentals booked with {BUSINESS_NAME_NB} by phone or with our team.</p>
       <h2>Reservations</h2>
       <p>Reservations are made over the phone. A reservation is confirmed once payment is received or our team confirms it with you.</p>
       <h2>Delivery and pickup</h2>

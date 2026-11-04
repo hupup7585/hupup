@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { Phone, type LucideIcon } from "lucide-react";
 export { categoryIcon } from "@/lib/category-icons";
+import { keepName } from "@/lib/site-copy";
 import type { SiteContent } from "@/lib/site-content";
 
 /*
@@ -15,7 +16,7 @@ export function Wordmark({ logoUrl, light = false }: { logoUrl: string | null; l
     return <Image src={logoUrl} alt="Hup Up Attractions" width={180} height={56} className="h-12 w-auto" priority />;
   }
   return (
-    <span className={`font-display text-lg font-extrabold leading-none tracking-tight min-[400px]:text-xl sm:text-2xl ${light ? "text-white" : "text-hu-deep"}`}>
+    <span className={`whitespace-nowrap font-display text-lg font-extrabold leading-none tracking-tight min-[400px]:text-xl sm:text-2xl ${light ? "text-white" : "text-hu-deep"}`}>
       Hup Up <span className={light ? "text-hu-yellow" : "rounded-md bg-hu-yellow px-1.5"}>Attractions</span>
     </span>
   );
@@ -53,8 +54,8 @@ export function Wave({ fill = "#FFFFFF", className = "" }: { fill?: string; clas
 export function SectionTitle({ kicker, title, className = "" }: { kicker?: string; title: string; className?: string }) {
   return (
     <div className={className}>
-      {kicker && <p className="mb-2 text-sm font-extrabold uppercase tracking-[0.18em] text-hu-deep/70">{kicker}</p>}
-      <h2 className="font-display text-3xl font-extrabold leading-tight text-hu-deep sm:text-4xl lg:text-5xl">{title}</h2>
+      {kicker && <p className="mb-2 text-sm font-extrabold uppercase tracking-[0.18em] text-hu-deep/70">{keepName(kicker)}</p>}
+      <h2 className="font-display text-[1.7rem] font-extrabold leading-tight text-hu-deep min-[370px]:text-3xl sm:text-4xl lg:text-5xl">{keepName(title)}</h2>
     </div>
   );
 }

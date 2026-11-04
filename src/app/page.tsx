@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
-import { DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
+import { BUSINESS_NAME_NB, keepName, DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -55,7 +55,7 @@ export default async function Home() {
             <div>
               <span className="hu-sticker -rotate-2">Reservations by phone</span>
               <h1 className="mt-5 text-[2.15rem] min-[360px]:text-[2.5rem] font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-[4.1rem]">{SLOGAN}</h1>
-              <p className="mt-5 max-w-xl text-lg font-medium leading-relaxed sm:text-xl">{INTRO}</p>
+              <p className="mt-5 max-w-xl text-lg font-medium leading-relaxed sm:text-xl">{keepName(INTRO)}</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <CallButton phone={c.phoneE164} label="CALL NOW TO BOOK" className="!min-h-14 !px-5 text-lg min-[360px]:!px-8" />
                 <a href="#rentals" className="hu-btn-outline !min-h-14 !px-5 text-lg min-[360px]:!px-8">
@@ -218,7 +218,7 @@ export default async function Home() {
         <section className="bg-hu-yellow">
           <div className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 sm:py-20">
             <h2 className="text-3xl font-extrabold leading-tight sm:text-5xl">{FINAL_CTA_TITLE}</h2>
-            <p className="mx-auto mt-4 max-w-2xl text-lg font-medium sm:text-xl">{FINAL_CTA_TEXT}</p>
+            <p className="mx-auto mt-4 max-w-2xl text-lg font-medium sm:text-xl">{keepName(FINAL_CTA_TEXT)}</p>
             <a href={`tel:${c.phoneE164}`} className="mt-8 inline-flex min-h-14 items-center gap-3 rounded-full bg-hu-deep px-9 py-4 text-lg font-bold tracking-wide text-white hover:bg-[#0d2f5a]">
               <Phone className="h-5 w-5" strokeWidth={ICON_STROKE} aria-hidden /> CALL NOW TO BOOK
             </a>
@@ -235,7 +235,7 @@ export default async function Home() {
                 <IconTile icon={PartyPopper} tone="sky" />
                 <div>
                   <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Business</dt>
-                  <dd className="font-semibold">Hup Up Attractions</dd>
+                  <dd className="font-semibold">{BUSINESS_NAME_NB}</dd>
                 </div>
               </div>
               <div className="flex items-center gap-4 py-4">

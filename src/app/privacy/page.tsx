@@ -1,4 +1,5 @@
 import LegalPage from "@/components/site/LegalPage";
+import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 
 export const metadata = { title: "Privacy Policy | Hup Up Attractions" };
 export const revalidate = 3600;
@@ -6,7 +7,7 @@ export const revalidate = 3600;
 export default function Privacy() {
   return (
     <LegalPage title="Privacy Policy" updated="November 2026">
-      <p>Hup Up Attractions respects your privacy. This policy explains what information we collect when you call, text, or book with us, and how we use it.</p>
+      <p>{BUSINESS_NAME_NB} respects your privacy. This policy explains what information we collect when you call, text, or book with us, and how we use it.</p>
       <h2>Information we collect</h2>
       <ul>
         <li>Your name, phone number, email address, and delivery address when you make a reservation.</li>
