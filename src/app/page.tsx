@@ -48,14 +48,14 @@ export default async function Home() {
       <main>
         {/* HERO: big type on the left, a bold "call to book" board on the right */}
         <section className="bg-hu-sky">
-          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-8 pt-10 sm:px-6 lg:grid-cols-[1.25fr_1fr] lg:gap-14 lg:pb-12 lg:pt-16">
+          <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] items-center gap-10 px-4 pb-8 pt-10 sm:px-6 lg:grid-cols-[1.25fr_1fr] lg:gap-14 lg:pb-12 lg:pt-16">
             <div>
               <span className="hu-sticker -rotate-2">Reservations by phone</span>
-              <h1 className="mt-5 text-[2.5rem] font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-[4.1rem]">{SLOGAN}</h1>
+              <h1 className="mt-5 text-[2.15rem] min-[360px]:text-[2.5rem] font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-[4.1rem]">{SLOGAN}</h1>
               <p className="mt-5 max-w-xl text-lg font-medium leading-relaxed sm:text-xl">{INTRO}</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <CallButton phone={c.phoneE164} label="CALL NOW TO BOOK" className="!min-h-14 !px-8 text-lg" />
-                <a href="#rentals" className="hu-btn-outline !min-h-14 !px-8 text-lg">
+                <CallButton phone={c.phoneE164} label="CALL NOW TO BOOK" className="!min-h-14 !px-5 text-lg min-[360px]:!px-8" />
+                <a href="#rentals" className="hu-btn-outline !min-h-14 !px-5 text-lg min-[360px]:!px-8">
                   EXPLORE OUR RENTALS
                 </a>
               </div>
@@ -64,11 +64,11 @@ export default async function Home() {
             <div className="relative">
               <div className="rounded-[2rem] border-[3px] border-hu-deep bg-white p-6 shadow-[8px_8px_0_#123D73] sm:p-8">
                 <p className="text-sm font-extrabold uppercase tracking-[0.18em] opacity-75">Call to book</p>
-                <a href={`tel:${c.phoneE164}`} className="mt-1 flex items-center gap-3 whitespace-nowrap text-[1.7rem] font-extrabold leading-tight min-[400px]:text-[2rem] sm:text-[2.6rem]">
+                <a data-hero-phone href={`tel:${c.phoneE164}`} className="mt-1 flex items-center gap-3 whitespace-nowrap text-[1.7rem] font-extrabold leading-tight min-[400px]:text-[2rem] sm:text-[2.6rem]">
                   <Phone className="h-7 w-7 shrink-0 sm:h-9 sm:w-9" strokeWidth={ICON_STROKE} aria-hidden />
                   {c.phoneDisplay}
                 </a>
-                <ul className="mt-6 divide-y-2 divide-hu-deep/10 border-t-2 border-hu-deep/10">
+                <ul className="mt-6 divide-y-2 divide-hu-deep/10 border-t-2 border-hu-deep/10 pr-24 sm:pr-28">
                   {c.categories.map((cat) => (
                     <li key={cat.id}>
                       <a href={`#${cat.slug}`} className="flex items-center gap-4 py-3.5 text-lg font-bold hover:underline">
@@ -79,9 +79,16 @@ export default async function Home() {
                   ))}
                 </ul>
               </div>
-              <span className="absolute -top-6 right-3 grid h-20 w-20 rotate-12 text-xs sm:h-24 sm:w-24 sm:text-sm lg:-right-6 lg:h-28 lg:w-28 place-items-center rounded-full border-2 border-hu-deep bg-hu-yellow text-center font-extrabold uppercase leading-tight">
-                <Truck className="mb-0.5 h-6 w-6" strokeWidth={ICON_STROKE} aria-hidden />
-                We deliver
+              {/* Sticker sits on the board's bottom-right corner, clear of the phone number at every width */}
+              <span
+                data-sticker="we-deliver"
+                className="absolute -bottom-8 right-3 grid h-20 w-20 rotate-12 place-items-center rounded-full border-2 border-hu-deep bg-hu-yellow text-center text-xs font-extrabold uppercase leading-tight sm:-bottom-10 sm:right-4 sm:h-24 sm:w-24 sm:text-sm"
+              >
+                <span className="flex flex-col items-center">
+                  <Truck className="mb-0.5 h-5 w-5 sm:h-6 sm:w-6" strokeWidth={ICON_STROKE} aria-hidden />
+                  <span>We</span>
+                  <span>deliver</span>
+                </span>
               </span>
             </div>
           </div>

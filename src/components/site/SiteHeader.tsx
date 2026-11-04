@@ -29,7 +29,8 @@ export default function SiteHeader({ logoUrl, phoneDisplay, phoneE164 }: { logoU
           </a>
           <CallButton phone={phoneE164} className="hidden !min-h-11 !px-5 !py-2 sm:inline-flex" />
           <a href={`tel:${phoneE164}`} className="hu-btn !min-h-11 !gap-1.5 !px-3 sm:hidden" aria-label={`Call ${phoneDisplay} to book`}>
-            <Phone className="h-5 w-5" strokeWidth={ICON_STROKE} aria-hidden /> CALL
+            <Phone className="h-5 w-5" strokeWidth={ICON_STROKE} aria-hidden />
+            <span className="hidden min-[360px]:inline">CALL</span>
           </a>
           {/* Mobile menu: no JavaScript needed */}
           <details className="group relative lg:hidden">
