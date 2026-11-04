@@ -95,3 +95,15 @@ describe("rentals list", () => {
     expect(readFileSync("src/app/page.tsx", "utf8")).not.toMatch(/padStart\(2/);
   });
 });
+
+describe("contact list", () => {
+  it("phone row matches the other rows and the service area shows the main area", () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    const contact = page.slice(page.indexOf('id="contact"'));
+    expect(contact).toContain('href={`tel:${c.phoneE164}`} className="font-semibold underline underline-offset-4"');
+    expect(contact).not.toMatch(/text-xl font-extrabold underline/);
+    expect(contact).toContain("{c.serviceArea.main}");
+    expect(contact).not.toMatch(/Call to check your area/);
+    expect(page).toContain("md:items-center");
+  });
+});

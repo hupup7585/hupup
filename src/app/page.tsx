@@ -219,7 +219,7 @@ export default async function Home() {
 
         {/* CONTACT */}
         <section id="contact" className="scroll-mt-20 bg-white py-14 sm:py-20">
-          <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 md:grid-cols-2">
+          <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 md:grid-cols-2 md:items-center md:gap-10">
             <SectionTitle kicker="Get in touch" title="Contact Us" />
             <dl className="divide-y-2 divide-hu-deep/10 border-y-2 border-hu-deep/10 text-lg">
               <div className="flex items-center gap-4 py-4">
@@ -234,7 +234,7 @@ export default async function Home() {
                 <div>
                   <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Phone</dt>
                   <dd>
-                    <a href={`tel:${c.phoneE164}`} className="text-xl font-extrabold underline underline-offset-4">
+                    <a href={`tel:${c.phoneE164}`} className="font-semibold underline underline-offset-4">
                       {c.phoneDisplay}
                     </a>
                   </dd>
