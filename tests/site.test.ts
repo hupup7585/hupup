@@ -129,8 +129,8 @@ describe("delivery fee wording", () => {
       expect(t, f).not.toMatch(/delivery[^.\n]{0,40}\$\d/i);
     }
     const page = readFileSync("src/app/page.tsx", "utf8");
-    // Hero badge (Abram 9:58 PM): solid yellow, "OPTION FOR DELIVERY", no white pill
-    expect(page).toContain('aria-label="Option for delivery"');
+    // Hero badge (Abram 9:58 PM): solid yellow, "DELIVERY OPTION AVAILABLE", no white pill
+    expect(page).toContain('aria-label="Delivery option available"');
     expect(page).not.toContain("fee applies");
     expect(page).not.toMatch(/rounded-full bg-white px-1\.5/);
     expect(page).toContain("Delivery available for an additional fee"); // meta description

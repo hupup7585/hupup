@@ -106,12 +106,13 @@ export default async function Home() {
               <span
                 data-sticker="delivery-option"
                 className="absolute -bottom-12 right-2 flex h-[6.5rem] w-[6.5rem] rotate-12 items-center justify-center rounded-full border-2 border-hu-deep bg-hu-yellow text-center text-[10px] font-extrabold uppercase leading-[1.15] sm:-bottom-14 sm:right-3 sm:h-[7.5rem] sm:w-[7.5rem] sm:text-[11.5px]"
-                aria-label="Option for delivery"
+                aria-label="Delivery option available"
               >
                 <span data-badge-group className="flex flex-col items-center gap-0.5 text-hu-deep">
                   <Truck className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={ICON_STROKE} aria-hidden />
-                  <span>Option</span>
-                  <span>for delivery</span>
+                  <span>Delivery</span>
+                  <span>option</span>
+                  <span>available</span>
                 </span>
               </span>
             </div>
