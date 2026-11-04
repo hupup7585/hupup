@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
-import { FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
+import { DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -12,7 +12,7 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Hup Up Attractions | Bounce House, Laser Tag and Paddle Boat Rentals",
   description:
-    "Hup Up Attractions offers bounce house, laser tag, inflatable maze, and paddle boat rentals for parties and events in Kiryas Joel / Town of Palm Tree, Monroe, Chester, and nearby Orange County, NY towns. Call (845) 777-7585 to book.",
+    "Hup Up Attractions offers bounce house, laser tag, inflatable maze, and paddle boat rentals for parties and events in Kiryas Joel / Town of Palm Tree, Monroe, Chester, and nearby Orange County, NY towns. Delivery available for an additional fee. Call (845) 777-7585 to book.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Hup Up Attractions | Party and Event Rentals",
@@ -85,12 +85,13 @@ export default async function Home() {
               {/* Sticker sits on the board's bottom-right corner, clear of the phone number at every width */}
               <span
                 data-sticker="we-deliver"
-                className="absolute -bottom-8 right-3 grid h-20 w-20 rotate-12 place-items-center rounded-full border-2 border-hu-deep bg-hu-yellow text-center text-xs font-extrabold uppercase leading-tight sm:-bottom-10 sm:right-4 sm:h-24 sm:w-24 sm:text-sm"
+                className="absolute -bottom-10 right-2 grid h-24 w-24 rotate-12 place-items-center rounded-full border-2 border-hu-deep bg-hu-yellow text-center text-[11px] font-extrabold uppercase leading-tight sm:-bottom-12 sm:right-3 sm:h-28 sm:w-28 sm:text-[13px]"
+                aria-label="We deliver, delivery fee applies"
               >
                 <span className="flex flex-col items-center">
                   <Truck className="mb-0.5 h-5 w-5 sm:h-6 sm:w-6" strokeWidth={ICON_STROKE} aria-hidden />
-                  <span>We</span>
-                  <span>deliver</span>
+                  <span>We deliver</span>
+                  <span className="mt-1 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold normal-case leading-none sm:text-[11px]">fee applies</span>
                 </span>
               </span>
             </div>
@@ -166,6 +167,10 @@ export default async function Home() {
                 );
               })}
             </ol>
+            <p className="mt-10 inline-flex items-center gap-3 rounded-2xl bg-hu-tint px-4 py-3 text-base font-semibold">
+              <Truck className="h-5 w-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
+              {DELIVERY_FEE_NOTE}
+            </p>
           </div>
         </section>
 
@@ -188,6 +193,10 @@ export default async function Home() {
                   ))}
                 </p>
                 <p className="mt-3 text-lg font-medium">{c.serviceArea.region}</p>
+                <p className="mt-2 flex items-center gap-2 text-base font-semibold">
+                  <Truck className="h-5 w-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
+                  {DELIVERY_FEE_NOTE}
+                </p>
                 <CallButton phone={c.phoneE164} className="mt-6" />
               </div>
               <div className="rounded-3xl bg-hu-tint p-6 sm:p-7">
@@ -199,7 +208,7 @@ export default async function Home() {
                     </li>
                   ))}
                 </ul>
-                <p className="mt-4 text-base">All in {c.serviceArea.region}.</p>
+                <p className="mt-4 text-base">All in {c.serviceArea.region}. {DELIVERY_FEE_SHORT}</p>
               </div>
             </div>
           </div>

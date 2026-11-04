@@ -10,7 +10,7 @@ export default function Terms() {
       <h2>Reservations</h2>
       <p>Reservations are made over the phone. A reservation is confirmed once payment is received or our team confirms it with you.</p>
       <h2>Delivery and pickup</h2>
-      <p>We deliver rentals on your event date and pick them up as arranged with you. Please make sure the setup area is accessible and suitable for the rental.</p>
+      <p>Delivery is available for an additional fee, which our team will quote when you book. We deliver rentals on your event date and pick them up as arranged with you. Please make sure the setup area is accessible and suitable for the rental.</p>
       <h2>Safety</h2>
       <p>Rentals must be used as instructed by our team and under adult supervision at all times.</p>
       <h2>Text messages</h2>

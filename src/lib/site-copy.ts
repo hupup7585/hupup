@@ -4,10 +4,10 @@ export const INTRO =
   "Make your next event unforgettable with exciting attractions and rentals from Hup Up Attractions. We bring something special to parties, schools, celebrations, and special occasions.";
 export const WHY = [
   "Exciting rental attractions",
-  "Options for different types of events",
+  "Options for all types of events",
   "Convenient phone reservations",
   "Professional customer service",
-  "Delivery arrangements",
+  "Delivery arrangements for an additional fee",
   "Simple booking process",
 ];
 export const STEPS = [
@@ -15,6 +15,10 @@ export const STEPS = [
   ["STEP 2", "CALL", "Call us to discuss rental options, availability, and pricing."],
   ["STEP 3", "CONFIRM", "Complete your reservation over the phone with our team."],
 ] as const;
+/** Delivery always costs extra. Never state an amount (not supplied yet) or suggest it costs nothing. */
+export const DELIVERY_FEE_NOTE = "Delivery available for an additional fee. Call for pricing.";
+export const DELIVERY_FEE_SHORT = "Delivery fee applies, call for pricing.";
+
 export const FINAL_CTA_TITLE = "READY TO MAKE YOUR EVENT SPECIAL?";
 export const FINAL_CTA_TEXT = "Contact Hup Up Attractions today to explore our rental options and reserve your attraction.";
 

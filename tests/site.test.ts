@@ -107,3 +107,24 @@ describe("contact list", () => {
     expect(page).toContain("md:items-center");
   });
 });
+
+describe("delivery fee wording", () => {
+  it("delivery is always described as an additional fee, never free, with no amount", async () => {
+    const { DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, WHY } = await import("@/lib/site-copy");
+    expect(DELIVERY_FEE_NOTE).toBe("Delivery available for an additional fee. Call for pricing.");
+    expect(DELIVERY_FEE_SHORT).toBe("Delivery fee applies, call for pricing.");
+    expect(WHY).toContain("Delivery arrangements for an additional fee");
+    expect(WHY).toContain("Options for all types of events");
+    expect(WHY).not.toContain("Options for different types of events");
+    const files = ["src/app/page.tsx", "src/lib/site-copy.ts", "src/app/terms/page.tsx", "src/components/site/SiteFooter.tsx"];
+    for (const f of files) {
+      const t = readFileSync(f, "utf8");
+      expect(t, f).not.toMatch(/free delivery|delivery (is )?free|free of charge|no delivery fee|includes delivery/i);
+      expect(t, f).not.toMatch(/delivery[^.\n]{0,40}\$\d/i);
+    }
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain("fee applies");
+    expect(page).toContain("Delivery available for an additional fee");
+    expect(page.match(/DELIVERY_FEE_NOTE/g)!.length).toBeGreaterThanOrEqual(3); // import + How It Works + Service Area
+  });
+});
