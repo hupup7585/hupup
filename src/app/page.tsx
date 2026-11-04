@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
-import { BUSINESS_NAME_NB, keepName, noLonelyWord, whyLabel, DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, SERVICE_AREA_DELIVERY_NOTE, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
+import { BUSINESS_NAME_NB, keepName, noLonelyWord, whyLabel, whyRows, DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, SERVICE_AREA_DELIVERY_NOTE, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -164,7 +164,17 @@ export default async function Home() {
               {WHY.map((w, i) => (
                 <li key={w} className="flex w-full items-center gap-4 border-b-2 border-hu-deep/10 py-4 text-lg font-semibold">
                   <IconTile icon={WHY_ICONS[i]} tone="white" />
-                  <span className="min-w-0 flex-1 [text-wrap:balance]">{whyLabel(w)}</span>
+                  {(() => {
+                    const rows = whyRows(w);
+                    return rows ? (
+                      <span data-why-rows className="min-w-0 flex-1">
+                        <span className="block">{rows[0]}</span>
+                        <span className="block">{rows[1]}</span>
+                      </span>
+                    ) : (
+                      <span className="min-w-0 flex-1 [text-wrap:balance]">{whyLabel(w)}</span>
+                    );
+                  })()}
                 </li>
               ))}
             </ul>

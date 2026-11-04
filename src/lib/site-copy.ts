@@ -7,7 +7,7 @@ export const WHY = [
   "Options for all types of events",
   "Convenient phone reservations",
   "Friendly customer service",
-  "Delivery available in our service areas",
+  "Delivery option available",
   "Simple booking process",
 ];
 export const STEPS = [
@@ -60,6 +60,17 @@ export function noLonelyWord(text: string): string {
 export const WHY_LINE_BREAKS: Record<string, [string, string]> = {
   "Options for all types of events": ["Options for", "all types of events"], // Abram 10:51 PM
 };
+
+/** Labels Abram wants on exactly these two rows at every width (Abram Nov 4, 2:08 PM). */
+export const WHY_FORCED_LINES: Record<string, [string, string]> = {
+  "Delivery option available": ["Delivery", "option available"],
+};
+
+/** The two fixed rows for a label, or null when it wraps naturally. */
+export function whyRows(text: string): [string, string] | null {
+  const rows = WHY_FORCED_LINES[text];
+  return rows ? [rows[0], rows[1].replace(/ /g, "\u00A0")] : null;
+}
 
 export function whyLabel(text: string): string {
   const parts = WHY_LINE_BREAKS[text];

@@ -116,7 +116,7 @@ describe("delivery fee wording", () => {
     const { DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, WHY } = await import("@/lib/site-copy");
     expect(DELIVERY_FEE_NOTE).toBe("Delivery available. Call for pricing.");
     expect(DELIVERY_FEE_SHORT).toBe("Delivery fee applies, call for pricing.");
-    expect(WHY).toContain("Delivery available in our service areas"); // Abram 10:50 PM
+    expect(WHY).toContain("Delivery option available"); // Abram Nov 4, 2:08 PM
     expect(WHY).not.toContain("Delivery arrangements for an additional fee");
     expect(WHY).toContain("Options for all types of events");
     expect(WHY).not.toContain("Options for different types of events");
@@ -269,18 +269,29 @@ describe("Kiryas Joel box delivery line (Abram 10:46 PM)", () => {
 });
 
 describe("Why Choose delivery item (Abram 10:50 PM)", () => {
-  it("is exactly 'Delivery available in our service areas', no period, same position and truck icon", async () => {
+  it("is exactly 'Delivery option available', no period, same position and truck icon", async () => {
     const { WHY } = await import("@/lib/site-copy");
     expect(WHY).toEqual([
       "Exciting rental attractions",
       "Options for all types of events",
       "Convenient phone reservations",
       "Friendly customer service",
-      "Delivery available in our service areas",
+      "Delivery option available",
       "Simple booking process",
     ]);
     const page = readFileSync("src/app/page.tsx", "utf8");
     expect(page).toContain("const WHY_ICONS = [PartyPopper, ListChecks, PhoneCall, Headset, Truck, ClipboardCheck];");
+  });
+});
+
+describe("'Delivery / option available' rows (Abram Nov 4, 2:08 PM)", () => {
+  it("always renders as two rows: 'Delivery' then 'option available'", async () => {
+    const { whyRows, WHY } = await import("@/lib/site-copy");
+    expect(whyRows("Delivery option available")).toEqual(["Delivery", "option\u00A0available"]);
+    expect(whyRows(WHY[0])).toBeNull();
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain('<span className="block">{rows[0]}</span>');
+    expect(page).toContain('<span className="block">{rows[1]}</span>');
   });
 });
 
