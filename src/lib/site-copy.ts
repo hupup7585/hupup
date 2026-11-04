@@ -7,7 +7,7 @@ export const WHY = [
   "Options for all types of events",
   "Convenient phone reservations",
   "Friendly customer service",
-  "Delivery arrangements for an additional fee",
+  "Delivery available in our service areas",
   "Simple booking process",
 ];
 export const STEPS = [

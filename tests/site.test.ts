@@ -116,7 +116,8 @@ describe("delivery fee wording", () => {
     const { DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, WHY } = await import("@/lib/site-copy");
     expect(DELIVERY_FEE_NOTE).toBe("Delivery available. Call for pricing.");
     expect(DELIVERY_FEE_SHORT).toBe("Delivery fee applies, call for pricing.");
-    expect(WHY).toContain("Delivery arrangements for an additional fee");
+    expect(WHY).toContain("Delivery available in our service areas"); // Abram 10:50 PM
+    expect(WHY).not.toContain("Delivery arrangements for an additional fee");
     expect(WHY).toContain("Options for all types of events");
     expect(WHY).not.toContain("Options for different types of events");
     expect(WHY).toContain("Friendly customer service");
@@ -264,5 +265,21 @@ describe("Kiryas Joel box delivery line (Abram 10:46 PM)", () => {
     expect(box).toContain("{noLonelyWord(SERVICE_AREA_DELIVERY_NOTE)}");
     const how = page.slice(page.indexOf('id="how-it-works"'), page.indexOf('id="service-area"'));
     expect(how).toContain("{DELIVERY_FEE_NOTE}");
+  });
+});
+
+describe("Why Choose delivery item (Abram 10:50 PM)", () => {
+  it("is exactly 'Delivery available in our service areas', no period, same position and truck icon", async () => {
+    const { WHY } = await import("@/lib/site-copy");
+    expect(WHY).toEqual([
+      "Exciting rental attractions",
+      "Options for all types of events",
+      "Convenient phone reservations",
+      "Friendly customer service",
+      "Delivery available in our service areas",
+      "Simple booking process",
+    ]);
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain("const WHY_ICONS = [PartyPopper, ListChecks, PhoneCall, Headset, Truck, ClipboardCheck];");
   });
 });
