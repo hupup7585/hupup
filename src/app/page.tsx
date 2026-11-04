@@ -22,6 +22,23 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Even chip grid: each chip spans 2 tracks (4 tracks = 2 columns on phones, 8 tracks = 4 columns from md/768px).
+ * The leftover last row is centered by starting its first chip later.
+ */
+function townCentering(i: number, count: number): string {
+  const classes: string[] = [];
+  if (count % 2 === 1 && i === count - 1) classes.push("col-start-2");
+  const r4 = count % 4;
+  const firstOfLastRow = count - r4;
+  if (r4 > 0 && i === firstOfLastRow) {
+    classes.push(r4 === 3 ? "md:col-start-2" : r4 === 2 ? "md:col-start-3" : "md:col-start-4");
+  } else if (count % 2 === 1 && i === count - 1) {
+    classes.push("md:col-start-auto");
+  }
+  return classes.join(" ");
+}
+
 const WHY_ICONS = [PartyPopper, ListChecks, PhoneCall, Headset, Truck, ClipboardCheck];
 const STEP_ICONS = [Search, PhoneCall, CalendarCheck];
 
@@ -184,8 +201,9 @@ export default async function Home() {
               <IconTile icon={MapPin} tone="white" size="lg" />
               <h2 className="text-3xl font-extrabold sm:text-4xl lg:text-5xl">Service Area</h2>
             </div>
-            <div className="mt-8 grid gap-6 lg:grid-cols-[1.15fr_1fr] lg:items-start">
-              <div className="rounded-[2rem] border-[3px] border-hu-deep bg-white p-6 shadow-[6px_6px_0_#123D73] sm:p-8">
+            <div className="mt-8 grid gap-6">
+              <div className="rounded-[2rem] border-[3px] border-hu-deep bg-white p-6 shadow-[6px_6px_0_#123D73] sm:p-8 lg:flex lg:items-center lg:justify-between lg:gap-8">
+                <div>
                 <p className="text-base font-extrabold uppercase tracking-[0.14em] text-hu-deep/75">{c.serviceArea.mainLabel}</p>
                 <p className="mt-2 text-4xl font-extrabold leading-tight sm:text-5xl">{c.serviceArea.main}</p>
                 <p className="mt-2 text-base font-medium text-hu-deep/80">{c.serviceArea.mainSub}</p>
@@ -193,14 +211,25 @@ export default async function Home() {
                   <Truck className="h-5 w-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
                   {DELIVERY_FEE_NOTE}
                 </p>
-                <CallButton phone={c.phoneE164} className="mt-6" />
+                </div>
+                <CallButton phone={c.phoneE164} className="mt-6 shrink-0 lg:mt-0 lg:!min-h-14 lg:!px-8 lg:text-lg" />
               </div>
-              <div className="rounded-3xl bg-hu-tint p-6 sm:p-7">
+              <div className="rounded-3xl bg-hu-tint p-4 min-[360px]:p-5 sm:p-7">
                 <h3 className="text-lg font-bold">{c.serviceArea.alsoTitle}</h3>
-                <ul className="mt-4 flex flex-wrap gap-2">
-                  {c.serviceArea.also.map((town) => (
-                    <li key={town} className="rounded-2xl border-2 border-hu-deep/20 bg-white px-3.5 py-1.5 text-base font-semibold">
-                      {town}
+                <ul className="mt-4 grid auto-rows-fr grid-cols-4 gap-2 md:grid-cols-8">
+                  {c.serviceArea.also.map((town, i, all) => (
+                    <li
+                      key={town}
+                      className={`col-span-2 flex items-center justify-center rounded-2xl border-2 border-hu-deep/20 bg-white px-1.5 py-2.5 text-center text-[13px] font-semibold leading-snug min-[360px]:text-[15px] md:px-3 md:py-3 md:text-base ${townCentering(i, all.length)}`}
+                    >
+                      {town.includes(" and ") ? (
+                        <span>
+                          {town.split(" and ")[0]} and
+                          <span className="block"> {town.split(" and ")[1]}</span>
+                        </span>
+                      ) : (
+                        town
+                      )}
                     </li>
                   ))}
                 </ul>

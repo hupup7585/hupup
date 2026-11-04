@@ -181,3 +181,12 @@ describe("Kiryas Joel is one place", () => {
     }
   });
 });
+
+describe("nearby towns grid", () => {
+  it("is an even grid: 2 columns on phones, 4 from 768px, leftover row centered", async () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain("grid auto-rows-fr grid-cols-4 gap-2 md:grid-cols-8");
+    expect(page).toContain("col-span-2 flex items-center justify-center");
+    expect(page).not.toMatch(/flex flex-wrap gap-2/);
+  });
+});
