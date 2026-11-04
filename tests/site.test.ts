@@ -202,7 +202,7 @@ describe("Why Choose layout and badge (Abram 10:25-10:30 PM)", () => {
     expect(noLonelyWord("Options for all types of events")).toBe("Options for all types of events");
     expect(noLonelyWord("Single")).toBe("Single");
     const page = readFileSync("src/app/page.tsx", "utf8");
-    expect(page).toContain("[text-wrap:balance]\">{noLonelyWord(w)}");
+    expect(page).toContain("[text-wrap:balance]\">{whyLabel(w)}");
     expect(page).toContain("grid auto-rows-fr gap-x-10 sm:grid-cols-2");
   });
   it("heading column is sized to the business name with a 64px gap", () => {
@@ -281,5 +281,15 @@ describe("Why Choose delivery item (Abram 10:50 PM)", () => {
     ]);
     const page = readFileSync("src/app/page.tsx", "utf8");
     expect(page).toContain("const WHY_ICONS = [PartyPopper, ListChecks, PhoneCall, Headset, Truck, ClipboardCheck];");
+  });
+});
+
+describe("'Options for / all types of events' break (Abram 10:51 PM)", () => {
+  it("can only break between 'for' and 'all'; wording unchanged", async () => {
+    const { whyLabel } = await import("@/lib/site-copy");
+    const out = whyLabel("Options for all types of events");
+    expect(out.replace(/\u00A0/g, " ")).toBe("Options for all types of events");
+    expect(out.split(" ")).toEqual(["Options\u00A0for", "all\u00A0types\u00A0of\u00A0events"]);
+    expect(whyLabel("Friendly customer service")).toBe("Friendly customer\u00A0service");
   });
 });

@@ -52,3 +52,17 @@ export function noLonelyWord(text: string): string {
   const i = text.lastIndexOf(" ");
   return i > 0 ? `${text.slice(0, i)} ${text.slice(i + 1)}` : text;
 }
+
+/**
+ * Exact line breaks Abram chose for specific Why Choose labels (used whenever the label
+ * needs two lines; on wide screens it still fits on one). Each part is kept unbreakable.
+ */
+export const WHY_LINE_BREAKS: Record<string, [string, string]> = {
+  "Options for all types of events": ["Options for", "all types of events"], // Abram 10:51 PM
+};
+
+export function whyLabel(text: string): string {
+  const parts = WHY_LINE_BREAKS[text];
+  if (!parts) return noLonelyWord(text);
+  return parts.map((p) => p.replace(/ /g, " ")).join(" ");
+}
