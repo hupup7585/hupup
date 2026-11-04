@@ -6,7 +6,7 @@ export const WHY = [
   "Exciting rental attractions",
   "Options for all types of events",
   "Convenient phone reservations",
-  "Professional customer service",
+  "Friendly customer service",
   "Delivery arrangements for an additional fee",
   "Simple booking process",
 ];

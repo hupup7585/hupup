@@ -116,6 +116,8 @@ describe("delivery fee wording", () => {
     expect(WHY).toContain("Delivery arrangements for an additional fee");
     expect(WHY).toContain("Options for all types of events");
     expect(WHY).not.toContain("Options for different types of events");
+    expect(WHY).toContain("Friendly customer service");
+    expect(WHY).not.toContain("Professional customer service");
     const files = ["src/app/page.tsx", "src/lib/site-copy.ts", "src/app/terms/page.tsx", "src/components/site/SiteFooter.tsx"];
     for (const f of files) {
       const t = readFileSync(f, "utf8");
