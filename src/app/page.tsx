@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Truck } from "lucide-react";
+import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
 import { BUSINESS_NAME_NB, keepName, noLonelyWord, DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
@@ -264,7 +264,7 @@ export default async function Home() {
             <SectionTitle kicker="Get in touch" title="Contact Us" />
             <dl className="divide-y-2 divide-hu-deep/10 border-y-2 border-hu-deep/10 text-lg">
               <div className="flex items-center gap-4 py-4">
-                <IconTile icon={PartyPopper} tone="sky" />
+                <IconTile icon={Store} tone="sky" />
                 <div>
                   <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Business</dt>
                   <dd className="font-semibold">{BUSINESS_NAME_NB}</dd>

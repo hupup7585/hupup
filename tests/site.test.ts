@@ -243,3 +243,12 @@ describe("nearby-towns footnote stays exactly as Abram approved (10:39 PM)", () 
     expect(readFileSync("src/app/page.tsx", "utf8")).toContain('<p className="mt-4 text-base">All in {c.serviceArea.region}. {DELIVERY_FEE_SHORT}</p>');
   });
 });
+
+describe("contact list Business icon (Abram 10:43 PM)", () => {
+  it("uses the Lucide Store icon in the same sky tile", () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    const contact = page.slice(page.indexOf('id="contact"'));
+    expect(contact).toMatch(/<IconTile icon=\{Store\} tone="sky" \/>\s*<div>\s*<dt[^>]*>Business<\/dt>/);
+    expect(contact).not.toContain("icon={PartyPopper}");
+  });
+});
