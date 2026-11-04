@@ -1,10 +1,18 @@
 export const BUSINESS_NAME = "Hup Up Attractions";
 export const DEFAULT_VOICE = "Google.en-US-Chirp3-HD-Fenrir";
+/** Public business number for the website (forwards to the Twilio hotline). */
+export const PUBLIC_PHONE_DISPLAY = "(845) 777-7585";
+export const PUBLIC_PHONE_E164 = "+18457777585";
 
 export const config = {
   baseUrl: () => (process.env.PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, ""),
-  hotlineDisplay: process.env.NEXT_PUBLIC_HOTLINE_DISPLAY || "(845) 000-0000",
-  hotlineE164: process.env.NEXT_PUBLIC_HOTLINE_E164 || "+18450000000",
+  /**
+   * PUBLIC number shown on the website (display + tel: links only). Abram forwards it to the
+   * Twilio hotline. The IVR, transfers and SMS sending use TWILIO_PHONE_NUMBER, never this.
+   */
+  hotlineDisplay: process.env.NEXT_PUBLIC_HOTLINE_DISPLAY || PUBLIC_PHONE_DISPLAY,
+  hotlineE164: process.env.NEXT_PUBLIC_HOTLINE_E164 || PUBLIC_PHONE_E164,
+  publicEmail: "hupupattractions@gmail.com",
   /** Hotline voice. Abram's choice: Google Chirp3-HD "Fenrir" (young, friendly male). Plain text only, no SSML. */
   voice: () => process.env.IVR_VOICE || DEFAULT_VOICE,
   adminEmail: () => process.env.ADMIN_EMAIL || "",
