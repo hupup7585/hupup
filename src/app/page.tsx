@@ -150,11 +150,11 @@ export default async function Home() {
           <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[min-content_minmax(0,1fr)] lg:items-center lg:gap-16">
             <div>
               <SectionTitle title="Why Choose Hup Up Attractions" compactLg />
-              {/* Secondary line under the heading: 60% of the heading size at every width (Abram 10:52 PM); icon scales with the text */}
+              {/* Secondary line under the heading: 60% of the heading size at every width (Abram 10:52 PM); icon scales with the text; one solid yellow line under icon + number (Abram 2:10 PM) */}
               <a
                 data-why-phone
                 href={`tel:${c.phoneE164}`}
-                className="mt-8 inline-flex items-center gap-[0.4em] text-[1.02rem] font-bold underline decoration-hu-yellow decoration-[3px] underline-offset-[5px] min-[370px]:text-[1.125rem] sm:text-[1.35rem] xl:text-[1.8rem]"
+                className="relative mt-8 inline-flex items-center gap-[0.4em] text-[1.02rem] font-bold after:absolute after:inset-x-0 after:top-[calc(100%-0.43em+5px)] after:h-[3px] after:bg-hu-yellow after:content-[''] min-[370px]:text-[1.125rem] sm:text-[1.35rem] xl:text-[1.8rem]"
               >
                 <Phone className="h-[0.9em] w-[0.9em] shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
                 {c.phoneDisplay}

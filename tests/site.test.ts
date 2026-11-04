@@ -212,7 +212,7 @@ describe("Why Choose layout and badge (Abram 10:25-10:30 PM)", () => {
   it("phone line under the heading is a smaller, thin-underlined tap-to-call link", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
     expect(page).toMatch(/data-why-phone[\s\S]{0,80}href=\{`tel:\$\{c\.phoneE164\}`\}/);
-    expect(page).toContain("decoration-[3px] underline-offset-[5px]");
+    expect(page).toContain("after:top-[calc(100%-0.43em+5px)] after:h-[3px] after:bg-hu-yellow"); // same 3px thickness, 5px below the baseline
     expect(page).not.toContain("text-2xl font-extrabold underline decoration-hu-yellow decoration-[6px]");
   });
   it("delivery note is centered under the steps", () => {
@@ -308,7 +308,10 @@ describe("'Options for / all types of events' break (Abram 10:51 PM)", () => {
 describe("Why Choose phone line size (Abram 10:52 PM)", () => {
   it("is about 60% of the heading at each breakpoint, icon scales with it, thin underline kept", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
-    expect(page).toContain("text-[1.02rem] font-bold underline decoration-hu-yellow decoration-[3px] underline-offset-[5px] min-[370px]:text-[1.125rem] sm:text-[1.35rem] xl:text-[1.8rem]");
+    expect(page).toContain("text-[1.02rem] font-bold after:absolute after:inset-x-0 after:top-[calc(100%-0.43em+5px)] after:h-[3px] after:bg-hu-yellow after:content-[\'\'] min-[370px]:text-[1.125rem] sm:text-[1.35rem] xl:text-[1.8rem]");
+    // One unbroken line (Abram 2:10 PM): no text underline that skips ink or the icon
+    const phone = page.slice(page.indexOf("data-why-phone"), page.indexOf("data-why-phone") + 600);
+    expect(phone).not.toContain("underline");
     expect(page).toContain('<Phone className="h-[0.9em] w-[0.9em] shrink-0"');
   });
 });
