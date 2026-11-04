@@ -17,6 +17,8 @@ export const STEPS = [
 ] as const;
 /** Delivery always costs extra. Never state an amount (not supplied yet) or suggest it costs nothing. */
 export const DELIVERY_FEE_NOTE = "Delivery available. Call for pricing.";
+/** Kiryas Joel box only (Abram 10:46 PM). */
+export const SERVICE_AREA_DELIVERY_NOTE = "Delivery available for an additional fee.";
 export const DELIVERY_FEE_SHORT = "Delivery fee applies, call for pricing.";
 
 export const FINAL_CTA_TITLE = "READY TO MAKE YOUR EVENT SPECIAL?";

@@ -133,7 +133,7 @@ describe("delivery fee wording", () => {
     expect(page).not.toContain("fee applies");
     expect(page).not.toMatch(/rounded-full bg-white px-1\.5/);
     expect(page).toContain("Delivery available for an additional fee"); // meta description
-    expect(page.match(/DELIVERY_FEE_NOTE/g)!.length).toBeGreaterThanOrEqual(3); // import + How It Works + Service Area
+    expect(page.match(/DELIVERY_FEE_NOTE/g)!.length).toBeGreaterThanOrEqual(2); // import + How It Works
   });
 });
 
@@ -250,5 +250,19 @@ describe("contact list Business icon (Abram 10:43 PM)", () => {
     const contact = page.slice(page.indexOf('id="contact"'));
     expect(contact).toMatch(/<IconTile icon=\{Store\} tone="sky" \/>\s*<div>\s*<dt[^>]*>Business<\/dt>/);
     expect(contact).not.toContain("icon={PartyPopper}");
+  });
+});
+
+describe("Kiryas Joel box delivery line (Abram 10:46 PM)", () => {
+  it("has its own text; How It Works note and towns footnote unchanged", async () => {
+    const { SERVICE_AREA_DELIVERY_NOTE, DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT } = await import("@/lib/site-copy");
+    expect(SERVICE_AREA_DELIVERY_NOTE).toBe("Delivery available for an additional fee.");
+    expect(DELIVERY_FEE_NOTE).toBe("Delivery available. Call for pricing.");
+    expect(DELIVERY_FEE_SHORT).toBe("Delivery fee applies, call for pricing.");
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    const box = page.slice(page.indexOf("data-sa-delivery-note"), page.indexOf("data-sa-delivery-note") + 600);
+    expect(box).toContain("{noLonelyWord(SERVICE_AREA_DELIVERY_NOTE)}");
+    const how = page.slice(page.indexOf('id="how-it-works"'), page.indexOf('id="service-area"'));
+    expect(how).toContain("{DELIVERY_FEE_NOTE}");
   });
 });

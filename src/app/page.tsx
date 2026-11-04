@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
-import { BUSINESS_NAME_NB, keepName, noLonelyWord, DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
+import { BUSINESS_NAME_NB, keepName, noLonelyWord, DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, SERVICE_AREA_DELIVERY_NOTE, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -217,7 +217,7 @@ export default async function Home() {
                 {/* Calm note: regular weight, slightly smaller, 16px+ clear above and below, icon aligned to the first line */}
                 <p data-sa-delivery-note className="mt-4 flex items-start gap-2 text-[15px] font-normal leading-6 text-hu-deep">
                   <Truck className="mt-[3px] h-[18px] w-[18px] shrink-0 overflow-visible" strokeWidth={ICON_STROKE} aria-hidden />
-                  <span className="[text-wrap:balance]">{noLonelyWord(DELIVERY_FEE_NOTE)}</span>
+                  <span className="[text-wrap:balance]">{noLonelyWord(SERVICE_AREA_DELIVERY_NOTE)}</span>
                 </p>
                 <CallButton phone={c.phoneE164} className="mt-5" />
               </div>
