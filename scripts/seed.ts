@@ -1,11 +1,17 @@
 import "dotenv/config";
 import { getDb, closeDb, schema } from "../src/lib/db";
+import { dbWriteSkipReason } from "./db-guard";
 
 /**
  * Starter catalog. These are SAMPLE items/prices — edit them in /admin/catalog.
  * Safe to run once on an empty database; it skips if categories already exist.
  */
 async function main() {
+  const skip = dbWriteSkipReason();
+  if (skip) {
+    console.log(skip);
+    return;
+  }
   if (!process.env.DATABASE_URL) {
     console.log("No DATABASE_URL set - skipping seed.");
     return;
