@@ -50,6 +50,14 @@ export function detectKeyword(body: string): Keyword {
 }
 
 /** Sent when an opt-out was recognized in a phrase (Twilio confirms exact keywords itself). */
+/** The default HELP reply; a custom text is used only if it still names the business and both contacts. */
+export const HELP_REPLY = "Hup Up Attractions: For help, call (845) 777-7585 or email hupupattractions@gmail.com. Msg & data rates may apply. Reply STOP to opt out.";
+
+export function helpReply(custom?: string | null): string {
+  const t = (custom ?? "").trim();
+  return t && /hup up attractions/i.test(t) && t.includes("(845) 777-7585") && t.includes("hupupattractions@gmail.com") ? t : HELP_REPLY;
+}
+
 /** Reply to NOPROMO (only when the number has not replied STOP). */
 export const NOPROMO_CONFIRMATION =
   "Hup Up Attractions: You won't receive promotional texts anymore. You'll still get texts about your orders. Reply STOP to stop all texts.";
@@ -122,8 +130,9 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
       await consent("marketing", "opt_out");
       await cancelQueuedPromotions(from);
       if (!customer.smsOptOut) reply = NOPROMO_CONFIRMATION;
-    } else if (keyword === "help" && settings.smsHelpReplyEnabled) {
-      reply = settings.smsHelpText;
+    } else if (keyword === "help") {
+      // Always answered (SMS Terms): identifies Hup Up Attractions and gives the support phone and email.
+      reply = helpReply(settings.smsHelpText);
     }
   }
 

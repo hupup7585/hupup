@@ -6,8 +6,8 @@ import { BUSINESS_NAME } from "@/lib/config";
 export const SETTING_DEFAULTS = {
   smsForwardEnabled: true,
   smsForwardPhone: "",
-  smsHelpReplyEnabled: false,
-  smsHelpText: `${BUSINESS_NAME}: for help call or text us at this number. Reply STOP to opt out.`,
+  smsHelpReplyEnabled: true,
+  smsHelpText: `${BUSINESS_NAME}: For help, call (845) 777-7585 or email hupupattractions@gmail.com. Msg & data rates may apply. Reply STOP to opt out.`,
   supportPhone: "",
 } as const;
 

@@ -6,7 +6,7 @@ import { smsNumberDisplay } from "@/lib/sms-number";
 export const metadata = { title: "SMS Terms | Hup Up Attractions" };
 export const revalidate = 3600;
 
-/** SMS program terms (A2P 10DLC), including Abram's "Additional Requirements" of 2026-11-05. Draft for Abram to review. */
+/** SMS program terms (A2P 10DLC): SMS messages only. Business and rental terms are on /terms. */
 export default function SmsTerms() {
   const sms = smsNumberDisplay();
   return (
@@ -26,8 +26,9 @@ export default function SmsTerms() {
           Every promotional text begins with <strong>&ldquo;{PROMO_OPENING}&rdquo;</strong>, followed by the offer.
         </li>
         <li>
-          Promotional texts are sent only between 8:00 a.m. and 9:00 p.m. in your local time zone. We use the time zone you give us when you sign up. If we don&rsquo;t have it, we send
-          only when it is within those hours both in the time zone of your phone number&rsquo;s area code and in New York (Eastern) time. Our system blocks promotional texts outside these hours.
+          Promotional texts are sent only between 8:00 a.m. and 9:00 p.m. in your local time zone. We use the customer&rsquo;s confirmed local time zone whenever available. If it is unavailable,
+          promotional messages will be sent only when the permitted hours are satisfied in both the telephone number&rsquo;s area-code time zone and Eastern Time. Our system blocks promotional texts
+          outside these hours.
         </li>
       </ul>
 
@@ -37,8 +38,11 @@ export default function SmsTerms() {
       <h2>How to stop texts</h2>
       <p>
         Reply with any of these words to {sms} at any time: {OPT_OUT_KEYWORDS.join(", ")}. We also honor other clear requests to stop, such as &ldquo;please stop texting me&rdquo;. Opt-outs take
-        effect immediately, including for promotional texts that were already scheduled. You may get one final, non-promotional text confirming the opt-out, and no promotional texts after that. To start
-        again, reply START.
+        effect immediately, including for promotional texts that were already scheduled. You may get one final, non-promotional text confirming the opt-out, and no promotional texts after that.
+      </p>
+      <p>
+        To re-enroll after opting out, reply START and follow the confirmation instructions. Re-enrollment applies only to the messaging program for which you provide new consent. Your previous
+        opt-out remains documented in our records.
       </p>
       <p>
         NOPROMO is our own keyword that stops promotional texts only, while order texts continue. It never undoes a STOP: if you replied STOP, you receive no texts from us until you reply START.
@@ -46,7 +50,7 @@ export default function SmsTerms() {
 
       <h2>Help</h2>
       <p>
-        Reply HELP to {sms}, call (845) 777-7585, or email hupupattractions@gmail.com.
+        Reply HELP to {sms}, call (845) 777-7585, or email hupupattractions@gmail.com. A HELP response identifies Hup Up Attractions and provides our customer support telephone number and email address.
       </p>
 
       <h2>Service providers</h2>
@@ -61,13 +65,17 @@ export default function SmsTerms() {
 
       <h2>Security</h2>
       <p>
-        Access to your phone number, consent records, and messages is limited to authorized staff who need it to serve you. These records are stored securely with our service providers. Suspected
+        Access to your phone number, consent records, and messages is limited to authorized staff who need it to serve you. We use reasonable administrative, technical, and organizational safeguards designed to protect customer information against unauthorized access, use, alteration, or disclosure. Suspected
         unauthorized access to or disclosure of this information is reported to us immediately and handled as required by law.
       </p>
 
       <h2>Privacy</h2>
       <p>
-        See our <a className="underline" href="/privacy">Privacy Policy</a>. Text messaging originator opt-in data and consent will not be shared with any third parties, except service providers as described
+        See our Privacy Policy at{" "}
+        <a className="underline" href="/privacy-policy">
+          https://hupupattractions.com/privacy-policy
+        </a>
+        . Text messaging originator opt-in data and consent will not be shared with any third parties, except service providers as described
         above.
       </p>
     </LegalPage>
