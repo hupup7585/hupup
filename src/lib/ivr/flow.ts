@@ -6,7 +6,8 @@ import { addDays, longDate, todayISO } from "@/lib/dates";
 import { spokenMoney } from "@/lib/money";
 import { last4, spokenDigits, toE164 } from "@/lib/phone";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
-import { checkEventDate, openNow } from "@/lib/jewish-calendar";
+import { checkEventDate } from "@/lib/jewish-calendar";
+import { officeOpenNow } from "@/lib/business-hours";
 import {
   PAYMENT_HOLD_MINUTES,
   PHONE_HOLD_MINUTES,
@@ -214,15 +215,10 @@ type Handler = (ctx: Ctx, vr: VR) => Promise<VR> | VR;
 const handlers: Record<string, Handler> = {
   async incoming(ctx, vr) {
     await ensureSession(ctx.callSid, ctx.from);
-    // Same open/closed rules as the POS (Jewish calendar settings): closed callers hear when we reopen.
-    const status = openNow(new Date(), await getSettings());
-    if (!status.open) {
-      const reopen = status.reopensAt ? `after ${status.reopensAt.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })} tonight` : "when we reopen";
-      sp(vr, ctx, "closed_now", { reason: status.reason ?? "the holiday", reopen });
-      vr.hangup();
-      return vr;
-    }
     sp(vr, ctx, "greeting");
+    // Booking by phone is available 24/7; outside office hours (Jewish calendar + business hours) callers are told
+    // the office is closed and the live-person option is not offered.
+    if (!officeOpenNow(new Date(), await getSettings())) sp(vr, ctx, "office_closed");
     return back(vr, "menu");
   },
 
@@ -245,7 +241,8 @@ const handlers: Record<string, Handler> = {
     if (!cats.length) sp(g, ctx, "menu_empty");
     for (const c of cats) sp(g, ctx, "menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
     if (order?.items.length) sp(g, ctx, "menu_cart");
-    if (config.forwardPhone()) sp(g, ctx, "menu_operator");
+    const officeOpen = officeOpenNow(new Date(), await getSettings());
+    if (config.forwardPhone() && officeOpen) sp(g, ctx, "menu_operator");
     if (cats.length) sp(g, ctx, "menu_speech");
     sp(g, ctx, "menu_repeat");
     return noInput(vr, ctx, "menu");
@@ -791,7 +788,7 @@ const handlers: Record<string, Handler> = {
 
   async operator(ctx, vr) {
     const to = config.forwardPhone();
-    if (!to) {
+    if (!to || !officeOpenNow(new Date(), await getSettings())) {
       sp(vr, ctx, "operator_unavailable");
       return back(vr, "menu");
     }

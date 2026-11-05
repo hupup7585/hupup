@@ -2,6 +2,13 @@ import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { SERVICE_AREA } from "@/lib/site-copy";
+import { getSettings } from "@/lib/settings";
+import { hoursLines } from "@/lib/business-hours";
+
+async function officeHoursText(): Promise<string> {
+  const s = await getSettings();
+  return [...hoursLines(s), "", s.hoursWebsiteNote].join("\n");
+}
 
 export type SiteContent = {
   logoUrl: string | null;
@@ -59,7 +66,8 @@ export async function getSiteContent(): Promise<SiteContent> {
   return {
     logoUrl: str(settings.get(SITE_KEYS.logoUrl)),
     serviceArea: SERVICE_AREA,
-    hours: str(settings.get(SITE_KEYS.hours)),
+    // Office hours from the business-hours settings (same source as the POS and hotline), plus Abraham's note.
+    hours: str(settings.get(SITE_KEYS.hours)) ?? (await officeHoursText()),
     email: str(settings.get(SITE_KEYS.email)) ?? config.publicEmail,
     phoneDisplay: config.hotlineDisplay,
     phoneE164: config.hotlineE164,

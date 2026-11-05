@@ -38,6 +38,22 @@ export const SETTING_DEFAULTS = {
   closeLagBaomer: "no",
   /** Owner overrides, one per line: "2027-01-01 closed" or "2027-04-25 open" (optionally followed by a note) */
   calendarOverrides: "",
+  /* Office hours (walk-ins and live calls), Eastern time, "HH:MM-HH:MM" (24-hour). The automated phone system
+     books 24/7 regardless. Items marked "to confirm" are Abraham's pending answers. */
+  hoursMonThu: "10:30-19:00",
+  /** Friday opening; closing follows the Erev Shabbos rule (chatzos) until Abraham confirms. */
+  hoursFridayOpen: "10:30",
+  hoursSunday: "11:30-19:00",
+  /** Motzei Shabbos opening: "tzeis" (when Shabbos ends) or HH:MM. To confirm. */
+  hoursMotzeiOpen: "tzeis",
+  hoursMotzeiCloseWinter: "23:30",
+  hoursMotzeiCloseSummer: "00:30",
+  /** Which Motzei Shabbos closing applies: "dst" = summer while daylight saving time is in effect (to confirm). */
+  hoursMotzeiSeason: "dst",
+  /** Chol Hamoed hours (opening to confirm). */
+  hoursCholHamoed: "10:30-22:30",
+  /** Website note under the hours (Abraham's wording). */
+  hoursWebsiteNote: "Please note that you can book at any time using our automated phone system.",
 } as const;
 
 export type Settings = { -readonly [K in keyof typeof SETTING_DEFAULTS]: (typeof SETTING_DEFAULTS)[K] extends boolean ? boolean : string };

@@ -64,6 +64,37 @@ export default function CalendarSettingsForm({ initial }: { initial: Record<stri
           ))}
         </div>
       </fieldset>
+      <fieldset className="grid gap-3 sm:grid-cols-2">
+        <legend className="label">Office hours (walk-ins and live calls; Eastern time, 24-hour). Phone booking stays open 24/7.</legend>
+        {(
+          [
+            ["hoursMonThu", "Monday to Thursday", "10:30-19:00"],
+            ["hoursFridayOpen", "Friday opens (closes at the Erev Shabbos time)", "10:30"],
+            ["hoursSunday", "Sunday", "11:30-19:00"],
+            ["hoursCholHamoed", "Chol Hamoed", "10:30-22:30"],
+            ["hoursMotzeiOpen", "Motzei Shabbos opens (\"tzeis\" or a time)", "tzeis"],
+            ["hoursMotzeiCloseWinter", "Motzei Shabbos closes (winter)", "23:30"],
+            ["hoursMotzeiCloseSummer", "Motzei Shabbos closes (summer)", "00:30"],
+          ] as const
+        ).map(([k, label, ph]) => (
+          <label key={k} className="block">
+            <span className="label">{label}</span>
+            <input className="input" placeholder={ph} value={v[k] ?? ""} onChange={(e) => set(k, e.target.value)} />
+          </label>
+        ))}
+        <label className="block">
+          <span className="label">Motzei Shabbos summer hours apply</span>
+          <select className="input" value={v.hoursMotzeiSeason} onChange={(e) => set("hoursMotzeiSeason", e.target.value)}>
+            <option value="dst">While daylight saving time is in effect</option>
+            <option value="summer">Always (summer hours)</option>
+            <option value="winter">Never (winter hours)</option>
+          </select>
+        </label>
+        <label className="block sm:col-span-2">
+          <span className="label">Website note under the hours</span>
+          <input className="input" value={v.hoursWebsiteNote ?? ""} onChange={(e) => set("hoursWebsiteNote", e.target.value)} />
+        </label>
+      </fieldset>
       <label className="block">
         <span className="label">Owner overrides (one per line)</span>
         <textarea className="input font-mono text-sm" rows={4} placeholder={"2027-01-01 closed Family simcha\n2027-04-25 open"} value={v.calendarOverrides} onChange={(e) => set("calendarOverrides", e.target.value)} />

@@ -16,4 +16,13 @@ export const CALENDAR_KEYS = [
   "calendarOverrides",
   "calendarLatitude",
   "calendarLongitude",
+  "hoursMonThu",
+  "hoursFridayOpen",
+  "hoursSunday",
+  "hoursMotzeiOpen",
+  "hoursMotzeiCloseWinter",
+  "hoursMotzeiCloseSummer",
+  "hoursMotzeiSeason",
+  "hoursCholHamoed",
+  "hoursWebsiteNote",
 ] as const satisfies readonly (keyof Settings)[];

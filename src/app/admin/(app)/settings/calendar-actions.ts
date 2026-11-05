@@ -17,6 +17,12 @@ export async function saveCalendarSettingsAction(values: Record<string, string>)
     .map((l) => l.trim())
     .filter((l) => l && !/^\d{4}-\d{2}-\d{2}\s+(open|closed)\b/i.test(l));
   if (bad.length) return { ok: false, message: `Override lines must look like "2027-01-01 closed" or "2027-04-25 open". Check: ${bad[0]}` };
+  const time = /^\d{1,2}:\d{2}$/;
+  const span = /^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/;
+  for (const [k, re] of [["hoursMonThu", span], ["hoursSunday", span], ["hoursCholHamoed", span], ["hoursFridayOpen", time], ["hoursMotzeiCloseWinter", time], ["hoursMotzeiCloseSummer", time]] as const) {
+    if (k in values && !re.test(String(values[k]).trim())) return { ok: false, message: `Check the format of ${k}: use 24-hour times like 10:30 or 10:30-19:00.` };
+  }
+  if ("hoursMotzeiOpen" in values && !/^(tzeis|\d{1,2}:\d{2})$/.test(String(values.hoursMotzeiOpen).trim())) return { ok: false, message: 'Motzei Shabbos opening: "tzeis" or a time like 20:00.' };
   const changed: Record<string, [string, string]> = {};
   for (const k of CALENDAR_KEYS) {
     if (!(k in values)) continue;
