@@ -9,6 +9,7 @@ import {
   jsonb,
   index,
   primaryKey,
+  real,
 } from "drizzle-orm/pg-core";
 
 export const categories = pgTable("categories", {
@@ -141,6 +142,10 @@ export type CallData = {
   /** Value heard but not yet confirmed */
   heard?: string;
   retries?: number;
+  /** Transactional SMS consent outcome for this call: yes | no | existing | stopped */
+  smsConsent?: string;
+  /** Order placed on this call (for the promotional question and goodbye) */
+  placedOrderId?: number;
 };
 
 export const callSessions = pgTable("call_sessions", {
@@ -266,15 +271,28 @@ export const smsConsents = pgTable(
     scope: text("scope").notNull(),
     /** opt_in | opt_out | declined */
     action: text("action").notNull(),
-    /** phone | pos | staff | keyword */
+    /** phone | pos | staff | keyword | web */
     source: text("source").notNull(),
+    /** How the answer was given: keypad | speech | keyword | checkbox | staff */
+    method: text("method"),
+    /** Exact consent language presented (spoken or shown) */
     wording: text("wording"),
+    /** Version id of that language: a dated default, or custom-<hash> when edited in admin */
+    wordingVersion: text("wording_version"),
+    /** What the person did: the key pressed, or the speech transcript */
+    response: text("response"),
+    /** Twilio speech-recognition confidence (0-1) for spoken answers */
+    speechConfidence: real("speech_confidence"),
+    /** Caller ID of the call the consent was given on (may differ from `phone`) */
+    callerPhone: text("caller_phone"),
+    orderId: integer("order_id"),
     keyword: text("keyword"),
     callSid: text("call_sid"),
     userId: integer("user_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("sms_consents_phone_idx").on(t.phone)],
+  // Append-only (permanent compliance record): a DB trigger in migration 0004 rejects UPDATE and DELETE.
+  (t) => [index("sms_consents_phone_idx").on(t.phone), index("sms_consents_phone_scope_idx").on(t.phone, t.scope, t.createdAt)],
 );
 
 /* ------------------------------------------------------------- settings & prompts */

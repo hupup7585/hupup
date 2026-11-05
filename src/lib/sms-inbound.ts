@@ -11,14 +11,35 @@ export const NOPROMO_WORDS = ["NOPROMO"];
 
 export type Keyword = "stop" | "start" | "help" | "nopromo" | null;
 
-export function detectKeyword(body: string): Keyword {
+/** Unambiguous opt-out words that also count anywhere in a short message ("unsubscribe me", "opt me out"). */
+const OPT_OUT_IN_PHRASE = ["STOPALL", "UNSUBSCRIBE", "OPTOUT", "REVOKE"];
+/** "Stop" alone is ambiguous ("stop by at 5?"), so in a phrase it only counts in these shapes. */
+const STOP_PHRASE = /^(?:(?:PLEASE|OK|OKAY|JUST)\s+)*STOP(?:\s+(?:TEXTING|MESSAGING|SENDING|CONTACTING|TEXT|TEXTS|MESSAGES|IT|NOW|PLEASE|ALL|THIS|THESE)\b.*)?$|\bSTOP\s*$/;
+const MAX_PHRASE_WORDS = 6;
+
+/**
+ * Exact keyword match (the whole message is the keyword, ignoring case, spaces and punctuation), or an
+ * opt-out word inside a short message. `exact` is false for the phrase case: Twilio's carrier-level opt-out
+ * only reacts to exact keywords, so the app must block and confirm those itself.
+ */
+export function detectKeywordDetail(body: string): { keyword: Keyword; exact: boolean } {
   const w = body.trim().toUpperCase().replace(/[^A-Z]/g, "");
-  if (STOP_WORDS.includes(w)) return "stop";
-  if (START_WORDS.includes(w)) return "start";
-  if (HELP_WORDS.includes(w)) return "help";
-  if (NOPROMO_WORDS.includes(w)) return "nopromo";
-  return null;
+  if (STOP_WORDS.includes(w)) return { keyword: "stop", exact: true };
+  if (START_WORDS.includes(w)) return { keyword: "start", exact: true };
+  if (HELP_WORDS.includes(w)) return { keyword: "help", exact: true };
+  if (NOPROMO_WORDS.includes(w)) return { keyword: "nopromo", exact: true };
+  const words = body.toUpperCase().replace(/\bOPT[\s-]+(?:ME[\s-]+)?OUT\b/g, "OPTOUT").replace(/[^A-Z\s]/g, " ").split(/\s+/).filter(Boolean);
+  if (words.length <= MAX_PHRASE_WORDS && (words.some((x) => OPT_OUT_IN_PHRASE.includes(x)) || STOP_PHRASE.test(words.join(" "))))
+    return { keyword: "stop", exact: false };
+  return { keyword: null, exact: false };
 }
+
+export function detectKeyword(body: string): Keyword {
+  return detectKeywordDetail(body).keyword;
+}
+
+/** Sent when an opt-out was recognized in a phrase (Twilio confirms exact keywords itself). */
+export const OPT_OUT_CONFIRMATION = "Hup Up Attractions: You're unsubscribed and won't receive more texts from us. Reply START to resubscribe.";
 
 export type InboundResult = { messageId: number; keyword: Keyword; reply: string | null; forwarded: boolean };
 
@@ -41,7 +62,7 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
     [customer] = await db.insert(schema.customers).values({ phone: from, name: null }).returning();
   }
 
-  const keyword = detectKeyword(text);
+  const { keyword, exact } = detectKeywordDetail(text);
   const [row] = await db
     .insert(schema.messages)
     .values({
@@ -64,12 +85,13 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
 
   if (customer && keyword) {
     const consent = (scope: string, action: string) =>
-      db.insert(schema.smsConsents).values({ customerId: customer.id, phone: from, scope, action, source: "keyword", keyword: text.trim().toUpperCase() });
+      db.insert(schema.smsConsents).values({ customerId: customer.id, phone: from, scope, action, source: "keyword", method: "keyword", keyword: text.trim().toUpperCase(), wording: text });
     if (keyword === "stop") {
       // Twilio blocks all messages after STOP, so both scopes are opted out.
       await db.update(schema.customers).set({ smsOptOut: true, marketingOptIn: false }).where(eq(schema.customers.id, customer.id));
       await consent("transactional", "opt_out");
       await consent("marketing", "opt_out");
+      if (!exact) reply = OPT_OUT_CONFIRMATION;
     } else if (keyword === "start") {
       // Clears the block; marketing needs a new explicit opt-in.
       await db.update(schema.customers).set({ smsOptOut: false }).where(eq(schema.customers.id, customer.id));

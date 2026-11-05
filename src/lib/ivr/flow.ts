@@ -17,11 +17,21 @@ import {
   upsertCustomer,
 } from "@/lib/orders";
 import { paymentLink } from "@/lib/sola";
-import { sendSms } from "@/lib/notify";
+import { sendEmail, sendSms } from "@/lib/notify";
+import { sendMessage } from "@/lib/sms";
+import {
+  MARKETING_CONFIRMATION_SMS,
+  TRANSACTIONAL_FOOTER,
+  consentState,
+  parseConsentAnswer,
+  recordConsent,
+  shouldAskMarketing,
+  wordingVersion,
+} from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { matchMenuSpeech, menuSpeechHints } from "./category-speech";
-import { loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
+import { PROMPTS, loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
 
 const { categories, products, orders } = schema;
 type VR = InstanceType<typeof twilio.twiml.VoiceResponse>;
@@ -148,6 +158,36 @@ async function currentOrder(ctx: Ctx) {
 
 function itemPhrase(qty: number, name: string) {
   return qty === 1 ? `one ${name}` : `${qty} ${name}`;
+}
+
+const CONSENT_HINTS = "yes, no, I agree, agree, yes please, no thanks, skip";
+
+async function customerByPhone(phone: string) {
+  const [c] = await db.select().from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1);
+  return c ?? null;
+}
+
+/** Store a phone consent decision with the exact language the caller heard. */
+async function recordPhoneConsent(ctx: Ctx, scope: "transactional" | "marketing", action: "opt_in" | "declined", phone: string) {
+  const key = scope === "transactional" ? "consent_transactional" : "consent_marketing";
+  const wording = promptText(ctx.prompts, key);
+  const digits = ctx.body.Digits || "";
+  const said = (ctx.body.SpeechResult || "").trim();
+  const conf = ctx.body.Confidence ? Number(ctx.body.Confidence) : null;
+  return recordConsent({
+    phone,
+    scope,
+    action,
+    source: "phone",
+    method: digits ? "keypad" : "speech",
+    wording,
+    wordingVersion: wordingVersion(wording, PROMPTS[key].text),
+    response: digits ? `pressed ${digits}` : said ? `said "${said}"` : "no answer",
+    speechConfidence: !digits && conf !== null && Number.isFinite(conf) ? conf : null,
+    callerPhone: toE164(ctx.from),
+    callSid: ctx.callSid,
+    orderId: ctx.session?.orderId ?? ctx.session?.data.placedOrderId ?? null,
+  });
 }
 
 /* ------------------------------------------------------------------ handlers */
@@ -463,7 +503,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (d === "1") {
       await updateSession(ctx.callSid, { data: { phone: toE164(ctx.from)! } }, ctx.session);
-      return back(vr, "finalize");
+      return back(vr, "sms-consent");
     }
     if (d === "2") return back(vr, "phone-enter");
     return noInput(vr, ctx, "phone");
@@ -490,6 +530,42 @@ const handlers: Record<string, Handler> = {
   async "phone-confirm"(ctx, vr) {
     if (ctx.body.Digits !== "1" || !ctx.session?.data.heard) return back(vr, "phone-enter");
     await updateSession(ctx.callSid, { data: { phone: ctx.session.data.heard, heard: undefined } }, ctx.session);
+    return back(vr, "sms-consent");
+  },
+
+  /* ---- SMS consent: transactional (before the payment link), separate from promotional (after the order) ---- */
+
+  async "sms-consent"(ctx, vr) {
+    const phone = ctx.session?.data.phone;
+    if (!phone) return back(vr, "phone");
+    const retry = Number(ctx.query.get("n") || 0) > 0;
+    if (!retry) {
+      const customer = await customerByPhone(phone);
+      if (customer?.smsOptOut) {
+        // Twilio blocks texts to a number that replied STOP until it texts START; don't ask, explain.
+        sp(vr, ctx, "consent_stopped");
+        await updateSession(ctx.callSid, { data: { smsConsent: "stopped" } }, ctx.session);
+        return back(vr, "finalize");
+      }
+      const state = await consentState(phone);
+      if (state.transactional?.action === "opt_in") {
+        await updateSession(ctx.callSid, { data: { smsConsent: "existing" } }, ctx.session);
+        return back(vr, "finalize");
+      }
+    }
+    const g = speech(vr, url("sms-consent-answer", { n: ctx.query.get("n") ?? undefined }), CONSENT_HINTS, { dtmf: true, numDigits: 1 });
+    sp(g, ctx, retry ? "consent_unclear" : "consent_transactional");
+    return vr;
+  },
+
+  async "sms-consent-answer"(ctx, vr) {
+    const phone = ctx.session?.data.phone;
+    if (!phone) return back(vr, "phone");
+    const n = Number(ctx.query.get("n") || 0);
+    const answer = parseConsentAnswer({ digits: ctx.body.Digits, speech: ctx.body.SpeechResult, confidence: ctx.body.Confidence });
+    if (answer === "unclear" && n < 1) return back(vr, "sms-consent", { n: n + 1 });
+    await recordPhoneConsent(ctx, "transactional", answer === "yes" ? "opt_in" : "declined", phone);
+    await updateSession(ctx.callSid, { data: { smsConsent: answer === "yes" ? "yes" : "no" } }, ctx.session);
     return back(vr, "finalize");
   },
 
@@ -529,21 +605,65 @@ const handlers: Record<string, Handler> = {
       phone,
     });
     const lines = order.items.map((i) => `${i.qty} x ${i.name}`).join(", ");
+    const details =
+      `${BUSINESS_NAME} order #${num}: ${lines} for ${longDate(order.order.eventDate)} (pickup ${longDate(order.order.pickupDate)}). ` +
+      `Total $${(order.order.subtotalCents / 100).toFixed(2)}. Pay securely within ${PAYMENT_HOLD_MINUTES} minutes to confirm: ${link}`;
+    // Texts go out only with transactional consent given on this call or recorded before.
+    const consented = data.smsConsent === "yes" || data.smsConsent === "existing";
     let texted = false;
-    if (phone) {
-      const res = await sendSms(
-        phone,
-        `${BUSINESS_NAME} order #${num}: ${lines} for ${longDate(order.order.eventDate)} (pickup ${longDate(order.order.pickupDate)}). ` +
-          `Total $${(order.order.subtotalCents / 100).toFixed(2)}. Pay securely within ${PAYMENT_HOLD_MINUTES} minutes to confirm: ${link}`,
-      );
+    let emailed = false;
+    if (phone && consented) {
+      const res = await sendSms(phone, `${details} ${TRANSACTIONAL_FOOTER}`, { kind: "transactional", event: "order_payment_link", customerId, orderId: order.order.id, callSid: ctx.callSid });
       texted = res.sent;
+    } else if (!consented && data.email) {
+      const res = await sendEmail(data.email, `${BUSINESS_NAME} order #${num}`, details);
+      emailed = res.sent;
     }
 
     const first = data.name.split(" ")[0];
     sp(vr, ctx, "thanks_order", { name: first, number: spokenDigits(num) });
     if (texted) sp(vr, ctx, "link_sent", { minutes: PAYMENT_HOLD_MINUTES });
+    else if (emailed) sp(vr, ctx, "link_emailed", { minutes: PAYMENT_HOLD_MINUTES });
+    else if (!consented) sp(vr, ctx, "link_call_back");
     else sp(vr, ctx, "link_failed");
-    sp(vr, ctx, "goodbye_order", { date: longDate(order.order.eventDate), pickup: longDate(order.order.pickupDate) });
+    await updateSession(ctx.callSid, { data: { placedOrderId: order.order.id } }, ctx.session);
+    return back(vr, "promo-consent");
+  },
+
+  async "promo-consent"(ctx, vr) {
+    const phone = ctx.session?.data.phone;
+    const retry = Number(ctx.query.get("n") || 0) > 0;
+    if (!phone) return back(vr, "goodbye");
+    if (!retry) {
+      const customer = await customerByPhone(phone);
+      if (!shouldAskMarketing(await consentState(phone), customer)) return back(vr, "goodbye");
+    }
+    const g = speech(vr, url("promo-consent-answer", { n: ctx.query.get("n") ?? undefined }), CONSENT_HINTS, { dtmf: true, numDigits: 1 });
+    sp(g, ctx, retry ? "consent_unclear" : "consent_marketing");
+    return vr;
+  },
+
+  async "promo-consent-answer"(ctx, vr) {
+    const phone = ctx.session?.data.phone;
+    if (!phone) return back(vr, "goodbye");
+    const n = Number(ctx.query.get("n") || 0);
+    const answer = parseConsentAnswer({ digits: ctx.body.Digits, speech: ctx.body.SpeechResult, confidence: ctx.body.Confidence });
+    if (answer === "unclear" && n < 1) return back(vr, "promo-consent", { n: n + 1 });
+    // Never auto-enroll: only a clear "yes" (key 1, or a confident spoken yes) opts in.
+    const customerId = await recordPhoneConsent(ctx, "marketing", answer === "yes" ? "opt_in" : "declined", phone);
+    if (answer === "yes") {
+      await sendMessage({ to: phone, body: MARKETING_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId, callSid: ctx.callSid });
+      sp(vr, ctx, "consent_marketing_yes");
+    } else if (answer === "no") {
+      sp(vr, ctx, "consent_marketing_no");
+    }
+    return back(vr, "goodbye");
+  },
+
+  async goodbye(ctx, vr) {
+    const id = ctx.session?.data.placedOrderId;
+    const full = id ? await getOrderWithItems(id) : null;
+    if (full) sp(vr, ctx, "goodbye_order", { date: longDate(full.order.eventDate), pickup: longDate(full.order.pickupDate) });
     vr.hangup();
     return vr;
   },

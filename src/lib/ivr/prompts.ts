@@ -5,7 +5,14 @@ import { db, schema } from "@/lib/db";
  * Plain text only (Google Chirp3-HD voices don't support SSML) — punctuation creates the pauses.
  * Each prompt can be overridden from /admin/phone/prompts. {placeholders} are filled at runtime.
  */
-export type PromptDef = { label: string; group: string; text: string; vars?: string[] };
+export type PromptDef = {
+  label: string;
+  group: string;
+  text: string;
+  vars?: string[];
+  /** Always spoken from the text (never an uploaded recording), so the stored consent language is exactly what was heard. */
+  textOnly?: boolean;
+};
 
 export const PROMPTS = {
   // Welcome & main menu
@@ -74,6 +81,26 @@ export const PROMPTS = {
   link_failed: { group: "Checkout", label: "Couldn't text the link", text: "We couldn't send the text, so someone from our team will call you back shortly to finish up." },
   goodbye_order: { group: "Checkout", label: "Goodbye after ordering", text: "We'll deliver on {date} and pick up on {pickup}. Thanks so much for choosing Hup Up Attractions. Have an amazing party, bye for now!", vars: ["date", "pickup"] },
 
+  // Text message consent (A2P 10DLC). The exact text spoken is stored with every consent record.
+  consent_transactional: {
+    group: "Text message consent",
+    label: "Ask for order and service texts (transactional)",
+    textOnly: true,
+    text: "Can Hup Up Attractions text you at this number about your reservation, order, payment, delivery, pickup, and customer service? Message frequency varies. Message and data rates may apply. You can reply STOP to opt out, or HELP for help, at any time. Our text message terms and privacy policy are on our website. To agree, press 1 or say yes. If not, press 2 or say no.",
+  },
+  consent_marketing: {
+    group: "Text message consent",
+    label: "Ask for promotional texts (marketing)",
+    textOnly: true,
+    text: "One more question. Would you like to receive recurring promotional and marketing text messages from Hup Up Attractions at this number? Message frequency varies. Message and data rates may apply. You can reply STOP to opt out, or HELP for help, at any time. Agreeing is not required to book or buy anything. To agree, press 1 or say yes. To skip, press 2 or say no.",
+  },
+  consent_unclear: { group: "Text message consent", label: "Didn't understand the answer", text: "Sorry, I didn't get that. Please press 1 for yes, or 2 for no." },
+  consent_stopped: { group: "Text message consent", label: "Number replied STOP before", text: "This number has opted out of our text messages, so we won't text you. To get our texts again, text the word START to this hotline number." },
+  consent_marketing_yes: { group: "Text message consent", label: "Signed up for promotional texts", text: "Thank you, you're signed up for promotional texts. We just texted you a confirmation." },
+  consent_marketing_no: { group: "Text message consent", label: "Said no to promotional texts", text: "No problem, you won't get promotional texts." },
+  link_emailed: { group: "Checkout", label: "Payment link emailed (no texts)", text: "No problem, we won't text you. We just emailed you a secure payment link. Your party rentals are saved for {minutes} minutes while you pay.", vars: ["minutes"] },
+  link_call_back: { group: "Checkout", label: "No texts and no email", text: "No problem, we won't text you. Someone from our team will call you shortly to finish your payment." },
+
   // Talk to a person
   transfer_connecting: { group: "Talk to a person", label: "Connecting", text: "Sure thing! Hang tight while I connect you to our team." },
   transfer_failed: { group: "Talk to a person", label: "No one answered", text: "Sorry, our team is busy helping other customers right now. I'm happy to help you book in the meantime!" },
@@ -110,6 +137,6 @@ export function promptText(overrides: PromptOverrides, key: PromptKey, vars?: Re
 /** Recorded audio for a prompt (only used when the prompt has no placeholders). */
 export function promptAudio(overrides: PromptOverrides, key: PromptKey): string | null {
   const def = PROMPTS[key] as PromptDef;
-  if (def.vars?.length) return null;
+  if (def.vars?.length || def.textOnly) return null;
   return overrides[key]?.audioUrl || null;
 }

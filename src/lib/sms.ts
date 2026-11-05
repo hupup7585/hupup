@@ -19,6 +19,8 @@ export type SendInput = {
   templateId?: number | null;
   /** false = don't store the body (sign-in codes). */
   log?: boolean;
+  /** Test hook for the promotional quiet-hours check. */
+  now?: Date;
 };
 
 export type SendResult = {
@@ -26,7 +28,7 @@ export type SendResult = {
   messageId?: number;
   sid?: string;
   dev?: boolean;
-  blocked?: "opted_out" | "no_marketing_consent" | "card_number";
+  blocked?: "opted_out" | "no_marketing_consent" | "card_number" | "quiet_hours";
   error?: string;
   /** MMS failed and we fell back to plain SMS */
   mmsFallback?: boolean;
@@ -51,6 +53,24 @@ export function containsCardNumber(text: string): boolean {
   });
 }
 
+/** Promotional texts may go out only 8:00 AM to 9:00 PM local time (customers are in the America/New_York zone). */
+export const MARKETING_HOURS = { start: 8, end: 21, timeZone: "America/New_York" } as const;
+
+export function inMarketingHours(now = new Date()): boolean {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: MARKETING_HOURS.timeZone }).format(now),
+  );
+  return hour >= MARKETING_HOURS.start && hour < MARKETING_HOURS.end;
+}
+
+/** Every promotional text opens with the business name and tells the customer how to opt out. */
+export function marketingBody(body: string): string {
+  let b = body.trim();
+  if (!/^hup up attractions\b/i.test(b)) b = `Hup Up Attractions: ${b}`;
+  if (!/\bSTOP\b/.test(b)) b = `${b} Reply STOP to opt out.`;
+  return b;
+}
+
 async function customerByPhone(phone: string) {
   const [c] = await db.select().from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1);
   return c ?? null;
@@ -70,6 +90,7 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   if (!to) return { sent: false, error: "Invalid phone number" };
   const kind = input.kind ?? "transactional";
   const log = input.log !== false;
+  if (kind === "marketing") input = { ...input, body: marketingBody(input.body) };
 
   if (containsCardNumber(input.body)) {
     return { sent: false, blocked: "card_number", error: "Message looks like it contains a card number and was not sent." };
@@ -82,6 +103,7 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   let blocked: SendResult["blocked"];
   if (kind !== "system" && customer?.smsOptOut) blocked = "opted_out";
   else if (kind === "marketing" && !customer?.marketingOptIn) blocked = "no_marketing_consent";
+  else if (kind === "marketing" && !inMarketingHours(input.now)) blocked = "quiet_hours";
 
   let messageId: number | undefined;
   if (log) {
@@ -97,7 +119,7 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
         kind,
         event: input.event ?? null,
         status: blocked ? "blocked" : "queued",
-        errorMessage: blocked === "opted_out" ? "Customer replied STOP. Ask them to text START to receive messages again." : blocked === "no_marketing_consent" ? "No marketing consent" : null,
+        errorMessage: blocked ? BLOCK_REASON[blocked] : null,
         customerId: customer?.id ?? null,
         orderId: input.orderId ?? null,
         callSid: input.callSid ?? null,
@@ -107,7 +129,7 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
       .returning({ id: schema.messages.id });
     messageId = row.id;
   }
-  if (blocked) return { sent: false, blocked, messageId, error: blocked === "opted_out" ? "Customer has opted out (replied STOP)." : "Customer has not opted in to marketing texts." };
+  if (blocked) return { sent: false, blocked, messageId, error: BLOCK_REASON[blocked] };
 
   const client = getTwilio();
   if (!client || (!process.env.TWILIO_PHONE_NUMBER && !process.env.TWILIO_MESSAGING_SERVICE_SID)) {
@@ -144,6 +166,13 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
     return { sent: false, messageId, error: err.message || "SMS failed" };
   }
 }
+
+const BLOCK_REASON: Record<NonNullable<SendResult["blocked"]>, string> = {
+  opted_out: "Customer replied STOP. Ask them to text START to receive messages again.",
+  no_marketing_consent: "Customer has not opted in to promotional texts.",
+  card_number: "Message looks like it contains a card number and was not sent.",
+  quiet_hours: "Promotional texts can only be sent between 8 AM and 9 PM.",
+};
 
 async function markFailed(messageId: number | undefined, code: unknown, message: string | undefined) {
   if (!messageId) return;

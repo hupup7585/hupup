@@ -46,8 +46,14 @@ describe.skipIf(!hasDb)("SMS: inbound, keywords, status, sending", async () => {
     const ids = custs.map((c) => c.id);
     await db.delete(schema.messages).where(eq(schema.messages.contactPhone, phone));
     if (ids.length) {
-      await db.delete(schema.smsConsents).where(inArray(schema.smsConsents.customerId, ids));
-      await db.delete(schema.customers).where(inArray(schema.customers.id, ids));
+      // Once migration 0004 is applied, sms_consents is append-only (and customers with consents can't be
+      // deleted), so test rows stay behind on the local test DB; before it, clean up as usual.
+      try {
+        await db.delete(schema.smsConsents).where(inArray(schema.smsConsents.customerId, ids));
+        await db.delete(schema.customers).where(inArray(schema.customers.id, ids));
+      } catch {
+        /* permanent consent record */
+      }
     }
     await closeDb();
   });
@@ -122,7 +128,7 @@ describe.skipIf(!hasDb)("SMS: inbound, keywords, status, sending", async () => {
     [c] = await db.select().from(schema.customers).where(eq(schema.customers.id, c0.id));
     expect(c.marketingOptIn).toBe(false);
     expect(c.smsOptOut).toBe(false);
-    const consents = await db.select().from(schema.smsConsents).where(eq(schema.smsConsents.customerId, c0.id));
+    const consents = await db.select({ scope: schema.smsConsents.scope, action: schema.smsConsents.action }).from(schema.smsConsents).where(eq(schema.smsConsents.customerId, c0.id));
     expect(consents.map((x) => `${x.scope}:${x.action}`)).toEqual(
       expect.arrayContaining(["transactional:opt_out", "marketing:opt_out", "transactional:opt_in"]),
     );
