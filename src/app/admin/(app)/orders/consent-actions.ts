@@ -7,7 +7,7 @@ import { requireAdmin } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { getOrderWithItems } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
-import { recordStaffConsent, type ConsentScope, type StaffResponse } from "@/lib/sms-consent";
+import { ConsentBlockedError, recordStaffConsent, type ConsentScope, type StaffResponse } from "@/lib/sms-consent";
 import { STAFF_CONSENT_VERSION, STAFF_DISCLOSURE } from "@/lib/sms-consent-copy";
 
 export type ConsentActionResult = { ok: boolean; message: string };
@@ -31,7 +31,8 @@ export async function recordStaffConsentAction(orderId: number, form: { scope: C
   if (!phone) return { ok: false, message: "This order has no customer phone number." };
 
   const wording = STAFF_DISCLOSURE[form.scope].replace("{phone}", formatPhone(phone));
-  await recordStaffConsent({
+  try {
+    await recordStaffConsent({
     phone,
     scope: form.scope,
     response: form.response,
@@ -42,6 +43,18 @@ export async function recordStaffConsentAction(orderId: number, form: { scope: C
     orderId,
     timeZone: form.timeZone || null,
   });
+  } catch (e) {
+    // e.g. the customer replied STOP: staff can't override it. The attempt is audited.
+    if (!(e instanceof Error)) throw e;
+    await db.insert(schema.auditLog).values({
+      userId: session.userId ?? null,
+      action: e instanceof ConsentBlockedError ? "sms_consent.staff_blocked" : "sms_consent.staff_error",
+      entityType: "customer",
+      entityId: String(full!.customer!.id),
+      after: { scope: form.scope, response: form.response, disclosureRead: form.disclosureRead, orderId, reason: e.message },
+    });
+    return { ok: false, message: e.message };
+  }
 
   const h = await headers();
   await db.insert(schema.auditLog).values({

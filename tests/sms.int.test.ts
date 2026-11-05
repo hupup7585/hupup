@@ -100,7 +100,7 @@ describe.skipIf(!hasDb)("SMS: inbound, keywords, status, sending", async () => {
     expect(rows).toHaveLength(1);
   });
 
-  it("keywords: STOP opts out of everything, START clears it, NOPROMO stops marketing only", async () => {
+  it("keywords: STOP opts out of everything, START + YES restores order texts, NOPROMO stops marketing only", async () => {
     expect(detectKeyword(" stop ")).toBe("stop");
     expect(detectKeyword("Unsubscribe")).toBe("stop");
     expect(detectKeyword("start")).toBe("start");
@@ -118,6 +118,9 @@ describe.skipIf(!hasDb)("SMS: inbound, keywords, status, sending", async () => {
     expect(blocked.blocked).toBe("opted_out");
 
     await incoming.POST(signed("/api/sms/incoming", { From: phone, Body: "START", MessageSid: `SMt${Date.now()}` }, "hupup.vercel.app"));
+    [c] = await db.select().from(schema.customers).where(eq(schema.customers.id, c0.id));
+    expect(c.smsOptOut).toBe(true); // START alone enrolls no one; it asks for YES
+    await incoming.POST(signed("/api/sms/incoming", { From: phone, Body: "YES", MessageSid: `SMy${Date.now()}` }, "hupup.vercel.app"));
     [c] = await db.select().from(schema.customers).where(eq(schema.customers.id, c0.id));
     expect(c.smsOptOut).toBe(false);
     expect(c.marketingOptIn).toBe(false); // needs a fresh opt-in

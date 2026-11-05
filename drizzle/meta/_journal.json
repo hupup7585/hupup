@@ -64,6 +64,13 @@
       "when": 1793851628685,
       "tag": "0008_rental_terms_acceptance",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793856177820,
+      "tag": "0009_start_yes_reenroll",
+      "breakpoints": true
     }
   ]
 }

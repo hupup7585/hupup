@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import OrderActions from "./OrderActions";
 import ConsentPanel from "./ConsentPanel";
 import { STAFF_DISCLOSURE } from "@/lib/sms-consent-copy";
+import { NO_TEXT_CONSENT, hasTransactionalConsent } from "@/lib/sms";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,6 +16,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   if (!full) notFound();
   const { order: o, items, customer } = full;
   const due = o.subtotalCents - o.paidCents;
+  const textStatus = !customer?.phone ? "none" : customer.smsOptOut ? "stopped" : (await hasTransactionalConsent(customer.phone)) ? "ok" : "none";
   return (
     <div className="mx-auto max-w-5xl">
       <Link href="/admin/orders" className="text-sm font-bold text-sky">← All orders</Link>
@@ -56,7 +58,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <p className="text-muted">Not entered yet (caller still on the phone or abandoned cart).</p>
             )}
           </div>
-          {customer?.phone && <ConsentPanel orderId={o.id} phoneDisplay={formatPhone(customer.phone)} disclosures={STAFF_DISCLOSURE} />}
+          {customer?.phone && (
+            <div data-text-consent className={`card p-4 text-sm font-semibold ${textStatus === "ok" ? "text-[#13895C]" : "text-coral"}`}>
+              {textStatus === "ok" ? "Order texts: customer has given text consent." : textStatus === "stopped" ? "Customer replied STOP: no texts of any kind. They must text START and reply YES. Call or email instead." : NO_TEXT_CONSENT}
+            </div>
+          )}
+          {customer?.phone && <ConsentPanel orderId={o.id} phoneDisplay={formatPhone(customer.phone)} disclosures={STAFF_DISCLOSURE} stopped={textStatus === "stopped"} />}
         </div>
         <OrderActions
           orderId={o.id}

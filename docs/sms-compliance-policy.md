@@ -44,10 +44,10 @@ All texts are sent from the Hup Up Attractions hotline texting number through ou
 
 ## 5. Opt-outs
 - Customers can revoke consent at any time by replying **STOP, UNSUBSCRIBE, CANCEL, END, QUIT, OPT OUT** or **REVOKE**, or with any other reasonable message that clearly asks us to stop (for example "please stop texting me", "remove me from your list").
-- The system applies opt-outs to the relevant program **immediately**: STOP (and the other keywords) covers all texts; NOPROMO covers promotions only. Promotional texts that were already queued or scheduled for that customer are canceled at once and never sent. Every send also re-checks consent at the moment it goes out. Twilio also blocks further texts to that number until the customer texts START.
+- The system applies opt-outs to the relevant program **immediately**: STOP (and the other keywords) covers all texts, both order and service texts and promotional texts, until the customer re-enrolls in each program; NOPROMO covers promotions only. Promotional texts that were already queued or scheduled for that customer are canceled at once and never sent. Every send also re-checks consent at the moment it goes out. Twilio also blocks further texts to that number until the customer texts START.
 - At most **one non-promotional confirmation** may be sent after an opt-out. After that, **no promotional texts** to that customer, and no other texts until they opt back in.
 - If a customer asks a staff member by phone, in person or by email to stop texting, record the opt-out in the admin the same day. Never later than the legal deadline (10 business days where the federal rule applies).
-- **NOPROMO** is our own internal keyword that stops **promotional texts only**; order texts continue. It never overrides a broader STOP request: a customer who replied STOP stays opted out of everything until they reply START, even if they also send NOPROMO.
+- **NOPROMO** is our own internal keyword that stops **promotional texts only**; order texts continue. NOPROMO does not restart promotional messages after a STOP and never undoes a STOP. To receive promotional texts again after opting out, a separate new promotional opt-in is required.
 - Never ask a customer to give a reason for opting out, and never send a "we'll miss you" promotion.
 
 ## 6. Records
@@ -55,7 +55,7 @@ All texts are sent from the Hup Up Attractions hotline texting number through ou
   - **Consent records:** phone number, program (order or promotional), decision, date and time, method (website checkbox, keypad, voice, staff), the exact disclosure shown or spoken and its version, plus call, IP and browser details where available.
   - **Consent changes and opt-out history,** including the message the customer sent.
   - **Message history:** every text sent and received, including promotions, with its delivery status.
-- **Original consent records are never edited or deleted.** The database rejects any change or deletion. If a record is wrong (for example, recorded on the wrong customer), the Owner or an authorized staff member adds a **separate, timestamped correction entry** that points to the original, states the reason, and records who made it. The original stays unchanged; the newest entry is the current consent.
+- **Original consent records are never edited or deleted.** The database rejects any change or deletion. A correction is a separate, dated entry with the reason, who made it, the date and time, a reference to the original record, and the corrected information. Corrections can only withdraw consent; they can never create it. The newest entry is the current consent.
 - Message records can't be deleted for 24 months, and their content can't be changed (delivery status updates still apply).
 - Records are kept for at least 24 months, or longer where the law requires. Nothing deletes them automatically before then.
 - Never export these records except as the Owner approves for a legal or compliance request.
@@ -91,7 +91,7 @@ Breaking this policy can lead to losing texting access and other discipline. Rep
 **How the system enforces this:**
 - **Withdrawal is immediate.** STOP (or any other opt-out keyword or clear request) turns off all texts for that number at once; NOPROMO turns off promotional texts only. Promotional texts already queued or scheduled are canceled. Every send re-checks the customer's status at the moment it goes out.
 - **Only the withdrawal confirmation may follow.** After STOP, the system blocks every other text to that number, including enrollment confirmations and other automatic messages; the only exception is the single opt-out confirmation.
-- **Approved enrollment processes** are the website sign-up form, the phone menu consent questions, and staff reading the entire disclosure in the admin consent panel. Texting START re-enrolls a customer in order and service texts only (the carrier-standard way back in); it never restores promotional texts, which always need new consent through one of the approved processes. The system rejects any other way of recording consent.
+- **Approved enrollment processes** are the website sign-up form, the phone menu consent questions, and staff reading the entire disclosure in the admin consent panel. After a STOP, the only way back to order and service texts is **START followed by YES**: START sends a confirmation text and opens a pending confirmation for 24 hours; only a YES reply to that active confirmation restores order and service consent. A YES at any other time, after the 24 hours, or after a new STOP does nothing. START and YES never restore promotional texts; those need a new promotional opt-in. Staff cannot turn texts back on for a customer who replied STOP (no checkbox, panel answer, correction, or profile change can do it), and blocked attempts are written to the audit log.
 - **Documented separately.** A re-enrollment is saved as a new consent record linked to the withdrawal it follows. The earlier consent and withdrawal records stay exactly as they were.
 
 ## 12. System Controls and Compliance Monitoring

@@ -41,3 +41,13 @@ export const STAFF_DISCLOSURE = {
   marketing:
     "Would you like to receive promotional text messages from Hup Up Attractions at {phone}? If you agree, you also authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages. Consent is not a condition of purchase. Message and data rates may apply. Message frequency varies. You can reply STOP to opt out, or HELP for help, at any time. Do you agree? Please answer yes or no.",
 } as const;
+
+/** Sent when an opted-out customer replies START (approved wording). */
+export const START_CONFIRMATION_SMS =
+  "Hup Up Attractions: To receive order and service texts again (reservations, orders, payments, deliveries, pickups), reply YES. Msg frequency varies. Msg & data rates may apply. Reply HELP for help. Promotional texts require a separate sign-up.";
+
+/** Version id of the START confirmation wording stored with a YES re-enrollment. */
+export const START_CONFIRMATION_VERSION = "start-confirm-2026-11-05";
+
+/** A START confirmation is valid for this long; after that a new START is needed. */
+export const REENROLL_WINDOW_HOURS = 24;

@@ -16,7 +16,7 @@ const h = vi.hoisted(() => ({
 vi.mock("@/lib/db", async () => {
   const schema = await vi.importActual<typeof import("@/lib/db/schema")>("@/lib/db/schema");
   const q = (rows: unknown[]): unknown => {
-    const p: Record<string, unknown> = { where: () => p, limit: () => p, orderBy: () => p, then: (res: (v: unknown) => void) => res(rows) };
+    const p: Record<string, unknown> = { where: () => p, limit: () => p, orderBy: () => p, for: () => p, then: (res: (v: unknown) => void) => res(rows) };
     return p;
   };
   const db = {
@@ -30,6 +30,7 @@ vi.mock("@/lib/db", async () => {
     }),
     update: (t: unknown) => ({ set: (v: Record<string, unknown>) => ({ where: () => (h.updates.push({ table: t, v }), Promise.resolve()) }) }),
     delete: (t: unknown) => (h.deletes.push(t), { where: () => Promise.resolve() }),
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(db),
   };
   return { db, schema };
 });
@@ -171,9 +172,9 @@ describe("7. corrections are separate, timestamped entries; originals are never 
 describe("8. security and docs", () => {
   it("policy and SMS Terms cover restricted access, secure storage and immediate reporting", () => {
     const doc = readFileSync("docs/sms-compliance-policy.md", "utf8");
-    for (const s of ["Restricted access", "Secure storage", "Immediate reporting", "separate, timestamped correction entry", "NOPROMO", "entire", "Silence, uncertainty, or an unclear response counts as no consent"]) expect(doc).toContain(s);
+    for (const s of ["Restricted access", "Secure storage", "Immediate reporting", "A correction is a separate, dated entry with the reason, who made it", "NOPROMO", "entire", "Silence, uncertainty, or an unclear response counts as no consent"]) expect(doc).toContain(s);
     const terms = readFileSync("src/app/sms-terms/page.tsx", "utf8");
-    for (const s of ["<h2>Security</h2>", "limited to authorized staff", "reported to us immediately", "separate, dated correction entry", "It never undoes a STOP"]) expect(terms).toContain(s);
+    for (const s of ["<h2>Security</h2>", "limited to authorized staff", "reported to us immediately", "A correction is a separate dated entry with the reason, who made it, the date and time, a reference to the original record, and the corrected information.", "never undoes a STOP"]) expect(terms).toContain(s);
   });
 });
 
@@ -201,13 +202,13 @@ describe("11. withdrawal and re-enrollment", () => {
     await expect(consent.recordConsent({ phone: PHONE, scope: "marketing", action: "opt_in", source: "staff", method: "staff", wording: "W", wordingVersion: "v", disclosureRead: false })).rejects.toThrow(/entire disclosure/);
     expect(consentInserts()).toEqual([]);
   });
-  it("START re-enrolls order texts only, as a separate linked record; promotions stay off", async () => {
+  it("START alone records no consent and keeps the block; it only opens a pending YES confirmation", async () => {
     h.rows.set(schema.customers, [cust({ smsOptOut: true })]);
     h.rows.set(schema.smsConsents, [{ id: 40, action: "opt_out" }]);
     await handleInboundSms({ From: PHONE, Body: "START" });
-    expect(h.updates.find((u) => u.table === schema.customers)?.v).toEqual({ smsOptOut: false });
-    expect(consentInserts()).toHaveLength(1);
-    expect(consentInserts()[0]).toMatchObject({ scope: "transactional", action: "opt_in", source: "keyword", reenrollsAfterId: 40 });
+    expect(h.updates.filter((u) => u.table === schema.customers)).toEqual([]);
+    expect(consentInserts()).toEqual([]);
+    expect(h.inserts.find((i) => i.table === schema.smsReenrollRequests)?.v).toMatchObject({ phone: PHONE, status: "pending", scope: "transactional" });
   });
   it("migration 0007 adds the re-enrollment link (add-only) and the policy has sections 11 and 12", () => {
     const sql = readFileSync("drizzle/0007_consent_reenrollment.sql", "utf8");

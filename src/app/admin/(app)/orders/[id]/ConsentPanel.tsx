@@ -9,7 +9,7 @@ import type { ConsentScope, StaffResponse } from "@/lib/sms-consent";
  * Staff records text consent by phone or in person. The full disclosure is shown to read aloud; a yes can only
  * be recorded after confirming it was read in full. Silence or an unclear answer is recorded as no consent.
  */
-export default function ConsentPanel({ orderId, phoneDisplay, disclosures }: { orderId: number; phoneDisplay: string; disclosures: Record<ConsentScope, string> }) {
+export default function ConsentPanel({ orderId, phoneDisplay, disclosures, stopped = false }: { orderId: number; phoneDisplay: string; disclosures: Record<ConsentScope, string>; stopped?: boolean }) {
   const [scope, setScope] = useState<ConsentScope>("transactional");
   const [read, setRead] = useState(false);
   const [response, setResponse] = useState<StaffResponse | "">("");
@@ -23,6 +23,11 @@ export default function ConsentPanel({ orderId, phoneDisplay, disclosures }: { o
   return (
     <div className="card p-5">
       <h2 className="mb-1 font-bold">Text message consent</h2>
+      {stopped && (
+        <p data-stopped className="mb-3 rounded-lg bg-coral/10 p-2 text-sm font-semibold text-coral">
+          This customer replied STOP. Staff can&rsquo;t turn texts back on: the customer must text START and reply YES (order texts only). Promotions need a new sign-up after that.
+        </p>
+      )}
       <p className="mb-3 text-sm text-muted">Read the whole disclosure to the customer, word for word, before recording their answer. If they are silent, unsure, or unclear, record &ldquo;No clear answer&rdquo;: that is not consent.</p>
       <div className="mb-3 flex gap-2">
         {(["transactional", "marketing"] as const).map((s) => (
@@ -55,7 +60,7 @@ export default function ConsentPanel({ orderId, phoneDisplay, disclosures }: { o
           ] as const
         ).map(([v, label]) => (
           <label key={v} className="flex items-center gap-2">
-            <input type="radio" name={`resp-${orderId}`} checked={response === v} onChange={() => setResponse(v)} />
+            <input type="radio" name={`resp-${orderId}`} checked={response === v} disabled={stopped && v === "clear_yes"} onChange={() => setResponse(v)} />
             {label}
           </label>
         ))}

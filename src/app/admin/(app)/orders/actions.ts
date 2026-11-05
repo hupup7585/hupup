@@ -8,7 +8,7 @@ import { ORDER_STATUSES, type OrderStatus } from "@/lib/db/schema";
 import { checkBookable } from "@/lib/availability";
 import { getOrderWithItems, markPaid, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES, setOrderStatus } from "@/lib/orders";
 import { paymentLink } from "@/lib/sola";
-import { sendSms } from "@/lib/notify";
+import { sendOrderText } from "@/lib/notify";
 import { parseMoneyToCents } from "@/lib/money";
 import { longDate } from "@/lib/dates";
 import { BUSINESS_NAME } from "@/lib/config";
@@ -48,7 +48,7 @@ export async function recordPaymentAction(orderId: number, amount: string, metho
 }
 
 export async function sendPayLinkAction(orderId: number): Promise<ActionResult> {
-  await requireAdmin();
+  const session = await requireAdmin();
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found" };
   const phone = full.customer?.phone;
@@ -59,12 +59,20 @@ export async function sendPayLinkAction(orderId: number): Promise<ActionResult> 
   if (full.order.status === "PENDING_PAYMENT") {
     await setOrderStatus(orderId, "PENDING_PAYMENT", { holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES) });
   }
-  const r = await sendSms(
+  const r = await sendOrderText({
     phone,
-    `${BUSINESS_NAME} order #${orderNumber(orderId)} for ${longDate(full.order.eventDate)}: $${(due / 100).toFixed(2)} due. Pay securely here: ${link}`,
-  );
+    email: full.customer?.email,
+    subject: `${BUSINESS_NAME} order #${orderNumber(orderId)} payment link`,
+    body: `${BUSINESS_NAME} order #${orderNumber(orderId)} for ${longDate(full.order.eventDate)}: $${(due / 100).toFixed(2)} due. Pay securely here: ${link}`,
+    orderId,
+    customerId: full.customer?.id,
+    userId: session.userId ?? null,
+    event: "staff_payment_link",
+  });
   revalidatePath("/admin", "layout");
-  return r.sent ? { ok: true, message: "Payment link texted" } : { ok: false, message: r.error || "SMS failed" };
+  if (r.texted) return { ok: true, message: "Payment link texted" };
+  if (r.emailed) return { ok: true, message: r.message };
+  return { ok: false, message: r.message };
 }
 
 export async function updateDetailsAction(orderId: number, form: FormData): Promise<ActionResult> {

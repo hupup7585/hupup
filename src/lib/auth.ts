@@ -63,7 +63,7 @@ export async function sendLoginCode(channel: Channel): Promise<{ ok: boolean; er
 
   const msg = `${BUSINESS_NAME} admin code: ${code}. It expires in ${CODE_TTL_MIN} minutes. If you didn't request it, ignore this message.`;
   const res =
-    channel === "sms" ? await sendSms(dest, msg) : await sendEmail(dest, `Your ${BUSINESS_NAME} sign-in code: ${code}`, msg);
+    channel === "sms" ? await sendSms(dest, msg, { kind: "system", event: "login_code", log: false }) : await sendEmail(dest, `Your ${BUSINESS_NAME} sign-in code: ${code}`, msg);
   if (!res.sent) return { ok: false, error: res.error || "Could not send the code." };
   return { ok: true, devCode: res.dev ? code : undefined };
 }

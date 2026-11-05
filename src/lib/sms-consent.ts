@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { isSelectableTimeZone } from "@/lib/area-code-tz";
+import { cancelQueuedPromotions } from "@/lib/sms";
 
 /**
  * SMS consent (A2P 10DLC). Every consent decision is written to `sms_consents`, an append-only table
@@ -97,6 +98,8 @@ export type RecordConsentInput = {
   userAgent?: string | null;
   pageUrl?: string | null;
   disclosureRead?: boolean | null;
+  /** Only the START -> YES confirmation may re-enroll a number that replied STOP. */
+  viaStartConfirmation?: boolean;
 };
 
 /**
@@ -105,20 +108,30 @@ export type RecordConsentInput = {
  *    disclosure; or
  *  - the carrier-standard START keyword, for order and service texts only (never promotions).
  */
-export function assertApprovedEnrollment(input: Pick<RecordConsentInput, "action" | "scope" | "source" | "method" | "disclosureRead">) {
+export function assertApprovedEnrollment(input: Pick<RecordConsentInput, "action" | "scope" | "source" | "method" | "disclosureRead" | "viaStartConfirmation">) {
   if (input.action !== "opt_in") return;
   if (input.source === "keyword" && input.scope === "marketing") throw new Error("Promotional texts can't be re-enrolled by keyword; new consent is required.");
+  if (input.source === "keyword" && !input.viaStartConfirmation) throw new Error("A keyword alone can't enroll anyone: START must be confirmed with YES.");
   if ((input.source === "staff" || input.source === "pos") && !input.disclosureRead) throw new Error("Staff consent requires the entire disclosure to be read first.");
   if (!["web", "phone", "staff", "pos", "keyword"].includes(input.source)) throw new Error("Not an approved enrollment process.");
 }
 
+/** Database handle: the shared connection or an open transaction (keyword processing locks the customer row). */
+export type Exec = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export class ConsentBlockedError extends Error {}
+
 /** Append a consent row (creating a minimal customer record for the number if needed) and update current state. */
-export async function recordConsent(input: RecordConsentInput) {
+export async function recordConsent(input: RecordConsentInput, exec: Exec = db): Promise<number> {
+  return (await recordConsentDetailed(input, exec)).customerId;
+}
+
+export async function recordConsentDetailed(input: RecordConsentInput, exec: Exec = db): Promise<{ customerId: number; consentId: number }> {
   assertApprovedEnrollment(input);
   // Re-enrollment after a withdrawal is documented as its own row that points at that withdrawal.
   let reenrollsAfterId: number | null = null;
   if (input.action === "opt_in") {
-    const [last] = await db
+    const [last] = await exec
       .select({ id: schema.smsConsents.id, action: schema.smsConsents.action })
       .from(schema.smsConsents)
       .where(and(eq(schema.smsConsents.phone, input.phone), eq(schema.smsConsents.scope, input.scope)))
@@ -126,9 +139,14 @@ export async function recordConsent(input: RecordConsentInput) {
       .limit(1);
     if (last?.action === "opt_out") reenrollsAfterId = last.id;
   }
-  let [customer] = await db.select().from(schema.customers).where(eq(schema.customers.phone, input.phone)).limit(1);
-  if (!customer) [customer] = await db.insert(schema.customers).values({ phone: input.phone, name: null }).returning();
-  await db.insert(schema.smsConsents).values({
+  let [customer] = await exec.select().from(schema.customers).where(eq(schema.customers.phone, input.phone)).limit(1);
+  if (!customer) [customer] = await exec.insert(schema.customers).values({ phone: input.phone, name: null }).returning();
+  // STOP can only be undone by START + YES. No form, staff action, correction or automation may opt in a number
+  // that replied STOP (the YES confirmation path clears the block itself, in the same locked transaction).
+  if (input.action === "opt_in" && customer.smsOptOut && !input.viaStartConfirmation) {
+    throw new ConsentBlockedError("This customer replied STOP. They must text START and reply YES to receive order texts again; promotions need a new sign-up after that.");
+  }
+  const [row] = await exec.insert(schema.smsConsents).values({
     customerId: customer.id,
     phone: input.phone,
     scope: input.scope,
@@ -148,16 +166,18 @@ export async function recordConsent(input: RecordConsentInput) {
     pageUrl: input.pageUrl ?? null,
     disclosureRead: input.disclosureRead ?? null,
     reenrollsAfterId,
-  });
+  }).returning({ id: schema.smsConsents.id });
   if (input.scope === "marketing") {
     // Only an explicit opt-in turns promotions on; anything else leaves/turns them off.
     const on = input.action === "opt_in";
-    await db
+    await exec
       .update(schema.customers)
       .set({ marketingOptIn: on, marketingOptInAt: on ? new Date() : customer.marketingOptInAt })
       .where(eq(schema.customers.id, customer.id));
+    // A promotional "no" cancels every promotion still waiting to go out.
+    if (!on && exec === db) await cancelQueuedPromotions(input.phone);
   }
-  return customer.id;
+  return { customerId: customer.id, consentId: row.id };
 }
 
 /**
@@ -226,6 +246,9 @@ export async function correctConsent(input: { originalId: number; action: Consen
   const reason = input.reason.trim();
   if (!reason) throw new Error("A correction needs a reason.");
   if (!input.userId) throw new Error("A correction must record who made it.");
+  // No manual overrides: a correction can only take consent away. New consent always needs the customer's own
+  // affirmative decision through an approved process (website, phone menu, staff reading the full disclosure).
+  if (input.action === "opt_in") throw new ConsentBlockedError("A correction can't create consent. Record the customer's new consent through an approved process instead.");
   const [orig] = await db.select().from(schema.smsConsents).where(eq(schema.smsConsents.id, input.originalId)).limit(1);
   if (!orig) throw new Error("Consent record not found.");
   await db.insert(schema.smsConsents).values({
@@ -243,7 +266,8 @@ export async function correctConsent(input: { originalId: number; action: Consen
     correctionReason: reason,
   });
   if (orig.scope === "marketing" && orig.customerId) {
-    await db.update(schema.customers).set({ marketingOptIn: input.action === "opt_in" }).where(eq(schema.customers.id, orig.customerId));
+    await db.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.id, orig.customerId));
+    await cancelQueuedPromotions(orig.phone); // a correction to "no" cancels promotions still waiting
   }
 }
 

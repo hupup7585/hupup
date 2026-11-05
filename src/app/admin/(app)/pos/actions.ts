@@ -10,7 +10,7 @@ import { createOrderWithItems, getOrderWithItems, minutesFromNow, orderNumber, P
 import { parseMoneyToCents } from "@/lib/money";
 import { toE164 } from "@/lib/phone";
 import { paymentLink } from "@/lib/sola";
-import { sendSms } from "@/lib/notify";
+import { sendOrderText } from "@/lib/notify";
 import { BUSINESS_NAME } from "@/lib/config";
 
 export async function availabilityFor(date: string) {
@@ -35,7 +35,7 @@ export async function createBookingAction(input: {
   payment: "link" | "cash" | "check" | "later";
   amountPaid: string;
 }): Promise<PosResult> {
-  await requireAdmin();
+  const session = await requireAdmin();
   if (!isValidISO(input.date)) return { ok: false, message: "Pick an event date." };
   if (input.date < todayISO()) return { ok: false, message: "That date is in the past." };
   const items = Object.entries(input.items)
@@ -71,11 +71,17 @@ export async function createBookingAction(input: {
   if (input.payment === "link" && phone) {
     const full = await getOrderWithItems(r.orderId);
     const link = paymentLink({ orderId: r.orderId, amountCents: full!.order.subtotalCents, name: input.name, email: input.email, phone });
-    const sms = await sendSms(
+    const sent = await sendOrderText({
       phone,
-      `${BUSINESS_NAME} order #${orderNumber(r.orderId)} for ${longDate(input.date)}: $${(full!.order.subtotalCents / 100).toFixed(2)}. Pay securely within 2 hours to confirm: ${link}`,
-    );
-    message += sms.sent ? " Payment link texted (held for 2 hours)." : ` Could not text payment link: ${sms.error}`;
+      email: input.email || null,
+      subject: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} payment link`,
+      body: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} for ${longDate(input.date)}: $${(full!.order.subtotalCents / 100).toFixed(2)}. Pay securely within 2 hours to confirm: ${link}`,
+      orderId: r.orderId,
+      customerId: full?.customer?.id ?? null,
+      userId: session.userId ?? null,
+      event: "staff_payment_link",
+    });
+    message += sent.texted ? " Payment link texted (held for 2 hours)." : sent.emailed ? " No text consent: payment link emailed (held for 2 hours)." : ` Payment link not texted: ${sent.message}`;
   }
   revalidatePath("/admin", "layout");
   return { ok: true, message, orderId: r.orderId };

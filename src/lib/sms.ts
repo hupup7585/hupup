@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, lte } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
@@ -30,7 +30,9 @@ export type SendResult = {
   messageId?: number;
   sid?: string;
   dev?: boolean;
-  blocked?: "opted_out" | "no_marketing_consent" | "card_number" | "quiet_hours";
+  blocked?: "opted_out" | "no_marketing_consent" | "no_transactional_consent" | "not_allowed" | "card_number" | "quiet_hours";
+  /** A promotion outside quiet hours: saved and sent in the next window (after rechecking consent). */
+  held?: boolean;
   error?: string;
   /** MMS failed and we fell back to plain SMS */
   mmsFallback?: boolean;
@@ -83,8 +85,70 @@ function senderParams(): { from?: string; messagingServiceSid?: string } {
 }
 
 /**
- * The single way the app sends a text. Logs every message (content, type, who, links, status),
- * refuses opted-out numbers and card numbers, and falls back from MMS to SMS if media fails.
+ * Automatic (non-customer-program) messages: each purpose must be listed here, so "system" can't be used to
+ * get around consent. Only the two marked `afterStop` may reach a number that replied STOP.
+ */
+export const SYSTEM_EVENTS: Record<string, { afterStop: boolean }> = {
+  login_code: { afterStop: false }, // staff sign-in codes
+  owner_forward: { afterStop: false }, // copy of an incoming text to the owner
+  owner_alert: { afterStop: false }, // "new paid order" to the owner
+  compliance_alert: { afterStop: false }, // compliance report to the owner
+  consent_confirmation: { afterStop: false }, // confirmation right after a customer opts in
+  opt_out_confirmation: { afterStop: true }, // the single permitted confirmation of an opt-out
+  reenroll_request: { afterStop: true }, // the START confirmation asking the customer to reply YES
+};
+
+export type Customer = typeof schema.customers.$inferSelect;
+type Blocked = NonNullable<SendResult["blocked"]>;
+
+/** Latest order/service (transactional) consent decision for a number is an opt-in. */
+export async function hasTransactionalConsent(phone: string): Promise<boolean> {
+  const [row] = await db
+    .select({ action: schema.smsConsents.action })
+    .from(schema.smsConsents)
+    .where(and(eq(schema.smsConsents.phone, phone), eq(schema.smsConsents.scope, "transactional")))
+    .orderBy(desc(schema.smsConsents.createdAt), desc(schema.smsConsents.id))
+    .limit(1);
+  return row?.action === "opt_in";
+}
+
+/**
+ * Every rule a text must pass, checked at the moment of sending (also for held promotions):
+ *  - system texts: listed purpose only; after STOP only the opt-out confirmation and the START confirmation;
+ *  - STOP blocks both programs;
+ *  - order/service texts need order/service consent;
+ *  - promotional texts need promotional consent and the 8 AM - 9 PM window.
+ */
+export async function checkEligibility(input: { to: string; kind: MessageKind; event?: string | null; customer: Customer | null; now?: Date }): Promise<Blocked | null> {
+  const { to, kind, customer } = input;
+  if (kind === "system") {
+    const rule = input.event ? SYSTEM_EVENTS[input.event] : undefined;
+    if (!rule) return "not_allowed";
+    if (customer?.smsOptOut && !rule.afterStop) return "opted_out";
+    return null;
+  }
+  if (customer?.smsOptOut) return "opted_out";
+  if (kind === "transactional") return (await hasTransactionalConsent(to)) ? null : "no_transactional_consent";
+  if (!customer?.marketingOptIn) return "no_marketing_consent";
+  if (!inMarketingHours(to, input.now, customer.timeZone)) return "quiet_hours";
+  return null;
+}
+
+/** Next time (on the hour, within 7 days) the promotional window is open for this recipient. */
+export function nextPromoWindow(to: string, from: Date, customerTimeZone?: string | null): Date | null {
+  const t = new Date(from);
+  t.setUTCMinutes(0, 0, 0);
+  for (let i = 1; i <= 24 * 7; i++) {
+    const c = new Date(t.getTime() + i * 3600 * 1000);
+    if (inMarketingHours(to, c, customerTimeZone)) return c;
+  }
+  return null;
+}
+
+/**
+ * The single way the app sends a text. Logs every message (content, type, who, links, status), applies every
+ * consent rule, holds promotions that fall outside quiet hours for the next window, refuses card numbers, and
+ * falls back from MMS to SMS if media fails.
  */
 export async function sendMessage(input: SendInput): Promise<SendResult> {
   const to = toE164(input.to);
@@ -101,14 +165,12 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
     ? (await db.select().from(schema.customers).where(eq(schema.customers.id, input.customerId)))[0] ?? null
     : await customerByPhone(to);
 
-  let blocked: SendResult["blocked"];
-  // After a withdrawal (STOP) nothing goes out except the permitted opt-out confirmation (policy section 11).
-  if (customer?.smsOptOut && !(kind === "system" && input.event === "opt_out_confirmation")) blocked = "opted_out";
-  else if (kind === "marketing" && !customer?.marketingOptIn) blocked = "no_marketing_consent";
-  else if (kind === "marketing" && !inMarketingHours(to, input.now, customer?.timeZone)) blocked = "quiet_hours";
+  const blocked = await checkEligibility({ to, kind, event: input.event, customer, now: input.now });
+  const held = blocked === "quiet_hours";
+  const sendAfter = held ? nextPromoWindow(to, input.now ?? new Date(), customer?.timeZone) : null;
 
   let messageId: number | undefined;
-  if (log) {
+  if (log || held) {
     const [row] = await db
       .insert(schema.messages)
       .values({
@@ -120,8 +182,9 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
         mediaUrls: input.mediaUrls ?? [],
         kind,
         event: input.event ?? null,
-        status: blocked ? "blocked" : "queued",
+        status: held ? "held" : blocked ? "blocked" : "queued",
         errorMessage: blocked ? BLOCK_REASON[blocked] : null,
+        sendAfter,
         customerId: customer?.id ?? null,
         orderId: input.orderId ?? null,
         callSid: input.callSid ?? null,
@@ -131,76 +194,114 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
       .returning({ id: schema.messages.id });
     messageId = row.id;
   }
-  if (blocked) return { sent: false, blocked, messageId, error: BLOCK_REASON[blocked] };
+  if (blocked) return { sent: false, blocked, held, messageId, error: BLOCK_REASON[blocked] };
+  return deliver({ messageId, to, body: input.body, mediaUrls: input.mediaUrls, customer, logBody: log, retry: () => sendMessage({ ...input, mediaUrls: [] }) });
+}
 
+async function deliver(m: { messageId?: number; to: string; body: string; mediaUrls?: string[]; customer: Customer | null; logBody: boolean; retry?: () => Promise<SendResult> }): Promise<SendResult> {
+  const { messageId, to } = m;
   const client = getTwilio();
   if (!client || (!process.env.TWILIO_PHONE_NUMBER && !process.env.TWILIO_MESSAGING_SERVICE_SID)) {
     if (config.isProd()) {
       await markFailed(messageId, "config", "Twilio is not configured");
       return { sent: false, messageId, error: "Twilio is not configured" };
     }
-    console.log(`[dev SMS to ${to}] ${log ? input.body : "(not logged)"}${input.mediaUrls?.length ? ` [media: ${input.mediaUrls.join(", ")}]` : ""}`);
+    console.log(`[dev SMS to ${to}] ${m.logBody ? m.body : "(not logged)"}${m.mediaUrls?.length ? ` [media: ${m.mediaUrls.join(", ")}]` : ""}`);
     if (messageId) await db.update(schema.messages).set({ status: "dev" }).where(eq(schema.messages.id, messageId));
     return { sent: true, dev: true, messageId };
   }
 
   const statusCallback = `${config.baseUrl()}/api/sms/status`;
-  const create = (mediaUrl?: string[]) =>
-    client.messages.create({ to, body: input.body, ...senderParams(), statusCallback, ...(mediaUrl?.length ? { mediaUrl } : {}) });
-
   try {
-    const msg = await create(input.mediaUrls);
+    const msg = await client.messages.create({ to, body: m.body, ...senderParams(), statusCallback, ...(m.mediaUrls?.length ? { mediaUrl: m.mediaUrls } : {}) });
     if (messageId) await db.update(schema.messages).set({ twilioSid: msg.sid, status: msg.status || "queued" }).where(eq(schema.messages.id, messageId));
     return { sent: true, sid: msg.sid, messageId };
   } catch (e) {
     const err = e as { code?: number | string; message?: string };
-    if (input.mediaUrls?.length) {
+    if (m.mediaUrls?.length && m.retry) {
       // MMS failed: keep the record of the failure, then send the same text without media.
       await markFailed(messageId, err.code, `MMS failed: ${err.message}`);
-      const retry = await sendMessage({ ...input, mediaUrls: [] });
+      const retry = await m.retry();
       return { ...retry, mmsFallback: true };
     }
     await markFailed(messageId, err.code, err.message);
-    if (String(err.code) === "21610" && customer) {
+    if (String(err.code) === "21610" && m.customer) {
       // Twilio says the recipient unsubscribed: mirror it.
-      await db.update(schema.customers).set({ smsOptOut: true }).where(eq(schema.customers.id, customer.id));
+      await db.update(schema.customers).set({ smsOptOut: true }).where(eq(schema.customers.id, m.customer.id));
     }
     return { sent: false, messageId, error: err.message || "SMS failed" };
   }
 }
 
-/** Message statuses that mean "not sent yet" (Twilio scheduled/queued, or held by us). */
-const PENDING_STATUSES = ["scheduled", "queued", "accepted", "held"];
+/**
+ * Send promotions that were held for quiet hours and are now due. Each one is rechecked right before sending:
+ * if the customer opted out or lost consent it is canceled (never sent); if it is still outside the window it is
+ * moved to the next window.
+ */
+export async function processHeldPromotions(now = new Date()): Promise<{ sent: number; canceled: number; rescheduled: number }> {
+  const due = await db
+    .select()
+    .from(schema.messages)
+    .where(and(eq(schema.messages.status, "held"), eq(schema.messages.kind, "marketing"), lte(schema.messages.sendAfter, now)));
+  const out = { sent: 0, canceled: 0, rescheduled: 0 };
+  for (const m of due) {
+    const to = m.toNumber || m.contactPhone || "";
+    const customer = m.customerId ? ((await db.select().from(schema.customers).where(eq(schema.customers.id, m.customerId)))[0] ?? null) : await customerByPhone(to);
+    const blocked = await checkEligibility({ to, kind: "marketing", customer, now });
+    if (blocked === "quiet_hours") {
+      await db.update(schema.messages).set({ sendAfter: nextPromoWindow(to, now, customer?.timeZone) }).where(eq(schema.messages.id, m.id));
+      out.rescheduled++;
+    } else if (blocked) {
+      await db.update(schema.messages).set({ status: "canceled", errorMessage: `Canceled before sending: ${BLOCK_REASON[blocked]}` }).where(eq(schema.messages.id, m.id));
+      out.canceled++;
+    } else {
+      const r = await deliver({ messageId: m.id, to, body: m.body, mediaUrls: m.mediaUrls ?? [], customer, logBody: true });
+      if (r.sent) out.sent++;
+    }
+  }
+  return out;
+}
+
+/** Message statuses that mean "not sent yet" (held by us, or scheduled/queued at Twilio). */
+const PENDING_STATUSES = ["held", "scheduled", "queued", "accepted"];
 
 /**
- * Opt-out: cancel every promotional text for this number that hasn't gone out yet. Twilio-scheduled messages
- * are canceled through the API; anything else still pending is marked canceled so it is never sent.
- * (Every send also re-checks consent at the moment of sending.)
+ * Opt-out: cancel every promotional text for this number that hasn't gone out yet. Held texts (ours) are
+ * canceled outright; texts already handed to Twilio are canceled through the API (and marked canceled only if
+ * Twilio confirms). Every send also rechecks consent at the moment of sending.
  */
 export async function cancelQueuedPromotions(phone: string): Promise<number> {
   const pending = await db
-    .select({ id: schema.messages.id, sid: schema.messages.twilioSid })
+    .select({ id: schema.messages.id, sid: schema.messages.twilioSid, status: schema.messages.status })
     .from(schema.messages)
     .where(and(eq(schema.messages.contactPhone, phone), eq(schema.messages.kind, "marketing"), eq(schema.messages.direction, "out"), inArray(schema.messages.status, PENDING_STATUSES)));
   const client = getTwilio();
+  let canceled = 0;
   for (const m of pending) {
-    if (m.sid && client) {
+    if (m.sid) {
+      if (!client) continue;
       try {
         await (client.messages as unknown as (sid: string) => { update: (p: { status: string }) => Promise<unknown> })(m.sid).update({ status: "canceled" });
       } catch (e) {
-        console.error("Could not cancel scheduled promotion", m.sid, e);
+        console.error("Could not cancel promotion at Twilio (it may already be sending)", m.sid, e);
+        continue;
       }
     }
     await db.update(schema.messages).set({ status: "canceled", errorMessage: "Canceled: customer opted out before it was sent" }).where(eq(schema.messages.id, m.id));
+    canceled++;
   }
-  return pending.length;
+  return canceled;
 }
 
-const BLOCK_REASON: Record<NonNullable<SendResult["blocked"]>, string> = {
-  opted_out: "Customer replied STOP. Ask them to text START to receive messages again.",
+export const NO_TEXT_CONSENT = "No text consent; call or email.";
+
+const BLOCK_REASON: Record<Blocked, string> = {
+  opted_out: "Customer replied STOP. They must text START and reply YES to receive order texts again.",
   no_marketing_consent: "Customer has not opted in to promotional texts.",
+  no_transactional_consent: NO_TEXT_CONSENT,
+  not_allowed: "This kind of automatic message is not allowed.",
   card_number: "Message looks like it contains a card number and was not sent.",
-  quiet_hours: "Promotional texts can only be sent between 8 AM and 9 PM in the customer's local time.",
+  quiet_hours: "Held: promotional texts are sent only between 8 AM and 9 PM in the customer's local time.",
 };
 
 async function markFailed(messageId: number | undefined, code: unknown, message: string | undefined) {

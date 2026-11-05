@@ -37,15 +37,18 @@ export default function SmsTerms() {
 
       <h2>How to stop texts</h2>
       <p>
-        Reply with any of these words to {sms} at any time: {OPT_OUT_KEYWORDS.join(", ")}. We also honor other clear requests to stop, such as &ldquo;please stop texting me&rdquo;. Opt-outs take
+        Reply with any of these words to {sms} at any time: {OPT_OUT_KEYWORDS.join(", ")}. Replying STOP (or any of the words above) stops both order and service texts and promotional texts.
+        You will not receive either until you re-enroll in the relevant program. We also honor other clear requests to stop, such as &ldquo;please stop texting me&rdquo;. Opt-outs take
         effect immediately, including for promotional texts that were already scheduled. You may get one final, non-promotional text confirming the opt-out, and no promotional texts after that.
       </p>
       <p>
-        To re-enroll after opting out, reply START and follow the confirmation instructions. Re-enrollment applies only to the messaging program for which you provide new consent. Your previous
-        opt-out remains documented in our records.
+        To re-enroll after opting out, reply START and follow the confirmation instructions: we will ask you to reply YES to confirm that you want order and service texts again. Replying START
+        alone does not re-enroll you in any program, and it never re-enrolls you in promotional texts. To receive promotional texts again, you must give new promotional consent through our website,
+        our phone line, or our team. Re-enrollment applies only to the messaging program for which you provide new consent. Your previous opt-out remains documented in our records.
       </p>
       <p>
-        NOPROMO is our own keyword that stops promotional texts only, while order texts continue. It never undoes a STOP: if you replied STOP, you receive no texts from us until you reply START.
+        NOPROMO is our own keyword that stops promotional texts only, while order texts continue. NOPROMO does not restart promotional messages after a STOP and never undoes a STOP. To receive
+        promotional texts again after opting out, a separate new promotional opt-in is required.
       </p>
 
       <h2>Help</h2>
@@ -60,7 +63,7 @@ export default function SmsTerms() {
       <p>
         We keep records of your text consent, changes to your consent, opt-out requests, and the texts we send for at least {RECORD_RETENTION_MONTHS} months, or longer where the law requires. These records
         include your phone number, the type of consent, the date and time, how you gave consent, and the exact consent wording you saw or heard. Original consent records are never edited or
-        deleted; if a record needs correcting, we add a separate, dated correction entry.
+        deleted. A correction is a separate dated entry with the reason, who made it, the date and time, a reference to the original record, and the corrected information.
       </p>
 
       <h2>Security</h2>

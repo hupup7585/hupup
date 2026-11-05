@@ -261,9 +261,11 @@ export const messages = pgTable(
     userId: integer("user_id"),
     templateId: integer("template_id"),
     readAt: timestamp("read_at", { withTimezone: true }),
+    /** Held promotional text (blocked by quiet hours): earliest time it may be sent. Consent is rechecked then. */
+    sendAfter: timestamp("send_after", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("messages_contact_idx").on(t.contactPhone, t.createdAt), index("messages_customer_idx").on(t.customerId)],
+  (t) => [index("messages_contact_idx").on(t.contactPhone, t.createdAt), index("messages_customer_idx").on(t.customerId), index("messages_held_idx").on(t.status, t.sendAfter)],
 );
 
 export const smsConsents = pgTable(
@@ -364,4 +366,33 @@ export const termsAcceptances = pgTable(
     acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("terms_acceptances_order_idx").on(t.orderId, t.acceptedAt)],
+);
+
+/* ------------------------------------------------------------- START -> YES re-enrollment */
+
+/**
+ * A customer who opted out (STOP) texts START: we create one pending confirmation (24 hours) and ask them to reply
+ * YES. Only YES to an active pending confirmation restores order/service consent. STOP cancels it. Never deleted.
+ */
+export const smsReenrollRequests = pgTable(
+  "sms_reenroll_requests",
+  {
+    id: serial("id").primaryKey(),
+    phone: text("phone").notNull(),
+    customerId: integer("customer_id").references(() => customers.id),
+    /** Program being restored: always "transactional" (START never restores promotions) */
+    scope: text("scope").notNull().default("transactional"),
+    /** pending | confirmed | expired | canceled */
+    status: text("status").notNull().default("pending"),
+    /** The exact START confirmation text sent to the customer */
+    promptText: text("prompt_text").notNull(),
+    startMessage: text("start_message"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    /** e.g. "stop", "expired", or the consent row id that confirmed it */
+    resolution: text("resolution"),
+    confirmConsentId: integer("confirm_consent_id"),
+  },
+  (t) => [index("sms_reenroll_phone_idx").on(t.phone, t.status)],
 );

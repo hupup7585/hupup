@@ -48,7 +48,7 @@ export function findComplianceIssues(input: { messages: Msg[]; consents: Consent
     }
     // After a STOP (transactional opt-out), only the opt-out confirmation may go out until a new opt-in.
     const t = latestBefore(phone, "transactional", m.createdAt);
-    if (t?.action === "opt_out" && t.source === "keyword" && m.event !== "opt_out_confirmation")
+    if (t?.action === "opt_out" && t.source === "keyword" && m.event !== "opt_out_confirmation" && m.event !== "reenroll_request")
       out.push({ check: "sent_after_opt_out", messageId: m.id, phone, at: m.createdAt, detail: "Text sent after the customer opted out (STOP) and before any new consent." });
   }
 

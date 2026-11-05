@@ -18,7 +18,10 @@ describe("Abram's five final /sms-terms corrections", () => {
   const page = readFileSync("src/app/sms-terms/page.tsx", "utf8").replace(/\s+/g, " ").replace(/&rsquo;/g, "'");
   it("each sentence is present word for word", () => {
     for (const s of [
-      "To re-enroll after opting out, reply START and follow the confirmation instructions. Re-enrollment applies only to the messaging program for which you provide new consent. Your previous opt-out remains documented in our records.",
+      "To re-enroll after opting out, reply START and follow the confirmation instructions: we will ask you to reply YES to confirm that you want order and service texts again. Replying START alone does not re-enroll you in any program, and it never re-enrolls you in promotional texts. To receive promotional texts again, you must give new promotional consent through our website, our phone line, or our team. Re-enrollment applies only to the messaging program for which you provide new consent. Your previous opt-out remains documented in our records.",
+      "NOPROMO is our own keyword that stops promotional texts only, while order texts continue. NOPROMO does not restart promotional messages after a STOP and never undoes a STOP. To receive promotional texts again after opting out, a separate new promotional opt-in is required.",
+      "Replying STOP (or any of the words above) stops both order and service texts and promotional texts. You will not receive either until you re-enroll in the relevant program.",
+      "Original consent records are never edited or deleted. A correction is a separate dated entry with the reason, who made it, the date and time, a reference to the original record, and the corrected information.",
       "We use the customer's confirmed local time zone whenever available. If it is unavailable, promotional messages will be sent only when the permitted hours are satisfied in both the telephone number's area-code time zone and Eastern Time.",
       "A HELP response identifies Hup Up Attractions and provides our customer support telephone number and email address.",
       "We use reasonable administrative, technical, and organizational safeguards designed to protect customer information against unauthorized access, use, alteration, or disclosure.",
@@ -27,7 +30,7 @@ describe("Abram's five final /sms-terms corrections", () => {
       expect(page).toContain(s);
   });
   it("replaced wording is gone (nothing stated twice)", () => {
-    for (const old of ["To start again, reply START", "We use the time zone you give us", "New York (Eastern) time", "stored securely", "See our <a"]) expect(page).not.toContain(old);
+    for (const old of ["To start again, reply START", "We use the time zone you give us", "New York (Eastern) time", "stored securely", "See our <a", "until you reply START", "separate, dated correction entry"]) expect(page).not.toContain(old);
   });
   it("/privacy-policy redirects to /privacy", () => {
     expect(readFileSync("next.config.ts", "utf8")).toContain('{ source: "/privacy-policy", destination: "/privacy", permanent: true }');

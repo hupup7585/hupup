@@ -3,14 +3,18 @@ import { db, schema } from "@/lib/db";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { getSettings } from "@/lib/settings";
 import { cancelQueuedPromotions, sendMessage } from "@/lib/sms";
-import { recordConsent } from "@/lib/sms-consent";
+import { TRANSACTIONAL_CONFIRMATION_SMS } from "@/lib/sms-consent";
+import { START_CONFIRMATION_SMS } from "@/lib/sms-consent-copy";
+import { cancelPendingReenroll, handleStart, handleYes } from "@/lib/sms-reenroll";
 
 export const STOP_WORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "REVOKE", "OPTOUT"];
-export const START_WORDS = ["START", "UNSTOP", "YES"];
+export const START_WORDS = ["START", "UNSTOP"];
+/** YES only counts as a reply to an active START confirmation (see sms-reenroll.ts). */
+export const YES_WORDS = ["YES"];
 export const HELP_WORDS = ["HELP", "INFO"];
 export const NOPROMO_WORDS = ["NOPROMO"];
 
-export type Keyword = "stop" | "start" | "help" | "nopromo" | null;
+export type Keyword = "stop" | "start" | "yes" | "help" | "nopromo" | null;
 
 /** Unambiguous opt-out words that also count anywhere in a short message ("unsubscribe me", "opt me out"). */
 const OPT_OUT_IN_PHRASE = ["STOPALL", "UNSUBSCRIBE", "OPTOUT", "REVOKE"];
@@ -36,6 +40,7 @@ export function detectKeywordDetail(body: string): { keyword: Keyword; exact: bo
   const w = body.trim().toUpperCase().replace(/[^A-Z]/g, "");
   if (STOP_WORDS.includes(w)) return { keyword: "stop", exact: true };
   if (START_WORDS.includes(w)) return { keyword: "start", exact: true };
+  if (YES_WORDS.includes(w)) return { keyword: "yes", exact: true };
   if (HELP_WORDS.includes(w)) return { keyword: "help", exact: true };
   if (NOPROMO_WORDS.includes(w)) return { keyword: "nopromo", exact: true };
   const words = body.toUpperCase().replace(/\bOPT[\s-]+(?:ME[\s-]+)?OUT\b/g, "OPTOUT").replace(/[^A-Z\s]/g, " ").split(/\s+/).filter(Boolean);
@@ -49,7 +54,6 @@ export function detectKeyword(body: string): Keyword {
   return detectKeywordDetail(body).keyword;
 }
 
-/** Sent when an opt-out was recognized in a phrase (Twilio confirms exact keywords itself). */
 /** The default HELP reply; a custom text is used only if it still names the business and both contacts. */
 export const HELP_REPLY = "Hup Up Attractions: For help, call (845) 777-7585 or email hupupattractions@gmail.com. Msg & data rates may apply. Reply STOP to opt out.";
 
@@ -62,7 +66,7 @@ export function helpReply(custom?: string | null): string {
 export const NOPROMO_CONFIRMATION =
   "Hup Up Attractions: You won't receive promotional texts anymore. You'll still get texts about your orders. Reply STOP to stop all texts.";
 
-/** The single non-promotional confirmation allowed after an opt-out (Requirement 5). */
+/** The single non-promotional confirmation allowed after an opt-out (sent when an opt-out was recognized in a phrase; Twilio confirms exact keywords itself). */
 export const OPT_OUT_CONFIRMATION = "Hup Up Attractions: You're unsubscribed and won't receive more texts from us. Reply START to resubscribe.";
 
 export type InboundResult = { messageId: number; keyword: Keyword; reply: string | null; forwarded: boolean };
@@ -107,39 +111,51 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
   const settings = await getSettings();
   let reply: string | null = null;
 
+  // Consent changes run in one transaction that locks this customer's row, so a STOP and a START/YES arriving at
+  // the same time are applied one after the other and a YES can never restore consent after a STOP.
+  const effects = { cancelPromos: false, sendStartConfirmation: false, sendReenrolled: false };
   if (customer && keyword) {
-    const consent = (scope: string, action: string) =>
-      db.insert(schema.smsConsents).values({ customerId: customer.id, phone: from, scope, action, source: "keyword", method: "keyword", keyword: text.trim().toUpperCase(), wording: text });
-    if (keyword === "stop") {
-      // Twilio blocks all messages after STOP, so both scopes are opted out.
-      await db.update(schema.customers).set({ smsOptOut: true, marketingOptIn: false }).where(eq(schema.customers.id, customer.id));
-      await consent("transactional", "opt_out");
-      await consent("marketing", "opt_out");
-      // Immediately: no promotion that was already queued or scheduled may still go out.
-      await cancelQueuedPromotions(from);
-      if (!exact) reply = OPT_OUT_CONFIRMATION;
-    } else if (keyword === "start") {
-      // New affirmative consent for order texts only (carrier-standard re-enrollment), recorded as its own row
-      // linked to the earlier withdrawal. Promotions are NOT restored: they need new consent on the website,
-      // phone menu, or with staff.
-      await db.update(schema.customers).set({ smsOptOut: false }).where(eq(schema.customers.id, customer.id));
-      await recordConsent({ phone: from, scope: "transactional", action: "opt_in", source: "keyword", method: "keyword", wording: text, wordingVersion: "keyword", response: `texted "${text.trim()}"` });
-    } else if (keyword === "nopromo") {
-      // Internal keyword: promotions only. It never clears or weakens a STOP (smsOptOut stays as it is).
-      await db.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.id, customer.id));
-      await consent("marketing", "opt_out");
-      await cancelQueuedPromotions(from);
-      if (!customer.smsOptOut) reply = NOPROMO_CONFIRMATION;
-    } else if (keyword === "help") {
-      // Always answered (SMS Terms): identifies Hup Up Attractions and gives the support phone and email.
-      reply = helpReply(settings.smsHelpText);
-    }
+    await db.transaction(async (tx) => {
+      const [c] = await tx.select().from(schema.customers).where(eq(schema.customers.id, customer.id)).for("update");
+      const consent = (scope: string, action: string) =>
+        tx.insert(schema.smsConsents).values({ customerId: c.id, phone: from, scope, action, source: "keyword", method: "keyword", keyword: text.trim().toUpperCase(), wording: text });
+      if (keyword === "stop") {
+        // STOP blocks both programs until the customer re-enrolls in each one.
+        await tx.update(schema.customers).set({ smsOptOut: true, marketingOptIn: false }).where(eq(schema.customers.id, c.id));
+        await consent("transactional", "opt_out");
+        await consent("marketing", "opt_out");
+        await cancelPendingReenroll(tx, from); // a pending START confirmation dies; a late YES does nothing
+        effects.cancelPromos = true;
+        if (!exact) reply = OPT_OUT_CONFIRMATION;
+      } else if (keyword === "start") {
+        // START alone enrolls no one: it asks the customer to confirm with YES (order/service texts only).
+        effects.sendStartConfirmation = (await handleStart(tx, c, from, text)).sendConfirmation;
+      } else if (keyword === "yes") {
+        // YES restores order/service consent only as a reply to an active START confirmation; otherwise nothing.
+        effects.sendReenrolled = (await handleYes(tx, c, from, text)).confirmed;
+      } else if (keyword === "nopromo") {
+        // Internal keyword: promotions only. It never clears or weakens a STOP (smsOptOut stays as it is).
+        await tx.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.id, c.id));
+        await consent("marketing", "opt_out");
+        effects.cancelPromos = true;
+        if (!c.smsOptOut) reply = NOPROMO_CONFIRMATION;
+      } else if (keyword === "help") {
+        // Always answered (SMS Terms): identifies Hup Up Attractions and gives the support phone and email.
+        reply = helpReply(settings.smsHelpText);
+      }
+    });
   }
+  // Immediately after the opt-out is saved: no promotion that was queued, held or scheduled may still go out.
+  if (effects.cancelPromos) await cancelQueuedPromotions(from);
+  if (effects.sendStartConfirmation && customer)
+    await sendMessage({ to: from, body: START_CONFIRMATION_SMS, kind: "system", event: "reenroll_request", customerId: customer.id });
+  if (effects.sendReenrolled && customer)
+    await sendMessage({ to: from, body: TRANSACTIONAL_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId: customer.id });
 
   // Forward a copy to the owner (not for STOP/START, which Twilio handles, and not the owner's own texts).
   let forwarded = false;
   const fwd = toE164(settings.smsForwardPhone);
-  if (settings.smsForwardEnabled && fwd && fwd !== from && keyword !== "stop" && keyword !== "start") {
+  if (settings.smsForwardEnabled && fwd && fwd !== from && keyword !== "stop" && keyword !== "start" && !(keyword === "yes" && effects.sendReenrolled)) {
     const who = customer?.name ? `${customer.name} ${formatPhone(from)}` : formatPhone(from);
     const r = await sendMessage({
       to: fwd,
