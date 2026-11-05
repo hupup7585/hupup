@@ -334,3 +334,34 @@ export type Order = typeof orders.$inferSelect;
 export type Customer = typeof customers.$inferSelect;
 export type AdminUser = typeof adminUsers.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+
+/* ------------------------------------------------------------- rental terms acceptance */
+
+/**
+ * Evidence that a customer accepted the rental terms (NY electronic records and signatures): the exact terms
+ * text and version shown, when, how, and on which order/phone. Append-only (DB trigger in migration 0008).
+ */
+export const termsAcceptances = pgTable(
+  "terms_acceptances",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id").references(() => orders.id).notNull(),
+    customerId: integer("customer_id").references(() => customers.id),
+    phone: text("phone"),
+    termsVersion: text("terms_version").notNull(),
+    /** sha256 of termsText, so the exact wording can be proven */
+    termsHash: text("terms_hash").notNull(),
+    termsText: text("terms_text").notNull(),
+    /** web_checkbox (accept page before payment) | staff_read (read to the customer by staff) */
+    method: text("method").notNull(),
+    /** The words the customer acted on, e.g. the checkbox label */
+    acceptanceStatement: text("acceptance_statement").notNull(),
+    amountCents: integer("amount_cents"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    pageUrl: text("page_url"),
+    userId: integer("user_id"),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("terms_acceptances_order_idx").on(t.orderId, t.acceptedAt)],
+);

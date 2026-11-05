@@ -1,5 +1,6 @@
 import { field, isApproved, orderIdFromInvoice, verifyWebhookSignature } from "@/lib/sola";
 import { getOrderWithItems, markPaid, orderNumber } from "@/lib/orders";
+import { linkPaymentToAcceptance } from "@/lib/rental-terms";
 import { sendEmail, sendSms } from "@/lib/notify";
 import { BUSINESS_NAME } from "@/lib/config";
 import { longDate } from "@/lib/dates";
@@ -33,6 +34,8 @@ export async function POST(req: Request) {
   if (!before) return new Response("unknown order", { status: 404 });
   const updated = await markPaid(orderId, cents, "sola", field(fields, "xRefNum") || null);
   if (!updated) return new Response("unknown order", { status: 404 });
+  // Evidence: tie this payment to the rental terms version the customer accepted (or record that none was).
+  if (before.order.solaRefNum !== field(fields, "xRefNum")) await linkPaymentToAcceptance(orderId, field(fields, "xRefNum") || null, cents);
 
   if (before.order.solaRefNum !== field(fields, "xRefNum")) {
     const num = orderNumber(orderId);
