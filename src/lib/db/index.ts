@@ -9,7 +9,8 @@ const g = globalThis as unknown as { __hupPool?: Pool; __hupDb?: DB };
 function makePool() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
-  return new Pool({ connectionString: url, max: 5 });
+  // DB_POOL_MAX: only for local end-to-end tests against the single-connection in-memory server.
+  return new Pool({ connectionString: url, max: Number(process.env.DB_POOL_MAX) || 5, ...(process.env.DB_IDLE_MS ? { idleTimeoutMillis: Number(process.env.DB_IDLE_MS) } : {}) });
 }
 
 export function getDb(): DB {
