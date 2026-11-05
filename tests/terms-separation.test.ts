@@ -54,3 +54,45 @@ describe("HELP auto-reply matches the SMS Terms", async () => {
     expect(src).not.toContain("settings.smsHelpReplyEnabled");
   });
 });
+
+describe("/terms sections A-E (Abraham's approved wording)", () => {
+  const raw = readFileSync("src/app/terms/page.tsx", "utf8");
+  const page = raw
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\{" "\}/g, " ")
+    .replace(/&ldquo;|&rdquo;/g, '"')
+    .replace(/\s+/g, " ")
+    .replace(/\( /g, "(")
+    .replace(/ \)/g, ")")
+    .replace(/ \./g, ".");
+  it("page heading is TERMS AND CONDITIONS", () => {
+    expect(raw).toContain('<LegalPage title="TERMS AND CONDITIONS"');
+  });
+  const sections = [
+    'HUP UP ATTRACTIONS INC. ("Hup Up Attractions")',
+    "A. ACCEPTANCE OF TERMS",
+    "By reserving, paying for, accepting delivery of, or using any equipment or services provided by Hup Up Attractions, you acknowledge that you have read, understood, and agree to be bound by all terms, conditions, policies, and notices contained herein, as well as any additional terms published on our website (https://hupupattractions.com).",
+    "B. NO SIGNATURE REQUIRED",
+    "Completing a reservation or payment, including pressing # on our phone line or paying by our payment link, constitutes full acceptance of these Terms. No physical or electronic signature is required to make these Terms and Conditions binding upon you.",
+    "C. GENERAL RULES AND REGULATIONS",
+    "See Sections 9 through 13 (Bounce Houses and Inflatable Attractions, Laser Tag and Inflatable Mazes, Paddle Boats and Water Safety, Supervision of Minors, Participant Conduct and Safety Rules).",
+    "D. LIABILITY AND WAIVERS",
+    "See Sections 15 through 18 (Injuries and Incidents, Assumption of Ordinary Activity Risks, Limitation of Liability, Customer Responsibility for Claims and Damage).",
+    "E. MODIFICATIONS TO TERMS",
+    "Hup Up Attractions may update or modify these Terms and Conditions at any time. The most current version, with its effective date, will always be available at https://hupupattractions.com/terms. Changes apply to reservations made after the update; a reservation already confirmed follows the Terms in effect when it was made.",
+  ];
+  it("every line is present word for word, in order, before the existing content", () => {
+    let at = -1;
+    for (const s of sections) {
+      const i = page.indexOf(s, at + 1);
+      expect(i, s.slice(0, 50)).toBeGreaterThan(at);
+      at = i;
+    }
+    expect(page.indexOf("These terms apply to rentals booked with")).toBeGreaterThan(at);
+  });
+  it("the acceptance log uses the bumped terms version", async () => {
+    const { CURRENT_TERMS_VERSION } = await import("@/lib/rental-terms");
+    expect(CURRENT_TERMS_VERSION).toBe("terms-2026-11-06-AE");
+  });
+});

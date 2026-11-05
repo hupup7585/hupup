@@ -267,7 +267,7 @@ describe("checkout pricing, delivery area and terms (Abram's final decisions)", 
   it("pressing # logs time, phone, order and terms version, then continues", async () => {
     h.session.data.termsAccepted = undefined;
     const xml = await call("terms-answer", { Digits: "#" });
-    expect(h.terms[0]).toMatchObject({ orderId: 7, phone: "+18455550100", termsVersion: "terms-2026-11-05-draft", method: "phone_hash" });
+    expect(h.terms[0]).toMatchObject({ orderId: 7, phone: "+18455550100", termsVersion: "terms-2026-11-06-AE", method: "phone_hash" });
     expect(h.session.data.termsAccepted).toBe(true);
     expect(xml).toContain("/api/voice/finalize");
   });

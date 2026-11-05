@@ -158,7 +158,12 @@ describe("business name never splits across lines", () => {
 describe("Jumping Balloons and no slashes", () => {
   const visible = ["src/app/page.tsx", "src/components/site/SiteFooter.tsx", "src/components/site/SiteHeader.tsx", "src/lib/site-copy.ts", "src/lib/site-content.ts", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/app/layout.tsx"];
   it("'bounce house' appears only as the search-engine hint (meta description + structured data)", () => {
-    const all = visible.map((f) => readFileSync(f, "utf8")).join("\n");
+    // Exception: Abraham's approved /terms section C names the business-terms section "Bounce Houses and Inflatable
+    // Attractions" verbatim (legal section title), so that one phrase is allowed there.
+    const all = visible
+      .map((f) => readFileSync(f, "utf8"))
+      .join("\n")
+      .replace("See Sections 9 through 13 (Bounce Houses and Inflatable Attractions,", "");
     expect(all).not.toMatch(/Bounce Houses/);
     const hits = all.match(/bounce house/gi) ?? [];
     expect(hits).toHaveLength(2);

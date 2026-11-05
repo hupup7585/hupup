@@ -96,4 +96,5 @@ export async function linkPaymentToAcceptance(orderId: number, paymentRef: strin
 }
 
 /** Version of the business Terms and Conditions (/terms) customers agree to. Bump when /terms changes. */
-export const CURRENT_TERMS_VERSION = "terms-2026-11-05-draft";
+// History: "terms-2026-11-05-draft" (before sections A-E). Bumped when sections A-E were added.
+export const CURRENT_TERMS_VERSION = "terms-2026-11-06-AE";
