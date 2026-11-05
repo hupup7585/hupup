@@ -1,3 +1,4 @@
+import { requireOwner } from "@/lib/auth";
 import { asc } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Category, Product } from "@/lib/db/schema";
@@ -45,6 +46,7 @@ function ProductForm({ p, categories, categoryId }: { p?: Product; categories: C
 }
 
 export default async function CatalogPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
+  await requireOwner(); // Owner only (finances, catalog, hotline prompts)
   const sp = await searchParams;
   const [cats, prods] = await Promise.all([
     db.select().from(schema.categories).orderBy(asc(schema.categories.sortOrder), asc(schema.categories.id)),

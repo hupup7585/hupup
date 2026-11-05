@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { sendCodeAction, verifyCodeAction } from "./actions";
+import { KeyRound, MessageSquareText } from "lucide-react";
+import { passwordAction, sendCodeAction, verifyCodeAction } from "./actions";
 
-export default function LoginForm({ sms, email }: { sms: string; email: string }) {
-  const [channel, setChannel] = useState<"sms" | "email">("sms");
+/** Staff sign-in: phone number, then a texted code (everyone) or a password (Owner and Secretary). */
+export default function LoginForm() {
+  const [phone, setPhone] = useState("");
+  const [mode, setMode] = useState<"code" | "password">("code");
   const [sent, setSent] = useState(false);
   const [code, setCode] = useState("");
-  const [trust, setTrust] = useState(true);
+  const [password, setPassword] = useState("");
+  const [trust, setTrust] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -15,91 +20,107 @@ export default function LoginForm({ sms, email }: { sms: string; email: string }
   const send = () =>
     start(async () => {
       setError(null);
-      const r = await sendCodeAction(channel);
-      if (!r.ok) return setError(r.error || "Could not send code");
+      const r = await sendCodeAction(phone);
+      if (!r.ok) return setError(r.message);
       setSent(true);
+      setMsg(r.message);
       setDevCode(r.devCode ?? null);
     });
 
-  const verify = () =>
-    start(async () => {
-      setError(null);
-      const r = await verifyCodeAction(code, trust);
-      if (r && !r.ok) setError(r.error || "Incorrect code");
-    });
-
   return (
-    <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl shadow-navy/10 sm:p-10">
-      <div className="flex items-center gap-3 text-xl font-black">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="" className="h-10" />
-        Hup Up Admin
+    <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-xl">
+      <div className="border-b border-line px-6 py-5">
+        <div className="font-display text-2xl font-extrabold tracking-tight text-navy">
+          Hup Up <span className="rounded bg-sun px-1">Attractions</span>
+        </div>
+        <div className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-muted">Staff sign-in</div>
       </div>
-      <h1 className="mt-6 text-2xl font-black">{sent ? "Enter your 6-digit code" : "Owner sign-in"}</h1>
-      <p className="mb-6 mt-1 text-muted">hupupattractions.com/admin</p>
+      <div className="space-y-4 px-6 py-6">
+        <label className="block">
+          <span className="label">Your mobile number</span>
+          <input className="input" inputMode="tel" autoComplete="tel-national" placeholder="(845) 555-0123" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={sent} />
+        </label>
 
-      <div className="mb-3 flex rounded-xl bg-bg p-1">
-        {(["sms", "email"] as const).map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => {
-              setChannel(c);
-              setSent(false);
-              setCode("");
-            }}
-            className={`flex-1 rounded-lg py-2.5 font-bold ${channel === c ? "bg-white text-navy shadow-sm" : "text-muted"}`}
-          >
-            {c === "sms" ? "💬 Text message" : "✉️ Email"}
-          </button>
-        ))}
-      </div>
+        {!sent && (
+          <div className="flex rounded-lg bg-bg p-1" role="tablist" aria-label="Sign-in method">
+            {(
+              [
+                ["code", "Text me a code", MessageSquareText],
+                ["password", "Use password", KeyRound],
+              ] as const
+            ).map(([m, label, Icon]) => (
+              <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => (setMode(m), setError(null))} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-sm font-bold ${mode === m ? "bg-white text-navy shadow-sm" : "text-muted"}`}>
+                <Icon className="h-4 w-4" aria-hidden /> {label}
+              </button>
+            ))}
+          </div>
+        )}
 
-      {!sent ? (
-        <>
-          <p className="mb-5 text-sm text-muted">
-            We&apos;ll send a one-time code to <b className="text-navy">{channel === "sms" ? sms : email}</b>.
-          </p>
-          <button className="btn-dark w-full py-3.5" onClick={send} disabled={pending}>
+        {mode === "code" && !sent && (
+          <button className="btn-dark w-full py-3" onClick={send} disabled={pending || phone.replace(/\D/g, "").length < 10}>
             {pending ? "Sending…" : "Send code"}
           </button>
-        </>
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            verify();
-          }}
-        >
-          <p className="text-sm text-muted">
-            We sent a code to <b className="text-navy">{channel === "sms" ? sms : email}</b>
-          </p>
-          <input
-            autoFocus
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-            className="my-4 w-full rounded-2xl border-2 border-line px-4 py-3 text-center font-mono text-3xl font-extrabold tracking-[0.5em] outline-none focus:border-sky"
-            placeholder="••••••"
-            aria-label="6-digit code"
-          />
-          {devCode && <p className="mb-3 rounded-lg bg-sun/30 p-2 text-sm">Dev mode code: <b>{devCode}</b></p>}
-          <button className="btn-dark w-full py-3.5" disabled={pending || code.length !== 6}>
-            {pending ? "Checking…" : "Verify & sign in"}
-          </button>
-          <div className="mt-4 flex items-center justify-between text-sm text-muted">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={trust} onChange={(e) => setTrust(e.target.checked)} /> Trust this device for 30 days
+        )}
+
+        {mode === "code" && sent && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              start(async () => {
+                setError(null);
+                const r = await verifyCodeAction(phone, code, trust);
+                if (r && !r.ok) setError(r.error ?? "Could not sign in.");
+              });
+            }}
+            className="space-y-3"
+          >
+            {msg && <p className="text-sm text-muted">{msg}</p>}
+            <label className="block">
+              <span className="label">6-digit code</span>
+              <input autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6} className="input text-center text-2xl tracking-[0.4em]" placeholder="••••••" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} />
             </label>
-            <button type="button" className="font-bold text-navy underline-offset-2 hover:underline" onClick={send} disabled={pending}>
-              Resend code
+            {devCode && <p className="rounded-lg bg-sun/40 p-2 text-sm">Dev mode code: <b>{devCode}</b></p>}
+            <button className="btn-dark w-full py-3" disabled={pending || code.length !== 6}>
+              {pending ? "Checking…" : "Sign in"}
             </button>
-          </div>
-        </form>
-      )}
-      {error && <p className="mt-4 rounded-lg bg-coral/10 p-3 text-sm font-semibold text-coral-dark">{error}</p>}
+            <button type="button" className="text-sm font-bold text-navy underline-offset-2 hover:underline" onClick={() => (setSent(false), setCode(""))}>
+              Use a different number
+            </button>
+          </form>
+        )}
+
+        {mode === "password" && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              start(async () => {
+                setError(null);
+                const r = await passwordAction(phone, password, trust);
+                if (r && !r.ok) setError(r.error ?? "Could not sign in.");
+              });
+            }}
+            className="space-y-3"
+          >
+            <label className="block">
+              <span className="label">Password</span>
+              <input type="password" autoComplete="current-password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </label>
+            <button className="btn-dark w-full py-3" disabled={pending || !password || phone.replace(/\D/g, "").length < 10}>
+              {pending ? "Checking…" : "Sign in"}
+            </button>
+            <p className="text-xs text-muted">Delivery accounts sign in with a texted code.</p>
+          </form>
+        )}
+
+        <label className="flex items-center gap-2 text-sm text-muted">
+          <input type="checkbox" checked={trust} onChange={(e) => setTrust(e.target.checked)} /> Keep me signed in on this device for 30 days
+        </label>
+        {error && (
+          <p role="alert" className="rounded-lg bg-[#ffe6e4] p-2 text-sm font-semibold text-[#b3261e]">
+            {error}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

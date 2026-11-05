@@ -1,3 +1,4 @@
+import { requireOwner } from "@/lib/auth";
 import { PROMPTS, type PromptDef } from "@/lib/ivr/prompts";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
@@ -6,6 +7,7 @@ import PromptEditor from "./PromptEditor";
 export const metadata = { title: "Hotline prompts · Hup Up Attractions" };
 
 export default async function PromptsPage() {
+  await requireOwner(); // Owner only (finances, catalog, hotline prompts)
   const rows = await db.select().from(schema.voicePrompts);
   const overrides = Object.fromEntries(rows.map((r) => [r.key, r.text ?? ""]));
   const groups = new Map<string, { key: string; def: PromptDef }[]>();

@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/auth";
+import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { PROMPTS, type PromptKey } from "@/lib/ivr/prompts";
 
 export async function savePromptAction(key: string, text: string): Promise<{ ok: boolean; message: string }> {
-  await requireAdmin();
+  await requireOwner();
   if (!(key in PROMPTS)) return { ok: false, message: "Unknown prompt" };
   const clean = text.trim();
   if (/<[^>]+>/.test(clean)) return { ok: false, message: "Plain text only: the hotline voice doesn't support tags or SSML." };

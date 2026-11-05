@@ -1,3 +1,4 @@
+import { requireOwner } from "@/lib/auth";
 import Link from "next/link";
 import { kpis, leaderboard, listOrders, todaysRuns, weeklyRevenue, channelSplit } from "@/lib/admin-queries";
 import { addDays, endOfMonth, shortDate, startOfMonth, startOfWeek, todayISO, weekdayShort } from "@/lib/dates";
@@ -27,6 +28,7 @@ function greeting() {
 }
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
+  await requireOwner(); // Owner only (finances, catalog, hotline prompts)
   const sp = await searchParams;
   const range: Range = (sp.range as Range) in RANGES ? (sp.range as Range) : "month";
   const today = todayISO();

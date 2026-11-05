@@ -1,5 +1,5 @@
 import { config } from "@/lib/config";
-import { maskedDestination } from "@/lib/auth";
+import { requireOwner } from "@/lib/auth";
 
 function Row({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
   return (
@@ -10,7 +10,8 @@ function Row({ ok, label, detail }: { ok: boolean; label: string; detail: string
   );
 }
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  await requireOwner();
   const base = config.baseUrl();
   return (
     <div className="mx-auto max-w-3xl">
@@ -22,7 +23,7 @@ export default function SettingsPage() {
         <Row ok={config.resendConfigured()} label="Email (Resend)" detail={config.resendConfigured() ? "Email sign-in codes and receipts enabled." : "Add RESEND_API_KEY to enable email codes."} />
         <Row ok={config.solaConfigured()} label="Sola Payments" detail={config.solaConfigured() ? `PaymentSITE: ${process.env.SOLA_PAYMENTSITE_NAME}` : "Add SOLA_PAYMENTSITE_NAME to send real payment links."} />
         <Row ok={Boolean(process.env.SOLA_WEBHOOK_PIN)} label="Sola payment webhook" detail={`Webhook URL: ${base}/api/sola/webhook (set SOLA_WEBHOOK_PIN to match the portal).`} />
-        <Row ok={Boolean(config.adminPhone() && config.adminEmail())} label="Admin sign-in" detail={`Codes go to ${maskedDestination("sms")} and ${maskedDestination("email")}.`} />
+        <Row ok={Boolean(config.adminPhone())} label="Staff sign-in" detail={`Each staff member signs in with their own phone. The owner's codes go to the number ending ${config.adminPhone().slice(-4) || "(not set)"}.`} />
       </div>
       <div className="card p-5">
         <h2 className="mb-2 font-bold">Twilio phone number setup</h2>

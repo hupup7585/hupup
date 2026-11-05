@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth";
+import { currentStaff } from "@/lib/auth";
 import { listOrders } from "@/lib/admin-queries";
 import { orderNumber } from "@/lib/orders";
 
@@ -12,7 +12,9 @@ function cell(v: unknown) {
 }
 
 export async function GET(req: Request) {
-  if (!(await getSession())) return new Response("Unauthorized", { status: 401 });
+  const staff = await currentStaff();
+  if (!staff) return new Response("Unauthorized", { status: 401 });
+  if (staff.role !== "owner") return new Response("Forbidden: finances are owner-only", { status: 403 });
   const u = new URL(req.url);
   const list = await listOrders({
     q: u.searchParams.get("q") || undefined,

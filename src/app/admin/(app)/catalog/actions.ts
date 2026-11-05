@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, ne } from "drizzle-orm";
-import { requireAdmin } from "@/lib/auth";
+import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { parseMoneyToCents } from "@/lib/money";
 
@@ -16,7 +16,7 @@ function done(msg: string, isError = false): never {
 }
 
 export async function saveCategoryAction(fd: FormData) {
-  await requireAdmin();
+  await requireOwner();
   const id = Number(fd.get("id") || 0);
   const name = s(fd, "name");
   if (!name) done("Category name is required", true);
@@ -46,7 +46,7 @@ export async function saveCategoryAction(fd: FormData) {
 }
 
 export async function saveProductAction(fd: FormData) {
-  await requireAdmin();
+  await requireOwner();
   const id = Number(fd.get("id") || 0);
   const name = s(fd, "name");
   const priceCents = parseMoneyToCents(s(fd, "price"));

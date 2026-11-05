@@ -3,23 +3,29 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { CalendarDays, ClipboardList, LayoutDashboard, LogOut, Menu, Mic, Package, Palette, PhoneCall, PlusCircle, Settings, ShieldCheck, X, type LucideIcon } from "lucide-react";
+import { CalendarDays, ClipboardList, LayoutDashboard, LogOut, Menu, Mic, Package, Palette, PhoneCall, PlusCircle, Settings, ShieldCheck, Truck, Users, X, type LucideIcon } from "lucide-react";
+import type { Role } from "@/lib/db/schema";
 
-const NAV: [string, LucideIcon, string][] = [
-  ["/admin", LayoutDashboard, "Dashboard"],
-  ["/admin/calendar", CalendarDays, "Calendar"],
-  ["/admin/orders", ClipboardList, "Orders"],
-  ["/admin/pos", PlusCircle, "New booking"],
-  ["/admin/catalog", Package, "Catalog"],
-  ["/admin/calls", PhoneCall, "Call log"],
-  ["/admin/phone/prompts", Mic, "Hotline prompts"],
-  ["/admin/compliance", ShieldCheck, "Compliance"],
-  ["/admin/settings", Settings, "Settings"],
-  ["/admin/design", Palette, "Staff screens (preview)"],
+const O: Role[] = ["owner"];
+const OS: Role[] = ["owner", "secretary"];
+/** Each role sees only the screens it can use (the server enforces the same rules). */
+const NAV: [string, LucideIcon, string, Role[]][] = [
+  ["/admin", LayoutDashboard, "Dashboard", O],
+  ["/admin/calendar", CalendarDays, "Calendar", OS],
+  ["/admin/orders", ClipboardList, "Orders", OS],
+  ["/admin/pos", PlusCircle, "New booking", OS],
+  ["/admin/deliveries", Truck, "Deliveries", OS],
+  ["/admin/catalog", Package, "Catalog", O],
+  ["/admin/calls", PhoneCall, "Call log", OS],
+  ["/admin/phone/prompts", Mic, "Hotline prompts", O],
+  ["/admin/compliance", ShieldCheck, "Compliance", OS],
+  ["/admin/staff", Users, "Staff", O],
+  ["/admin/settings", Settings, "Settings", O],
+  ["/admin/design", Palette, "Staff screens (preview)", O],
 ];
 
 /** Staff navigation: navy bar, yellow marker on the current page. Hidden when printing. */
-export default function Sidebar({ logout }: { logout: () => Promise<void> }) {
+export default function Sidebar({ logout, role = "owner", name }: { logout: () => Promise<void>; role?: Role; name?: string }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const active = (href: string) => (href === "/admin" ? path === "/admin" : path.startsWith(href));
@@ -39,9 +45,10 @@ export default function Sidebar({ logout }: { logout: () => Promise<void> }) {
             Hup Up <span className="text-sun">Attractions</span>
           </div>
           <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky">Staff portal</div>
+          {name && <div className="mt-3 text-sm text-white/80">{name} · <span className="capitalize">{role}</span></div>}
         </div>
         <nav className="space-y-0.5">
-          {NAV.map(([href, Icon, label]) => {
+          {NAV.filter(([, , , roles]) => roles.includes(role)).map(([href, Icon, label]) => {
             const on = active(href);
             return (
               <Link

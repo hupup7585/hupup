@@ -1,19 +1,25 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { sendLoginCode, verifyLoginCode, logout, type Channel } from "@/lib/auth";
+import { homeFor, logout, passwordLogin, sendLoginCode, verifyLoginCode } from "@/lib/auth";
 import { config } from "@/lib/config";
 
-export async function sendCodeAction(channel: Channel) {
-  const r = await sendLoginCode(channel);
-  // Only expose the code when running locally without SMS/email providers.
-  return { ok: r.ok, error: r.error, devCode: config.isProd() ? undefined : r.devCode };
+export async function sendCodeAction(phone: string) {
+  const r = await sendLoginCode(phone);
+  // Only expose the code when running locally without an SMS provider.
+  return { ok: r.ok, message: r.message, devCode: config.isProd() ? undefined : r.devCode };
 }
 
-export async function verifyCodeAction(code: string, trust: boolean) {
-  const r = await verifyLoginCode(code, trust);
-  if (!r.ok) return r;
-  redirect("/admin");
+export async function verifyCodeAction(phone: string, code: string, trust: boolean) {
+  const r = await verifyLoginCode(phone, code, trust);
+  if (!r.ok || !r.role) return { ok: false, error: r.error };
+  redirect(homeFor(r.role));
+}
+
+export async function passwordAction(phone: string, password: string, trust: boolean) {
+  const r = await passwordLogin(phone, password, trust);
+  if (!r.ok || !r.role) return { ok: false, error: r.error };
+  redirect(homeFor(r.role));
 }
 
 export async function logoutAction() {
