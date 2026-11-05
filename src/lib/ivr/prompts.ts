@@ -101,6 +101,8 @@ export const PROMPTS = {
   tz_ask: { group: "Text message consent", label: "Ask the caller's time zone (after a promotional yes)", text: "Last question, so we only send promotional texts at reasonable hours. Are you in the Eastern time zone, the same as New York? Press 1 for yes, or 2 for a different time zone." },
   tz_pick: { group: "Text message consent", label: "Pick a different time zone", text: "For Central time, press 1. Mountain, press 2. Arizona, press 3. Pacific, press 4. Alaska, press 5. Hawaii, press 6. To skip, press 0." },
   tz_saved: { group: "Text message consent", label: "Time zone saved", text: "Got it, thank you." },
+  closed_now: { group: "Welcome & main menu", label: "Closed right now (Shabbos, Yom Tov, other closed times)", text: "Thanks for calling Hup Up Attractions. We're closed right now for {reason}. Please call us back {reopen}. Have a wonderful day!", vars: ["reason", "reopen"] },
+  date_closed: { group: "Date & quantity", label: "Chosen date is a closed day", text: "Sorry, we're closed on {date} for {reason}. Let's pick another date.", vars: ["date", "reason"] },
   address_outside_area: { group: "Checkout", label: "Address outside the delivery area", text: "Sorry, we only deliver in Kiryas Joel and nearby Orange County towns. Please say a delivery address in our area." },
   checkout_total: { group: "Checkout", label: "Order total read-back", text: "Your total is {total}. That's {items} for the rentals, {delivery} for delivery, and {tax} sales tax.", vars: ["total", "items", "delivery", "tax"] },
   terms_notice: {

@@ -5,7 +5,8 @@ import { BUSINESS_NAME, config } from "@/lib/config";
 import { addDays, longDate, todayISO } from "@/lib/dates";
 import { spokenMoney } from "@/lib/money";
 import { last4, spokenDigits, toE164 } from "@/lib/phone";
-import { checkBookable } from "@/lib/availability";
+import { checkBookable, pickupDateFor } from "@/lib/availability";
+import { checkEventDate, openNow } from "@/lib/jewish-calendar";
 import {
   PAYMENT_HOLD_MINUTES,
   PHONE_HOLD_MINUTES,
@@ -213,6 +214,14 @@ type Handler = (ctx: Ctx, vr: VR) => Promise<VR> | VR;
 const handlers: Record<string, Handler> = {
   async incoming(ctx, vr) {
     await ensureSession(ctx.callSid, ctx.from);
+    // Same open/closed rules as the POS (Jewish calendar settings): closed callers hear when we reopen.
+    const status = openNow(new Date(), await getSettings());
+    if (!status.open) {
+      const reopen = status.reopensAt ? `after ${status.reopensAt.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })} tonight` : "when we reopen";
+      sp(vr, ctx, "closed_now", { reason: status.reason ?? "the holiday", reopen });
+      vr.hangup();
+      return vr;
+    }
     sp(vr, ctx, "greeting");
     return back(vr, "menu");
   },
@@ -344,8 +353,14 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, r.reason === "past" ? "date_past" : r.reason === "too_far" ? "date_too_far" : "date_unclear");
       return back(vr, "date", { p, n: Number(ctx.query.get("n") || 0) + 1 });
     }
+    const cal = await getSettings();
+    const chk = checkEventDate(r.date, cal);
+    if (!chk.ok) {
+      sp(vr, ctx, "date_closed", { date: longDate(r.date), reason: chk.day.reason ?? "a holiday" });
+      return back(vr, "date", { p, n: Number(ctx.query.get("n") || 0) + 1 });
+    }
     const g = keypad(vr, url("date-confirm", { p, d: r.date }));
-    sp(g, ctx, "date_confirm", { date: longDate(r.date), pickup: longDate(addDays(r.date, 1)) });
+    sp(g, ctx, "date_confirm", { date: longDate(r.date), pickup: longDate(pickupDateFor(r.date, cal)) });
     return noInput(vr, ctx, "date", { p });
   },
 

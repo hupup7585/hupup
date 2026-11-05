@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { asc, eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { getUsage, bookableQty } from "@/lib/availability";
+import { getUsage, bookableQty, pickupDateFor } from "@/lib/availability";
+import { getSettings } from "@/lib/settings";
+import { checkEventDate, dayInfo } from "@/lib/jewish-calendar";
 import { addDays, isValidISO, longDate, todayISO } from "@/lib/dates";
 import { createOrderWithItems, getOrderWithItems, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES } from "@/lib/orders";
 import { parseMoneyToCents } from "@/lib/money";
@@ -17,8 +19,30 @@ export async function availabilityFor(date: string) {
   await requireAdmin();
   if (!isValidISO(date)) return {};
   const prods = await db.select().from(schema.products).where(eq(schema.products.active, true)).orderBy(asc(schema.products.id));
-  const usage = await getUsage(date, addDays(date, 1));
-  return Object.fromEntries(prods.map((p) => [p.id, bookableQty(p.quantity, usage, p.id, date)]));
+  const pickup = pickupDateFor(date, await getSettings());
+  const usage = await getUsage(date, pickup);
+  return Object.fromEntries(prods.map((p) => [p.id, bookableQty(p.quantity, usage, p.id, date, pickup)]));
+}
+
+export type CalendarDay = { date: string; hebrew: string; hebrewHe: string; names: string[]; closed: boolean; reason: string | null; closesAtLabel: string | null };
+export type DateCheck = { ok: boolean; message: string | null; pickupWarning: string | null; pickup: string; day: CalendarDay };
+
+const plainDay = (d: ReturnType<typeof dayInfo>): CalendarDay => ({ date: d.date, hebrew: d.hebrew, hebrewHe: d.hebrewHe, names: d.names, closed: d.closed, reason: d.reason, closesAtLabel: d.closesAtLabel });
+
+/** Jewish-calendar info for the POS: the coming days, and the selected event date. */
+export async function calendarFor(start: string, days = 14): Promise<CalendarDay[]> {
+  await requireAdmin();
+  if (!isValidISO(start)) return [];
+  const cal = await getSettings();
+  return Array.from({ length: Math.min(days, 60) }, (_, i) => plainDay(dayInfo(addDays(start, i), cal)));
+}
+
+export async function checkDateFor(date: string): Promise<DateCheck | null> {
+  await requireAdmin();
+  if (!isValidISO(date)) return null;
+  const cal = await getSettings();
+  const c = checkEventDate(date, cal);
+  return { ok: c.ok, message: c.message, pickupWarning: c.pickupWarning, pickup: pickupDateFor(date, cal), day: plainDay(c.day) };
 }
 
 export type PosResult = { ok: boolean; message: string; orderId?: number };
@@ -38,6 +62,8 @@ export async function createBookingAction(input: {
   const session = await requireAdmin();
   if (!isValidISO(input.date)) return { ok: false, message: "Pick an event date." };
   if (input.date < todayISO()) return { ok: false, message: "That date is in the past." };
+  const dateCheck = checkEventDate(input.date, await getSettings());
+  if (!dateCheck.ok) return { ok: false, message: dateCheck.message ?? "We're closed on that day." };
   const items = Object.entries(input.items)
     .map(([id, qty]) => ({ productId: Number(id), qty: Number(qty) }))
     .filter((i) => i.qty > 0);

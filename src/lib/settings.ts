@@ -18,6 +18,26 @@ export const SETTING_DEFAULTS = {
   zoneKjPlaces: "Kiryas Joel\nKiryas Yoel\nTown of Palm Tree\nPalm Tree",
   /** Surrounding towns ($15 zone), all in Orange County. */
   zoneAreaPlaces: "Monroe\nBlooming Grove\nWoodbury\nHighland Mills\nChester\nHarriman\nMiddletown\nWashingtonville",
+  /* Jewish calendar (Abraham, 2026-11-06). Diaspora; zmanim for Monroe / Kiryas Joel. Booleans as "yes"/"no". */
+  calendarEnabled: "yes",
+  calendarLatitude: "41.3407",
+  calendarLongitude: "-74.1679",
+  /** Erev Shabbos closes at: "chatzos" (halachic midday) or "candles" (candle lighting) */
+  erevShabbosClose: "chatzos",
+  /** Erev Yom Tov closes at: "chatzos" or "candles" (pending Abraham; default chatzos) */
+  erevYomTovClose: "chatzos",
+  /** Minutes before sunset for candle lighting (used only when a "candles" close is chosen) */
+  candleLightingMinutes: "18",
+  /** Reopen after Shabbos / Yom Tov: minutes after sunset, or "tzeis" for nightfall at 8.5 degrees */
+  reopenAfter: "tzeis",
+  closeCholHamoed: "no",
+  closeChanukah: "no",
+  closePurim: "yes",
+  closeTishaBav: "yes",
+  closeMinorFasts: "no",
+  closeLagBaomer: "no",
+  /** Owner overrides, one per line: "2027-01-01 closed" or "2027-04-25 open" (optionally followed by a note) */
+  calendarOverrides: "",
 } as const;
 
 export type Settings = { -readonly [K in keyof typeof SETTING_DEFAULTS]: (typeof SETTING_DEFAULTS)[K] extends boolean ? boolean : string };

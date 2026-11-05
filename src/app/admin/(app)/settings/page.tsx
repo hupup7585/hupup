@@ -1,3 +1,6 @@
+import { getSettings } from "@/lib/settings";
+import CalendarSettingsForm from "./CalendarSettingsForm";
+import { CALENDAR_KEYS } from "./calendar-keys";
 import { config } from "@/lib/config";
 import { requireOwner } from "@/lib/auth";
 
@@ -13,8 +16,14 @@ function Row({ ok, label, detail }: { ok: boolean; label: string; detail: string
 export default async function SettingsPage() {
   await requireOwner();
   const base = config.baseUrl();
+  const settings = await getSettings();
+  const calInitial = Object.fromEntries(CALENDAR_KEYS.map((k) => [k, String(settings[k])]));
   return (
     <div className="mx-auto max-w-3xl">
+      <section className="card mb-6 p-5" id="calendar">
+        <h2 className="mb-3 text-lg font-extrabold">Jewish calendar: open and closed days</h2>
+        <CalendarSettingsForm initial={calInitial} />
+      </section>
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Settings & system status</h1>
       <p className="mb-5 text-muted">These are set as environment variables in Vercel (Project → Settings → Environment Variables).</p>
       <div className="card mb-5 p-5">

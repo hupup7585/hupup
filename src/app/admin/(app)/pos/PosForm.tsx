@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { availabilityFor, createBookingAction, type PosResult } from "./actions";
+import { availabilityFor, createBookingAction, type PosResult , calendarFor, checkDateFor, type CalendarDay, type DateCheck } from "./actions";
 
 type P = { id: number; categoryId: number; name: string; priceCents: number; quantity: number };
 
@@ -21,12 +21,19 @@ export default function PosForm(props: {
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", deliveryTime: "", notes: "", amountPaid: "" });
   const [payment, setPayment] = useState<"link" | "cash" | "check" | "later">("link");
   const [result, setResult] = useState<PosResult | null>(null);
+  const [days, setDays] = useState<CalendarDay[]>([]);
+  const [check, setCheck] = useState<DateCheck | null>(null);
   const [pending, start] = useTransition();
+
+  useEffect(() => {
+    calendarFor(props.today, 14).then(setDays);
+  }, [props.today]);
 
   useEffect(() => {
     if (!date) return;
     let live = true;
     availabilityFor(date).then((a) => live && setAvail(a));
+    checkDateFor(date).then((c) => live && setCheck(c));
     return () => {
       live = false;
     };
@@ -56,8 +63,37 @@ export default function PosForm(props: {
   return (
     <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
       <div className="card p-5">
-        <label className="label">Event (delivery) date — pickup is the next day</label>
-        <input type="date" min={props.today} value={date} onChange={(e) => setDate(e.target.value)} className="input mb-5 max-w-xs" />
+        <label className="label">Event (delivery) date — pickup is the next open day</label>
+        {/* Coming days with Hebrew dates; closed days (Shabbos, Yom Tov, other closed days) can't be chosen. */}
+        <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1" data-pos-calendar>
+          {days.map((d) => (
+            <button
+              key={d.date}
+              type="button"
+              disabled={d.closed}
+              onClick={() => setDate(d.date)}
+              title={d.closed ? `Closed: ${d.reason}` : d.names.join(", ") || d.hebrew}
+              className={`min-w-[5.5rem] shrink-0 rounded-lg border px-2 py-1.5 text-left text-xs ${d.date === date ? "border-navy bg-navy text-white" : d.closed ? "border-line bg-bg text-muted line-through" : "border-line bg-white hover:border-navy"}`}
+            >
+              <span className="block font-bold">{new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
+              <span className="block" dir="rtl">{d.hebrewHe}</span>
+              <span className="block truncate">{d.closed ? d.reason : d.closesAtLabel ? "Closes early" : d.names[0] ?? ""}</span>
+            </button>
+          ))}
+        </div>
+        <input type="date" min={props.today} value={date} onChange={(e) => setDate(e.target.value)} className="input mb-3 max-w-xs" />
+        {check && (
+          <div data-date-check className={`mb-5 rounded-lg p-3 text-sm ${check.ok ? "bg-bg" : "bg-[#ffe6e4] font-semibold text-[#b3261e]"}`}>
+            <div className="font-bold">
+              {check.day.hebrew} · <span dir="rtl">{check.day.hebrewHe}</span>
+              {check.day.names.length > 0 && <span className="font-normal"> · {check.day.names.join(", ")}</span>}
+            </div>
+            {!check.ok && <div>{check.message}</div>}
+            {check.day.closesAtLabel && <div className="badge badge-pending mt-1">{check.day.closesAtLabel}</div>}
+            {check.ok && <div className="mt-1">Pickup: {new Date(check.pickup + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</div>}
+            {check.pickupWarning && <div className="mt-1 font-semibold text-navy">{check.pickupWarning}</div>}
+          </div>
+        )}
         {!date && <p className="text-muted">Pick a date to see what&apos;s available.</p>}
         {date &&
           props.categories.map((c) => {
@@ -123,7 +159,7 @@ export default function PosForm(props: {
           <span className="text-muted">Total</span>
           <span className="text-2xl font-black">{money(total)}</span>
         </div>
-        <button className="btn w-full py-3.5" disabled={pending || !date || total === 0} onClick={submit}>
+        <button className="btn w-full py-3.5" disabled={pending || !date || total === 0 || check?.ok === false} onClick={submit}>
           {pending ? "Booking…" : "Book it"}
         </button>
         {result && (

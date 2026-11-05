@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { addDays } from "@/lib/dates";
+import { getSettings } from "@/lib/settings";
+import { calendarDefaults, nextOpenDay, type CalendarSettings } from "@/lib/jewish-calendar";
 
 /**
  * Inventory rule: a rented unit is OUT on its event (delivery) day AND the
@@ -77,16 +79,22 @@ export function freeOnDay(quantity: number, usage: UsageMap, productId: number, 
   return Math.max(0, quantity - usedOn(usage, productId, day));
 }
 
-/** Units that can be booked for an event on `eventDate` (needs eventDate and the pickup day). */
-export function bookableQty(quantity: number, usage: UsageMap, productId: number, eventDate: string): number {
-  return Math.min(
-    freeOnDay(quantity, usage, productId, eventDate),
-    freeOnDay(quantity, usage, productId, addDays(eventDate, 1)),
-  );
+/**
+ * Pickup day for an event: the next day, or, when that day is Shabbos / Yom Tov / another closed day, the next open
+ * day (Jewish calendar settings). The unit stays out until then, so it can't be double-booked in between.
+ */
+export function pickupDateFor(eventDate: string, cal: CalendarSettings = calendarDefaults()): string {
+  return nextOpenDay(addDays(eventDate, 1), cal);
 }
 
-/** Bookable units for one product on one event date (fresh DB read). */
-export async function checkBookable(productId: number, quantity: number, eventDate: string, exec: Executor = db) {
-  const usage = await getUsage(eventDate, addDays(eventDate, 1), [productId], exec);
-  return bookableQty(quantity, usage, productId, eventDate);
+/** Units that can be booked for an event on `eventDate` (needs the event day and the pickup day). */
+export function bookableQty(quantity: number, usage: UsageMap, productId: number, eventDate: string, pickupDate: string = addDays(eventDate, 1)): number {
+  return Math.min(freeOnDay(quantity, usage, productId, eventDate), freeOnDay(quantity, usage, productId, pickupDate));
+}
+
+/** Bookable units for one product on one event date (fresh DB read). Pass `pickupDate` when inside a transaction. */
+export async function checkBookable(productId: number, quantity: number, eventDate: string, exec: Executor = db, pickupDate?: string) {
+  const pickup = pickupDate ?? pickupDateFor(eventDate, await getSettings());
+  const usage = await getUsage(eventDate, pickup, [productId], exec);
+  return bookableQty(quantity, usage, productId, eventDate, pickup);
 }

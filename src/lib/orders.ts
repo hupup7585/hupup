@@ -1,7 +1,8 @@
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { addDays } from "@/lib/dates";
-import { checkBookable } from "@/lib/availability";
+import { checkBookable, pickupDateFor } from "@/lib/availability";
+import { getSettings } from "@/lib/settings";
 import type { Channel, OrderStatus } from "@/lib/db/schema";
 
 const { orders, orderItems, products, customers } = schema;
@@ -37,12 +38,15 @@ async function reserveInTx(
     productId: number;
     qty: number;
     eventDate: string;
+    /** Real pickup day (next open day); computed before the transaction */
+    pickupDate?: string;
     channel: Channel;
     status?: OrderStatus;
     holdExpiresAt?: Date | null;
     callSid?: string | null;
   },
 ): Promise<ReserveResult> {
+  const pickupDate = opts.pickupDate ?? addDays(opts.eventDate, 1);
   const locked = await tx.execute(
     sql`SELECT id, quantity, price_cents, active FROM products WHERE id = ${opts.productId} FOR UPDATE`,
   );
@@ -57,7 +61,7 @@ async function reserveInTx(
     if (o.eventDate !== opts.eventDate) return { ok: false, reason: "date_mismatch" };
   }
 
-  const free = await checkBookable(p.id, p.quantity, opts.eventDate, tx);
+  const free = await checkBookable(p.id, p.quantity, opts.eventDate, tx, pickupDate);
   if (free < opts.qty) return { ok: false, reason: "unavailable", free };
 
   if (!orderId) {
@@ -67,7 +71,7 @@ async function reserveInTx(
         status: opts.status ?? "HOLD",
         channel: opts.channel,
         eventDate: opts.eventDate,
-        pickupDate: addDays(opts.eventDate, 1),
+        pickupDate,
         holdExpiresAt: opts.holdExpiresAt ?? null,
         callSid: opts.callSid ?? null,
       })
@@ -104,7 +108,8 @@ async function recalcSubtotal(tx: Tx | typeof db, orderId: number) {
 
 /** Phone cart: add one product to the caller's held order. */
 export async function reserveItem(opts: Parameters<typeof reserveInTx>[1]): Promise<ReserveResult> {
-  return db.transaction((tx) => reserveInTx(tx, opts));
+  const pickupDate = opts.pickupDate ?? pickupDateFor(opts.eventDate, await getSettings());
+  return db.transaction((tx) => reserveInTx(tx, { ...opts, pickupDate }));
 }
 
 /**
@@ -126,6 +131,7 @@ export async function createOrderWithItems(opts: {
 }): Promise<ReserveResult> {
   const items = [...opts.items].filter((i) => i.qty > 0).sort((a, b) => a.productId - b.productId);
   if (!items.length) return { ok: false, reason: "not_found" };
+  const pickupDate = pickupDateFor(opts.eventDate, await getSettings());
   try {
     return await db.transaction(async (tx) => {
       let orderId: number | null = null;
@@ -135,6 +141,7 @@ export async function createOrderWithItems(opts: {
           productId: it.productId,
           qty: it.qty,
           eventDate: opts.eventDate,
+          pickupDate,
           channel: opts.channel,
           status: opts.status,
           holdExpiresAt: opts.holdExpiresAt ?? null,
