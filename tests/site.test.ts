@@ -74,10 +74,10 @@ describe("service area", () => {
     expect(SERVICE_AREA.main).toBe("Kiryas Joel");
     expect(SERVICE_AREA.mainSub).toBe("Town of Palm Tree, Orange County, NY");
     expect(SERVICE_AREA.alsoTitle).toBe("We also deliver to these nearby towns:");
-    expect([...SERVICE_AREA.also]).toEqual(["Monroe", "Blooming Grove", "Woodbury and Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville"]);
+    expect([...SERVICE_AREA.also]).toEqual(["Monroe", "Blooming Grove", "Woodbury and Highland Mills", "Chester", "Harriman", "Washingtonville"]);
     expect(SERVICE_AREA.region).toBe("Orange County, NY");
     expect(serviceAreaPlaces()).toEqual([
-      "Kiryas Joel", "Monroe", "Blooming Grove", "Woodbury", "Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville",
+      "Kiryas Joel", "Monroe", "Blooming Grove", "Woodbury", "Highland Mills", "Chester", "Harriman", "Washingtonville",
     ]);
   });
   it("homepage shows the section and nav link, main area before the secondary list, and no placeholder text", () => {
@@ -347,5 +347,17 @@ describe("Service Area heading matches the other sections (Abraham)", () => {
     expect(sa).toContain('<SectionTitle kicker="Right to your door" title="Service Area" />');
     expect(sa).not.toContain("<IconTile");
     expect(sa).not.toContain("<h2");
+  });
+});
+
+describe("Middletown is not served (Abraham)", () => {
+  it("never appears in site copy, delivery zones, prompts or pages", async () => {
+    const { readdirSync, statSync } = await import("node:fs");
+    const walk = (d: string): string[] => readdirSync(d).flatMap((f) => (statSync(`${d}/${f}`).isDirectory() ? walk(`${d}/${f}`) : [`${d}/${f}`]));
+    const hits = walk("src").filter((f) => /middletown/i.test(readFileSync(f, "utf8")));
+    expect(hits).toEqual([]);
+    const { deliveryZone } = await import("@/lib/pricing");
+    const { SETTING_DEFAULTS } = await import("@/lib/settings");
+    expect(deliveryZone("10 Main St, Middletown, NY", SETTING_DEFAULTS)).toBe("outside");
   });
 });

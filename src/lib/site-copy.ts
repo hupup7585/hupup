@@ -32,7 +32,7 @@ export const SERVICE_AREA = {
   mainSub: "Town of Palm Tree, Orange County, NY",
   officialName: "Town of Palm Tree",
   alsoTitle: "We also deliver to these nearby towns:",
-  also: ["Monroe", "Blooming Grove", "Woodbury and Highland Mills", "Chester", "Harriman", "Middletown", "Washingtonville"],
+  also: ["Monroe", "Blooming Grove", "Woodbury and Highland Mills", "Chester", "Harriman", "Washingtonville"],
   region: "Orange County, NY",
 } as const;
 

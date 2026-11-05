@@ -17,7 +17,7 @@ export const SETTING_DEFAULTS = {
   /** Kiryas Joel ($10 zone). Full list to come from Abram. */
   zoneKjPlaces: "Kiryas Joel\nKiryas Yoel\nTown of Palm Tree\nPalm Tree",
   /** Surrounding towns ($15 zone), all in Orange County. */
-  zoneAreaPlaces: "Monroe\nBlooming Grove\nWoodbury\nHighland Mills\nChester\nHarriman\nMiddletown\nWashingtonville",
+  zoneAreaPlaces: "Monroe\nBlooming Grove\nWoodbury\nHighland Mills\nChester\nHarriman\nWashingtonville",
   /* Jewish calendar (Abraham, 2026-11-06). Diaspora; zmanim for Monroe / Kiryas Joel. Booleans as "yes"/"no". */
   calendarEnabled: "yes",
   calendarLatitude: "41.3407",
