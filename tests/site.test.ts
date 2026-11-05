@@ -107,7 +107,7 @@ describe("contact list", () => {
     expect(contact).not.toMatch(/text-xl font-extrabold underline/);
     expect(contact).toContain("{c.serviceArea.main}");
     expect(contact).not.toMatch(/Call to check your area/);
-    expect(page).toContain("md:items-center");
+    expect(contact).toContain("md:items-start"); // heading at the top of the column, like the other sections
   });
 });
 
@@ -322,15 +322,19 @@ describe("Why Choose phone line size (Abram 10:52 PM)", () => {
 });
 
 describe("Contact Us heading and icons (Abram)", () => {
-  it("centers the heading and lifts the GET IN TOUCH label 8px; other titles unchanged", () => {
+  it("heading matches the other sections: left-aligned, top of the column, standard eyebrow and heading", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
-    expect(page).toContain('<SectionTitle kicker="Get in touch" title="Contact Us" kickerSpacing="-mt-2 mb-4" className="text-center" />');
-    // Label and heading share one centered alignment; every contact icon tile is light blue
+    expect(page).toContain('<SectionTitle kicker="Get in touch" title="Contact Us" />');
+    expect(page).toContain('<SectionTitle kicker="When to reach us" title="Our Hours" />');
+    const contactGrid = page.slice(page.indexOf('id="contact"'), page.indexOf('<SectionTitle kicker="Get in touch"'));
+    expect(contactGrid).toContain("md:items-start");
+    expect(contactGrid).not.toContain("md:items-center");
+    // every contact icon tile is light blue
     const after = page.slice(page.indexOf('id="contact"'));
     const contact = after.slice(0, after.indexOf("</section>"));
     expect(contact.match(/<IconTile icon=\{\w+\} tone="sky" \/>/g)).toHaveLength(5); // business, phone, email, area, hours (when set)
     expect(contact).not.toContain('tone="yellow"');
-    expect(page.match(/kickerSpacing=/g)).toHaveLength(1);
+    expect(page.match(/kickerSpacing=/g)).toBeNull();
     const parts = readFileSync("src/components/site/parts.tsx", "utf8");
     expect(parts).toContain('kickerSpacing = "mb-2"');
   });
