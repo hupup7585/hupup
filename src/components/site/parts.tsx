@@ -11,9 +11,13 @@ import type { SiteContent } from "@/lib/site-content";
 
 export const ICON_STROKE = 2;
 
+/** Official logo (transparent PNG). Abraham's rule: only on a white area, never on navy. */
+export const LOGO_SRC = "/brand/hupup-logo-320.png";
+
 export function Wordmark({ logoUrl, light = false }: { logoUrl: string | null; light?: boolean }) {
-  if (logoUrl) {
-    return <Image src={logoUrl} alt="Hup Up Attractions" width={180} height={56} className="h-12 w-auto" priority />;
+  // On light backgrounds show the logo; on navy (light = true) keep the text name instead.
+  if (!light) {
+    return <Image src={logoUrl || LOGO_SRC} alt="Hup Up Attractions" width={320} height={337} className="h-14 w-auto sm:h-16" priority />;
   }
   return (
     <span className={`whitespace-nowrap font-display text-lg font-extrabold leading-none tracking-tight min-[400px]:text-xl sm:text-2xl ${light ? "text-white" : "text-hu-deep"}`}>

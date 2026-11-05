@@ -30,9 +30,8 @@ export default function LoginForm() {
   return (
     <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-xl">
       <div className="border-b border-line px-6 py-5">
-        <div className="font-display text-2xl font-extrabold tracking-tight text-navy">
-          Hup Up <span className="rounded bg-sun px-1">Attractions</span>
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/hupup-logo-320.png" alt="Hup Up Attractions" className="h-20 w-auto" />
         <div className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-muted">Staff sign-in</div>
       </div>
       <div className="space-y-4 px-6 py-6">

@@ -40,9 +40,11 @@ export default function Sidebar({ logout, role = "owner", name }: { logout: () =
         </button>
       </div>
       <aside className={`${open ? "block" : "hidden"} no-print bg-navy px-3 py-5 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col`}>
-        <div className="mb-8 hidden px-3 lg:block">
-          <div className="font-display text-xl font-extrabold leading-tight tracking-tight">
-            Hup Up <span className="text-sun">Attractions</span>
+        <div className="mb-8 hidden px-1 lg:block">
+          {/* Logo on a white panel (never directly on navy) */}
+          <div className="rounded-xl bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/hupup-logo-320.png" alt="Hup Up Attractions" className="mx-auto h-24 w-auto" />
           </div>
           <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky">Staff portal</div>
           {name && <div className="mt-3 text-sm text-white/80">{name} · <span className="capitalize">{role}</span></div>}
