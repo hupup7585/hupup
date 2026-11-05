@@ -42,6 +42,13 @@ async function call(callSid, from, answers, { stopAfterGathers = Infinity } = {}
   return { said, error: "too many steps" };
 }
 
+// Ordinary open weekdays (not Shabbos, Yom Tov, Purim or Tisha B'Av, with an open next day), so the test isn't
+// tripped by the Jewish-calendar rules. Each run picks at random so earlier runs don't hold the stock.
+const OPEN_DAYS = ["2027-01-12", "2027-01-13", "2027-01-19", "2027-01-20", "2027-01-26", "2027-01-27", "2027-02-02", "2027-02-03", "2027-02-09", "2027-02-10", "2027-02-16", "2027-02-17", "2027-02-23", "2027-02-24", "2027-03-02", "2027-03-03", "2027-03-09", "2027-03-10", "2027-05-04", "2027-05-05", "2027-05-11", "2027-05-12", "2027-06-01", "2027-06-02", "2027-07-06", "2027-07-07"];
+const openDay = () => {
+  const iso = OPEN_DAYS[Math.floor(Math.random() * OPEN_DAYS.length)];
+  return { iso, mmdd: iso.slice(5, 7) + iso.slice(8, 10) };
+};
 const addDays = (n) => {
   const d = new Date(Date.now() + n * 86400e3);
   return { mmdd: `${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`, iso: d.toISOString().slice(0, 10) };
@@ -49,7 +56,7 @@ const addDays = (n) => {
 
 (async () => {
   const caller = `+1845555${String(1000 + Math.floor(Math.random() * 8999))}`;
-  const date = addDays(20 + Math.floor(Math.random() * 300)); // a fresh date each run (earlier runs may hold the stock)
+  const date = openDay();
 
   // 1. Full booking: Jumping Balloons -> first item -> add -> date -> qty 1 -> checkout -> consent -> terms -> pay link
   const sid1 = "CAe2e" + crypto.randomBytes(4).toString("hex");
@@ -113,7 +120,7 @@ const addDays = (n) => {
   // 3. Out-of-area address stops checkout
   const sid2 = "CAe2e" + crypto.randomBytes(4).toString("hex");
   const run2 = await call(sid2, "+18455550143", [
-    { Digits: "1" }, { Digits: "1" }, { Digits: "2" }, { Digits: addDays(20 + Math.floor(Math.random() * 300)).mmdd }, { Digits: "1" }, { Digits: "1" }, { Digits: "9" }, { Digits: "1" },
+    { Digits: "1" }, { Digits: "1" }, { Digits: "2" }, { Digits: openDay().mmdd }, { Digits: "1" }, { Digits: "1" }, { Digits: "9" }, { Digits: "1" },
     { SpeechResult: "Sam Green", Confidence: "0.9" }, { Digits: "1" },
     { SpeechResult: "5 Main Street Albany", Confidence: "0.9" }, { Digits: "1" },
   ], { stopAfterGathers: 12 });
@@ -121,7 +128,7 @@ const addDays = (n) => {
 
   // 4. Hanging up releases the held items
   const sid3 = "CAe2e" + crypto.randomBytes(4).toString("hex");
-  await call(sid3, "+18455550144", [{ Digits: "3" }, { Digits: "1" }, { Digits: "2" }, { Digits: addDays(20 + Math.floor(Math.random() * 300)).mmdd }, { Digits: "1" }, { Digits: "1" }], { stopAfterGathers: 6 });
+  await call(sid3, "+18455550144", [{ Digits: "3" }, { Digits: "1" }, { Digits: "2" }, { Digits: openDay().mmdd }, { Digits: "1" }, { Digits: "1" }], { stopAfterGathers: 6 });
   const held = (await q("select o.id, o.status from orders o join call_sessions s on s.order_id = o.id where s.call_sid = $1", [sid3]))[0];
   await post("/api/voice/status", { CallSid: sid3, CallStatus: "completed" });
   const after = held ? (await q("select status from orders where id = $1", [held.id]))[0] : null;

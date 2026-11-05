@@ -5,16 +5,17 @@ const BASE = process.env.E2E_BASE || "http://localhost:3100";
 const results = [];
 const check = (name, ok, info = "") => (results.push({ name, ok }), console.log(`${ok ? "PASS" : "FAIL"}  ${name}${info ? "  " + info : ""}`));
 
-async function signIn(page) {
-  await page.goto(BASE + "/admin");
-  await page.waitForURL(/\/admin\/login/, { timeout: 30000 });
+async function signIn(page, phone = "(845) 777-7585") {
+  await page.goto(BASE + "/admin/login");
+  await page.fill('input[inputmode="tel"]', phone);
   await page.getByRole("button", { name: "Send code" }).click();
   const codeEl = await page.waitForSelector("text=/Dev mode code/", { timeout: 30000 });
   const code = (await codeEl.textContent()).match(/\d{6}/)[0];
   await page.fill('input[inputmode="numeric"]', code);
-  await page.getByRole("button", { name: /sign in|verify|continue/i }).first().click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL((u) => !u.pathname.startsWith("/admin/login"), { timeout: 30000 });
 }
+module.exports.signIn = signIn;
 
 const broken = async (page) => /Application error|Unhandled Runtime Error|Internal Server Error|This page could not be found/i.test(await page.innerText("body"));
 

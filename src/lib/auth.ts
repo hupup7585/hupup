@@ -76,7 +76,8 @@ export async function sendLoginCode(rawPhone: string): Promise<{ ok: boolean; me
     await audit("login.code_unknown_number", null, { phone: toE164(rawPhone) });
     return { ok: true, message: GENERIC };
   }
-  const recent = await db.execute(sql`SELECT COUNT(*)::int AS n FROM login_codes WHERE created_at > now() - interval '10 minutes'`);
+  // Rate limit per staff phone (not business-wide, so one person can't block everyone else's codes).
+  const recent = await db.execute(sql`SELECT COUNT(*)::int AS n FROM login_codes WHERE channel = ${`sms:${staff.phone}`} AND created_at > now() - interval '10 minutes'`);
   if ((recent.rows[0] as { n: number }).n >= MAX_SENDS_PER_10_MIN) return { ok: false, message: "Too many codes requested. Please wait a few minutes." };
 
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
