@@ -272,8 +272,8 @@ export default async function Home() {
         {/* CONTACT */}
         <section id="contact" className="scroll-mt-20 bg-white py-14 sm:py-20">
           <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 md:grid-cols-2 md:items-center md:gap-10">
-            {/* Abram: "Contact Us" centered; "GET IN TOUCH" stays left but sits 8px higher (heading does not move) */}
-            <SectionTitle kicker="Get in touch" title="Contact Us" kickerSpacing="-mt-2 mb-4" titleAlign="text-center" />
+            {/* Abram: "GET IN TOUCH" centered right above the centered "Contact Us"; label sits 8px higher (heading does not move) */}
+            <SectionTitle kicker="Get in touch" title="Contact Us" kickerSpacing="-mt-2 mb-4" className="text-center" />
             <dl className="divide-y-2 divide-hu-deep/10 border-y-2 border-hu-deep/10 text-lg">
               <div className="flex items-center gap-4 py-4">
                 <IconTile icon={Store} tone="sky" />
@@ -283,7 +283,7 @@ export default async function Home() {
                 </div>
               </div>
               <div className="flex items-center gap-4 py-4">
-                <IconTile icon={Phone} tone="yellow" />
+                <IconTile icon={Phone} tone="sky" />
                 <div>
                   <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Phone</dt>
                   <dd>

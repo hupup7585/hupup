@@ -316,11 +316,15 @@ describe("Why Choose phone line size (Abram 10:52 PM)", () => {
   });
 });
 
-describe("Contact Us heading (Abram)", () => {
+describe("Contact Us heading and icons (Abram)", () => {
   it("centers the heading and lifts the GET IN TOUCH label 8px; other titles unchanged", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
-    expect(page).toContain('<SectionTitle kicker="Get in touch" title="Contact Us" kickerSpacing="-mt-2 mb-4" titleAlign="text-center" />');
-    expect(page.match(/titleAlign=/g)).toHaveLength(1);
+    expect(page).toContain('<SectionTitle kicker="Get in touch" title="Contact Us" kickerSpacing="-mt-2 mb-4" className="text-center" />');
+    // Label and heading share one centered alignment; every contact icon tile is light blue
+    const after = page.slice(page.indexOf('id="contact"'));
+    const contact = after.slice(0, after.indexOf("</section>"));
+    expect(contact.match(/<IconTile icon=\{\w+\} tone="sky" \/>/g)).toHaveLength(5); // business, phone, email, area, hours (when set)
+    expect(contact).not.toContain('tone="yellow"');
     expect(page.match(/kickerSpacing=/g)).toHaveLength(1);
     const parts = readFileSync("src/components/site/parts.tsx", "utf8");
     expect(parts).toContain('kickerSpacing = "mb-2"');
