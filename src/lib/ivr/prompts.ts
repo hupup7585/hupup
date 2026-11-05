@@ -9,10 +9,11 @@ export type PromptDef = { label: string; group: string; text: string; vars?: str
 
 export const PROMPTS = {
   // Welcome & main menu
-  greeting: { group: "Welcome & main menu", label: "Welcome greeting", text: "Hi, thanks for calling Hup Up Attractions, where the party starts! We bring bounce houses, laser tag, and paddle boats right to your door." },
+  greeting: { group: "Welcome & main menu", label: "Welcome greeting", text: "Hi, thanks for calling Hup Up Attractions, where the party starts! We bring jumping balloons, laser tag, and paddle boats right to your door." },
   menu_category: { group: "Welcome & main menu", label: "Menu option for a category", text: "For {category}, press {key}.", vars: ["category", "key"] },
   menu_cart: { group: "Welcome & main menu", label: "Menu option: review cart", text: "Ready to check out? Press 9 to hear your cart." },
   menu_operator: { group: "Welcome & main menu", label: "Menu option: talk to a person", text: "To talk with someone from our team, press 0." },
+  menu_speech: { group: "Welcome & main menu", label: "Menu: you can also speak", text: "Or just tell me what you're looking for." },
   menu_repeat: { group: "Welcome & main menu", label: "Menu option: repeat", text: "To hear this again, press star." },
   menu_empty: { group: "Welcome & main menu", label: "No rentals set up yet", text: "We're getting our rentals ready right now. Please call back soon!" },
 
@@ -28,7 +29,7 @@ export const PROMPTS = {
   category_item: { group: "Browsing", label: "Item option in a category", text: "For the {item}, press {key}.", vars: ["item", "key"] },
   back_to_menu: { group: "Browsing", label: "Go back option", text: "To go back to the main menu, press star." },
   category_empty: { group: "Browsing", label: "Category has no items", text: "Sorry, nothing is available in that section right now. Let's head back to the main menu." },
-  product_intro: { group: "Browsing", label: "Item intro", text: "Great choice! The {item} is {price}, and that includes delivery and next-day pickup.", vars: ["item", "price"] },
+  product_intro: { group: "Browsing", label: "Item intro", text: "Great choice! The {item} is {price}. Delivery is available for an additional fee, and our team will give you the delivery price.", vars: ["item", "price"] },
   product_options: { group: "Browsing", label: "Item options", text: "To hear more about it, press 1. To add it to your cart, press 2. To go back, press star." },
   product_default_desc: { group: "Browsing", label: "Description when an item has none", text: "The {item} is one of our most popular rentals. Kids love it!", vars: ["item"] },
 
@@ -50,7 +51,7 @@ export const PROMPTS = {
   added: { group: "Cart", label: "Item added to cart", text: "Woohoo! I added {items} to your cart for {date}. It's saved just for you while we're on the phone.", vars: ["items", "date"] },
   after_add: { group: "Cart", label: "After adding", text: "To keep shopping, press 1. To check out, press 9." },
   cart_empty: { group: "Cart", label: "Cart is empty", text: "Your cart is empty right now. Let's find something fun!" },
-  cart_summary: { group: "Cart", label: "Cart summary", text: "Here's your cart: {items}, for {date}. Your total is {total}.", vars: ["items", "date", "total"] },
+  cart_summary: { group: "Cart", label: "Cart summary", text: "Here's your cart: {items}, for {date}. Your total is {total}, plus the delivery fee.", vars: ["items", "date", "total"] },
   cart_options: { group: "Cart", label: "Cart options", text: "To check out, press 1. To keep shopping, press 2. To start over with an empty cart, press 3." },
   cart_cleared: { group: "Cart", label: "Cart emptied", text: "All set, your cart is empty. Let's start fresh!" },
   cart_expired: { group: "Cart", label: "Cart timed out", text: "Sorry, your cart timed out. Let's start again." },
