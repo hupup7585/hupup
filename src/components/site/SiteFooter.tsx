@@ -55,7 +55,14 @@ export default function SiteFooter({ c }: { c: SiteContent }) {
               Plus nearby {c.serviceArea.region} towns
             </a>
           </p>
-          {c.hours && <p className="mt-2 whitespace-pre-line text-white/85">{c.hours}</p>}
+          <p data-footer-hours className="mt-3 text-white/85">
+            <span className="font-semibold text-white">Hours:</span> {c.officeHours.today}
+            <br />
+            <a href="/#hours" className="underline underline-offset-4 hover:text-hu-yellow">
+              See all hours
+            </a>
+          </p>
+          <p className="mt-2 text-sm text-white/75">{c.officeHours.note}</p>
         </div>
       </div>
       <div className="border-t border-white/15">

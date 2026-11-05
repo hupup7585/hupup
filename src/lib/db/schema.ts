@@ -406,3 +406,13 @@ export const smsReenrollRequests = pgTable(
   },
   (t) => [index("sms_reenroll_phone_idx").on(t.phone, t.status)],
 );
+
+/** A stored copy of every Terms and Conditions version customers can accept (append-only; migration 0011). */
+export const termsVersions = pgTable("terms_versions", {
+  version: text("version").primaryKey(),
+  /** Effective date as shown on /terms, or "draft" while the Terms are preview-only */
+  effectiveDate: text("effective_date").notNull(),
+  text: text("text").notNull(),
+  textHash: text("text_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

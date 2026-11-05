@@ -11,7 +11,10 @@ import { addDays, isValidISO, longDate, todayISO } from "@/lib/dates";
 import { createOrderWithItems, getOrderWithItems, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES } from "@/lib/orders";
 import { parseMoneyToCents } from "@/lib/money";
 import { toE164 } from "@/lib/phone";
-import { paymentLink } from "@/lib/sola";
+import { CURRENT_TERMS_VERSION, payPageLink, recordTermsAcceptance } from "@/lib/rental-terms";
+import { TERMS_TEXT } from "@/lib/terms-content";
+
+const TERMS_VIA = ["phone", "text", "email", "in_person"] as const;
 import { sendOrderText } from "@/lib/notify";
 import { BUSINESS_NAME } from "@/lib/config";
 
@@ -58,6 +61,8 @@ export async function createBookingAction(input: {
   notes: string;
   payment: "link" | "cash" | "check" | "later";
   amountPaid: string;
+  /** How the customer accepted the Terms and Conditions (required). */
+  termsVia: string;
 }): Promise<PosResult> {
   const session = await requireAdmin();
   if (!isValidISO(input.date)) return { ok: false, message: "Pick an event date." };
@@ -69,6 +74,7 @@ export async function createBookingAction(input: {
     .filter((i) => i.qty > 0);
   if (!items.length) return { ok: false, message: "Add at least one item." };
   if (!input.name.trim()) return { ok: false, message: "Enter the customer's name." };
+  if (!TERMS_VIA.includes(input.termsVia as (typeof TERMS_VIA)[number])) return { ok: false, message: "Choose how the customer accepted the Terms and Conditions." };
   const phone = input.phone ? toE164(input.phone) : null;
   if (input.phone && !phone) return { ok: false, message: "Phone number doesn't look right." };
   if (input.payment === "link" && !phone) return { ok: false, message: "A phone number is needed to text a payment link." };
@@ -93,10 +99,20 @@ export async function createBookingAction(input: {
     return { ok: false, message: "Could not create the booking." };
   }
 
+  // Log the customer's acceptance of the Terms, as chosen by staff.
+  await recordTermsAcceptance({
+    orderId: r.orderId,
+    phone,
+    termsVersion: CURRENT_TERMS_VERSION,
+    termsText: TERMS_TEXT,
+    method: `staff_${input.termsVia}` as "staff_phone",
+    acceptanceStatement: `Staff recorded that the customer accepted the Terms and Conditions by ${input.termsVia.replace("_", " ")} for reservation #${orderNumber(r.orderId)}`,
+    userId: session.userId ?? null,
+  });
   let message = `Booked order #${orderNumber(r.orderId)}.`;
   if (input.payment === "link" && phone) {
     const full = await getOrderWithItems(r.orderId);
-    const link = paymentLink({ orderId: r.orderId, amountCents: full!.order.subtotalCents, name: input.name, email: input.email, phone });
+    const link = payPageLink(r.orderId); // review-and-pay page: Terms box, then Sola
     const sent = await sendOrderText({
       phone,
       email: input.email || null,

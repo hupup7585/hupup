@@ -44,8 +44,8 @@ export const SETTING_DEFAULTS = {
   /** Friday opening; closing follows the Erev Shabbos rule (chatzos) until Abraham confirms. */
   hoursFridayOpen: "10:30",
   hoursSunday: "11:30-19:00",
-  /** Motzei Shabbos opening: "tzeis" (when Shabbos ends) or HH:MM. To confirm. */
-  hoursMotzeiOpen: "tzeis",
+  /** Motzei Shabbos opening: "tzeis+120" = 2 hours after Shabbos ends (Abraham), "tzeis", or HH:MM. */
+  hoursMotzeiOpen: "tzeis+120",
   hoursMotzeiCloseWinter: "23:30",
   hoursMotzeiCloseSummer: "00:30",
   /** Which Motzei Shabbos closing applies: "dst" = summer while daylight saving time is in effect (to confirm). */

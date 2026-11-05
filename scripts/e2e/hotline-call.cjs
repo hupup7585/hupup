@@ -102,10 +102,26 @@ const addDays = (n) => {
   const amt = m?.body.match(/total \$(\d+\.\d{2})/)?.[1];
   check("payment text: sent with breakdown and HELP/STOP footer", Boolean(m) && /Rentals \$.* \+ delivery \$10\.00 \+ sales tax \$/.test(m.body) && /STOP to opt out/.test(m.body), m?.status);
   const link = m?.body.match(/https?:\/\/\S+/)?.[0] || "";
-  check("payment link: charges items + delivery + tax", link.includes(`xAmount=${(o.total_cents / 100).toFixed(2)}`) && amt === (o.total_cents / 100).toFixed(2), link.slice(0, 90));
-
-  // 2. Sola says paid -> order confirmed, confirmation text, terms linked to the payment
-  const invoice = new URL(link).searchParams.get("xInvoice");
+  check("payment text: links to the review-and-pay page", /\/pay\/\d+\?t=/.test(link), link.slice(0, 80));
+  // Customer opens the link: unchecked Terms box required, then continue to Sola (intercepted, never leaves this machine)
+  const { chromium } = require("playwright");
+  const br = await chromium.launch();
+  const pg = await br.newPage();
+  let solaUrl = "";
+  await pg.route("https://secure.cardknox.com/**", (r) => ((solaUrl = r.request().url()), r.abort()));
+  await pg.goto(link.replace(/[.,]$/, ""));
+  const box = pg.locator('input[name="agree"]');
+  check("pay page: Terms box starts unchecked; pay button disabled", !(await box.isChecked()) && (await pg.getByRole("button", { name: "Continue to secure payment" }).isDisabled()));
+  await box.check();
+  await pg.getByRole("button", { name: "Continue to secure payment" }).click();
+  for (let i = 0; i < 40 && !solaUrl; i++) await pg.waitForTimeout(250);
+  await br.close();
+  check("payment link: Sola charges items + delivery + tax", solaUrl.includes(`xAmount=${(o.total_cents / 100).toFixed(2)}`) && amt === (o.total_cents / 100).toFixed(2), solaUrl.slice(0, 90));
+  const acc = await q("select method from terms_acceptances where order_id = $1 order by id", [o.id]);
+  check("terms: phone # and website checkbox acceptances both logged", acc.map((x) => x.method).join(",") === "phone_hash,web_checkbox");
+  const tv = await q("select version, effective_date from terms_versions");
+  check("terms: a copy of the accepted version is stored", tv.length >= 1);
+  const invoice = new URL(solaUrl || "http://x/?xInvoice=").searchParams.get("xInvoice");
   const fields = { xResult: "A", xInvoice: invoice, xAuthAmount: (o.total_cents / 100).toFixed(2), xRefNum: "R" + o.id };
   const lowered = Object.entries(fields).map(([k, v]) => [k.toLowerCase(), v]).sort(([a], [b]) => (a < b ? -1 : 1));
   const sig = crypto.createHash("md5").update(lowered.map(([, v]) => v).join("") + process.env.SOLA_WEBHOOK_PIN).digest("hex");

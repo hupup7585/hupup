@@ -101,6 +101,7 @@ beforeEach(() => {
   h.messages = [];
   h.zones = [];
   process.env.PUBLIC_BASE_URL = "https://hupup.vercel.app";
+  process.env.AUTH_SECRET = "test-secret-at-least-24-characters-long";
 });
 
 describe("transactional consent step (before the payment link)", () => {
@@ -262,12 +263,13 @@ describe("checkout pricing, delivery area and terms (Abram's final decisions)", 
     let xml = await call("finalize");
     expect(xml).toContain("/api/voice/terms");
     xml = await call("terms");
-    expect(xml).toContain("By pressing #, you agree to our Terms and Conditions. To review them, go to hupupattractions.com/terms. To continue, press #.");
+    expect(xml).toContain("By pressing #, you agree to our Terms and Conditions. To review them, go to hupupattractions.com/terms. To get the link by text message, press 1. To continue, press #.");
   });
   it("pressing # logs time, phone, order and terms version, then continues", async () => {
     h.session.data.termsAccepted = undefined;
     const xml = await call("terms-answer", { Digits: "#" });
     expect(h.terms[0]).toMatchObject({ orderId: 7, phone: "+18455550100", termsVersion: "terms-2026-11-06-AE", method: "phone_hash" });
+    expect(String(h.terms[0].acceptanceStatement)).toMatch(/^Pressed "#" for reservation #\d+ after hearing: "By pressing #/);
     expect(h.session.data.termsAccepted).toBe(true);
     expect(xml).toContain("/api/voice/finalize");
   });
@@ -284,5 +286,26 @@ describe("checkout pricing, delivery area and terms (Abram's final decisions)", 
     // $250.00 rentals + $10.00 delivery = $260.00; tax 8.125% = $21.13; total $281.13
     expect(h.sms[0].body).toContain("Rentals $250.00 + delivery $10.00 + sales tax $21.13 = total $281.13.");
     expect(xml).toContain("Your total is");
+  });
+});
+
+describe("Terms on the phone: text the link (press 1)", () => {
+  it("with text consent: texts the /terms link, then repeats the notice", async () => {
+    h.session.data.smsConsent = "yes";
+    const xml = await call("terms-answer", { Digits: "1" });
+    expect(h.sms[0].body).toContain("/terms");
+    expect(xml).toContain("We just texted you the link");
+    expect(xml).toContain("/api/voice/terms");
+  });
+  it("without text consent: no text, gives the address instead", async () => {
+    h.session.data.smsConsent = "no";
+    const xml = await call("terms-answer", { Digits: "1" });
+    expect(h.sms).toEqual([]);
+    expect(xml).toContain("you can read our Terms at hupupattractions.com/terms");
+  });
+  it("payment text links to the review-and-pay page (Terms box), not straight to Sola", async () => {
+    h.session.data.smsConsent = "yes";
+    await call("finalize");
+    expect(h.sms[0].body).toMatch(/https:\/\/hupup\.vercel\.app\/pay\/7\?t=/);
   });
 });

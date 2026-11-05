@@ -7,7 +7,7 @@ import { db, schema } from "@/lib/db";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/db/schema";
 import { checkBookable } from "@/lib/availability";
 import { getOrderWithItems, markPaid, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES, setOrderStatus } from "@/lib/orders";
-import { paymentLink } from "@/lib/sola";
+import { payPageLink } from "@/lib/rental-terms";
 import { sendOrderText } from "@/lib/notify";
 import { parseMoneyToCents } from "@/lib/money";
 import { longDate } from "@/lib/dates";
@@ -55,7 +55,7 @@ export async function sendPayLinkAction(orderId: number): Promise<ActionResult> 
   if (!phone) return { ok: false, message: "This customer has no phone number" };
   const due = (full.order.totalCents ?? full.order.subtotalCents) - full.order.paidCents;
   if (due <= 0) return { ok: false, message: "Nothing left to pay" };
-  const link = paymentLink({ orderId, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone });
+  const link = payPageLink(orderId); // review-and-pay page: Terms box, then Sola
   if (full.order.status === "PENDING_PAYMENT") {
     await setOrderStatus(orderId, "PENDING_PAYMENT", { holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES) });
   }

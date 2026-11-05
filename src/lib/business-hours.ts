@@ -59,9 +59,14 @@ export function officeOpenNow(at: Date = new Date(), s: HoursSettings = hoursDef
 
   if (today.closed) {
     if (!today.reopensAt || at < today.reopensAt) return false;
-    // Motzei Shabbos / Motzei Yom Tov
-    const open = s.hoursMotzeiOpen === "tzeis" ? null : mins(s.hoursMotzeiOpen);
-    if (open !== null && now < open) return false;
+    // Motzei Shabbos / Motzei Yom Tov: opens N minutes after Shabbos ends ("tzeis+120"), at tzeis, or at a set time.
+    const after = s.hoursMotzeiOpen.trim().match(/^tzeis(?:\+(\d+))?$/);
+    if (after) {
+      if (at.getTime() < today.reopensAt.getTime() + Number(after[1] ?? 0) * 60_000) return false;
+    } else {
+      const open = mins(s.hoursMotzeiOpen);
+      if (open !== null && now < open) return false;
+    }
     return close >= 6 * 60 ? now < close : true; // past-midnight close handled above
   }
 
@@ -88,7 +93,9 @@ const span = (r: string) => {
 
 /** Hours as lines for the website. */
 export function hoursLines(s: HoursSettings = hoursDefaults()): string[] {
-  const motzeiOpen = s.hoursMotzeiOpen === "tzeis" ? "after Shabbos ends" : `from ${ampm(s.hoursMotzeiOpen)}`;
+  const after = s.hoursMotzeiOpen.trim().match(/^tzeis(?:\+(\d+))?$/);
+  const n = after ? Number(after[1] ?? 0) : 0;
+  const motzeiOpen = after ? (n ? `from ${n % 60 === 0 ? `${n / 60} hour${n === 60 ? "" : "s"}` : `${n} minutes`} after Shabbos ends` : "when Shabbos ends") : `from ${ampm(s.hoursMotzeiOpen)}`;
   return [
     `Monday to Thursday: ${span(s.hoursMonThu)}`,
     `Friday: from ${ampm(s.hoursFridayOpen)} until midday (chatzos)`,
@@ -98,4 +105,24 @@ export function hoursLines(s: HoursSettings = hoursDefaults()): string[] {
     `Chol Hamoed: ${span(s.hoursCholHamoed)}`,
     "Closed on Shabbos and Yom Tov.",
   ];
+}
+
+/** Today's office hours as one line, e.g. "Today: 10:30 AM to 7:00 PM" or "Closed today (Shabbos). Open tonight from 7:22 PM to 11:30 PM." */
+export function todayHours(at: Date = new Date(), s: HoursSettings = hoursDefaults()): string {
+  const iso = localISO(at);
+  const info = dayInfo(iso, s);
+  const t = (d: Date) => d.toLocaleTimeString("en-US", { timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit" });
+  if (info.closed) {
+    if (!info.reopensAt) return `Closed today (${info.reason}).`;
+    const after = s.hoursMotzeiOpen.trim().match(/^tzeis(?:\+(\d+))?$/);
+    const opens = after ? new Date(info.reopensAt.getTime() + Number(after[1] ?? 0) * 60_000) : null;
+    const summer = s.hoursMotzeiSeason === "dst" ? inDST(at) : s.hoursMotzeiSeason === "summer";
+    const close = ampm(summer ? s.hoursMotzeiCloseSummer : s.hoursMotzeiCloseWinter);
+    return `Closed today (${info.reason}). Open tonight${opens ? ` from ${t(opens)}` : ""} until ${close}.`;
+  }
+  if (isCholHamoed(iso)) return `Today (Chol Hamoed): ${span(s.hoursCholHamoed)}`;
+  if (dow(iso) === 0) return `Today: ${span(s.hoursSunday)}`;
+  if (info.closesAt) return `Today: ${ampm(s.hoursFridayOpen)} to ${t(info.closesAt)} (${dow(iso) === 5 ? "Erev Shabbos" : "Erev Yom Tov"})`;
+  if (dow(iso) === 5) return `Today: from ${ampm(s.hoursFridayOpen)}`;
+  return `Today: ${span(s.hoursMonThu)}`;
 }

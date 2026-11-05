@@ -18,7 +18,8 @@ import {
   reserveItem,
   upsertCustomer,
 } from "@/lib/orders";
-import { paymentLink } from "@/lib/sola";
+import { payPageLink } from "@/lib/rental-terms";
+import { TERMS_TEXT } from "@/lib/terms-content";
 import { sendEmail, sendSms } from "@/lib/notify";
 import { getSettings } from "@/lib/settings";
 import { computeTotals, deliveryZone } from "@/lib/pricing";
@@ -539,15 +540,23 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "cart_expired");
       return back(vr, "menu");
     }
+    if (ctx.body.Digits === "1") {
+      // Text the Terms link (only with order-text consent from this call or before).
+      const phone = ctx.session?.data.phone;
+      const consented = ctx.session?.data.smsConsent === "yes" || ctx.session?.data.smsConsent === "existing";
+      const r = phone && consented ? await sendSms(phone, `${BUSINESS_NAME} Terms and Conditions: ${config.baseUrl()}/terms`, { kind: "transactional", event: "terms_link", orderId: order.order.id, callSid: ctx.callSid }) : null;
+      sp(vr, ctx, r?.sent ? "terms_link_sent" : "terms_link_no_text");
+      return back(vr, "terms", { n: ctx.query.get("n") ?? undefined });
+    }
     if (ctx.body.Digits === "#") {
       const notice = promptText(ctx.prompts, "terms_notice");
       await recordTermsAcceptance({
         orderId: order.order.id,
         phone: ctx.session?.data.phone ?? toE164(ctx.from),
         termsVersion: CURRENT_TERMS_VERSION,
-        termsText: `${notice} [Terms and Conditions at /terms, version ${CURRENT_TERMS_VERSION}]`,
+        termsText: TERMS_TEXT,
         method: "phone_hash",
-        acceptanceStatement: "Caller pressed # after hearing the terms notice",
+        acceptanceStatement: `Pressed "#" for reservation #${orderNumber(order.order.id)} after hearing: "${notice}"`,
         amountCents: order.order.subtotalCents,
       });
       await updateSession(ctx.callSid, { data: { termsAccepted: true } }, ctx.session);
@@ -680,13 +689,7 @@ const handlers: Record<string, Handler> = {
     await updateSession(ctx.callSid, { outcome: "checked_out" }, ctx.session);
 
     const num = orderNumber(order.order.id);
-    const link = paymentLink({
-      orderId: order.order.id,
-      amountCents: totals.totalCents, // items + delivery + tax
-      name: data.name,
-      email: data.email,
-      phone,
-    });
+    const link = payPageLink(order.order.id); // review-and-pay page: Terms box, then Sola
     const lines = order.items.map((i) => `${i.qty} x ${i.name}`).join(", ");
     const details =
       `${BUSINESS_NAME} order #${num}: ${lines} for ${longDate(order.order.eventDate)} (pickup ${longDate(order.order.pickupDate)}). ` +

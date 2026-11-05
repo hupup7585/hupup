@@ -37,7 +37,10 @@ const broken = async (page) => /Application error|Unhandled Runtime Error|Intern
 
   // New booking at the POS for a customer without text consent: the link must not be texted.
   await page.goto(BASE + "/admin/pos");
-  const d = new Date(Date.now() + (40 + Math.floor(Math.random() * 200)) * 86400e3).toISOString().slice(0, 10);
+  // An ordinary open weekday (calendar rules refuse Shabbos / Yom Tov); random so earlier runs don't hold the stock.
+  const OPEN = ["2027-01-12", "2027-01-19", "2027-01-26", "2027-02-02", "2027-02-09", "2027-02-16", "2027-02-23", "2027-03-02", "2027-05-04", "2027-05-11", "2027-06-01", "2027-07-06", "2027-08-03", "2027-08-24"];
+  const d = OPEN[Math.floor(Math.random() * OPEN.length)];
+  await page.waitForSelector("[data-pos-calendar] button", { timeout: 60000 }); // page hydrated
   await page.fill('input[type="date"]', d);
   await page.waitForSelector('button:has-text("+"):not([disabled])', { timeout: 60000 });
   await page.locator('button:has-text("+"):not([disabled])').first().click();
@@ -45,6 +48,7 @@ const broken = async (page) => /Application error|Unhandled Runtime Error|Intern
   const posPhone = `(845) 555-${String(2000 + Math.floor(Math.random() * 7999))}`;
   await page.fill('input[placeholder="Mobile phone"]', posPhone);
   await page.fill('input[placeholder="Delivery address"]', "3 Garfield Rd, Kiryas Joel");
+  await page.locator("select").filter({ hasText: "Choose how they accepted" }).selectOption("phone");
   const linkBtn = page.locator("button", { hasText: /link/i }).first();
   if (await linkBtn.count()) await linkBtn.click();
   await page.locator("button.btn.w-full").last().click();

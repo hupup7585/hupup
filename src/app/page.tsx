@@ -270,6 +270,45 @@ export default async function Home() {
         </section>
 
         {/* CONTACT */}
+        {/* HOURS: a dedicated, easy-to-find section right above Contact (Abraham 14:45 CST; preview only) */}
+        <section id="hours" data-hours className="scroll-mt-20 bg-hu-tint py-14 sm:py-20">
+          <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 md:grid-cols-2 md:items-start md:gap-10">
+            <div>
+              <SectionTitle kicker="When to reach us" title="Our Hours" />
+              <div className="mt-6 rounded-2xl border-2 border-hu-deep bg-white p-5">
+                <p className="text-sm font-extrabold uppercase tracking-wider text-hu-deep/70">{c.officeHours.openNow ? "Open now" : "Closed now"}</p>
+                <p data-today className="mt-1 text-xl font-bold">{c.officeHours.today}</p>
+              </div>
+              <p data-hours-note className="mt-4 flex items-start gap-3 rounded-2xl bg-hu-yellow p-4 font-semibold">
+                <PhoneCall className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
+                <span>
+                  {c.officeHours.note}{" "}
+                  <a href={`tel:${c.phoneE164}`} className="whitespace-nowrap underline underline-offset-4">
+                    {c.phoneDisplay}
+                  </a>
+                </span>
+              </p>
+            </div>
+            <ul className="divide-y-2 divide-hu-deep/10 rounded-2xl border-2 border-hu-deep/10 bg-white px-5 text-lg">
+              {c.officeHours.lines.map((line) => {
+                const i = line.indexOf(": ");
+                return (
+                  <li key={line} className="py-3">
+                    {i > 0 ? (
+                      <>
+                        <span className="block text-sm font-bold uppercase tracking-wider opacity-70">{line.slice(0, i)}</span>
+                        <span className="font-semibold">{line.slice(i + 2)}</span>
+                      </>
+                    ) : (
+                      <span className="font-semibold">{line}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </section>
+
         <section id="contact" className="scroll-mt-20 bg-white py-14 sm:py-20">
           <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 md:grid-cols-2 md:items-center md:gap-10">
             {/* Abram: "GET IN TOUCH" centered right above the centered "Contact Us"; label sits 8px higher (heading does not move) */}

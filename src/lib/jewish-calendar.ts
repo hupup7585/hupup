@@ -84,6 +84,7 @@ function kinds(iso: string): { kinds: Set<Kind>; names: string[] } {
   }
   for (const e of events(iso)) {
     const f = e.getFlags();
+    if (f & flags.YOM_KIPPUR_KATAN) continue; // a minor custom, not a closure; would only confuse staff
     const desc = e.getDesc();
     if (f & flags.CHAG) k.add("yomtov");
     else if (f & flags.CHOL_HAMOED) k.add("cholHamoed");

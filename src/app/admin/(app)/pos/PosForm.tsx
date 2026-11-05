@@ -18,7 +18,7 @@ export default function PosForm(props: {
   const [date, setDate] = useState(props.initialDate);
   const [avail, setAvail] = useState<Record<string, number>>({});
   const [qty, setQty] = useState<Record<string, number>>(props.initialProduct ? { [props.initialProduct]: 1 } : {});
-  const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", deliveryTime: "", notes: "", amountPaid: "" });
+  const [form, setForm] = useState({ name: "", termsVia: "", phone: "", email: "", address: "", deliveryTime: "", notes: "", amountPaid: "" });
   const [payment, setPayment] = useState<"link" | "cash" | "check" | "later">("link");
   const [result, setResult] = useState<PosResult | null>(null);
   const [days, setDays] = useState<CalendarDay[]>([]);
@@ -48,7 +48,7 @@ export default function PosForm(props: {
     if (payment === "cash" || payment === "check") setForm((f) => ({ ...f, amountPaid: (total / 100).toFixed(2) }));
   }, [payment, total]);
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
 
   const submit = () =>
     start(async () => {
@@ -56,7 +56,7 @@ export default function PosForm(props: {
       setResult(r);
       if (r.ok) {
         setQty({});
-        setForm({ name: "", phone: "", email: "", address: "", deliveryTime: "", notes: "", amountPaid: "" });
+        setForm({ name: "", phone: "", email: "", address: "", deliveryTime: "", notes: "", amountPaid: "", termsVia: "" });
       }
     });
 
@@ -137,6 +137,16 @@ export default function PosForm(props: {
         <input className="input" placeholder="Delivery address" value={form.address} onChange={set("address")} />
         <input className="input" placeholder="Delivery time (optional, e.g. 9:00 AM)" value={form.deliveryTime} onChange={set("deliveryTime")} />
         <textarea className="input" placeholder="Notes" rows={2} value={form.notes} onChange={set("notes")} />
+        <label className="block">
+          <span className="label">Customer accepted the Terms and Conditions by *</span>
+          <select className="input" value={form.termsVia} onChange={set("termsVia")} required>
+            <option value="">Choose how they accepted</option>
+            <option value="phone">Phone</option>
+            <option value="text">Text message</option>
+            <option value="email">Email</option>
+            <option value="in_person">In person</option>
+          </select>
+        </label>
 
         <h2 className="pt-2 font-bold">Payment</h2>
         <div className="grid grid-cols-2 gap-2">
@@ -159,7 +169,7 @@ export default function PosForm(props: {
           <span className="text-muted">Total</span>
           <span className="text-2xl font-black">{money(total)}</span>
         </div>
-        <button className="btn w-full py-3.5" disabled={pending || !date || total === 0 || check?.ok === false} onClick={submit}>
+        <button className="btn w-full py-3.5" disabled={pending || !date || total === 0 || check?.ok === false || !form.termsVia} onClick={submit}>
           {pending ? "Booking…" : "Book it"}
         </button>
         {result && (

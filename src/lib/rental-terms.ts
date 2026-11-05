@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
+import { TERMS_EFFECTIVE_DATE, TERMS_TEXT, TERMS_VERSION } from "@/lib/terms-content";
 
 /**
  * Rental terms acceptance (NY electronic records and signatures). Before paying, the customer sees the exact
@@ -38,7 +39,7 @@ export type AcceptanceInput = {
   phone?: string | null;
   termsVersion: string;
   termsText: string;
-  method: "web_checkbox" | "web_continue" | "phone_hash" | "staff_read";
+  method: "web_checkbox" | "web_continue" | "phone_hash" | "staff_read" | "staff_phone" | "staff_text" | "staff_email" | "staff_in_person";
   acceptanceStatement: string;
   amountCents?: number | null;
   ip?: string | null;
@@ -50,6 +51,7 @@ export type AcceptanceInput = {
 export async function recordTermsAcceptance(input: AcceptanceInput) {
   if (!input.termsText.trim()) throw new Error("Terms text is required.");
   if (!input.acceptanceStatement.trim()) throw new Error("Acceptance statement is required.");
+  if (input.termsVersion === TERMS_VERSION) await ensureTermsVersionStored();
   const [row] = await db
     .insert(schema.termsAcceptances)
     .values({
@@ -96,5 +98,18 @@ export async function linkPaymentToAcceptance(orderId: number, paymentRef: strin
 }
 
 /** Version of the business Terms and Conditions (/terms) customers agree to. Bump when /terms changes. */
-// History: "terms-2026-11-05-draft" (before sections A-E). Bumped when sections A-E were added.
-export const CURRENT_TERMS_VERSION = "terms-2026-11-06-AE";
+// History: "terms-2026-11-05-draft" (before sections A-E). The current version lives in terms-content.ts.
+export const CURRENT_TERMS_VERSION = TERMS_VERSION;
+
+/** Store a permanent copy of the current Terms version (once per version). */
+export async function ensureTermsVersionStored() {
+  await db
+    .insert(schema.termsVersions)
+    .values({ version: TERMS_VERSION, effectiveDate: TERMS_EFFECTIVE_DATE, text: TERMS_TEXT, textHash: termsHash(TERMS_TEXT) })
+    .onConflictDoNothing();
+}
+
+/** Customer-facing payment link: our review-and-pay page (Terms box) which then continues to Sola. */
+export function payPageLink(orderId: number): string {
+  return `${(process.env.PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "")}/pay/${orderId}?t=${payToken(orderId)}`;
+}

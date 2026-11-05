@@ -3,11 +3,11 @@ import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { SERVICE_AREA } from "@/lib/site-copy";
 import { getSettings } from "@/lib/settings";
-import { hoursLines } from "@/lib/business-hours";
+import { hoursLines, officeOpenNow, todayHours } from "@/lib/business-hours";
 
-async function officeHoursText(): Promise<string> {
+async function officeHours(): Promise<SiteContent["officeHours"]> {
   const s = await getSettings();
-  return [...hoursLines(s), "", s.hoursWebsiteNote].join("\n");
+  return { lines: hoursLines(s), today: todayHours(new Date(), s), openNow: officeOpenNow(new Date(), s), note: s.hoursWebsiteNote };
 }
 
 export type SiteContent = {
@@ -15,6 +15,8 @@ export type SiteContent = {
   serviceArea: { mainLabel: string; main: string; mainSub: string; officialName: string; alsoTitle: string; also: readonly string[]; region: string };
   /** Business hours; null = hidden until set. */
   hours: string | null;
+  /** Office hours from the shared business-hours settings (website Hours section and footer). */
+  officeHours: { lines: string[]; today: string; openNow: boolean; note: string };
   email: string;
   phoneDisplay: string;
   phoneE164: string;
@@ -66,8 +68,9 @@ export async function getSiteContent(): Promise<SiteContent> {
   return {
     logoUrl: str(settings.get(SITE_KEYS.logoUrl)),
     serviceArea: SERVICE_AREA,
+    hours: str(settings.get(SITE_KEYS.hours)),
     // Office hours from the business-hours settings (same source as the POS and hotline), plus Abraham's note.
-    hours: str(settings.get(SITE_KEYS.hours)) ?? (await officeHoursText()),
+    officeHours: await officeHours(),
     email: str(settings.get(SITE_KEYS.email)) ?? config.publicEmail,
     phoneDisplay: config.hotlineDisplay,
     phoneE164: config.hotlineE164,
