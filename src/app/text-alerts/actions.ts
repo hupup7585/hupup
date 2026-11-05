@@ -1,0 +1,70 @@
+"use server";
+
+import { headers } from "next/headers";
+import { and, eq, gt, sql } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
+import { config } from "@/lib/config";
+import { toE164 } from "@/lib/phone";
+import { sendMessage } from "@/lib/sms";
+import { MARKETING_CONFIRMATION_SMS, TRANSACTIONAL_CONFIRMATION_SMS, recordConsent } from "@/lib/sms-consent";
+import { WEB_CONSENT_MARKETING, WEB_CONSENT_TRANSACTIONAL, WEB_CONSENT_VERSION } from "@/lib/sms-consent-copy";
+
+export type SignUpState = { ok?: boolean; error?: string; stopped?: boolean; promo?: boolean; orders?: boolean };
+
+const MAX_PER_PHONE_PER_DAY = 6; // 3 sign-ups x 2 boxes
+const MAX_PER_IP_PER_DAY = 20;
+
+/** Preview builds share the production database: never create real consent records from the preview site. */
+export async function signUpsDisabledReason(): Promise<string | null> {
+  if (process.env.VERCEL_ENV === "preview" && process.env.ALLOW_PREVIEW_DB_WRITES !== "1") {
+    return "This is the preview site, so sign-ups are turned off here and no consent is recorded.";
+  }
+  return null;
+}
+
+export async function signUpForTexts(_prev: SignUpState, form: FormData): Promise<SignUpState> {
+  if (String(form.get("company") || "")) return { ok: true }; // honeypot: bots fill hidden fields
+  const phone = toE164(String(form.get("phone") || ""));
+  if (!phone) return { error: "Please enter a valid 10-digit US or Canadian mobile number." };
+  const orders = form.get("transactional") === "on";
+  const promo = form.get("marketing") === "on";
+  if (!orders && !promo) return { error: "Please check at least one box to sign up." };
+
+  const disabled = await signUpsDisabledReason();
+  if (disabled) return { error: disabled };
+
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") || "").split(",")[0].trim() || h.get("x-real-ip") || null;
+  const userAgent = h.get("user-agent")?.slice(0, 500) ?? null;
+  const pageUrl = `${config.baseUrl()}/text-alerts`;
+
+  const since = new Date(Date.now() - 24 * 3600 * 1000);
+  const count = async (cond: ReturnType<typeof eq>) =>
+    Number(
+      (
+        await db
+          .select({ n: sql<number>`count(*)` })
+          .from(schema.smsConsents)
+          .where(and(eq(schema.smsConsents.source, "web"), gt(schema.smsConsents.createdAt, since), cond))
+      )[0]?.n ?? 0,
+    );
+  if ((await count(eq(schema.smsConsents.phone, phone))) >= MAX_PER_PHONE_PER_DAY || (ip && (await count(eq(schema.smsConsents.ip, ip))) >= MAX_PER_IP_PER_DAY)) {
+    return { error: "Too many sign-ups right now. Please try again tomorrow or call us." };
+  }
+
+  const [customer] = await db.select().from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1);
+  if (customer?.smsOptOut) return { stopped: true };
+
+  const base = { phone, source: "web" as const, method: "checkbox" as const, wordingVersion: WEB_CONSENT_VERSION, response: "checked", ip, userAgent, pageUrl };
+  let customerId = customer?.id;
+  if (orders) customerId = await recordConsent({ ...base, scope: "transactional", action: "opt_in", wording: WEB_CONSENT_TRANSACTIONAL });
+  if (promo) customerId = await recordConsent({ ...base, scope: "marketing", action: "opt_in", wording: WEB_CONSENT_MARKETING });
+
+  const firstName = String(form.get("firstName") || "").trim().slice(0, 60);
+  if (firstName && customerId && !customer?.name) await db.update(schema.customers).set({ name: firstName }).where(eq(schema.customers.id, customerId));
+
+  // One confirmation text per program joined (non-promotional).
+  if (orders) await sendMessage({ to: phone, body: TRANSACTIONAL_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId });
+  if (promo) await sendMessage({ to: phone, body: MARKETING_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId });
+  return { ok: true, orders, promo };
+}

@@ -15,7 +15,10 @@ export default function Terms() {
       <h2>Safety</h2>
       <p>Rentals must be used as instructed by our team and under adult supervision at all times.</p>
       <h2>Text messages</h2>
-      <p>By giving us your mobile number for a booking, you agree to receive texts about that booking. Promotional texts are sent only if you opt in, up to 5 per year. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help.</p>
+      <p>
+        We text you only with your consent, and order texts and promotional texts are separate choices. Promotional texts are sent only if you opt in, and agreeing is not required to book. Message
+        frequency varies. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help. See our <a className="underline" href="/sms-terms">SMS Terms</a>.
+      </p>
       <h2>Contact</h2>
       <p>Call (845) 777-7585 or email hupupattractions@gmail.com.</p>
     </LegalPage>

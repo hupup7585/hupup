@@ -83,6 +83,9 @@ export type RecordConsentInput = {
   callSid?: string | null;
   orderId?: number | null;
   userId?: number | null;
+  ip?: string | null;
+  userAgent?: string | null;
+  pageUrl?: string | null;
 };
 
 /** Append a consent row (creating a minimal customer record for the number if needed) and update current state. */
@@ -104,6 +107,9 @@ export async function recordConsent(input: RecordConsentInput) {
     callSid: input.callSid ?? null,
     orderId: input.orderId ?? null,
     userId: input.userId ?? null,
+    ip: input.ip ?? null,
+    userAgent: input.userAgent ?? null,
+    pageUrl: input.pageUrl ?? null,
   });
   if (input.scope === "marketing") {
     // Only an explicit opt-in turns promotions on; anything else leaves/turns them off.
@@ -119,6 +125,10 @@ export async function recordConsent(input: RecordConsentInput) {
 /** Opt-in confirmation text for the promotional program (CTIA). */
 export const MARKETING_CONFIRMATION_SMS =
   "Hup Up Attractions: You're subscribed to promotional texts. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.";
+
+/** Opt-in confirmation text for order and service texts (sent after a website sign-up). */
+export const TRANSACTIONAL_CONFIRMATION_SMS =
+  "Hup Up Attractions: You'll receive texts about your reservations, orders, payments, deliveries and pickups. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.";
 
 /** Footer on transactional texts sent after phone consent. */
 export const TRANSACTIONAL_FOOTER = "Reply HELP for help, STOP to opt out.";

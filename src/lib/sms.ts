@@ -3,6 +3,8 @@ import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
 import { getTwilio } from "@/lib/twilio-client";
+import { inRecipientPromoHours } from "@/lib/area-code-tz";
+import { PROMO_OPENING } from "@/lib/sms-consent-copy";
 
 export type MessageKind = "transactional" | "marketing" | "system";
 
@@ -53,22 +55,21 @@ export function containsCardNumber(text: string): boolean {
   });
 }
 
-/** Promotional texts may go out only 8:00 AM to 9:00 PM local time (customers are in the America/New_York zone). */
-export const MARKETING_HOURS = { start: 8, end: 21, timeZone: "America/New_York" } as const;
-
-export function inMarketingHours(now = new Date()): boolean {
-  const hour = Number(
-    new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: MARKETING_HOURS.timeZone }).format(now),
-  );
-  return hour >= MARKETING_HOURS.start && hour < MARKETING_HOURS.end;
+/**
+ * Promotional texts go out only 8:00 AM - 9:00 PM in the recipient's local time, worked out from the
+ * area code (New York time when unknown). See src/lib/area-code-tz.ts.
+ */
+export function inMarketingHours(to: string, now = new Date()): boolean {
+  return inRecipientPromoHours(to, now);
 }
 
-/** Every promotional text opens with the business name and tells the customer how to opt out. */
+/** Every promotional text begins with "Hup Up Attractions: Reply STOP to opt out." and then the offer. */
 export function marketingBody(body: string): string {
-  let b = body.trim();
-  if (!/^hup up attractions\b/i.test(b)) b = `Hup Up Attractions: ${b}`;
-  if (!/\bSTOP\b/.test(b)) b = `${b} Reply STOP to opt out.`;
-  return b;
+  let offer = body.trim();
+  if (offer.startsWith(PROMO_OPENING)) return offer;
+  offer = offer.replace(/^hup up attractions\s*[:\-]\s*/i, "");
+  offer = offer.replace(/\s*reply stop to opt out\.?\s*$/i, "");
+  return `${PROMO_OPENING} ${offer}`.trim();
 }
 
 async function customerByPhone(phone: string) {
@@ -103,7 +104,7 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   let blocked: SendResult["blocked"];
   if (kind !== "system" && customer?.smsOptOut) blocked = "opted_out";
   else if (kind === "marketing" && !customer?.marketingOptIn) blocked = "no_marketing_consent";
-  else if (kind === "marketing" && !inMarketingHours(input.now)) blocked = "quiet_hours";
+  else if (kind === "marketing" && !inMarketingHours(to, input.now)) blocked = "quiet_hours";
 
   let messageId: number | undefined;
   if (log) {
@@ -171,7 +172,7 @@ const BLOCK_REASON: Record<NonNullable<SendResult["blocked"]>, string> = {
   opted_out: "Customer replied STOP. Ask them to text START to receive messages again.",
   no_marketing_consent: "Customer has not opted in to promotional texts.",
   card_number: "Message looks like it contains a card number and was not sent.",
-  quiet_hours: "Promotional texts can only be sent between 8 AM and 9 PM.",
+  quiet_hours: "Promotional texts can only be sent between 8 AM and 9 PM in the customer's local time.",
 };
 
 async function markFailed(messageId: number | undefined, code: unknown, message: string | undefined) {

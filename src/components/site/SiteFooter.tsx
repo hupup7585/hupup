@@ -61,9 +61,11 @@ export default function SiteFooter({ c }: { c: SiteContent }) {
       <div className="border-t border-white/15">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-5 text-sm text-white/75 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <span>© {year} {BUSINESS_NAME_NB}</span>
-          <span className="flex gap-5">
+          <span className="flex flex-wrap gap-x-5 gap-y-2">
             <a href="/privacy" className="hover:text-hu-yellow">Privacy Policy</a>
             <a href="/terms" className="hover:text-hu-yellow">Terms and Conditions</a>
+            <a href="/sms-terms" className="hover:text-hu-yellow">SMS Terms</a>
+            <a href="/text-alerts" className="hover:text-hu-yellow">Text Updates</a>
           </span>
         </div>
       </div>

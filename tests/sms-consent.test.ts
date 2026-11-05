@@ -8,12 +8,12 @@ import { inMarketingHours, marketingBody } from "@/lib/sms";
 describe("phone consent language (A2P 10DLC)", () => {
   it("transactional disclosure: brand, program, frequency, rates, STOP, HELP, terms, keypad and voice options", () => {
     const t = PROMPTS.consent_transactional.text;
-    for (const part of ["Hup Up Attractions", "reservation, order, payment, delivery, pickup, and customer service", "Message frequency varies.", "Message and data rates may apply.", "reply STOP to opt out", "HELP for help", "text message terms and privacy policy", "press 1 or say yes", "press 2 or say no"])
+    for (const part of ["Hup Up Attractions", "reservation, order, payment, delivery, pickup, and customer service", "authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages", "Message frequency varies.", "Message and data rates may apply.", "reply STOP to opt out", "HELP for help", "text message terms and privacy policy", "press 1 or say yes", "press 2 or say no"])
       expect(t).toContain(part);
   });
-  it("promotional disclosure is separate and says it is not required to book or buy", () => {
+  it("promotional disclosure is separate, says it is not a condition of purchase, and covers provider sharing", () => {
     const t = PROMPTS.consent_marketing.text;
-    for (const part of ["recurring promotional and marketing text messages from Hup Up Attractions", "Message frequency varies.", "Message and data rates may apply.", "reply STOP to opt out", "HELP for help", "Agreeing is not required to book or buy anything.", "press 1 or say yes", "press 2 or say no"])
+    for (const part of ["promotional text messages from Hup Up Attractions", "authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages", "Consent is not a condition of purchase.", "Message frequency varies.", "Message and data rates may apply.", "reply STOP to opt out", "HELP for help", "press 1 or say yes", "press 2 or say no"])
       expect(t).toContain(part);
     expect(t).not.toBe(PROMPTS.consent_transactional.text);
   });
@@ -92,18 +92,20 @@ describe("opt-out words (STOP and NY GBL 399-z list)", () => {
   });
 });
 
-describe("promotional text rules (NY proposals)", () => {
-  it("opens with the business name and includes STOP", () => {
-    expect(marketingBody("20% off jumping balloons this week!")).toBe("Hup Up Attractions: 20% off jumping balloons this week! Reply STOP to opt out.");
-    expect(marketingBody("Hup Up Attractions: Sale! Reply STOP to opt out")).toBe("Hup Up Attractions: Sale! Reply STOP to opt out");
+describe("promotional text rules (Abram's SMS Terms requirements 1 and 2)", () => {
+  it("every promo begins with exactly 'Hup Up Attractions: Reply STOP to opt out.' and then the offer", () => {
+    expect(marketingBody("20% off jumping balloons this week!")).toBe("Hup Up Attractions: Reply STOP to opt out. 20% off jumping balloons this week!");
+    expect(marketingBody("Hup Up Attractions: Sale on paddle boats! Reply STOP to opt out.")).toBe("Hup Up Attractions: Reply STOP to opt out. Sale on paddle boats!");
+    expect(marketingBody("Hup Up Attractions: Reply STOP to opt out. Spring deals")).toBe("Hup Up Attractions: Reply STOP to opt out. Spring deals");
   });
-  it("only 8 AM to 9 PM New York time (DST aware)", () => {
-    expect(inMarketingHours(new Date("2026-07-01T11:59:00Z"))).toBe(false); // 7:59 AM EDT
-    expect(inMarketingHours(new Date("2026-07-01T12:00:00Z"))).toBe(true); // 8:00 AM EDT
-    expect(inMarketingHours(new Date("2026-07-02T00:59:00Z"))).toBe(true); // 8:59 PM EDT
-    expect(inMarketingHours(new Date("2026-07-02T01:00:00Z"))).toBe(false); // 9:00 PM EDT
-    expect(inMarketingHours(new Date("2026-12-01T13:00:00Z"))).toBe(true); // 8:00 AM EST
-    expect(inMarketingHours(new Date("2026-12-01T12:59:00Z"))).toBe(false); // 7:59 AM EST
+  it("New York numbers: 8 AM to 9 PM Eastern (DST aware)", () => {
+    const ny = "+18455550100";
+    expect(inMarketingHours(ny, new Date("2026-07-01T11:59:00Z"))).toBe(false); // 7:59 AM EDT
+    expect(inMarketingHours(ny, new Date("2026-07-01T12:00:00Z"))).toBe(true); // 8:00 AM EDT
+    expect(inMarketingHours(ny, new Date("2026-07-02T00:59:00Z"))).toBe(true); // 8:59 PM EDT
+    expect(inMarketingHours(ny, new Date("2026-07-02T01:00:00Z"))).toBe(false); // 9:00 PM EDT
+    expect(inMarketingHours(ny, new Date("2026-12-01T13:00:00Z"))).toBe(true); // 8:00 AM EST
+    expect(inMarketingHours(ny, new Date("2026-12-01T12:59:00Z"))).toBe(false); // 7:59 AM EST
   });
 });
 

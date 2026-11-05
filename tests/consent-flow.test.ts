@@ -173,7 +173,8 @@ describe("finalize sends texts only with consent", () => {
 describe("promotional consent (separate, never automatic)", () => {
   it("asked after the order with its own disclosure", async () => {
     const xml = await call("promo-consent");
-    expect(xml).toContain("Agreeing is not required to book or buy anything.");
+    expect(xml).toContain("Consent is not a condition of purchase.");
+    expect(xml).toContain("service providers only as necessary to deliver these messages");
     expect(xml).toContain("/api/voice/promo-consent-answer");
   });
   it("yes: records marketing opt-in and texts the confirmation", async () => {
@@ -193,7 +194,7 @@ describe("promotional consent (separate, never automatic)", () => {
   it("skipped when already decided recently", async () => {
     h.state.marketing = { action: "declined", at: new Date() };
     const xml = await call("promo-consent");
-    expect(xml).not.toContain("promotional and marketing");
+    expect(xml).not.toContain("promotional text messages");
     expect(xml).toContain("/api/voice/goodbye");
   });
   it("goodbye reads the delivery and pickup dates and hangs up", async () => {

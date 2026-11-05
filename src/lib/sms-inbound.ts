@@ -15,7 +15,16 @@ export type Keyword = "stop" | "start" | "help" | "nopromo" | null;
 const OPT_OUT_IN_PHRASE = ["STOPALL", "UNSUBSCRIBE", "OPTOUT", "REVOKE"];
 /** "Stop" alone is ambiguous ("stop by at 5?"), so in a phrase it only counts in these shapes. */
 const STOP_PHRASE = /^(?:(?:PLEASE|OK|OKAY|JUST)\s+)*STOP(?:\s+(?:TEXTING|MESSAGING|SENDING|CONTACTING|TEXT|TEXTS|MESSAGES|IT|NOW|PLEASE|ALL|THIS|THESE)\b.*)?$|\bSTOP\s*$/;
-const MAX_PHRASE_WORDS = 6;
+/** Other reasonable ways people ask us to stop texting (Requirement 5). Matched on the whole short message. */
+const STOP_REQUESTS = [
+  /\b(?:DONT|DO NOT|PLEASE DONT|PLEASE DO NOT)\s+(?:TEXT|MESSAGE|SMS|CONTACT)\b/,
+  /\bNO MORE\s+(?:TEXTS|TEXT|MESSAGES|MESSAGE|SMS)\b/,
+  /\b(?:REMOVE|DELETE|TAKE)\s+(?:ME|MY NUMBER|THIS NUMBER)\s*(?:OFF|FROM)?\s*(?:YOUR|THE|THIS)?\s*(?:LIST|TEXTS|TEXT LIST|MAILING LIST|CONTACTS)?\s*$/,
+  /\bTAKE ME OFF\b/,
+  /\b(?:I )?(?:DONT|DO NOT) WANT (?:ANY )?(?:MORE )?(?:TEXTS|MESSAGES|THESE)\b/,
+  /\bWRONG NUMBER\b.*\bSTOP\b|\bLEAVE ME ALONE\b/,
+];
+const MAX_PHRASE_WORDS = 8;
 
 /**
  * Exact keyword match (the whole message is the keyword, ignoring case, spaces and punctuation), or an
@@ -29,7 +38,8 @@ export function detectKeywordDetail(body: string): { keyword: Keyword; exact: bo
   if (HELP_WORDS.includes(w)) return { keyword: "help", exact: true };
   if (NOPROMO_WORDS.includes(w)) return { keyword: "nopromo", exact: true };
   const words = body.toUpperCase().replace(/\bOPT[\s-]+(?:ME[\s-]+)?OUT\b/g, "OPTOUT").replace(/[^A-Z\s]/g, " ").split(/\s+/).filter(Boolean);
-  if (words.length <= MAX_PHRASE_WORDS && (words.some((x) => OPT_OUT_IN_PHRASE.includes(x)) || STOP_PHRASE.test(words.join(" "))))
+  const joined = words.join(" ").replace(/\bDON T\b/g, "DONT");
+  if (words.length <= MAX_PHRASE_WORDS && (words.some((x) => OPT_OUT_IN_PHRASE.includes(x)) || STOP_PHRASE.test(joined) || STOP_REQUESTS.some((r) => r.test(joined))))
     return { keyword: "stop", exact: false };
   return { keyword: null, exact: false };
 }
@@ -39,6 +49,7 @@ export function detectKeyword(body: string): Keyword {
 }
 
 /** Sent when an opt-out was recognized in a phrase (Twilio confirms exact keywords itself). */
+/** The single non-promotional confirmation allowed after an opt-out (Requirement 5). */
 export const OPT_OUT_CONFIRMATION = "Hup Up Attractions: You're unsubscribed and won't receive more texts from us. Reply START to resubscribe.";
 
 export type InboundResult = { messageId: number; keyword: Keyword; reply: string | null; forwarded: boolean };

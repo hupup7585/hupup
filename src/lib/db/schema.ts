@@ -286,6 +286,10 @@ export const smsConsents = pgTable(
     /** Caller ID of the call the consent was given on (may differ from `phone`) */
     callerPhone: text("caller_phone"),
     orderId: integer("order_id"),
+    /** Website sign-ups: request IP, browser user agent and the page the form was on */
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    pageUrl: text("page_url"),
     keyword: text("keyword"),
     callSid: text("call_sid"),
     userId: integer("user_id"),

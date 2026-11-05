@@ -1,5 +1,6 @@
 import LegalPage from "@/components/site/LegalPage";
 import { BUSINESS_NAME_NB } from "@/lib/site-copy";
+import { PROVIDER_DISCLOSURE, RECORD_RETENTION_MONTHS } from "@/lib/sms-consent-copy";
 
 export const metadata = { title: "Privacy Policy | Hup Up Attractions" };
 export const revalidate = 3600;
@@ -23,7 +24,11 @@ export default function Privacy() {
       <h2>Payments</h2>
       <p>Payments are processed securely by our payment provider. We do not store your full card number.</p>
       <h2>Text messages</h2>
-      <p>Message and data rates may apply. Reply STOP to stop receiving texts, or HELP for help. We do not sell or share your phone number with third parties for their marketing.</p>
+      <p>
+        Message and data rates may apply. Reply STOP to stop receiving texts, or HELP for help. {PROVIDER_DISCLOSURE} Text messaging originator opt-in data and consent will not be shared with any third
+        parties, except service providers as described here. We keep records of text consent, opt-outs, and the texts we send for at least {RECORD_RETENTION_MONTHS} months. See our{" "}
+        <a className="underline" href="/sms-terms">SMS Terms</a>.
+      </p>
       <h2>Sharing</h2>
       <p>We share information only with service providers that help us run our business, such as our phone, text messaging, and payment providers, and only as needed to provide our services.</p>
       <h2>Contact</h2>
