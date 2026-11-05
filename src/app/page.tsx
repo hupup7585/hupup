@@ -216,8 +216,8 @@ export default async function Home() {
         {/* SERVICE AREA: main area first and prominent, nearby towns clearly secondary */}
         <section id="service-area" className="scroll-mt-20 bg-hu-sky py-14 sm:py-16">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            {/* Same heading style as the other sections (eyebrow + title); eyebrow is a placeholder until Abraham sends the final wording */}
-            <SectionTitle kicker="Areas we serve" title="Service Area" />
+            {/* Same heading style as the other sections (eyebrow + title); eyebrow wording from Abraham */}
+            <SectionTitle kicker="Right to your door" title="Service Area" />
             <div className="mt-8 grid gap-6">
               <div className="rounded-[2rem] border-[3px] border-hu-deep bg-white p-6 shadow-[6px_6px_0_#123D73] sm:p-8">
                 <p className="text-base font-extrabold uppercase tracking-[0.14em] text-hu-deep/75">{c.serviceArea.mainLabel}</p>

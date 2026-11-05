@@ -344,7 +344,7 @@ describe("Service Area heading matches the other sections (Abraham)", () => {
   it("eyebrow + title via the shared heading, no icon box beside it; Kiryas Joel card unchanged", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
     const sa = page.slice(page.indexOf('id="service-area"'), page.indexOf("rounded-[2rem]", page.indexOf('id="service-area"')));
-    expect(sa).toContain('<SectionTitle kicker="Areas we serve" title="Service Area" />');
+    expect(sa).toContain('<SectionTitle kicker="Right to your door" title="Service Area" />');
     expect(sa).not.toContain("<IconTile");
     expect(sa).not.toContain("<h2");
   });
