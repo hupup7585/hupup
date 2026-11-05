@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { SELECTABLE_TIME_ZONES } from "@/lib/area-code-tz";
 import { signUpForTexts, type SignUpState } from "./actions";
 
 /**
@@ -9,6 +10,16 @@ import { signUpForTexts, type SignUpState } from "./actions";
  */
 export default function SignUpForm({ transactionalText, marketingText, smsNumber, disabledReason }: { transactionalText: string; marketingText: string; smsNumber: string; disabledReason: string | null }) {
   const [state, action, pending] = useActionState<SignUpState, FormData>(signUpForTexts, {});
+  // Pre-select the time zone this device reports; the customer can change it.
+  const [zone, setZone] = useState("");
+  useEffect(() => {
+    try {
+      const z = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (SELECTABLE_TIME_ZONES.some((o) => o.zone === z)) setZone(z);
+    } catch {
+      /* keep blank */
+    }
+  }, []);
 
   if (state.ok) {
     return (
@@ -60,6 +71,19 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
           </span>
         </label>
       </fieldset>
+
+      <label className="block">
+        <span className="font-bold">Your time zone</span> <span className="opacity-70">(required for promotional texts)</span>
+        <span className="mt-1 block text-base">We send promotional texts only between 8:00 a.m. and 9:00 p.m. in your time zone.</span>
+        <select name="timeZone" value={zone} onChange={(e) => setZone(e.target.value)} className="mt-2 block w-full rounded-xl border-2 border-hu-deep/30 bg-white px-4 py-3 text-lg focus:border-hu-deep focus:outline-none">
+          <option value="">Choose your time zone</option>
+          {SELECTABLE_TIME_ZONES.map((o) => (
+            <option key={o.zone} value={o.zone}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <p className="text-base">
         Text HELP to {smsNumber} for help. Text STOP to opt out. See our{" "}

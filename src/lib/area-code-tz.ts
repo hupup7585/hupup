@@ -1,6 +1,12 @@
 /**
  * Recipient local time for promotional quiet hours (8:00 AM - 9:00 PM).
  *
+ * Order of preference (see promoTimeZones):
+ *  1. The time zone the customer told us (website form, phone menu, or staff), stored on the customer.
+ *  2. Otherwise, the area code AND New York time: a promotion goes out only when it is inside the window in
+ *     every zone the area code covers and in New York (the documented fallback). Area codes are never relied
+ *     on alone, because people keep their number when they move.
+ *
  * The area code of a +1 (North American) number is mapped to the time zone(s) it covers. When an area
  * code spans two zones, every zone is returned and a promotional text may go out only when it is within
  * the window in ALL of them. Unknown area codes, toll-free numbers and non +1 numbers fall back to
@@ -109,9 +115,45 @@ function hourIn(zone: string, now: Date): number {
   return Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: zone }).format(now));
 }
 
-/** True when it is 8:00 AM - 8:59 PM in every time zone the recipient's area code may be in. */
-export function inRecipientPromoHours(phone: string | null | undefined, now = new Date()): boolean {
-  return timeZonesForPhone(phone).zones.every((z) => {
+/** Time zones a customer can pick (website form, phone menu, staff). */
+export const SELECTABLE_TIME_ZONES = [
+  { zone: "America/New_York", label: "Eastern (New York)" },
+  { zone: "America/Chicago", label: "Central (Chicago)" },
+  { zone: "America/Denver", label: "Mountain (Denver)" },
+  { zone: "America/Phoenix", label: "Arizona (Phoenix)" },
+  { zone: "America/Los_Angeles", label: "Pacific (Los Angeles)" },
+  { zone: "America/Anchorage", label: "Alaska" },
+  { zone: "Pacific/Honolulu", label: "Hawaii" },
+  { zone: "America/Halifax", label: "Atlantic (Halifax)" },
+  { zone: "America/St_Johns", label: "Newfoundland" },
+  { zone: "America/Regina", label: "Saskatchewan" },
+  { zone: "America/Puerto_Rico", label: "Puerto Rico" },
+] as const;
+
+export function isSelectableTimeZone(zone: string | null | undefined): boolean {
+  return SELECTABLE_TIME_ZONES.some((z) => z.zone === zone);
+}
+
+/** Zones that must all be inside promotional hours for this customer, and why. */
+export function promoTimeZones(phone: string | null | undefined, recordedZone?: string | null): { zones: string[]; basis: "customer" | "area_code_and_new_york" | "new_york" } {
+  if (recordedZone && isValidZone(recordedZone)) return { zones: [recordedZone], basis: "customer" };
+  const byArea = timeZonesForPhone(phone);
+  if (byArea.source === "fallback") return { zones: [FALLBACK_TIME_ZONE], basis: "new_york" };
+  return { zones: [...new Set([...byArea.zones, FALLBACK_TIME_ZONE])], basis: "area_code_and_new_york" };
+}
+
+function isValidZone(z: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: z });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** True when it is 8:00 AM - 8:59 PM in every zone that applies to this customer. */
+export function inRecipientPromoHours(phone: string | null | undefined, now = new Date(), recordedZone?: string | null): boolean {
+  return promoTimeZones(phone, recordedZone).zones.every((z) => {
     const h = hourIn(z, now);
     return h >= PROMO_HOURS.start && h < PROMO_HOURS.end;
   });

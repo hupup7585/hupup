@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
@@ -56,11 +56,11 @@ export function containsCardNumber(text: string): boolean {
 }
 
 /**
- * Promotional texts go out only 8:00 AM - 9:00 PM in the recipient's local time, worked out from the
- * area code (New York time when unknown). See src/lib/area-code-tz.ts.
+ * Promotional texts go out only 8:00 AM - 9:00 PM in the recipient's local time: the time zone the customer
+ * gave us, otherwise both the area-code zone(s) and New York time. See src/lib/area-code-tz.ts.
  */
-export function inMarketingHours(to: string, now = new Date()): boolean {
-  return inRecipientPromoHours(to, now);
+export function inMarketingHours(to: string, now = new Date(), customerTimeZone?: string | null): boolean {
+  return inRecipientPromoHours(to, now, customerTimeZone);
 }
 
 /** Every promotional text begins with "Hup Up Attractions: Reply STOP to opt out." and then the offer. */
@@ -104,7 +104,7 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   let blocked: SendResult["blocked"];
   if (kind !== "system" && customer?.smsOptOut) blocked = "opted_out";
   else if (kind === "marketing" && !customer?.marketingOptIn) blocked = "no_marketing_consent";
-  else if (kind === "marketing" && !inMarketingHours(to, input.now)) blocked = "quiet_hours";
+  else if (kind === "marketing" && !inMarketingHours(to, input.now, customer?.timeZone)) blocked = "quiet_hours";
 
   let messageId: number | undefined;
   if (log) {
@@ -166,6 +166,33 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
     }
     return { sent: false, messageId, error: err.message || "SMS failed" };
   }
+}
+
+/** Message statuses that mean "not sent yet" (Twilio scheduled/queued, or held by us). */
+const PENDING_STATUSES = ["scheduled", "queued", "accepted", "held"];
+
+/**
+ * Opt-out: cancel every promotional text for this number that hasn't gone out yet. Twilio-scheduled messages
+ * are canceled through the API; anything else still pending is marked canceled so it is never sent.
+ * (Every send also re-checks consent at the moment of sending.)
+ */
+export async function cancelQueuedPromotions(phone: string): Promise<number> {
+  const pending = await db
+    .select({ id: schema.messages.id, sid: schema.messages.twilioSid })
+    .from(schema.messages)
+    .where(and(eq(schema.messages.contactPhone, phone), eq(schema.messages.kind, "marketing"), eq(schema.messages.direction, "out"), inArray(schema.messages.status, PENDING_STATUSES)));
+  const client = getTwilio();
+  for (const m of pending) {
+    if (m.sid && client) {
+      try {
+        await (client.messages as unknown as (sid: string) => { update: (p: { status: string }) => Promise<unknown> })(m.sid).update({ status: "canceled" });
+      } catch (e) {
+        console.error("Could not cancel scheduled promotion", m.sid, e);
+      }
+    }
+    await db.update(schema.messages).set({ status: "canceled", errorMessage: "Canceled: customer opted out before it was sent" }).where(eq(schema.messages.id, m.id));
+  }
+  return pending.length;
 }
 
 const BLOCK_REASON: Record<NonNullable<SendResult["blocked"]>, string> = {

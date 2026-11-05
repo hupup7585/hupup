@@ -27,3 +27,17 @@ export const OPT_OUT_KEYWORDS = ["STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT",
 
 /** Minimum retention for consent, opt-out and message records (Requirement 4). */
 export const RECORD_RETENTION_MONTHS = 24;
+
+/** Version id of the staff read-aloud disclosures. Bump when the text changes. */
+export const STAFF_CONSENT_VERSION = "staff-2026-11-05";
+
+/**
+ * Read aloud by staff, in full, before recording consent (phone or in person). {phone} is the customer's number.
+ * The exact text read (with the number filled in) is stored on the consent record.
+ */
+export const STAFF_DISCLOSURE = {
+  transactional:
+    "May Hup Up Attractions text you at {phone} about your reservations, orders, payments, deliveries, pickups, and customer service? If you agree, you also authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages. Message frequency varies. Message and data rates may apply. You can reply STOP to opt out, or HELP for help, at any time. Do you agree? Please answer yes or no.",
+  marketing:
+    "Would you like to receive promotional text messages from Hup Up Attractions at {phone}? If you agree, you also authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages. Consent is not a condition of purchase. Message and data rates may apply. Message frequency varies. You can reply STOP to opt out, or HELP for help, at any time. Do you agree? Please answer yes or no.",
+} as const;

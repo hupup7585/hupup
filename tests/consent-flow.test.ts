@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   sms: [] as { to: string; body: string; opts?: Record<string, unknown> }[],
   emails: [] as { to: string }[],
   messages: [] as Record<string, unknown>[],
+  zones: [] as { phone: string; zone: string; source: string }[],
 }));
 
 vi.mock("@/lib/db", async () => {
@@ -38,6 +39,10 @@ vi.mock("@/lib/sms-consent", async (orig) => ({
   recordConsent: async (input: Record<string, unknown>) => {
     h.recorded.push(input);
     return 42;
+  },
+  setCustomerTimeZone: async (phone: string, zone: string, source: string) => {
+    h.zones.push({ phone, zone, source });
+    return true;
   },
 }));
 vi.mock("@/lib/notify", () => ({
@@ -81,6 +86,7 @@ beforeEach(() => {
   h.sms = [];
   h.emails = [];
   h.messages = [];
+  h.zones = [];
   process.env.PUBLIC_BASE_URL = "https://hupup.vercel.app";
 });
 
@@ -181,8 +187,8 @@ describe("promotional consent (separate, never automatic)", () => {
     const xml = await call("promo-consent-answer", { Digits: "1" });
     expect(h.recorded[0]).toMatchObject({ scope: "marketing", action: "opt_in", method: "keypad", wording: PROMPTS.consent_marketing.text });
     expect(h.messages).toHaveLength(1);
-    expect(String(h.messages[0].body)).toContain("You're subscribed to promotional texts");
-    expect(xml).toContain("/api/voice/goodbye");
+    expect(String(h.messages[0].body)).toContain("You're now enrolled in promotional text messages");
+    expect(xml).toContain("/api/voice/tz");
   });
   it("no, silence or an unclear answer never enrolls", async () => {
     await call("promo-consent-answer", { Digits: "2" });
@@ -202,5 +208,26 @@ describe("promotional consent (separate, never automatic)", () => {
     const xml = await call("goodbye");
     expect(xml).toContain("Thanks so much for choosing Hup Up Attractions");
     expect(xml).toContain("<Hangup/>");
+  });
+});
+
+describe("time zone question (after a promotional yes)", () => {
+  it("asks Eastern first; press 1 saves New York", async () => {
+    let xml = await call("tz");
+    expect(xml).toContain("Are you in the Eastern time zone, the same as New York?");
+    xml = await call("tz-answer", { Digits: "1" });
+    expect(h.zones).toEqual([{ phone: "+18455550100", zone: "America/New_York", source: "phone" }]);
+    expect(xml).toContain("/api/voice/goodbye");
+  });
+  it("press 2 offers the other zones; press 4 saves Pacific", async () => {
+    const xml = await call("tz-answer", { Digits: "2" });
+    expect(xml).toContain("Pacific, press 4");
+    await call("tz-pick", { Digits: "4" });
+    expect(h.zones).toEqual([{ phone: "+18455550100", zone: "America/Los_Angeles", source: "phone" }]);
+  });
+  it("skipping or silence saves nothing (fallback rule applies)", async () => {
+    await call("tz-answer", {});
+    await call("tz-pick", { Digits: "0" });
+    expect(h.zones).toEqual([]);
   });
 });

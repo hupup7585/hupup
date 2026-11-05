@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { getSettings } from "@/lib/settings";
-import { sendMessage } from "@/lib/sms";
+import { cancelQueuedPromotions, sendMessage } from "@/lib/sms";
 
 export const STOP_WORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "REVOKE", "OPTOUT"];
 export const START_WORDS = ["START", "UNSTOP", "YES"];
@@ -49,6 +49,10 @@ export function detectKeyword(body: string): Keyword {
 }
 
 /** Sent when an opt-out was recognized in a phrase (Twilio confirms exact keywords itself). */
+/** Reply to NOPROMO (only when the number has not replied STOP). */
+export const NOPROMO_CONFIRMATION =
+  "Hup Up Attractions: You won't receive promotional texts anymore. You'll still get texts about your orders. Reply STOP to stop all texts.";
+
 /** The single non-promotional confirmation allowed after an opt-out (Requirement 5). */
 export const OPT_OUT_CONFIRMATION = "Hup Up Attractions: You're unsubscribed and won't receive more texts from us. Reply START to resubscribe.";
 
@@ -102,15 +106,19 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
       await db.update(schema.customers).set({ smsOptOut: true, marketingOptIn: false }).where(eq(schema.customers.id, customer.id));
       await consent("transactional", "opt_out");
       await consent("marketing", "opt_out");
+      // Immediately: no promotion that was already queued or scheduled may still go out.
+      await cancelQueuedPromotions(from);
       if (!exact) reply = OPT_OUT_CONFIRMATION;
     } else if (keyword === "start") {
       // Clears the block; marketing needs a new explicit opt-in.
       await db.update(schema.customers).set({ smsOptOut: false }).where(eq(schema.customers.id, customer.id));
       await consent("transactional", "opt_in");
     } else if (keyword === "nopromo") {
+      // Internal keyword: promotions only. It never clears or weakens a STOP (smsOptOut stays as it is).
       await db.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.id, customer.id));
       await consent("marketing", "opt_out");
-      reply = "Hup Up Attractions: You won't receive promotional texts anymore. You'll still get booking and delivery updates. Reply STOP to stop all texts.";
+      await cancelQueuedPromotions(from);
+      if (!customer.smsOptOut) reply = NOPROMO_CONFIRMATION;
     } else if (keyword === "help" && settings.smsHelpReplyEnabled) {
       reply = settings.smsHelpText;
     }

@@ -40,12 +40,12 @@ describe("reading the caller's answer", () => {
     expect(parseConsentAnswer({ digits: "2" })).toBe("no");
     expect(parseConsentAnswer({ digits: "5" })).toBe("unclear");
   });
-  it("speech: clear yes / no", () => {
-    for (const s of ["Yes", "yes please", "Sure.", "I agree", "okay"]) expect(parseConsentAnswer({ speech: s, confidence: "0.92" }), s).toBe("yes");
-    for (const s of ["No", "no thanks", "Nope", "skip", "not interested"]) expect(parseConsentAnswer({ speech: s, confidence: "0.9" }), s).toBe("no");
+  it("speech: only a clear affirmative reply to the question is yes", () => {
+    for (const s of ["Yes", "yes please", "Yes, I agree.", "I agree", "yeah", "yep"]) expect(parseConsentAnswer({ speech: s, confidence: "0.92" }), s).toBe("yes");
+    for (const s of ["No", "no thanks", "Nope", "skip", "not interested", "I don't agree"]) expect(parseConsentAnswer({ speech: s, confidence: "0.9" }), s).toBe("no");
   });
-  it("speech: mixed, empty, unrelated or low-confidence answers are never taken as yes", () => {
-    for (const s of ["I don't agree", "yes no", "", "what", "maybe later"]) expect(parseConsentAnswer({ speech: s, confidence: "0.9" }), s).toBe("unclear");
+  it("speech: vague, mixed, empty, unrelated or low-confidence answers are never yes", () => {
+    for (const s of ["Sure.", "okay", "I guess", "yes no", "", "what", "maybe later", "yes but what does it cost", "please"]) expect(parseConsentAnswer({ speech: s, confidence: "0.9" }), s).toBe("unclear");
     expect(parseConsentAnswer({ speech: "yes", confidence: String(MIN_SPEECH_CONFIDENCE - 0.1) })).toBe("unclear");
     expect(parseConsentAnswer({})).toBe("unclear");
   });

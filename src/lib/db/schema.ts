@@ -63,6 +63,11 @@ export const customers = pgTable(
     smsOptOut: boolean("sms_opt_out").notNull().default(false),
     marketingOptIn: boolean("marketing_opt_in").notNull().default(false),
     marketingOptInAt: timestamp("marketing_opt_in_at", { withTimezone: true }),
+    /** The customer's own time zone (IANA), as they told us; used for promotional quiet hours */
+    timeZone: text("time_zone"),
+    /** Where timeZone came from: web_form | phone | staff */
+    timeZoneSource: text("time_zone_source"),
+    timeZoneSetAt: timestamp("time_zone_set_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("customers_phone_idx").on(t.phone)],
@@ -290,6 +295,11 @@ export const smsConsents = pgTable(
     ip: text("ip"),
     userAgent: text("user_agent"),
     pageUrl: text("page_url"),
+    /** Staff-recorded consent: staff confirmed they read the entire approved disclosure first */
+    disclosureRead: boolean("disclosure_read"),
+    /** Corrections never edit the original: they are new rows pointing at the row they correct */
+    correctsConsentId: integer("corrects_consent_id"),
+    correctionReason: text("correction_reason"),
     keyword: text("keyword"),
     callSid: text("call_sid"),
     userId: integer("user_id"),

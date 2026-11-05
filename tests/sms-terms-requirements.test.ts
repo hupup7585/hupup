@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { FALLBACK_TIME_ZONE, inRecipientPromoHours, knownAreaCodes, timeZonesForPhone } from "@/lib/area-code-tz";
+import { FALLBACK_TIME_ZONE, inRecipientPromoHours, knownAreaCodes, promoTimeZones, timeZonesForPhone } from "@/lib/area-code-tz";
 import { detectKeyword, detectKeywordDetail } from "@/lib/sms-inbound";
 import { OPT_OUT_KEYWORDS, PROMO_OPENING, PROVIDER_DISCLOSURE, WEB_CONSENT_MARKETING, WEB_CONSENT_TRANSACTIONAL } from "@/lib/sms-consent-copy";
 
@@ -20,14 +20,22 @@ describe("1. promotional hours in the recipient's local time (area code, New Yor
   it("unknown, toll-free or foreign numbers fall back to New York", () => {
     for (const p of ["+18005550100", "+19995550100", "+442071234567", "", null]) expect(timeZonesForPhone(p)).toEqual({ zones: [FALLBACK_TIME_ZONE], source: "fallback" });
   });
-  it("blocks by local time, not New York time", () => {
+  it("uses the customer's recorded time zone first", () => {
+    const ninePmNY = new Date("2026-07-02T01:30:00Z"); // 9:30 PM EDT, 6:30 PM PDT
+    expect(inRecipientPromoHours("+18455550100", ninePmNY, "America/Los_Angeles")).toBe(true); // NY number, lives in California
+    expect(inRecipientPromoHours("+14155550100", ninePmNY, "America/New_York")).toBe(false); // CA number, lives in New York
+  });
+  it("without a recorded zone: area code AND New York must both be inside the window (documented fallback)", () => {
     const noonNY = new Date("2026-07-01T16:00:00Z"); // 12:00 PM EDT, 9:00 AM PDT, 6:00 AM HST
     expect(inRecipientPromoHours("+18455550100", noonNY)).toBe(true);
     expect(inRecipientPromoHours("+14155550100", noonNY)).toBe(true);
     expect(inRecipientPromoHours("+18085550100", noonNY)).toBe(false); // 6 AM in Hawaii
-    const ninePmNY = new Date("2026-07-02T01:30:00Z"); // 9:30 PM EDT, 6:30 PM PDT
+    const ninePmNY = new Date("2026-07-02T01:30:00Z");
     expect(inRecipientPromoHours("+18455550100", ninePmNY)).toBe(false);
-    expect(inRecipientPromoHours("+14155550100", ninePmNY)).toBe(true);
+    expect(inRecipientPromoHours("+14155550100", ninePmNY)).toBe(false); // 6:30 PM in CA but 9:30 PM in NY
+    expect(promoTimeZones("+14155550100")).toEqual({ zones: ["America/Los_Angeles", "America/New_York"], basis: "area_code_and_new_york" });
+    expect(promoTimeZones("+18005550100")).toEqual({ zones: ["America/New_York"], basis: "new_york" });
+    expect(promoTimeZones("+14155550100", "America/Chicago")).toEqual({ zones: ["America/Chicago"], basis: "customer" });
   });
   it("an area code spanning two zones must be inside the window in both", () => {
     const eightAmEastern = new Date("2026-07-01T12:30:00Z"); // 8:30 AM EDT = 7:30 AM CDT

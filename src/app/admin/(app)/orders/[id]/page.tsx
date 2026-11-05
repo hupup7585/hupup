@@ -6,6 +6,8 @@ import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { StatusBadge } from "@/components/StatusBadge";
 import OrderActions from "./OrderActions";
+import ConsentPanel from "./ConsentPanel";
+import { STAFF_DISCLOSURE } from "@/lib/sms-consent-copy";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -54,6 +56,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <p className="text-muted">Not entered yet (caller still on the phone or abandoned cart).</p>
             )}
           </div>
+          {customer?.phone && <ConsentPanel orderId={o.id} phoneDisplay={formatPhone(customer.phone)} disclosures={STAFF_DISCLOSURE} />}
         </div>
         <OrderActions
           orderId={o.id}
