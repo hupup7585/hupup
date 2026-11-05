@@ -61,7 +61,7 @@ describe("delivery is an additional fee on the phone", () => {
       expect(def.text, k).not.toMatch(/includes delivery|free delivery|delivery is free/i);
     }
     expect(PROMPTS.product_intro.text).toBe("Great choice! The {item} is {price}. Delivery is available for an additional fee, and our team will give you the delivery price.");
-    expect(PROMPTS.cart_summary.text).toContain("plus the delivery fee");
+    expect(PROMPTS.cart_summary.text).toContain("plus delivery and sales tax");
   });
   it("greeting says jumping balloons, not bounce houses", () => {
     expect(PROMPTS.greeting.text).toContain("jumping balloons");

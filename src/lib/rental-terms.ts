@@ -38,7 +38,7 @@ export type AcceptanceInput = {
   phone?: string | null;
   termsVersion: string;
   termsText: string;
-  method: "web_checkbox" | "staff_read";
+  method: "web_checkbox" | "web_continue" | "phone_hash" | "staff_read";
   acceptanceStatement: string;
   amountCents?: number | null;
   ip?: string | null;
@@ -94,3 +94,6 @@ export async function linkPaymentToAcceptance(orderId: number, paymentRef: strin
   });
   return acc;
 }
+
+/** Version of the business Terms and Conditions (/terms) customers agree to. Bump when /terms changes. */
+export const CURRENT_TERMS_VERSION = "terms-2026-11-05-draft";

@@ -7,9 +7,9 @@ import type { Channel, OrderStatus } from "@/lib/db/schema";
 const { orders, orderItems, products, customers } = schema;
 
 /** How long a phone cart holds stock if the call-ended webhook never arrives. */
-export const PHONE_HOLD_MINUTES = 60;
+export const PHONE_HOLD_MINUTES = 15;
 /** How long a texted payment link holds stock before it's released. */
-export const PAYMENT_HOLD_MINUTES = 30;
+export const PAYMENT_HOLD_MINUTES = 15;
 
 export function orderNumber(id: number): string {
   return String(1000 + id);

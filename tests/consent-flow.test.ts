@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   emails: [] as { to: string }[],
   messages: [] as Record<string, unknown>[],
   zones: [] as { phone: string; zone: string; source: string }[],
+  terms: [] as Record<string, unknown>[],
 }));
 
 vi.mock("@/lib/db", async () => {
@@ -62,6 +63,17 @@ vi.mock("@/lib/sms", async (orig) => ({
     return { sent: true };
   },
 }));
+vi.mock("@/lib/settings", async (orig) => {
+  const m = await orig<typeof import("@/lib/settings")>();
+  return { ...m, getSettings: async () => ({ ...m.SETTING_DEFAULTS }) };
+});
+vi.mock("@/lib/rental-terms", async (orig) => ({
+  ...(await orig<typeof import("@/lib/rental-terms")>()),
+  recordTermsAcceptance: async (input: Record<string, unknown>) => {
+    h.terms.push(input);
+    return 1;
+  },
+}));
 vi.mock("@/lib/orders", async (orig) => ({
   ...(await orig<typeof import("@/lib/orders")>()),
   upsertCustomer: async () => 42,
@@ -79,7 +91,8 @@ const call = (action: string, body: Record<string, string> = {}, query = "") =>
   handleVoice({ action, query: new URLSearchParams(query), body, callSid: "CA1", from: "+18455550100" });
 
 beforeEach(() => {
-  h.session.data = { name: "Yossi Friedman", address: "12 Forest Road", phone: "+18455550100" };
+  h.session.data = { name: "Yossi Friedman", address: "12 Forest Road, Kiryas Joel", phone: "+18455550100", termsAccepted: true };
+  h.terms = [];
   h.customer = null;
   h.state = { transactional: null, marketing: null };
   h.recorded = [];
@@ -229,5 +242,47 @@ describe("time zone question (after a promotional yes)", () => {
     await call("tz-answer", {});
     await call("tz-pick", { Digits: "0" });
     expect(h.zones).toEqual([]);
+  });
+});
+
+describe("checkout pricing, delivery area and terms (Abram's final decisions)", () => {
+  it("an address outside the delivery area stops checkout and asks again", async () => {
+    h.session.data.heard = "5 Main Street, Albany";
+    const xml = await call("confirm", { Digits: "1" }, "f=address");
+    expect(xml).toContain("we only deliver in Kiryas Joel and nearby Orange County towns");
+    expect(xml).toContain("/api/voice/ask?f=address");
+  });
+  it("an in-area address continues", async () => {
+    h.session.data.heard = "5 Main Street, Monroe";
+    const xml = await call("confirm", { Digits: "1" }, "f=address");
+    expect(xml).not.toContain("we only deliver");
+  });
+  it("finalize asks for the terms first, with the exact notice", async () => {
+    h.session.data.termsAccepted = undefined;
+    let xml = await call("finalize");
+    expect(xml).toContain("/api/voice/terms");
+    xml = await call("terms");
+    expect(xml).toContain("By pressing #, you agree to our Terms and Conditions. To review them, go to hupupattractions.com/terms. To continue, press #.");
+  });
+  it("pressing # logs time, phone, order and terms version, then continues", async () => {
+    h.session.data.termsAccepted = undefined;
+    const xml = await call("terms-answer", { Digits: "#" });
+    expect(h.terms[0]).toMatchObject({ orderId: 7, phone: "+18455550100", termsVersion: "terms-2026-11-05-draft", method: "phone_hash" });
+    expect(h.session.data.termsAccepted).toBe(true);
+    expect(xml).toContain("/api/voice/finalize");
+  });
+  it("not pressing # twice ends the call without an order", async () => {
+    h.session.data.termsAccepted = undefined;
+    const xml = await call("terms-answer", {}, "n=1");
+    expect(xml).toContain("you need to accept our Terms and Conditions");
+    expect(xml).toContain("<Hangup/>");
+    expect(h.terms).toEqual([]);
+  });
+  it("the payment text and read-back include delivery and tax (KJ: $10 + 8.125% on everything)", async () => {
+    h.session.data.smsConsent = "yes";
+    const xml = await call("finalize");
+    // $250.00 rentals + $10.00 delivery = $260.00; tax 8.125% = $21.13; total $281.13
+    expect(h.sms[0].body).toContain("Rentals $250.00 + delivery $10.00 + sales tax $21.13 = total $281.13.");
+    expect(xml).toContain("Your total is");
   });
 });

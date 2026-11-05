@@ -53,7 +53,7 @@ export async function sendPayLinkAction(orderId: number): Promise<ActionResult> 
   if (!full) return { ok: false, message: "Order not found" };
   const phone = full.customer?.phone;
   if (!phone) return { ok: false, message: "This customer has no phone number" };
-  const due = full.order.subtotalCents - full.order.paidCents;
+  const due = (full.order.totalCents ?? full.order.subtotalCents) - full.order.paidCents;
   if (due <= 0) return { ok: false, message: "Nothing left to pay" };
   const link = paymentLink({ orderId, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone });
   if (full.order.status === "PENDING_PAYMENT") {

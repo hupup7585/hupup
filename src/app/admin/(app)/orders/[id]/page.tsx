@@ -15,7 +15,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const full = await getOrderWithItems(Number(id));
   if (!full) notFound();
   const { order: o, items, customer } = full;
-  const due = o.subtotalCents - o.paidCents;
+  const due = (o.totalCents ?? o.subtotalCents) - o.paidCents;
   const textStatus = !customer?.phone ? "none" : customer.smsOptOut ? "stopped" : (await hasTransactionalConsent(customer.phone)) ? "ok" : "none";
   return (
     <div className="mx-auto max-w-5xl">
@@ -41,7 +41,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               </tbody>
             </table>
             <div className="mt-3 space-y-1 text-right">
-              <div>Total <b className="ml-3 text-lg">{formatMoney(o.subtotalCents)}</b></div>
+              {o.totalCents !== null ? (
+                <>
+                  <div className="text-sm text-muted">Rentals {formatMoney(o.subtotalCents)} · Delivery {formatMoney(o.deliveryFeeCents)} · Sales tax ({o.taxPercent}%) {formatMoney(o.taxCents)}</div>
+                  <div>Total <b className="ml-3 text-lg">{formatMoney(o.totalCents)}</b></div>
+                </>
+              ) : (
+                <div>Total <b className="ml-3 text-lg">{formatMoney(o.subtotalCents)}</b></div>
+              )}
               <div className="text-sm text-muted">Paid {formatMoney(o.paidCents)}{o.paymentMethod ? ` (${o.paymentMethod})` : ""}{o.solaRefNum ? ` · Sola ref ${o.solaRefNum}` : ""}</div>
               {due > 0 && <div className="text-sm font-bold text-coral">Balance due {formatMoney(due)}</div>}
             </div>

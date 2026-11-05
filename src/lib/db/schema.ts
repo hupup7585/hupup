@@ -101,6 +101,14 @@ export const orders = pgTable(
     deliveryAddress: text("delivery_address"),
     deliveryTime: text("delivery_time"),
     subtotalCents: integer("subtotal_cents").notNull().default(0),
+    /** Delivery zone at checkout: kj ($10) | area ($15). Set when the order is priced. */
+    deliveryZone: text("delivery_zone"),
+    deliveryFeeCents: integer("delivery_fee_cents").notNull().default(0),
+    /** Sales tax rate used (percent, e.g. "8.125") and amount, on items + delivery */
+    taxPercent: text("tax_percent"),
+    taxCents: integer("tax_cents").notNull().default(0),
+    /** Items + delivery + tax: what the payment link charges. Null for orders priced before this existed. */
+    totalCents: integer("total_cents"),
     paidCents: integer("paid_cents").notNull().default(0),
     /** sola | cash | check | other */
     paymentMethod: text("payment_method"),
@@ -151,6 +159,8 @@ export type CallData = {
   smsConsent?: string;
   /** Order placed on this call (for the promotional question and goodbye) */
   placedOrderId?: number;
+  /** Caller pressed # to accept the Terms and Conditions on this call */
+  termsAccepted?: boolean;
 };
 
 export const callSessions = pgTable("call_sessions", {

@@ -18,6 +18,9 @@ import {
 } from "@/lib/orders";
 import { paymentLink } from "@/lib/sola";
 import { sendEmail, sendSms } from "@/lib/notify";
+import { getSettings } from "@/lib/settings";
+import { computeTotals, deliveryZone } from "@/lib/pricing";
+import { CURRENT_TERMS_VERSION, recordTermsAcceptance } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
 import {
   MARKETING_CONFIRMATION_SMS,
@@ -156,6 +159,8 @@ async function currentOrder(ctx: Ctx) {
   if (!full || full.order.status !== "HOLD") return null;
   return full;
 }
+
+const money = (cents: number) => (cents / 100).toFixed(2);
 
 function itemPhrase(qty: number, name: string) {
   return qty === 1 ? `one ${name}` : `${qty} ${name}`;
@@ -498,8 +503,51 @@ const handlers: Record<string, Handler> = {
     if (d !== "1") return back(vr, "ask", { f });
     const heard = ctx.session?.data.heard;
     if (!heard) return back(vr, "ask", { f });
+    if (f === "address" && deliveryZone(heard, await getSettings()) === "outside") {
+      // Outside the delivery area: checkout stops here and asks for an in-area address.
+      await updateSession(ctx.callSid, { data: { heard: undefined } }, ctx.session);
+      sp(vr, ctx, "address_outside_area");
+      return back(vr, "ask", { f: "address" });
+    }
     await updateSession(ctx.callSid, { data: { [f]: heard, heard: undefined } }, ctx.session);
     return back(vr, FIELDS[f].next);
+  },
+
+  /* ---- Terms: "By pressing #, you agree to our Terms and Conditions..." (logged with time, phone, order, version) ---- */
+
+  terms(ctx, vr) {
+    const g = keypad(vr, url("terms-answer", { n: ctx.query.get("n") ?? undefined }), { timeout: 8 });
+    say(g, promptText(ctx.prompts, "terms_notice"));
+    return back(vr, "terms-answer", { n: ctx.query.get("n") ?? undefined });
+  },
+
+  async "terms-answer"(ctx, vr) {
+    const order = await currentOrder(ctx);
+    if (!order) {
+      sp(vr, ctx, "cart_expired");
+      return back(vr, "menu");
+    }
+    if (ctx.body.Digits === "#") {
+      const notice = promptText(ctx.prompts, "terms_notice");
+      await recordTermsAcceptance({
+        orderId: order.order.id,
+        phone: ctx.session?.data.phone ?? toE164(ctx.from),
+        termsVersion: CURRENT_TERMS_VERSION,
+        termsText: `${notice} [Terms and Conditions at /terms, version ${CURRENT_TERMS_VERSION}]`,
+        method: "phone_hash",
+        acceptanceStatement: "Caller pressed # after hearing the terms notice",
+        amountCents: order.order.subtotalCents,
+      });
+      await updateSession(ctx.callSid, { data: { termsAccepted: true } }, ctx.session);
+      return back(vr, "finalize");
+    }
+    const n = Number(ctx.query.get("n") || 0) + 1;
+    if (n >= 2) {
+      sp(vr, ctx, "terms_required");
+      vr.hangup(); // hanging up releases the held items
+      return vr;
+    }
+    return back(vr, "terms", { n });
   },
 
   async phone(ctx, vr) {
@@ -588,6 +636,13 @@ const handlers: Record<string, Handler> = {
       return back(vr, "menu");
     }
     if (!data.name || !data.address) return back(vr, "ask", { f: !data.name ? "name" : "address" });
+    if (!data.termsAccepted) return back(vr, "terms");
+    const settings = await getSettings();
+    const totals = computeTotals(order.order.subtotalCents, deliveryZone(data.address, settings), settings);
+    if (!totals) {
+      sp(vr, ctx, "address_outside_area");
+      return back(vr, "ask", { f: "address" });
+    }
     const phone = data.phone || toE164(ctx.from);
     const customerId = await upsertCustomer(db, {
       name: data.name,
@@ -602,6 +657,11 @@ const handlers: Record<string, Handler> = {
         deliveryAddress: data.address,
         status: "PENDING_PAYMENT",
         holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES),
+        deliveryZone: totals.zone,
+        deliveryFeeCents: totals.deliveryFeeCents,
+        taxPercent: totals.taxPercent,
+        taxCents: totals.taxCents,
+        totalCents: totals.totalCents,
         updatedAt: new Date(),
       })
       .where(and(eq(orders.id, order.order.id), eq(orders.status, "HOLD")));
@@ -610,7 +670,7 @@ const handlers: Record<string, Handler> = {
     const num = orderNumber(order.order.id);
     const link = paymentLink({
       orderId: order.order.id,
-      amountCents: order.order.subtotalCents,
+      amountCents: totals.totalCents, // items + delivery + tax
       name: data.name,
       email: data.email,
       phone,
@@ -618,7 +678,8 @@ const handlers: Record<string, Handler> = {
     const lines = order.items.map((i) => `${i.qty} x ${i.name}`).join(", ");
     const details =
       `${BUSINESS_NAME} order #${num}: ${lines} for ${longDate(order.order.eventDate)} (pickup ${longDate(order.order.pickupDate)}). ` +
-      `Total $${(order.order.subtotalCents / 100).toFixed(2)}. Pay securely within ${PAYMENT_HOLD_MINUTES} minutes to confirm: ${link}`;
+      `Rentals $${money(totals.subtotalCents)} + delivery $${money(totals.deliveryFeeCents)} + sales tax $${money(totals.taxCents)} = total $${money(totals.totalCents)}. ` +
+      `Pay securely within ${PAYMENT_HOLD_MINUTES} minutes to confirm: ${link}`;
     // Texts go out only with transactional consent given on this call or recorded before.
     const consented = data.smsConsent === "yes" || data.smsConsent === "existing";
     let texted = false;
@@ -633,6 +694,7 @@ const handlers: Record<string, Handler> = {
 
     const first = data.name.split(" ")[0];
     sp(vr, ctx, "thanks_order", { name: first, number: spokenDigits(num) });
+    sp(vr, ctx, "checkout_total", { total: spokenMoney(totals.totalCents), items: spokenMoney(totals.subtotalCents), delivery: spokenMoney(totals.deliveryFeeCents), tax: spokenMoney(totals.taxCents) });
     if (texted) sp(vr, ctx, "link_sent", { minutes: PAYMENT_HOLD_MINUTES });
     else if (emailed) sp(vr, ctx, "link_emailed", { minutes: PAYMENT_HOLD_MINUTES });
     else if (!consented) sp(vr, ctx, "link_call_back");

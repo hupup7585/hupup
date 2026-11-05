@@ -9,6 +9,15 @@ export const SETTING_DEFAULTS = {
   smsHelpReplyEnabled: true,
   smsHelpText: `${BUSINESS_NAME}: For help, call (845) 777-7585 or email hupupattractions@gmail.com. Msg & data rates may apply. Reply STOP to opt out.`,
   supportPhone: "",
+  /* Checkout pricing (Abram's decisions; editable in admin). Lists are one place per line. */
+  deliveryFeeKjCents: "1000",
+  deliveryFeeAreaCents: "1500",
+  /** Orange County, NY sales tax, applied to the whole order including delivery. */
+  salesTaxPercent: "8.125",
+  /** Kiryas Joel ($10 zone). Full list to come from Abram. */
+  zoneKjPlaces: "Kiryas Joel\nKiryas Yoel\nTown of Palm Tree\nPalm Tree",
+  /** Surrounding towns ($15 zone), all in Orange County. */
+  zoneAreaPlaces: "Monroe\nBlooming Grove\nWoodbury\nHighland Mills\nChester\nHarriman\nMiddletown\nWashingtonville",
 } as const;
 
 export type Settings = { -readonly [K in keyof typeof SETTING_DEFAULTS]: (typeof SETTING_DEFAULTS)[K] extends boolean ? boolean : string };
