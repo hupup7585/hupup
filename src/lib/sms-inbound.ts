@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { getSettings } from "@/lib/settings";
 import { cancelQueuedPromotions, sendMessage } from "@/lib/sms";
+import { recordConsent } from "@/lib/sms-consent";
 
 export const STOP_WORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "REVOKE", "OPTOUT"];
 export const START_WORDS = ["START", "UNSTOP", "YES"];
@@ -110,9 +111,11 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
       await cancelQueuedPromotions(from);
       if (!exact) reply = OPT_OUT_CONFIRMATION;
     } else if (keyword === "start") {
-      // Clears the block; marketing needs a new explicit opt-in.
+      // New affirmative consent for order texts only (carrier-standard re-enrollment), recorded as its own row
+      // linked to the earlier withdrawal. Promotions are NOT restored: they need new consent on the website,
+      // phone menu, or with staff.
       await db.update(schema.customers).set({ smsOptOut: false }).where(eq(schema.customers.id, customer.id));
-      await consent("transactional", "opt_in");
+      await recordConsent({ phone: from, scope: "transactional", action: "opt_in", source: "keyword", method: "keyword", wording: text, wordingVersion: "keyword", response: `texted "${text.trim()}"` });
     } else if (keyword === "nopromo") {
       // Internal keyword: promotions only. It never clears or weakens a STOP (smsOptOut stays as it is).
       await db.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.id, customer.id));

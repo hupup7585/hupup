@@ -83,3 +83,37 @@ All texts are sent from the Hup Up Attractions hotline texting number through ou
 
 ## 10. Violations
 Breaking this policy can lead to losing texting access and other discipline. Report mistakes right away (for example a text sent to someone who opted out) so they can be corrected and recorded.
+
+## 11. Consent Withdrawal and Re-Enrollment
+- Customers may withdraw consent at any time. Once consent is withdrawn, the Company must immediately update the customer's messaging status and prevent further messages of the applicable category, except for a permitted confirmation of the withdrawal.
+- A customer may re-enroll only after providing new, affirmative consent through an approved enrollment process. The new consent must be documented separately from the previous consent history.
+
+**How the system enforces this:**
+- **Withdrawal is immediate.** STOP (or any other opt-out keyword or clear request) turns off all texts for that number at once; NOPROMO turns off promotional texts only. Promotional texts already queued or scheduled are canceled. Every send re-checks the customer's status at the moment it goes out.
+- **Only the withdrawal confirmation may follow.** After STOP, the system blocks every other text to that number, including enrollment confirmations and other automatic messages; the only exception is the single opt-out confirmation.
+- **Approved enrollment processes** are the website sign-up form, the phone menu consent questions, and staff reading the entire disclosure in the admin consent panel. Texting START re-enrolls a customer in order and service texts only (the carrier-standard way back in); it never restores promotional texts, which always need new consent through one of the approved processes. The system rejects any other way of recording consent.
+- **Documented separately.** A re-enrollment is saved as a new consent record linked to the withdrawal it follows. The earlier consent and withdrawal records stay exactly as they were.
+
+## 12. System Controls and Compliance Monitoring
+- The Company messaging system must enforce this policy automatically wherever technically possible. Required controls include separate transactional and promotional consent records, approved message templates, promotional quiet-hour restrictions, automatic opt-out processing, employee permissions, and retention of communication records.
+- Management must periodically review system activity, employee access, consent records, opt-out processing, and promotional message history. Any suspected compliance failure must be reported to the policy owner immediately and corrected promptly.
+
+**How the system enforces this:**
+| Required control | How it is enforced |
+|---|---|
+| Separate transactional and promotional consent records | Every consent decision is its own record with its program (order texts or promotional), and the two are asked, stored and checked separately. Records can't be edited or deleted. |
+| Approved message templates | Customers only receive messages written into the system (order and payment texts, confirmations, opt-out replies). Staff have no free-form text box today; when staff texting is added, it will be template-only for Delivery and owner-approved templates for everyone. |
+| Promotional quiet hours | Every promotional text is checked at the moment of sending against 8:00 a.m. - 9:00 p.m. in the customer's time zone (or the documented fallback) and blocked outside it. |
+| Automatic opt-out processing | STOP, the other keywords and clear stop requests are processed automatically and immediately; queued promotions are canceled; only the opt-out confirmation may follow. |
+| Employee permissions | Every admin page and action requires a signed-in staff account. Recording consent is limited to Owner and Secretary; the compliance review is Owner-only; Delivery accounts can't record consent. Actions are written to the audit log. |
+| Retention of communication records | Consent records are permanent; message records can't be deleted for 24 months or have their content changed (database rules). |
+
+**Periodic review (Owner):**
+- At least every **30 days**, the Owner opens **Admin > Compliance** and reviews: the automatic checks, employee access (who has an account, role, active sessions), consent records, opt-outs processed, and promotional message history. The page flags "Review due" when 30 days have passed.
+- The automatic checks look for: promotional texts sent without promotional consent at that time; promotional texts sent outside quiet hours; promotional texts missing the required opening; any text sent after a STOP and before new consent; and staff opt-ins recorded without the full disclosure.
+- The Owner marks the review complete, with notes. The system records who did it, when, and how many issues the checks showed.
+- Each issue found is corrected promptly (for example, removing an employee's access, adding a correction entry, or fixing a template), and the fix is noted in the review.
+
+**Reporting a suspected failure:**
+- Any employee reports a suspected compliance failure or unauthorized access **immediately** using **Admin > Compliance > Report**. The Owner (policy owner) is texted and emailed right away, and the report is kept in the audit log.
+- The Owner investigates, corrects the problem promptly, and records what was done in the next review notes.

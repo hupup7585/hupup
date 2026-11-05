@@ -102,7 +102,8 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
     : await customerByPhone(to);
 
   let blocked: SendResult["blocked"];
-  if (kind !== "system" && customer?.smsOptOut) blocked = "opted_out";
+  // After a withdrawal (STOP) nothing goes out except the permitted opt-out confirmation (policy section 11).
+  if (customer?.smsOptOut && !(kind === "system" && input.event === "opt_out_confirmation")) blocked = "opted_out";
   else if (kind === "marketing" && !customer?.marketingOptIn) blocked = "no_marketing_consent";
   else if (kind === "marketing" && !inMarketingHours(to, input.now, customer?.timeZone)) blocked = "quiet_hours";
 

@@ -50,6 +50,13 @@
       "when": 1793850439613,
       "tag": "0006_consent_corrections_timezone",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793851048224,
+      "tag": "0007_consent_reenrollment",
+      "breakpoints": true
     }
   ]
 }

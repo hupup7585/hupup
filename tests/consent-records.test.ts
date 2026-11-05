@@ -176,3 +176,46 @@ describe("8. security and docs", () => {
     for (const s of ["<h2>Security</h2>", "limited to authorized staff", "reported to us immediately", "separate, dated correction entry", "It never undoes a STOP"]) expect(terms).toContain(s);
   });
 });
+
+describe("11. withdrawal and re-enrollment", () => {
+  it("after STOP nothing goes out except the opt-out confirmation (not even system confirmations)", async () => {
+    h.rows.set(schema.customers, [cust({ smsOptOut: true })]);
+    expect((await sendMessage({ to: PHONE, body: "x", kind: "system", event: "consent_confirmation" })).blocked).toBe("opted_out");
+    expect((await sendMessage({ to: PHONE, body: "x", kind: "transactional" })).blocked).toBe("opted_out");
+    expect((await sendMessage({ to: PHONE, body: "Hup Up Attractions: You're unsubscribed.", kind: "system", event: "opt_out_confirmation" })).blocked).toBeUndefined();
+  });
+  it("re-enrollment is a new row linked to the withdrawal it follows; history untouched", async () => {
+    h.rows.set(schema.customers, [cust()]);
+    h.rows.set(schema.smsConsents, [{ id: 31, action: "opt_out" }]);
+    await consent.recordConsent({ phone: PHONE, scope: "marketing", action: "opt_in", source: "web", method: "checkbox", wording: "W", wordingVersion: "web-2026-11-05" });
+    expect(consentInserts()[0]).toMatchObject({ action: "opt_in", reenrollsAfterId: 31 });
+    noConsentEditsOrDeletes();
+  });
+  it("a first enrollment has no re-enrollment link", async () => {
+    h.rows.set(schema.customers, [cust()]);
+    await consent.recordConsent({ phone: PHONE, scope: "transactional", action: "opt_in", source: "phone", method: "keypad", wording: "W", wordingVersion: "v" });
+    expect(consentInserts()[0].reenrollsAfterId).toBeNull();
+  });
+  it("only approved processes can enroll: no promotional opt-in by keyword, no staff yes without the full reading", async () => {
+    await expect(consent.recordConsent({ phone: PHONE, scope: "marketing", action: "opt_in", source: "keyword", method: "keyword", wording: "START", wordingVersion: "keyword" })).rejects.toThrow(/new consent/);
+    await expect(consent.recordConsent({ phone: PHONE, scope: "marketing", action: "opt_in", source: "staff", method: "staff", wording: "W", wordingVersion: "v", disclosureRead: false })).rejects.toThrow(/entire disclosure/);
+    expect(consentInserts()).toEqual([]);
+  });
+  it("START re-enrolls order texts only, as a separate linked record; promotions stay off", async () => {
+    h.rows.set(schema.customers, [cust({ smsOptOut: true })]);
+    h.rows.set(schema.smsConsents, [{ id: 40, action: "opt_out" }]);
+    await handleInboundSms({ From: PHONE, Body: "START" });
+    expect(h.updates.find((u) => u.table === schema.customers)?.v).toEqual({ smsOptOut: false });
+    expect(consentInserts()).toHaveLength(1);
+    expect(consentInserts()[0]).toMatchObject({ scope: "transactional", action: "opt_in", source: "keyword", reenrollsAfterId: 40 });
+  });
+  it("migration 0007 adds the re-enrollment link (add-only) and the policy has sections 11 and 12", () => {
+    const sql = readFileSync("drizzle/0007_consent_reenrollment.sql", "utf8");
+    expect(sql).toContain('ADD COLUMN "reenrolls_after_id"');
+    expect(sql).toContain("sms_consents_reenrolls_fk");
+    expect(sql).not.toMatch(/\b(DROP|DELETE FROM|UPDATE\s+"|ALTER COLUMN|RENAME)\b/i);
+    const doc = readFileSync("docs/sms-compliance-policy.md", "utf8");
+    expect(doc).toContain("## 11. Consent Withdrawal and Re-Enrollment");
+    expect(doc).toContain("## 12. System Controls and Compliance Monitoring");
+  });
+});

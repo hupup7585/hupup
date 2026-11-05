@@ -300,6 +300,8 @@ export const smsConsents = pgTable(
     /** Corrections never edit the original: they are new rows pointing at the row they correct */
     correctsConsentId: integer("corrects_consent_id"),
     correctionReason: text("correction_reason"),
+    /** Re-enrollment: the opt-out row this new, separate consent follows (null for a first enrollment) */
+    reenrollsAfterId: integer("reenrolls_after_id"),
     keyword: text("keyword"),
     callSid: text("call_sid"),
     userId: integer("user_id"),

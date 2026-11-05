@@ -99,8 +99,33 @@ export type RecordConsentInput = {
   disclosureRead?: boolean | null;
 };
 
+/**
+ * Approved enrollment processes (policy section 11). An opt-in may only come from:
+ *  - the website form (checkbox), the phone menu (keypad or clear spoken yes), or staff after reading the full
+ *    disclosure; or
+ *  - the carrier-standard START keyword, for order and service texts only (never promotions).
+ */
+export function assertApprovedEnrollment(input: Pick<RecordConsentInput, "action" | "scope" | "source" | "method" | "disclosureRead">) {
+  if (input.action !== "opt_in") return;
+  if (input.source === "keyword" && input.scope === "marketing") throw new Error("Promotional texts can't be re-enrolled by keyword; new consent is required.");
+  if ((input.source === "staff" || input.source === "pos") && !input.disclosureRead) throw new Error("Staff consent requires the entire disclosure to be read first.");
+  if (!["web", "phone", "staff", "pos", "keyword"].includes(input.source)) throw new Error("Not an approved enrollment process.");
+}
+
 /** Append a consent row (creating a minimal customer record for the number if needed) and update current state. */
 export async function recordConsent(input: RecordConsentInput) {
+  assertApprovedEnrollment(input);
+  // Re-enrollment after a withdrawal is documented as its own row that points at that withdrawal.
+  let reenrollsAfterId: number | null = null;
+  if (input.action === "opt_in") {
+    const [last] = await db
+      .select({ id: schema.smsConsents.id, action: schema.smsConsents.action })
+      .from(schema.smsConsents)
+      .where(and(eq(schema.smsConsents.phone, input.phone), eq(schema.smsConsents.scope, input.scope)))
+      .orderBy(desc(schema.smsConsents.createdAt), desc(schema.smsConsents.id))
+      .limit(1);
+    if (last?.action === "opt_out") reenrollsAfterId = last.id;
+  }
   let [customer] = await db.select().from(schema.customers).where(eq(schema.customers.phone, input.phone)).limit(1);
   if (!customer) [customer] = await db.insert(schema.customers).values({ phone: input.phone, name: null }).returning();
   await db.insert(schema.smsConsents).values({
@@ -122,6 +147,7 @@ export async function recordConsent(input: RecordConsentInput) {
     userAgent: input.userAgent ?? null,
     pageUrl: input.pageUrl ?? null,
     disclosureRead: input.disclosureRead ?? null,
+    reenrollsAfterId,
   });
   if (input.scope === "marketing") {
     // Only an explicit opt-in turns promotions on; anything else leaves/turns them off.
