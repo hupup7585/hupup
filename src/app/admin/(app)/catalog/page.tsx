@@ -73,7 +73,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
               </h2>
             </div>
             <details className="mt-2">
-              <summary className="cursor-pointer text-sm font-bold text-sky">Edit category</summary>
+              <summary className="cursor-pointer text-sm font-bold text-navy underline-offset-2 hover:underline">Edit category</summary>
               <div className="mt-3"><CategoryForm c={c} /></div>
             </details>
             <div className="mt-4 divide-y divide-line">
@@ -84,7 +84,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                     <span className={`flex-1 font-bold ${p.active ? "" : "text-muted line-through"}`}>{p.name}</span>
                     <span className="text-sm text-muted">{p.quantity} owned</span>
                     <span className="font-bold">{formatMoney(p.priceCents)}</span>
-                    <span className="text-sm font-bold text-sky">Edit</span>
+                    <span className="text-sm font-bold text-navy underline-offset-2 hover:underline">Edit</span>
                   </summary>
                   <div className="mt-3 rounded-xl bg-bg p-4"><ProductForm p={p} categories={cats} /></div>
                 </details>

@@ -48,7 +48,7 @@ export default async function OrdersPage({
           <tbody>
             {list.map((o) => (
               <tr key={o.id} className="hover:bg-bg">
-                <td className="td font-bold"><Link className="text-sky" href={`/admin/orders/${o.id}`}>#{orderNumber(o.id)}</Link></td>
+                <td className="td font-bold"><Link className="text-navy underline-offset-2 hover:underline" href={`/admin/orders/${o.id}`}>#{orderNumber(o.id)}</Link></td>
                 <td className="td">{o.customer_name ?? <span className="text-muted">Caller in progress</span>}<div className="text-xs text-muted">{formatPhone(o.customer_phone)}</div></td>
                 <td className="td whitespace-nowrap">{shortDate(o.event_date)}<div className="text-xs text-muted">→ {shortDate(o.pickup_date)}</div></td>
                 <td className="td">{o.items}</td>

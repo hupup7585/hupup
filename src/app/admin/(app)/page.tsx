@@ -136,7 +136,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       <div className="card overflow-x-auto p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-bold">Upcoming orders</h2>
-          <Link href="/admin/orders" className="text-sm font-bold text-sky">All orders →</Link>
+          <Link href="/admin/orders" className="text-sm font-bold text-navy underline-offset-2 hover:underline">All orders →</Link>
         </div>
         {upcoming.length === 0 ? (
           <p className="py-8 text-center text-muted">No upcoming orders.</p>

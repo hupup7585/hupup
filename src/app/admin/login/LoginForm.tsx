@@ -93,7 +93,7 @@ export default function LoginForm({ sms, email }: { sms: string; email: string }
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={trust} onChange={(e) => setTrust(e.target.checked)} /> Trust this device for 30 days
             </label>
-            <button type="button" className="font-bold text-sky" onClick={send} disabled={pending}>
+            <button type="button" className="font-bold text-navy underline-offset-2 hover:underline" onClick={send} disabled={pending}>
               Resend code
             </button>
           </div>

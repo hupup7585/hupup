@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy: #1b2a49;
+  --color-navy: #123d73; /* staff tools: brand navy (sidebar, headers, text) */
   --color-coral: #ff5a4e;
   --color-coral-dark: #e8463b;
-  --color-sky: #1fa2ff;
-  --color-sun: #ffc93c;
+  --color-sky: #8ccbff; /* light-blue accent */
+  --color-sun: #ffd84d; /* yellow accent */
   --color-mint: #2bc48a;
-  --color-bg: #f6f8fc;
-  --color-line: #e3e8f2;
-  --color-muted: #6b7895;
+  --color-bg: #f4f8fc;
+  --color-line: #dde6f0;
+  --color-muted: #5b6b85;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 
   /* Website brand palette (keep in sync with src/lib/theme.ts) */
@@ -25,29 +25,51 @@ html {
   background: #fff;
 }
 
+/* ---------- staff tools: one shared theme (navy #123D73, yellow #FFD84D, light blue #8CCBFF, white) ---------- */
 .card {
-  @apply rounded-2xl border border-line bg-white;
+  @apply rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(18,61,115,0.06)];
 }
 .btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-full bg-coral px-5 py-2.5 font-bold text-white transition hover:bg-coral-dark disabled:opacity-50;
+  /* primary action */
+  @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-sun px-4 py-2 font-bold text-navy transition hover:bg-[#ffcf1f] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:opacity-50;
 }
 .btn-dark {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-navy px-4 py-2.5 font-bold text-white transition hover:opacity-90 disabled:opacity-50;
+  @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-navy px-4 py-2 font-bold text-white transition hover:bg-[#0e3160] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun disabled:opacity-50;
 }
 .btn-ghost {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-white px-3.5 py-2 font-semibold text-navy transition hover:bg-bg;
+  @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3.5 py-2 font-semibold text-navy transition hover:bg-bg focus-visible:outline-2 focus-visible:outline-navy;
 }
 .input {
-  @apply w-full rounded-xl border border-line bg-white px-3 py-2 text-navy outline-none focus:border-sky focus:ring-2 focus:ring-sky/20;
+  @apply min-h-10 w-full rounded-lg border border-line bg-white px-3 py-2 text-navy outline-none focus:border-navy focus:ring-2 focus:ring-sky/50;
 }
 .label {
-  @apply mb-1 block text-sm font-semibold text-muted;
+  @apply mb-1 block text-xs font-bold uppercase tracking-wide text-muted;
 }
 .th {
-  @apply border-b border-line px-2 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted;
+  @apply border-b-2 border-navy/15 bg-bg px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-navy/70;
 }
 .td {
-  @apply border-b border-line px-2 py-3 align-top;
+  @apply border-b border-line px-3 py-3 align-top;
+}
+.badge {
+  @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold;
+}
+.badge-scheduled { @apply bg-sky/40 text-navy; }
+.badge-pending { @apply bg-sun text-navy; }
+.badge-done { @apply bg-navy text-white; }
+.badge-muted { @apply bg-[#eef1f5] text-muted; }
+.badge-alert { @apply bg-[#ffe6e4] text-[#b3261e]; }
+.page-title {
+  @apply text-2xl font-extrabold tracking-tight text-navy sm:text-3xl;
+}
+
+/* Printing worksheets and the delivery schedule: content only, black on white. */
+@media print {
+  .no-print { display: none !important; }
+  body, main { background: #fff !important; }
+  .card { box-shadow: none !important; border-color: #999 !important; break-inside: avoid; }
+  .print-tight .td, .print-tight .th { padding-top: 4px !important; padding-bottom: 4px !important; }
+  a { text-decoration: none !important; color: inherit !important; }
 }
 
 /* ---------- public website (components layer so utilities like `hidden` can override) ---------- */

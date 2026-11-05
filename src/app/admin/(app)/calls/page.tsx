@@ -32,13 +32,13 @@ export default async function CallsPage() {
               return (
                 <tr key={c.call_sid} className="hover:bg-bg">
                   <td className="td whitespace-nowrap">{new Date(c.started_at).toLocaleString("en-US", { timeZone: tz, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
-                  <td className="td">{c.from_number ? <a className="text-sky" href={`tel:${c.from_number}`}>{formatPhone(c.from_number)}</a> : "Unknown"}</td>
+                  <td className="td">{c.from_number ? <a className="text-navy underline-offset-2 hover:underline" href={`tel:${c.from_number}`}>{formatPhone(c.from_number)}</a> : "Unknown"}</td>
                   <td className="td">{c.customer_name ?? "—"}</td>
                   <td className="td"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${cls}`}>{label}</span></td>
                   <td className="td">
                     {c.order_id ? (
                       <Link href={`/admin/orders/${c.order_id}`} className="flex items-center gap-2">
-                        <b className="text-sky">#{orderNumber(c.order_id)}</b>
+                        <b className="text-navy underline-offset-2 hover:underline">#{orderNumber(c.order_id)}</b>
                         {c.order_status && <StatusBadge status={c.order_status} />}
                         {c.subtotal_cents ? <span className="text-muted">{formatMoney(c.subtotal_cents)}</span> : null}
                       </Link>

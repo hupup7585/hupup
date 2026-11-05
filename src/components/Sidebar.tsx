@@ -3,57 +3,65 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { CalendarDays, ClipboardList, LayoutDashboard, LogOut, Menu, Mic, Package, Palette, PhoneCall, PlusCircle, Settings, ShieldCheck, X, type LucideIcon } from "lucide-react";
 
-const NAV = [
-  ["/admin", "📊", "Dashboard"],
-  ["/admin/calendar", "📅", "Calendar"],
-  ["/admin/orders", "🧾", "Orders"],
-  ["/admin/pos", "➕", "New booking"],
-  ["/admin/catalog", "📦", "Catalog"],
-  ["/admin/calls", "📞", "Call log"],
-  ["/admin/phone/prompts", "🎙️", "Hotline prompts"],
-  ["/admin/compliance", "🛡️", "Compliance"],
-  ["/admin/settings", "⚙️", "Settings"],
-] as const;
+const NAV: [string, LucideIcon, string][] = [
+  ["/admin", LayoutDashboard, "Dashboard"],
+  ["/admin/calendar", CalendarDays, "Calendar"],
+  ["/admin/orders", ClipboardList, "Orders"],
+  ["/admin/pos", PlusCircle, "New booking"],
+  ["/admin/catalog", Package, "Catalog"],
+  ["/admin/calls", PhoneCall, "Call log"],
+  ["/admin/phone/prompts", Mic, "Hotline prompts"],
+  ["/admin/compliance", ShieldCheck, "Compliance"],
+  ["/admin/settings", Settings, "Settings"],
+  ["/admin/design", Palette, "Staff screens (preview)"],
+];
 
+/** Staff navigation: navy bar, yellow marker on the current page. Hidden when printing. */
 export default function Sidebar({ logout }: { logout: () => Promise<void> }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const active = (href: string) => (href === "/admin" ? path === "/admin" : path.startsWith(href));
   return (
     <>
-      <div className="flex items-center justify-between bg-navy px-4 py-3 text-white lg:hidden">
-        <span className="flex items-center gap-2 font-black">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="" className="h-8" /> Hup Up
+      <div className="no-print sticky top-0 z-30 flex items-center justify-between bg-navy px-4 py-3 text-white lg:hidden">
+        <span className="font-display text-lg font-extrabold tracking-tight">
+          Hup Up <span className="text-sun">Attractions</span>
         </span>
-        <button onClick={() => setOpen(!open)} className="rounded-lg px-3 py-1 text-2xl" aria-label="Menu">
-          ☰
+        <button onClick={() => setOpen(!open)} className="rounded-lg p-2 hover:bg-white/10" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open}>
+          {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </div>
-      <aside
-        className={`${open ? "block" : "hidden"} bg-navy px-4 py-6 text-white lg:sticky lg:top-0 lg:block lg:h-screen lg:w-60 lg:shrink-0`}
-      >
-        <div className="mb-8 hidden items-center gap-3 text-xl font-black lg:flex">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="" className="h-10" /> Hup Up
+      <aside className={`${open ? "block" : "hidden"} no-print bg-navy px-3 py-5 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col`}>
+        <div className="mb-8 hidden px-3 lg:block">
+          <div className="font-display text-xl font-extrabold leading-tight tracking-tight">
+            Hup Up <span className="text-sun">Attractions</span>
+          </div>
+          <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky">Staff portal</div>
         </div>
-        <nav className="space-y-1">
-          {NAV.map(([href, icon, label]) => (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setOpen(false)}
-              className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 font-semibold ${
-                active(href) ? "bg-white/10 opacity-100" : "opacity-75 hover:opacity-100"
-              }`}
-            >
-              <span>{icon}</span> {label}
-            </Link>
-          ))}
+        <nav className="space-y-0.5">
+          {NAV.map(([href, Icon, label]) => {
+            const on = active(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setOpen(false)}
+                aria-current={on ? "page" : undefined}
+                className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-semibold transition ${on ? "bg-white/10 text-white" : "text-white/75 hover:bg-white/5 hover:text-white"}`}
+              >
+                {on && <span className="absolute inset-y-1.5 left-0 w-1 rounded-full bg-sun" aria-hidden />}
+                <Icon className={`h-[18px] w-[18px] shrink-0 ${on ? "text-sun" : "text-sky"}`} strokeWidth={2} aria-hidden />
+                {label}
+              </Link>
+            );
+          })}
         </nav>
-        <form action={logout} className="mt-8">
-          <button className="px-3.5 text-sm opacity-60 hover:opacity-100">Sign out</button>
+        <form action={logout} className="mt-8 lg:mt-auto">
+          <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-white/70 hover:bg-white/5 hover:text-white">
+            <LogOut className="h-4 w-4" aria-hidden /> Sign out
+          </button>
         </form>
       </aside>
     </>

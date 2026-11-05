@@ -19,7 +19,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const textStatus = !customer?.phone ? "none" : customer.smsOptOut ? "stopped" : (await hasTransactionalConsent(customer.phone)) ? "ok" : "none";
   return (
     <div className="mx-auto max-w-5xl">
-      <Link href="/admin/orders" className="text-sm font-bold text-sky">← All orders</Link>
+      <Link href="/admin/orders" className="text-sm font-bold text-navy underline-offset-2 hover:underline">← All orders</Link>
       <div className="mb-5 mt-2 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-black sm:text-3xl">Order #{orderNumber(o.id)}</h1>
         <StatusBadge status={o.status} />
@@ -51,8 +51,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             {customer ? (
               <div className="space-y-1">
                 <div className="text-lg font-bold">{customer.name}</div>
-                {customer.phone && <a className="block text-sky" href={`tel:${customer.phone}`}>{formatPhone(customer.phone)}</a>}
-                {customer.email && <a className="block text-sky" href={`mailto:${customer.email}`}>{customer.email}</a>}
+                {customer.phone && <a className="block text-navy underline-offset-2 hover:underline" href={`tel:${customer.phone}`}>{formatPhone(customer.phone)}</a>}
+                {customer.email && <a className="block text-navy underline-offset-2 hover:underline" href={`mailto:${customer.email}`}>{customer.email}</a>}
               </div>
             ) : (
               <p className="text-muted">Not entered yet (caller still on the phone or abandoned cart).</p>
