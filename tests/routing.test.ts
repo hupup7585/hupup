@@ -93,13 +93,23 @@ describe("the staff member's side", () => {
 });
 
 describe("pauses between menu options (Abraham)", () => {
-  it("a short pause after the greeting and after each option", async () => {
+  it("three-quarters of a second after the greeting and between options (750 ms silent clip)", async () => {
+    const pause = "<Play>https://hupup.example/audio/pause-750ms.wav</Play>";
     const greet = await call("incoming");
-    expect(greet).toMatch(/<Pause length="1"\/><Redirect/);
+    expect(greet).toContain(`${pause}<Redirect`);
+    expect(greet).not.toContain("<Pause");
     const xml = await call("menu");
     const menu = xml.slice(xml.indexOf("<Gather"), xml.indexOf("</Gather>"));
     const options = (menu.match(/<Say /g) || []).length;
     expect(options).toBeGreaterThan(1);
-    expect((menu.match(/<Pause length="1"\/>/g) || []).length).toBe(options - 1); // between options, not after "press star"
+    expect(menu.split(pause).length - 1).toBe(options - 1); // between options, not after "press star"
+    expect(menu).not.toContain("<Pause");
+  });
+  it("the clip is exactly 0.75 seconds of silence", async () => {
+    const { readFileSync } = await import("node:fs");
+    const wav = readFileSync("public/audio/pause-750ms.wav");
+    const rate = wav.readUInt32LE(24), bytes = wav.readUInt32LE(40), bits = wav.readUInt16LE(34);
+    expect(bytes / (rate * (bits / 8))).toBe(0.75);
+    expect(wav.subarray(44).every((b) => b === 0)).toBe(true);
   });
 });

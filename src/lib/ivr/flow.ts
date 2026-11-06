@@ -212,6 +212,15 @@ async function recordPhoneConsent(ctx: Ctx, scope: "transactional" | "marketing"
   });
 }
 
+/**
+ * A 0.75-second pause. Twilio's <Pause> only takes whole seconds and the Chirp3-HD voice doesn't support SSML
+ * <break>, so this plays a 750 ms silent clip served from our own site (public/audio/pause-750ms.wav).
+ */
+export const SHORT_PAUSE_FILE = "/audio/pause-750ms.wav";
+function shortPause(target: VR | Gather) {
+  target.play(`${config.baseUrl()}${SHORT_PAUSE_FILE}`);
+}
+
 /** Ring one routing step (sequential) or everyone (simultaneous). */
 function dialTargets(vr: VR, settings: Settings, i: number, from?: string | null): VR {
   const all = routeTargets(settings);
@@ -255,7 +264,7 @@ const handlers: Record<string, Handler> = {
       if (late === "cholHamoed") sp(vr, ctx, "late_cholhamoed");
       else if (late === "chanukah") sp(vr, ctx, "late_chanukah");
     }
-    vr.pause({ length: 1 }); // a short pause after the greeting, before the menu options (Abraham)
+    shortPause(vr); // three-quarters of a second after the greeting, before the menu options (Abraham)
     return back(vr, "menu");
   },
 
@@ -275,10 +284,10 @@ const handlers: Record<string, Handler> = {
       speechTimeout: "auto",
       hints: menuSpeechHints(cats),
     });
-    // A short pause between options so callers can follow the choices (Abraham)
+    // A three-quarter-second pause between options so callers can follow the choices (Abraham)
     const option = (key: PromptKey, vars?: Record<string, string | number>) => {
       sp(g, ctx, key, vars);
-      g.pause({ length: 1 });
+      shortPause(g);
     };
     if (!cats.length) option("menu_empty");
     for (const c of cats) option("menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
