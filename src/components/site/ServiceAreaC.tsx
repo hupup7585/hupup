@@ -12,7 +12,7 @@ const EYEBROW = "text-sm font-extrabold uppercase tracking-[0.18em] opacity-75";
 
 /**
  * Service Area on the home page (Option C, approved by Abraham; also shown on /mockups/service-area): both cards styled like the hero call-to-book board (even border),
- * light-blue icon tiles beside each line, thin dividers, a yellow round badge. Same wording as the live section.
+ * light-blue icon tiles beside each line, thin dividers (no badge on this card, Abraham). Same wording as the live section.
  */
 export default function ServiceAreaC({ c, badge }: { c: SiteContent; badge?: string }) {
   return (
@@ -37,19 +37,6 @@ export default function ServiceAreaC({ c, badge }: { c: SiteContent; badge?: str
               </li>
             </ul>
             <CallButton phone={c.phoneE164} className="mt-6 self-start lg:mt-auto" />
-            {/* Yellow round badge, same as the hero sticker */}
-            <span
-              data-sa-badge
-              className="absolute -top-7 right-3 flex h-[5.5rem] w-[5.5rem] rotate-12 items-center justify-center rounded-full border-2 border-hu-deep bg-hu-yellow text-center text-[10px] font-extrabold uppercase leading-[1.15] text-hu-deep sm:-top-9 sm:right-5 sm:h-[6.5rem] sm:w-[6.5rem] sm:text-[11px]"
-              aria-label="Delivery option available"
-            >
-              <span className="flex flex-col items-center gap-0.5">
-                <Truck className="h-5 w-5" strokeWidth={ICON_STROKE} aria-hidden />
-                <span>Delivery</span>
-                <span>option</span>
-                <span>available</span>
-              </span>
-            </span>
           </div>
 
           <div className={CARD}>

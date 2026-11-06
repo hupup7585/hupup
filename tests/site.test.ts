@@ -513,3 +513,13 @@ describe("text alerts promotional box (Abraham approved)", () => {
     expect(f).toContain("{marketingText}");
   });
 });
+
+describe("Service Area Kiryas Joel card (Abraham)", () => {
+  it("has no yellow 'Delivery option available' badge; the delivery line and truck tile stay", () => {
+    const c = readFileSync("src/components/site/ServiceAreaC.tsx", "utf8");
+    expect(c).not.toContain("data-sa-badge");
+    expect(c).not.toMatch(/rounded-full[^"]*bg-hu-yellow/);
+    expect(c).toContain("<IconTile icon={Truck} tone=\"sky\" />");
+    expect(c).toContain("{noLonelyWord(SERVICE_AREA_DELIVERY_NOTE)}");
+  });
+});
