@@ -378,3 +378,11 @@ describe("footer contact block (Abraham)", () => {
     expect(contact).not.toMatch(/Main area|nearby|officeHours|See all hours|automated phone/);
   });
 });
+
+describe("mock-up review pages (Abraham)", () => {
+  it("are noindex and not in the sitemap, and the live pages never use the mock-up header", () => {
+    expect(readFileSync("src/app/mockups/layout.tsx", "utf8")).toMatch(/index: false/);
+    expect(readFileSync("src/app/sitemap.ts", "utf8")).not.toContain("mockups");
+    for (const f of ["src/app/page.tsx", "src/app/text-alerts/page.tsx"]) expect(readFileSync(f, "utf8")).not.toContain('variant="mockup"');
+  });
+});
