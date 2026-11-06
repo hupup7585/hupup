@@ -3,6 +3,8 @@ import CalendarSettingsForm from "./CalendarSettingsForm";
 import { CALENDAR_KEYS } from "./calendar-keys";
 import { config } from "@/lib/config";
 import { requireOwner } from "@/lib/auth";
+import RoutingForm from "./RoutingForm";
+import { routeSummary, routeTargets } from "@/lib/ivr/routing";
 
 function Row({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
   return (
@@ -24,6 +26,13 @@ export default async function SettingsPage() {
         <h2 className="mb-3 text-lg font-extrabold">Jewish calendar: open and closed days</h2>
         <CalendarSettingsForm initial={calInitial} />
       </section>
+      <section className="card mb-6 p-5" id="routing">
+        <h2 className="mb-3 text-lg font-extrabold">Speak to someone (hotline option 0)</h2>
+        <RoutingForm
+          initial={{ operatorTargets: settings.operatorTargets, operatorMode: settings.operatorMode, operatorAcceptPrompt: settings.operatorAcceptPrompt, operatorAcceptText: settings.operatorAcceptText }}
+          summary={routeSummary(routeTargets(settings), settings.operatorMode)}
+        />
+      </section>
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Settings & system status</h1>
       <p className="mb-5 text-muted">These are set as environment variables in Vercel (Project → Settings → Environment Variables).</p>
       <div className="card mb-5 p-5">
@@ -40,7 +49,7 @@ export default async function SettingsPage() {
           <li>Voice → “A call comes in”: <b>Webhook</b>, <code className="rounded bg-bg px-1">{base}/api/voice/incoming</code>, HTTP POST</li>
           <li>Voice → “Call status changes”: <code className="rounded bg-bg px-1">{base}/api/voice/status</code> (releases cart holds when callers hang up)</li>
           <li>Hotline voice: <b>{config.voice()}</b> (change with IVR_VOICE)</li>
-          <li>“Press 0” forwards to: <b>{config.forwardPhone() || "not set"}</b></li>
+          <li>“Press 0” rings: <b>{routeSummary(routeTargets(settings), settings.operatorMode)}</b> (edit above)</li>
         </ol>
       </div>
     </div>

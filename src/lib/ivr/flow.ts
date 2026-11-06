@@ -21,7 +21,7 @@ import {
 import { payPageLink } from "@/lib/rental-terms";
 import { TERMS_TEXT } from "@/lib/terms-content";
 import { sendEmail, sendSms } from "@/lib/notify";
-import { getSettings } from "@/lib/settings";
+import { getSettings, type Settings } from "@/lib/settings";
 import { computeTotals, deliveryZone } from "@/lib/pricing";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
@@ -39,6 +39,7 @@ import { ensureSession, getSession, updateSession, type CallSession } from "./se
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { matchMenuSpeech, menuSpeechHints } from "./category-speech";
 import { boxById, mainBox, saveRecording, saveTranscription } from "@/lib/voicemail";
+import { routeTargets } from "./routing";
 import { PROMPTS, loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
 
 const { categories, products, orders } = schema;
@@ -208,6 +209,24 @@ async function recordPhoneConsent(ctx: Ctx, scope: "transactional" | "marketing"
     callSid: ctx.callSid,
     orderId: ctx.session?.orderId ?? ctx.session?.data.placedOrderId ?? null,
   });
+}
+
+/** Ring one routing step (sequential) or everyone (simultaneous). */
+function dialTargets(vr: VR, settings: Settings, i: number, from?: string | null): VR {
+  const all = routeTargets(settings);
+  const simultaneous = settings.operatorMode === "simultaneous";
+  const ring = simultaneous ? all : [all[i]];
+  const dial = vr.dial({
+    callerId: process.env.TWILIO_PHONE_NUMBER || undefined,
+    timeout: Math.max(...ring.map((t) => t.ringSeconds)),
+    action: url("operator-done", { i: simultaneous ? undefined : i }),
+    method: "POST",
+  });
+  for (const t of ring) {
+    if (settings.operatorAcceptPrompt) dial.number({ url: url("whisper", { from: from || undefined }), method: "POST" }, t.phone);
+    else dial.number(t.phone);
+  }
+  return vr;
 }
 
 /* ------------------------------------------------------------------ handlers */
@@ -792,25 +811,49 @@ const handlers: Record<string, Handler> = {
     return vr;
   },
 
+  /**
+   * Option 0, "Speak to someone": ring the routing list from Settings (one after another, or all at once).
+   * Each person must press 1 to take the call, so a personal voicemail never answers for the business.
+   */
   async operator(ctx, vr) {
-    const to = config.forwardPhone();
-    if (!to || !officeOpenNow(new Date(), await getSettings())) return back(vr, "voicemail");
+    const settings = await getSettings();
+    const targets = routeTargets(settings);
+    if (!targets.length || !officeOpenNow(new Date(), settings)) return back(vr, "voicemail");
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "forwarded" }, ctx.session);
     sp(vr, ctx, "transfer_connecting");
-    vr.dial({ callerId: process.env.TWILIO_PHONE_NUMBER || undefined, timeout: 25, action: url("operator-done"), method: "POST" }, to);
-    return vr;
+    return dialTargets(vr, settings, 0, ctx.session?.fromNumber ?? ctx.from);
   },
 
-  /** After the transfer: a finished conversation ends the call; otherwise offer a message or more booking. */
+  /** After a ring attempt: a finished conversation ends the call; otherwise try the next number, then voicemail. */
   async "operator-done"(ctx, vr) {
     if (ctx.body.DialCallStatus === "completed") {
       vr.hangup();
       return vr;
     }
+    const settings = await getSettings();
+    const next = Number(ctx.query.get("i") ?? -1) + 1;
+    if (settings.operatorMode !== "simultaneous" && next > 0 && next < routeTargets(settings).length) return dialTargets(vr, settings, next, ctx.session?.fromNumber ?? ctx.from);
     sp(vr, ctx, "transfer_failed");
     const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 6, action: url("voicemail-offer"), method: "POST" });
     sp(g, ctx, "voicemail_offer");
     return back(vr, "menu");
+  },
+
+  /** Plays to the staff member who answered (not the caller): press 1 to take the call. */
+  async whisper(ctx, vr) {
+    const settings = await getSettings();
+    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, action: url("whisper-accept"), method: "POST" });
+    const caller = ctx.query.get("from");
+    say(g, `${settings.operatorAcceptText}${caller ? ` The caller's number is ${caller.replace(/\D/g, "").slice(-10).split("").join(" ")}.` : ""}`);
+    say(vr, settings.operatorAcceptText);
+    vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 6, action: url("whisper-accept"), method: "POST" });
+    vr.hangup(); // no answer from the staff member (or their voicemail): this leg ends and routing moves on
+    return vr;
+  },
+
+  async "whisper-accept"(ctx, vr) {
+    if (ctx.body.Digits !== "1") vr.hangup(); // 2 or anything else: pass to the next number
+    return vr; // empty response = connect the caller
   },
 
   async "voicemail-offer"(ctx, vr) {
@@ -914,6 +957,8 @@ const FIELDS: Record<
 
 /* ------------------------------------------------------------------ dispatcher */
 
+const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept"]);
+
 export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Promise<string> {
   const vr = new twilio.twiml.VoiceResponse();
   const prompts = await loadPromptOverrides();
@@ -922,6 +967,11 @@ export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Prom
   if (!handler) {
     sp(vr, ctx, "went_wrong");
     vr.redirect({ method: "POST" }, url("menu"));
+    return vr.toString();
+  }
+  // The staff member's leg (press 1 to accept) is a separate call: never log it as a caller session.
+  if (STAFF_LEG_ACTIONS.has(ctx.action)) {
+    await handler({ ...ctx, session: null }, vr);
     return vr.toString();
   }
   const session = ctx.action === "incoming" ? null : await getSession(ctx.callSid);

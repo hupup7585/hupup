@@ -52,6 +52,15 @@ export const SETTING_DEFAULTS = {
   hoursMotzeiSeason: "dst",
   /** Chol Hamoed hours (opening to confirm). */
   hoursCholHamoed: "10:30-22:30",
+  /*
+   * "Speak to someone" (hotline option 0) routing. One number per line: "Label | phone | ring seconds".
+   * Empty = ring FORWARD_PHONE / ADMIN_PHONE as before. sequential = one after another; simultaneous = all at once.
+   */
+  operatorTargets: "",
+  operatorMode: "sequential",
+  /** The person answering must press 1, so a personal voicemail picking up doesn't take the call. */
+  operatorAcceptPrompt: true,
+  operatorAcceptText: "Call from the Hup Up Attractions hotline. To accept, press 1. To pass, press 2.",
   /** Website note under the hours (Abraham's wording). */
   hoursWebsiteNote: "Please note that you can book at any time using our automated phone system.",
 } as const;

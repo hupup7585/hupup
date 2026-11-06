@@ -113,7 +113,7 @@ describe("hotline voicemail", () => {
     h.open = true;
     process.env.FORWARD_PHONE = "+18457777585";
     const dial = await call("operator");
-    expect(dial).toMatch(/<Dial [^>]*action="[^"]*operator-done"/);
+    expect(dial).toMatch(/<Dial [^>]*action="[^"]*operator-done\?i=0"/);
     const missed = await call("operator-done", { DialCallStatus: "no-answer" });
     expect(missed).toContain("To leave a message, press 1.");
     expect(await call("voicemail-offer", { Digits: "1" })).toContain("/api/voice/voicemail");
