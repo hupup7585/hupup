@@ -1,7 +1,7 @@
 /** Abram's exact website copy. Do not paraphrase. */
 export const SLOGAN = "BRINGING SOMETHING SPECIAL TO EVERY OCCASION";
 export const INTRO =
-  "Make your next event unforgettable with exciting attractions and rentals from Hup Up Attractions. We bring something special to parties, schools, celebrations, and special occasions.";
+  "Make your next event unforgettable with our exciting rentals! Affordable and suitable for any party, gathering, celebration & occasion, or just because.";
 export const WHY = [
   "Exciting rental attractions",
   "Options for all types of events",

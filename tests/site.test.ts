@@ -9,7 +9,7 @@ describe("website copy and brand", () => {
   it("uses Abram's exact slogan and copy", () => {
     expect(SLOGAN).toBe("BRINGING SOMETHING SPECIAL TO EVERY OCCASION");
     expect(INTRO).toBe(
-      "Make your next event unforgettable with exciting attractions and rentals from Hup Up Attractions. We bring something special to parties, schools, celebrations, and special occasions.",
+      "Make your next event unforgettable with our exciting rentals! Affordable and suitable for any party, gathering, celebration & occasion, or just because.",
     );
     expect(FINAL_CTA_TITLE).toBe("READY TO MAKE YOUR EVENT SPECIAL?");
     expect(FINAL_CTA_TEXT).toBe("Contact Hup Up Attractions today to explore our rental options and reserve your attraction.");
