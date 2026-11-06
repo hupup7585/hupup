@@ -523,3 +523,12 @@ describe("Service Area Kiryas Joel card (Abraham)", () => {
     expect(c).toContain("{noLonelyWord(SERVICE_AREA_DELIVERY_NOTE)}");
   });
 });
+
+describe("Service Area town tiles (Abraham)", () => {
+  it("show the town names without house icons", () => {
+    const c = readFileSync("src/components/site/ServiceAreaC.tsx", "utf8");
+    const grid = c.slice(c.indexOf("data-town-grid"), c.indexOf("</ul>", c.indexOf("data-town-grid")));
+    expect(grid).not.toMatch(/IconTile|Home/);
+    expect(grid).toContain("c.serviceArea.also.map(");
+  });
+});

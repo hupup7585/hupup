@@ -1,4 +1,4 @@
-import { Home, MapPin, Truck } from "lucide-react";
+import { MapPin, Truck } from "lucide-react";
 import type { SiteContent } from "@/lib/site-content";
 import { DELIVERY_FEE_SHORT, SERVICE_AREA_DELIVERY_NOTE, noLonelyWord } from "@/lib/site-copy";
 import { CallButton, ICON_STROKE, IconTile, SectionTitle } from "./parts";
@@ -44,8 +44,7 @@ export default function ServiceAreaC({ c, badge }: { c: SiteContent; badge?: str
             {/* 2 per row on phones, 3 per row from 768px; every tile the same size */}
             <ul data-town-grid className="mt-4 grid auto-rows-fr grid-cols-2 gap-3 border-t-2 border-hu-deep/10 pt-4 md:grid-cols-3">
               {c.serviceArea.also.map((town) => (
-                <li key={town} className="flex h-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-hu-deep/15 bg-white px-1.5 py-3.5 text-center sm:px-3">
-                  <IconTile icon={Home} tone="sky" size="sm" />
+                <li key={town} className="flex h-full min-h-[4.5rem] items-center justify-center rounded-2xl border-2 border-hu-deep/15 bg-white px-1.5 py-3.5 text-center sm:px-3">
                   <span className="text-[15px] font-bold leading-snug min-[400px]:text-base">
                     {town.includes(" and ") ? (
                       <>
