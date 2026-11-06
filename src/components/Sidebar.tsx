@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { CalendarDays, ClipboardList, LayoutDashboard, LogOut, Menu, Mic, Package, Palette, PhoneCall, PlusCircle, Settings, ShieldCheck, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
+import { CalendarDays, Contact, ClipboardList, LayoutDashboard, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PlusCircle, Settings, ShieldCheck, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
 import type { Role } from "@/lib/db/schema";
 
 const O: Role[] = ["owner"];
@@ -15,9 +15,11 @@ const NAV: [string, LucideIcon, string, Role[]][] = [
   ["/admin/orders", ClipboardList, "Orders", OS],
   ["/admin/pos", PlusCircle, "New booking", OS],
   ["/admin/deliveries", Truck, "Deliveries", OS],
+  ["/admin/customers", Contact, "Customers", OS],
   ["/admin/catalog", Package, "Catalog", O],
   ["/admin/calls", PhoneCall, "Call log", OS],
   ["/admin/voicemail", Voicemail, "Voicemail", OS],
+  ["/admin/messages", MessageSquare, "Messages", OS],
   ["/admin/phone/prompts", Mic, "Hotline prompts", O],
   ["/admin/compliance", ShieldCheck, "Compliance", OS],
   ["/admin/staff", Users, "Staff", O],
