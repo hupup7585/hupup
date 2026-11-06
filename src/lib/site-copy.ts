@@ -21,7 +21,7 @@ export const DELIVERY_FEE_NOTE = "Delivery available. Call for pricing.";
 export const WEBSITE_HOURS = [
   "Sunday: 11:30 AM - 7:00 PM",
   "Monday - Thursday: 10:30 AM - 7:00 PM",
-  "Friday: 10:30 AM - Chatzose",
+  "Friday: 10:30 AM - Chatzos",
   "Shabbos: Closed",
   "Motzei Shabbos: 2 hours after Shabbos - 11:30 PM (winter), 12:30 AM (summer)",
 ] as const;

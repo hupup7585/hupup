@@ -482,7 +482,7 @@ describe("website Hours (Abraham's simple list)", () => {
     expect(WEBSITE_HOURS).toEqual([
       "Sunday: 11:30 AM - 7:00 PM",
       "Monday - Thursday: 10:30 AM - 7:00 PM",
-      "Friday: 10:30 AM - Chatzose",
+      "Friday: 10:30 AM - Chatzos",
       "Shabbos: Closed",
       "Motzei Shabbos: 2 hours after Shabbos - 11:30 PM (winter), 12:30 AM (summer)",
     ]);
