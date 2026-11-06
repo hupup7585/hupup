@@ -4,3 +4,12 @@
 - Vercel account is on the Hobby plan: cron jobs can run at most once a day.
 - Business name is always "Hup Up Attractions".
 - Before pushing: `npm run typecheck` and `npm test`.
+
+## Website SEO and tone rule (Abraham, applies to every website step)
+- Follow Google's helpful, people-first content guidelines.
+- Copy is humanized, friendly, warm and customer-friendly, in simple but professional English, with natural long-tail keywords (e.g. "bounce house rental in Kiryas Joel", "laser tag party rental Orange County NY", "paddle boat rental Monroe NY"). No keyword stuffing.
+- Never change text Abraham dictated exactly (e.g. the hero subtitle, slogan, section copy in `src/lib/site-copy.ts`). Keyword work goes in titles, meta descriptions, alt text and structured data unless he asks.
+- Technical SEO: a unique title and meta description per page, exactly one H1 per page, alt text on every meaningful image, and LocalBusiness schema (name Hup Up Attractions, phone (845) 777-7585, service area, hours).
+- Sitemap and robots allow indexing on the live site only; every preview stays noindex (`src/lib/seo.ts`).
+- Middletown is served but never shown on the public website.
+- After any website text change, reply with every change as old → new so Abraham can review it on preview.

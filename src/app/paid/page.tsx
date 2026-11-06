@@ -1,6 +1,7 @@
 import { BUSINESS_NAME, config } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Thank You | Hup Up Attractions", description: "Your Hup Up Attractions payment is being confirmed.", robots: { index: false, follow: false } };
 
 /** Where Sola's PaymentSITE sends the customer after paying. Confirmation itself comes from the webhook. */
 export default async function Paid({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -11,7 +12,7 @@ export default async function Paid({ searchParams }: { searchParams: Promise<Rec
     <main className="grid min-h-screen place-items-center bg-bg px-4">
       <div className="card max-w-md p-8 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="" className="mx-auto h-14" />
+        <img src="/logo.svg" alt="Hup Up Attractions" className="mx-auto h-14" />
         {declined ? (
           <>
             <h1 className="mt-5 text-2xl font-black">Payment didn&apos;t go through</h1>

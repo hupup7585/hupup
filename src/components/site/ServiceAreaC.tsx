@@ -11,12 +11,12 @@ const CARD = "relative flex flex-col rounded-[2rem] border-4 border-hu-deep bg-w
 const EYEBROW = "text-sm font-extrabold uppercase tracking-[0.18em] opacity-75";
 
 /**
- * Service Area, Option C (mock-up only, /mockups/service-area): both cards styled like the hero call-to-book board (even border),
+ * Service Area on the home page (Option C, approved by Abraham; also shown on /mockups/service-area): both cards styled like the hero call-to-book board (even border),
  * light-blue icon tiles beside each line, thin dividers, a yellow round badge. Same wording as the live section.
  */
 export default function ServiceAreaC({ c, badge }: { c: SiteContent; badge?: string }) {
   return (
-    <section data-sa-option="C" className="bg-hu-sky py-14 sm:py-16">
+    <section id={badge ? undefined : "service-area"} data-sa-option="C" className="scroll-mt-20 bg-hu-sky py-14 sm:py-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         {badge && <p className="mb-6 inline-block rounded-full bg-hu-deep px-4 py-1.5 text-sm font-bold text-white">{badge}</p>}
         <SectionTitle kicker="Right to your door" title="Service Area" />

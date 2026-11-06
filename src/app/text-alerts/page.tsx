@@ -7,8 +7,8 @@ import SignUpForm from "./SignUpForm";
 import { signUpsDisabledReason } from "./actions";
 
 export const metadata = {
-  title: "Text Updates | Hup Up Attractions",
-  description: "Sign up for order and service texts or promotional texts from Hup Up Attractions. Message frequency varies. Reply STOP to opt out.",
+  title: "Get Text Updates and Party Rental Deals | Hup Up Attractions",
+  description: "Join the Hup Up Attractions text list for new rental items, seasonal promos and order updates for your party in Kiryas Joel and Orange County, NY. Message frequency varies. Reply STOP to opt out.",
 };
 export const dynamic = "force-dynamic";
 

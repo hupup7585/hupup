@@ -5,19 +5,20 @@ import { BUSINESS_NAME_NB, keepName, whyLabel, whyRows, DELIVERY_FEE_NOTE, FINAL
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
-import ServiceArea from "@/components/site/ServiceArea";
+import ServiceAreaC from "@/components/site/ServiceAreaC";
+import { getSettings } from "@/lib/settings";
 import { CallButton, ICON_STROKE, IconTile, SectionTitle, Wave, categoryIcon } from "@/components/site/parts";
 
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Hup Up Attractions | Jumping Balloon, Laser Tag and Paddle Boat Rentals",
+  title: "Bounce House & Party Rentals in Kiryas Joel, NY | Hup Up Attractions",
   description:
-    "Hup Up Attractions offers Jumping Balloons (bounce houses), laser tag, inflatable maze, and paddle boat rentals for parties and events in Kiryas Joel (Town of Palm Tree), Monroe, Chester, and nearby Orange County, NY towns. Delivery available for an additional fee. Call (845) 777-7585 to book.",
+    "Planning a party in Kiryas Joel (Town of Palm Tree) or Monroe, NY? Hup Up Attractions rents Jumping Balloons (bounce houses), laser tag, inflatable mazes and paddle boats across Orange County, NY. Delivery available for an additional fee. Call (845) 777-7585 to book.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Hup Up Attractions | Party and Event Rentals",
-    description: "Jumping balloons, laser tag, inflatable mazes, and paddle boats for parties, schools, celebrations, and special occasions. Call to book.",
+    title: "Hup Up Attractions | Bounce House, Laser Tag & Paddle Boat Rentals",
+    description: "Friendly party rentals for birthdays, schools and celebrations in Kiryas Joel and Orange County, NY. Call (845) 777-7585 to book.",
     type: "website",
     siteName: "Hup Up Attractions",
   },
@@ -26,18 +27,27 @@ export const metadata: Metadata = {
 
 const WHY_ICONS = [PartyPopper, ListChecks, PhoneCall, Headset, Truck, ClipboardCheck];
 const STEP_ICONS = [Search, PhoneCall, CalendarCheck];
+/** The hero subtitle split after its first sentence (wording unchanged). */
+const INTRO_FIRST = INTRO.slice(0, INTRO.indexOf("!") + 1);
+const INTRO_REST = INTRO.slice(INTRO.indexOf("!") + 1).trim();
 
 export default async function Home() {
   const c = await getSiteContent();
+  const settings = await getSettings();
+  const span = (v: string) => v.split("-").map((t) => t.trim());
+  const [monOpen, monClose] = span(settings.hoursMonThu);
+  const [sunOpen, sunClose] = span(settings.hoursSunday);
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     name: "Hup Up Attractions",
-    description: "Jumping Balloon (bounce house), laser tag, inflatable maze, and paddle boat rentals for parties and events.",
-    telephone: c.phoneE164,
+    description:
+      "Jumping Balloon (bounce house) rental in Kiryas Joel, plus laser tag, inflatable maze and paddle boat rentals for birthday parties, schools and celebrations across Orange County, NY. Reservations by phone; delivery available for an additional fee.",
+    telephone: "+1-845-777-7585",
     email: c.email,
     url: process.env.PUBLIC_BASE_URL || "https://hupup.vercel.app",
     ...(c.logoUrl ? { logo: c.logoUrl } : {}),
+    address: { "@type": "PostalAddress", addressLocality: "Kiryas Joel", addressRegion: "NY", addressCountry: "US" },
     areaServed: [
       { "@type": "Place", name: `${c.serviceArea.main}, NY`, alternateName: `${c.serviceArea.officialName}, NY` },
       ...serviceAreaPlaces()
@@ -45,7 +55,11 @@ export default async function Home() {
         .map((name) => ({ "@type": "Place", name: `${name}, NY` })),
       { "@type": "AdministrativeArea", name: c.serviceArea.region.replace(", NY", ", New York") },
     ],
-    ...(c.hours ? { openingHours: c.hours } : {}),
+    // Regular weekly hours (Friday closes at midday and Motzei Shabbos varies, so they're listed in the Hours section).
+    openingHoursSpecification: [
+      { "@type": "OpeningHoursSpecification", dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday"], opens: monOpen, closes: monClose },
+      { "@type": "OpeningHoursSpecification", dayOfWeek: "Sunday", opens: sunOpen, closes: sunClose },
+    ],
   };
 
   return (
@@ -60,7 +74,10 @@ export default async function Home() {
             <div>
               <span className="hu-sticker -rotate-2">Reservations by phone</span>
               <h1 className="mt-5 text-[2.15rem] min-[360px]:text-[2.5rem] font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-[4.1rem]">{SLOGAN}</h1>
-              <p className="mt-5 max-w-xl text-lg font-medium leading-relaxed sm:text-xl">{keepName(INTRO)}</p>
+              {/* Abraham's exact wording, shown in uppercase; the first sentence stays on one line on desktop */}
+              <p data-hero-subtitle className="mt-5 max-w-xl text-base font-semibold uppercase leading-relaxed min-[400px]:text-[17px] xl:max-w-none xl:text-base">
+                <span className="xl:block xl:whitespace-nowrap">{INTRO_FIRST}</span> {keepName(INTRO_REST)}
+              </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <CallButton phone={c.phoneE164} label="CALL NOW TO BOOK" className="!min-h-14 !px-5 text-lg min-[360px]:!px-8" />
                 <a href="#rentals" className="hu-btn-outline !min-h-14 !px-5 text-lg min-[360px]:!px-8">
@@ -199,7 +216,7 @@ export default async function Home() {
         </section>
 
         {/* SERVICE AREA: main area first and prominent, nearby towns clearly secondary */}
-        <ServiceArea c={c} />
+        <ServiceAreaC c={c} />
 
         {/* FINAL CTA */}
         <section className="bg-hu-yellow">

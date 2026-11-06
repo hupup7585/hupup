@@ -3,7 +3,10 @@ import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 import { OPT_OUT_KEYWORDS, PROMO_OPENING, PROVIDER_DISCLOSURE, RECORD_RETENTION_MONTHS } from "@/lib/sms-consent-copy";
 import { smsNumberDisplay } from "@/lib/sms-number";
 
-export const metadata = { title: "SMS Terms | Hup Up Attractions" };
+export const metadata = {
+  title: "SMS Terms | Hup Up Attractions",
+  description: "How Hup Up Attractions text messages work: order and service texts, promotional texts, message frequency, and how to reply STOP or HELP.",
+};
 export const revalidate = 3600;
 
 /** SMS program terms (A2P 10DLC): SMS messages only. Business and rental terms are on /terms. */

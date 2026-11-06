@@ -83,8 +83,8 @@ describe("service area", () => {
   it("homepage shows the section and nav link, main area before the secondary list, and no placeholder text", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
     const header = readFileSync("src/components/site/SiteHeader.tsx", "utf8");
-    expect(page).toContain("<ServiceArea c={c} />");
-    expect(readFileSync("src/components/site/ServiceArea.tsx", "utf8")).toContain('"service-area"');
+    expect(page).toContain("<ServiceAreaC c={c} />");
+    expect(readFileSync("src/components/site/ServiceAreaC.tsx", "utf8")).toContain('"service-area"');
     expect(header).toContain('["Service Area", "/#service-area"]');
     const saComp = readFileSync("src/components/site/ServiceArea.tsx", "utf8");
     expect(saComp.indexOf("serviceArea.mainLabel")).toBeLessThan(saComp.indexOf("serviceArea.alsoTitle"));
@@ -151,7 +151,7 @@ describe("business name never splits across lines", () => {
     const parts = readFileSync("src/components/site/parts.tsx", "utf8");
     expect(parts).toContain("{keepName(title)}");
     const page = readFileSync("src/app/page.tsx", "utf8");
-    expect(page).toContain("{keepName(INTRO)}");
+    expect(page).toContain("{keepName(INTRO_REST)}"); // hero subtitle: first sentence has no business name
     expect(page).toContain("{keepName(FINAL_CTA_TEXT)}");
     expect(readFileSync("src/components/site/SiteFooter.tsx", "utf8")).toContain("{BUSINESS_NAME_NB}");
   });
@@ -159,16 +159,19 @@ describe("business name never splits across lines", () => {
 
 describe("Jumping Balloons and no slashes", () => {
   const visible = ["src/app/page.tsx", "src/components/site/SiteFooter.tsx", "src/components/site/SiteHeader.tsx", "src/lib/site-copy.ts", "src/lib/site-content.ts", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/app/layout.tsx"];
-  it("'bounce house' appears only as the search-engine hint (meta description + structured data)", () => {
+  it("'bounce house' appears only as a search-engine hint (page titles, meta descriptions, structured data)", () => {
     // Exception: Abraham's approved /terms section C names the business-terms section "Bounce Houses and Inflatable
     // Attractions" verbatim (legal section title), so that one phrase is allowed there.
+    const stripHints = (t: string) =>
+      t
+        .replace(/export const metadata[\s\S]*?\n};\n/g, "")
+        .replace(/const jsonLd = \{[\s\S]*?\n  \};\n/g, "");
     const all = visible
-      .map((f) => readFileSync(f, "utf8"))
+      .map((f) => stripHints(readFileSync(f, "utf8")))
       .join("\n")
       .replace("See Sections 9 through 13 (Bounce Houses and Inflatable Attractions,", "");
     expect(all).not.toMatch(/Bounce Houses/);
-    const hits = all.match(/bounce house/gi) ?? [];
-    expect(hits).toHaveLength(2);
+    expect(all.match(/bounce house/gi) ?? []).toEqual([]); // never in visible copy
     const page = readFileSync("src/app/page.tsx", "utf8");
     expect(page).toContain("Jumping Balloons (bounce houses)");
     expect(page).toContain("Jumping Balloon (bounce house)");
@@ -274,7 +277,7 @@ describe("Kiryas Joel box delivery line (Abram 10:46 PM)", () => {
     const saFile = readFileSync("src/components/site/ServiceArea.tsx", "utf8");
     const box = saFile.slice(saFile.indexOf("data-sa-delivery-note"), saFile.indexOf("data-sa-delivery-note") + 600);
     expect(box).toContain("{noLonelyWord(SERVICE_AREA_DELIVERY_NOTE)}");
-    const how = page.slice(page.indexOf('id="how-it-works"'), page.indexOf("<ServiceArea c={c} />"));
+    const how = page.slice(page.indexOf('id="how-it-works"'), page.indexOf("<ServiceAreaC c={c} />"));
     expect(how).toContain("{DELIVERY_FEE_NOTE}");
   });
 });
@@ -390,10 +393,10 @@ describe("mock-up review pages (Abraham)", () => {
   });
 });
 
-describe("Service Area Option C mock-up (Abraham)", () => {
-  it("has even edges and lives only on the noindex mock-up page; the home page is unchanged", () => {
+describe("Service Area in the hero card style (Abraham, live on the home page)", () => {
+  it("has even edges plus the hero card's solid navy shadow, 3 towns per row on desktop, 2 on phone", () => {
+    expect(readFileSync("src/app/page.tsx", "utf8")).toContain("<ServiceAreaC c={c} />");
     expect(readFileSync("src/app/mockups/service-area/page.tsx", "utf8")).toContain("<ServiceAreaC");
-    expect(readFileSync("src/app/page.tsx", "utf8")).not.toContain("ServiceAreaC");
     const c = readFileSync("src/components/site/ServiceAreaC.tsx", "utf8");
     // Even border on every side, plus the hero card's solid navy offset shadow (no soft or blurred shadow)
     expect(c).toContain('const CARD = "relative flex flex-col rounded-[2rem] border-4 border-hu-deep bg-white p-6 shadow-[8px_8px_0_#123D73] sm:p-8"');
@@ -401,5 +404,46 @@ describe("Service Area Option C mock-up (Abraham)", () => {
     expect(c.match(/shadow-\[[^\]]*\]/g)).toEqual(["shadow-[8px_8px_0_#123D73]"]);
     expect(c).toContain("grid auto-rows-fr grid-cols-2 gap-3");
     expect(c).toContain("md:grid-cols-3");
+  });
+});
+
+describe("hero subtitle (Abraham)", () => {
+  it("keeps the dictated wording, uppercase, first sentence on one line on desktop", async () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toMatch(/data-hero-subtitle className="[^"]*\buppercase\b/);
+    expect(page).toContain('<span className="xl:block xl:whitespace-nowrap">{INTRO_FIRST}</span> {keepName(INTRO_REST)}');
+    const { INTRO } = await import("@/lib/site-copy");
+    expect(INTRO).toBe("Make your next event unforgettable with our exciting rentals! Affordable and suitable for any party, gathering, celebration & occasion, or just because.");
+  });
+});
+
+describe("SEO rule (Abraham)", () => {
+  it("previews are noindex with no sitemap; the live site is indexable", async () => {
+    const { isLiveSite } = await import("@/lib/seo");
+    expect(isLiveSite({ VERCEL_ENV: "preview" })).toBe(false);
+    expect(isLiveSite({})).toBe(false);
+    expect(isLiveSite({ VERCEL_ENV: "production" })).toBe(true);
+    expect(readFileSync("src/app/layout.tsx", "utf8")).toContain("robots: isLiveSite() ? { index: true, follow: true } : { index: false, follow: false }");
+    expect(readFileSync("src/app/robots.ts", "utf8")).toContain('if (!isLiveSite()) return { rules: [{ userAgent: "*", disallow: "/" }] };');
+    expect(readFileSync("src/app/sitemap.ts", "utf8")).toContain("if (!isLiveSite()) return [];");
+  });
+  it("every public page has its own title and description; the rule is saved in CLAUDE.md", () => {
+    const titles = new Set<string>();
+    for (const f of ["src/app/page.tsx", "src/app/text-alerts/page.tsx", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/app/sms-terms/page.tsx", "src/app/paid/page.tsx"]) {
+      const t = readFileSync(f, "utf8");
+      const title = t.match(/title: "([^"]+)"/)?.[1];
+      expect(title, f).toBeTruthy();
+      expect(t, f).toMatch(/description:/);
+      expect(titles.has(title!), f).toBe(false);
+      titles.add(title!);
+    }
+    expect(readFileSync("CLAUDE.md", "utf8")).toContain("Website SEO and tone rule");
+  });
+  it("LocalBusiness data has the name, phone, service area and hours", () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain('"@type": "LocalBusiness"');
+    expect(page).toContain('telephone: "+1-845-777-7585"');
+    expect(page).toContain("areaServed");
+    expect(page).toContain("openingHoursSpecification");
   });
 });
