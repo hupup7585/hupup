@@ -24,5 +24,6 @@ export const CALENDAR_KEYS = [
   "hoursMotzeiCloseSummer",
   "hoursMotzeiSeason",
   "hoursCholHamoed",
+  "hoursChanukah",
   "hoursWebsiteNote",
 ] as const satisfies readonly (keyof Settings)[];

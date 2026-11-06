@@ -9,7 +9,7 @@ import { HDate, HebrewCalendar, flags } from "@hebcal/core";
  */
 
 export type HoursSettings = CalendarSettings &
-  Pick<Settings, "hoursMonThu" | "hoursFridayOpen" | "hoursSunday" | "hoursMotzeiOpen" | "hoursMotzeiCloseWinter" | "hoursMotzeiCloseSummer" | "hoursMotzeiSeason" | "hoursCholHamoed" | "hoursWebsiteNote">;
+  Pick<Settings, "hoursMonThu" | "hoursFridayOpen" | "hoursSunday" | "hoursMotzeiOpen" | "hoursMotzeiCloseWinter" | "hoursMotzeiCloseSummer" | "hoursMotzeiSeason" | "hoursCholHamoed" | "hoursChanukah" | "hoursWebsiteNote">;
 
 export function hoursDefaults(): HoursSettings {
   return { ...SETTING_DEFAULTS };
@@ -36,6 +36,16 @@ function dow(iso: string) {
 function isCholHamoed(iso: string) {
   const [y, m, d] = iso.split("-").map(Number);
   return (HebrewCalendar.getHolidaysOnDate(new HDate(new Date(y, m - 1, d, 12)), false) ?? []).some((e) => e.getFlags() & flags.CHOL_HAMOED);
+}
+function isChanukah(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return (HebrewCalendar.getHolidaysOnDate(new HDate(new Date(y, m - 1, d, 12)), false) ?? []).some((e) => e.getDesc().startsWith("Chanukah"));
+}
+/** Which late-hours window applies on this date (Friday of Chanukah keeps Friday hours: closes at chatzos). */
+function lateWindow(iso: string): "cholHamoed" | "chanukah" | null {
+  if (isCholHamoed(iso)) return "cholHamoed";
+  if (isChanukah(iso) && dow(iso) !== 5 && dow(iso) !== 6) return "chanukah";
+  return null;
 }
 function inDST(at: Date) {
   const name = new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value;
@@ -71,13 +81,26 @@ export function officeOpenNow(at: Date = new Date(), s: HoursSettings = hoursDef
   }
 
   let window: [number, number] | null;
-  if (isCholHamoed(iso)) window = range(s.hoursCholHamoed);
+  const late = lateWindow(iso);
+  if (late === "cholHamoed") window = range(s.hoursCholHamoed);
+  else if (late === "chanukah") window = range(s.hoursChanukah);
   else if (dow(iso) === 0) window = range(s.hoursSunday);
   else if (dow(iso) === 5) window = [mins(s.hoursFridayOpen) ?? 630, 24 * 60];
   else window = range(s.hoursMonThu);
   if (!window || now < window[0] || now >= window[1]) return false;
   if (today.closesAt && at >= today.closesAt) return false; // Erev Shabbos / Erev Yom Tov
   return true;
+}
+
+/**
+ * For the hotline's "open late today" line: Chol Hamoed or Chanukah when that day's late hours apply and the office
+ * is open right now. Never on a day that closes early (Erev Shabbos / Erev Yom Tov).
+ */
+export function lateHoursToday(at: Date = new Date(), s: HoursSettings = hoursDefaults()): "cholHamoed" | "chanukah" | null {
+  const iso = localISO(at);
+  const late = lateWindow(iso);
+  if (!late || dayInfo(iso, s).closesAt || !officeOpenNow(at, s)) return null;
+  return late;
 }
 
 function ampm(hhmm: string) {
@@ -103,6 +126,7 @@ export function hoursLines(s: HoursSettings = hoursDefaults()): string[] {
     `Saturday night (Motzei Shabbos): ${motzeiOpen} until ${ampm(s.hoursMotzeiCloseWinter)} in winter, ${ampm(s.hoursMotzeiCloseSummer)} in summer`,
     `Sunday: ${span(s.hoursSunday)}`,
     `Chol Hamoed: ${span(s.hoursCholHamoed)}`,
+    `Chanukah: ${span(s.hoursChanukah)}`,
     "Closed on Shabbos and Yom Tov.",
   ];
 }

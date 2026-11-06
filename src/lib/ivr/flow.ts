@@ -7,7 +7,7 @@ import { spokenMoney } from "@/lib/money";
 import { last4, spokenDigits, toE164 } from "@/lib/phone";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
 import { checkEventDate } from "@/lib/jewish-calendar";
-import { officeOpenNow } from "@/lib/business-hours";
+import { lateHoursToday, officeOpenNow } from "@/lib/business-hours";
 import {
   PAYMENT_HOLD_MINUTES,
   PHONE_HOLD_MINUTES,
@@ -247,7 +247,14 @@ const handlers: Record<string, Handler> = {
     sp(vr, ctx, "greeting");
     // Booking by phone is available 24/7; outside office hours (Jewish calendar + business hours) callers are told
     // the office is closed and the live-person option is not offered.
-    if (!officeOpenNow(new Date(), await getSettings())) sp(vr, ctx, "office_closed");
+    const settings = await getSettings();
+    if (!officeOpenNow(new Date(), settings)) sp(vr, ctx, "office_closed");
+    else {
+      // Chol Hamoed and Chanukah: Abraham's approved "open late" line (no closing time is spoken).
+      const late = lateHoursToday(new Date(), settings);
+      if (late === "cholHamoed") sp(vr, ctx, "late_cholhamoed");
+      else if (late === "chanukah") sp(vr, ctx, "late_chanukah");
+    }
     return back(vr, "menu");
   },
 

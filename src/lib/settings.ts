@@ -52,6 +52,8 @@ export const SETTING_DEFAULTS = {
   hoursMotzeiSeason: "dst",
   /** Chol Hamoed hours (opening to confirm). */
   hoursCholHamoed: "10:30-22:30",
+  /** Chanukah: same late hours as Chol Hamoed (Abraham). Friday of Chanukah still closes at chatzos. */
+  hoursChanukah: "10:30-22:30",
   /*
    * "Speak to someone" (hotline option 0) routing. One number per line: "Label | phone | ring seconds".
    * Empty = ring FORWARD_PHONE / ADMIN_PHONE as before. sequential = one after another; simultaneous = all at once.

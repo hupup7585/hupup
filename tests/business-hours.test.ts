@@ -52,7 +52,7 @@ describe("office hours (Abraham 2026-11-06, Eastern time)", () => {
   });
   it("the hotline never hangs up for closed hours: booking stays 24/7, live person only in hours", () => {
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
-    expect(flow).toContain('if (!officeOpenNow(new Date(), await getSettings())) sp(vr, ctx, "office_closed");');
+    expect(flow).toContain('if (!officeOpenNow(new Date(), settings)) sp(vr, ctx, "office_closed");');
     expect(flow).toContain("if (config.forwardPhone() && officeOpen) sp(g, ctx, \"menu_operator\");");
     expect(flow).not.toContain("closed_now");
   });
