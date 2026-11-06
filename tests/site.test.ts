@@ -389,3 +389,14 @@ describe("mock-up review pages (Abraham)", () => {
 
   });
 });
+
+describe("Service Area Option C mock-up (Abraham)", () => {
+  it("lives only on the noindex mock-up page; the home page is unchanged", () => {
+    expect(readFileSync("src/app/mockups/service-area/page.tsx", "utf8")).toContain("<ServiceAreaC");
+    expect(readFileSync("src/app/page.tsx", "utf8")).not.toContain("ServiceAreaC");
+    const c = readFileSync("src/components/site/ServiceAreaC.tsx", "utf8");
+    expect(c).toContain("border-[3px] border-hu-deep bg-white p-6 shadow-[8px_8px_0_#123D73]");
+    expect(c).toContain("grid auto-rows-fr grid-cols-2 gap-3");
+    expect(c).toContain("md:grid-cols-3");
+  });
+});

@@ -35,10 +35,10 @@ export function CallButton({ phone, label = "CALL TO BOOK", variant = "solid", c
 }
 
 /** Icon on a flat square tile. */
-export function IconTile({ icon: Icon, tone = "sky", size = "md" }: { icon: LucideIcon; tone?: "sky" | "yellow" | "white"; size?: "md" | "lg" }) {
+export function IconTile({ icon: Icon, tone = "sky", size = "md" }: { icon: LucideIcon; tone?: "sky" | "yellow" | "white"; size?: "sm" | "md" | "lg" }) {
   const bg = tone === "sky" ? "bg-hu-sky" : tone === "yellow" ? "bg-hu-yellow" : "bg-white";
-  const dims = size === "lg" ? "h-20 w-20 rounded-3xl" : "h-12 w-12 rounded-2xl";
-  const icon = size === "lg" ? "h-10 w-10" : "h-6 w-6";
+  const dims = size === "lg" ? "h-20 w-20 rounded-3xl" : size === "sm" ? "h-9 w-9 rounded-xl" : "h-12 w-12 rounded-2xl";
+  const icon = size === "lg" ? "h-10 w-10" : size === "sm" ? "h-5 w-5" : "h-6 w-6";
   return (
     <span className={`grid shrink-0 place-items-center border-2 border-hu-deep text-hu-deep ${bg} ${dims}`} aria-hidden>
       <Icon className={icon} strokeWidth={ICON_STROKE} />
