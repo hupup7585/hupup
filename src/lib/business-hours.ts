@@ -1,7 +1,8 @@
 import type { Settings } from "@/lib/settings";
 import { SETTING_DEFAULTS } from "@/lib/settings";
 import { TIME_ZONE, addDaysISO, dayInfo, localISO, type CalendarSettings } from "@/lib/jewish-calendar";
-import { HDate, HebrewCalendar, flags } from "@hebcal/core";
+import { fixedFromISO } from "@/lib/hup-calendar/hebrew-date";
+import { holidaysOn } from "@/lib/hup-calendar/holidays";
 
 /**
  * Office hours (walk-ins and live calls), Abraham 2026-11-06. Eastern time. Uses the Jewish calendar for closed
@@ -34,12 +35,10 @@ function dow(iso: string) {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
 function isCholHamoed(iso: string) {
-  const [y, m, d] = iso.split("-").map(Number);
-  return (HebrewCalendar.getHolidaysOnDate(new HDate(new Date(y, m - 1, d, 12)), false) ?? []).some((e) => e.getFlags() & flags.CHOL_HAMOED);
+  return holidaysOn(fixedFromISO(iso)).some((e) => e.flags.includes("CHOL_HAMOED"));
 }
 function isChanukah(iso: string) {
-  const [y, m, d] = iso.split("-").map(Number);
-  return (HebrewCalendar.getHolidaysOnDate(new HDate(new Date(y, m - 1, d, 12)), false) ?? []).some((e) => e.getDesc().startsWith("Chanukah"));
+  return holidaysOn(fixedFromISO(iso)).some((e) => e.key.startsWith("Chanukah"));
 }
 /** Which late-hours window applies on this date (Friday of Chanukah keeps Friday hours: closes at chatzos). */
 function lateWindow(iso: string): "cholHamoed" | "chanukah" | null {

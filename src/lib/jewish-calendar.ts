@@ -1,10 +1,14 @@
-import { HDate, HebrewCalendar, Location, Zmanim, flags, type Event } from "@hebcal/core";
+import { fixedFromISO, hebrewFromISO } from "@/lib/hup-calendar/hebrew-date";
+import { holidaysOn, type Holiday } from "@/lib/hup-calendar/holidays";
+import { renderEnglish, renderHebrew } from "@/lib/hup-calendar/names";
+import { zmanim as solarTimes } from "@/lib/hup-calendar/zmanim";
 import type { Settings } from "@/lib/settings";
 import { SETTING_DEFAULTS } from "@/lib/settings";
 
 /**
  * Jewish calendar open/closed rules (Abraham, 2026-11-06), shared by the POS, the hotline and booking checks.
- * Offline (@hebcal/core): no API calls. Diaspora (two-day Yom Tov). Zmanim for Monroe / Kiryas Joel, NY.
+ * Hup Up's own calendar (src/lib/hup-calendar, written in-house, no outside library). Diaspora (two-day Yom Tov).
+ * Zmanim for Monroe / Kiryas Joel, NY.
  *
  * Closed all day: every Shabbos and Yom Tov (Rosh Hashanah, Yom Kippur, Sukkos 1-2, Shemini Atzeres, Simchas
  * Torah, Pesach 1-2 and 7-8, Shavuos 1-2). Open: Chol Hamoed, Chanukah. Admin toggles (defaults): Purim closed,
@@ -42,11 +46,6 @@ function parts(iso: string) {
   const [y, m, d] = iso.split("-").map(Number);
   return { y, m, d };
 }
-/** Noon on that calendar day (avoids time-zone edge cases when deriving the Hebrew date). */
-function noon(iso: string) {
-  const { y, m, d } = parts(iso);
-  return new Date(y, m - 1, d, 12);
-}
 export function addDaysISO(iso: string, n: number) {
   const { y, m, d } = parts(iso);
   const t = new Date(Date.UTC(y, m - 1, d + n));
@@ -61,16 +60,17 @@ function weekday(iso: string) {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 6 = Saturday
 }
 
-function location(s: CalendarSettings) {
-  return new Location(Number(s.calendarLatitude) || 41.3407, Number(s.calendarLongitude) || -74.1679, false, TIME_ZONE, "Kiryas Joel, NY");
+function place(s: CalendarSettings) {
+  return { latitude: Number(s.calendarLatitude) || 41.3407, longitude: Number(s.calendarLongitude) || -74.1679 };
 }
-/** Zmanim for a date. Zmanim works from the date's year/month/day, so pass a local-noon Date. */
+/** Sunrise, sunset, chatzos and tzeis for a date at the business's location. */
 function zmanim(iso: string, s: CalendarSettings) {
-  return new Zmanim(location(s), noon(iso), false);
+  const z = solarTimes(iso, place(s));
+  return { sunset: z.sunset, chatzot: z.chatzos, tzeit: z.tzeis };
 }
 
-function events(iso: string): Event[] {
-  return HebrewCalendar.getHolidaysOnDate(new HDate(noon(iso)), false) ?? [];
+function events(iso: string): Holiday[] {
+  return holidaysOn(fixedFromISO(iso));
 }
 
 type Kind = "shabbos" | "yomtov" | "cholHamoed" | "chanukah" | "purim" | "tishaBav" | "minorFast" | "lagBaomer";
@@ -83,18 +83,17 @@ function kinds(iso: string): { kinds: Set<Kind>; names: string[] } {
     names.push("Shabbos");
   }
   for (const e of events(iso)) {
-    const f = e.getFlags();
-    if (f & flags.YOM_KIPPUR_KATAN) continue; // a minor custom, not a closure; would only confuse staff
-    const desc = e.getDesc();
-    if (f & flags.CHAG) k.add("yomtov");
-    else if (f & flags.CHOL_HAMOED) k.add("cholHamoed");
-    if (desc.startsWith("Chanukah")) k.add("chanukah");
-    if (desc === "Purim") k.add("purim");
-    if (desc.startsWith("Tish'a B'Av")) k.add("tishaBav");
-    if (f & flags.MINOR_FAST && desc !== "Ta'anit Bechorot") k.add("minorFast");
-    if (desc === "Lag BaOmer") k.add("lagBaomer");
-    if (f & (flags.CHAG | flags.CHOL_HAMOED | flags.MINOR_FAST | flags.MAJOR_FAST | flags.MINOR_HOLIDAY | flags.EREV) || desc.startsWith("Chanukah") || desc === "Purim" || desc === "Lag BaOmer")
-      names.push(e.render("ashkenazi"));
+    const f = new Set(e.flags);
+    const key = e.key;
+    if (f.has("CHAG")) k.add("yomtov");
+    else if (f.has("CHOL_HAMOED")) k.add("cholHamoed");
+    if (key.startsWith("Chanukah")) k.add("chanukah");
+    if (key === "Purim") k.add("purim");
+    if (key.startsWith("Tish'a B'Av")) k.add("tishaBav");
+    if (f.has("MINOR_FAST") && key !== "Ta'anit Bechorot") k.add("minorFast");
+    if (key === "Lag BaOmer") k.add("lagBaomer");
+    if (f.has("CHAG") || f.has("CHOL_HAMOED") || f.has("MINOR_FAST") || f.has("MAJOR_FAST") || f.has("MINOR_HOLIDAY") || f.has("EREV") || key.startsWith("Chanukah") || key === "Purim" || key === "Lag BaOmer")
+      names.push(e.name);
   }
   return { kinds: k, names };
 }
@@ -157,7 +156,7 @@ function fmt(d: Date) {
 
 /** Everything about one calendar day. */
 export function dayInfo(iso: string, s: CalendarSettings = calendarDefaults()): DayInfo {
-  const hd = new HDate(noon(iso));
+  const hd = hebrewFromISO(iso);
   const { names } = kinds(iso);
   const today = fullClosed(iso, s);
   let closesAt: Date | null = null;
@@ -176,8 +175,8 @@ export function dayInfo(iso: string, s: CalendarSettings = calendarDefaults()): 
   }
   return {
     date: iso,
-    hebrew: hd.render("ashkenazi"),
-    hebrewHe: hd.renderGematriya(),
+    hebrew: renderEnglish(hd),
+    hebrewHe: renderHebrew(hd),
     names,
     closed: today.closed,
     reason: today.reason,

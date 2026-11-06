@@ -59,7 +59,7 @@ describe("office hours (Abraham 2026-11-06, Eastern time)", () => {
 });
 
 describe("phone line holiday schedule (Abraham, phone system and admin only)", () => {
-  // Finds each day by its Hebrew-calendar name (offline @hebcal), so the dates are never hand-typed.
+  // Finds each day by its Hebrew-calendar name (our own calendar), so the dates are never hand-typed.
   const findDay = async (re: RegExp, from = "2026-11-01", days = 400) => {
     const { dayInfo, addDaysISO } = await import("@/lib/jewish-calendar");
     let d = from;
