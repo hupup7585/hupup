@@ -484,7 +484,7 @@ describe("website Hours (Abraham's simple list)", () => {
       "Monday - Thursday: 10:30 AM - 7:00 PM",
       "Friday: 10:30 AM - Chatzos",
       "Shabbos: Closed",
-      "Motzei Shabbos: 2 hours after Shabbos - 11:30 PM (winter), 12:30 AM (summer)",
+      "Motzei Shabbos: Winter - 2 hours after Shabbos - 11:00 PM\nSummer - 12:00 AM",
     ]);
     expect(WEBSITE_HOURS_NOTE).toBe("Book by phone anytime, 24/7.");
     const page = readFileSync("src/app/page.tsx", "utf8");

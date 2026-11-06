@@ -74,8 +74,8 @@ export default function CalendarSettingsForm({ initial }: { initial: Record<stri
             ["hoursCholHamoed", "Chol Hamoed", "10:30-22:30"],
             ["hoursChanukah", "Chanukah (Friday of Chanukah still closes at chatzos)", "10:30-22:30"],
             ["hoursMotzeiOpen", "Motzei Shabbos opens (\"tzeis+120\" = 2 hours after Shabbos ends)", "tzeis+120"],
-            ["hoursMotzeiCloseWinter", "Motzei Shabbos closes (winter)", "23:30"],
-            ["hoursMotzeiCloseSummer", "Motzei Shabbos closes (summer)", "00:30"],
+            ["hoursMotzeiCloseWinter", "Motzei Shabbos closes (winter)", "23:00"],
+            ["hoursMotzeiCloseSummer", "Motzei Shabbos closes (summer, 00:00 = midnight)", "00:00"],
           ] as const
         ).map(([k, label, ph]) => (
           <label key={k} className="block">

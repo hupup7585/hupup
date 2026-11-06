@@ -250,7 +250,7 @@ export default async function Home() {
                 return (
                   <li key={line} className="py-3">
                     <span className="block text-sm font-bold uppercase tracking-wider opacity-70">{line.slice(0, i)}</span>
-                    <span className="font-semibold">{line.slice(i + 2)}</span>
+                    <span className="block whitespace-pre-line font-semibold">{line.slice(i + 2)}</span>
                   </li>
                 );
               })}

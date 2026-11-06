@@ -61,7 +61,7 @@ export function officeOpenNow(at: Date = new Date(), s: HoursSettings = hoursDef
   const now = localMinutes(at);
   const today = dayInfo(iso, s);
 
-  // After midnight on Sunday: the end of a Motzei Shabbos that runs past 12:00 AM (summer 12:30 AM).
+  // After midnight on Sunday: the end of a Motzei Shabbos set to close after 12:00 AM (the default summer close is midnight).
   const yesterday = dayInfo(addDaysISO(iso, -1), s);
   const close = motzeiCloseMinutes(at, s);
   if (yesterday.reopensAt && close < 6 * 60 && now < close) return true;
@@ -155,7 +155,7 @@ export function hoursLines(s: HoursSettings = hoursDefaults()): string[] {
   ];
 }
 
-/** Today's office hours as one line, e.g. "Today: 10:30 AM to 7:00 PM" or "Closed today (Shabbos). Open tonight from 7:22 PM to 11:30 PM." */
+/** Today's office hours as one line, e.g. "Today: 10:30 AM to 7:00 PM" or "Closed today (Shabbos). Open tonight from 7:22 PM to 11:00 PM." */
 export function todayHours(at: Date = new Date(), s: HoursSettings = hoursDefaults()): string {
   const iso = localISO(at);
   const info = dayInfo(iso, s);

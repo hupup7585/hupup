@@ -46,8 +46,8 @@ export const SETTING_DEFAULTS = {
   hoursSunday: "11:30-19:00",
   /** Motzei Shabbos opening: "tzeis+120" = 2 hours after Shabbos ends (Abraham), "tzeis", or HH:MM. */
   hoursMotzeiOpen: "tzeis+120",
-  hoursMotzeiCloseWinter: "23:30",
-  hoursMotzeiCloseSummer: "00:30",
+  hoursMotzeiCloseWinter: "23:00",
+  hoursMotzeiCloseSummer: "00:00",
   /** Which Motzei Shabbos closing applies: "dst" = summer while daylight saving time is in effect (to confirm). */
   hoursMotzeiSeason: "dst",
   /** Chol Hamoed hours (opening to confirm). */

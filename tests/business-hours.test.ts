@@ -17,17 +17,18 @@ describe("office hours (Abraham 2026-11-06, Eastern time)", () => {
     expect(officeOpenNow(at("2026-11-13T16:00:00Z"), S)).toBe(true); // 11:00 AM
     expect(officeOpenNow(at("2026-11-13T17:00:00Z"), S)).toBe(false); // 12:00 PM, after chatzos (~11:41)
   });
-  it("Shabbos closed; Motzei Shabbos opens 2 hours after Shabbos ends, until 11:30 PM in winter", () => {
+  it("Shabbos closed; Motzei Shabbos opens 2 hours after Shabbos ends, until 11:00 PM in winter", () => {
     // Nov 14, 2026: Shabbos ends (tzeis 8.5 deg) about 5:22 PM, so the office opens about 7:22 PM
     expect(officeOpenNow(at("2026-11-14T17:00:00Z"), S)).toBe(false); // Shabbos noon
     expect(officeOpenNow(at("2026-11-14T23:30:00Z"), S)).toBe(false); // 6:30 PM: Shabbos over, but < 2 hours
     expect(officeOpenNow(at("2026-11-15T00:30:00Z"), S)).toBe(true); // 7:30 PM
-    expect(officeOpenNow(at("2026-11-15T04:29:00Z"), S)).toBe(true); // 11:29 PM
-    expect(officeOpenNow(at("2026-11-15T04:30:00Z"), S)).toBe(false); // 11:30 PM
+    expect(officeOpenNow(at("2026-11-15T03:59:00Z"), S)).toBe(true); // 10:59 PM
+    expect(officeOpenNow(at("2026-11-15T04:00:00Z"), S)).toBe(false); // 11:00 PM
   });
-  it("summer (daylight saving): Motzei Shabbos runs until 12:30 AM", () => {
-    expect(officeOpenNow(at("2027-06-20T04:15:00Z"), S)).toBe(true); // Sun 12:15 AM EDT after Shabbos Jun 19
-    expect(officeOpenNow(at("2027-06-20T04:31:00Z"), S)).toBe(false); // 12:31 AM
+  it("summer (daylight saving): Motzei Shabbos runs until 12:00 AM midnight", () => {
+    expect(officeOpenNow(at("2027-06-20T03:59:00Z"), S)).toBe(true); // Sat Jun 19, 11:59 PM EDT
+    expect(officeOpenNow(at("2027-06-20T04:00:00Z"), S)).toBe(false); // Sun 12:00 AM
+    expect(officeOpenNow(at("2027-06-20T04:15:00Z"), S)).toBe(false); // 12:15 AM
   });
   it("Sunday 11:30 AM to 7:00 PM", () => {
     expect(officeOpenNow(at("2026-11-15T16:00:00Z"), S)).toBe(false); // 11:00 AM
@@ -47,7 +48,7 @@ describe("office hours (Abraham 2026-11-06, Eastern time)", () => {
     expect(l[0]).toBe("Monday to Thursday: 10:30 AM to 7:00 PM");
     expect(l).toContain("Sunday: 11:30 AM to 7:00 PM");
     expect(l).toContain("Chol Hamoed: 10:30 AM to 10:30 PM");
-    expect(l).toContain("Saturday night (Motzei Shabbos): from 2 hours after Shabbos ends until 11:30 PM in winter, 12:30 AM in summer");
+    expect(l).toContain("Saturday night (Motzei Shabbos): from 2 hours after Shabbos ends until 11:00 PM in winter, 12:00 AM in summer");
     expect(S.hoursWebsiteNote).toBe("Please note that you can book at any time using our automated phone system.");
   });
   it("the hotline never hangs up for closed hours: booking stays 24/7, live person only in hours", () => {
