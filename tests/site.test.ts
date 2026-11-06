@@ -368,3 +368,13 @@ describe("Middletown: served, but not shown on the public website (Abraham)", ()
     expect(serviceAreaPlaces().join(" ")).not.toMatch(/middletown/i);
   });
 });
+
+describe("footer contact block (Abraham)", () => {
+  it("holds contact info only: no service area or hours lines", () => {
+    const footer = readFileSync("src/components/site/SiteFooter.tsx", "utf8");
+    const contact = footer.slice(footer.indexOf(">Contact</h3>"), footer.indexOf("border-t border-white/15"));
+    expect(contact).toContain("tel:");
+    expect(contact).toContain("mailto:");
+    expect(contact).not.toMatch(/Main area|nearby|officeHours|See all hours|automated phone/);
+  });
+});
