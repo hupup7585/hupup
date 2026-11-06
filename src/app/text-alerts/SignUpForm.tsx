@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { SELECTABLE_TIME_ZONES } from "@/lib/area-code-tz";
-import { PROMO_BENEFITS, PROMO_BENEFITS_NOTE } from "@/lib/sms-consent-copy";
+import { PROMO_BENEFITS, PROMO_BENEFITS_NOTE, PROMO_HEADING, PROMO_TITLE } from "@/lib/sms-consent-copy";
 import { signUpForTexts, type SignUpState } from "./actions";
 
 /**
@@ -60,8 +60,9 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
         <legend className="mb-2 font-bold">Choose the texts you want (check one or both)</legend>
         {/* Promotional list: the larger, highlighted choice (Abraham). Still unchecked; consent wording unchanged. */}
         <div data-consent="marketing" className="rounded-3xl border-[3px] border-hu-deep bg-hu-yellow/30 p-5 shadow-[6px_6px_0_#123D73] sm:p-7">
-          <h2 className="text-2xl font-extrabold leading-tight sm:text-3xl">Join our text list</h2>
-          <p className="mt-2 text-lg font-semibold">Members get:</p>
+          <h2 data-promo-title className="text-2xl font-extrabold leading-tight sm:text-3xl">{PROMO_TITLE}</h2>
+          <p data-promo-heading className="mt-1 text-lg font-extrabold uppercase tracking-[0.14em] sm:text-xl">{PROMO_HEADING}</p>
+          <p className="mt-3 text-lg font-semibold">Members get:</p>
           <ul data-promo-benefits className="mt-2 grid gap-x-6 gap-y-1.5 text-lg sm:grid-cols-2">
             {PROMO_BENEFITS.map((b) => (
               <li key={b} className="flex items-start gap-2">

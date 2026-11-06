@@ -498,3 +498,18 @@ describe("website Hours (Abraham's simple list)", () => {
     }
   });
 });
+
+describe("text alerts promotional box (Abraham approved)", () => {
+  it("'And much more' is the title on top, 'STAY INFORMED' directly under it; consent text unchanged", async () => {
+    const c = await import("@/lib/sms-consent-copy");
+    expect(c.PROMO_TITLE).toBe("And much more");
+    expect(c.PROMO_HEADING).toBe("STAY INFORMED");
+    expect(c.PROMO_BENEFITS).toEqual(["New item notices", "Promos and special offers", "Our catalog before each season"]);
+    expect(c.PROMO_BENEFITS_NOTE).toBe("All in our occasional promotional texts. Message frequency varies.");
+    const f = readFileSync("src/app/text-alerts/SignUpForm.tsx", "utf8");
+    expect(f.indexOf("{PROMO_TITLE}")).toBeLessThan(f.indexOf("{PROMO_HEADING}"));
+    expect(f.indexOf("{PROMO_HEADING}")).toBeLessThan(f.indexOf("PROMO_BENEFITS.map("));
+    expect(f).not.toContain("Join our text list");
+    expect(f).toContain("{marketingText}");
+  });
+});

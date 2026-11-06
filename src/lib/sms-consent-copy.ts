@@ -18,7 +18,10 @@ export const WEB_CONSENT_MARKETING =
  * What the promotional list offers (Abraham's list, shown above the promotional checkbox on /text-alerts).
  * "And much more" is limited by the note: it adds content, never extra texts beyond the stated frequency.
  */
-export const PROMO_BENEFITS = ["New item notices", "Promos and special offers", "Our catalog before each season", "And much more!"] as const;
+export const PROMO_BENEFITS = ["New item notices", "Promos and special offers", "Our catalog before each season"] as const;
+/** Top of the promotional box (Abraham approved): title, then the heading directly under it. */
+export const PROMO_TITLE = "And much more";
+export const PROMO_HEADING = "STAY INFORMED";
 export const PROMO_BENEFITS_NOTE = "All in our occasional promotional texts. Message frequency varies.";
 
 /** Website checkbox: transactional (Abram's earlier wording plus the same provider-sharing clause). Unchecked by default. */
