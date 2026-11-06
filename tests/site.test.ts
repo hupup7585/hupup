@@ -270,7 +270,7 @@ describe("contact list Business icon (Abram 10:43 PM)", () => {
   it("uses the Lucide Store icon in the same sky tile", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
     const contact = page.slice(page.indexOf('id="contact"'));
-    expect(contact).toMatch(/<IconTile icon=\{Store\} tone="sky" \/>\s*<div>\s*<dt[^>]*>Business<\/dt>/);
+    expect(contact).toMatch(/<IconTile icon=\{Store\} tone="sky" \/>\s*<div>\s*<p[^>]*>Business<\/p>/);
     expect(contact).not.toContain("icon={PartyPopper}");
   });
 });
@@ -543,5 +543,19 @@ describe("delivery only, no setup (Abraham)", () => {
   });
   it("header: a little more space between the phone number and CALL TO BOOK", () => {
     expect(readFileSync("src/components/site/SiteHeader.tsx", "utf8")).toContain("lg:pl-6 xl:gap-6");
+  });
+});
+
+describe("Google optimization fixes (no wording changes)", () => {
+  it("contact list is a proper list, eyebrows have full contrast, logo has sizes, every public page has a canonical", () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).not.toMatch(/<dl|<dt|<dd/);
+    expect(page).toContain("<ul data-contact-list");
+    const parts = readFileSync("src/components/site/parts.tsx", "utf8");
+    expect(parts).toContain("tracking-[0.18em] text-hu-deep`}>{keepName(kicker)}");
+    expect(parts).toContain('sizes="(min-width: 640px) 61px, 54px"');
+    for (const [f, c] of [["src/app/page.tsx", "/"], ["src/app/text-alerts/page.tsx", "/text-alerts"], ["src/app/privacy/page.tsx", "/privacy"], ["src/app/terms/page.tsx", "/terms"], ["src/app/sms-terms/page.tsx", "/sms-terms"]]) {
+      expect(readFileSync(f, "utf8"), f).toContain(`alternates: { canonical: "${c}" }`);
+    }
   });
 });

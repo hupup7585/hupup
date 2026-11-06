@@ -256,58 +256,58 @@ export default async function Home() {
           <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 md:grid-cols-2 md:items-start md:gap-10">
             {/* Abraham: same as the other section headings (like the Our Hours heading): left-aligned, top of the column */}
             <SectionTitle kicker="Get in touch" title="Contact Us" />
-            <dl className="divide-y-2 divide-hu-deep/10 border-y-2 border-hu-deep/10 text-lg">
-              <div className="flex items-center gap-4 py-4">
+            <ul data-contact-list className="divide-y-2 divide-hu-deep/10 border-y-2 border-hu-deep/10 text-lg">
+              <li className="flex items-center gap-4 py-4">
                 <IconTile icon={Store} tone="sky" />
                 <div>
-                  <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Business</dt>
-                  <dd className="font-semibold">{BUSINESS_NAME_NB}</dd>
+                  <p className="text-sm font-bold uppercase tracking-wider opacity-70">Business</p>
+                  <div className="font-semibold">{BUSINESS_NAME_NB}</div>
                 </div>
-              </div>
-              <div className="flex items-center gap-4 py-4">
+              </li>
+              <li className="flex items-center gap-4 py-4">
                 <IconTile icon={Phone} tone="sky" />
                 <div>
-                  <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Phone</dt>
-                  <dd>
+                  <p className="text-sm font-bold uppercase tracking-wider opacity-70">Phone</p>
+                  <div>
                     <a href={`tel:${c.phoneE164}`} className="font-semibold underline underline-offset-4">
                       {c.phoneDisplay}
                     </a>
-                  </dd>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-4 py-4">
+              </li>
+              <li className="flex items-center gap-4 py-4">
                 <IconTile icon={Mail} tone="sky" />
                 <div className="min-w-0">
-                  <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Email</dt>
-                  <dd className="break-all">
+                  <p className="text-sm font-bold uppercase tracking-wider opacity-70">Email</p>
+                  <div className="break-all">
                     <a href={`mailto:${c.email}`} className="font-semibold underline underline-offset-4">
                       {c.email}
                     </a>
-                  </dd>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-4 py-4">
+              </li>
+              <li className="flex items-center gap-4 py-4">
                 <IconTile icon={MapPin} tone="sky" />
                 <div>
-                  <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Service area</dt>
-                  <dd className="font-semibold">
+                  <p className="text-sm font-bold uppercase tracking-wider opacity-70">Service area</p>
+                  <div className="font-semibold">
                     {c.serviceArea.main}
                     <a href="#service-area" className="block text-base font-medium underline underline-offset-4">
                       Plus nearby {c.serviceArea.region} towns
                     </a>
-                  </dd>
-                </div>
-              </div>
-              {c.hours && (
-                <div className="flex items-center gap-4 py-4">
-                  <IconTile icon={CalendarCheck} tone="sky" />
-                  <div>
-                    <dt className="text-sm font-bold uppercase tracking-wider opacity-70">Hours</dt>
-                    <dd className="whitespace-pre-line font-semibold">{c.hours}</dd>
                   </div>
                 </div>
+              </li>
+              {c.hours && (
+                <li className="flex items-center gap-4 py-4">
+                  <IconTile icon={CalendarCheck} tone="sky" />
+                  <div>
+                    <p className="text-sm font-bold uppercase tracking-wider opacity-70">Hours</p>
+                    <div className="whitespace-pre-line font-semibold">{c.hours}</div>
+                  </div>
+                </li>
               )}
-            </dl>
+            </ul>
           </div>
         </section>
       </main>

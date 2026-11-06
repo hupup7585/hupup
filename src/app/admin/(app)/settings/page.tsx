@@ -5,7 +5,7 @@ import { config } from "@/lib/config";
 import { requireOwner } from "@/lib/auth";
 import RoutingForm from "./RoutingForm";
 import BlockingForm from "./BlockingForm";
-import { routeSummary, routeTargets } from "@/lib/ivr/routing";
+import { RING_KEYS, RING_KEY_LABELS, ringListFor, routeSummary, routeTargets } from "@/lib/ivr/routing";
 
 function Row({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
   return (
@@ -28,11 +28,24 @@ export default async function SettingsPage() {
         <CalendarSettingsForm initial={calInitial} />
       </section>
       <section className="card mb-6 p-5" id="routing">
-        <h2 className="mb-3 text-lg font-extrabold">Speak to someone (hotline option 0)</h2>
-        <RoutingForm
-          initial={{ operatorTargets: settings.operatorTargets, operatorMode: settings.operatorMode, operatorAcceptPrompt: settings.operatorAcceptPrompt, operatorAcceptText: settings.operatorAcceptText }}
-          summary={routeSummary(routeTargets(settings), settings.operatorMode)}
-        />
+        <h2 className="mb-1 text-lg font-extrabold">Live employee ring lists (main menu keys 2, 4, 5, 6 and 0)</h2>
+        <p className="mb-4 text-sm text-muted">Key 9 goes straight to the general voicemail, no ringing.</p>
+        <div className="grid gap-8">
+          {RING_KEYS.map((k) => {
+            const list = ringListFor(settings, k);
+            const own = k === "0" ? { targets: settings.operatorTargets, mode: settings.operatorMode, accept: settings.operatorAcceptPrompt } : { targets: settings[`ringTargets${k}`], mode: settings[`ringMode${k}`], accept: settings[`ringAccept${k}`] };
+            return (
+              <div key={k}>
+                <h3 className="mb-2 font-extrabold">{RING_KEY_LABELS[k]}</h3>
+                <RoutingForm
+                  ringKey={k}
+                  initial={{ ...own, acceptText: settings.operatorAcceptText }}
+                  summary={`${list.usesOperatorList ? "No numbers yet, so it uses the operator list: " : ""}${routeSummary(list.targets, list.mode)}`}
+                />
+              </div>
+            );
+          })}
+        </div>
       </section>
       <section className="card mb-6 p-5" id="blocking">
         <h2 className="mb-3 text-lg font-extrabold">Caller blocking</h2>

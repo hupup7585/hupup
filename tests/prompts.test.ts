@@ -5,9 +5,7 @@ import { PROMPTS, fill, promptAudio, promptText, type PromptDef } from "@/lib/iv
 
 describe("hotline prompts", () => {
   it("greeting is warm and uses the exact business name", () => {
-    expect(PROMPTS.greeting.text).toBe(
-      "Hi, thanks for calling Hup Up Attractions, where the party starts! We bring jumping balloons, laser tag, and paddle boats right to your door.",
-    );
+    expect(PROMPTS.greeting.text).toBe("Hi! Thank you for calling Hup Up Attractions, bringing something special to every occasion!");
   });
   it("are plain text (no SSML/markup) for Chirp3-HD voices", () => {
     for (const def of Object.values(PROMPTS) as PromptDef[]) expect(def.text).not.toMatch(/<[^>]+>/);
@@ -63,8 +61,7 @@ describe("delivery is an additional fee on the phone", () => {
     expect(PROMPTS.product_intro.text).toBe("Great choice! The {item} is {price}. Delivery is available for an additional fee, and our team will give you the delivery price.");
     expect(PROMPTS.cart_summary.text).toContain("plus delivery and sales tax");
   });
-  it("greeting says jumping balloons, not bounce houses", () => {
-    expect(PROMPTS.greeting.text).toContain("jumping balloons");
+  it("greeting never says bounce houses", () => {
     expect(PROMPTS.greeting.text).not.toMatch(/bounce/i);
   });
 });

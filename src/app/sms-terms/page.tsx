@@ -6,6 +6,7 @@ import { smsNumberDisplay } from "@/lib/sms-number";
 export const metadata = {
   title: "SMS Terms | Hup Up Attractions",
   description: "How Hup Up Attractions text messages work: order and service texts, promotional texts, message frequency, and how to reply STOP or HELP.",
+  alternates: { canonical: "/sms-terms" },
 };
 export const revalidate = 3600;
 

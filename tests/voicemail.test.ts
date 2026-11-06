@@ -48,9 +48,11 @@ beforeEach(() => {
 });
 
 describe("hotline voicemail", () => {
-  it("office closed: the menu offers a message on 0, and 0 goes straight to voicemail", async () => {
-    expect(await call("menu")).toContain("To leave us a message, press 0.");
-    const closed = await call("operator");
+  it("office closed: the menu still offers 9 (voicemail) and 0; 0 plays the missed-call line then voicemail", async () => {
+    const menu = await call("menu");
+    expect(menu).toContain("To leave a message in our general voicemail, press 9.");
+    expect(menu).toContain("To speak with an operator, press 0.");
+    const closed = await call("ring", {}, "k=0");
     expect(closed).toContain("Sorry, we missed your call, our team is busy helping others right now. Please leave a message after the tone and someone will get back to you shortly. Thank you and have a wonderful day!");
     expect(closed).toContain("/api/voice/voicemail?after=1");
   });
@@ -114,8 +116,8 @@ describe("hotline voicemail", () => {
   it("office open: 0 rings the office; if no one answers, Abraham's missed-call line then the voicemail beep", async () => {
     h.open = true;
     process.env.FORWARD_PHONE = "+18457777585";
-    const dial = await call("operator");
-    expect(dial).toMatch(/<Dial [^>]*action="[^"]*operator-done\?i=0"/);
+    const dial = await call("ring", {}, "k=0");
+    expect(dial).toMatch(/<Dial [^>]*action="[^"]*operator-done\?i=0&amp;k=0"/);
     const missed = await call("operator-done", { DialCallStatus: "no-answer" });
     expect(missed).toContain("Sorry, we missed your call, our team is busy helping others right now. Please leave a message after the tone and someone will get back to you shortly. Thank you and have a wonderful day!");
     expect(missed).toContain("/api/voice/voicemail?after=1");

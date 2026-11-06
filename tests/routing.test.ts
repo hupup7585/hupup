@@ -50,25 +50,25 @@ describe("routing list", () => {
 
 describe("sequential: one after another, each must press 1", () => {
   it("rings #1 for its own time with the accept prompt, then #2, then #3, then the missed-call line and voicemail", async () => {
-    const first = await call("operator");
-    expect(first).toMatch(/<Dial [^>]*timeout="20"[^>]*action="[^"]*operator-done\?i=0"/);
+    const first = await call("ring", {}, "k=0");
+    expect(first).toMatch(/<Dial [^>]*timeout="20"[^>]*action="[^"]*operator-done\?i=0&amp;k=0"/);
     expect(first).toContain(`<Number url="https://hupup.example/api/voice/whisper?from=%2B18455550199" method="POST">+18457777585</Number>`);
-    const second = await call("operator-done", { DialCallStatus: "no-answer" }, "i=0");
-    expect(second).toMatch(/timeout="15"[^>]*operator-done\?i=1/);
+    const second = await call("operator-done", { DialCallStatus: "no-answer" }, "i=0&k=0");
+    expect(second).toMatch(/timeout="15"[^>]*operator-done\?i=1&amp;k=0/);
     expect(second).toContain(">+18455550100</Number>");
-    const third = await call("operator-done", { DialCallStatus: "busy" }, "i=1");
+    const third = await call("operator-done", { DialCallStatus: "busy" }, "i=1&k=0");
     expect(third).toContain(">+18455550111</Number>");
-    const end = await call("operator-done", { DialCallStatus: "no-answer" }, "i=2");
+    const end = await call("operator-done", { DialCallStatus: "no-answer" }, "i=2&k=0");
     expect(end).toContain("Sorry, we missed your call, our team is busy helping others right now. Please leave a message after the tone and someone will get back to you shortly. Thank you and have a wonderful day!");
     expect(end).toContain("/api/voice/voicemail?after=1"); // straight to the beep
-    expect(await call("operator-done", { DialCallStatus: "completed" }, "i=1")).toContain("<Hangup/>");
+    expect(await call("operator-done", { DialCallStatus: "completed" }, "i=1&k=0")).toContain("<Hangup/>");
   });
 });
 
 describe("simultaneous: everyone at once, first to press 1 wins", () => {
   it("dials all numbers in one Dial with the longest ring time; no answer goes to the missed-call line and voicemail", async () => {
     await saveSetting("operatorMode", "simultaneous");
-    const xml = await call("operator");
+    const xml = await call("ring", {}, "k=0");
     expect(xml).toMatch(/<Dial [^>]*timeout="20"/);
     expect((xml.match(/<Number /g) || []).length).toBe(3);
     expect(xml).not.toContain("?i=");
@@ -88,7 +88,7 @@ describe("the staff member's side", () => {
   });
   it("accept prompt off: numbers ring straight through", async () => {
     await saveSetting("operatorAcceptPrompt", false);
-    expect(await call("operator")).toContain("<Number>+18457777585</Number>");
+    expect(await call("ring", {}, "k=0")).toContain("<Number>+18457777585</Number>");
   });
 });
 

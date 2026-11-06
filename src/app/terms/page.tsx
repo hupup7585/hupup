@@ -4,6 +4,7 @@ import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 export const metadata = {
   title: "Terms and Conditions | Hup Up Attractions",
   description: "The rental terms for bounce houses, laser tag, inflatable mazes and paddle boats from Hup Up Attractions: booking, delivery, safety and payment.",
+  alternates: { canonical: "/terms" },
 };
 export const revalidate = 3600;
 

@@ -17,7 +17,7 @@ export const LOGO_SRC = "/brand/hupup-logo-320.png";
 export function Wordmark({ logoUrl, light = false }: { logoUrl: string | null; light?: boolean }) {
   // On light backgrounds show the logo; on navy (light = true) keep the text name instead.
   if (!light) {
-    return <Image src={logoUrl || LOGO_SRC} alt="Hup Up Attractions" width={320} height={337} className="h-14 w-auto sm:h-16" priority />;
+    return <Image src={logoUrl || LOGO_SRC} alt="Hup Up Attractions" width={320} height={337} sizes="(min-width: 640px) 61px, 54px" className="h-14 w-auto sm:h-16" priority />;
   }
   return (
     <span className={`whitespace-nowrap font-display text-lg font-extrabold leading-none tracking-tight min-[400px]:text-xl sm:text-2xl ${light ? "text-white" : "text-hu-deep"}`}>
@@ -71,7 +71,7 @@ export function SectionTitle({
 }) {
   return (
     <div className={className}>
-      {kicker && <p className={`${kickerSpacing} text-sm font-extrabold uppercase tracking-[0.18em] text-hu-deep/70`}>{keepName(kicker)}</p>}
+      {kicker && <p className={`${kickerSpacing} text-sm font-extrabold uppercase tracking-[0.18em] text-hu-deep`}>{keepName(kicker)}</p>}
       <h2 className={`font-display text-[1.7rem] font-extrabold leading-tight text-hu-deep min-[370px]:text-3xl sm:text-4xl ${compactLg ? "lg:text-4xl xl:text-5xl" : "lg:text-5xl"}`}>{keepName(title)}</h2>
     </div>
   );

@@ -16,7 +16,17 @@ export type PromptDef = {
 
 export const PROMPTS = {
   // Welcome & main menu
-  greeting: { group: "Welcome & main menu", label: "Welcome greeting", text: "Hi, thanks for calling Hup Up Attractions, where the party starts! We bring jumping balloons, laser tag, and paddle boats right to your door." },
+  // Abraham's exact main menu (greeting, then one line per key, with a 0.75-second pause after each)
+  greeting: { group: "Welcome & main menu", label: "Welcome greeting (Abraham)", text: "Hi! Thank you for calling Hup Up Attractions, bringing something special to every occasion!" },
+  main_1: { group: "Welcome & main menu", label: "Main menu key 1 (Abraham)", text: "For bookings with our automatic easy system, press 1." },
+  main_2: { group: "Welcome & main menu", label: "Main menu key 2 (Abraham)", text: "For corporates & organizations, press 2." },
+  main_3: { group: "Welcome & main menu", label: "Main menu key 3 (Abraham)", text: "To learn more about our entertainment rentals, press 3." },
+  main_4: { group: "Welcome & main menu", label: "Main menu key 4 (Abraham)", text: "For customer service, press 4." },
+  main_5: { group: "Welcome & main menu", label: "Main menu key 5 (Abraham)", text: "For questions or problems during your rental, press 5." },
+  main_6: { group: "Welcome & main menu", label: "Main menu key 6 (Abraham)", text: "For delivery and pickup information, press 6." },
+  main_7: { group: "Welcome & main menu", label: "Main menu key 7 (Abraham)", text: "For our hours of operation, press 7." },
+  main_9: { group: "Welcome & main menu", label: "Main menu key 9 (Abraham)", text: "To leave a message in our general voicemail, press 9." },
+  main_0: { group: "Welcome & main menu", label: "Main menu key 0 (Abraham)", text: "To speak with an operator, press 0." },
   menu_category: { group: "Welcome & main menu", label: "Menu option for a category", text: "For {category}, press {key}.", vars: ["category", "key"] },
   menu_cart: { group: "Welcome & main menu", label: "Menu option: review cart", text: "Ready to check out? Press 9 to hear your cart." },
   menu_operator: { group: "Welcome & main menu", label: "Menu option: talk to a person", text: "To talk with someone from our team, press 0." },

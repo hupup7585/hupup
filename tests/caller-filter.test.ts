@@ -44,7 +44,7 @@ describe("blocked callers on the hotline", () => {
     expect(blocked).toBe('<?xml version="1.0" encoding="UTF-8"?><Response><Reject reason="busy"/></Response>');
     expect(h.ensured).not.toContain("CAblk");
     const ok = await handleVoice({ action: "incoming", query: new URLSearchParams(), body: { CallSid: "CAok" }, callSid: "CAok", from: "+18455550100" });
-    expect(ok).toContain("thanks for calling Hup Up Attractions");
+    expect(ok).toContain("Thank you for calling Hup Up Attractions");
     expect(h.ensured).toContain("CAok");
   });
 });

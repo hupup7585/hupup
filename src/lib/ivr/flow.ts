@@ -21,7 +21,7 @@ import {
 import { payPageLink } from "@/lib/rental-terms";
 import { TERMS_TEXT } from "@/lib/terms-content";
 import { sendEmail, sendSms } from "@/lib/notify";
-import { getSettings, type Settings } from "@/lib/settings";
+import { getSettings } from "@/lib/settings";
 import { computeTotals, deliveryZone } from "@/lib/pricing";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
@@ -39,7 +39,7 @@ import { ensureSession, getSession, updateSession, type CallSession } from "./se
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { matchMenuSpeech, menuSpeechHints } from "./category-speech";
 import { boxById, mainBox, saveRecording, saveTranscription } from "@/lib/voicemail";
-import { routeTargets } from "./routing";
+import { RING_KEYS, ringListFor, type RingKey } from "./routing";
 import { matchBlock, parseBlockList } from "./caller-filter";
 import { PROMPTS, loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
 
@@ -221,19 +221,18 @@ function shortPause(target: VR | Gather) {
   target.play(`${config.baseUrl()}${SHORT_PAUSE_FILE}`);
 }
 
-/** Ring one routing step (sequential) or everyone (simultaneous). */
-function dialTargets(vr: VR, settings: Settings, i: number, from?: string | null): VR {
-  const all = routeTargets(settings);
-  const simultaneous = settings.operatorMode === "simultaneous";
-  const ring = simultaneous ? all : [all[i]];
+/** Ring one step of a key's list (one after another) or everyone at once. */
+function dialTargets(vr: VR, list: ReturnType<typeof ringListFor>, k: RingKey, i: number, from?: string | null): VR {
+  const simultaneous = list.mode === "simultaneous";
+  const ring = simultaneous ? list.targets : [list.targets[i]];
   const dial = vr.dial({
     callerId: process.env.TWILIO_PHONE_NUMBER || undefined,
     timeout: Math.max(...ring.map((t) => t.ringSeconds)),
-    action: url("operator-done", { i: simultaneous ? undefined : i }),
+    action: url("operator-done", { i: simultaneous ? undefined : i, k }),
     method: "POST",
   });
   for (const t of ring) {
-    if (settings.operatorAcceptPrompt) dial.number({ url: url("whisper", { from: from || undefined }), method: "POST" }, t.phone);
+    if (list.accept) dial.number({ url: url("whisper", { from: from || undefined }), method: "POST" }, t.phone);
     else dial.number(t.phone);
   }
   return vr;
@@ -268,10 +267,13 @@ const handlers: Record<string, Handler> = {
     return back(vr, "menu");
   },
 
+  /**
+   * Abraham's main menu. 1 bookings (rental list), 2/4/5/6/0 ring a live employee (each key's own list), 9 general
+   * voicemail, * repeats. Until Abraham approves their messages: 3 opens the rental list, 7 rings the operator.
+   * Voice commands keep working in the background (not announced).
+   */
   async menu(ctx, vr) {
     const cats = await phoneCategories();
-    const order = await currentOrder(ctx);
-    // Keypad OR speech: callers can press a key or just say what they want ("bounce house" works too).
     const g = vr.gather({
       input: ["dtmf", "speech"],
       numDigits: 1,
@@ -284,20 +286,11 @@ const handlers: Record<string, Handler> = {
       speechTimeout: "auto",
       hints: menuSpeechHints(cats),
     });
-    // A three-quarter-second pause between options so callers can follow the choices (Abraham)
-    const option = (key: PromptKey, vars?: Record<string, string | number>) => {
-      sp(g, ctx, key, vars);
-      shortPause(g);
-    };
-    if (!cats.length) option("menu_empty");
-    for (const c of cats) option("menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
-    if (order?.items.length) option("menu_cart");
-    const officeOpen = officeOpenNow(new Date(), await getSettings());
-    // Option 0: a live person while the office is open; otherwise leave a message (voicemail).
-    if (config.forwardPhone() && officeOpen) option("menu_operator");
-    else option("menu_voicemail");
-    if (cats.length) option("menu_speech");
-    sp(g, ctx, "menu_repeat");
+    const keys = ["main_1", "main_2", "main_3", "main_4", "main_5", "main_6", "main_7", "main_9", "main_0"] as const;
+    keys.forEach((k, i) => {
+      sp(g, ctx, k);
+      if (i < keys.length - 1) shortPause(g); // 0.75 s between options (Abraham)
+    });
     return noInput(vr, ctx, "menu");
   },
 
@@ -308,20 +301,82 @@ const handlers: Record<string, Handler> = {
       const choice = matchMenuSpeech(said, await phoneCategories());
       if (choice?.kind === "category") return back(vr, "category", { c: choice.categoryId });
       if (choice?.kind === "cart") return back(vr, "cart");
-      if (choice?.kind === "operator") return back(vr, "operator");
+      if (choice?.kind === "operator") return back(vr, "ring", { k: "0" });
       if (choice?.kind === "repeat") return back(vr, "menu");
       sp(vr, ctx, "invalid");
       return back(vr, "menu");
     }
     if (!d) return noInput(vr, ctx, "menu", {});
+    switch (d) {
+      case "*":
+        return back(vr, "menu");
+      case "1":
+        return back(vr, "book");
+      case "3": // stand-in until Abraham approves the key 3 message
+        return back(vr, "book");
+      case "2":
+      case "4":
+      case "5":
+      case "6":
+      case "0":
+        return back(vr, "ring", { k: d });
+      case "7": // stand-in until Abraham approves the key 7 hours message
+        return back(vr, "ring", { k: "0" });
+      case "9":
+        return back(vr, "voicemail");
+      default:
+        sp(vr, ctx, "invalid");
+        return back(vr, "menu");
+    }
+  },
+
+  /** Key 1: the rentals to book (existing approved lines), the cart when it has items, star for the main menu. */
+  async book(ctx, vr) {
+    const cats = await phoneCategories();
+    const order = await currentOrder(ctx);
+    const g = vr.gather({
+      input: ["dtmf", "speech"],
+      numDigits: 1,
+      timeout: 6,
+      action: url("book-choice"),
+      method: "POST",
+      language: "en-US",
+      speechModel: "phone_call",
+      enhanced: true,
+      speechTimeout: "auto",
+      hints: menuSpeechHints(cats),
+    });
+    if (!cats.length) sp(g, ctx, "menu_empty");
+    for (const c of cats) {
+      sp(g, ctx, "menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
+      shortPause(g);
+    }
+    if (order?.items.length) {
+      sp(g, ctx, "menu_cart");
+      shortPause(g);
+    }
+    sp(g, ctx, "back_to_menu");
+    return noInput(vr, ctx, "book");
+  },
+
+  async "book-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    const said = (ctx.body.SpeechResult || "").trim();
+    if (!d && said) {
+      const choice = matchMenuSpeech(said, await phoneCategories());
+      if (choice?.kind === "category") return back(vr, "category", { c: choice.categoryId });
+      if (choice?.kind === "cart") return back(vr, "cart");
+      if (choice?.kind === "operator") return back(vr, "ring", { k: "0" });
+      sp(vr, ctx, "invalid");
+      return back(vr, "book");
+    }
+    if (!d) return noInput(vr, ctx, "book", {});
     if (d === "*") return back(vr, "menu");
     if (d === "9") return back(vr, "cart");
-    if (d === "0") return back(vr, "operator");
-    const cats = await phoneCategories();
-    const cat = cats.find((c) => String(c.ivrDigit) === d);
+    const cat = (await phoneCategories()).find((c) => String(c.ivrDigit) === d);
     if (!cat) {
       sp(vr, ctx, "invalid");
-      return back(vr, "menu");
+      return back(vr, "book");
     }
     return back(vr, "category", { c: cat.id });
   },
@@ -842,20 +897,26 @@ const handlers: Record<string, Handler> = {
   },
 
   /**
-   * Option 0, "Speak to someone": ring the routing list from Settings (one after another, or all at once).
-   * Each person must press 1 to take the call, so a personal voicemail never answers for the business.
+   * Ring a live employee for main-menu key k (2, 4, 5, 6 or 0), using that key's list from Settings (an empty list
+   * rings the operator list). Each person must press 1 to take the call. Office closed or no one to ring: Abraham's
+   * missed-call line, then the general voicemail.
    */
-  async operator(ctx, vr) {
+  async ring(ctx, vr) {
+    const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
     const settings = await getSettings();
-    const targets = routeTargets(settings);
-    if (!targets.length || !officeOpenNow(new Date(), settings)) {
-      // Abraham's missed-call line, then straight to the voicemail beep
+    const list = ringListFor(settings, k);
+    if (!list.targets.length || !officeOpenNow(new Date(), settings)) {
       sp(vr, ctx, "operator_unavailable");
       return back(vr, "voicemail", { after: 1 });
     }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "forwarded" }, ctx.session);
     sp(vr, ctx, "transfer_connecting");
-    return dialTargets(vr, settings, 0, ctx.session?.fromNumber ?? ctx.from);
+    return dialTargets(vr, list, k, 0, ctx.session?.fromNumber ?? ctx.from);
+  },
+
+  /** Older links and voice commands ("operator"): same as key 0. */
+  async operator(ctx, vr) {
+    return back(vr, "ring", { k: "0" });
   },
 
   /** After a ring attempt: a finished conversation ends the call; otherwise try the next number, then voicemail. */
@@ -864,9 +925,10 @@ const handlers: Record<string, Handler> = {
       vr.hangup();
       return vr;
     }
-    const settings = await getSettings();
+    const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
+    const list = ringListFor(await getSettings(), k);
     const next = Number(ctx.query.get("i") ?? -1) + 1;
-    if (settings.operatorMode !== "simultaneous" && next > 0 && next < routeTargets(settings).length) return dialTargets(vr, settings, next, ctx.session?.fromNumber ?? ctx.from);
+    if (list.mode !== "simultaneous" && next > 0 && next < list.targets.length) return dialTargets(vr, list, k, next, ctx.session?.fromNumber ?? ctx.from);
     // Abraham's missed-call line, then straight to the voicemail beep
     sp(vr, ctx, "transfer_failed");
     return back(vr, "voicemail", { after: 1 });

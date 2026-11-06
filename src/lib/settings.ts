@@ -63,6 +63,22 @@ export const SETTING_DEFAULTS = {
   /** The person answering must press 1, so a personal voicemail picking up doesn't take the call. */
   operatorAcceptPrompt: true,
   operatorAcceptText: "Call from the Hup Up Attractions hotline. To accept, press 1. To pass, press 2.",
+  /*
+   * Ring lists for main-menu keys 2 (corporates & organizations), 4 (customer service), 5 (problems during a
+   * rental) and 6 (delivery and pickup). Same format as operatorTargets. Empty = ring the operator list (key 0).
+   */
+  ringTargets2: "",
+  ringMode2: "sequential",
+  ringAccept2: true,
+  ringTargets4: "",
+  ringMode4: "sequential",
+  ringAccept4: true,
+  ringTargets5: "",
+  ringMode5: "sequential",
+  ringAccept5: true,
+  ringTargets6: "",
+  ringMode6: "sequential",
+  ringAccept6: true,
   /**
    * Caller blocking (checked first on every call). One per line: pattern | note.
    * Patterns: an exact number, * for any digits (+1845*), ? for one digit (+1845555????), or "withheld".

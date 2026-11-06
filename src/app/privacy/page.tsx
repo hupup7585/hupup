@@ -5,6 +5,7 @@ import { PROVIDER_DISCLOSURE, RECORD_RETENTION_MONTHS } from "@/lib/sms-consent-
 export const metadata = {
   title: "Privacy Policy | Hup Up Attractions",
   description: "How Hup Up Attractions collects, uses and protects your information when you book a party rental by phone or sign up for our texts.",
+  alternates: { canonical: "/privacy" },
 };
 export const revalidate = 3600;
 

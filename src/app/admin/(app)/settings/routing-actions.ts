@@ -3,33 +3,42 @@
 import { revalidatePath } from "next/cache";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { getSettings, saveSetting } from "@/lib/settings";
-import { parseTargets } from "@/lib/ivr/routing";
+import { getSettings, saveSetting, type Settings } from "@/lib/settings";
+import { RING_KEYS, parseTargets, type RingKey } from "@/lib/ivr/routing";
 
-/** Owner only: who rings when a caller presses 0. Validated and audited. */
+/** Setting names for each key's ring list (key 0 is the operator list). */
+function names(k: RingKey) {
+  return k === "0"
+    ? ({ targets: "operatorTargets", mode: "operatorMode", accept: "operatorAcceptPrompt" } as const)
+    : ({ targets: `ringTargets${k}`, mode: `ringMode${k}`, accept: `ringAccept${k}` } as const);
+}
+
+/** Owner only: who rings for a main-menu key (2, 4, 5, 6 or 0). Validated and audited. */
 export async function saveRoutingAction(_prev: { ok?: boolean; message?: string } | null, form: FormData): Promise<{ ok?: boolean; message?: string }> {
   const owner = await requireOwner();
-  const targetsText = String(form.get("operatorTargets") || "").trim();
-  const { targets, errors } = parseTargets(targetsText);
+  const k = String(form.get("ringKey") || "0") as RingKey;
+  if (!(RING_KEYS as readonly string[]).includes(k)) return { ok: false, message: "Unknown menu key." };
+  const n = names(k);
+  const { targets, errors } = parseTargets(String(form.get("targets") || "").trim());
   if (errors.length) return { ok: false, message: errors[0] };
   if (targets.length > 10) return { ok: false, message: "Up to 10 numbers." };
-  const mode = form.get("operatorMode") === "simultaneous" ? "simultaneous" : "sequential";
-  const accept = form.get("operatorAcceptPrompt") === "on";
-  const acceptText = String(form.get("operatorAcceptText") || "").trim().slice(0, 300);
-  if (accept && !/press 1/i.test(acceptText)) return { ok: false, message: 'The accept message must tell the person to "press 1".' };
+  const mode = form.get("mode") === "simultaneous" ? "simultaneous" : "sequential";
+  const accept = form.get("accept") === "on";
+  const acceptText = String(form.get("acceptText") ?? "").trim().slice(0, 300);
+  if (k === "0" && accept && !/press 1/i.test(acceptText)) return { ok: false, message: 'The accept message must tell the person to "press 1".' };
   const before = await getSettings();
   const normalized = targets.map((t) => `${t.label} | ${t.phone} | ${t.ringSeconds}`).join("\n");
-  await saveSetting("operatorTargets", normalized, owner.userId);
-  await saveSetting("operatorMode", mode, owner.userId);
-  await saveSetting("operatorAcceptPrompt", accept, owner.userId);
-  if (acceptText) await saveSetting("operatorAcceptText", acceptText, owner.userId);
+  await saveSetting(n.targets as keyof Settings, normalized as never, owner.userId);
+  await saveSetting(n.mode as keyof Settings, mode as never, owner.userId);
+  await saveSetting(n.accept as keyof Settings, accept as never, owner.userId);
+  if (k === "0" && acceptText) await saveSetting("operatorAcceptText", acceptText, owner.userId);
   await db.insert(schema.auditLog).values({
     userId: owner.userId,
     action: "settings.routing_updated",
     entityType: "settings",
-    entityId: "operator_routing",
-    before: { operatorTargets: before.operatorTargets, operatorMode: before.operatorMode, operatorAcceptPrompt: before.operatorAcceptPrompt },
-    after: { operatorTargets: normalized, operatorMode: mode, operatorAcceptPrompt: accept },
+    entityId: `ring_key_${k}`,
+    before: { targets: before[n.targets], mode: before[n.mode], accept: before[n.accept] },
+    after: { targets: normalized, mode, accept },
   });
   revalidatePath("/admin/settings");
   return { ok: true, message: "Saved." };
