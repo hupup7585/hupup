@@ -61,7 +61,8 @@ const addDays = (n) => {
   // 1. Full booking: Jumping Balloons -> first item -> add -> date -> qty 1 -> checkout -> consent -> terms -> pay link
   const sid1 = "CAe2e" + crypto.randomBytes(4).toString("hex");
   const run = await call(sid1, caller, [
-    { Digits: "1" }, // menu: category 1
+    { Digits: "1" }, // main menu: bookings (Abraham's menu)
+    { Digits: "1" }, // rental list: category 1
     { Digits: "1" }, // first item
     { Digits: "2" }, // add to cart
     { Digits: date.mmdd }, // date by keypad
@@ -81,7 +82,7 @@ const addDays = (n) => {
   ]);
   const all = run.said.join(" | ");
   if (process.env.E2E_DEBUG) console.log("DEBUG", JSON.stringify({ error: run.error, open: run.open, hungUp: run.hungUp, said: run.said.slice(0, 4), xml: (run.xml || "").slice(0, 300) }));
-  check("call: greeting and menu spoken", /thanks for calling Hup Up Attractions/i.test(all) && /For Jumping Balloons, press 1/i.test(all));
+  check("call: greeting and menu spoken", /Thank you for calling Hup Up Attractions/i.test(all) && /For bookings with our automatic easy system, press 1/i.test(all) && /For Jumping Balloons, press 1/i.test(all));
   check("call: item added, held for the call", /I added one/i.test(all));
   check("call: order-text consent question asked", /Can Hup Up Attractions text you at this number/i.test(all));
   check("call: terms notice played", all.includes("By pressing #, you agree to our Terms and Conditions"));
@@ -136,15 +137,15 @@ const addDays = (n) => {
   // 3. Out-of-area address stops checkout
   const sid2 = "CAe2e" + crypto.randomBytes(4).toString("hex");
   const run2 = await call(sid2, "+18455550143", [
-    { Digits: "1" }, { Digits: "1" }, { Digits: "2" }, { Digits: openDay().mmdd }, { Digits: "1" }, { Digits: "1" }, { Digits: "9" }, { Digits: "1" },
+    { Digits: "1" }, { Digits: "1" }, { Digits: "1" }, { Digits: "2" }, { Digits: openDay().mmdd }, { Digits: "1" }, { Digits: "1" }, { Digits: "9" }, { Digits: "1" },
     { SpeechResult: "Sam Green", Confidence: "0.9" }, { Digits: "1" },
     { SpeechResult: "5 Main Street Albany", Confidence: "0.9" }, { Digits: "1" },
-  ], { stopAfterGathers: 12 });
+  ], { stopAfterGathers: 13 });
   check("out of area: checkout stops and asks for an in-area address", run2.said.join(" ").includes("we only deliver in Kiryas Joel and nearby Orange County towns"));
 
   // 4. Hanging up releases the held items
   const sid3 = "CAe2e" + crypto.randomBytes(4).toString("hex");
-  await call(sid3, "+18455550144", [{ Digits: "3" }, { Digits: "1" }, { Digits: "2" }, { Digits: openDay().mmdd }, { Digits: "1" }, { Digits: "1" }], { stopAfterGathers: 6 });
+  await call(sid3, "+18455550144", [{ Digits: "1" }, { Digits: "3" }, { Digits: "1" }, { Digits: "2" }, { Digits: openDay().mmdd }, { Digits: "1" }, { Digits: "1" }], { stopAfterGathers: 7 });
   const held = (await q("select o.id, o.status from orders o join call_sessions s on s.order_id = o.id where s.call_sid = $1", [sid3]))[0];
   await post("/api/voice/status", { CallSid: sid3, CallStatus: "completed" });
   const after = held ? (await q("select status from orders where id = $1", [held.id]))[0] : null;
