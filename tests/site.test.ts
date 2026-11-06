@@ -395,9 +395,10 @@ describe("Service Area Option C mock-up (Abraham)", () => {
     expect(readFileSync("src/app/mockups/service-area/page.tsx", "utf8")).toContain("<ServiceAreaC");
     expect(readFileSync("src/app/page.tsx", "utf8")).not.toContain("ServiceAreaC");
     const c = readFileSync("src/components/site/ServiceAreaC.tsx", "utf8");
-    // Even edge contrast: one uniform solid border, no offset shadow
-    expect(c).toContain('const CARD = "relative flex flex-col rounded-[2rem] border-4 border-hu-deep bg-white p-6 sm:p-8"');
-    expect(c).not.toMatch(/shadow-\[/);
+    // Even border on every side, plus the hero card's solid navy offset shadow (no soft or blurred shadow)
+    expect(c).toContain('const CARD = "relative flex flex-col rounded-[2rem] border-4 border-hu-deep bg-white p-6 shadow-[8px_8px_0_#123D73] sm:p-8"');
+    expect(readFileSync("src/app/page.tsx", "utf8")).toContain("shadow-[8px_8px_0_#123D73]"); // same shadow as the hero card
+    expect(c.match(/shadow-\[[^\]]*\]/g)).toEqual(["shadow-[8px_8px_0_#123D73]"]);
     expect(c).toContain("grid auto-rows-fr grid-cols-2 gap-3");
     expect(c).toContain("md:grid-cols-3");
   });

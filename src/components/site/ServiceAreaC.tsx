@@ -4,10 +4,10 @@ import { DELIVERY_FEE_SHORT, SERVICE_AREA_DELIVERY_NOTE, noLonelyWord } from "@/
 import { CallButton, ICON_STROKE, IconTile, SectionTitle } from "./parts";
 
 /**
- * Hero-board look with even edges (Abraham): one solid navy border, the same thickness on every side, and no
- * offset shadow, so no edge looks heavier or fades into the blue background.
+ * Hero-board look (Abraham): one solid navy border, the same thickness on every side (even edge contrast, 19b49c6),
+ * plus the same solid navy offset shadow as the hero "Call to book" card.
  */
-const CARD = "relative flex flex-col rounded-[2rem] border-4 border-hu-deep bg-white p-6 sm:p-8";
+const CARD = "relative flex flex-col rounded-[2rem] border-4 border-hu-deep bg-white p-6 shadow-[8px_8px_0_#123D73] sm:p-8";
 const EYEBROW = "text-sm font-extrabold uppercase tracking-[0.18em] opacity-75";
 
 /**

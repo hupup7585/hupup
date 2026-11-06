@@ -20,7 +20,7 @@ export default async function ServiceAreaMockup() {
         {(Object.keys(SERVICE_AREA_STYLES) as ServiceAreaStyle[]).map((k) => (
           <ServiceArea key={k} c={c} style={k} badge={SERVICE_AREA_STYLES[k].name} />
         ))}
-        <ServiceAreaC c={c} badge="Option C: hero card style (even navy border, icon tiles, yellow badge)" />
+        <ServiceAreaC c={c} badge="Option C: hero card style (even navy border, solid navy shadow, icon tiles, yellow badge)" />
       </div>
     </div>
   );
