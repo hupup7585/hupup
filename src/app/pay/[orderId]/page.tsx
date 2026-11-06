@@ -1,7 +1,8 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { paymentLink } from "@/lib/sola";
 import { getOrderWithItems, orderNumber } from "@/lib/orders";
 import { longDate } from "@/lib/dates";
-import { verifyPayToken } from "@/lib/rental-terms";
+import { termsActive, verifyPayToken } from "@/lib/rental-terms";
 import PayForm from "./PayForm";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,10 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   if (!full) notFound();
   const o = full.order;
   const due = (o.totalCents ?? o.subtotalCents) - o.paidCents;
+  // Live site while the Terms are still a draft: no Terms box, straight to the secure payment page (as before)
+  if (!termsActive() && o.status === "PENDING_PAYMENT" && due > 0) {
+    redirect(paymentLink({ orderId: id, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone: full.customer?.phone }));
+  }
   return (
     <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">
       <div className="mx-auto max-w-md rounded-2xl border-2 border-hu-deep bg-white p-6">

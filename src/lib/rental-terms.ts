@@ -109,6 +109,15 @@ export async function ensureTermsVersionStored() {
     .onConflictDoNothing();
 }
 
+/**
+ * Is the Terms flow on? Always on previews (for testing). On the live site only once Abraham's final Terms are in
+ * (TERMS_EFFECTIVE_DATE is no longer "draft"). While off on live: no /terms page or links, no hotline Terms step, no
+ * Terms box before payment, no staff Terms question; payment links go straight to the secure payment page.
+ */
+export function termsActive(env: Record<string, string | undefined> = process.env): boolean {
+  return env.VERCEL_ENV !== "production" || TERMS_EFFECTIVE_DATE !== "draft";
+}
+
 /** Customer-facing payment link: our review-and-pay page (Terms box) which then continues to Sola. */
 export function payPageLink(orderId: number): string {
   return `${(process.env.PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "")}/pay/${orderId}?t=${payToken(orderId)}`;

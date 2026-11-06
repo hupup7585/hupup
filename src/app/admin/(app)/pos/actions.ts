@@ -11,7 +11,7 @@ import { addDays, isValidISO, longDate, todayISO } from "@/lib/dates";
 import { createOrderWithItems, getOrderWithItems, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES } from "@/lib/orders";
 import { parseMoneyToCents } from "@/lib/money";
 import { toE164 } from "@/lib/phone";
-import { CURRENT_TERMS_VERSION, payPageLink, recordTermsAcceptance } from "@/lib/rental-terms";
+import { CURRENT_TERMS_VERSION, payPageLink, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { TERMS_TEXT } from "@/lib/terms-content";
 
 const TERMS_VIA = ["phone", "text", "email", "in_person"] as const;
@@ -74,7 +74,7 @@ export async function createBookingAction(input: {
     .filter((i) => i.qty > 0);
   if (!items.length) return { ok: false, message: "Add at least one item." };
   if (!input.name.trim()) return { ok: false, message: "Enter the customer's name." };
-  if (!TERMS_VIA.includes(input.termsVia as (typeof TERMS_VIA)[number])) return { ok: false, message: "Choose how the customer accepted the Terms and Conditions." };
+  if (termsActive() && !TERMS_VIA.includes(input.termsVia as (typeof TERMS_VIA)[number])) return { ok: false, message: "Choose how the customer accepted the Terms and Conditions." };
   const phone = input.phone ? toE164(input.phone) : null;
   if (input.phone && !phone) return { ok: false, message: "Phone number doesn't look right." };
   if (input.payment === "link" && !phone) return { ok: false, message: "A phone number is needed to text a payment link." };
@@ -99,8 +99,8 @@ export async function createBookingAction(input: {
     return { ok: false, message: "Could not create the booking." };
   }
 
-  // Log the customer's acceptance of the Terms, as chosen by staff.
-  await recordTermsAcceptance({
+  // Log the customer's acceptance of the Terms, as chosen by staff (only while the Terms flow is on).
+  if (termsActive()) await recordTermsAcceptance({
     orderId: r.orderId,
     phone,
     termsVersion: CURRENT_TERMS_VERSION,

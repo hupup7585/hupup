@@ -1,4 +1,6 @@
+import { notFound } from "next/navigation";
 import LegalPage from "@/components/site/LegalPage";
+import { termsActive } from "@/lib/rental-terms";
 import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 
 export const metadata = {
@@ -9,6 +11,8 @@ export const metadata = {
 export const revalidate = 3600;
 
 export default function Terms() {
+  // Preview only until Abraham fills in the blanks: the live site has no /terms page yet.
+  if (!termsActive()) notFound();
   return (
     <LegalPage title="TERMS AND CONDITIONS" updated="November 2026">
       {/* Approved wording (Abraham, sections A-E), verbatim. The full business terms (sections 1-34) follow once the blanks are filled in. */}

@@ -27,6 +27,7 @@ export const PROMPTS = {
   main_7: { group: "Welcome & main menu", label: "Main menu key 7 (Abraham)", text: "For our hours of operation, press 7." },
   main_9: { group: "Welcome & main menu", label: "Main menu key 9 (Abraham)", text: "To leave a message in our general voicemail, press 9." },
   main_0: { group: "Welcome & main menu", label: "Main menu key 0 (Abraham)", text: "To speak with an operator, press 0." },
+  main_invalid: { group: "Welcome & main menu", label: "Main menu: a key with no action (Abraham)", text: "Oops, that's not an option. Let's try that again!" },
   menu_category: { group: "Welcome & main menu", label: "Menu option for a category", text: "For {category}, press {key}.", vars: ["category", "key"] },
   menu_cart: { group: "Welcome & main menu", label: "Menu option: review cart", text: "Ready to check out? Press 9 to hear your cart." },
   menu_operator: { group: "Welcome & main menu", label: "Menu option: talk to a person", text: "To talk with someone from our team, press 0." },

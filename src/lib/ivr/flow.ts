@@ -23,7 +23,7 @@ import { TERMS_TEXT } from "@/lib/terms-content";
 import { sendEmail, sendSms } from "@/lib/notify";
 import { getSettings } from "@/lib/settings";
 import { computeTotals, deliveryZone } from "@/lib/pricing";
-import { CURRENT_TERMS_VERSION, recordTermsAcceptance } from "@/lib/rental-terms";
+import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
 import {
   MARKETING_CONFIRMATION_SMS,
@@ -325,7 +325,8 @@ const handlers: Record<string, Handler> = {
       case "9":
         return back(vr, "voicemail");
       default:
-        sp(vr, ctx, "invalid");
+        // Abraham: any key with no action says this, then the main menu plays again
+        sp(vr, ctx, "main_invalid");
         return back(vr, "menu");
     }
   },
@@ -764,7 +765,7 @@ const handlers: Record<string, Handler> = {
       return back(vr, "menu");
     }
     if (!data.name || !data.address) return back(vr, "ask", { f: !data.name ? "name" : "address" });
-    if (!data.termsAccepted) return back(vr, "terms");
+    if (termsActive() && !data.termsAccepted) return back(vr, "terms"); // off on live until the final Terms are in
     const settings = await getSettings();
     const totals = computeTotals(order.order.subtotalCents, deliveryZone(data.address, settings), settings);
     if (!totals) {

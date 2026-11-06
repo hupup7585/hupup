@@ -89,9 +89,9 @@ describe("every key, office open", () => {
     expect(vm).toMatch(/<Record /);
     expect(vm).not.toContain("<Dial");
   });
-  it("8 is not an option; star repeats the menu", async () => {
+  it("8 is not an option: Abraham's line, then the main menu again; star repeats the menu", async () => {
     const eight = await press("8");
-    expect(eight).toContain("that's not one of the choices");
+    expect(eight).toContain("Oops, that's not an option. Let's try that again!");
     expect(redirect(eight)).toBe("menu");
     expect(redirect(await press("*"))).toBe("menu");
   });
@@ -118,5 +118,27 @@ describe("every key, office closed", () => {
     }
     expect(redirect(await press("7"))).toBe("ring?k=0");
     expect(redirect(await press("9"))).toBe("voicemail");
+  });
+});
+
+describe("Terms switch for going live (Abraham: /terms stays on preview until filled in)", () => {
+  it("on, everywhere except the live site while the Terms are a draft", async () => {
+    const { termsActive } = await import("@/lib/rental-terms");
+    const { TERMS_EFFECTIVE_DATE } = await import("@/lib/terms-content");
+    expect(TERMS_EFFECTIVE_DATE).toBe("draft");
+    expect(termsActive({ VERCEL_ENV: "preview" })).toBe(true);
+    expect(termsActive({})).toBe(true);
+    expect(termsActive({ VERCEL_ENV: "production" })).toBe(false);
+  });
+  it("live while draft: no /terms page or links, no hotline Terms step, no Terms box, no staff Terms question", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/app/terms/page.tsx", "utf8")).toContain("if (!termsActive()) notFound();");
+    expect(readFileSync("src/components/site/SiteFooter.tsx", "utf8")).toContain('{termsActive() && <a href="/terms"');
+    expect(readFileSync("src/app/sitemap.ts", "utf8")).toContain('...(termsActive() ? ["/terms"] : [])');
+    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toContain('if (termsActive() && !data.termsAccepted) return back(vr, "terms");');
+    expect(readFileSync("src/app/pay/[orderId]/page.tsx", "utf8")).toContain("if (!termsActive() && o.status === \"PENDING_PAYMENT\" && due > 0) {");
+    const pos = readFileSync("src/app/admin/(app)/pos/actions.ts", "utf8");
+    expect(pos).toContain("if (termsActive() && !TERMS_VIA.includes(");
+    expect(pos).toContain("if (termsActive()) await recordTermsAcceptance({");
   });
 });

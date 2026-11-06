@@ -14,6 +14,8 @@ export default function PosForm(props: {
   initialProduct: number | null;
   categories: { id: number; name: string }[];
   products: P[];
+  /** Ask how the customer accepted the Terms (off on the live site until the final Terms are in) */
+  askTerms?: boolean;
 }) {
   const [date, setDate] = useState(props.initialDate);
   const [avail, setAvail] = useState<Record<string, number>>({});
@@ -137,6 +139,7 @@ export default function PosForm(props: {
         <input className="input" placeholder="Delivery address" value={form.address} onChange={set("address")} />
         <input className="input" placeholder="Delivery time (optional, e.g. 9:00 AM)" value={form.deliveryTime} onChange={set("deliveryTime")} />
         <textarea className="input" placeholder="Notes" rows={2} value={form.notes} onChange={set("notes")} />
+        {props.askTerms !== false && (
         <label className="block">
           <span className="label">Customer accepted the Terms and Conditions by *</span>
           <select className="input" value={form.termsVia} onChange={set("termsVia")} required>
@@ -147,6 +150,7 @@ export default function PosForm(props: {
             <option value="in_person">In person</option>
           </select>
         </label>
+        )}
 
         <h2 className="pt-2 font-bold">Payment</h2>
         <div className="grid grid-cols-2 gap-2">
@@ -169,7 +173,7 @@ export default function PosForm(props: {
           <span className="text-muted">Total</span>
           <span className="text-2xl font-black">{money(total)}</span>
         </div>
-        <button className="btn w-full py-3.5" disabled={pending || !date || total === 0 || check?.ok === false || !form.termsVia} onClick={submit}>
+        <button className="btn w-full py-3.5" disabled={pending || !date || total === 0 || check?.ok === false || (props.askTerms !== false && !form.termsVia)} onClick={submit}>
           {pending ? "Booking…" : "Book it"}
         </button>
         {result && (
