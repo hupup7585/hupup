@@ -465,3 +465,13 @@ describe("hero buttons (Abraham)", () => {
     expect(readFileSync("src/app/globals.css", "utf8")).toMatch(/\.hu-btn-outline \{\s*@apply[^;]*border-2 border-hu-deep/);
   });
 });
+
+describe("logo mock-up (Abraham)", () => {
+  it("shows every placement on light blue #8CCBFF, is noindex, and the real pages are unchanged", () => {
+    const m = readFileSync("src/app/mockups/logo/page.tsx", "utf8");
+    expect(m).toContain('const LOGO_TILE = "inline-flex items-center justify-center rounded-2xl bg-[#8CCBFF]"');
+    for (const part of ["Header", "Footer", "favicon", "Section break", "Final call to book"]) expect(m).toContain(part);
+    expect(readFileSync("src/app/mockups/layout.tsx", "utf8")).toMatch(/index: false/);
+    for (const f of ["src/app/page.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/SiteFooter.tsx"]) expect(readFileSync(f, "utf8")).not.toContain("8CCBFF");
+  });
+});
