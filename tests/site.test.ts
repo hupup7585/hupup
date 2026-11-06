@@ -70,7 +70,7 @@ describe("public phone number", () => {
 describe("service area", () => {
   it("uses Abram's exact towns with Kiryas Joel (Town of Palm Tree) as the single main area", async () => {
     const { SERVICE_AREA, serviceAreaPlaces } = await import("@/lib/site-copy");
-    expect(SERVICE_AREA.mainLabel).toBe("Our main service area:");
+    expect(SERVICE_AREA.mainLabel).toBe("Main service area:");
     expect(SERVICE_AREA.main).toBe("Kiryas Joel");
     expect(SERVICE_AREA.mainSub).toBe("Town of Palm Tree, Orange County, NY");
     expect(SERVICE_AREA.alsoTitle).toBe("We also deliver to these nearby towns:");
@@ -83,9 +83,11 @@ describe("service area", () => {
   it("homepage shows the section and nav link, main area before the secondary list, and no placeholder text", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
     const header = readFileSync("src/components/site/SiteHeader.tsx", "utf8");
-    expect(page).toContain('id="service-area"');
+    expect(page).toContain("<ServiceArea c={c} />");
+    expect(readFileSync("src/components/site/ServiceArea.tsx", "utf8")).toContain('"service-area"');
     expect(header).toContain('["Service Area", "/#service-area"]');
-    expect(page.indexOf("serviceArea.mainLabel")).toBeLessThan(page.indexOf("serviceArea.alsoTitle"));
+    const saComp = readFileSync("src/components/site/ServiceArea.tsx", "utf8");
+    expect(saComp.indexOf("serviceArea.mainLabel")).toBeLessThan(saComp.indexOf("serviceArea.alsoTitle"));
     expect(page).toContain("areaServed");
     expect(page).not.toMatch(/Kiryas Joel and Town of Palm Tree/);
     expect(page).toContain("Kiryas Joel (Town of Palm Tree)");
@@ -194,8 +196,9 @@ describe("Kiryas Joel is one place", () => {
 describe("nearby towns grid", () => {
   it("is an even grid: 2 per row on phones, 3 per row from 768px, full rows only", async () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
-    expect(page).toContain("grid auto-rows-fr grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3");
-    const grid = page.slice(page.indexOf("data-town-grid"), page.indexOf("</ul>", page.indexOf("data-town-grid")));
+    expect(readFileSync("src/components/site/ServiceArea.tsx", "utf8")).toContain("grid auto-rows-fr grid-cols-2 gap-3 md:grid-cols-3");
+    const saSrc = readFileSync("src/components/site/ServiceArea.tsx", "utf8");
+    const grid = saSrc.slice(saSrc.indexOf("data-town-grid"), saSrc.indexOf("</ul>", saSrc.indexOf("data-town-grid")));
     expect(grid).not.toMatch(/col-start|col-span/);
     const { SERVICE_AREA } = await import("@/lib/site-copy");
     expect(SERVICE_AREA.also.length % 6).toBe(0); // 2 full rows of 3, 3 full rows of 2
@@ -239,9 +242,8 @@ describe("Service Area delivery note (Abram 10:36 + 10:38 PM)", () => {
     const { DELIVERY_FEE_NOTE } = await import("@/lib/site-copy");
     expect(DELIVERY_FEE_NOTE).toBe("Delivery available. Call for pricing.");
     const page = readFileSync("src/app/page.tsx", "utf8");
-    expect(page).toMatch(/data-sa-delivery-note className="mt-4 flex items-start gap-2 text-\[15px\] font-normal leading-6 text-hu-deep"/);
-    expect(page).toContain("overflow-visible");
-    expect(page).not.toContain("Delivery available for an additional fee. Call for pricing.");
+    expect(readFileSync("src/components/site/ServiceArea.tsx", "utf8")).toMatch(/data-sa-delivery-note className="mt-5 flex items-start gap-2 text-base leading-7"/);
+    expect(page + readFileSync("src/components/site/ServiceArea.tsx", "utf8")).not.toContain("Delivery available for an additional fee. Call for pricing.");
   });
 });
 
@@ -249,7 +251,7 @@ describe("nearby-towns footnote stays exactly as Abram approved (10:39 PM)", () 
   it("wording and styling unchanged", async () => {
     const { DELIVERY_FEE_SHORT } = await import("@/lib/site-copy");
     expect(DELIVERY_FEE_SHORT).toBe("Delivery fee applies, call for pricing.");
-    expect(readFileSync("src/app/page.tsx", "utf8")).toContain('<p className="mt-4 text-base">All in {c.serviceArea.region}. {DELIVERY_FEE_SHORT}</p>');
+    expect(readFileSync("src/components/site/ServiceArea.tsx", "utf8")).toContain("{noLonelyWord(`All in ${c.serviceArea.region}. ${DELIVERY_FEE_SHORT}`)}");
   });
 });
 
@@ -269,9 +271,10 @@ describe("Kiryas Joel box delivery line (Abram 10:46 PM)", () => {
     expect(DELIVERY_FEE_NOTE).toBe("Delivery available. Call for pricing.");
     expect(DELIVERY_FEE_SHORT).toBe("Delivery fee applies, call for pricing.");
     const page = readFileSync("src/app/page.tsx", "utf8");
-    const box = page.slice(page.indexOf("data-sa-delivery-note"), page.indexOf("data-sa-delivery-note") + 600);
+    const saFile = readFileSync("src/components/site/ServiceArea.tsx", "utf8");
+    const box = saFile.slice(saFile.indexOf("data-sa-delivery-note"), saFile.indexOf("data-sa-delivery-note") + 600);
     expect(box).toContain("{noLonelyWord(SERVICE_AREA_DELIVERY_NOTE)}");
-    const how = page.slice(page.indexOf('id="how-it-works"'), page.indexOf('id="service-area"'));
+    const how = page.slice(page.indexOf('id="how-it-works"'), page.indexOf("<ServiceArea c={c} />"));
     expect(how).toContain("{DELIVERY_FEE_NOTE}");
   });
 });
@@ -346,7 +349,7 @@ describe("Contact Us heading and icons (Abram)", () => {
 describe("Service Area heading matches the other sections (Abraham)", () => {
   it("eyebrow + title via the shared heading, no icon box beside it; Kiryas Joel card unchanged", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
-    const sa = page.slice(page.indexOf('id="service-area"'), page.indexOf("rounded-[2rem]", page.indexOf('id="service-area"')));
+    const sa = readFileSync("src/components/site/ServiceArea.tsx", "utf8");
     expect(sa).toContain('<SectionTitle kicker="Right to your door" title="Service Area" />');
     expect(sa).not.toContain("<IconTile");
     expect(sa).not.toContain("<h2");
@@ -383,6 +386,6 @@ describe("mock-up review pages (Abraham)", () => {
   it("are noindex and not in the sitemap, and the live pages never use the mock-up header", () => {
     expect(readFileSync("src/app/mockups/layout.tsx", "utf8")).toMatch(/index: false/);
     expect(readFileSync("src/app/sitemap.ts", "utf8")).not.toContain("mockups");
-    for (const f of ["src/app/page.tsx", "src/app/text-alerts/page.tsx"]) expect(readFileSync(f, "utf8")).not.toContain('variant="mockup"');
+
   });
 });

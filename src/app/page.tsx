@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
-import { BUSINESS_NAME_NB, keepName, noLonelyWord, whyLabel, whyRows, DELIVERY_FEE_NOTE, DELIVERY_FEE_SHORT, SERVICE_AREA_DELIVERY_NOTE, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
+import { BUSINESS_NAME_NB, keepName, whyLabel, whyRows, DELIVERY_FEE_NOTE, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
+import ServiceArea from "@/components/site/ServiceArea";
 import { CallButton, ICON_STROKE, IconTile, SectionTitle, Wave, categoryIcon } from "@/components/site/parts";
 
 export const revalidate = 300;
@@ -198,47 +199,7 @@ export default async function Home() {
         </section>
 
         {/* SERVICE AREA: main area first and prominent, nearby towns clearly secondary */}
-        <section id="service-area" className="scroll-mt-20 bg-hu-sky py-14 sm:py-16">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            {/* Same heading style as the other sections (eyebrow + title); eyebrow wording from Abraham */}
-            <SectionTitle kicker="Right to your door" title="Service Area" />
-            <div className="mt-8 grid gap-6">
-              <div className="rounded-[2rem] border-[3px] border-hu-deep bg-white p-6 shadow-[6px_6px_0_#123D73] sm:p-8">
-                <p className="text-base font-extrabold uppercase tracking-[0.14em] text-hu-deep/75">{c.serviceArea.mainLabel}</p>
-                <p className="mt-2 text-4xl font-extrabold leading-tight sm:text-5xl">{c.serviceArea.main}</p>
-                <p className="mt-2 text-base font-medium text-hu-deep/80">{c.serviceArea.mainSub}</p>
-                {/* Calm note: regular weight, slightly smaller, 16px+ clear above and below, icon aligned to the first line */}
-                <p data-sa-delivery-note className="mt-4 flex items-start gap-2 text-[15px] font-normal leading-6 text-hu-deep">
-                  <Truck className="mt-[3px] h-[18px] w-[18px] shrink-0 overflow-visible" strokeWidth={ICON_STROKE} aria-hidden />
-                  <span className="[text-wrap:balance]">{noLonelyWord(SERVICE_AREA_DELIVERY_NOTE)}</span>
-                </p>
-                <CallButton phone={c.phoneE164} className="mt-5" />
-              </div>
-              <div className="rounded-3xl bg-hu-tint p-4 min-[360px]:p-5 sm:p-7">
-                <h3 className="text-lg font-bold">{c.serviceArea.alsoTitle}</h3>
-                {/* Even grid (Abraham): 2 per row on phones, 3 per row from 768px, every tile the same size, full card width */}
-                <ul data-town-grid className="mt-4 grid auto-rows-fr grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3">
-                  {c.serviceArea.also.map((town) => (
-                    <li
-                      key={town}
-                      className="flex h-full min-h-[3.75rem] items-center justify-center rounded-2xl border-2 border-hu-deep/20 bg-white px-1.5 py-2.5 text-center text-[13px] font-semibold leading-snug min-[360px]:text-[15px] md:px-3 md:py-3 md:text-base"
-                    >
-                      {town.includes(" and ") ? (
-                        <span>
-                          {town.split(" and ")[0]} and
-                          <span className="block"> {town.split(" and ")[1]}</span>
-                        </span>
-                      ) : (
-                        town
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-4 text-base">All in {c.serviceArea.region}. {DELIVERY_FEE_SHORT}</p>
-              </div>
-            </div>
-          </div>
-        </section>
+        <ServiceArea c={c} />
 
         {/* FINAL CTA */}
         <section className="bg-hu-yellow">

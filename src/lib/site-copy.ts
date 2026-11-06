@@ -26,7 +26,7 @@ export const FINAL_CTA_TEXT = "Contact Hup Up Attractions today to explore our r
 
 /** Service area from Abram (exact wording). Main area first; the rest are secondary. */
 export const SERVICE_AREA = {
-  mainLabel: "Our main service area:",
+  mainLabel: "Main service area:",
   main: "Kiryas Joel",
   /** Town of Palm Tree is the same place as Kiryas Joel (the town's official name), not a second area. */
   mainSub: "Town of Palm Tree, Orange County, NY",

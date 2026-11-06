@@ -1,7 +1,9 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { Check } from "lucide-react";
 import { SELECTABLE_TIME_ZONES } from "@/lib/area-code-tz";
+import { PROMO_BENEFITS, PROMO_BENEFITS_NOTE } from "@/lib/sms-consent-copy";
 import { signUpForTexts, type SignUpState } from "./actions";
 
 /**
@@ -56,18 +58,32 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
 
       <fieldset className="space-y-4">
         <legend className="mb-2 font-bold">Choose the texts you want (check one or both)</legend>
+        {/* Promotional list: the larger, highlighted choice (Abraham). Still unchecked; consent wording unchanged. */}
+        <div data-consent="marketing" className="rounded-3xl border-[3px] border-hu-deep bg-hu-yellow/30 p-5 shadow-[6px_6px_0_#123D73] sm:p-7">
+          <h2 className="text-2xl font-extrabold leading-tight sm:text-3xl">Join our text list</h2>
+          <p className="mt-2 text-lg font-semibold">Members get:</p>
+          <ul data-promo-benefits className="mt-2 grid gap-x-6 gap-y-1.5 text-lg sm:grid-cols-2">
+            {PROMO_BENEFITS.map((b) => (
+              <li key={b} className="flex items-start gap-2">
+                <Check className="mt-1 h-5 w-5 shrink-0 text-hu-deep" strokeWidth={3} aria-hidden />
+                {b}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-base">{PROMO_BENEFITS_NOTE}</p>
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-white p-4">
+            <input type="checkbox" name="marketing" className="mt-1 h-6 w-6 shrink-0 accent-hu-deep" />
+            <span>
+              <span className="block text-lg font-bold">Promotional text messages</span>
+              <span className="mt-1 block text-base leading-relaxed">{marketingText}</span>
+            </span>
+          </label>
+        </div>
         <label data-consent="transactional" className="flex items-start gap-3 rounded-2xl border-2 border-hu-deep/15 p-4">
           <input type="checkbox" name="transactional" className="mt-1 h-5 w-5 shrink-0 accent-hu-deep" />
           <span>
             <span className="block font-bold">Order and service notifications</span>
             <span className="mt-1 block text-base leading-relaxed">{transactionalText}</span>
-          </span>
-        </label>
-        <label data-consent="marketing" className="flex items-start gap-3 rounded-2xl border-2 border-hu-deep/15 p-4">
-          <input type="checkbox" name="marketing" className="mt-1 h-5 w-5 shrink-0 accent-hu-deep" />
-          <span>
-            <span className="block font-bold">Promotional text messages</span>
-            <span className="mt-1 block text-base leading-relaxed">{marketingText}</span>
           </span>
         </label>
       </fieldset>

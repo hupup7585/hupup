@@ -14,6 +14,13 @@ export const PROMO_OPENING = "Hup Up Attractions: Reply STOP to opt out.";
 export const WEB_CONSENT_MARKETING =
   "I agree to receive promotional text messages from Hup Up Attractions and authorize Hup Up Attractions to share my phone number with service providers only as necessary to deliver these messages. Consent is not a condition of purchase. Message and data rates may apply. Message frequency varies. Reply STOP to opt out or HELP for help.";
 
+/**
+ * What the promotional list offers (Abraham's list, shown above the promotional checkbox on /text-alerts).
+ * "And much more" is limited by the note: it adds content, never extra texts beyond the stated frequency.
+ */
+export const PROMO_BENEFITS = ["New item notices", "Promos and special offers", "Our catalog before each season", "And much more!"] as const;
+export const PROMO_BENEFITS_NOTE = "All in our occasional promotional texts. Message frequency varies.";
+
 /** Website checkbox: transactional (Abram's earlier wording plus the same provider-sharing clause). Unchecked by default. */
 export const WEB_CONSENT_TRANSACTIONAL =
   "I agree to receive transactional text messages from Hup Up Attractions regarding my reservations, orders, payments, deliveries, pickups, and customer service, and authorize Hup Up Attractions to share my phone number with service providers only as necessary to deliver these messages. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help.";
