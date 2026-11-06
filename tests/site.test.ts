@@ -447,3 +447,11 @@ describe("SEO rule (Abraham)", () => {
     expect(page).toContain("openingHoursSpecification");
   });
 });
+
+describe("hero buttons (Abraham)", () => {
+  it("CALL NOW TO BOOK has the same navy trim as EXPLORE OUR RENTALS", () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain('label="CALL NOW TO BOOK" className="!min-h-14 border-2 border-hu-deep');
+    expect(readFileSync("src/app/globals.css", "utf8")).toMatch(/\.hu-btn-outline \{\s*@apply[^;]*border-2 border-hu-deep/);
+  });
+});

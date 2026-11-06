@@ -79,7 +79,8 @@ export default async function Home() {
                 <span className="xl:block xl:whitespace-nowrap">{INTRO_FIRST}</span> {keepName(INTRO_REST)}
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <CallButton phone={c.phoneE164} label="CALL NOW TO BOOK" className="!min-h-14 !px-5 text-lg min-[360px]:!px-8" />
+                {/* Same navy trim as EXPLORE OUR RENTALS beside it (Abraham) */}
+                <CallButton phone={c.phoneE164} label="CALL NOW TO BOOK" className="!min-h-14 border-2 border-hu-deep !px-5 text-lg min-[360px]:!px-8" />
                 <a href="#rentals" className="hu-btn-outline !min-h-14 !px-5 text-lg min-[360px]:!px-8">
                   EXPLORE OUR RENTALS
                 </a>
