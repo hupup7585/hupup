@@ -131,8 +131,8 @@ describe("delivery fee wording", () => {
       expect(t, f).not.toMatch(/delivery[^.\n]{0,40}\$\d/i);
     }
     const page = readFileSync("src/app/page.tsx", "utf8");
-    // Hero badge (Abram 9:58 PM): solid yellow, "DELIVERY OPTION AVAILABLE", no white pill
-    expect(page).toContain('aria-label="Delivery option available"');
+    // Hero card: "Delivery option available" as a line inside the card (Abraham: no corner circle)
+    expect(page).toMatch(/data-hero-delivery[^>]*>[\s\S]*?Delivery option available/);
     expect(page).not.toContain("fee applies");
     expect(page).not.toMatch(/rounded-full bg-white px-1\.5/);
     expect(page).toContain("Delivery available for an additional fee"); // meta description
@@ -236,11 +236,15 @@ describe("Why Choose layout and badge (Abram 10:25-10:30 PM)", () => {
     expect(note).toMatch(/text-lg [^"]*sm:text-xl/); // step descriptions are text-lg
     expect(note).toContain("<Truck");
   });
-  it("delivery badge centers one group (truck + two lines) in a slightly larger circle", () => {
+  it("hero card: no corner circle; 'Delivery option available' sits inside the card, left-aligned under the rentals", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
-    expect(page).toContain("data-badge-group");
-    expect(page).toContain("h-[6.5rem] w-[6.5rem]");
-    expect(page).toContain("items-center justify-center rounded-full");
+    expect(page).not.toContain("data-sticker");
+    expect(page).not.toContain("data-badge-group");
+    const card = page.slice(page.indexOf("data-hero-phone"), page.indexOf("<Wave fill={theme.white} />"));
+    const list = card.indexOf("</ul>"), line = card.indexOf("data-hero-delivery"), cardEnd = card.indexOf("</div>", line);
+    expect(list).toBeLessThan(line);
+    expect(line).toBeLessThan(cardEnd);
+    expect(card.slice(line, cardEnd)).toContain("<Truck");
   });
 });
 

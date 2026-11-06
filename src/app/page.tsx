@@ -96,7 +96,7 @@ export default async function Home() {
                 </a>
                 <ul className="mt-6 divide-y-2 divide-hu-deep/10 border-t-2 border-hu-deep/10">
                   {c.categories.map((cat) => (
-                    <li key={cat.id} className="last:pr-[6.75rem] sm:last:pr-[7.75rem]">
+                    <li key={cat.id}>
                       <a href={`#${cat.slug}`} className="flex items-center gap-4 py-3.5 text-lg font-bold hover:underline">
                         <IconTile icon={categoryIcon(cat.name)} tone="sky" />
                         {cat.name}
@@ -104,20 +104,14 @@ export default async function Home() {
                     </li>
                   ))}
                 </ul>
+                {/* Delivery note inside the card, left-aligned with the rentals (Abraham: no corner circle) */}
+                <p data-hero-delivery className="flex items-center gap-4 border-t-2 border-hu-deep/10 pt-3.5 text-base font-semibold text-hu-deep/85">
+                  <span className="grid w-12 shrink-0 place-items-center" aria-hidden>
+                    <Truck className="h-6 w-6" strokeWidth={ICON_STROKE} />
+                  </span>
+                  Delivery option available
+                </p>
               </div>
-              {/* Sticker sits on the board's bottom-right corner, clear of the phone number at every width */}
-              <span
-                data-sticker="delivery-option"
-                className="absolute -bottom-12 right-2 flex h-[6.5rem] w-[6.5rem] rotate-12 items-center justify-center rounded-full border-2 border-hu-deep bg-hu-yellow text-center text-[10px] font-extrabold uppercase leading-[1.15] sm:-bottom-14 sm:right-3 sm:h-[7.5rem] sm:w-[7.5rem] sm:text-[11.5px]"
-                aria-label="Delivery option available"
-              >
-                <span data-badge-group className="flex flex-col items-center gap-0.5 text-hu-deep">
-                  <Truck className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={ICON_STROKE} aria-hidden />
-                  <span>Delivery</span>
-                  <span>option</span>
-                  <span>available</span>
-                </span>
-              </span>
             </div>
           </div>
           <Wave fill={theme.white} />
