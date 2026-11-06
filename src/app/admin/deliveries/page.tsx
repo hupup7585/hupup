@@ -8,6 +8,7 @@ import { orderNumber } from "@/lib/orders";
 import { Badge, PageHeader } from "@/components/staff/ui";
 import PrintButton from "@/components/staff/PrintButton";
 import { logoutAction } from "../login/actions";
+import ExportButtons from "@/components/ExportButtons";
 import StopActions from "./StopActions";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +74,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
               <Link className="btn-ghost" href={`/admin/deliveries?d=${addDays(day, -1)}`}>← Previous day</Link>
               <Link className="btn-ghost" href={`/admin/deliveries?d=${addDays(day, 1)}`}>Next day →</Link>
               <PrintButton label="Print schedule" />
+              {staff.role !== "delivery" && <ExportButtons report="deliveries" params={{ from: day, to: addDays(day, 6) }} />}
             </>
           }
         />

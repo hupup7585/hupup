@@ -5,6 +5,7 @@ import { addDays, endOfMonth, shortDate, startOfMonth, startOfWeek, todayISO, we
 import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { StatusBadge } from "@/components/StatusBadge";
+import ExportButtons from "@/components/ExportButtons";
 import { orderNumber } from "@/lib/orders";
 
 const RANGES = { week: "This week", month: "This month", year: "This year" } as const;
@@ -57,7 +58,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               {RANGES[r]}
             </Link>
           ))}
-          <a href={`/api/admin/orders.csv?from=${from}&to=${to}`} className="btn-ghost">⬇ Export CSV</a>
+          <ExportButtons report="dashboard" params={{ from, to }} />
+          <ExportButtons report="payments" params={{ from, to }} />
         </div>
       </div>
 
