@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
-import { BUSINESS_NAME_NB, keepName, whyLabel, whyRows, HOW_IT_WORKS_DELIVERY, noLonelyWord, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
+import { BUSINESS_NAME_NB, keepName, whyLabel, whyRows, HOW_IT_WORKS_DELIVERY, WEBSITE_HOURS, WEBSITE_HOURS_NOTE, noLonelyWord, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -234,37 +234,23 @@ export default async function Home() {
 
         {/* CONTACT */}
         {/* HOURS: a dedicated, easy-to-find section right above Contact (Abraham 14:45 CST; preview only) */}
+        {/* HOURS: Abraham's simple list, one line per day. No holidays on the website (the phone system handles them). */}
         <section id="hours" data-hours className="scroll-mt-20 bg-hu-tint py-14 sm:py-20">
           <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 md:grid-cols-2 md:items-start md:gap-10">
             <div>
               <SectionTitle kicker="When to reach us" title="Our Hours" />
-              <div className="mt-6 rounded-2xl border-2 border-hu-deep bg-white p-5">
-                <p className="text-sm font-extrabold uppercase tracking-wider text-hu-deep/70">{c.officeHours.openNow ? "Open now" : "Closed now"}</p>
-                <p data-today className="mt-1 text-xl font-bold">{c.officeHours.today}</p>
-              </div>
-              <p data-hours-note className="mt-4 flex items-start gap-3 rounded-2xl bg-hu-yellow p-4 font-semibold">
-                <PhoneCall className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
-                <span>
-                  {c.officeHours.note}{" "}
-                  <a href={`tel:${c.phoneE164}`} className="whitespace-nowrap underline underline-offset-4">
-                    {c.phoneDisplay}
-                  </a>
-                </span>
-              </p>
+              <a href={`tel:${c.phoneE164}`} data-hours-note className="mt-6 flex items-center gap-3 rounded-2xl bg-hu-yellow p-4 text-lg font-bold hover:underline">
+                <PhoneCall className="h-6 w-6 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
+                <span>{WEBSITE_HOURS_NOTE}</span>
+              </a>
             </div>
-            <ul className="divide-y-2 divide-hu-deep/10 rounded-2xl border-2 border-hu-deep/10 bg-white px-5 text-lg">
-              {c.officeHours.lines.map((line) => {
+            <ul data-hours-list className="divide-y-2 divide-hu-deep/10 rounded-2xl border-2 border-hu-deep/10 bg-white px-5 text-lg">
+              {WEBSITE_HOURS.map((line) => {
                 const i = line.indexOf(": ");
                 return (
                   <li key={line} className="py-3">
-                    {i > 0 ? (
-                      <>
-                        <span className="block text-sm font-bold uppercase tracking-wider opacity-70">{line.slice(0, i)}</span>
-                        <span className="font-semibold">{line.slice(i + 2)}</span>
-                      </>
-                    ) : (
-                      <span className="font-semibold">{line}</span>
-                    )}
+                    <span className="block text-sm font-bold uppercase tracking-wider opacity-70">{line.slice(0, i)}</span>
+                    <span className="font-semibold">{line.slice(i + 2)}</span>
                   </li>
                 );
               })}

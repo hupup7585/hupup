@@ -57,3 +57,38 @@ describe("office hours (Abraham 2026-11-06, Eastern time)", () => {
     expect(flow).not.toContain("closed_now");
   });
 });
+
+describe("phone line holiday schedule (Abraham, phone system and admin only)", () => {
+  // Finds each day by its Hebrew-calendar name (offline @hebcal), so the dates are never hand-typed.
+  const findDay = async (re: RegExp, from = "2026-11-01", days = 400) => {
+    const { dayInfo, addDaysISO } = await import("@/lib/jewish-calendar");
+    let d = from;
+    for (let i = 0; i < days; i++, d = addDaysISO(d, 1)) if (dayInfo(d).names.some((n) => re.test(n))) return d;
+    throw new Error(`no day matching ${re}`);
+  };
+  it("closed on Shabbos, Yom Tov, Purim and Tisha B'Av; open on Chanukah and Lag Ba'Omer", async () => {
+    const { dayInfo } = await import("@/lib/jewish-calendar");
+    expect(dayInfo("2026-11-14").closed).toBe(true); // Shabbos
+    expect(dayInfo(await findDay(/^Pesach I$/)).closed).toBe(true); // Yom Tov
+    expect(dayInfo(await findDay(/^Purim$/)).closed).toBe(true);
+    expect(dayInfo(await findDay(/^Tish['’]a B['’]Av$/)).closed).toBe(true);
+    const chanukahWeekday = await findDay(/^Chanukah: 3 Candles$/);
+    expect(dayInfo(chanukahWeekday).closed).toBe(false);
+    expect(dayInfo(await findDay(/^Lag BaOmer$/)).closed).toBe(false);
+  });
+  it("closes by chatzos on Erev Shabbos and Erev Yom Tov; Chol Hamoed open until 10:30 PM", async () => {
+    const { dayInfo } = await import("@/lib/jewish-calendar");
+    expect(dayInfo("2026-11-13").closesAtLabel).toMatch(/^Erev Shabbos: closes at chatzos/);
+    expect(dayInfo(await findDay(/^Erev Pesach$/)).closesAtLabel).toMatch(/^Erev Yom Tov: closes at chatzos/);
+    expect(S.hoursCholHamoed).toBe("10:30-22:30");
+    const chm = await findDay(/^Pesach IV \(CH['’]['’]M\)$/); // Sun Apr 25, 2027 (Pesach III that year is Shabbos)
+    expect(chm).toBe("2027-04-25");
+    expect(dayInfo(chm).closed).toBe(false);
+    expect(officeOpenNow(at("2027-04-26T02:00:00Z"), S)).toBe(true); // 10:00 PM EDT
+    expect(officeOpenNow(at("2027-04-26T02:31:00Z"), S)).toBe(false); // 10:31 PM
+  });
+  it("phone booking stays available 24/7 (the closed message still offers booking)", async () => {
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    expect(PROMPTS.office_closed.text).toBe("Our office is closed right now, but you can book anytime using this automated system.");
+  });
+});

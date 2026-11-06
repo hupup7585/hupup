@@ -475,3 +475,26 @@ describe("logo mock-up (Abraham)", () => {
     for (const f of ["src/app/page.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/SiteFooter.tsx"]) expect(readFileSync(f, "utf8")).not.toContain("8CCBFF");
   });
 });
+
+describe("website Hours (Abraham's simple list)", () => {
+  it("shows exactly his lines and the 24/7 note, with nothing about holidays", async () => {
+    const { WEBSITE_HOURS, WEBSITE_HOURS_NOTE } = await import("@/lib/site-copy");
+    expect(WEBSITE_HOURS).toEqual([
+      "Sunday: 11:30 AM - 7:00 PM",
+      "Monday - Thursday: 10:30 AM - 7:00 PM",
+      "Friday: 10:30 AM - Chatzose",
+      "Shabbos: Closed",
+      "Motzei Shabbos: 2 hours after Shabbos - 11:30 PM (winter), 12:30 AM (summer)",
+    ]);
+    expect(WEBSITE_HOURS_NOTE).toBe("Book by phone anytime, 24/7.");
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    const hours = page.slice(page.indexOf('id="hours"'), page.indexOf('id="contact"'));
+    expect(hours).toContain("WEBSITE_HOURS.map(");
+    expect(hours).toContain("{WEBSITE_HOURS_NOTE}");
+    expect(hours).not.toMatch(/officeHours|openNow|data-today/); // no "closed today (holiday)" line
+    const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\/|\{\/\*[\s\S]*?\*\/\}|\/\/[^\n]*/g, "");
+    for (const f of ["src/app/page.tsx", "src/lib/site-copy.ts", "src/components/site/SiteFooter.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/ServiceAreaC.tsx", "src/app/text-alerts/page.tsx"]) {
+      expect(strip(readFileSync(f, "utf8")), f).not.toMatch(/yom tov|chol hamoed|purim|tisha|chanukah|lag ba|holiday/i);
+    }
+  });
+});

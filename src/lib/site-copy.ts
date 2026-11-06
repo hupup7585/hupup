@@ -17,6 +17,16 @@ export const STEPS = [
 ] as const;
 /** Delivery always costs extra. Never state an amount (not supplied yet) or suggest it costs nothing. */
 export const DELIVERY_FEE_NOTE = "Delivery available. Call for pricing.";
+/** Website Hours (Abraham's exact lines). No holidays on the website: holiday rules live in the phone system and admin. */
+export const WEBSITE_HOURS = [
+  "Sunday: 11:30 AM - 7:00 PM",
+  "Monday - Thursday: 10:30 AM - 7:00 PM",
+  "Friday: 10:30 AM - Chatzose",
+  "Shabbos: Closed",
+  "Motzei Shabbos: 2 hours after Shabbos - 11:30 PM (winter), 12:30 AM (summer)",
+] as const;
+export const WEBSITE_HOURS_NOTE = "Book by phone anytime, 24/7.";
+
 /** How It Works, under the three steps (Abraham's approved wording, exact). */
 export const HOW_IT_WORKS_DELIVERY =
   "We deliver and set up your bounce house, laser tag, and paddle boat rentals right to your door in Kiryas Joel and nearby Orange County towns, so just give us a call for friendly help and a quick delivery price.";
