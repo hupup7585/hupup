@@ -4,6 +4,7 @@ import { CALENDAR_KEYS } from "./calendar-keys";
 import { config } from "@/lib/config";
 import { requireOwner } from "@/lib/auth";
 import RoutingForm from "./RoutingForm";
+import BlockingForm from "./BlockingForm";
 import { routeSummary, routeTargets } from "@/lib/ivr/routing";
 
 function Row({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
@@ -32,6 +33,10 @@ export default async function SettingsPage() {
           initial={{ operatorTargets: settings.operatorTargets, operatorMode: settings.operatorMode, operatorAcceptPrompt: settings.operatorAcceptPrompt, operatorAcceptText: settings.operatorAcceptText }}
           summary={routeSummary(routeTargets(settings), settings.operatorMode)}
         />
+      </section>
+      <section className="card mb-6 p-5" id="blocking">
+        <h2 className="mb-3 text-lg font-extrabold">Caller blocking</h2>
+        <BlockingForm initial={settings.blockedCallers} />
       </section>
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Settings & system status</h1>
       <p className="mb-5 text-muted">These are set as environment variables in Vercel (Project → Settings → Environment Variables).</p>

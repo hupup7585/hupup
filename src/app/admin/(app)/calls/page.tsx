@@ -4,6 +4,8 @@ import { formatPhone } from "@/lib/phone";
 import { formatMoney } from "@/lib/money";
 import { orderNumber } from "@/lib/orders";
 import ExportButtons from "@/components/ExportButtons";
+import { requireStaff } from "@/lib/auth";
+import { blockCallerAction } from "../settings/blocking-actions";
 import { StatusBadge } from "@/components/StatusBadge";
 
 const OUTCOME: Record<string, [string, string]> = {
@@ -16,6 +18,7 @@ const OUTCOME: Record<string, [string, string]> = {
 };
 
 export default async function CallsPage() {
+  const staff = await requireStaff(["owner", "secretary"]);
   const calls = await recentCalls();
   const tz = process.env.BUSINESS_TIMEZONE || "America/New_York";
   return (
@@ -37,7 +40,14 @@ export default async function CallsPage() {
               return (
                 <tr key={c.call_sid} className="hover:bg-bg">
                   <td className="td whitespace-nowrap">{new Date(c.started_at).toLocaleString("en-US", { timeZone: tz, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
-                  <td className="td">{c.from_number ? <a className="text-navy underline-offset-2 hover:underline" href={`tel:${c.from_number}`}>{formatPhone(c.from_number)}</a> : "Unknown"}</td>
+                  <td className="td">
+                    {c.from_number ? <a className="text-navy underline-offset-2 hover:underline" href={`tel:${c.from_number}`}>{formatPhone(c.from_number)}</a> : "Unknown"}
+                    {staff.role === "owner" && c.from_number && (
+                      <form action={blockCallerAction.bind(null, c.from_number)} className="inline">
+                        <button className="ml-2 text-xs font-semibold text-muted hover:text-[#C83A2F]" title="Blocked callers hear a busy signal (Settings → Caller blocking)">Block</button>
+                      </form>
+                    )}
+                  </td>
                   <td className="td">{c.customer_name ?? "—"}</td>
                   <td className="td"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${cls}`}>{label}</span></td>
                   <td className="td">

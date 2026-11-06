@@ -40,6 +40,7 @@ import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, pars
 import { matchMenuSpeech, menuSpeechHints } from "./category-speech";
 import { boxById, mainBox, saveRecording, saveTranscription } from "@/lib/voicemail";
 import { routeTargets } from "./routing";
+import { matchBlock, parseBlockList } from "./caller-filter";
 import { PROMPTS, loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
 
 const { categories, products, orders } = schema;
@@ -235,6 +236,13 @@ type Handler = (ctx: Ctx, vr: VR) => Promise<VR> | VR;
 
 const handlers: Record<string, Handler> = {
   async incoming(ctx, vr) {
+    // Blocked callers (Settings → Caller blocking) get a busy signal before anything else, and no session.
+    const blocked = matchBlock(ctx.from, parseBlockList((await getSettings()).blockedCallers || ""));
+    if (blocked) {
+      console.log(`[hotline] blocked caller ${ctx.from ?? "withheld"} (${blocked.pattern})`);
+      vr.reject({ reason: "busy" });
+      return vr;
+    }
     await ensureSession(ctx.callSid, ctx.from);
     sp(vr, ctx, "greeting");
     // Booking by phone is available 24/7; outside office hours (Jewish calendar + business hours) callers are told

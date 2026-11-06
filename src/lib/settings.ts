@@ -61,6 +61,11 @@ export const SETTING_DEFAULTS = {
   /** The person answering must press 1, so a personal voicemail picking up doesn't take the call. */
   operatorAcceptPrompt: true,
   operatorAcceptText: "Call from the Hup Up Attractions hotline. To accept, press 1. To pass, press 2.",
+  /**
+   * Caller blocking (checked first on every call). One per line: pattern | note.
+   * Patterns: an exact number, * for any digits (+1845*), ? for one digit (+1845555????), or "withheld".
+   */
+  blockedCallers: "",
   /** Website note under the hours (Abraham's wording). */
   hoursWebsiteNote: "Please note that you can book at any time using our automated phone system.",
 } as const;
