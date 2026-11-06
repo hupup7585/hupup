@@ -49,7 +49,7 @@ describe("routing list", () => {
 });
 
 describe("sequential: one after another, each must press 1", () => {
-  it("rings #1 for its own time with the accept prompt, then #2, then #3, then offers voicemail", async () => {
+  it("rings #1 for its own time with the accept prompt, then #2, then #3, then the missed-call line and voicemail", async () => {
     const first = await call("operator");
     expect(first).toMatch(/<Dial [^>]*timeout="20"[^>]*action="[^"]*operator-done\?i=0"/);
     expect(first).toContain(`<Number url="https://hupup.example/api/voice/whisper?from=%2B18455550199" method="POST">+18457777585</Number>`);
@@ -59,19 +59,20 @@ describe("sequential: one after another, each must press 1", () => {
     const third = await call("operator-done", { DialCallStatus: "busy" }, "i=1");
     expect(third).toContain(">+18455550111</Number>");
     const end = await call("operator-done", { DialCallStatus: "no-answer" }, "i=2");
-    expect(end).toContain("To leave a message, press 1.");
+    expect(end).toContain("Sorry, we missed your call, our team is busy helping others right now. Please leave a message after the tone and someone will get back to you shortly. Thank you and have a wonderful day!");
+    expect(end).toContain("/api/voice/voicemail?after=1"); // straight to the beep
     expect(await call("operator-done", { DialCallStatus: "completed" }, "i=1")).toContain("<Hangup/>");
   });
 });
 
 describe("simultaneous: everyone at once, first to press 1 wins", () => {
-  it("dials all numbers in one Dial with the longest ring time; no answer goes to the voicemail offer", async () => {
+  it("dials all numbers in one Dial with the longest ring time; no answer goes to the missed-call line and voicemail", async () => {
     await saveSetting("operatorMode", "simultaneous");
     const xml = await call("operator");
     expect(xml).toMatch(/<Dial [^>]*timeout="20"/);
     expect((xml.match(/<Number /g) || []).length).toBe(3);
     expect(xml).not.toContain("?i=");
-    expect(await call("operator-done", { DialCallStatus: "no-answer" })).toContain("To leave a message, press 1.");
+    expect(await call("operator-done", { DialCallStatus: "no-answer" })).toContain("/api/voice/voicemail?after=1");
   });
 });
 
@@ -88,5 +89,17 @@ describe("the staff member's side", () => {
   it("accept prompt off: numbers ring straight through", async () => {
     await saveSetting("operatorAcceptPrompt", false);
     expect(await call("operator")).toContain("<Number>+18457777585</Number>");
+  });
+});
+
+describe("pauses between menu options (Abraham)", () => {
+  it("a short pause after the greeting and after each option", async () => {
+    const greet = await call("incoming");
+    expect(greet).toMatch(/<Pause length="1"\/><Redirect/);
+    const xml = await call("menu");
+    const menu = xml.slice(xml.indexOf("<Gather"), xml.indexOf("</Gather>"));
+    const options = (menu.match(/<Say /g) || []).length;
+    expect(options).toBeGreaterThan(1);
+    expect((menu.match(/<Pause length="1"\/>/g) || []).length).toBe(options - 1); // between options, not after "press star"
   });
 });

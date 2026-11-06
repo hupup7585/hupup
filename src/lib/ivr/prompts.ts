@@ -121,8 +121,9 @@ export const PROMPTS = {
 
   // Talk to a person
   transfer_connecting: { group: "Talk to a person", label: "Connecting", text: "Sure thing! Hang tight while I connect you to our team." },
-  transfer_failed: { group: "Talk to a person", label: "No one answered", text: "Sorry, our team is busy helping other customers right now. I'm happy to help you book in the meantime!" },
-  operator_unavailable: { group: "Talk to a person", label: "No one available", text: "Sorry, no one is available right now. But I'm happy to help you book!" },
+  // Abraham's own wording (same line for both), followed straight by the voicemail beep
+  transfer_failed: { group: "Talk to a person", label: "No one answered (then voicemail)", text: "Sorry, we missed your call, our team is busy helping others right now. Please leave a message after the tone and someone will get back to you shortly. Thank you and have a wonderful day!" },
+  operator_unavailable: { group: "Talk to a person", label: "No one available (then voicemail)", text: "Sorry, we missed your call, our team is busy helping others right now. Please leave a message after the tone and someone will get back to you shortly. Thank you and have a wonderful day!" },
 
   // Voicemail (Main box)
   menu_voicemail: { group: "Voicemail", label: "Menu option when the office is closed: leave a message", text: "To leave us a message, press 0." },

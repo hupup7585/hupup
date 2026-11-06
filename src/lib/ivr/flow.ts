@@ -255,6 +255,7 @@ const handlers: Record<string, Handler> = {
       if (late === "cholHamoed") sp(vr, ctx, "late_cholhamoed");
       else if (late === "chanukah") sp(vr, ctx, "late_chanukah");
     }
+    vr.pause({ length: 1 }); // a short pause after the greeting, before the menu options (Abraham)
     return back(vr, "menu");
   },
 
@@ -274,14 +275,19 @@ const handlers: Record<string, Handler> = {
       speechTimeout: "auto",
       hints: menuSpeechHints(cats),
     });
-    if (!cats.length) sp(g, ctx, "menu_empty");
-    for (const c of cats) sp(g, ctx, "menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
-    if (order?.items.length) sp(g, ctx, "menu_cart");
+    // A short pause between options so callers can follow the choices (Abraham)
+    const option = (key: PromptKey, vars?: Record<string, string | number>) => {
+      sp(g, ctx, key, vars);
+      g.pause({ length: 1 });
+    };
+    if (!cats.length) option("menu_empty");
+    for (const c of cats) option("menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
+    if (order?.items.length) option("menu_cart");
     const officeOpen = officeOpenNow(new Date(), await getSettings());
     // Option 0: a live person while the office is open; otherwise leave a message (voicemail).
-    if (config.forwardPhone() && officeOpen) sp(g, ctx, "menu_operator");
-    else sp(g, ctx, "menu_voicemail");
-    if (cats.length) sp(g, ctx, "menu_speech");
+    if (config.forwardPhone() && officeOpen) option("menu_operator");
+    else option("menu_voicemail");
+    if (cats.length) option("menu_speech");
     sp(g, ctx, "menu_repeat");
     return noInput(vr, ctx, "menu");
   },
@@ -833,7 +839,11 @@ const handlers: Record<string, Handler> = {
   async operator(ctx, vr) {
     const settings = await getSettings();
     const targets = routeTargets(settings);
-    if (!targets.length || !officeOpenNow(new Date(), settings)) return back(vr, "voicemail");
+    if (!targets.length || !officeOpenNow(new Date(), settings)) {
+      // Abraham's missed-call line, then straight to the voicemail beep
+      sp(vr, ctx, "operator_unavailable");
+      return back(vr, "voicemail", { after: 1 });
+    }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "forwarded" }, ctx.session);
     sp(vr, ctx, "transfer_connecting");
     return dialTargets(vr, settings, 0, ctx.session?.fromNumber ?? ctx.from);
@@ -848,10 +858,9 @@ const handlers: Record<string, Handler> = {
     const settings = await getSettings();
     const next = Number(ctx.query.get("i") ?? -1) + 1;
     if (settings.operatorMode !== "simultaneous" && next > 0 && next < routeTargets(settings).length) return dialTargets(vr, settings, next, ctx.session?.fromNumber ?? ctx.from);
+    // Abraham's missed-call line, then straight to the voicemail beep
     sp(vr, ctx, "transfer_failed");
-    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 6, action: url("voicemail-offer"), method: "POST" });
-    sp(g, ctx, "voicemail_offer");
-    return back(vr, "menu");
+    return back(vr, "voicemail", { after: 1 });
   },
 
   /** Plays to the staff member who answered (not the caller): press 1 to take the call. */
@@ -884,8 +893,11 @@ const handlers: Record<string, Handler> = {
       return back(vr, "menu");
     }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail" }, ctx.session);
-    if (box.greetingText?.trim()) say(vr, box.greetingText.trim());
-    else sp(vr, ctx, "voicemail_prompt");
+    // After the missed-call line the caller has already been told to leave a message: go straight to the beep.
+    if (ctx.query.get("after") !== "1") {
+      if (box.greetingText?.trim()) say(vr, box.greetingText.trim());
+      else sp(vr, ctx, "voicemail_prompt");
+    }
     vr.record({
       maxLength: Math.min(Math.max(box.maxLengthSec, 10), 600),
       playBeep: true,

@@ -50,7 +50,9 @@ beforeEach(() => {
 describe("hotline voicemail", () => {
   it("office closed: the menu offers a message on 0, and 0 goes straight to voicemail", async () => {
     expect(await call("menu")).toContain("To leave us a message, press 0.");
-    expect(await call("operator")).toContain("/api/voice/voicemail");
+    const closed = await call("operator");
+    expect(closed).toContain("Sorry, we missed your call, our team is busy helping others right now. Please leave a message after the tone and someone will get back to you shortly. Thank you and have a wonderful day!");
+    expect(closed).toContain("/api/voice/voicemail?after=1");
   });
 
   it("records into the Main box with a beep, transcription and callbacks; Main box alerts the owner by default", async () => {
@@ -109,15 +111,18 @@ describe("hotline voicemail", () => {
     await db.update(schema.voicemailBoxes).set({ greetingText: null }).where(eq(schema.voicemailBoxes.id, box.id));
   });
 
-  it("office open: 0 rings the office; if no one answers the caller can press 1 to leave a message", async () => {
+  it("office open: 0 rings the office; if no one answers, Abraham's missed-call line then the voicemail beep", async () => {
     h.open = true;
     process.env.FORWARD_PHONE = "+18457777585";
     const dial = await call("operator");
     expect(dial).toMatch(/<Dial [^>]*action="[^"]*operator-done\?i=0"/);
     const missed = await call("operator-done", { DialCallStatus: "no-answer" });
-    expect(missed).toContain("To leave a message, press 1.");
-    expect(await call("voicemail-offer", { Digits: "1" })).toContain("/api/voice/voicemail");
-    expect(await call("voicemail-offer", { Digits: "*" })).toContain("/api/voice/menu");
+    expect(missed).toContain("Sorry, we missed your call, our team is busy helping others right now. Please leave a message after the tone and someone will get back to you shortly. Thank you and have a wonderful day!");
+    expect(missed).toContain("/api/voice/voicemail?after=1");
+    // After the missed-call line: no second greeting, straight to the beep
+    const vm = await call("voicemail", {}, "after=1");
+    expect(vm).not.toContain("Please leave your name");
+    expect(vm).toMatch(/<Record [^>]*playBeep="true"/);
     expect(await call("operator-done", { DialCallStatus: "completed" })).toContain("<Hangup/>");
     delete process.env.FORWARD_PHONE;
   });
