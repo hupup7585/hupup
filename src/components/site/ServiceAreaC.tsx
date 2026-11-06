@@ -3,12 +3,15 @@ import type { SiteContent } from "@/lib/site-content";
 import { DELIVERY_FEE_SHORT, SERVICE_AREA_DELIVERY_NOTE, noLonelyWord } from "@/lib/site-copy";
 import { CallButton, ICON_STROKE, IconTile, SectionTitle } from "./parts";
 
-/** Same card as the hero "Call to book" board: thick navy border and a solid navy offset shadow. */
-const CARD = "relative flex flex-col rounded-[2rem] border-[3px] border-hu-deep bg-white p-6 shadow-[8px_8px_0_#123D73] sm:p-8";
+/**
+ * Hero-board look with even edges (Abraham): one solid navy border, the same thickness on every side, and no
+ * offset shadow, so no edge looks heavier or fades into the blue background.
+ */
+const CARD = "relative flex flex-col rounded-[2rem] border-4 border-hu-deep bg-white p-6 sm:p-8";
 const EYEBROW = "text-sm font-extrabold uppercase tracking-[0.18em] opacity-75";
 
 /**
- * Service Area, Option C (mock-up only, /mockups/service-area): both cards styled like the hero call-to-book board,
+ * Service Area, Option C (mock-up only, /mockups/service-area): both cards styled like the hero call-to-book board (even border),
  * light-blue icon tiles beside each line, thin dividers, a yellow round badge. Same wording as the live section.
  */
 export default function ServiceAreaC({ c, badge }: { c: SiteContent; badge?: string }) {
