@@ -3,7 +3,7 @@ export const SLOGAN = "BRINGING SOMETHING SPECIAL TO EVERY OCCASION";
 export const INTRO =
   "Make your next event unforgettable with our exciting rentals! Affordable and suitable for any party, gathering, celebration & occasion, or just because.";
 export const WHY = [
-  "Exciting rental attractions",
+  "Exciting attraction rentals",
   "Options for all types of events",
   "Convenient phone reservations",
   "Friendly customer service",
@@ -29,8 +29,7 @@ export const WEBSITE_HOURS = [
 export const WEBSITE_HOURS_NOTE = "Book by phone anytime, 24/7.";
 
 /** How It Works, under the three steps (Abraham's approved wording, exact). */
-export const HOW_IT_WORKS_DELIVERY =
-  "We deliver and set up your bounce house, laser tag, and paddle boat rentals right to your door in Kiryas Joel and nearby Orange County towns, so just give us a call for friendly help and a quick delivery price.";
+export const HOW_IT_WORKS_DELIVERY = "We deliver our rentals right to your door.";
 /** Kiryas Joel box only (Abram 10:46 PM). */
 export const SERVICE_AREA_DELIVERY_NOTE = "Delivery available for an additional fee.";
 export const DELIVERY_FEE_SHORT = "Delivery fee applies, call for pricing.";

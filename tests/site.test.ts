@@ -159,7 +159,7 @@ describe("business name never splits across lines", () => {
 
 describe("Jumping Balloons and no slashes", () => {
   const visible = ["src/app/page.tsx", "src/components/site/SiteFooter.tsx", "src/components/site/SiteHeader.tsx", "src/lib/site-copy.ts", "src/lib/site-content.ts", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/app/layout.tsx"];
-  it("'bounce house' appears only as a search-engine hint or in Abraham's approved How It Works sentence", () => {
+  it("'bounce house' appears only as a search-engine hint (page titles, meta descriptions, structured data)", () => {
     // Exception: Abraham's approved /terms section C names the business-terms section "Bounce Houses and Inflatable
     // Attractions" verbatim (legal section title), so that one phrase is allowed there.
     const stripHints = (t: string) =>
@@ -169,9 +169,7 @@ describe("Jumping Balloons and no slashes", () => {
     const all = visible
       .map((f) => stripHints(readFileSync(f, "utf8")))
       .join("\n")
-      .replace("See Sections 9 through 13 (Bounce Houses and Inflatable Attractions,", "")
-      // Abraham approved this exact How It Works sentence, which says "bounce house"
-      .replace("We deliver and set up your bounce house, laser tag, and paddle boat rentals", "");
+      .replace("See Sections 9 through 13 (Bounce Houses and Inflatable Attractions,", "");
     expect(all).not.toMatch(/Bounce Houses/);
     expect(all.match(/bounce house/gi) ?? []).toEqual([]); // never in visible copy
     const page = readFileSync("src/app/page.tsx", "utf8");
@@ -286,9 +284,7 @@ describe("Kiryas Joel box delivery line (Abram 10:46 PM)", () => {
     const how = page.slice(page.indexOf('id="how-it-works"'), page.indexOf("<ServiceAreaC c={c} />"));
     expect(how).toContain("{noLonelyWord(HOW_IT_WORKS_DELIVERY)}");
     const { HOW_IT_WORKS_DELIVERY } = await import("@/lib/site-copy");
-    expect(HOW_IT_WORKS_DELIVERY).toBe(
-      "We deliver and set up your bounce house, laser tag, and paddle boat rentals right to your door in Kiryas Joel and nearby Orange County towns, so just give us a call for friendly help and a quick delivery price.",
-    );
+    expect(HOW_IT_WORKS_DELIVERY).toBe("We deliver our rentals right to your door.");
   });
 });
 
@@ -296,7 +292,7 @@ describe("Why Choose delivery item (Abram 10:50 PM)", () => {
   it("is exactly 'Delivery option available', no period, same position and truck icon", async () => {
     const { WHY } = await import("@/lib/site-copy");
     expect(WHY).toEqual([
-      "Exciting rental attractions",
+      "Exciting attraction rentals",
       "Options for all types of events",
       "Convenient phone reservations",
       "Friendly customer service",
@@ -530,5 +526,18 @@ describe("Service Area town tiles (Abraham)", () => {
     const grid = c.slice(c.indexOf("data-town-grid"), c.indexOf("</ul>", c.indexOf("data-town-grid")));
     expect(grid).not.toMatch(/IconTile|Home/);
     expect(grid).toContain("c.serviceArea.also.map(");
+  });
+});
+
+describe("delivery only, no setup (Abraham)", () => {
+  it("How It Works says exactly 'We deliver our rentals right to your door.' with the truck icon", async () => {
+    const { HOW_IT_WORKS_DELIVERY } = await import("@/lib/site-copy");
+    expect(HOW_IT_WORKS_DELIVERY).toBe("We deliver our rentals right to your door.");
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    const note = page.slice(page.indexOf("data-delivery-note"), page.indexOf("</p>", page.indexOf("data-delivery-note")));
+    expect(note).toContain("<Truck");
+  });
+  it("header: a little more space between the phone number and CALL TO BOOK", () => {
+    expect(readFileSync("src/components/site/SiteHeader.tsx", "utf8")).toContain("lg:pl-6 xl:gap-6");
   });
 });

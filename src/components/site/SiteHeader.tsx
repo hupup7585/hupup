@@ -28,7 +28,7 @@ export default function SiteHeader({ logoUrl, phoneDisplay, phoneE164 }: { logoU
             </a>
           ))}
         </nav>
-        <div data-header-contact className="flex items-center gap-2 lg:border-l-2 lg:border-hu-deep/15 lg:pl-6 xl:gap-4">
+        <div data-header-contact className="flex items-center gap-2 lg:border-l-2 lg:border-hu-deep/15 lg:pl-6 xl:gap-6">
           <a href={`tel:${phoneE164}`} className="hidden font-bold text-hu-deep xl:inline">
             {phoneDisplay}
           </a>
