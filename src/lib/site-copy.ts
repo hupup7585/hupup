@@ -17,6 +17,9 @@ export const STEPS = [
 ] as const;
 /** Delivery always costs extra. Never state an amount (not supplied yet) or suggest it costs nothing. */
 export const DELIVERY_FEE_NOTE = "Delivery available. Call for pricing.";
+/** How It Works, under the three steps (Abraham's approved wording, exact). */
+export const HOW_IT_WORKS_DELIVERY =
+  "We deliver and set up your bounce house, laser tag, and paddle boat rentals right to your door in Kiryas Joel and nearby Orange County towns, so just give us a call for friendly help and a quick delivery price.";
 /** Kiryas Joel box only (Abram 10:46 PM). */
 export const SERVICE_AREA_DELIVERY_NOTE = "Delivery available for an additional fee.";
 export const DELIVERY_FEE_SHORT = "Delivery fee applies, call for pricing.";

@@ -136,7 +136,7 @@ describe("delivery fee wording", () => {
     expect(page).not.toContain("fee applies");
     expect(page).not.toMatch(/rounded-full bg-white px-1\.5/);
     expect(page).toContain("Delivery available for an additional fee"); // meta description
-    expect(page.match(/DELIVERY_FEE_NOTE/g)!.length).toBeGreaterThanOrEqual(2); // import + How It Works
+    expect(page).toContain("{noLonelyWord(HOW_IT_WORKS_DELIVERY)}"); // How It Works (Abraham's approved sentence)
   });
 });
 
@@ -159,7 +159,7 @@ describe("business name never splits across lines", () => {
 
 describe("Jumping Balloons and no slashes", () => {
   const visible = ["src/app/page.tsx", "src/components/site/SiteFooter.tsx", "src/components/site/SiteHeader.tsx", "src/lib/site-copy.ts", "src/lib/site-content.ts", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/app/layout.tsx"];
-  it("'bounce house' appears only as a search-engine hint (page titles, meta descriptions, structured data)", () => {
+  it("'bounce house' appears only as a search-engine hint or in Abraham's approved How It Works sentence", () => {
     // Exception: Abraham's approved /terms section C names the business-terms section "Bounce Houses and Inflatable
     // Attractions" verbatim (legal section title), so that one phrase is allowed there.
     const stripHints = (t: string) =>
@@ -169,7 +169,9 @@ describe("Jumping Balloons and no slashes", () => {
     const all = visible
       .map((f) => stripHints(readFileSync(f, "utf8")))
       .join("\n")
-      .replace("See Sections 9 through 13 (Bounce Houses and Inflatable Attractions,", "");
+      .replace("See Sections 9 through 13 (Bounce Houses and Inflatable Attractions,", "")
+      // Abraham approved this exact How It Works sentence, which says "bounce house"
+      .replace("We deliver and set up your bounce house, laser tag, and paddle boat rentals", "");
     expect(all).not.toMatch(/Bounce Houses/);
     expect(all.match(/bounce house/gi) ?? []).toEqual([]); // never in visible copy
     const page = readFileSync("src/app/page.tsx", "utf8");
@@ -229,8 +231,12 @@ describe("Why Choose layout and badge (Abram 10:25-10:30 PM)", () => {
     expect(page).toContain("after:top-[calc(100%-0.43em+5px)] after:h-[3px] after:bg-hu-yellow"); // same 3px thickness, 5px below the baseline
     expect(page).not.toContain("text-2xl font-extrabold underline decoration-hu-yellow decoration-[6px]");
   });
-  it("delivery note is centered under the steps", () => {
-    expect(readFileSync("src/app/page.tsx", "utf8")).toContain('<div className="mt-10 flex justify-center">');
+  it("delivery note is centered under the steps, at least as large as the step text, truck icon kept", () => {
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain('<div className="mt-12 flex justify-center">');
+    const note = page.slice(page.indexOf("data-delivery-note"), page.indexOf("</p>", page.indexOf("data-delivery-note")));
+    expect(note).toMatch(/text-lg [^"]*sm:text-xl/); // step descriptions are text-lg
+    expect(note).toContain("<Truck");
   });
   it("delivery badge centers one group (truck + two lines) in a slightly larger circle", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
@@ -278,7 +284,11 @@ describe("Kiryas Joel box delivery line (Abram 10:46 PM)", () => {
     const box = saFile.slice(saFile.indexOf("data-sa-delivery-note"), saFile.indexOf("data-sa-delivery-note") + 600);
     expect(box).toContain("{noLonelyWord(SERVICE_AREA_DELIVERY_NOTE)}");
     const how = page.slice(page.indexOf('id="how-it-works"'), page.indexOf("<ServiceAreaC c={c} />"));
-    expect(how).toContain("{DELIVERY_FEE_NOTE}");
+    expect(how).toContain("{noLonelyWord(HOW_IT_WORKS_DELIVERY)}");
+    const { HOW_IT_WORKS_DELIVERY } = await import("@/lib/site-copy");
+    expect(HOW_IT_WORKS_DELIVERY).toBe(
+      "We deliver and set up your bounce house, laser tag, and paddle boat rentals right to your door in Kiryas Joel and nearby Orange County towns, so just give us a call for friendly help and a quick delivery price.",
+    );
   });
 });
 

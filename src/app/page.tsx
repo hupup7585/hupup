@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
-import { BUSINESS_NAME_NB, keepName, whyLabel, whyRows, DELIVERY_FEE_NOTE, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
+import { BUSINESS_NAME_NB, keepName, whyLabel, whyRows, HOW_IT_WORKS_DELIVERY, noLonelyWord, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -207,10 +207,11 @@ export default async function Home() {
                 );
               })}
             </ol>
-            <div className="mt-10 flex justify-center">
-              <p data-delivery-note className="inline-flex items-center gap-3 rounded-2xl bg-hu-tint px-4 py-3 text-center text-base font-semibold">
-                <Truck className="h-5 w-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
-                <span className="[text-wrap:balance]">{DELIVERY_FEE_NOTE}</span>
+            {/* Abraham's delivery sentence: at least as large as the step text, centered under the steps, truck icon kept */}
+            <div className="mt-12 flex justify-center">
+              <p data-delivery-note className="flex max-w-3xl items-start gap-4 rounded-3xl bg-hu-tint px-5 py-5 text-left text-lg font-semibold leading-relaxed sm:items-center sm:px-7 sm:text-xl">
+                <Truck className="mt-1 h-8 w-8 shrink-0 sm:mt-0" strokeWidth={ICON_STROKE} aria-hidden />
+                <span className="[text-wrap:pretty]">{noLonelyWord(HOW_IT_WORKS_DELIVERY)}</span>
               </p>
             </div>
           </div>
