@@ -192,10 +192,13 @@ describe("Kiryas Joel is one place", () => {
 });
 
 describe("nearby towns grid", () => {
-  it("is an even grid: 2 columns on phones, 4 from 768px, leftover row centered", async () => {
+  it("is an even grid: 2 per row on phones, 3 per row from 768px, full rows only", async () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
-    expect(page).toContain("grid auto-rows-fr grid-cols-4 gap-2 md:grid-cols-8");
-    expect(page).toContain("col-span-2 flex items-center justify-center");
+    expect(page).toContain("grid auto-rows-fr grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3");
+    const grid = page.slice(page.indexOf("data-town-grid"), page.indexOf("</ul>", page.indexOf("data-town-grid")));
+    expect(grid).not.toMatch(/col-start|col-span/);
+    const { SERVICE_AREA } = await import("@/lib/site-copy");
+    expect(SERVICE_AREA.also.length % 6).toBe(0); // 2 full rows of 3, 3 full rows of 2
     expect(page).not.toMatch(/flex flex-wrap gap-2/);
   });
 });
@@ -350,14 +353,18 @@ describe("Service Area heading matches the other sections (Abraham)", () => {
   });
 });
 
-describe("Middletown is not served (Abraham)", () => {
-  it("never appears in site copy, delivery zones, prompts or pages", async () => {
-    const { readdirSync, statSync } = await import("node:fs");
-    const walk = (d: string): string[] => readdirSync(d).flatMap((f) => (statSync(`${d}/${f}`).isDirectory() ? walk(`${d}/${f}`) : [`${d}/${f}`]));
-    const hits = walk("src").filter((f) => /middletown/i.test(readFileSync(f, "utf8")));
-    expect(hits).toEqual([]);
+describe("Middletown: served, but not shown on the public website (Abraham)", () => {
+  it("stays in the $15 delivery zone (pricing, POS, hotline address check)", async () => {
     const { deliveryZone } = await import("@/lib/pricing");
     const { SETTING_DEFAULTS } = await import("@/lib/settings");
-    expect(deliveryZone("10 Main St, Middletown, NY", SETTING_DEFAULTS)).toBe("outside");
+    expect(deliveryZone("10 Main St, Middletown, NY", SETTING_DEFAULTS)).toBe("area");
+  });
+  it("never appears in what the website displays (Service Area, town lists, FAQ, SEO, structured data)", async () => {
+    const { readdirSync, statSync } = await import("node:fs");
+    const walk = (d: string): string[] => readdirSync(d).flatMap((f) => (statSync(`${d}/${f}`).isDirectory() ? walk(`${d}/${f}`) : [`${d}/${f}`]));
+    const publicFiles = ["src/lib/site-copy.ts", ...walk("src/components/site"), ...walk("src/app").filter((f) => !f.includes("/admin/") && !f.includes("/api/"))];
+    expect(publicFiles.filter((f) => /middletown/i.test(readFileSync(f, "utf8")))).toEqual([]);
+    const { serviceAreaPlaces } = await import("@/lib/site-copy");
+    expect(serviceAreaPlaces().join(" ")).not.toMatch(/middletown/i);
   });
 });

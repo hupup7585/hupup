@@ -22,22 +22,6 @@ export const metadata: Metadata = {
   },
 };
 
-/**
- * Even chip grid: each chip spans 2 tracks (4 tracks = 2 columns on phones, 8 tracks = 4 columns from md/768px).
- * The leftover last row is centered by starting its first chip later.
- */
-function townCentering(i: number, count: number): string {
-  const classes: string[] = [];
-  if (count % 2 === 1 && i === count - 1) classes.push("col-start-2");
-  const r4 = count % 4;
-  const firstOfLastRow = count - r4;
-  if (r4 > 0 && i === firstOfLastRow) {
-    classes.push(r4 === 3 ? "md:col-start-2" : r4 === 2 ? "md:col-start-3" : "md:col-start-4");
-  } else if (count % 2 === 1 && i === count - 1) {
-    classes.push("md:col-start-auto");
-  }
-  return classes.join(" ");
-}
 
 const WHY_ICONS = [PartyPopper, ListChecks, PhoneCall, Headset, Truck, ClipboardCheck];
 const STEP_ICONS = [Search, PhoneCall, CalendarCheck];
@@ -232,11 +216,12 @@ export default async function Home() {
               </div>
               <div className="rounded-3xl bg-hu-tint p-4 min-[360px]:p-5 sm:p-7">
                 <h3 className="text-lg font-bold">{c.serviceArea.alsoTitle}</h3>
-                <ul className="mt-4 grid auto-rows-fr grid-cols-4 gap-2 md:grid-cols-8">
-                  {c.serviceArea.also.map((town, i, all) => (
+                {/* Even grid (Abraham): 2 per row on phones, 3 per row from 768px, every tile the same size, full card width */}
+                <ul data-town-grid className="mt-4 grid auto-rows-fr grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3">
+                  {c.serviceArea.also.map((town) => (
                     <li
                       key={town}
-                      className={`col-span-2 flex items-center justify-center rounded-2xl border-2 border-hu-deep/20 bg-white px-1.5 py-2.5 text-center text-[13px] font-semibold leading-snug min-[360px]:text-[15px] md:px-3 md:py-3 md:text-base ${townCentering(i, all.length)}`}
+                      className="flex h-full min-h-[3.75rem] items-center justify-center rounded-2xl border-2 border-hu-deep/20 bg-white px-1.5 py-2.5 text-center text-[13px] font-semibold leading-snug min-[360px]:text-[15px] md:px-3 md:py-3 md:text-base"
                     >
                       {town.includes(" and ") ? (
                         <span>
