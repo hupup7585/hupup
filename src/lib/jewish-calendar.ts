@@ -73,9 +73,9 @@ function events(iso: string): Holiday[] {
   return holidaysOn(fixedFromISO(iso));
 }
 
-type Kind = "shabbos" | "yomtov" | "cholHamoed" | "chanukah" | "purim" | "tishaBav" | "minorFast" | "lagBaomer";
+export type Kind = "shabbos" | "yomtov" | "cholHamoed" | "chanukah" | "purim" | "tishaBav" | "minorFast" | "lagBaomer";
 
-function kinds(iso: string): { kinds: Set<Kind>; names: string[] } {
+export function kinds(iso: string): { kinds: Set<Kind>; names: string[] } {
   const k = new Set<Kind>();
   const names: string[] = [];
   if (weekday(iso) === 6) {
@@ -98,13 +98,36 @@ function kinds(iso: string): { kinds: Set<Kind>; names: string[] } {
   return { kinds: k, names };
 }
 
-function overrides(s: CalendarSettings): Map<string, { open: boolean; note: string }> {
-  const m = new Map<string, { open: boolean; note: string }>();
-  for (const line of s.calendarOverrides.split("\n")) {
-    const r = line.trim().match(/^(\d{4}-\d{2}-\d{2})\s+(open|closed)\b\s*(.*)$/i);
-    if (r) m.set(r[1], { open: r[2].toLowerCase() === "open", note: r[3] });
+/** The Owner's entry for one day (admin "Holidays & hours"): Open or Closed, optional hours, notes. */
+export type DayOverride = { open: boolean; hours: string | null; note: string };
+
+/**
+ * Owner overrides, one line per day: "2027-04-25 open 10:30-22:30 Notes" or "2027-01-01 closed Notes".
+ * Hours (24-hour "HH:MM-HH:MM") are optional and only apply to open days. Older lines without hours still work.
+ */
+export function parseOverrides(text: string): Map<string, DayOverride> {
+  const m = new Map<string, DayOverride>();
+  for (const line of text.split("\n")) {
+    const r = line.trim().match(/^(\d{4}-\d{2}-\d{2})\s+(open|closed)\b(?:\s+(\d{1,2}:\d{2}-\d{1,2}:\d{2})(?=\s|$))?\s*(.*)$/i);
+    if (r) m.set(r[1], { open: r[2].toLowerCase() === "open", hours: r[2].toLowerCase() === "open" ? r[3] ?? null : null, note: r[4] });
   }
   return m;
+}
+
+export function formatOverrides(m: Map<string, DayOverride>): string {
+  return [...m.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([d, o]) => [d, o.open ? "open" : "closed", o.open && o.hours ? o.hours : "", o.note.replace(/\s+/g, " ").trim()].filter(Boolean).join(" "))
+    .join("\n");
+}
+
+function overrides(s: CalendarSettings): Map<string, DayOverride> {
+  return parseOverrides(s.calendarOverrides);
+}
+
+/** The Owner's entry for a day, if any. */
+export function overrideFor(iso: string, s: CalendarSettings = calendarDefaults()): DayOverride | null {
+  return overrides(s).get(iso) ?? null;
 }
 
 function shabbosOrYomTov(iso: string) {

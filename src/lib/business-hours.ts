@@ -1,6 +1,6 @@
 import type { Settings } from "@/lib/settings";
 import { SETTING_DEFAULTS } from "@/lib/settings";
-import { TIME_ZONE, addDaysISO, dayInfo, localISO, type CalendarSettings } from "@/lib/jewish-calendar";
+import { TIME_ZONE, addDaysISO, dayInfo, localISO, overrideFor, type CalendarSettings } from "@/lib/jewish-calendar";
 import { fixedFromISO } from "@/lib/hup-calendar/hebrew-date";
 import { holidaysOn } from "@/lib/hup-calendar/holidays";
 
@@ -66,6 +66,13 @@ export function officeOpenNow(at: Date = new Date(), s: HoursSettings = hoursDef
   const close = motzeiCloseMinutes(at, s);
   if (yesterday.reopensAt && close < 6 * 60 && now < close) return true;
 
+  // The Owner's own hours for this day (admin "Holidays & hours") win over the calendar's defaults.
+  const own = overrideFor(iso, s);
+  if (own?.open && own.hours) {
+    const w = range(own.hours);
+    if (w) return now >= w[0] && now < w[1];
+  }
+
   if (today.closed) {
     if (!today.reopensAt || at < today.reopensAt) return false;
     // Motzei Shabbos / Motzei Yom Tov: opens N minutes after Shabbos ends ("tzeis+120"), at tzeis, or at a set time.
@@ -98,7 +105,7 @@ export function officeOpenNow(at: Date = new Date(), s: HoursSettings = hoursDef
 export function lateHoursToday(at: Date = new Date(), s: HoursSettings = hoursDefaults()): "cholHamoed" | "chanukah" | null {
   const iso = localISO(at);
   const late = lateWindow(iso);
-  if (!late || dayInfo(iso, s).closesAt || !officeOpenNow(at, s)) return null;
+  if (!late || overrideFor(iso, s) || dayInfo(iso, s).closesAt || !officeOpenNow(at, s)) return null;
   return late;
 }
 
@@ -112,6 +119,24 @@ const span = (r: string) => {
   const [a, b] = r.split("-");
   return `${ampm(a)} to ${ampm(b)}`;
 };
+
+/**
+ * The calendar's default for a day, in words, for the admin "Holidays & hours" list (ignores the Owner's entries),
+ * e.g. "Closed (Pesach I)", "10:30 AM to 10:30 PM", "10:30 AM until chatzos (12:56 PM)".
+ */
+export function defaultDayText(iso: string, s: HoursSettings = hoursDefaults()): { open: boolean; hours: string } {
+  const base = { ...s, calendarOverrides: "" };
+  const info = dayInfo(iso, base);
+  if (info.closed) return { open: false, hours: `Closed (${info.reason})` };
+  const late = lateWindow(iso);
+  const span24 = late === "cholHamoed" ? s.hoursCholHamoed : late === "chanukah" ? s.hoursChanukah : dow(iso) === 0 ? s.hoursSunday : dow(iso) === 5 ? null : s.hoursMonThu;
+  const start = span24 ? span24.split("-")[0] : s.hoursFridayOpen;
+  if (info.closesAt) {
+    const t = info.closesAt.toLocaleTimeString("en-US", { timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit" });
+    return { open: true, hours: `${ampm(start)} until ${/candle/.test(info.closesAtLabel ?? "") ? "candle lighting" : "chatzos"} (${t})` };
+  }
+  return { open: true, hours: span24 ? span(span24) : `${ampm(start)} until chatzos` };
+}
 
 /** Hours as lines for the website. */
 export function hoursLines(s: HoursSettings = hoursDefaults()): string[] {
