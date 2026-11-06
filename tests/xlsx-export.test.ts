@@ -62,12 +62,14 @@ describe("report access", () => {
     for (const k of Object.keys(REPORTS)) expect(reportFor(k, "delivery")).toMatchObject({ status: 403 });
     expect(reportFor("nope", "owner")).toMatchObject({ status: 404 });
   });
-  it("the export route checks sign-in and role, and every report has the Excel button somewhere", async () => {
+  it("the export route checks sign-in and role; buttons are on the mock-up only until Abraham approves", async () => {
     const route = readFileSync("src/app/api/admin/export/[report]/route.ts", "utf8");
     expect(route).toContain("currentStaff()");
     expect(route).toContain("reportFor(");
-    const { REPORTS } = await import("@/lib/reports");
-    const pages = ["src/app/admin/(app)/orders/page.tsx", "src/app/admin/(app)/page.tsx", "src/app/admin/(app)/calls/page.tsx", "src/app/admin/deliveries/page.tsx"].map((f) => readFileSync(f, "utf8")).join("\n");
-    for (const k of Object.keys(REPORTS)) expect(pages).toContain(`report="${k}"`);
+    const real = ["src/app/admin/(app)/orders/page.tsx", "src/app/admin/(app)/page.tsx", "src/app/admin/(app)/calls/page.tsx", "src/app/admin/deliveries/page.tsx", "src/app/admin/(app)/customers/page.tsx"].map((f) => readFileSync(f, "utf8")).join("\n");
+    expect(real).not.toContain("ExportButtons");
+    const mock = readFileSync("src/app/mockups/admin-export/page.tsx", "utf8");
+    for (const label of ["Bookings", "Customers", "Dashboard report", "Payments", "Call log", "Deliveries and pickups"]) expect(mock).toContain(`<Buttons label="${label}" />`);
+    expect(mock).toContain("Open in Google Sheets");
   });
 });

@@ -5,7 +5,6 @@ import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { orderNumber } from "@/lib/orders";
 import { StatusBadge, STATUS_LABEL } from "@/components/StatusBadge";
-import ExportButtons from "@/components/ExportButtons";
 import { ORDER_STATUSES } from "@/lib/db/schema";
 
 export default async function OrdersPage({
@@ -15,13 +14,13 @@ export default async function OrdersPage({
 }) {
   const sp = await searchParams;
   const list = await listOrders({ q: sp.q, status: sp.status || "ALL", from: sp.from, to: sp.to });
+  const csv = new URLSearchParams(Object.entries(sp).filter(([, v]) => v) as [string, string][]).toString();
   return (
     <div className="mx-auto max-w-7xl">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black sm:text-3xl">All orders</h1>
         <div className="flex flex-wrap gap-2">
-          <ExportButtons report="bookings" params={sp} />
-          <ExportButtons report="customers" params={{ q: sp.q }} />
+          <a className="btn-ghost" href={`/api/admin/orders.csv?${csv}`}>⬇ Export CSV</a>
           <Link className="btn" href="/admin/pos">+ New booking</Link>
         </div>
       </div>

@@ -3,7 +3,6 @@ import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";
 import { formatPhone } from "@/lib/phone";
-import ExportButtons from "@/components/ExportButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +25,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   ).rows as Row[];
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-black sm:text-3xl">Customers</h1>
-        <ExportButtons report="customers" params={{ q }} />
-      </div>
+      <h1 className="mb-5 text-2xl font-black sm:text-3xl">Customers</h1>
       <form className="card mb-5 flex gap-2 p-4">
         <input name="q" defaultValue={q} placeholder="Name, phone, email or address" className="input" />
         <button className="btn-dark">Search</button>

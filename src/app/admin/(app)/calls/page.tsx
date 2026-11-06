@@ -3,7 +3,6 @@ import { recentCalls } from "@/lib/admin-queries";
 import { formatPhone } from "@/lib/phone";
 import { formatMoney } from "@/lib/money";
 import { orderNumber } from "@/lib/orders";
-import ExportButtons from "@/components/ExportButtons";
 import { requireStaff } from "@/lib/auth";
 import { blockCallerAction } from "../settings/blocking-actions";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -23,10 +22,7 @@ export default async function CallsPage() {
   const tz = process.env.BUSINESS_TIMEZONE || "America/New_York";
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-black sm:text-3xl">Call log</h1>
-        <ExportButtons report="calls" />
-      </div>
+      <h1 className="mb-1 text-2xl font-black sm:text-3xl">Call log</h1>
       <p className="mb-5 text-muted">Every call to the hotline. Callers who hung up with items in their cart are listed so you can call them back.</p>
       <div className="card overflow-x-auto p-4">
         <table className="w-full min-w-[760px] text-sm">
