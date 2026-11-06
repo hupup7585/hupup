@@ -38,6 +38,7 @@ import {
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { matchMenuSpeech, menuSpeechHints } from "./category-speech";
+import { boxById, mainBox, saveRecording, saveTranscription } from "@/lib/voicemail";
 import { PROMPTS, loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
 
 const { categories, products, orders } = schema;
@@ -243,7 +244,9 @@ const handlers: Record<string, Handler> = {
     for (const c of cats) sp(g, ctx, "menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
     if (order?.items.length) sp(g, ctx, "menu_cart");
     const officeOpen = officeOpenNow(new Date(), await getSettings());
+    // Option 0: a live person while the office is open; otherwise leave a message (voicemail).
     if (config.forwardPhone() && officeOpen) sp(g, ctx, "menu_operator");
+    else sp(g, ctx, "menu_voicemail");
     if (cats.length) sp(g, ctx, "menu_speech");
     sp(g, ctx, "menu_repeat");
     return noInput(vr, ctx, "menu");
@@ -791,15 +794,88 @@ const handlers: Record<string, Handler> = {
 
   async operator(ctx, vr) {
     const to = config.forwardPhone();
-    if (!to || !officeOpenNow(new Date(), await getSettings())) {
+    if (!to || !officeOpenNow(new Date(), await getSettings())) return back(vr, "voicemail");
+    await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "forwarded" }, ctx.session);
+    sp(vr, ctx, "transfer_connecting");
+    vr.dial({ callerId: process.env.TWILIO_PHONE_NUMBER || undefined, timeout: 25, action: url("operator-done"), method: "POST" }, to);
+    return vr;
+  },
+
+  /** After the transfer: a finished conversation ends the call; otherwise offer a message or more booking. */
+  async "operator-done"(ctx, vr) {
+    if (ctx.body.DialCallStatus === "completed") {
+      vr.hangup();
+      return vr;
+    }
+    sp(vr, ctx, "transfer_failed");
+    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 6, action: url("voicemail-offer"), method: "POST" });
+    sp(g, ctx, "voicemail_offer");
+    return back(vr, "menu");
+  },
+
+  async "voicemail-offer"(ctx, vr) {
+    if (ctx.body.Digits === "1") return back(vr, "voicemail");
+    return back(vr, "menu");
+  },
+
+  /** Leave a message in the Main box: greeting, beep, record. Twilio posts the recording and transcription back. */
+  async voicemail(ctx, vr) {
+    const box = await mainBox();
+    if (!box.enabled) {
       sp(vr, ctx, "operator_unavailable");
       return back(vr, "menu");
     }
-    await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "forwarded" }, ctx.session);
-    sp(vr, ctx, "transfer_connecting");
-    vr.dial({ callerId: process.env.TWILIO_PHONE_NUMBER || undefined, timeout: 25 }, to);
-    sp(vr, ctx, "transfer_failed");
-    return back(vr, "menu");
+    await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail" }, ctx.session);
+    if (box.greetingText?.trim()) say(vr, box.greetingText.trim());
+    else sp(vr, ctx, "voicemail_prompt");
+    vr.record({
+      maxLength: Math.min(Math.max(box.maxLengthSec, 10), 600),
+      playBeep: true,
+      finishOnKey: "#",
+      timeout: 6,
+      action: url("voicemail-done", { b: box.id }),
+      method: "POST",
+      recordingStatusCallback: url("vm-recording", { b: box.id, t: box.transcribe ? 1 : 0 }),
+      recordingStatusCallbackEvent: ["completed"],
+      recordingStatusCallbackMethod: "POST",
+      transcribe: box.transcribe,
+      ...(box.transcribe ? { transcribeCallback: url("vm-transcription", { b: box.id }) } : {}),
+    });
+    // Reached only if nothing was recorded.
+    sp(vr, ctx, "voicemail_none");
+    vr.hangup();
+    return vr;
+  },
+
+  async "voicemail-done"(ctx, vr) {
+    if (Number(ctx.body.RecordingDuration || 0) < 1) sp(vr, ctx, "voicemail_none");
+    else sp(vr, ctx, "voicemail_thanks");
+    vr.hangup();
+    return vr;
+  },
+
+  /** Twilio recording status callback (no caller on the line; returns empty TwiML). */
+  async "vm-recording"(ctx, vr) {
+    const b = ctx.body;
+    if (b.RecordingStatus === "completed" && b.RecordingSid && b.RecordingUrl && Number(b.RecordingDuration || 0) >= 1) {
+      const box = await boxById(Number(ctx.query.get("b")) || null);
+      await saveRecording({
+        boxId: box.id,
+        callSid: ctx.callSid,
+        from: ctx.session?.fromNumber ?? ctx.from,
+        recordingSid: b.RecordingSid,
+        recordingUrl: b.RecordingUrl,
+        durationSec: Number(b.RecordingDuration || 0),
+        transcribe: ctx.query.get("t") === "1",
+      });
+    }
+    return vr;
+  },
+
+  /** Twilio transcription callback (returns empty TwiML). */
+  async "vm-transcription"(ctx, vr) {
+    if (ctx.body.RecordingSid) await saveTranscription(ctx.body.RecordingSid, ctx.body.TranscriptionStatus || "failed", ctx.body.TranscriptionText || null);
+    return vr;
   },
 };
 

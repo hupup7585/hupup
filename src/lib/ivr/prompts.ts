@@ -121,6 +121,13 @@ export const PROMPTS = {
   transfer_connecting: { group: "Talk to a person", label: "Connecting", text: "Sure thing! Hang tight while I connect you to our team." },
   transfer_failed: { group: "Talk to a person", label: "No one answered", text: "Sorry, our team is busy helping other customers right now. I'm happy to help you book in the meantime!" },
   operator_unavailable: { group: "Talk to a person", label: "No one available", text: "Sorry, no one is available right now. But I'm happy to help you book!" },
+
+  // Voicemail (Main box)
+  menu_voicemail: { group: "Voicemail", label: "Menu option when the office is closed: leave a message", text: "To leave us a message, press 0." },
+  voicemail_offer: { group: "Voicemail", label: "Offer after no one answered", text: "To leave a message, press 1. To keep booking, press star." },
+  voicemail_prompt: { group: "Voicemail", label: "Before the beep (unless the box has its own greeting)", text: "Please leave your name, phone number, and a short message after the beep. Press pound when you're done." },
+  voicemail_thanks: { group: "Voicemail", label: "After the message", text: "Thanks! We got your message and will call you back soon. Bye for now!" },
+  voicemail_none: { group: "Voicemail", label: "Caller didn't leave a message", text: "We didn't get a message. Please call back anytime. Bye for now!" },
 } satisfies Record<string, PromptDef>;
 
 export type PromptKey = keyof typeof PROMPTS;

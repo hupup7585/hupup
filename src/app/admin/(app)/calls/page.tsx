@@ -12,6 +12,7 @@ const OUTCOME: Record<string, [string, string]> = {
   checked_out: ["Checked out", "bg-[#E3F8EF] text-[#13895C]"],
   dropped: ["Hung up · hold released", "bg-[#FFE6E4] text-[#C83A2F]"],
   forwarded: ["Transferred to you", "bg-[#FFF4D6] text-[#A87800]"],
+  voicemail: ["Left a voicemail", "bg-[#F1E8FF] text-[#6B3FB8]"],
 };
 
 export default async function CallsPage() {

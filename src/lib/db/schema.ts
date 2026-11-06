@@ -11,6 +11,7 @@ import {
   primaryKey,
   real,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
@@ -416,3 +417,47 @@ export const termsVersions = pgTable("terms_versions", {
   textHash: text("text_hash").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Voicemail boxes (migration 0012). One Main box is used by the hotline (option 0 when no one answers or the
+ * office is closed); more boxes (per extension) can be added later. Notification recipients are per box.
+ */
+export const voicemailBoxes = pgTable("voicemail_boxes", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  isMain: boolean("is_main").notNull().default(false),
+  /** Spoken before the beep (text to speech). Empty = the default prompt from the prompts catalog. */
+  greetingText: text("greeting_text"),
+  /** Off by default: Twilio charges extra per minute for transcription (Abraham approves before turning on). */
+  transcribe: boolean("transcribe").notNull().default(false),
+  maxLengthSec: integer("max_length_sec").notNull().default(120),
+  enabled: boolean("enabled").notNull().default(true),
+  /** E.164 numbers texted for each new message */
+  notifySms: text("notify_sms").array().notNull().default(sql`'{}'::text[]`),
+  notifyEmail: text("notify_email").array().notNull().default(sql`'{}'::text[]`),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** One caller message. Audio stays in Twilio and is played through a signed-in admin route (no public link). */
+export const voicemails = pgTable(
+  "voicemails",
+  {
+    id: serial("id").primaryKey(),
+    boxId: integer("box_id").notNull().references(() => voicemailBoxes.id),
+    callSid: text("call_sid"),
+    fromNumber: text("from_number"),
+    recordingSid: text("recording_sid").notNull().unique(),
+    recordingUrl: text("recording_url").notNull(),
+    durationSec: integer("duration_sec").notNull().default(0),
+    transcription: text("transcription"),
+    /** pending | completed | failed | off */
+    transcriptionStatus: text("transcription_status").notNull().default("pending"),
+    urgent: boolean("urgent").notNull().default(false),
+    heardAt: timestamp("heard_at", { withTimezone: true }),
+    heardBy: integer("heard_by").references(() => adminUsers.id),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("voicemails_box_idx").on(t.boxId, t.createdAt)],
+);
