@@ -2,6 +2,7 @@ import LegalPage from "@/components/site/LegalPage";
 import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 import { OPT_OUT_KEYWORDS, PROMO_OPENING, PROVIDER_DISCLOSURE, RECORD_RETENTION_MONTHS } from "@/lib/sms-consent-copy";
 import { smsNumberDisplay } from "@/lib/sms-number";
+import { publicEmail } from "@/lib/config";
 
 export const metadata = {
   title: "SMS Terms | Hup Up Attractions",
@@ -57,7 +58,7 @@ export default function SmsTerms() {
 
       <h2>Help</h2>
       <p>
-        Reply HELP to {sms}, call (845) 777-7585, or email hupupattractions@gmail.com. A HELP response identifies Hup Up Attractions and provides our customer support telephone number and email address.
+        Reply HELP to {sms}, call (845) 777-7585, or email {publicEmail()}. A HELP response identifies Hup Up Attractions and provides our customer support telephone number and email address.
       </p>
 
       <h2>Service providers</h2>

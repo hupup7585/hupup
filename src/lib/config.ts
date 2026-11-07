@@ -4,6 +4,21 @@ export const DEFAULT_VOICE = "Google.en-US-Chirp3-HD-Fenrir";
 export const PUBLIC_PHONE_DISPLAY = "(845) 777-7585";
 export const PUBLIC_PHONE_E164 = "+18457777585";
 
+/** Public email on the website. Gmail stays on the live site until Abraham confirms the new mailbox works. */
+export const LIVE_PUBLIC_EMAIL = "hupupattractions@gmail.com";
+export const NEW_PUBLIC_EMAIL = "info@hupupattractions.com";
+/** Flip to true once Abraham says info@hupupattractions.com works; then the live site shows it too. */
+export const NEW_EMAIL_LIVE = false;
+
+/**
+ * The email the public website shows (footer, contact, legal pages, business schema): info@ on previews,
+ * gmail on the live site until NEW_EMAIL_LIVE. `stored` is an owner-saved site email, used on the live site only.
+ */
+export function publicEmail(env: Record<string, string | undefined> = process.env, stored?: string | null): string {
+  if (NEW_EMAIL_LIVE || env.VERCEL_ENV !== "production") return NEW_PUBLIC_EMAIL;
+  return stored || LIVE_PUBLIC_EMAIL;
+}
+
 export const config = {
   baseUrl: () => (process.env.PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, ""),
   /**
@@ -12,7 +27,6 @@ export const config = {
    */
   hotlineDisplay: process.env.NEXT_PUBLIC_HOTLINE_DISPLAY || PUBLIC_PHONE_DISPLAY,
   hotlineE164: process.env.NEXT_PUBLIC_HOTLINE_E164 || PUBLIC_PHONE_E164,
-  publicEmail: "hupupattractions@gmail.com",
   /** Hotline voice. Abram's choice: Google Chirp3-HD "Fenrir" (young, friendly male). Plain text only, no SSML. */
   voice: () => process.env.IVR_VOICE || DEFAULT_VOICE,
   adminEmail: () => process.env.ADMIN_EMAIL || "",

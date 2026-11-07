@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { config } from "@/lib/config";
+import { config, publicEmail } from "@/lib/config";
 import { SERVICE_AREA } from "@/lib/site-copy";
 import { getSettings } from "@/lib/settings";
 import { hoursLines, officeOpenNow, todayHours } from "@/lib/business-hours";
@@ -71,7 +71,7 @@ export async function getSiteContent(): Promise<SiteContent> {
     hours: str(settings.get(SITE_KEYS.hours)),
     // Office hours from the business-hours settings (same source as the POS and hotline), plus Abraham's note.
     officeHours: await officeHours(),
-    email: str(settings.get(SITE_KEYS.email)) ?? config.publicEmail,
+    email: publicEmail(process.env, str(settings.get(SITE_KEYS.email))),
     phoneDisplay: config.hotlineDisplay,
     phoneE164: config.hotlineE164,
     categories: cats,

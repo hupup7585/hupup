@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import LegalPage from "@/components/site/LegalPage";
 import { termsActive } from "@/lib/rental-terms";
 import { BUSINESS_NAME_NB } from "@/lib/site-copy";
+import { publicEmail } from "@/lib/config";
 
 export const metadata = {
   title: "Terms and Conditions | Hup Up Attractions",
@@ -65,7 +66,7 @@ export default function Terms() {
         frequency varies. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help. See our <a className="underline" href="/sms-terms">SMS Terms</a>.
       </p>
       <h2>Contact</h2>
-      <p>Call (845) 777-7585 or email hupupattractions@gmail.com.</p>
+      <p>Call (845) 777-7585 or email {publicEmail()}.</p>
     </LegalPage>
   );
 }

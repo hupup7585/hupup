@@ -1,6 +1,7 @@
 import LegalPage from "@/components/site/LegalPage";
 import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 import { PROVIDER_DISCLOSURE, RECORD_RETENTION_MONTHS } from "@/lib/sms-consent-copy";
+import { publicEmail } from "@/lib/config";
 
 export const metadata = {
   title: "Privacy Policy | Hup Up Attractions",
@@ -36,7 +37,7 @@ export default function Privacy() {
       <h2>Sharing</h2>
       <p>We share information only with service providers that help us run our business, such as our phone, text messaging, and payment providers, and only as needed to provide our services.</p>
       <h2>Contact</h2>
-      <p>Questions about this policy? Call us at (845) 777-7585 or email hupupattractions@gmail.com.</p>
+      <p>Questions about this policy? Call us at (845) 777-7585 or email {publicEmail()}.</p>
     </LegalPage>
   );
 }
