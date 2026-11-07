@@ -495,6 +495,11 @@ describe("website Hours (Abraham's simple list)", () => {
     const hours = page.slice(page.indexOf('id="hours"'), page.indexOf('id="contact"'));
     expect(hours).toContain("WEBSITE_HOURS.map(");
     expect(hours).toContain("{WEBSITE_HOURS_NOTE}");
+    // Abraham: left column centered against the card; the 24/7 box is white with a thin navy border and navy text, not yellow
+    expect(hours).toMatch(/data-hours-grid className="[^"]*md:items-center/);
+    const note = hours.match(/data-hours-note className="([^"]*)"/)![1];
+    expect(note.split(" ")).toEqual(expect.arrayContaining(["border", "border-hu-deep", "bg-white", "text-hu-deep"]));
+    expect(note).not.toContain("bg-hu-yellow");
     expect(hours).not.toMatch(/officeHours|openNow|data-today/); // no "closed today (holiday)" line
     const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\/|\{\/\*[\s\S]*?\*\/\}|\/\/[^\n]*/g, "");
     for (const f of ["src/app/page.tsx", "src/lib/site-copy.ts", "src/components/site/SiteFooter.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/ServiceAreaC.tsx", "src/app/text-alerts/page.tsx"]) {

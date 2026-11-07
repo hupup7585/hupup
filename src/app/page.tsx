@@ -229,11 +229,12 @@ export default async function Home() {
         {/* CONTACT */}
         {/* HOURS: a dedicated, easy-to-find section right above Contact (Abraham 14:45 CST; preview only) */}
         {/* HOURS: Abraham's simple list, one line per day. No holidays on the website (the phone system handles them). */}
+        {/* Abraham: left column (heading + 24/7 box) centered against the hours card; the box is white with a thin navy border (no second yellow block under the yellow Call Now band) */}
         <section id="hours" data-hours className="scroll-mt-20 bg-hu-tint py-14 sm:py-20">
-          <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 md:grid-cols-2 md:items-start md:gap-10">
+          <div data-hours-grid className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 md:grid-cols-2 md:items-center md:gap-10">
             <div>
               <SectionTitle kicker="When to reach us" title="Our Hours" />
-              <a href={`tel:${c.phoneE164}`} data-hours-note className="mt-6 flex items-center gap-3 rounded-2xl bg-hu-yellow p-4 text-lg font-bold hover:underline">
+              <a href={`tel:${c.phoneE164}`} data-hours-note className="mt-6 flex items-center gap-3 rounded-2xl border border-hu-deep bg-white p-4 text-lg font-bold text-hu-deep hover:underline">
                 <PhoneCall className="h-6 w-6 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
                 <span>{WEBSITE_HOURS_NOTE}</span>
               </a>
