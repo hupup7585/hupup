@@ -44,7 +44,13 @@ describe.skipIf(!hasDb)("SMS: inbound, keywords, status, sending", async () => {
     setTwilioForTests(undefined);
     const custs = await db.select().from(schema.customers).where(eq(schema.customers.phone, phone));
     const ids = custs.map((c) => c.id);
-    await db.delete(schema.messages).where(eq(schema.messages.contactPhone, phone));
+    // Migration 0005 keeps text records for 24 months (deletes are refused), so test messages stay behind on the
+    // local test DB once it is applied; before it, clean up as usual.
+    try {
+      await db.delete(schema.messages).where(eq(schema.messages.contactPhone, phone));
+    } catch {
+      /* 24-month text record retention */
+    }
     if (ids.length) {
       // Once migration 0004 is applied, sms_consents is append-only (and customers with consents can't be
       // deleted), so test rows stay behind on the local test DB; before it, clean up as usual.

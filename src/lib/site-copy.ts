@@ -24,7 +24,7 @@ export const WEBSITE_HOURS = [
   "Friday: 10:30 AM - Chatzos",
   "Shabbos: Closed",
   // Abraham's layout: two lines under Motzei Shabbos
-  "Motzei Shabbos: Winter - 2 hours after Shabbos - 11:00 PM\nSummer - 12:00 AM",
+  "Motzei Shabbos: Winter: 2 hours after Shabbos - 11:00 PM\nSummer: 12:00 AM",
 ] as const;
 export const WEBSITE_HOURS_NOTE = "Book by phone anytime, 24/7.";
 
