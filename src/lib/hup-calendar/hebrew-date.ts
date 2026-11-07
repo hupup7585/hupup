@@ -4,7 +4,8 @@
  * The fixed Hebrew calendar (Hillel II): 19-year cycle with 7 leap years, the molad of Tishrei and the four
  * postponements (dechiyos: Molad Zakein, Lo ADU Rosh, GaTaRaD, BeTUTaKPaT). Days are counted as "R.D." fixed day
  * numbers (day 1 = Monday, January 1, year 1 of the proleptic Gregorian calendar), which makes weekday and
- * Gregorian conversion simple. Valid for any year; the business uses it from now through the end of year 6000.
+ * Gregorian conversion simple. Valid for any year; the business uses it from now through the end of the seventh millennium
+ * (האלף השביעי), 29 Elul 7000 (October 7, 3240).
  *
  * Month numbers: 1 Nisan, 2 Iyar, 3 Sivan, 4 Tamuz, 5 Av, 6 Elul, 7 Tishrei, 8 Cheshvan, 9 Kislev, 10 Teves,
  * 11 Shvat, 12 Adar (Adar I in a leap year), 13 Adar II (leap years only).
