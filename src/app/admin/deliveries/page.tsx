@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { and, eq, inArray, or } from "drizzle-orm";
-import { Clock, MapPin } from "lucide-react";
+import { Clock, MapPin, Navigation, Route, Warehouse } from "lucide-react";
 import { requireStaff } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { addDays, longDate, todayISO } from "@/lib/dates";
 import { orderNumber } from "@/lib/orders";
+import { getSettings } from "@/lib/settings";
+import { dayRunLinks, firstLeg, nextLeg, type NextLeg, type RouteStop } from "@/lib/delivery-route";
 import { Badge, PageHeader } from "@/components/staff/ui";
 import PrintButton from "@/components/staff/PrintButton";
 import { logoutAction } from "../login/actions";
@@ -44,6 +46,18 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
     })
     .sort((a, b) => (a.o.deliveryTime || "99").localeCompare(b.o.deliveryTime || "99"));
 
+  // Navigation (free Google Maps / Waze links): stops in the order shown, then back to stock
+  const stockAddress = (await getSettings()).stockAddress.trim() || null;
+  const route: RouteStop[] = stops.map(({ o, stop, done }) => ({
+    key: `${o.id}-${stop}`,
+    address: o.deliveryAddress,
+    label: `${stop === "delivery" ? "Drop off" : "Pick up"} · ${customers.find((x) => x.id === o.customerId)?.name || "Customer"}`,
+    done,
+  }));
+  const run = dayRunLinks(route, stockAddress);
+  const first = firstLeg(route);
+  const noAddress = route.filter((r) => !r.address?.trim()).length;
+
   return (
     <div className="min-h-screen bg-bg">
       <header className="no-print flex items-center justify-between gap-3 bg-navy px-4 py-3 text-white">
@@ -77,6 +91,37 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
           }
         />
         {!stops.length && <p className="card p-6 text-muted">No deliveries or pickups on this day.</p>}
+        {stops.length > 0 && (
+          <section data-route-card className="no-print card mb-5 p-4" aria-label="Today's route">
+            <h2 className="flex items-center gap-2 text-lg font-extrabold">
+              <Route className="h-5 w-5" aria-hidden /> Route
+            </h2>
+            <p className="mt-1 flex items-start gap-1.5 text-sm text-muted">
+              <Warehouse className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+              {stockAddress ? (
+                <span>
+                  Starts and ends at stock: <span className="font-semibold text-navy">{stockAddress}</span>
+                </span>
+              ) : (
+                <span>No stock address yet, so routes start from your location{staff.role === "owner" ? " (set it in Admin, Settings)" : ""}.</span>
+              )}
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {run.whole.map((l) => (
+                <a key={l.url} data-route-whole href={l.url} target="_blank" rel="noopener noreferrer" className="btn-dark">
+                  <Route className="h-4 w-4" aria-hidden /> {l.label}
+                </a>
+              ))}
+              {run.remaining.map((l) => (
+                <a key={l.url} data-route-remaining href={l.url} target="_blank" rel="noopener noreferrer" className="btn-ghost">
+                  <Route className="h-4 w-4" aria-hidden /> {l.label}
+                </a>
+              ))}
+            </div>
+            {first && <LegLinks leg={first} prefix="First stop" />}
+            {noAddress > 0 && <p className="mt-2 text-sm font-semibold text-[#b3261e]">{noAddress === 1 ? "1 stop has" : `${noAddress} stops have`} no address and {noAddress === 1 ? "is" : "are"} left out of the route.</p>}
+          </section>
+        )}
         <ol className="relative space-y-4 border-l-2 border-sky/60 pl-5">
           {stops.map(({ o, stop, done }) => {
             const c = customers.find((x) => x.id === o.customerId);
@@ -108,12 +153,38 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
                   <div className="mt-0.5 text-sm text-muted">{its.map((i) => `${i.qty} × ${i.name}`).join(", ")}</div>
                   {o.notes && <div className="mt-1 text-sm">Note: {o.notes}</div>}
                   <StopActions orderId={o.id} phone={c?.phone ?? null} stop={stop} done={done} />
+                  {(() => {
+                    const leg = nextLeg(route, route.findIndex((r) => r.key === `${o.id}-${stop}`), stockAddress);
+                    return leg ? <LegLinks leg={leg} prefix={leg.toStock ? "Then" : "Next"} /> : null;
+                  })()}
                 </article>
               </li>
             );
           })}
         </ol>
       </main>
+    </div>
+  );
+}
+
+/** "Next: Pick up · Name" with Google Maps and Waze buttons (large, thumb-friendly). */
+function LegLinks({ leg, prefix }: { leg: NextLeg; prefix: string }) {
+  return (
+    <div data-next-leg className="no-print mt-3 rounded-xl border border-line bg-bg p-3">
+      <div className="text-sm">
+        <span className="font-bold">
+          {prefix}: {leg.label}
+        </span>
+        <span className="block text-muted">{leg.address}</span>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <a data-nav="google" href={leg.google} target="_blank" rel="noopener noreferrer" className="btn-ghost whitespace-nowrap px-3">
+          <Navigation className="h-4 w-4 shrink-0" aria-hidden /> Google Maps
+        </a>
+        <a data-nav="waze" href={leg.waze} target="_blank" rel="noopener noreferrer" className="btn-ghost whitespace-nowrap px-3">
+          <Navigation className="h-4 w-4 shrink-0" aria-hidden /> Waze
+        </a>
+      </div>
     </div>
   );
 }

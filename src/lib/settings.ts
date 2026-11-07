@@ -84,6 +84,8 @@ export const SETTING_DEFAULTS = {
    * Patterns: an exact number, * for any digits (+1845*), ? for one digit (+1845555????), or "withheld".
    */
   blockedCallers: "",
+  /** Stock / warehouse address: where the delivery run starts and ends (Delivery screen route links). Owner only. */
+  stockAddress: "",
   /** Website note under the hours (Abraham's wording). */
   hoursWebsiteNote: "Please note that you can book at any time using our automated phone system.",
 } as const;

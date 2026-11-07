@@ -5,6 +5,7 @@ import { config } from "@/lib/config";
 import { requireOwner } from "@/lib/auth";
 import RoutingForm from "./RoutingForm";
 import BlockingForm from "./BlockingForm";
+import StockAddressForm from "./StockAddressForm";
 import { RING_KEYS, RING_KEY_LABELS, ringListFor, routeSummary, routeTargets } from "@/lib/ivr/routing";
 
 function Row({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
@@ -47,6 +48,11 @@ export default async function SettingsPage() {
           })}
         </div>
       </section>
+      <section className="card mb-6 p-5" id="stock">
+        <h2 className="mb-3 text-lg font-extrabold">Delivery routes: stock address</h2>
+        <StockAddressForm initial={settings.stockAddress} />
+      </section>
+
       <section className="card mb-6 p-5" id="blocking">
         <h2 className="mb-3 text-lg font-extrabold">Caller blocking</h2>
         <BlockingForm initial={settings.blockedCallers} />
