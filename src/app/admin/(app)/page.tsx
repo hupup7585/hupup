@@ -1,11 +1,13 @@
 import { requireOwner } from "@/lib/auth";
 import Link from "next/link";
 import { kpis, leaderboard, listOrders, todaysRuns, weeklyRevenue, channelSplit } from "@/lib/admin-queries";
-import { addDays, endOfMonth, shortDate, startOfMonth, startOfWeek, todayISO, weekdayShort } from "@/lib/dates";
+import { addDays, endOfMonth, shortDate, startOfMonth, startOfWeek, todayISO } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { StatusBadge } from "@/components/StatusBadge";
 import { orderNumber } from "@/lib/orders";
+import DualDate, { HebrewDay } from "@/components/DualDate";
+import { dualDate } from "@/lib/dual-date";
 
 const RANGES = { week: "This week", month: "This month", year: "This year" } as const;
 type Range = keyof typeof RANGES;
@@ -99,7 +101,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           </div>
           <div className="flex h-52 items-end gap-2 border-b border-line sm:gap-4">
             {weeks.map((w) => (
-              <div key={w.week} className="flex h-full flex-1 items-end gap-1" title={`Week of ${shortDate(w.week)}: phone ${formatMoney(w.phone)}, POS ${formatMoney(w.pos)}`}>
+              <div key={w.week} className="flex h-full flex-1 items-end gap-1" title={`Week of ${dualDate(w.week, "short")}: phone ${formatMoney(w.phone)}, POS ${formatMoney(w.pos)}`}>
                 <div className={`flex-1 rounded-t-md bg-sky ${w.week > thisWeek ? "opacity-50" : ""}`} style={{ height: `${(w.phone / maxWeek) * 100}%`, minHeight: w.phone ? 4 : 0 }} />
                 <div className={`flex-1 rounded-t-md bg-coral ${w.week > thisWeek ? "opacity-50" : ""}`} style={{ height: `${(w.pos / maxWeek) * 100}%`, minHeight: w.pos ? 4 : 0 }} />
               </div>
@@ -107,7 +109,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           </div>
           <div className="mt-1.5 flex gap-2 text-[11px] text-muted sm:gap-4">
             {weeks.map((w) => (
-              <span key={w.week} className={`flex-1 text-center ${w.week === thisWeek ? "font-bold text-navy" : ""}`}>{w.week === thisWeek ? "This wk" : shortDate(w.week).replace(/^\w+, /, "")}</span>
+              <span key={w.week} className={`flex-1 text-center ${w.week === thisWeek ? "font-bold text-navy" : ""}`}>{w.week === thisWeek ? "This wk" : shortDate(w.week).replace(/^\w+, /, "")}<HebrewDay iso={w.week} className="block" /></span>
             ))}
           </div>
         </div>
@@ -155,7 +157,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 <tr key={o.id} className="hover:bg-bg">
                   <td className="td font-bold"><Link href={`/admin/orders/${o.id}`}>#{orderNumber(o.id)}</Link></td>
                   <td className="td">{o.customer_name ?? "—"}<div className="text-xs text-muted">{formatPhone(o.customer_phone)}</div></td>
-                  <td className="td whitespace-nowrap">{shortDate(o.event_date)} <span className="text-muted">→ pickup {weekdayShort(o.pickup_date)}</span></td>
+                  <td className="td whitespace-nowrap"><DualDate iso={o.event_date} style="short" /> <span className="text-muted">→ pickup <DualDate iso={o.pickup_date} style="short" /></span></td>
                   <td className="td">{o.items}</td>
                   <td className="td">{o.channel === "PHONE" ? "📞 Phone" : "🖥 POS"}</td>
                   <td className="td font-bold">{formatMoney(o.subtotal_cents)}</td>

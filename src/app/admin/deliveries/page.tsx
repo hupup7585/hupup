@@ -3,7 +3,7 @@ import { and, eq, inArray, or } from "drizzle-orm";
 import { Clock, MapPin, Navigation, Route, Warehouse } from "lucide-react";
 import { requireStaff } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { addDays, longDate, todayISO } from "@/lib/dates";
+import { addDays, todayISO } from "@/lib/dates";
 import { orderNumber } from "@/lib/orders";
 import { getSettings } from "@/lib/settings";
 import { dayRunLinks, firstLeg, nextLeg, type NextLeg, type RouteStop } from "@/lib/delivery-route";
@@ -11,6 +11,7 @@ import { Badge, PageHeader } from "@/components/staff/ui";
 import PrintButton from "@/components/staff/PrintButton";
 import { logoutAction } from "../login/actions";
 import StopActions from "./StopActions";
+import DualDate from "@/components/DualDate";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Deliveries · Hup Up Attractions", robots: { index: false } };
@@ -81,7 +82,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
       <main className="mx-auto max-w-3xl px-4 py-6">
         <PageHeader
           title="Deliveries"
-          subtitle={longDate(day)}
+          subtitle={<DualDate iso={day} className="text-lg font-extrabold text-navy" />}
           actions={
             <>
               <Link className="btn-ghost" href={`/admin/deliveries?d=${addDays(day, -1)}`}>← Previous day</Link>

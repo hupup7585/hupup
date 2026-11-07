@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireOwner } from "@/lib/auth";
+import DualDate from "@/components/DualDate";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-t border-line align-top">
-                <td className="whitespace-nowrap py-2">{new Date(r.created_at).toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
+                <td className="whitespace-nowrap py-2"><DualDate at={r.created_at} /></td>
                 <td>{r.user_name ?? (r.action.startsWith("login") ? "Sign-in" : "System / Owner")}{r.role ? <span className="text-muted"> · {r.role}</span> : null}</td>
                 <td className="font-semibold">{r.action.replace(/[._]/g, " ")}</td>
                 <td>{r.entity_type ? `${r.entity_type.replace(/_/g, " ")}${r.entity_id ? ` ${r.entity_id}` : ""}` : ""}</td>

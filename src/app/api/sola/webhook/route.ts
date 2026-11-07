@@ -3,8 +3,8 @@ import { getOrderWithItems, markPaid, orderNumber } from "@/lib/orders";
 import { linkPaymentToAcceptance } from "@/lib/rental-terms";
 import { sendEmail, sendSms } from "@/lib/notify";
 import { BUSINESS_NAME } from "@/lib/config";
-import { longDate } from "@/lib/dates";
 import { parseMoneyToCents } from "@/lib/money";
+import { messageDate } from "@/lib/dual-date";
 
 export const dynamic = "force-dynamic";
 
@@ -39,12 +39,12 @@ export async function POST(req: Request) {
 
   if (before.order.solaRefNum !== field(fields, "xRefNum")) {
     const num = orderNumber(orderId);
-    const msg = `${BUSINESS_NAME}: payment received for order #${num}. You're all set for ${longDate(before.order.eventDate)}! We'll deliver that day and pick up ${longDate(before.order.pickupDate)}.`;
+    const msg = `${BUSINESS_NAME}: payment received for order #${num}. You're all set for ${messageDate(before.order.eventDate)}! We'll deliver that day and pick up ${messageDate(before.order.pickupDate)}.`;
     // Order/service text only with order-text consent (checked in sendMessage); the email copy goes out as before.
     if (before.customer?.phone) await sendSms(before.customer.phone, msg, { kind: "transactional", event: "payment_confirmation", orderId, customerId: before.customer.id });
     if (before.customer?.email) await sendEmail(before.customer.email, `Order #${num} confirmed`, msg);
     if (process.env.ADMIN_PHONE) {
-      await sendSms(process.env.ADMIN_PHONE, `New paid order #${num}: $${(cents / 100).toFixed(2)} for ${longDate(before.order.eventDate)}.`, { kind: "system", event: "owner_alert" });
+      await sendSms(process.env.ADMIN_PHONE, `New paid order #${num}: $${(cents / 100).toFixed(2)} for ${messageDate(before.order.eventDate)}.`, { kind: "system", event: "owner_alert" });
     }
   }
   return new Response("ok");

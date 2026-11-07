@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import type { HolidayRow } from "./data";
 import { dayRowAction, saveHolidayRowsAction } from "./actions";
 import { ampm24 } from "./hours";
+import DualDate from "@/components/DualDate";
 
 /** Holidays & hours: the calendar's default for each day, and the Owner's Open/Closed, Hours and Notes. */
 export default function HolidayTable({ initial }: { initial: HolidayRow[] }) {
@@ -12,7 +13,7 @@ export default function HolidayTable({ initial }: { initial: HolidayRow[] }) {
   const [add, setAdd] = useState("");
   const [pending, start] = useTransition();
   const set = (i: number, patch: Partial<HolidayRow>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-  const when = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  const when = (iso: string) => <DualDate iso={iso} />;
 
   return (
     <div className="space-y-4">

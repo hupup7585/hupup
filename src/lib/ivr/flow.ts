@@ -42,6 +42,7 @@ import { boxById, mainBox, saveRecording, saveTranscription } from "@/lib/voicem
 import { RING_KEYS, ringListFor, type RingKey } from "./routing";
 import { matchBlock, parseBlockList } from "./caller-filter";
 import { PROMPTS, loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
+import { messageDate } from "@/lib/dual-date";
 
 const { categories, products, orders } = schema;
 type VR = InstanceType<typeof twilio.twiml.VoiceResponse>;
@@ -800,7 +801,7 @@ const handlers: Record<string, Handler> = {
     const link = payPageLink(order.order.id); // review-and-pay page: Terms box, then Sola
     const lines = order.items.map((i) => `${i.qty} x ${i.name}`).join(", ");
     const details =
-      `${BUSINESS_NAME} order #${num}: ${lines} for ${longDate(order.order.eventDate)} (pickup ${longDate(order.order.pickupDate)}). ` +
+      `${BUSINESS_NAME} order #${num}: ${lines} for ${messageDate(order.order.eventDate)} (pickup ${messageDate(order.order.pickupDate)}). ` +
       `Rentals $${money(totals.subtotalCents)} + delivery $${money(totals.deliveryFeeCents)} + sales tax $${money(totals.taxCents)} = total $${money(totals.totalCents)}. ` +
       `Pay securely within ${PAYMENT_HOLD_MINUTES} minutes to confirm: ${link}`;
     // Texts go out only with transactional consent given on this call or recorded before.

@@ -3,11 +3,12 @@ import { requireStaff } from "@/lib/auth";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { listThreads, markThreadRead, threadMessages } from "@/lib/messages";
 import ReplyForm from "./ReplyForm";
+import { dualDateTime } from "@/lib/dual-date";
 
 export const dynamic = "force-dynamic";
 
 const TZ = process.env.BUSINESS_TIMEZONE || "America/New_York";
-const when = (d: Date | string) => new Date(d).toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const when = (d: Date | string) => dualDateTime(d);
 
 /** Text conversations with customers (Owner and Secretary). Owner can reply free-form. */
 export default async function MessagesPage({ searchParams }: { searchParams: Promise<{ p?: string; q?: string }> }) {

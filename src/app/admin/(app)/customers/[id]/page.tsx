@@ -9,11 +9,13 @@ import { orderNumber } from "@/lib/orders";
 import { CUSTOMER_COLS } from "@/lib/messages";
 import { StatusBadge } from "@/components/StatusBadge";
 import { saveCustomerAction } from "../actions";
+import DualDate from "@/components/DualDate";
+import { dualDateTime, localISO } from "@/lib/dual-date";
 
 export const dynamic = "force-dynamic";
 
 const TZ = process.env.BUSINESS_TIMEZONE || "America/New_York";
-const when = (d: Date | string) => new Date(d).toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+const when = (d: Date | string) => dualDateTime(d);
 
 type Event = { at: Date; kind: string; text: string; href?: string };
 
@@ -70,7 +72,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           <label className="block"><span className="label">Address</span><input name="address" defaultValue={c.address ?? ""} className="input" /></label>
           <label className="block"><span className="label">Notes</span><textarea name="notes" rows={3} defaultValue={c.notes ?? ""} className="input" /></label>
           <p className="text-sm text-muted">
-            Texts: {c.smsOptOut ? <b className="text-[#C83A2F]">replied STOP (no texts)</b> : c.marketingOptIn ? "agreed to promotional texts" : "no promotional consent"}. Customer since {when(c.createdAt).split(",").slice(0, 2).join(",")}.
+            Texts: {c.smsOptOut ? <b className="text-[#C83A2F]">replied STOP (no texts)</b> : c.marketingOptIn ? "agreed to promotional texts" : "no promotional consent"}. Customer since <DualDate iso={localISO(new Date(c.createdAt))} />.
           </p>
           <button className="btn-dark w-fit">Save</button>
         </form>
@@ -100,7 +102,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         <ol className="space-y-2">
           {timeline.map((e, i) => (
             <li key={i} className="flex gap-3 text-[15px]">
-              <span className="w-40 shrink-0 text-sm text-muted">{when(e.at)}</span>
+              <span className="w-56 shrink-0 text-sm text-muted"><DualDate at={e.at} stack /></span>
               <span className="w-36 shrink-0 font-semibold">{e.kind}</span>
               <span className="min-w-0 break-words">{e.href ? <Link className="hover:underline" href={e.href}>{e.text}</Link> : e.text}</span>
             </li>

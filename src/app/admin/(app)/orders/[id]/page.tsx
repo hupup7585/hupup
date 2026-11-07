@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderWithItems, orderNumber } from "@/lib/orders";
-import { longDate } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -9,6 +8,7 @@ import OrderActions from "./OrderActions";
 import ConsentPanel from "./ConsentPanel";
 import { STAFF_DISCLOSURE } from "@/lib/sms-consent-copy";
 import { NO_TEXT_CONSENT, hasTransactionalConsent } from "@/lib/sms";
+import DualDate from "@/components/DualDate";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,14 +23,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       <div className="mb-5 mt-2 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-black sm:text-3xl">Order #{orderNumber(o.id)}</h1>
         <StatusBadge status={o.status} />
-        <span className="text-sm text-muted">{o.channel === "PHONE" ? "📞 Booked by phone" : "🖥 Booked in person"} · {o.createdAt.toLocaleString("en-US", { timeZone: process.env.BUSINESS_TIMEZONE || "America/New_York" })}</span>
+        <span className="text-sm text-muted">{o.channel === "PHONE" ? "📞 Booked by phone" : "🖥 Booked in person"} · <DualDate at={o.createdAt} /></span>
       </div>
       <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-5">
           <div className="card p-5">
             <div className="mb-4 grid gap-4 sm:grid-cols-2">
-              <div><div className="label">🚚 Delivery</div><div className="font-bold">{longDate(o.eventDate)}</div></div>
-              <div><div className="label">↩️ Pickup</div><div className="font-bold">{longDate(o.pickupDate)}</div></div>
+              <div><div className="label">🚚 Delivery</div><div className="font-bold"><DualDate iso={o.eventDate} /></div></div>
+              <div><div className="label">↩️ Pickup</div><div className="font-bold"><DualDate iso={o.pickupDate} /></div></div>
             </div>
             <table className="w-full text-sm">
               <thead><tr><th className="th">Item</th><th className="th">Qty</th><th className="th">Price</th><th className="th text-right">Total</th></tr></thead>

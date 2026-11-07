@@ -7,7 +7,7 @@ import { db, schema } from "@/lib/db";
 import { getUsage, bookableQty, pickupDateFor } from "@/lib/availability";
 import { getSettings } from "@/lib/settings";
 import { checkEventDate, dayInfo } from "@/lib/jewish-calendar";
-import { addDays, isValidISO, longDate, todayISO } from "@/lib/dates";
+import { addDays, isValidISO, todayISO } from "@/lib/dates";
 import { createOrderWithItems, getOrderWithItems, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES } from "@/lib/orders";
 import { parseMoneyToCents } from "@/lib/money";
 import { toE164 } from "@/lib/phone";
@@ -17,6 +17,7 @@ import { TERMS_TEXT } from "@/lib/terms-content";
 const TERMS_VIA = ["phone", "text", "email", "in_person"] as const;
 import { sendOrderText } from "@/lib/notify";
 import { BUSINESS_NAME } from "@/lib/config";
+import { dualDate, messageDate } from "@/lib/dual-date";
 
 export async function availabilityFor(date: string) {
   await requireAdmin();
@@ -95,7 +96,7 @@ export async function createBookingAction(input: {
     paidCents,
   });
   if (!r.ok) {
-    if (r.reason === "unavailable") return { ok: false, message: `Not enough units available for ${longDate(input.date)} (only ${r.free} left of one item). Refresh availability.` };
+    if (r.reason === "unavailable") return { ok: false, message: `Not enough units available for ${dualDate(input.date)} (only ${r.free} left of one item). Refresh availability.` };
     return { ok: false, message: "Could not create the booking." };
   }
 
@@ -117,7 +118,7 @@ export async function createBookingAction(input: {
       phone,
       email: input.email || null,
       subject: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} payment link`,
-      body: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} for ${longDate(input.date)}: $${(full!.order.subtotalCents / 100).toFixed(2)}. Pay securely within 2 hours to confirm: ${link}`,
+      body: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} for ${messageDate(input.date)}: $${(full!.order.subtotalCents / 100).toFixed(2)}. Pay securely within 2 hours to confirm: ${link}`,
       orderId: r.orderId,
       customerId: full?.customer?.id ?? null,
       userId: session.userId ?? null,

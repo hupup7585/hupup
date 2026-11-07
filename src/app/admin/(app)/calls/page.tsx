@@ -6,6 +6,7 @@ import { orderNumber } from "@/lib/orders";
 import { requireStaff } from "@/lib/auth";
 import { blockCallerAction } from "../settings/blocking-actions";
 import { StatusBadge } from "@/components/StatusBadge";
+import DualDate from "@/components/DualDate";
 
 const OUTCOME: Record<string, [string, string]> = {
   browsing: ["Browsed only", "bg-bg text-muted"],
@@ -35,7 +36,7 @@ export default async function CallsPage() {
               const dur = c.ended_at ? Math.round((new Date(c.ended_at).getTime() - new Date(c.started_at).getTime()) / 1000) : null;
               return (
                 <tr key={c.call_sid} className="hover:bg-bg">
-                  <td className="td whitespace-nowrap">{new Date(c.started_at).toLocaleString("en-US", { timeZone: tz, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
+                  <td className="td whitespace-nowrap"><DualDate at={c.started_at} /></td>
                   <td className="td">
                     {c.from_number ? <a className="text-navy underline-offset-2 hover:underline" href={`tel:${c.from_number}`}>{formatPhone(c.from_number)}</a> : "Unknown"}
                     {staff.role === "owner" && c.from_number && (

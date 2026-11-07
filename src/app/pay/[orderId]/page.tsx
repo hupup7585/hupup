@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { paymentLink } from "@/lib/sola";
 import { getOrderWithItems, orderNumber } from "@/lib/orders";
-import { longDate } from "@/lib/dates";
 import { termsActive, verifyPayToken } from "@/lib/rental-terms";
 import PayForm from "./PayForm";
+import DualDate from "@/components/DualDate";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Review and pay | Hup Up Attractions", robots: { index: false } };
@@ -28,9 +28,10 @@ export default async function PayPage({ params, searchParams }: { params: Promis
     <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">
       <div className="mx-auto max-w-md rounded-2xl border-2 border-hu-deep bg-white p-6">
         <h1 className="text-2xl font-extrabold">Review and pay for order #{orderNumber(id)}</h1>
-        <p className="mt-1 text-sm">
-          Delivery {longDate(o.eventDate)} · pickup {longDate(o.pickupDate)}
-        </p>
+        <div className="mt-2 text-sm">
+          <span className="block"><b>Delivery:</b> <DualDate iso={o.eventDate} stack /></span>
+          <span className="mt-1 block"><b>Pickup:</b> <DualDate iso={o.pickupDate} stack /></span>
+        </div>
         <ul className="mt-4 space-y-1 text-sm">
           {full.items.map((i) => (
             <li key={i.id} className="flex justify-between">

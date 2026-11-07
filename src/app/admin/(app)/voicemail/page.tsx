@@ -3,11 +3,12 @@ import { requireStaff } from "@/lib/auth";
 import { formatPhone } from "@/lib/phone";
 import { listVoicemails, mainBox } from "@/lib/voicemail";
 import { deleteVoicemailAction, saveBoxAction, setHeardAction, setUrgentAction } from "./actions";
+import { dualDateTime } from "@/lib/dual-date";
 
 export const dynamic = "force-dynamic";
 
 const TZ = process.env.BUSINESS_TIMEZONE || "America/New_York";
-const when = (d: Date) => d.toLocaleString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const when = (d: Date) => dualDateTime(d);
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 /** Hotline voicemail: play, download, mark heard, urgent, call back, delete. Owner also edits the box settings. */

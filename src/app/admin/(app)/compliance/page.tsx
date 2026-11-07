@@ -2,8 +2,9 @@ import { requireAdmin } from "@/lib/auth";
 import { CHECK_LABELS, REVIEW_INTERVAL_DAYS, complianceSnapshot, isOwnerSession } from "@/lib/compliance";
 import { formatPhone } from "@/lib/phone";
 import { CompleteReviewForm, ReportIssueForm } from "./Forms";
+import { dualDateTime } from "@/lib/dual-date";
 
-const fmt = (d: Date | null) => (d ? d.toLocaleString("en-US", { timeZone: process.env.BUSINESS_TIMEZONE || "America/New_York" }) : "never");
+const fmt = (d: Date | null) => (d ? dualDateTime(d) : "never");
 
 /** SMS compliance monitoring (policy section 12). Review is Owner-only; any staff member can report an issue. */
 export default async function CompliancePage() {

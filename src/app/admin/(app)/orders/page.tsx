@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { listOrders } from "@/lib/admin-queries";
-import { shortDate } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { orderNumber } from "@/lib/orders";
 import { StatusBadge, STATUS_LABEL } from "@/components/StatusBadge";
 import { ORDER_STATUSES } from "@/lib/db/schema";
+import DualDate from "@/components/DualDate";
 
 export default async function OrdersPage({
   searchParams,
@@ -50,7 +50,7 @@ export default async function OrdersPage({
               <tr key={o.id} className="hover:bg-bg">
                 <td className="td font-bold"><Link className="text-navy underline-offset-2 hover:underline" href={`/admin/orders/${o.id}`}>#{orderNumber(o.id)}</Link></td>
                 <td className="td">{o.customer_name ?? <span className="text-muted">Caller in progress</span>}<div className="text-xs text-muted">{formatPhone(o.customer_phone)}</div></td>
-                <td className="td whitespace-nowrap">{shortDate(o.event_date)}<div className="text-xs text-muted">→ {shortDate(o.pickup_date)}</div></td>
+                <td className="td whitespace-nowrap"><DualDate iso={o.event_date} style="short" /><div className="text-xs text-muted">→ <DualDate iso={o.pickup_date} style="short" /></div></td>
                 <td className="td">{o.items}</td>
                 <td className="td">{o.channel === "PHONE" ? "📞 Phone" : "🖥 POS"}</td>
                 <td className="td font-bold">{formatMoney(o.subtotal_cents)}</td>

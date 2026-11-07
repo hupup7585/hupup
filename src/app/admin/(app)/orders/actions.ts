@@ -10,8 +10,8 @@ import { getOrderWithItems, markPaid, minutesFromNow, orderNumber, PAYMENT_HOLD_
 import { payPageLink } from "@/lib/rental-terms";
 import { sendOrderText } from "@/lib/notify";
 import { parseMoneyToCents } from "@/lib/money";
-import { longDate } from "@/lib/dates";
 import { BUSINESS_NAME } from "@/lib/config";
+import { dualDate, messageDate } from "@/lib/dual-date";
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -30,7 +30,7 @@ export async function updateStatusAction(orderId: number, status: OrderStatus): 
     for (const it of full.items) {
       const [p] = await db.select().from(schema.products).where(eq(schema.products.id, it.productId));
       const free = await checkBookable(it.productId, p.quantity, full.order.eventDate);
-      if (free < it.qty) return { ok: false, message: `${it.name} is no longer available for ${longDate(full.order.eventDate)} (${free} free).` };
+      if (free < it.qty) return { ok: false, message: `${it.name} is no longer available for ${dualDate(full.order.eventDate)} (${free} free).` };
     }
   }
   await setOrderStatus(orderId, status, status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {});
@@ -63,7 +63,7 @@ export async function sendPayLinkAction(orderId: number): Promise<ActionResult> 
     phone,
     email: full.customer?.email,
     subject: `${BUSINESS_NAME} order #${orderNumber(orderId)} payment link`,
-    body: `${BUSINESS_NAME} order #${orderNumber(orderId)} for ${longDate(full.order.eventDate)}: $${(due / 100).toFixed(2)} due. Pay securely here: ${link}`,
+    body: `${BUSINESS_NAME} order #${orderNumber(orderId)} for ${messageDate(full.order.eventDate)}: $${(due / 100).toFixed(2)} due. Pay securely here: ${link}`,
     orderId,
     customerId: full.customer?.id,
     userId: session.userId ?? null,
