@@ -65,19 +65,8 @@ export function gematriya(n: number): string {
   return `${s.slice(0, -1)}״${s.slice(-1)}`;
 }
 
-/**
- * Hebrew-letter year. Before 6000 the thousands are left off, as is customary (5787 = תשפ״ז). A round thousand
- * shows as its letter (6000 = ו׳, 7000 = ז׳). In the seventh millennium the thousands letter is written first so
- * 6001 can't be mistaken for 5001 (6001 = ו׳א׳, 6787 = ו׳תשפ״ז).
- */
-export function hebrewYear(year: number): string {
-  const thousands = Math.floor(year / 1000), rest = year % 1000;
-  if (rest === 0) return gematriya(thousands);
-  if (year < 6000) return gematriya(rest);
-  return `${gematriya(thousands)}${gematriya(rest)}`;
-}
-
-/** "ט״ו כִּסְלֵו תשפ״ז" */
+/** "ט״ו כִּסְלֵו תשפ״ז" (the thousands are left off, as is customary; a round thousand like 6000 shows as ו׳). */
 export function renderHebrew(h: HDay): string {
-  return `${gematriya(h.day)} ${monthName(h.month, h.year, "he")} ${hebrewYear(h.year)}`;
+  const y = h.year % 1000 === 0 ? h.year / 1000 : h.year % 1000;
+  return `${gematriya(h.day)} ${monthName(h.month, h.year, "he")} ${gematriya(y)}`;
 }
