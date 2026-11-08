@@ -90,7 +90,7 @@ describe("written promotional consent (phone keypress only sends a confirmation 
     h.sent.length = 0;
     await text("YES", "SMv2yes2");
     expect(await marketingRows()).toHaveLength(1);
-    expect(h.sent).toHaveLength(0);
+    expect(h.sent.filter((m) => m.to === PHONE)).toHaveLength(0); // (the owner may get a forwarded copy)
   });
 
   it("STOP cancels a waiting confirmation, so a late YES enrolls nothing", async () => {

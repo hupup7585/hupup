@@ -10,6 +10,7 @@ import {
   index,
   primaryKey,
   real,
+  customType,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -496,3 +497,178 @@ export const voicemails = pgTable(
   },
   (t) => [index("voicemails_box_idx").on(t.boxId, t.createdAt)],
 );
+
+/* ---------------- Bookkeeping (Abraham T): Owner only. Nothing is ever deleted; corrections are new entries. ---------------- */
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+
+/**
+ * The money ledger. Money in: income, deposit, cancellation_fee. Money out: expense, refund, processor_fee, contractor.
+ * Income from paid bookings is written automatically (source "auto") with its split into rental, delivery, tax and tip.
+ * A correction is a new row pointing at the original (correctsId) with the opposite amounts; rows are never edited.
+ */
+export const bookEntries = pgTable(
+  "book_entries",
+  {
+    id: serial("id").primaryKey(),
+    entryDate: date("entry_date", { mode: "string" }).notNull(),
+    kind: text("kind").notNull(),
+    category: text("category"),
+    amountCents: integer("amount_cents").notNull(),
+    rentalCents: integer("rental_cents").notNull().default(0),
+    deliveryCents: integer("delivery_cents").notNull().default(0),
+    taxCents: integer("tax_cents").notNull().default(0),
+    tipCents: integer("tip_cents").notNull().default(0),
+    /** cash | check | zelle | card | sola | bank | other */
+    method: text("method"),
+    checkNo: text("check_no"),
+    /** Vendor, customer, school or person paid */
+    party: text("party"),
+    orderId: integer("order_id"),
+    invoiceId: integer("invoice_id"),
+    billId: integer("bill_id"),
+    productId: integer("product_id"),
+    /** Staff/contractor payments: who (for 1099 totals) */
+    personName: text("person_name"),
+    county: text("county"),
+    taxExempt: boolean("tax_exempt").notNull().default(false),
+    /** For Sola payments: the payment reference, so fees and bank deposits can be matched */
+    ref: text("ref"),
+    notes: text("notes"),
+    fileId: integer("file_id"),
+    /** auto | manual */
+    source: text("source").notNull().default("manual"),
+    correctsId: integer("corrects_id"),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("book_entries_date_idx").on(t.entryDate), index("book_entries_order_idx").on(t.orderId), index("book_entries_kind_idx").on(t.kind, t.entryDate)],
+);
+
+export const bookCategories = pgTable("book_categories", {
+  id: serial("id").primaryKey(),
+  /** expense | income */
+  kind: text("kind").notNull().default("expense"),
+  name: text("name").notNull().unique(),
+  active: boolean("active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+/** Invoices for schools and institutions (often paid by check). Payments are income entries with invoiceId. */
+export const bookInvoices = pgTable("book_invoices", {
+  id: serial("id").primaryKey(),
+  customerName: text("customer_name").notNull(),
+  customerId: integer("customer_id"),
+  orderId: integer("order_id"),
+  issueDate: date("issue_date", { mode: "string" }).notNull(),
+  dueDate: date("due_date", { mode: "string" }).notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  taxExempt: boolean("tax_exempt").notNull().default(false),
+  exemptCertNo: text("exempt_cert_no"),
+  exemptFileId: integer("exempt_file_id"),
+  notes: text("notes"),
+  /** open | void (never deleted) */
+  status: text("status").notNull().default("open"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Bills the business owes. Payments are expense entries with billId. */
+export const bookBills = pgTable("book_bills", {
+  id: serial("id").primaryKey(),
+  vendor: text("vendor").notNull(),
+  category: text("category"),
+  billDate: date("bill_date", { mode: "string" }).notNull(),
+  dueDate: date("due_date", { mode: "string" }).notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  notes: text("notes"),
+  fileId: integer("file_id"),
+  /** open | void */
+  status: text("status").notNull().default("open"),
+  recurringId: integer("recurring_id"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Recurring expenses and subscriptions: each due date creates a bill (or the Owner records it). */
+export const bookRecurring = pgTable("book_recurring", {
+  id: serial("id").primaryKey(),
+  vendor: text("vendor").notNull(),
+  category: text("category"),
+  amountCents: integer("amount_cents").notNull(),
+  method: text("method"),
+  /** weekly | monthly | quarterly | yearly */
+  frequency: text("frequency").notNull().default("monthly"),
+  nextDate: date("next_date", { mode: "string" }).notNull(),
+  active: boolean("active").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Bank or card statement lines (CSV upload), matched to ledger entries or bookings. */
+export const bookBankLines = pgTable(
+  "book_bank_lines",
+  {
+    id: serial("id").primaryKey(),
+    /** bank | card */
+    account: text("account").notNull().default("bank"),
+    importName: text("import_name"),
+    lineDate: date("line_date", { mode: "string" }).notNull(),
+    description: text("description").notNull(),
+    /** + money in, - money out */
+    amountCents: integer("amount_cents").notNull(),
+    /** unmatched | matched | ignored */
+    status: text("status").notNull().default("unmatched"),
+    matchedEntryIds: jsonb("matched_entry_ids").$type<number[]>().notNull().default([]),
+    matchNote: text("match_note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("book_bank_date_idx").on(t.lineDate)],
+);
+
+/** Equipment purchases (rental items), for profit per item and the depreciation list. */
+export const bookEquipment = pgTable("book_equipment", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id"),
+  name: text("name").notNull(),
+  purchaseDate: date("purchase_date", { mode: "string" }).notNull(),
+  costCents: integer("cost_cents").notNull(),
+  qty: integer("qty").notNull().default(1),
+  /** Straight-line years for the accountant's list (the accountant decides the actual tax method) */
+  lifeYears: integer("life_years").notNull().default(5),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const bookMileage = pgTable("book_mileage", {
+  id: serial("id").primaryKey(),
+  tripDate: date("trip_date", { mode: "string" }).notNull(),
+  vehicle: text("vehicle"),
+  driver: text("driver"),
+  /** Miles in tenths (123 = 12.3 miles) */
+  milesTenths: integer("miles_tenths").notNull(),
+  purpose: text("purpose"),
+  orderId: integer("order_id"),
+  notes: text("notes"),
+  correctsId: integer("corrects_id"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** A locked month (YYYY-MM): no entries dated in it can be added. */
+export const bookLocks = pgTable("book_locks", {
+  month: text("month").primaryKey(),
+  lockedBy: integer("locked_by"),
+  lockedAt: timestamp("locked_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Receipts and tax-exempt certificates, stored privately in the database (Owner-only download). */
+export const bookFiles = pgTable("book_files", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  data: bytea("data").notNull(),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

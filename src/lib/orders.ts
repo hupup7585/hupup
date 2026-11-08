@@ -276,6 +276,9 @@ export async function markPaid(orderId: number, cents: number, method: string, r
     })
     .where(eq(orders.id, orderId))
     .returning();
+  // Bookkeeping (Abraham T): every paid booking is recorded as income automatically (rental, delivery, tax, tip).
+  const { recordBookingPayment } = await import("@/lib/books");
+  await recordBookingPayment(orderId, cents, method, ref);
   return updated;
 }
 

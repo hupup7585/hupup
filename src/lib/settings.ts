@@ -93,6 +93,11 @@ export const SETTING_DEFAULTS = {
    * in Settings). When on, every call hears the recording notice first; recording starts only after it.
    */
   callRecording: false,
+  /** Bookkeeping (Abraham T): Sola processing rate, to estimate fees and the net deposit per payment. Owner sets them from the Sola statement. */
+  solaFeePercent: "0",
+  solaFeeCents: "0",
+  /** Bookkeeping reminders: days before a bill, sales tax or estimated tax due date. */
+  bookReminderDays: "7",
   /** Stock / warehouse address: where the delivery run starts and ends (Delivery screen route links). Owner only. */
   stockAddress: "",
   /** Website note under the hours (Abraham's wording). */
