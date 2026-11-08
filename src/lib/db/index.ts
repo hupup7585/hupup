@@ -6,8 +6,17 @@ type DB = NodePgDatabase<typeof schema>;
 
 const g = globalThis as unknown as { __hupPool?: Pool; __hupDb?: DB };
 
+/**
+ * pg 8 already treats sslmode=prefer/require/verify-ca as verify-full and logs a warning about it on every cold start.
+ * Spelling out verify-full keeps exactly today's behavior (full certificate check) and stops the warning.
+ * The stored DATABASE_URL is not changed.
+ */
+export function explicitSslMode(url: string): string {
+  return url.replace(/([?&]sslmode=)(prefer|require|verify-ca)(?=&|$)/i, "$1verify-full");
+}
+
 function makePool() {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.DATABASE_URL && explicitSslMode(process.env.DATABASE_URL);
   if (!url) throw new Error("DATABASE_URL is not set");
   // DB_POOL_MAX: only for local end-to-end tests against the single-connection in-memory server.
   return new Pool({ connectionString: url, max: Number(process.env.DB_POOL_MAX) || 5, ...(process.env.DB_IDLE_MS ? { idleTimeoutMillis: Number(process.env.DB_IDLE_MS) } : {}) });

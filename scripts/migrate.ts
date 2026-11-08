@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import { dbWriteSkipReason } from "./db-guard";
+import { explicitSslMode } from "../src/lib/db";
 
 /** Applies pending migrations. Safe to run on every deploy (already-applied migrations are skipped). */
 async function main() {
@@ -17,7 +18,7 @@ async function main() {
     console.log("No DATABASE_URL set - skipping migrations.");
     return;
   }
-  const pool = new Pool({ connectionString: url, max: 1 });
+  const pool = new Pool({ connectionString: explicitSslMode(url), max: 1 });
   await migrate(drizzle(pool), { migrationsFolder: "./drizzle" });
   console.log("Migrations applied.");
   await pool.end();
