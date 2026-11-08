@@ -131,6 +131,22 @@ function noInput(vr: VR, ctx: Ctx, retryAction: string, retryParams: Record<stri
   return vr;
 }
 
+/** Main menu (Abraham): plays at most this many times with no choice, then the existing goodbye line and hang up. */
+export const MENU_MAX_PLAYS = 3;
+/** Main menu (Abraham): seconds to wait for a choice after the last menu line. */
+export const MENU_WAIT_SECONDS = 4;
+
+/** No choice after the main menu: replay the whole menu from the greeting, or after 3 plays say goodbye and hang up. */
+function menuNoChoice(vr: VR, ctx: Ctx) {
+  const plays = Number(ctx.query.get("n") || 0) + 1; // how many times the menu has played so far
+  if (plays >= MENU_MAX_PLAYS) {
+    sp(vr, ctx, "no_input_final");
+    vr.hangup();
+    return vr;
+  }
+  return back(vr, "menu", { first: 1, n: plays });
+}
+
 function back(vr: VR, action: string, params: Record<string, string | number | undefined> = {}) {
   vr.redirect({ method: "POST" }, url(action, params));
   return vr;
@@ -261,16 +277,18 @@ const handlers: Record<string, Handler> = {
    * Abraham's main menu (approved Nov 8, 2026). 1 bookings (rental list), 2/4/5/6/8/0 ring a live employee (each
    * key's own list), 9 general voicemail, * repeats. Until Abraham approves their messages: 3 opens the rental list,
    * 7 rings the operator. Voice commands keep working in the background (not announced).
-   * On the first pass (?first=1, from the incoming call) the greeting and the closed / open-late line play inside the
-   * same Gather, so a key pressed during the greeting works. Replays (star, a wrong key, silence) skip the greeting.
+   * With ?first=1 (the incoming call, star, and each replay after silence) the greeting and the closed / open-late
+   * line play inside the same Gather, so any key works at any time, even during the greeting. After the last line it
+   * waits 4 seconds; no choice replays the whole menu, and after 3 plays the existing goodbye line plays and the call
+   * ends. A wrong key ("Oops…") replays the menu lines without the greeting, as before.
    */
   async menu(ctx, vr) {
     const cats = await phoneCategories();
     const g = vr.gather({
       input: ["dtmf", "speech"],
       numDigits: 1,
-      timeout: 6,
-      action: url("menu-choice"),
+      timeout: MENU_WAIT_SECONDS, // Abraham: 4 seconds after the last line, then the menu plays again
+      action: url("menu-choice", { n: ctx.query.get("n") || undefined }),
       method: "POST",
       language: "en-US",
       speechModel: "phone_call",
@@ -310,7 +328,7 @@ const handlers: Record<string, Handler> = {
       sp(g, ctx, k);
       if (i < lines.length - 1) shortPause(g); // 0.75 s after each line (Abraham)
     });
-    return noInput(vr, ctx, "menu");
+    return menuNoChoice(vr, ctx);
   },
 
   async "menu-choice"(ctx, vr) {
@@ -321,14 +339,14 @@ const handlers: Record<string, Handler> = {
       if (choice?.kind === "category") return back(vr, "category", { c: choice.categoryId });
       if (choice?.kind === "cart") return back(vr, "cart");
       if (choice?.kind === "operator") return back(vr, "ring", { k: "0" });
-      if (choice?.kind === "repeat") return back(vr, "menu");
+      if (choice?.kind === "repeat") return back(vr, "menu", { first: 1 }); // same as star
       sp(vr, ctx, "invalid");
       return back(vr, "menu");
     }
-    if (!d) return noInput(vr, ctx, "menu", {});
+    if (!d) return menuNoChoice(vr, ctx);
     switch (d) {
-      case "*":
-        return back(vr, "menu");
+      case "*": // Abraham: star replays the entire main menu, from the greeting
+        return back(vr, "menu", { first: 1 });
       case "1":
         return back(vr, "book");
       case "3": // stand-in until Abraham approves the key 3 message

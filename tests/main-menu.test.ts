@@ -71,9 +71,34 @@ describe("Abraham's main menu wording (approved Nov 8, 2026)", () => {
     expect(gatherOf(xml)).toMatch(/<Gather [^>]*input="dtmf speech"[^>]*numDigits="1"/);
     expect(gatherOf(xml).split("pause-750ms.wav").length - 1).toBe(MENU.length); // 0.75 s after each line
   });
-  it("star, a wrong key or silence replays the menu without the greeting", async () => {
-    expect(redirect(await press("*"))).toBe("menu");
-    expect(saidIn(await call("menu"))).toEqual(MENU);
+  it("any valid key works at any time: the whole menu, greeting included, is one Gather", async () => {
+    const xml = await call("menu", {}, "first=1");
+    expect(xml.indexOf("<Gather")).toBeLessThan(xml.indexOf(GREETING)); // the keypad is listening before the first word
+    expect(xml.indexOf("</Gather>")).toBeGreaterThan(xml.lastIndexOf(MENU[MENU.length - 1]));
+    for (const k of ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "*"]) expect(await press(k)).not.toContain("Oops");
+  });
+  it("star (or saying 'repeat') replays the entire main menu, from the greeting", async () => {
+    expect(redirect(await press("*"))).toBe("menu?first=1");
+    expect(redirect(await call("menu-choice", { SpeechResult: "repeat", Confidence: "0.9" }))).toBe("menu?first=1");
+    expect(saidIn(await call("menu", {}, "first=1"))).toEqual([GREETING, ...MENU]);
+  });
+  it("waits 4 seconds after the last line; no choice replays the whole menu; after 3 plays, the goodbye line and hang up", async () => {
+    const first = await call("menu", {}, "first=1");
+    expect(gatherOf(first)).toMatch(/<Gather [^>]*timeout="4"/);
+    expect(redirect(first)).toBe("menu?first=1&n=1"); // 2nd play, from the greeting, no extra line in between
+    expect(first.slice(first.indexOf("</Gather>"))).not.toContain("<Say");
+    const second = await call("menu", {}, "first=1&n=1");
+    expect(saidIn(second)).toEqual([GREETING, ...MENU]);
+    expect(redirect(second)).toBe("menu?first=1&n=2"); // 3rd play
+    const third = await call("menu", {}, "first=1&n=2");
+    const after = third.slice(third.indexOf("</Gather>"));
+    expect(after).toContain("It sounds like we got disconnected. Please call us back anytime, we'd love to help. Thanks for calling Hup Up Attractions. Bye for now!");
+    expect(after).toContain("<Hangup/>");
+    expect(redirect(third)).toBeUndefined();
+    // the count travels with the keypad, so an empty answer on the 3rd play also ends the call; a key press always works
+    expect(gatherOf(third)).toContain("menu-choice?n=2");
+    expect(await call("menu-choice", {}, "n=2")).toContain("<Hangup/>");
+    expect(redirect(await call("menu-choice", { Digits: "1" }, "n=2"))).toBe("book");
   });
   it("office closed: the approved closed line plays right after the greeting, inside the menu", async () => {
     h.open = false;
@@ -114,11 +139,11 @@ describe("every key, office open", () => {
     expect(vm).toMatch(/<Record /);
     expect(vm).not.toContain("<Dial");
   });
-  it("# is not an option: Abraham's line, then the main menu again; star repeats the menu", async () => {
+  it("# is not an option: Abraham's line, then the main menu again; star repeats the whole menu", async () => {
     const hash = await press("#");
     expect(hash).toContain("Oops, that's not an option. Let's try that again!");
     expect(redirect(hash)).toBe("menu");
-    expect(redirect(await press("*"))).toBe("menu");
+    expect(redirect(await press("*"))).toBe("menu?first=1");
   });
   it("the rental list uses the existing lines; 9 there is the cart and star goes back", async () => {
     await db.insert(schema.categories).values({ name: "Jumping Balloons", spokenName: "Jumping Balloons", ivrDigit: 1, sortOrder: 1, active: true });
