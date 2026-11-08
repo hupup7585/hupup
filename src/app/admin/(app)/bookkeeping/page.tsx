@@ -1,4 +1,5 @@
 import Link from "next/link";
+import NotActive from "@/components/NotActive";
 import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { todayISO } from "@/lib/dates";
@@ -80,7 +81,7 @@ export default async function BookkeepingPage({ searchParams }: { searchParams: 
       {tab === "expenses" && <Expenses cats={activeCats} />}
       {tab === "bills" && <Bills cats={activeCats} today={today} />}
       {tab === "processor" && <Processor from={from} to={to} pct={settings.solaFeePercent} fixed={settings.solaFeeCents} />}
-      {tab === "bank" && <Bank />}
+      {tab === "bank" && <Bank cats={activeCats} />}
       {tab === "tax" && <Tax year={Number(sp.year) || Number(today.slice(0, 4))} />}
       {tab === "equipment" && <Equipment year={Number(today.slice(0, 4))} />}
       {tab === "people" && <People year={Number(sp.year) || Number(today.slice(0, 4))} />}
@@ -412,6 +413,7 @@ async function Processor({ from, to, pct, fixed }: { from: string; to: string; p
   return (
     <>
       <RangeForm tab="processor" from={from} to={to} />
+      <NotActive k="payments" />
       <Card title="Sola payments, fees and net deposits" note={`Estimated with your Sola rate (${pct}% + ${money(Number(fixed) || 0)} per payment; change it under Settings). Enter the actual monthly fees from the Sola statement as a "Processor fee" expense so the books match the bank.`}>
         <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Stat label="Card payments" value={money(v.grossCents)} />
@@ -429,7 +431,7 @@ async function Processor({ from, to, pct, fixed }: { from: string; to: string; p
   );
 }
 
-async function Bank() {
+async function Bank({ cats }: { cats: string[] }) {
   const lines = await db.select().from(schema.bookBankLines).orderBy(desc(schema.bookBankLines.lineDate), desc(schema.bookBankLines.id)).limit(300);
   const unmatched = lines.filter((l) => l.status === "unmatched");
   return (
@@ -457,6 +459,14 @@ async function Bank() {
             <div className="flex flex-wrap gap-2">
               <form action={A.matchLineAction} className="flex gap-1"><input type="hidden" name="id" value={l.id} /><input name="entryIds" placeholder="Entry #" className="input w-24 py-1 text-xs" /><button className="text-xs font-bold text-navy">Match</button></form>
               <form action={A.matchLineAction}><input type="hidden" name="id" value={l.id} /><input type="hidden" name="ignore" value="1" /><button className="text-xs font-bold text-muted">Ignore</button></form>
+              <form action={A.categorizeLineAction} className="flex gap-1">
+                <input type="hidden" name="id" value={l.id} />
+                <select name="category" className="input w-36 py-1 text-xs" defaultValue="" aria-label="Category">
+                  <option value="">Category…</option>
+                  {(l.amountCents < 0 ? cats : ["Bookings", "Invoices", "Other income"]).map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <button className="text-xs font-bold text-navy">Add to books</button>
+              </form>
             </div>,
           ])}
         />

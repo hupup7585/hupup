@@ -1,4 +1,5 @@
 import { getSettings } from "@/lib/settings";
+import NotActive from "@/components/NotActive";
 import CalendarSettingsForm from "./CalendarSettingsForm";
 import { CALENDAR_KEYS } from "./calendar-keys";
 import { config } from "@/lib/config";
@@ -65,7 +66,11 @@ export default async function SettingsPage() {
         <BlockingForm initial={settings.blockedCallers} />
       </section>
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Settings & system status</h1>
-      <p className="mb-5 text-muted">These are set as environment variables in Vercel (Project → Settings → Environment Variables).</p>
+      <p className="mb-5 text-muted">These are set as environment variables in Vercel (Project → Settings → Environment Variables). The full list of what&rsquo;s waiting on an outside step is on <a className="underline" href="/admin/status">System status</a>.</p>
+      <NotActive k="sms" />
+      <NotActive k="payments" />
+      <NotActive k="email" />
+      <NotActive k="recording" />
       <div className="card mb-5 p-5">
         <Row ok={Boolean(process.env.DATABASE_URL)} label="Database" detail="Postgres connection (Neon)." />
         <Row ok={config.twilioConfigured()} label="Twilio phone & SMS" detail={config.twilioConfigured() ? `Hotline number ${process.env.TWILIO_PHONE_NUMBER}` : "Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER."} />

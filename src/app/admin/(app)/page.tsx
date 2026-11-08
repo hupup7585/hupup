@@ -1,5 +1,6 @@
 import { requireOwner } from "@/lib/auth";
 import MyTasksCard from "@/components/MyTasksCard";
+import NotActive from "@/components/NotActive";
 import Link from "next/link";
 import { kpis, leaderboard, listOrders, todaysRuns, weeklyRevenue, channelSplit } from "@/lib/admin-queries";
 import { addDays, endOfMonth, shortDate, startOfMonth, startOfWeek, todayISO } from "@/lib/dates";
@@ -71,6 +72,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       </div>
 
       <MyTasksCard staff={staff} />
+      <NotActive k="sms" />
+      <NotActive k="payments" />
 
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="card p-5">

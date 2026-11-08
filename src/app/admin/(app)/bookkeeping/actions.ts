@@ -415,3 +415,31 @@ export async function reverseMileageAction(f: FormData) {
 export async function methodsList() {
   return METHODS;
 }
+
+/** Abraham EE: categorize a real statement line straight into the books (expense or income), then mark it matched. */
+export async function categorizeLineAction(f: FormData) {
+  return run("bank", async (userId) => {
+    const id = Number(s(f, "id"));
+    const [l] = await db.select().from(schema.bookBankLines).where(eq(schema.bookBankLines.id, id));
+    if (!l) throw new BooksError("Line not found.");
+    if (l.status !== "unmatched") throw new BooksError("This line is already matched.");
+    const category = s(f, "category");
+    if (!category) throw new BooksError("Choose a category.");
+    const out = l.amountCents < 0;
+    const row = await addEntry(
+      {
+        entryDate: l.lineDate,
+        kind: out ? "expense" : "income",
+        category,
+        amountCents: Math.abs(l.amountCents),
+        method: l.account === "card" ? "card" : "bank",
+        party: l.description.slice(0, 120),
+        notes: `From ${l.account} statement${l.importName ? ` (${l.importName})` : ""}`,
+      },
+      userId,
+    );
+    await db.update(schema.bookBankLines).set({ status: "matched", matchedEntryIds: [row.id], matchNote: `Added to the books as #${row.id} (${category})` }).where(eq(schema.bookBankLines.id, id));
+    await bookAudit(userId, "line_categorized", "book_bank_line", id, { entry: row.id, category });
+    return `Added to the books as entry #${row.id}.`;
+  });
+}

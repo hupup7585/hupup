@@ -1,4 +1,5 @@
 import Link from "next/link";
+import NotActive from "@/components/NotActive";
 import { requireStaff } from "@/lib/auth";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { listThreads, markThreadRead, threadMessages } from "@/lib/messages";
@@ -23,6 +24,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
     <div className="mx-auto max-w-6xl">
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Messages</h1>
       <p className="mb-5 text-muted">Texts to and from customers on the hotline number.</p>
+      <NotActive k="sms" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
         <div className={`card p-3 ${phone ? "hidden lg:block" : ""}`}>
           <form className="mb-3 flex gap-2">
