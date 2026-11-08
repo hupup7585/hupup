@@ -19,7 +19,8 @@ export function rowFor(date: string, s: HoursSettings): HolidayRow {
   const info = dayInfo(date, { ...s, calendarOverrides: "" } as CalendarSettings);
   const d = defaultDayText(date, s);
   const own = overrideFor(date, s);
-  const holiday = info.names.join(", ") || (info.closesAtLabel ? info.closesAtLabel.split(":")[0] : "") || "Regular day";
+  // Staff screens: Hebrew-letter holiday names (Abraham); days without one keep the calendar name
+  const holiday = info.namesYi.join(", ") || (info.closesAtLabel ? info.closesAtLabel.split(":")[0] : "") || "Regular day";
   return {
     date,
     hebrew: info.hebrew,

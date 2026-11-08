@@ -9,7 +9,7 @@ const TOGGLES: [string, string][] = [
   ["closeMinorFasts", "Minor fasts (Tzom Gedaliah, 10 Teves, Taanis Esther, 17 Tammuz)"],
   ["closeLagBaomer", "Lag Ba'Omer"],
   ["closeCholHamoed", "Chol Hamoed"],
-  ["closeChanukah", "Chanukah"],
+  ["closeChanukah", "Chanukkah"],
 ];
 
 export default function CalendarSettingsForm({ initial }: { initial: Record<string, string> }) {
@@ -72,7 +72,7 @@ export default function CalendarSettingsForm({ initial }: { initial: Record<stri
             ["hoursFridayOpen", "Friday opens (closes at the Erev Shabbos time)", "10:30"],
             ["hoursSunday", "Sunday", "11:30-19:00"],
             ["hoursCholHamoed", "Chol Hamoed", "10:30-22:30"],
-            ["hoursChanukah", "Chanukah (Friday of Chanukah still closes at chatzos)", "10:30-22:30"],
+            ["hoursChanukah", "Chanukkah (Friday of Chanukkah still closes at chatzos)", "10:30-22:30"],
             ["hoursMotzeiOpen", "Motzei Shabbos opens (\"tzeis+120\" = 2 hours after Shabbos ends)", "tzeis+120"],
             ["hoursMotzeiCloseWinter", "Motzei Shabbos closes (winter)", "23:00"],
             ["hoursMotzeiCloseSummer", "Motzei Shabbos closes (summer, 00:00 = midnight)", "00:00"],

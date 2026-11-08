@@ -509,7 +509,7 @@ const handlers: Record<string, Handler> = {
     const cal = await getSettings();
     const chk = checkEventDate(r.date, cal);
     if (!chk.ok) {
-      sp(vr, ctx, "date_closed", { date: longDate(r.date), reason: chk.day.reason ?? "a holiday" });
+      sp(vr, ctx, "date_closed", { date: longDate(r.date), reason: chk.day.reasonEn ?? chk.day.reason ?? "a holiday" }); // Ashkenazi English names (Abraham)
       return back(vr, "date", { p, n: Number(ctx.query.get("n") || 0) + 1 });
     }
     const g = keypad(vr, url("date-confirm", { p, d: r.date }));

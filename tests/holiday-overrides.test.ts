@@ -53,10 +53,10 @@ describe("the admin list", () => {
     const rows = holidayRows("2027-03-01", 120, withOwn("2027-03-02 closed Inventory"), ["2027-03-02"]);
     const by = Object.fromEntries(rows.map((r) => [r.date, r]));
     expect(by["2027-03-02"]).toMatchObject({ holiday: "Regular day", choice: "closed", note: "Inventory", defaultOpen: true });
-    expect(by["2027-03-23"]).toMatchObject({ holiday: "Purim", defaultOpen: false, choice: "default" }); // Purim
-    expect(by["2027-04-21"].holiday).toContain("Erev Pesach");
+    expect(by["2027-03-23"]).toMatchObject({ holiday: "פורים", defaultOpen: false, choice: "default" }); // Purim
+    expect(by["2027-04-21"].holiday).toContain("ערב יום טוב"); // Erev Pesach, Hebrew-letter name on staff screens (Abraham P)
     expect(by["2027-04-21"].defaultHours).toMatch(/until chatzos \(\d+:\d\d (AM|PM)\)$/);
-    expect(by["2027-04-22"]).toMatchObject({ holiday: "Pesach I", defaultOpen: false });
+    expect(by["2027-04-22"]).toMatchObject({ holiday: "פסח", defaultOpen: false }); // Pesach I
     expect(by["2027-04-25"].defaultHours).toBe("10:30 AM to 10:30 PM"); // Chol Hamoed
     expect(defaultDayText("2027-04-22", base)).toEqual({ open: false, hours: "Closed (Pesach I)" });
   });

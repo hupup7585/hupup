@@ -31,7 +31,8 @@ export async function availabilityFor(date: string) {
 export type CalendarDay = { date: string; hebrew: string; hebrewHe: string; names: string[]; closed: boolean; reason: string | null; closesAtLabel: string | null };
 export type DateCheck = { ok: boolean; message: string | null; pickupWarning: string | null; pickup: string; day: CalendarDay };
 
-const plainDay = (d: ReturnType<typeof dayInfo>): CalendarDay => ({ date: d.date, hebrew: d.hebrew, hebrewHe: d.hebrewHe, names: d.names, closed: d.closed, reason: d.reason, closesAtLabel: d.closesAtLabel });
+// Staff screen: Hebrew-letter holiday names (Abraham); days without one keep the calendar name
+const plainDay = (d: ReturnType<typeof dayInfo>): CalendarDay => ({ date: d.date, hebrew: d.hebrew, hebrewHe: d.hebrewHe, names: d.namesYi, closed: d.closed, reason: d.reasonYi ?? d.reason, closesAtLabel: d.closesAtLabel });
 
 /** Jewish-calendar info for the POS: the coming days, and the selected event date. */
 export async function calendarFor(start: string, days = 14): Promise<CalendarDay[]> {

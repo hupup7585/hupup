@@ -75,12 +75,20 @@ function events(iso: string): Holiday[] {
 
 export type Kind = "shabbos" | "yomtov" | "cholHamoed" | "chanukah" | "purim" | "tishaBav" | "minorFast" | "lagBaomer";
 
-export function kinds(iso: string): { kinds: Set<Kind>; names: string[] } {
+/**
+ * Holiday names for one day, three ways, same order: `names` (calendar names, e.g. "Sukkos I"), `namesEn` (Abraham's
+ * Ashkenazi English names for the phone line, e.g. "Sukkos"), `namesYi` (Hebrew-letter names for staff screens).
+ */
+export function kinds(iso: string): { kinds: Set<Kind>; names: string[]; namesEn: string[]; namesYi: string[] } {
   const k = new Set<Kind>();
   const names: string[] = [];
+  const namesEn: string[] = [];
+  const namesYi: string[] = [];
   if (weekday(iso) === 6) {
     k.add("shabbos");
     names.push("Shabbos");
+    namesEn.push("Shabbos");
+    namesYi.push("שבת");
   }
   for (const e of events(iso)) {
     const f = new Set(e.flags);
@@ -92,10 +100,13 @@ export function kinds(iso: string): { kinds: Set<Kind>; names: string[] } {
     if (key.startsWith("Tish'a B'Av")) k.add("tishaBav");
     if (f.has("MINOR_FAST") && key !== "Ta'anit Bechorot") k.add("minorFast");
     if (key === "Lag BaOmer") k.add("lagBaomer");
-    if (f.has("CHAG") || f.has("CHOL_HAMOED") || f.has("MINOR_FAST") || f.has("MAJOR_FAST") || f.has("MINOR_HOLIDAY") || f.has("EREV") || key.startsWith("Chanukah") || key === "Purim" || key === "Lag BaOmer")
+    if (f.has("CHAG") || f.has("CHOL_HAMOED") || f.has("MINOR_FAST") || f.has("MAJOR_FAST") || f.has("MINOR_HOLIDAY") || f.has("EREV") || key.startsWith("Chanukah") || key === "Purim" || key === "Lag BaOmer") {
       names.push(e.name);
+      namesEn.push(e.proposedEn ?? e.name);
+      namesYi.push(e.proposedYi ?? e.name);
+    }
   }
-  return { kinds: k, names };
+  return { kinds: k, names, namesEn, namesYi };
 }
 
 /** The Owner's entry for one day (admin "Holidays & hours"): Open or Closed, optional hours, notes. */
@@ -140,6 +151,12 @@ export type DayInfo = {
   hebrew: string;
   hebrewHe: string;
   names: string[];
+  /** Ashkenazi English names (phone line) and Hebrew-letter names (staff screens), same order as names */
+  namesEn: string[];
+  namesYi: string[];
+  /** Why the day is closed, as said on the phone line (Ashkenazi English) and shown on staff screens (Hebrew letters) */
+  reasonEn: string | null;
+  reasonYi: string | null;
   /** Closed for the whole day (no deliveries, pickups or bookings for that day). */
   closed: boolean;
   reason: string | null;
@@ -150,10 +167,13 @@ export type DayInfo = {
   reopensAt: Date | null;
 };
 
-function reasonFor(k: Set<Kind>, names: string[]): string {
-  if (k.has("yomtov")) return names.find((n) => !/^Erev|Shabbos/.test(n)) ?? "Yom Tov";
-  if (k.has("shabbos")) return "Shabbos";
-  return names[0] ?? "Closed";
+function reasonFor(k: Set<Kind>, names: string[], alt: string[] = names): string {
+  if (k.has("yomtov")) {
+    const i = names.findIndex((n) => !/^Erev|Shabbos/.test(n));
+    return i >= 0 ? alt[i] : alt === names ? "Yom Tov" : "יום טוב";
+  }
+  if (k.has("shabbos")) return alt[names.indexOf("Shabbos")] ?? "Shabbos";
+  return alt[0] ?? "Closed";
 }
 
 function fullClosed(iso: string, s: CalendarSettings): { closed: boolean; reason: string | null } {
@@ -180,8 +200,12 @@ function fmt(d: Date) {
 /** Everything about one calendar day. */
 export function dayInfo(iso: string, s: CalendarSettings = calendarDefaults()): DayInfo {
   const hd = hebrewFromISO(iso);
-  const { names } = kinds(iso);
+  const { kinds: k, names, namesEn, namesYi } = kinds(iso);
   const today = fullClosed(iso, s);
+  // Owner overrides keep their own note; calendar closures get the approved holiday names
+  const byCalendar = today.closed && today.reason === reasonFor(k, names);
+  const reasonEn = !today.closed ? null : byCalendar ? reasonFor(k, names, namesEn) : today.reason;
+  const reasonYi = !today.closed ? null : byCalendar ? reasonFor(k, names, namesYi) : today.reason;
   let closesAt: Date | null = null;
   let closesAtLabel: string | null = null;
   let reopensAt: Date | null = null;
@@ -201,8 +225,12 @@ export function dayInfo(iso: string, s: CalendarSettings = calendarDefaults()): 
     hebrew: renderEnglish(hd),
     hebrewHe: renderHebrew(hd),
     names,
+    namesEn,
+    namesYi,
     closed: today.closed,
     reason: today.reason,
+    reasonEn,
+    reasonYi,
     closesAt,
     closesAtLabel,
     reopensAt,

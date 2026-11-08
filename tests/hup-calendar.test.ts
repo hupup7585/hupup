@@ -99,11 +99,15 @@ describe("sun times for Kiryas Joel (in-house NOAA equations)", () => {
 });
 
 describe("names and the public website", () => {
-  it("proposed English and Yiddish names are stored but not used until Abraham approves", () => {
-    expect(PROPOSED_NAMES.chanukah).toEqual({ en: "Chanukah", yi: "חנוכה" });
+  it("approved names (Abraham P): Ashkenazi English on the phone line, Hebrew letters on staff screens", async () => {
     expect(PROPOSED_NAMES.cholHamoed).toEqual({ en: "Chol Hamoed", yi: "חול המועד" });
-    const engine = readFileSync("src/lib/jewish-calendar.ts", "utf8");
-    expect(engine).not.toMatch(/proposedEn|proposedYi|PROPOSED_NAMES/);
+    const { dayInfo } = await import("@/lib/jewish-calendar");
+    const sukkos = dayInfo("2026-09-26"); // Sukkos I, 5787
+    expect(sukkos.reasonEn).toBe("Sukkos");
+    expect(sukkos.reasonYi).toBe("סוכות");
+    expect(dayInfo("2026-11-14").reasonEn).toBe("Shabbos");
+    expect(dayInfo("2026-11-14").reasonYi).toBe("שבת");
+    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toContain("chk.day.reasonEn");
   });
   it("no outside calendar library, and nothing on the website uses the calendar", () => {
     expect(readFileSync("package.json", "utf8")).not.toContain("@hebcal");
