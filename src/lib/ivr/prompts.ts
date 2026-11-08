@@ -89,6 +89,11 @@ export const PROMPTS = {
   ask_name: { group: "Checkout", label: "Ask for name", text: "Awesome, let's get you booked! Please say your first and last name." },
   ask_address: { group: "Checkout", label: "Ask for address", text: "Thanks! Now please say the delivery address, with the house number, street, and town." },
   ask_email: { group: "Checkout", label: "Ask for email", text: "Almost done! Please say your email address for your receipt, like john at gmail dot com. Or press pound to skip." },
+  // Keypad typing (Abraham L; proposed wording approved under P, Nov 8, 2026)
+  type_hint: { group: "Checkout", label: "Typing: how to switch", text: "To type it on your keypad instead, press star." },
+  type_instructions: { group: "Checkout", label: "Typing: how to type", text: "To type, press each key until you reach the letter: press 2 once for A, twice for B, three times for C, and the same for every key. To type two letters on the same key, press star once between them. For example, A then B is 2, star, 2 2. Press star twice for a space. Press pound when you're done." },
+  type_email_symbols: { group: "Checkout", label: "Typing: email symbols", text: "For a dot, press 1 once. For the at sign, press 1 twice." },
+  typed_back: { group: "Checkout", label: "Typing: read back", text: "You typed: {value}. If that's right, press 1. To try again, press 2.", vars: ["value"] },
   heard: { group: "Checkout", label: "Read back what we heard", text: "I heard: {value}. If that's right, press 1. To try again, press 2.", vars: ["value"] },
   field_unclear: { group: "Checkout", label: "Didn't catch it", text: "Sorry, I didn't catch that. No problem, let's try that again." },
   email_unclear: { group: "Checkout", label: "Didn't catch the email", text: "Sorry, I couldn't quite catch that email. Let's try that again." },

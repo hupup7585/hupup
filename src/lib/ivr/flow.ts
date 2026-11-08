@@ -42,6 +42,7 @@ import { RING_KEYS, ringListFor, type RingKey } from "./routing";
 import { matchBlock, parseBlockList } from "./caller-filter";
 import { PROMPTS, loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
+import { decodeMultitap, titleCase } from "./multitap";
 
 const { categories, products, orders } = schema;
 type VR = InstanceType<typeof twilio.twiml.VoiceResponse>;
@@ -100,7 +101,7 @@ function keypad(vr: VR, action: string, opts: { numDigits?: number; timeout?: nu
 }
 
 /** Speech (plus optional keypad) gather tuned for phone audio. */
-function speech(vr: VR, action: string, hints: string, opts: { dtmf?: boolean; numDigits?: number } = {}) {
+function speech(vr: VR, action: string, hints: string, opts: { dtmf?: boolean; numDigits?: number; finishOnKey?: string } = {}) {
   return vr.gather({
     input: opts.dtmf ? ["speech", "dtmf"] : ["speech"],
     action,
@@ -113,7 +114,7 @@ function speech(vr: VR, action: string, hints: string, opts: { dtmf?: boolean; n
     hints,
     profanityFilter: false,
     actionOnEmptyResult: true,
-    ...(opts.dtmf ? { finishOnKey: "#", numDigits: opts.numDigits } : {}),
+    ...(opts.dtmf ? { finishOnKey: opts.finishOnKey ?? "#", numDigits: opts.numDigits } : {}),
   });
 }
 
@@ -638,16 +639,45 @@ const handlers: Record<string, Handler> = {
     const f = ctx.query.get("f") as Field;
     const n = ctx.query.get("n") ?? undefined;
     const spec = FIELDS[f];
-    const g = speech(vr, url("heard", { f, n }), spec.hints, { dtmf: f === "email" });
+    // Say it, or press star to type it on the keypad (Abraham L). finishOnKey "" so star and # arrive as keys.
+    const g = speech(vr, url("heard", { f, n }), spec.hints, { dtmf: true, numDigits: 1, finishOnKey: "" });
     sp(g, ctx, spec.prompt);
+    sp(g, ctx, "type_hint");
     return vr;
+  },
+
+  /** Keypad typing: the instructions, then keys until # (star separates letters inside this prompt, not the menu). */
+  type(ctx, vr) {
+    const f = ctx.query.get("f") as Field;
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 15, action: url("typed", { f }), method: "POST" });
+    if (!ctx.query.get("again")) {
+      sp(g, ctx, "type_instructions");
+      if (f === "email") sp(g, ctx, "type_email_symbols");
+    }
+    return back(vr, "typed", { f });
+  },
+
+  async typed(ctx, vr) {
+    const f = ctx.query.get("f") as Field;
+    const spec = FIELDS[f];
+    const raw = decodeMultitap(ctx.body.Digits || "", f === "email" ? "email" : "text");
+    const value = raw ? (f === "email" ? spec.normalize(raw) : titleCase(raw)) : null;
+    if (!value) {
+      sp(vr, ctx, "field_unclear");
+      return back(vr, "type", { f, again: 1 });
+    }
+    await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
+    const g = keypad(vr, url("confirm", { f }));
+    sp(g, ctx, "typed_back", { value: spec.readBack(value) });
+    return noInput(vr, ctx, "type", { f, again: 1 });
   },
 
   async heard(ctx, vr) {
     const f = ctx.query.get("f") as Field;
     const spec = FIELDS[f];
-    if (f === "email" && ctx.body.Digits === "#") return back(vr, "phone");
-    if (f === "email" && ctx.body.Digits !== undefined && !ctx.body.SpeechResult) return back(vr, "phone");
+    if (ctx.body.Digits === "*") return back(vr, "type", { f }); // switch to keypad typing
+    if (f === "email" && (ctx.body.Digits === "#" || (ctx.body.Digits === "" && !ctx.body.SpeechResult))) return back(vr, "phone"); // skip email (as before)
+    if (ctx.body.Digits && !ctx.body.SpeechResult) return back(vr, "ask", { f }); // another key: ask again
     const raw = (ctx.body.SpeechResult || "").trim();
     const value = raw ? spec.normalize(raw) : null;
     if (!value) {
