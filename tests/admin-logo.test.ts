@@ -40,7 +40,7 @@ describe("staff pages have their own description", () => {
 describe("staff sign-in design (Abraham)", () => {
   const form = readFileSync("src/app/admin/login/LoginForm.tsx", "utf8");
   it("bigger card and logo; logo on light blue #8CCBFF, never on navy; yellow accent; navy and white", () => {
-    expect(form).toMatch(/data-signin-card className="[^"]*max-w-md[^"]*bg-white/); // was max-w-sm
+    expect(form).toMatch(/data-signin-card className="[^"]*sm:max-w-\[560px\][^"]*bg-white/); // about 560px wide on desktop (Abraham)
     expect(form).toMatch(/data-signin-logo-panel className="[^"]*bg-sky/);
     const panel = form.slice(form.indexOf("data-signin-logo-panel"), form.indexOf("data-signin-accent"));
     expect(panel).toContain("hupup-logo-h128@1x.png"); // the logo sits inside the light blue panel

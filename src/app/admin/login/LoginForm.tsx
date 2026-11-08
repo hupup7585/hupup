@@ -29,7 +29,7 @@ export default function LoginForm() {
 
   return (
     // Abraham's sign-in design: bigger card and logo; logo on light blue #8CCBFF (never on navy); yellow #FFD84D accent; navy #123D73 and white.
-    <div data-signin-card className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
+    <div data-signin-card className="w-full max-w-md overflow-hidden sm:max-w-[560px] rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
       <div data-signin-logo-panel className="bg-sky px-8 pb-6 pt-8 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/hupup-logo-h128@1x.png" srcSet="/brand/hupup-logo-h128@1x.png 1x, /brand/hupup-logo-h128@2x.png 2x, /brand/hupup-logo-h128@3x.png 3x" width={122} height={128} alt="Hup Up Attractions" className="mx-auto h-32 w-auto" />
