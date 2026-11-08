@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { currentStaff, homeFor } from "@/lib/auth";
+import { currentStaff, emailLoginActive, homeFor, smsLoginActive } from "@/lib/auth";
 import LoginForm from "./LoginForm";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export default async function LoginPage() {
   if (staff) redirect(homeFor(staff.role));
   return (
     <main className="grid min-h-screen place-items-center bg-navy px-4">
-      <LoginForm />
+      <LoginForm smsActive={smsLoginActive()} emailActive={emailLoginActive()} />
     </main>
   );
 }

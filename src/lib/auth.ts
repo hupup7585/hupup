@@ -71,6 +71,21 @@ const GENERIC = "If that number belongs to a staff account, a code is on its way
 /** Abraham: the Owner can also get the sign-in code by email; it always goes to this address. */
 export const OWNER_CODE_EMAIL = "hupupattractions@gmail.com";
 const GENERIC_EMAIL = "If that number belongs to the Owner account, a code is on its way to the Owner's email.";
+/**
+ * Text codes only work once Twilio approves our texting registration (A2P 10DLC); until then carriers drop the texts.
+ * On the live site we say so plainly instead of pretending a code is on its way. (Test and preview builds keep the
+ * on-screen dev code.)
+ */
+export function smsLoginActive(env: Record<string, string | undefined> = process.env): boolean {
+  if (env.VERCEL_ENV !== "production") return true;
+  return Boolean(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_MESSAGING_SERVICE_SID);
+}
+export function emailLoginActive(env: Record<string, string | undefined> = process.env): boolean {
+  return env.VERCEL_ENV !== "production" || Boolean(env.RESEND_API_KEY);
+}
+export const SMS_LOGIN_NOT_ACTIVE =
+  "Not active yet: text codes start once Twilio approves our texting registration (A2P). Owner: use \"Send code by email\". Owner and Secretary: use your password.";
+
 export const EMAIL_NOT_SET_UP = "Email sign-in isn't set up yet. Please use \"Text me a code\" or your password.";
 
 /**
@@ -96,6 +111,7 @@ export async function sendLoginEmailCode(rawPhone: string): Promise<{ ok: boolea
 
 /** Text a sign-in code. The reply never reveals whether the number has an account. */
 export async function sendLoginCode(rawPhone: string): Promise<{ ok: boolean; message: string; devCode?: string }> {
+  if (!smsLoginActive()) return { ok: false, message: SMS_LOGIN_NOT_ACTIVE };
   const staff = await staffForPhone(rawPhone);
   if (!staff) {
     await audit("login.code_unknown_number", null, { phone: toE164(rawPhone) });
@@ -114,7 +130,14 @@ export async function sendLoginCode(rawPhone: string): Promise<{ ok: boolean; me
   return { ok: true, message: GENERIC, devCode: res.dev ? code : undefined };
 }
 
-async function startSession(staff: StaffUser, method: "sms_code" | "email_code" | "password", trustDevice: boolean) {
+async function startSession(staffIn: StaffUser, method: "sms_code" | "email_code" | "password", trustDevice: boolean) {
+  // The Owner (ADMIN_PHONE) becomes a real account on first sign-in, so the Owner can set a password and own history.
+  let staff = staffIn;
+  if (staff.role === "owner" && !staff.userId) {
+    const [row] = await db.select().from(adminUsers).where(eq(adminUsers.phone, staff.phone)).limit(1);
+    const owner = row ?? (await db.insert(adminUsers).values({ name: "Owner", phone: staff.phone, role: "owner", active: true }).returning())[0];
+    staff = { ...staff, userId: owner.id };
+  }
   const token = crypto.randomBytes(32).toString("base64url");
   const ms = trustDevice ? TRUSTED_DAYS * 86_400_000 : SHORT_SESSION_HOURS * 3_600_000;
   const expiresAt = new Date(Date.now() + ms);
@@ -239,4 +262,34 @@ export async function logout() {
 /** Revoke every session for a staff member (deactivation, password reset). */
 export async function revokeSessions(userId: number) {
   await db.delete(adminSessions).where(eq(adminSessions.userId, userId));
+}
+
+/**
+ * My account: Owner and Secretary set or change their own password. Changing an existing password needs the current
+ * one; setting the first password needs a sign-in from the last 15 minutes. Delivery accounts use text codes only.
+ */
+export async function setOwnPassword(current: string, next: string): Promise<{ ok: boolean; message: string }> {
+  const me = await currentStaff();
+  if (!me?.userId) return { ok: false, message: "Please sign in again." };
+  if (me.role === "delivery") return { ok: false, message: "Delivery accounts sign in with a texted code only." };
+  const [u] = await db.select().from(adminUsers).where(eq(adminUsers.id, me.userId)).limit(1);
+  if (!u) return { ok: false, message: "Account not found." };
+  if (u.passwordHash) {
+    if (!(await bcrypt.compare(current, u.passwordHash))) {
+      await audit("account.password_change_failed", u.id, {});
+      return { ok: false, message: "Your current password isn't right." };
+    }
+  } else {
+    const [sess] = await db.select().from(adminSessions).where(eq(adminSessions.id, me.sessionId)).limit(1);
+    if (!sess || Date.now() - sess.createdAt.getTime() > 15 * 60_000) return { ok: false, message: "For your first password, sign in again with a code, then set it within 15 minutes." };
+  }
+  let hash: string;
+  try {
+    hash = await hashPassword(next);
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+  await db.update(adminUsers).set({ passwordHash: hash, passwordSetAt: new Date(), failedLogins: 0, lockedUntil: null }).where(eq(adminUsers.id, u.id));
+  await audit(u.passwordHash ? "account.password_changed" : "account.password_set", u.id, {});
+  return { ok: true, message: "Password saved. You can now sign in with your phone number and password." };
 }

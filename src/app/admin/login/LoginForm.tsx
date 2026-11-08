@@ -5,9 +5,9 @@ import { KeyRound, MessageSquareText } from "lucide-react";
 import { passwordAction, sendCodeAction, sendEmailCodeAction, verifyCodeAction } from "./actions";
 
 /** Staff sign-in: phone number, then a texted code (everyone) or a password (Owner and Secretary). */
-export default function LoginForm() {
+export default function LoginForm({ smsActive = true, emailActive = true }: { smsActive?: boolean; emailActive?: boolean }) {
   const [phone, setPhone] = useState("");
-  const [mode, setMode] = useState<"code" | "password">("code");
+  const [mode, setMode] = useState<"code" | "password">(smsActive ? "code" : "password");
   const [sent, setSent] = useState(false);
   const [via, setVia] = useState<"sms" | "email">("sms");
   const [code, setCode] = useState("");
@@ -61,11 +61,16 @@ export default function LoginForm() {
 
         {mode === "code" && !sent && (
           <>
-            <button className="btn-dark w-full py-3" onClick={() => send("sms")} disabled={pending || phone.replace(/\D/g, "").length < 10}>
+            {!smsActive && (
+              <p data-not-active="sms-login" className="rounded-lg bg-[#FFF8E1] p-3 text-sm text-[#5C4600]">
+                <b>Not active yet:</b> text codes start once Twilio approves our texting registration (A2P). <b>Owner:</b> use &ldquo;Send code by email&rdquo; below. <b>Owner and Secretary:</b> use your password. <b>Delivery:</b> sign-in starts when text codes do.
+              </p>
+            )}
+            <button className="btn-dark w-full py-3" onClick={() => send("sms")} disabled={!smsActive || pending || phone.replace(/\D/g, "").length < 10}>
               {pending ? "Sending…" : "Send code"}
             </button>
             {/* Abraham: Owner only; the code always goes to the business email (hupupattractions@gmail.com) */}
-            <button type="button" data-email-code className="btn-ghost w-full py-2.5" onClick={() => send("email")} disabled={pending || phone.replace(/\D/g, "").length < 10}>
+            <button type="button" data-email-code className="btn-ghost w-full py-2.5" onClick={() => send("email")} disabled={!emailActive || pending || phone.replace(/\D/g, "").length < 10}>
               Send code by email <span className="font-normal text-muted">(Owner)</span>
             </button>
           </>
@@ -117,7 +122,7 @@ export default function LoginForm() {
             <button className="btn-dark w-full py-3" disabled={pending || !password || phone.replace(/\D/g, "").length < 10}>
               {pending ? "Checking…" : "Sign in"}
             </button>
-            <p className="text-xs text-muted">Delivery accounts sign in with a texted code.</p>
+            <p className="text-xs text-muted">Delivery accounts sign in with a texted code. No password yet? Owner: sign in with &ldquo;Send code by email&rdquo;, then set one under My account. Secretary: ask the Owner to set one on the Staff page.</p>
           </form>
         )}
 
