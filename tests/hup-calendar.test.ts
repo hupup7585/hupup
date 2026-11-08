@@ -110,7 +110,12 @@ describe("names and the public website", () => {
     expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toContain("chk.day.reasonEn");
   });
   it("no outside calendar library, and nothing on the website uses the calendar", () => {
-    expect(readFileSync("package.json", "utf8")).not.toContain("@hebcal");
+    // hebcal is only a test-time check of our own calendar (Abraham Y: "test against hebcal"); the app never uses it.
+    const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+    expect(Object.keys(pkg.dependencies ?? {})).not.toContain("@hebcal/core");
+    const grepSrc = (dir: string): string[] =>
+      require("node:fs").readdirSync(dir, { withFileTypes: true }).flatMap((e: { name: string; isDirectory: () => boolean }) => (e.isDirectory() ? grepSrc(`${dir}/${e.name}`) : [`${dir}/${e.name}`]));
+    for (const f of grepSrc("src")) expect(readFileSync(f, "utf8"), f).not.toContain("@hebcal");
     for (const f of ["src/app/page.tsx", "src/components/site/SiteFooter.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/ServiceAreaC.tsx"]) {
       expect(readFileSync(f, "utf8"), f).not.toMatch(/hup-calendar|jewish-calendar|officeHours/);
     }

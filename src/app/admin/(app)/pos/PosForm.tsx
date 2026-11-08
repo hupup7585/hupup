@@ -81,7 +81,7 @@ export default function PosForm(props: {
               className={`min-w-[5.5rem] shrink-0 rounded-lg border px-2 py-1.5 text-left text-xs ${d.date === date ? "border-navy bg-navy text-white" : d.closed ? "border-line bg-bg text-muted line-through" : "border-line bg-white hover:border-navy"}`}
             >
               <span className="block font-bold">{englishDate(d.date, "short")}</span>
-              <HebrewDay iso={d.date} className="block" />
+              <HebrewDay yi iso={d.date} className="block" />
               <span className="block truncate">{d.closed ? d.reason : d.closesAtLabel ? "Closes early" : d.names[0] ?? ""}</span>
             </button>
           ))}
@@ -90,12 +90,12 @@ export default function PosForm(props: {
         {check && (
           <div data-date-check className={`mb-5 rounded-lg p-3 text-sm ${check.ok ? "bg-bg" : "bg-[#ffe6e4] font-semibold text-[#b3261e]"}`}>
             <div className="font-bold">
-              <DualDate iso={check.day.date} />
+              <DualDate yi iso={check.day.date} />
               {check.day.names.length > 0 && <span className="font-normal"> · {check.day.names.join(", ")}</span>}
             </div>
             {!check.ok && <div>{check.message}</div>}
             {check.day.closesAtLabel && <div className="badge badge-pending mt-1">{check.day.closesAtLabel}</div>}
-            {check.ok && <div className="mt-1">Pickup: <DualDate iso={check.pickup} /></div>}
+            {check.ok && <div className="mt-1">Pickup: <DualDate yi iso={check.pickup} /></div>}
             {check.pickupWarning && <div className="mt-1 font-semibold text-navy">{check.pickupWarning}</div>}
           </div>
         )}

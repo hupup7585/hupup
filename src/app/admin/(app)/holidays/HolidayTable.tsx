@@ -13,7 +13,7 @@ export default function HolidayTable({ initial }: { initial: HolidayRow[] }) {
   const [add, setAdd] = useState("");
   const [pending, start] = useTransition();
   const set = (i: number, patch: Partial<HolidayRow>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-  const when = (iso: string) => <DualDate iso={iso} />;
+  const when = (iso: string) => <DualDate yi iso={iso} />;
 
   return (
     <div className="space-y-4">

@@ -83,7 +83,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
       <main className="mx-auto max-w-3xl px-4 py-6">
         <PageHeader
           title="Deliveries"
-          subtitle={<DualDate iso={day} className="text-lg font-extrabold text-navy" />}
+          subtitle={<DualDate yi iso={day} className="text-lg font-extrabold text-navy" />}
           actions={
             <>
               <Link className="btn-ghost" href={`/admin/deliveries?d=${addDays(day, -1)}`}>← Previous day</Link>

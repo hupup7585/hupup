@@ -39,7 +39,7 @@ export default async function CalendarPage({
     <div className="mx-auto max-w-7xl">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black sm:text-3xl">
-          Availability · <DualDate iso={start} style="short" /> – <DualDate iso={end} style="short" />
+          Availability · <DualDate yi iso={start} style="short" /> – <DualDate yi iso={end} style="short" />
         </h1>
         <div className="flex flex-wrap items-center gap-2">
           <Link className="btn-ghost" href={q({ start: addDays(start, -span) })}>◀</Link>
@@ -65,7 +65,7 @@ export default async function CalendarPage({
                 <th key={d} className={`border-b border-l border-line px-1 py-2 text-center text-xs font-semibold ${d === today ? "text-coral" : "text-muted"}`}>
                   <Link href={q({ day: d })} className={`block rounded-lg py-1 ${d === selected ? "bg-navy text-white" : ""}`}>
                     {weekdayShort(d)} {dayOfMonth(d)}
-                    <HebrewDay iso={d} className="block text-[10px] font-normal" />
+                    <HebrewDay yi iso={d} className="block text-[10px] font-normal" />
                   </Link>
                 </th>
               ))}
@@ -142,7 +142,7 @@ export default async function CalendarPage({
           return (
             <div key={kind}>
               <h2 className="mb-3 font-bold">
-                {kind === "delivery" ? "🚚 Deliveries" : "↩️ Pickups"} · <DualDate iso={selected} />
+                {kind === "delivery" ? "🚚 Deliveries" : "↩️ Pickups"} · <DualDate yi iso={selected} />
               </h2>
               {list.length === 0 && <p className="text-sm text-muted">None.</p>}
               {list.map((r) => (

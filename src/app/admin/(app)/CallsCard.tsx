@@ -62,10 +62,10 @@ export default function CallsCard({ a, periodLabel }: { a: CallAnalytics; period
           </div>
           <div className="mt-1 flex justify-between text-[11px] text-muted">
             <span>
-              {bars[0]?.day.slice(5)} <HebrewDay iso={bars[0]?.day ?? ""} />
+              {bars[0]?.day.slice(5)} <HebrewDay yi iso={bars[0]?.day ?? ""} />
             </span>
             <span>
-              {bars.at(-1)?.day.slice(5)} <HebrewDay iso={bars.at(-1)?.day ?? ""} />
+              {bars.at(-1)?.day.slice(5)} <HebrewDay yi iso={bars.at(-1)?.day ?? ""} />
             </span>
           </div>
         </div>

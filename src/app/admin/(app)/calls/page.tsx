@@ -7,6 +7,7 @@ import { requireStaff } from "@/lib/auth";
 import { blockCallerAction } from "../settings/blocking-actions";
 import { StatusBadge } from "@/components/StatusBadge";
 import DualDate from "@/components/DualDate";
+import CallYiddishDay from "@/components/CallYiddishDay";
 import { callJourneys, type JourneyEvent } from "@/lib/call-journey";
 
 const KIND_STYLE: Record<string, string> = {
@@ -82,7 +83,7 @@ export default async function CallsPage() {
               const ev = journeys.get(c.call_sid) ?? [];
               return [
                 <tr key={c.call_sid} className="hover:bg-bg">
-                  <td className="td whitespace-nowrap"><DualDate at={c.started_at} /></td>
+                  <td className="td whitespace-nowrap"><DualDate at={c.started_at} /><br /><CallYiddishDay at={c.started_at} /></td>
                   <td className="td">
                     {c.from_number ? <a className="text-navy underline-offset-2 hover:underline" href={`tel:${c.from_number}`}>{formatPhone(c.from_number)}</a> : "Unknown"}
                     {staff.role === "owner" && c.from_number && (

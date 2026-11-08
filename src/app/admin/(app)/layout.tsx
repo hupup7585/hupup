@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import Sidebar from "@/components/Sidebar";
+import DateInputHints from "@/components/DateInputHints";
 import { logoutAction } from "../login/actions";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen bg-bg lg:flex">
       <Sidebar logout={logoutAction} role={staff.role} name={staff.name} />
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-8">{children}</main>
+      <DateInputHints />
     </div>
   );
 }
