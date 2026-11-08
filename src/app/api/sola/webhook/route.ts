@@ -1,5 +1,5 @@
 import { field, isApproved, orderIdFromInvoice, verifyWebhookSignature } from "@/lib/sola";
-import { getOrderWithItems, markPaid, orderNumber } from "@/lib/orders";
+import { getPaymentGroup, markGroupPaid, orderNumber } from "@/lib/orders";
 import { linkPaymentToAcceptance } from "@/lib/rental-terms";
 import { sendEmail, sendSms } from "@/lib/notify";
 import { BUSINESS_NAME, config } from "@/lib/config";
@@ -31,26 +31,34 @@ export async function POST(req: Request) {
   const cents = parseMoneyToCents(field(fields, "xAuthAmount") || field(fields, "xAmount") || "");
   if (!orderId || cents === null) return new Response("ignored (no invoice/amount)");
 
-  const before = await getOrderWithItems(orderId);
-  if (!before) return new Response("unknown order", { status: 404 });
-  const updated = await markPaid(orderId, cents, "sola", field(fields, "xRefNum") || null);
-  if (!updated) return new Response("unknown order", { status: 404 });
+  // One payment may cover several rental days booked together (a payment group); all of them are confirmed.
+  const group = await getPaymentGroup(orderId);
+  if (!group) return new Response("unknown order", { status: 404 });
+  const before = group.primary;
+  const days = group.orders;
+  const updated = await markGroupPaid(orderId, cents, "sola", field(fields, "xRefNum") || null);
+  if (!updated.length && before.order.solaRefNum !== field(fields, "xRefNum")) return new Response("unknown order", { status: 404 });
   // Evidence: tie this payment to the rental terms version the customer accepted (or record that none was).
   if (before.order.solaRefNum !== field(fields, "xRefNum")) await linkPaymentToAcceptance(orderId, field(fields, "xRefNum") || null, cents);
 
   if (before.order.solaRefNum !== field(fields, "xRefNum")) {
     const num = orderNumber(orderId);
-    const msg = `${BUSINESS_NAME}: payment received for order #${num}. You're all set for ${messageDate(before.order.eventDate)}! We'll deliver that day and pick up ${messageDate(before.order.pickupDate)}.`;
+    const msg =
+      days.length > 1
+        ? `${BUSINESS_NAME}: payment received for order #${num}. You're all set for ${days.map((d) => messageDate(d.order.eventDate)).join(" and ")}! We'll deliver and pick up on the days you chose.`
+        : `${BUSINESS_NAME}: payment received for order #${num}. You're all set for ${messageDate(before.order.eventDate)}! We'll deliver that day and pick up ${messageDate(before.order.pickupDate)}.`;
     // Order/service text only with order-text consent (checked in sendMessage); the email copy goes out as before.
     if (before.customer?.phone) await sendSms(before.customer.phone, msg, { kind: "transactional", event: "payment_confirmation", orderId, customerId: before.customer.id });
     if (before.customer?.email) await sendEmail(before.customer.email, `Order #${num} confirmed`, msg);
     if (process.env.ADMIN_PHONE) {
-      await sendSms(process.env.ADMIN_PHONE, `New paid order #${num}: $${(cents / 100).toFixed(2)} for ${messageDate(before.order.eventDate)}.`, { kind: "system", event: "owner_alert" });
+      await sendSms(process.env.ADMIN_PHONE, `New paid order #${num}: $${(cents / 100).toFixed(2)} for ${messageDate(before.order.eventDate)}${days.length > 1 ? ` and ${days.length - 1} more day${days.length > 2 ? "s" : ""}` : ""}.`, { kind: "system", event: "owner_alert" });
     }
     // The business gets the full order details by email (sent once an email sender is connected; nothing else changes)
     if (config.adminEmail()) {
-      const mail = businessOrderEmail(before, cents);
-      await sendEmail(config.adminEmail(), mail.subject, mail.text);
+      for (const d of days) {
+        const mail = businessOrderEmail(d, days.length > 1 ? (d.order.totalCents ?? d.order.subtotalCents) : cents);
+        await sendEmail(config.adminEmail(), mail.subject, mail.text);
+      }
     }
   }
   return new Response("ok");

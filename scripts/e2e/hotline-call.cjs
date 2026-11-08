@@ -58,17 +58,17 @@ const addDays = (n) => {
   const caller = `+1845555${String(1000 + Math.floor(Math.random() * 8999))}`;
   const date = openDay();
 
-  // 1. Full booking: Jumping Balloons -> first item -> add -> date -> qty 1 -> checkout -> consent -> terms -> pay link
+  // 1. Full booking (date first): date -> Jumping Balloons -> first item -> add -> qty 1 -> cart (0) -> checkout -> consent -> terms -> pay link
   const sid1 = "CAe2e" + crypto.randomBytes(4).toString("hex");
   const run = await call(sid1, caller, [
     { Digits: "1" }, // main menu: bookings (Abraham's menu)
+    { Digits: date.mmdd }, // the rental date first, by keypad
+    { Digits: "1" }, // confirm date
     { Digits: "1" }, // rental list: category 1
     { Digits: "1" }, // first item
     { Digits: "2" }, // add to cart
-    { Digits: date.mmdd }, // date by keypad
-    { Digits: "1" }, // confirm date
     { Digits: "1" }, // quantity 1 (if asked)
-    { Digits: "9" }, // check out
+    { Digits: "0" }, // "To go to your shopping cart, press 0."
     { Digits: "1" }, // cart: check out
     { SpeechResult: "Yossi Friedman", Confidence: "0.9" },
     { Digits: "1" }, // name ok
@@ -137,7 +137,7 @@ const addDays = (n) => {
   // 3. Out-of-area address stops checkout
   const sid2 = "CAe2e" + crypto.randomBytes(4).toString("hex");
   const run2 = await call(sid2, "+18455550143", [
-    { Digits: "1" }, { Digits: "1" }, { Digits: "1" }, { Digits: "2" }, { Digits: openDay().mmdd }, { Digits: "1" }, { Digits: "1" }, { Digits: "9" }, { Digits: "1" },
+    { Digits: "1" }, { Digits: openDay().mmdd }, { Digits: "1" }, { Digits: "1" }, { Digits: "1" }, { Digits: "2" }, { Digits: "1" }, { Digits: "0" }, { Digits: "1" },
     { SpeechResult: "Sam Green", Confidence: "0.9" }, { Digits: "1" },
     { SpeechResult: "5 Main Street Albany", Confidence: "0.9" }, { Digits: "1" },
   ], { stopAfterGathers: 13 });
@@ -145,7 +145,7 @@ const addDays = (n) => {
 
   // 4. Hanging up releases the held items
   const sid3 = "CAe2e" + crypto.randomBytes(4).toString("hex");
-  await call(sid3, "+18455550144", [{ Digits: "1" }, { Digits: "3" }, { Digits: "1" }, { Digits: "2" }, { Digits: openDay().mmdd }, { Digits: "1" }, { Digits: "1" }], { stopAfterGathers: 7 });
+  await call(sid3, "+18455550144", [{ Digits: "1" }, { Digits: openDay().mmdd }, { Digits: "1" }, { Digits: "3" }, { Digits: "1" }, { Digits: "2" }, { Digits: "1" }], { stopAfterGathers: 7 });
   const held = (await q("select o.id, o.status from orders o join call_sessions s on s.order_id = o.id where s.call_sid = $1", [sid3]))[0];
   await post("/api/voice/status", { CallSid: sid3, CallStatus: "completed" });
   const after = held ? (await q("select status from orders where id = $1", [held.id]))[0] : null;

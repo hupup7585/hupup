@@ -278,3 +278,47 @@ export async function markPaid(orderId: number, cents: number, method: string, r
     .returning();
   return updated;
 }
+
+type FullOrder = NonNullable<Awaited<ReturnType<typeof getOrderWithItems>>>;
+const dueOf = (o: FullOrder["order"]) => Math.max(0, (o.totalCents ?? o.subtotalCents) - o.paidCents);
+
+/**
+ * Orders paid together with one charge (several rental days booked on one call; Abraham, Nov 8, 2026).
+ * A single order is its own group. `due` counts only orders still waiting for payment.
+ */
+export async function getPaymentGroup(orderId: number): Promise<{ primary: FullOrder; orders: FullOrder[]; due: number } | null> {
+  const first = await getOrderWithItems(orderId);
+  if (!first) return null;
+  const gid = first.order.paymentGroupId;
+  if (!gid) return { primary: first, orders: [first], due: first.order.status === "PENDING_PAYMENT" ? dueOf(first.order) : 0 };
+  const rows = await db.select({ id: orders.id }).from(orders).where(eq(orders.paymentGroupId, gid));
+  const list = (await Promise.all(rows.map((r) => getOrderWithItems(r.id)))).filter((x): x is FullOrder => Boolean(x));
+  list.sort((a, b) => a.order.eventDate.localeCompare(b.order.eventDate) || a.order.id - b.order.id);
+  const primary = list.find((x) => x.order.id === gid) ?? first;
+  return { primary, orders: list, due: list.filter((x) => x.order.status === "PENDING_PAYMENT").reduce((n, x) => n + dueOf(x.order), 0) };
+}
+
+/**
+ * One payment for a group: each order gets its own amount due (primary first), any remainder goes to the last one.
+ * Idempotent: a repeated Sola notice (same reference) changes nothing. Returns the orders that were updated.
+ */
+export async function markGroupPaid(orderId: number, cents: number, method: string, ref?: string | null) {
+  const group = await getPaymentGroup(orderId);
+  if (!group) return [];
+  if (group.orders.length === 1) {
+    const one = await markPaid(orderId, cents, method, ref);
+    return one ? [one] : [];
+  }
+  if (ref && group.primary.order.solaRefNum === ref) return []; // duplicate webhook
+  const ordered = [group.primary, ...group.orders.filter((x) => x.order.id !== group.primary.order.id)];
+  let remaining = cents;
+  const out = [];
+  for (let i = 0; i < ordered.length; i++) {
+    const o = ordered[i].order;
+    const pay = i === ordered.length - 1 ? remaining : Math.min(remaining, dueOf(o));
+    remaining -= pay;
+    const u = await markPaid(o.id, pay, method, ref);
+    if (u) out.push(u);
+  }
+  return out;
+}

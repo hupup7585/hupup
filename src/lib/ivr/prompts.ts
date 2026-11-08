@@ -75,6 +75,12 @@ export const PROMPTS = {
   after_add: { group: "Cart", label: "After adding", text: "To keep shopping, press 1. To check out, press 9." },
   cart_empty: { group: "Cart", label: "Cart is empty", text: "Your cart is empty right now. Let's find something fun!" },
   cart_summary: { group: "Cart", label: "Cart summary", text: "Here's your cart: {items}, for {date}. Your rental total is {total}, plus delivery and sales tax.", vars: ["items", "date", "total"] },
+  // Key 1 booking, several days on one call (Abraham, Nov 8, 2026). day_choice and cart_key are Abraham's exact lines.
+  day_choice: { group: "Cart", label: "After an item: same day or another day (Abraham)", text: "For the same day, press 1. For another day, press 2." },
+  cart_key: { group: "Cart", label: "Booking menus: go to the cart (Abraham)", text: "To go to your shopping cart, press 0." },
+  cart_intro: { group: "Cart", label: "Cart: opening line", text: "Here's your cart." },
+  cart_day: { group: "Cart", label: "Cart: one rental day", text: "For {date}: {items}.", vars: ["date", "items"] },
+  cart_total: { group: "Cart", label: "Cart: rental total", text: "Your rental total is {total}, plus delivery and sales tax.", vars: ["total"] },
   cart_options: { group: "Cart", label: "Cart options", text: "To check out, press 1. To keep shopping, press 2. To start over with an empty cart, press 3." },
   cart_cleared: { group: "Cart", label: "Cart emptied", text: "All set, your cart is empty. Let's start fresh!" },
   cart_expired: { group: "Cart", label: "Cart timed out", text: "Sorry, your cart timed out. Let's start again." },
@@ -95,6 +101,7 @@ export const PROMPTS = {
   thanks_order: { group: "Checkout", label: "Order placed", text: "You're all set, {name}! Your order number is {number}.", vars: ["name", "number"] },
   link_sent: { group: "Checkout", label: "Payment link texted", text: "We just texted you a secure payment link. Your party rentals are saved for {minutes} minutes while you pay, and we'll text you as soon as it's confirmed.", vars: ["minutes"] },
   link_failed: { group: "Checkout", label: "Couldn't text the link", text: "We couldn't send the text, so someone from our team will call you back shortly to finish up." },
+  goodbye_order_days: { group: "Checkout", label: "Goodbye after ordering several days", text: "We'll deliver and pick up on the days you chose. Thanks so much for choosing Hup Up Attractions. Have an amazing party, bye for now!" },
   goodbye_order: { group: "Checkout", label: "Goodbye after ordering", text: "We'll deliver on {date} and pick up on {pickup}. Thanks so much for choosing Hup Up Attractions. Have an amazing party, bye for now!", vars: ["date", "pickup"] },
 
   // Text message consent (A2P 10DLC). The exact text spoken is stored with every consent record.

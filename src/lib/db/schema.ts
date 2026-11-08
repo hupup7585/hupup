@@ -111,6 +111,8 @@ export const orders = pgTable(
     /** Items + delivery + tax: what the payment link charges. Null for orders priced before this existed. */
     totalCents: integer("total_cents"),
     paidCents: integer("paid_cents").notNull().default(0),
+    /** Orders paid together with one charge (several rental days on one call) share the first order's id here */
+    paymentGroupId: integer("payment_group_id"),
     /** sola | cash | check | other */
     paymentMethod: text("payment_method"),
     solaRefNum: text("sola_ref_num"),
@@ -166,6 +168,10 @@ export type CallData = {
   menuKeys?: string[];
   /** A department or operator was asked for and no one took the call: "closed" (office closed / no one on the list) or "no_answer" */
   missed?: "closed" | "no_answer";
+  /** Key 1 booking: the rental day being shopped for now (date first, then items) */
+  day?: string;
+  /** Key 1 booking: every held order on this call, one per rental day (paid together with one charge) */
+  dayOrderIds?: number[];
 };
 
 export const callSessions = pgTable("call_sessions", {

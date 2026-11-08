@@ -182,6 +182,17 @@ async function currentOrder(ctx: Ctx) {
   return full;
 }
 
+/** Every held order on this call (one per rental day), earliest day first. */
+async function callOrders(ctx: Ctx) {
+  const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), ...(ctx.session?.orderId ? [ctx.session.orderId] : [])])];
+  const out: NonNullable<Awaited<ReturnType<typeof getOrderWithItems>>>[] = [];
+  for (const id of ids) {
+    const full = await getOrderWithItems(id);
+    if (full && full.order.status === "HOLD" && full.items.length) out.push(full);
+  }
+  return out.sort((a, b) => a.order.eventDate.localeCompare(b.order.eventDate) || a.order.id - b.order.id);
+}
+
 const money = (cents: number) => (cents / 100).toFixed(2);
 
 function itemPhrase(qty: number, name: string) {
@@ -359,20 +370,23 @@ const handlers: Record<string, Handler> = {
   },
 
   /** Key 1: the rentals to book (existing approved lines), the cart when it has items, star for the main menu. */
+  /**
+   * Key 1 (Abraham, Nov 8, 2026): the rental date first, then the items. After an item: "For the same day, press 1.
+   * For another day, press 2." Each day is its own held order; checkout charges all of them together (one payment).
+   * Every booking menu ends with "To go to your shopping cart, press 0."; star returns to the main menu.
+   */
   async book(ctx, vr) {
+    if (!ctx.session?.data.day) return back(vr, "date");
     const cats = await phoneCategories();
-    const order = await currentOrder(ctx);
     const g = keypad(vr, url("book-choice")); // keys only (Abraham); # is an invalid choice
     if (!cats.length) sp(g, ctx, "menu_empty");
     for (const c of cats) {
       sp(g, ctx, "menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
       shortPause(g);
     }
-    if (order?.items.length) {
-      sp(g, ctx, "menu_cart");
-      shortPause(g);
-    }
     sp(g, ctx, "back_to_menu");
+    shortPause(g);
+    sp(g, ctx, "cart_key");
     return noInput(vr, ctx, "book");
   },
 
@@ -380,7 +394,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits; // keys only (Abraham)
     if (!d) return noInput(vr, ctx, "book", {});
     if (d === "*") return back(vr, "menu");
-    if (d === "9") return back(vr, "cart");
+    if (d === "0") return back(vr, "cart");
     const cat = (await phoneCategories()).find((c) => String(c.ivrDigit) === d);
     if (!cat) {
       sp(vr, ctx, "not_valid");
@@ -401,6 +415,7 @@ const handlers: Record<string, Handler> = {
     sp(g, ctx, "category_intro", { category: cat.spokenName || cat.name });
     items.forEach((p, i) => sp(g, ctx, "category_item", { item: p.name, key: i + 1 }));
     sp(g, ctx, "back_to_menu");
+    sp(g, ctx, "cart_key");
     return noInput(vr, ctx, "category", { c });
   },
 
@@ -409,6 +424,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (!d) return noInput(vr, ctx, "category", { c });
     if (d === "*") return back(vr, "menu");
+    if (d === "0") return back(vr, "cart");
     const items = await phoneProducts(c);
     const p = items[Number(d) - 1];
     if (!p) {
@@ -424,6 +440,7 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("product-choice", { p: p.id }));
     if (!ctx.query.get("again")) sp(g, ctx, "product_intro", { item: p.name, price: spokenMoney(p.priceCents) });
     sp(g, ctx, "product_options");
+    sp(g, ctx, "cart_key");
     return noInput(vr, ctx, "product", { p: p.id, again: 1 });
   },
 
@@ -433,6 +450,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (!d) return noInput(vr, ctx, "product", { p: p.id, again: 1 });
     if (d === "*") return back(vr, "category", { c: p.categoryId });
+    if (d === "0") return back(vr, "cart");
     if (d === "1") {
       if (p.spokenDescription || p.description) say(vr, p.spokenDescription || p.description);
       else sp(vr, ctx, "product_default_desc", { item: p.name });
@@ -440,23 +458,23 @@ const handlers: Record<string, Handler> = {
       return back(vr, "product", { p: p.id, again: 1 });
     }
     if (d === "2") {
-      const order = await currentOrder(ctx);
-      if (order) return back(vr, "qty", { p: p.id, d: order.order.eventDate });
-      return back(vr, "date", { p: p.id });
+      const day = ctx.session?.data.day;
+      return day ? back(vr, "qty", { p: p.id, d: day }) : back(vr, "date", { p: p.id });
     }
     sp(vr, ctx, "not_valid");
     return back(vr, "product", { p: p.id, again: 1 });
   },
 
+  /** The rental day (asked first). p = a product the caller already picked (then straight on to its quantity). */
   date(ctx, vr) {
-    const p = ctx.query.get("p")!;
+    const p = ctx.query.get("p") ?? undefined;
     const g = speech(vr, url("date-heard", { p, n: ctx.query.get("n") ?? undefined }), "today, tomorrow, Sunday, Monday, January, February, March, April, May, June, July, August, September, October, November, December", { dtmf: true, numDigits: 4 });
     sp(g, ctx, "date_prompt");
     return vr;
   },
 
   async "date-heard"(ctx, vr) {
-    const p = ctx.query.get("p")!;
+    const p = ctx.query.get("p") ?? undefined;
     const digits = ctx.body.Digits;
     const speechResult = ctx.body.SpeechResult;
     if (!digits && !speechResult) return noInput(vr, ctx, "date", { p });
@@ -478,12 +496,14 @@ const handlers: Record<string, Handler> = {
   },
 
   async "date-confirm"(ctx, vr) {
-    const p = Number(ctx.query.get("p"));
+    const p = ctx.query.get("p") ?? undefined;
     const date = ctx.query.get("d")!;
     const d = ctx.body.Digits;
-    if (d === "2" || !d) return back(vr, "date", { p });
     if (d !== "1") return back(vr, "date", { p });
-    return back(vr, "qty", { p, d: date });
+    // This day becomes the one being shopped for; an order already held for the same day is reused.
+    const sameDay = (await callOrders(ctx)).find((o) => o.order.eventDate === date);
+    await updateSession(ctx.callSid, { orderId: sameDay?.order.id ?? null, data: { day: date } }, ctx.session);
+    return p ? back(vr, "qty", { p, d: date }) : back(vr, "book");
   },
 
   async qty(ctx, vr) {
@@ -509,9 +529,14 @@ const handlers: Record<string, Handler> = {
     const p = await getProduct(Number(ctx.query.get("p")));
     const d = ctx.body.Digits;
     const order = await currentOrder(ctx);
-    if (d === "9") return back(vr, "cart");
+    if (d === "9" || d === "0") return back(vr, "cart");
+    if (d === "*") return back(vr, "menu");
     if (d === "1" && !order && p) return back(vr, "date", { p: p.id });
     if ((d === "1" && order) || d === "2") return back(vr, p ? "category" : "menu", p ? { c: p.categoryId } : {});
+    if (d && p) {
+      sp(vr, ctx, "not_valid"); // # or any other key (Abraham: # is never a menu key)
+      return back(vr, "qty", { p: p.id, d: ctx.session?.data.day ?? todayISO() });
+    }
     return back(vr, "menu");
   },
 
@@ -525,7 +550,8 @@ const handlers: Record<string, Handler> = {
       return back(vr, "qty", { p: p.id, d: date });
     }
     const session = ctx.session ?? (await ensureSession(ctx.callSid, ctx.from));
-    const existing = await currentOrder(ctx);
+    // The held order for this day (one per rental day on the call)
+    const existing = (await callOrders(ctx)).find((o) => o.order.eventDate === date) ?? null;
     const r = await reserveItem({
       orderId: existing?.order.id ?? null,
       productId: p.id,
@@ -544,30 +570,42 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "went_wrong");
       return back(vr, "menu");
     }
-    await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted" }, session);
+    const ids = [...new Set([...(session.data?.dayOrderIds ?? []), r.orderId])];
+    await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted", data: { day: date, dayOrderIds: ids } }, session);
     const g = keypad(vr, url("after-add"));
     sp(g, ctx, "added", { items: itemPhrase(q, p.name), date: longDate(date) });
-    sp(g, ctx, "after_add");
+    sp(g, ctx, "day_choice");
+    sp(g, ctx, "cart_key");
     return noInput(vr, ctx, "cart");
   },
 
   async "after-add"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "*") return back(vr, "menu"); // star always returns to the main menu (as in the other sub-menus)
-    if (d === "9") return back(vr, "cart");
-    if (d === "1") return back(vr, "menu");
+    if (d === "1") return back(vr, "book"); // same day: more items
+    if (d === "2") return back(vr, "date"); // another day: ask the day, then the items for that day
+    if (d === "0") return back(vr, "cart");
+    if (d) {
+      sp(vr, ctx, "not_valid");
+      const g = keypad(vr, url("after-add"));
+      sp(g, ctx, "day_choice");
+      sp(g, ctx, "cart_key");
+      return noInput(vr, ctx, "cart");
+    }
     return noInput(vr, ctx, "cart");
   },
 
+  /** The whole cart: every day on this call, then one total. */
   async cart(ctx, vr) {
-    const order = await currentOrder(ctx);
-    if (!order || !order.items.length) {
+    const days = await callOrders(ctx);
+    if (!days.length) {
       sp(vr, ctx, "cart_empty");
       return back(vr, "menu");
     }
-    const list = order.items.map((i) => itemPhrase(i.qty, i.name)).join(", ");
     const g = keypad(vr, url("cart-choice"));
-    sp(g, ctx, "cart_summary", { items: list, date: longDate(order.order.eventDate), total: spokenMoney(order.order.subtotalCents) });
+    sp(g, ctx, "cart_intro");
+    for (const o of days) sp(g, ctx, "cart_day", { date: longDate(o.order.eventDate), items: o.items.map((i) => itemPhrase(i.qty, i.name)).join(", ") });
+    sp(g, ctx, "cart_total", { total: spokenMoney(days.reduce((t, o) => t + o.order.subtotalCents, 0)) });
     sp(g, ctx, "cart_options");
     return noInput(vr, ctx, "cart");
   },
@@ -576,12 +614,16 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (d === "*") return back(vr, "menu"); // star always returns to the main menu (as in the other sub-menus)
     if (d === "1") return back(vr, "ask", { f: "name" });
-    if (d === "2") return back(vr, "menu");
+    if (d === "2") return back(vr, "book"); // keep shopping
     if (d === "3") {
-      if (ctx.session?.orderId) await cancelHold(ctx.session.orderId);
-      await updateSession(ctx.callSid, { orderId: null, outcome: "browsing" }, ctx.session);
+      for (const o of await callOrders(ctx)) await cancelHold(o.order.id);
+      await updateSession(ctx.callSid, { orderId: null, outcome: "browsing", data: { dayOrderIds: [], day: undefined } }, ctx.session);
       sp(vr, ctx, "cart_cleared");
       return back(vr, "menu");
+    }
+    if (d) {
+      sp(vr, ctx, "not_valid"); // # or any other key
+      return back(vr, "cart");
     }
     return noInput(vr, ctx, "cart");
   },
@@ -589,7 +631,7 @@ const handlers: Record<string, Handler> = {
   /* ---- checkout: name -> address -> email -> phone -> finalize ---- */
 
   async ask(ctx, vr) {
-    if (!(await currentOrder(ctx))) {
+    if (!(await callOrders(ctx)).length) {
       sp(vr, ctx, "cart_empty");
       return back(vr, "menu");
     }
@@ -652,7 +694,7 @@ const handlers: Record<string, Handler> = {
   },
 
   async "terms-answer"(ctx, vr) {
-    const order = await currentOrder(ctx);
+    const order = (await callOrders(ctx))[0] ?? null; // the first day's order stands for the whole reservation
     if (!order) {
       sp(vr, ctx, "cart_expired");
       return back(vr, "menu");
@@ -767,17 +809,19 @@ const handlers: Record<string, Handler> = {
   },
 
   async finalize(ctx, vr) {
-    const order = await currentOrder(ctx);
+    const days = await callOrders(ctx);
     const data = ctx.session?.data ?? {};
-    if (!order || !order.items.length) {
+    if (!days.length) {
       sp(vr, ctx, "cart_expired");
       return back(vr, "menu");
     }
     if (!data.name || !data.address) return back(vr, "ask", { f: !data.name ? "name" : "address" });
     if (termsActive() && !data.termsAccepted) return back(vr, "terms"); // off on live until the final Terms are in
     const settings = await getSettings();
-    const totals = computeTotals(order.order.subtotalCents, deliveryZone(data.address, settings), settings);
-    if (!totals) {
+    const zone = deliveryZone(data.address, settings);
+    // Each rental day is its own delivery: its own delivery fee and tax. One charge pays for all of them.
+    const perDay = days.map((o) => ({ o, t: computeTotals(o.order.subtotalCents, zone, settings) }));
+    if (perDay.some((x) => !x.t)) {
       sp(vr, ctx, "address_outside_area");
       return back(vr, "ask", { f: "address" });
     }
@@ -788,28 +832,34 @@ const handlers: Record<string, Handler> = {
       email: data.email ?? null,
       address: data.address,
     });
-    await db
-      .update(orders)
-      .set({
-        customerId,
-        deliveryAddress: data.address,
-        status: "PENDING_PAYMENT",
-        holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES),
-        deliveryZone: totals.zone,
-        deliveryFeeCents: totals.deliveryFeeCents,
-        taxPercent: totals.taxPercent,
-        taxCents: totals.taxCents,
-        totalCents: totals.totalCents,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(orders.id, order.order.id), eq(orders.status, "HOLD")));
+    const primary = days[0].order;
+    for (const { o, t } of perDay) {
+      await db
+        .update(orders)
+        .set({
+          customerId,
+          deliveryAddress: data.address,
+          status: "PENDING_PAYMENT",
+          holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES),
+          deliveryZone: t!.zone,
+          deliveryFeeCents: t!.deliveryFeeCents,
+          taxPercent: t!.taxPercent,
+          taxCents: t!.taxCents,
+          totalCents: t!.totalCents,
+          paymentGroupId: days.length > 1 ? primary.id : null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(orders.id, o.order.id), eq(orders.status, "HOLD")));
+    }
     await updateSession(ctx.callSid, { outcome: "checked_out" }, ctx.session);
+    const sum = (k: "subtotalCents" | "deliveryFeeCents" | "taxCents" | "totalCents") => perDay.reduce((n, x) => n + x.t![k], 0);
+    const totals = { subtotalCents: sum("subtotalCents"), deliveryFeeCents: sum("deliveryFeeCents"), taxCents: sum("taxCents"), totalCents: sum("totalCents") };
 
-    const num = orderNumber(order.order.id);
-    const link = payPageLink(order.order.id); // review-and-pay page: Terms box, then Sola
-    const lines = order.items.map((i) => `${i.qty} x ${i.name}`).join(", ");
+    const num = orderNumber(primary.id);
+    const link = payPageLink(primary.id); // review-and-pay page for the whole reservation: Terms box, then Sola
+    const dayText = (o: (typeof days)[number]) => `${o.items.map((i) => `${i.qty} x ${i.name}`).join(", ")} for ${messageDate(o.order.eventDate)} (pickup ${messageDate(o.order.pickupDate)})`;
     const details =
-      `${BUSINESS_NAME} order #${num}: ${lines} for ${messageDate(order.order.eventDate)} (pickup ${messageDate(order.order.pickupDate)}). ` +
+      `${BUSINESS_NAME} order #${num}: ${days.map(dayText).join("; ")}. ` +
       `Rentals $${money(totals.subtotalCents)} + delivery $${money(totals.deliveryFeeCents)} + sales tax $${money(totals.taxCents)} = total $${money(totals.totalCents)}. ` +
       `Pay securely within ${PAYMENT_HOLD_MINUTES} minutes to confirm: ${link}`;
     // Texts go out only with transactional consent given on this call or recorded before.
@@ -817,7 +867,7 @@ const handlers: Record<string, Handler> = {
     let texted = false;
     let emailed = false;
     if (phone && consented) {
-      const res = await sendSms(phone, `${details} ${TRANSACTIONAL_FOOTER}`, { kind: "transactional", event: "order_payment_link", customerId, orderId: order.order.id, callSid: ctx.callSid });
+      const res = await sendSms(phone, `${details} ${TRANSACTIONAL_FOOTER}`, { kind: "transactional", event: "order_payment_link", customerId, orderId: primary.id, callSid: ctx.callSid });
       texted = res.sent;
     } else if (!consented && data.email) {
       const res = await sendEmail(data.email, `${BUSINESS_NAME} order #${num}`, details);
@@ -831,7 +881,7 @@ const handlers: Record<string, Handler> = {
     else if (emailed) sp(vr, ctx, "link_emailed", { minutes: PAYMENT_HOLD_MINUTES });
     else if (!consented) sp(vr, ctx, "link_call_back");
     else sp(vr, ctx, "link_failed");
-    await updateSession(ctx.callSid, { data: { placedOrderId: order.order.id } }, ctx.session);
+    await updateSession(ctx.callSid, { data: { placedOrderId: primary.id } }, ctx.session);
     return back(vr, "promo-consent");
   },
 
@@ -901,7 +951,9 @@ const handlers: Record<string, Handler> = {
   async goodbye(ctx, vr) {
     const id = ctx.session?.data.placedOrderId;
     const full = id ? await getOrderWithItems(id) : null;
-    if (full) sp(vr, ctx, "goodbye_order", { date: longDate(full.order.eventDate), pickup: longDate(full.order.pickupDate) });
+    const several = full?.order.paymentGroupId ? (await db.select({ id: orders.id }).from(orders).where(eq(orders.paymentGroupId, full.order.paymentGroupId))).length > 1 : false;
+    if (full && several) sp(vr, ctx, "goodbye_order_days");
+    else if (full) sp(vr, ctx, "goodbye_order", { date: longDate(full.order.eventDate), pickup: longDate(full.order.pickupDate) });
     vr.hangup();
     return vr;
   },
@@ -1104,7 +1156,8 @@ export async function handleCallStatus(callSid: string, status: string) {
   if (!ended) return;
   const s = await getSession(callSid);
   if (!s) return;
-  if (s.orderId) await cancelHold(s.orderId); // only affects orders still in HOLD
+  // Every day's held order on this call (cancelHold only affects orders still in HOLD)
+  for (const id of new Set([...(s.data?.dayOrderIds ?? []), ...(s.orderId ? [s.orderId] : [])])) await cancelHold(id);
   await updateSession(
     callSid,
     {

@@ -4,7 +4,12 @@ import { readFileSync } from "node:fs";
 const h = vi.hoisted(() => ({ recorded: [] as Record<string, unknown>[], redirected: "" as string, order: null as unknown }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-forwarded-for": "1.2.3.4", "user-agent": "UA" }) }));
 vi.mock("next/navigation", () => ({ redirect: (u: string) => ((h.redirected = u), undefined) }));
-vi.mock("@/lib/orders", async (orig) => ({ ...(await orig<typeof import("@/lib/orders")>()), getOrderWithItems: async () => h.order }));
+vi.mock("@/lib/orders", async (orig) => ({
+  ...(await orig<typeof import("@/lib/orders")>()),
+  getOrderWithItems: async () => h.order,
+  // one order is its own payment group (several rental days booked together pay as one group)
+  getPaymentGroup: async () => (h.order ? ((o: any) => ({ primary: o, orders: [o], due: (o.order.totalCents ?? o.order.subtotalCents) - o.order.paidCents }))(h.order) : null),
+}));
 vi.mock("@/lib/rental-terms", async (orig) => ({ ...(await orig<typeof import("@/lib/rental-terms")>()), recordTermsAcceptance: async (i: Record<string, unknown>) => (h.recorded.push(i), 1) }));
 
 process.env.AUTH_SECRET = "test-secret-at-least-24-characters-long";

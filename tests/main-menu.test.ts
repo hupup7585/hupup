@@ -163,12 +163,16 @@ describe("every key, office open", () => {
     expect(redirect(hash)).toBe("menu");
     expect(redirect(await press("*"))).toBe("menu?first=1");
   });
-  it("the rental list uses the existing lines; 9 there is the cart and star goes back", async () => {
+  it("key 1 asks the date first; then the rental list with the existing lines, Abraham's cart line, 0 = cart, star goes back", async () => {
+    h.session.data = {};
+    expect(redirect(await call("book"))).toBe("date");
+    h.session.data = { day: "2026-12-01" };
     await db.insert(schema.categories).values({ name: "Jumping Balloons", spokenName: "Jumping Balloons", ivrDigit: 1, sortOrder: 1, active: true });
     const book = await call("book");
     expect(book).toContain("For Jumping Balloons, press 1.");
     expect(book).toContain("To go back to the main menu, press star.");
-    expect(redirect(await call("book-choice", { Digits: "9" }))).toBe("cart");
+    expect(book).toContain("To go to your shopping cart, press 0.");
+    expect(redirect(await call("book-choice", { Digits: "0" }))).toBe("cart");
     expect(redirect(await call("book-choice", { Digits: "*" }))).toBe("menu");
   });
 });
@@ -181,10 +185,25 @@ describe("star returns to the main menu from the sub-menus", () => {
   });
 });
 
+describe("# is never a menu key; star returns (Abraham, spec item 5)", () => {
+  it("# in the main menu, rental list, after-adding and cart menus: the approved invalid line, then the same menu", async () => {
+    h.session.data = { day: "2026-12-01" };
+    for (const [action, back] of [["menu-choice", "menu"], ["book-choice", "book"], ["after-add", undefined], ["cart-choice", "cart"]] as const) {
+      const xml = await call(action, { Digits: "#" });
+      expect(xml, action).toContain("Sorry, that is not a valid selection. Please try again.");
+      if (back) expect(redirect(xml), action).toBe(back);
+      expect(redirect(xml), action).not.toBe("menu?first=1");
+    }
+    // star: main menu from the booking menus
+    for (const action of ["book-choice", "after-add", "cart-choice"]) expect(redirect(await call(action, { Digits: "*" })), action).toBe("menu");
+  });
+});
+
 describe("menus are keys only (Abraham): no speech in any menu", () => {
   const OLD_OOPS = "Oops, that's not one of the choices. No problem, let's try again.";
   const NOT_VALID = "Sorry, that is not a valid selection. Please try again.";
   it("the main menu and the key 1 rental list listen for keys only, and # comes in as a key", async () => {
+    h.session.data = { day: "2026-12-01" };
     for (const xml of [await call("menu", {}, "first=1"), await call("book")]) {
       const tag = xml.match(/<Gather [^>]*>/)![0];
       expect(tag).toContain('input="dtmf"');
