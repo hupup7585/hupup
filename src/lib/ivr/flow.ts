@@ -1,5 +1,5 @@
 import twilio from "twilio";
-import { and, asc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { addDays, longDate, todayISO } from "@/lib/dates";
@@ -25,6 +25,7 @@ import { getSettings } from "@/lib/settings";
 import { computeTotals, deliveryZone } from "@/lib/pricing";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
+import { STEP_LABELS, track, trackStep } from "@/lib/call-journey";
 import { PROMO_CONFIRM_REQUEST_SMS, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import {
@@ -220,6 +221,21 @@ async function customerByPhone(phone: string) {
   return c ?? null;
 }
 
+/** Call log labels for main-menu keys (not spoken). */
+const MAIN_KEY_LABELS: Record<string, string> = {
+  "1": "book a rental",
+  "2": "equipment instructions and guidance",
+  "3": "book a rental (key 3 stand-in)",
+  "4": "staff line 4",
+  "5": "staff line 5",
+  "6": "staff line 6",
+  "7": "hours (rings the operator for now)",
+  "8": "schools, corporate events and organizations",
+  "9": "voicemail",
+  "0": "speak to someone",
+  "*": "repeat the main menu",
+};
+
 /** Store a phone consent decision with the exact language the caller heard. */
 async function recordPhoneConsent(ctx: Ctx, scope: "transactional" | "marketing", action: "opt_in" | "declined", phone: string) {
   const key = scope === "transactional" ? "consent_transactional" : smsTermsV2Active() ? "consent_marketing_v2" : "consent_marketing";
@@ -368,6 +384,7 @@ const handlers: Record<string, Handler> = {
     if (/^[0-9*]$/.test(d) && ctx.session) {
       await updateSession(ctx.callSid, { data: { menuKeys: [...(ctx.session.data?.menuKeys ?? []), d] } }, ctx.session);
     }
+    await track(ctx.callSid, "step", `Main menu key ${d}: ${MAIN_KEY_LABELS[d] ?? "not a menu choice"}`, { key: d }, "menu-choice");
     switch (d) {
       case "*": // Abraham: star replays the entire main menu, from the greeting
         return back(vr, "menu", { first: 1 });
@@ -435,6 +452,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "category_empty");
       return back(vr, "menu");
     }
+    await track(ctx.callSid, "category_heard", `Listened to ${cat.name}`, { category: cat.name, items: items.map((p) => p.name) });
     const g = keypad(vr, url("category-choice", { c }));
     sp(g, ctx, "category_intro", { category: cat.spokenName || cat.name });
     items.forEach((p, i) => sp(g, ctx, "category_item", { item: p.name, key: i + 1 }));
@@ -462,7 +480,10 @@ const handlers: Record<string, Handler> = {
     const p = await getProduct(Number(ctx.query.get("p")));
     if (!p || !p.active) return back(vr, "menu");
     const g = keypad(vr, url("product-choice", { p: p.id }));
-    if (!ctx.query.get("again")) sp(g, ctx, "product_intro", { item: p.name, price: spokenMoney(p.priceCents) });
+    if (!ctx.query.get("again")) {
+      sp(g, ctx, "product_intro", { item: p.name, price: spokenMoney(p.priceCents) });
+      await track(ctx.callSid, "item_heard", `Listened to ${p.name}`, { item: p.name, productId: p.id });
+    }
     sp(g, ctx, "product_options");
     sp(g, ctx, "cart_key");
     return noInput(vr, ctx, "product", { p: p.id, again: 1 });
@@ -476,6 +497,7 @@ const handlers: Record<string, Handler> = {
     if (d === "*") return back(vr, "category", { c: p.categoryId });
     if (d === "0") return back(vr, "cart");
     if (d === "1") {
+      await track(ctx.callSid, "item_details", `Heard the details of ${p.name}`, { item: p.name, productId: p.id });
       if (p.spokenDescription || p.description) say(vr, p.spokenDescription || p.description);
       else sp(vr, ctx, "product_default_desc", { item: p.name });
       pause(vr);
@@ -505,15 +527,18 @@ const handlers: Record<string, Handler> = {
     const today = todayISO();
     const r = parseDateInput({ digits, speech: speechResult }, today);
     if (!r.ok) {
+      await track(ctx.callSid, "date_unclear", `Date not usable (${r.reason})`, { said: speechResult ?? null, key: digits ?? null, reason: r.reason });
       sp(vr, ctx, r.reason === "past" ? "date_past" : r.reason === "too_far" ? "date_too_far" : "date_unclear");
       return back(vr, "date", { p, n: Number(ctx.query.get("n") || 0) + 1 });
     }
     const cal = await getSettings();
     const chk = checkEventDate(r.date, cal);
     if (!chk.ok) {
+      await track(ctx.callSid, "date_closed", `Asked for ${longDate(r.date)}: closed`, { date: r.date, reason: chk.day.reasonEn ?? chk.day.reason ?? null });
       sp(vr, ctx, "date_closed", { date: longDate(r.date), reason: chk.day.reasonEn ?? chk.day.reason ?? "a holiday" }); // Ashkenazi English names (Abraham)
       return back(vr, "date", { p, n: Number(ctx.query.get("n") || 0) + 1 });
     }
+    await track(ctx.callSid, "date_asked", `Asked about ${longDate(r.date)}`, { date: r.date, said: speechResult ?? null, key: digits ?? null });
     const g = keypad(vr, url("date-confirm", { p, d: r.date }));
     sp(g, ctx, "date_confirm_day", { date: longDate(r.date), pickup: longDate(pickupDateFor(r.date, cal)) });
     return noInput(vr, ctx, "date", { p });
@@ -536,6 +561,7 @@ const handlers: Record<string, Handler> = {
     if (!p) return back(vr, "menu");
     const free = await checkBookable(p.id, p.quantity, date);
     if (free <= 0) {
+      await track(ctx.callSid, "unavailable", `${p.name} not available on ${longDate(date)}`, { item: p.name, productId: p.id, date });
       const g = keypad(vr, url("soldout-choice", { p: p.id }));
       sp(g, ctx, "sold_out", { item: p.name, date: longDate(date) });
       const order = await currentOrder(ctx);
@@ -587,6 +613,7 @@ const handlers: Record<string, Handler> = {
     });
     if (!r.ok) {
       if (r.reason === "unavailable") {
+        await track(ctx.callSid, "unavailable", r.free > 0 ? `Only ${r.free} ${p.name} left on ${longDate(date)} (asked for ${q})` : `${p.name} was just booked for ${longDate(date)}`, { item: p.name, productId: p.id, date, asked: q, free: r.free });
         if (r.free > 0) sp(vr, ctx, "only_some_left", { count: r.free });
         else sp(vr, ctx, "just_booked", { item: p.name });
         return back(vr, r.free > 0 ? "qty" : "menu", r.free > 0 ? { p: p.id, d: date } : {});
@@ -594,6 +621,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "went_wrong");
       return back(vr, "menu");
     }
+    await track(ctx.callSid, "item_added", `Added ${itemPhrase(q, p.name)} for ${longDate(date)}`, { item: p.name, productId: p.id, qty: q, date, orderId: r.orderId });
     const ids = [...new Set([...(session.data?.dayOrderIds ?? []), r.orderId])];
     await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted", data: { day: date, dayOrderIds: ids } }, session);
     const g = keypad(vr, url("after-add"));
@@ -689,6 +717,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "field_unclear");
       return back(vr, "type", { f, again: 1 });
     }
+    await track(ctx.callSid, "typed", `Typed ${f}: ${value}`, { field: f, value });
     await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
     const g = keypad(vr, url("confirm", { f }));
     sp(g, ctx, "typed_back", { value: spec.readBack(value) });
@@ -716,6 +745,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, f === "email" ? "email_unclear" : "field_unclear");
       return back(vr, "ask", { f, n });
     }
+    await track(ctx.callSid, "said", `Said ${f}: ${value}`, { field: f, value, raw });
     await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
     const g = keypad(vr, url("confirm", { f }));
     sp(g, ctx, "heard", { value: spec.readBack(value) });
@@ -905,6 +935,7 @@ const handlers: Record<string, Handler> = {
         .where(and(eq(orders.id, o.order.id), eq(orders.status, "HOLD")));
     }
     await updateSession(ctx.callSid, { outcome: "checked_out" }, ctx.session);
+    await track(ctx.callSid, "booking_finished", `Booking finished: order #${orderNumber(primary.id)}${days.length > 1 ? ` (${days.length} days)` : ""}`, { orderIds: days.map((x) => x.order.id), days: days.map((x) => x.order.eventDate) });
     const sum = (k: "subtotalCents" | "deliveryFeeCents" | "taxCents" | "totalCents") => perDay.reduce((n, x) => n + x.t![k], 0);
     const totals = { subtotalCents: sum("subtotalCents"), deliveryFeeCents: sum("deliveryFeeCents"), taxCents: sum("taxCents"), totalCents: sum("totalCents") };
 
@@ -1211,6 +1242,8 @@ export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Prom
   }
   const session = ctx.action === "incoming" ? null : await getSession(ctx.callSid);
   if (!session && ctx.action !== "incoming") await ensureSession(ctx.callSid, ctx.from);
+  // Caller journey (Abraham S): this menu or question, with the key pressed or the words said
+  await trackStep(ctx.callSid, ctx.action, ctx.body, ctx.query);
   try {
     await handler({ ...ctx, session: session ?? (await getSession(ctx.callSid)) }, vr);
   } catch (e) {
@@ -1231,6 +1264,21 @@ export async function handleCallStatus(callSid: string, status: string) {
   if (!s) return;
   // Every day's held order on this call (cancelHold only affects orders still in HOLD)
   for (const id of new Set([...(s.data?.dayOrderIds ?? []), ...(s.orderId ? [s.orderId] : [])])) await cancelHold(id);
+  // Where the caller hung up (the last menu or question they reached) and whether a booking was finished
+  const [last] = await db
+    .select({ step: schema.callEvents.step, label: schema.callEvents.label })
+    .from(schema.callEvents)
+    .where(and(eq(schema.callEvents.callSid, callSid), eq(schema.callEvents.kind, "step")))
+    .orderBy(desc(schema.callEvents.id))
+    .limit(1);
+  const booked = s.outcome === "checked_out";
+  await track(callSid, "hung_up", booked ? "Call ended after booking" : `Hung up at: ${last ? (STEP_LABELS[last.step ?? ""] ?? last.label) : "before any menu"}`, {
+    lastStep: last?.step ?? null,
+    lastStepLabel: last ? (STEP_LABELS[last.step ?? ""] ?? last.label) : "Before any menu",
+    booked,
+    outcome: s.outcome === "carted" ? "dropped" : s.outcome,
+    status,
+  });
   await updateSession(
     callSid,
     {

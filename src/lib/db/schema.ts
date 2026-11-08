@@ -191,6 +191,27 @@ export const callSessions = pgTable("call_sessions", {
   endedAt: timestamp("ended_at", { withTimezone: true }),
 });
 
+/**
+ * The caller's full journey (Abraham S): one row per thing that happened on a hotline call, in order.
+ * kind: step (a menu or question the caller reached, with the key pressed / words said) | category_heard |
+ * item_heard | item_details | item_added | date_asked | date_closed | date_unclear | unavailable | typed | said |
+ * booking_finished | hung_up. Card numbers and security codes are never taken on a call; any long digit run is
+ * removed before saving as a safeguard.
+ */
+export const callEvents = pgTable(
+  "call_events",
+  {
+    id: serial("id").primaryKey(),
+    callSid: text("call_sid").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    step: text("step"),
+    kind: text("kind").notNull(),
+    label: text("label").notNull(),
+    detail: jsonb("detail").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (t) => [index("call_events_call_idx").on(t.callSid, t.id), index("call_events_kind_idx").on(t.kind, t.at)],
+);
+
 export const loginCodes = pgTable("login_codes", {
   id: serial("id").primaryKey(),
   userId: integer("user_id"),
