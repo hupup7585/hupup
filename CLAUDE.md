@@ -11,6 +11,9 @@
 - Work through the open to-do list without pausing between items.
 - Never buy usage credits, upgrade a plan, or turn on anything that costs money.
 
+## Key 8 rule (Abraham, standing)
+- Every time main-menu key 8 (schools, corporate events and organizations) or its staff list is changed, run an extra key 8 test after the change (`npx vitest run tests/main-menu.test.ts -t "8"` plus a live check of the ring list) and report the result with the commit and deploy ID.
+
 ## Website SEO and tone rule (Abraham, applies to every website step)
 - Follow Google's helpful, people-first content guidelines.
 - Copy is humanized, friendly, warm and customer-friendly, in simple but professional English, with natural long-tail keywords (e.g. "bounce house rental in Kiryas Joel", "laser tag party rental Orange County NY", "paddle boat rental Monroe NY"). No keyword stuffing.
