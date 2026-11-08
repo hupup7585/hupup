@@ -665,6 +665,11 @@ export const bookLocks = pgTable("book_locks", {
   month: text("month").primaryKey(),
   lockedBy: integer("locked_by"),
   lockedAt: timestamp("locked_at", { withTimezone: true }).notNull().defaultNow(),
+  /** locked | reopened (only the Owner reopens, with a reason; every change is in the audit log) */
+  status: text("status").notNull().default("locked"),
+  reopenedBy: integer("reopened_by"),
+  reopenedAt: timestamp("reopened_at", { withTimezone: true }),
+  reopenReason: text("reopen_reason"),
 });
 
 /** Receipts and tax-exempt certificates, stored privately in the database (Owner-only download). */
@@ -741,4 +746,57 @@ export const timeLogs = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("time_logs_task_idx").on(t.taskId), index("time_logs_user_idx").on(t.userId)],
+);
+
+/* ---------------- General ledger (Bookkeeping spec step 1): double entry, accountant-approved chart ---------------- */
+
+/** Chart of accounts. Entered or approved by the accountant; nothing is pre-filled. */
+export const glAccounts = pgTable("gl_accounts", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  /** asset | liability | equity | income | cogs | expense | other_income | other_expense */
+  type: text("type").notNull(),
+  parentId: integer("parent_id"),
+  active: boolean("active").notNull().default(true),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** A journal entry: draft -> pending approval -> posted (-> reversed by a new entry). Never deleted. */
+export const journalEntries = pgTable(
+  "journal_entries",
+  {
+    id: serial("id").primaryKey(),
+    entryDate: date("entry_date", { mode: "string" }).notNull(),
+    memo: text("memo").notNull(),
+    /** manual | books (posted from a Bookkeeping entry) | reversal */
+    source: text("source").notNull().default("manual"),
+    /** e.g. "book_entry:123", unique per source so nothing posts twice */
+    sourceRef: text("source_ref").unique(),
+    /** draft | pending | posted | reversed */
+    status: text("status").notNull().default("draft"),
+    totalCents: integer("total_cents").notNull().default(0),
+    preparedBy: integer("prepared_by"),
+    approvedBy: integer("approved_by"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    reversesId: integer("reverses_id"),
+    fileId: integer("file_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("journal_entries_date_idx").on(t.entryDate)],
+);
+
+export const journalLines = pgTable(
+  "journal_lines",
+  {
+    id: serial("id").primaryKey(),
+    entryId: integer("entry_id").notNull(),
+    accountId: integer("account_id").notNull(),
+    debitCents: integer("debit_cents").notNull().default(0),
+    creditCents: integer("credit_cents").notNull().default(0),
+    memo: text("memo"),
+    projectId: integer("project_id"),
+  },
+  (t) => [index("journal_lines_entry_idx").on(t.entryId), index("journal_lines_account_idx").on(t.accountId)],
 );

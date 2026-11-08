@@ -83,7 +83,7 @@ export const isoDate = (v: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v ?? "
 
 export async function isLocked(dateIso: string) {
   const [l] = await db.select().from(schema.bookLocks).where(eq(schema.bookLocks.month, dateIso.slice(0, 7)));
-  return !!l;
+  return l?.status === "locked";
 }
 
 export type NewEntry = {

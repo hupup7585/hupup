@@ -26,6 +26,8 @@ import {
   threshold1099,
 } from "@/lib/books-reports";
 import * as A from "./actions";
+import * as G from "./gl-actions";
+import GeneralLedger from "./Ledger";
 import { Card, CategorySelect, Field, FileInput, Grid, MethodSelect, Save, Stat, Table, money } from "./ui";
 
 export const metadata = { title: "Bookkeeping | Hup Up Attractions" };
@@ -45,14 +47,15 @@ const TABS: [string, string][] = [
   ["mileage", "Mileage"],
   ["reports", "Reports"],
   ["ledger", "All entries"],
+  ["gl", "General ledger"],
   ["settings", "Settings"],
 ];
 
-type SP = { tab?: string; from?: string; to?: string; group?: string; msg?: string; err?: string; year?: string };
+type SP = { asOf?: string; account?: string; tab?: string; from?: string; to?: string; group?: string; msg?: string; err?: string; year?: string };
 
 /** Bookkeeping (Abraham T): Owner only. */
 export default async function BookkeepingPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireBooks();
+  const staff = await requireBooks();
   const sp = await searchParams;
   const tab = TABS.some(([k]) => k === sp.tab) ? sp.tab! : "overview";
   const today = todayISO();
@@ -88,6 +91,7 @@ export default async function BookkeepingPage({ searchParams }: { searchParams: 
       {tab === "mileage" && <Mileage from={from} to={to} />}
       {tab === "reports" && <Reports from={from} to={to} group={(["month", "quarter", "year"].includes(sp.group ?? "") ? sp.group : "month") as "month"} />}
       {tab === "ledger" && <Ledger from={from} to={to} />}
+      {tab === "gl" && <GeneralLedger asOf={/^\d{4}-\d{2}-\d{2}$/.test(sp.asOf ?? "") ? sp.asOf! : today} accountId={Number(sp.account) || undefined} from={from} to={to} owner={staff.role === "owner"} />}
       {tab === "settings" && <SettingsTab categories={categories} pct={settings.solaFeePercent} fixed={settings.solaFeeCents} days={settings.bookReminderDays} openingCash={settings.bookOpeningCashCents} openingDate={settings.bookOpeningDate} />}
     </div>
   );
@@ -731,7 +735,24 @@ async function SettingsTab({ categories, pct, fixed, days, openingCash, openingD
           <Field label="Month"><input type="month" name="month" className="input" required /></Field>
           <Save label="Lock month" />
         </form>
-        <p className="text-sm">{locks.length ? `Locked: ${locks.map((l) => l.month).join(", ")}` : "No months locked yet."}</p>
+        {locks.length === 0 ? (
+          <p className="text-sm">No months locked yet.</p>
+        ) : (
+          <Table
+            head={["Month", "Status", ""]}
+            empty=""
+            minWidth={520}
+            rows={locks.map((l) => [
+              l.month,
+              l.status === "locked" ? "Locked" : `Reopened ${l.reopenedAt ? l.reopenedAt.toISOString().slice(0, 10) : ""}: ${l.reopenReason ?? ""}`,
+              l.status === "locked" ? (
+                <form key="o" action={G.reopenMonthAction} className="flex gap-1"><input type="hidden" name="month" value={l.month} /><input name="reason" placeholder="Why (Owner only)" className="input w-40 py-1 text-xs" /><button className="text-xs font-bold text-[#C83A2F]">Reopen</button></form>
+              ) : (
+                <form key="l" action={G.reopenMonthAction}><input type="hidden" name="month" value={l.month} /><input type="hidden" name="relock" value="1" /><button className="text-xs font-bold text-navy">Lock again</button></form>
+              ),
+            ])}
+          />
+        )}
       </Card>
     </>
   );

@@ -101,6 +101,14 @@ export const SETTING_DEFAULTS = {
   /** Balance sheet: cash in the bank on the day the books start (Owner enters it; cents) and that date. */
   bookOpeningCashCents: "0",
   bookOpeningDate: "",
+  /** General ledger (Bookkeeping spec): set by the Owner once the accountant approves. Empty = not set up yet. */
+  glChartApprovedBy: "",
+  glChartApprovedOn: "",
+  glFiscalYearStartMonth: "",
+  glAccountingMethod: "",
+  glBaseCurrency: "USD",
+  /** Journal entries at or above this amount (cents) need a second person to approve. Empty = always (until the Owner sets it). */
+  glApprovalThresholdCents: "",
   /** Stock / warehouse address: where the delivery run starts and ends (Delivery screen route links). Owner only. */
   stockAddress: "",
   /** Website note under the hours (Abraham's wording). */
