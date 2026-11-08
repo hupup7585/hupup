@@ -37,7 +37,6 @@ import {
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
-import { matchMenuSpeech, menuSpeechHints } from "./category-speech";
 import { boxById, mainBox, saveRecording, saveTranscription } from "@/lib/voicemail";
 import { RING_KEYS, ringListFor, type RingKey } from "./routing";
 import { matchBlock, parseBlockList } from "./caller-filter";
@@ -283,18 +282,14 @@ const handlers: Record<string, Handler> = {
    * ends. A wrong key ("Sorry, that is not a valid selection…") replays the menu lines without the greeting, as before.
    */
   async menu(ctx, vr) {
-    const cats = await phoneCategories();
+    // Abraham: menus are keys only (no speech). finishOnKey "" makes # arrive as a key, so # is an invalid choice.
     const g = vr.gather({
-      input: ["dtmf", "speech"],
+      input: ["dtmf"],
       numDigits: 1,
+      finishOnKey: "",
       timeout: MENU_WAIT_SECONDS, // Abraham: 4 seconds after the last line, then the menu plays again
       action: url("menu-choice", { n: ctx.query.get("n") || undefined }),
       method: "POST",
-      language: "en-US",
-      speechModel: "phone_call",
-      enhanced: true,
-      speechTimeout: "auto",
-      hints: menuSpeechHints(cats),
     });
     if (ctx.query.get("first") === "1") {
       sp(g, ctx, "greeting");
@@ -332,17 +327,7 @@ const handlers: Record<string, Handler> = {
   },
 
   async "menu-choice"(ctx, vr) {
-    const d = ctx.body.Digits;
-    const said = (ctx.body.SpeechResult || "").trim();
-    if (!d && said) {
-      const choice = matchMenuSpeech(said, await phoneCategories());
-      if (choice?.kind === "category") return back(vr, "category", { c: choice.categoryId });
-      if (choice?.kind === "cart") return back(vr, "cart");
-      if (choice?.kind === "operator") return back(vr, "ring", { k: "0" });
-      if (choice?.kind === "repeat") return back(vr, "menu", { first: 1 }); // same as star
-      sp(vr, ctx, "invalid");
-      return back(vr, "menu");
-    }
+    const d = ctx.body.Digits; // keys only (Abraham): anything said is ignored
     if (!d) return menuNoChoice(vr, ctx);
     switch (d) {
       case "*": // Abraham: star replays the entire main menu, from the greeting
@@ -364,7 +349,7 @@ const handlers: Record<string, Handler> = {
         return back(vr, "voicemail");
       default:
         // Abraham: any key with no action says this, then the main menu plays again
-        sp(vr, ctx, "main_not_valid");
+        sp(vr, ctx, "not_valid");
         return back(vr, "menu");
     }
   },
@@ -373,18 +358,7 @@ const handlers: Record<string, Handler> = {
   async book(ctx, vr) {
     const cats = await phoneCategories();
     const order = await currentOrder(ctx);
-    const g = vr.gather({
-      input: ["dtmf", "speech"],
-      numDigits: 1,
-      timeout: 6,
-      action: url("book-choice"),
-      method: "POST",
-      language: "en-US",
-      speechModel: "phone_call",
-      enhanced: true,
-      speechTimeout: "auto",
-      hints: menuSpeechHints(cats),
-    });
+    const g = keypad(vr, url("book-choice")); // keys only (Abraham); # is an invalid choice
     if (!cats.length) sp(g, ctx, "menu_empty");
     for (const c of cats) {
       sp(g, ctx, "menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
@@ -399,22 +373,13 @@ const handlers: Record<string, Handler> = {
   },
 
   async "book-choice"(ctx, vr) {
-    const d = ctx.body.Digits;
-    const said = (ctx.body.SpeechResult || "").trim();
-    if (!d && said) {
-      const choice = matchMenuSpeech(said, await phoneCategories());
-      if (choice?.kind === "category") return back(vr, "category", { c: choice.categoryId });
-      if (choice?.kind === "cart") return back(vr, "cart");
-      if (choice?.kind === "operator") return back(vr, "ring", { k: "0" });
-      sp(vr, ctx, "invalid");
-      return back(vr, "book");
-    }
+    const d = ctx.body.Digits; // keys only (Abraham)
     if (!d) return noInput(vr, ctx, "book", {});
     if (d === "*") return back(vr, "menu");
     if (d === "9") return back(vr, "cart");
     const cat = (await phoneCategories()).find((c) => String(c.ivrDigit) === d);
     if (!cat) {
-      sp(vr, ctx, "invalid");
+      sp(vr, ctx, "not_valid");
       return back(vr, "book");
     }
     return back(vr, "category", { c: cat.id });
@@ -443,7 +408,7 @@ const handlers: Record<string, Handler> = {
     const items = await phoneProducts(c);
     const p = items[Number(d) - 1];
     if (!p) {
-      sp(vr, ctx, "invalid");
+      sp(vr, ctx, "not_valid");
       return back(vr, "category", { c });
     }
     return back(vr, "product", { p: p.id });
@@ -475,7 +440,7 @@ const handlers: Record<string, Handler> = {
       if (order) return back(vr, "qty", { p: p.id, d: order.order.eventDate });
       return back(vr, "date", { p: p.id });
     }
-    sp(vr, ctx, "invalid");
+    sp(vr, ctx, "not_valid");
     return back(vr, "product", { p: p.id, again: 1 });
   },
 

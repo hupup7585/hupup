@@ -33,7 +33,7 @@ export const PROMPTS = {
   main_0: { group: "Welcome & main menu", label: "Main menu key 0 (Abraham)", text: "To speak with an operator, press 0." },
   main_star_again: { group: "Welcome & main menu", label: "Main menu: hear it again (Abraham)", text: "To hear this menu again, press the star key." },
   main_thanks: { group: "Welcome & main menu", label: "Main menu: closing line (Abraham)", text: "Thank you for choosing Hup Up Attractions. We look forward to serving you!" },
-  main_not_valid: { group: "Welcome & main menu", label: "Main menu: a key with no action (Abraham)", text: "Sorry, that is not a valid selection. Please try again." },
+  not_valid: { group: "Welcome & main menu", label: "Any menu: a key that is not a choice (Abraham)", text: "Sorry, that is not a valid selection. Please try again." },
   menu_category: { group: "Welcome & main menu", label: "Menu option for a category", text: "For {category}, press {key}.", vars: ["category", "key"] },
   menu_cart: { group: "Welcome & main menu", label: "Menu option: review cart", text: "Ready to check out? Press 9 to hear your cart." },
   menu_operator: { group: "Welcome & main menu", label: "Menu option: talk to a person", text: "To talk with someone from our team, press 0." },
@@ -44,7 +44,6 @@ export const PROMPTS = {
   // Errors & retries
   no_input: { group: "Errors & retries", label: "Didn't hear anything", text: "Sorry, I didn't catch that. No problem, let's try that again." },
   no_input_final: { group: "Errors & retries", label: "Giving up after no input", text: "It sounds like we got disconnected. Please call us back anytime, we'd love to help. Thanks for calling Hup Up Attractions. Bye for now!" },
-  invalid: { group: "Errors & retries", label: "Pressed a wrong key", text: "Oops, that's not one of the choices. No problem, let's try again." },
   tech_error: { group: "Errors & retries", label: "Technical problem", text: "Oops, something went wrong on our end. Please call back in a few minutes. Sorry about that!" },
   went_wrong: { group: "Errors & retries", label: "Something went wrong, back to menu", text: "Sorry, something went wrong. Let's head back to the main menu." },
 

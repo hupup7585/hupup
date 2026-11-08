@@ -68,7 +68,7 @@ describe("Abraham's main menu wording (approved Nov 8, 2026)", () => {
     expect(incoming).not.toContain("<Say"); // nothing plays before the keypad listens
     const xml = await call("menu", {}, "first=1");
     expect(saidIn(xml)).toEqual([GREETING, ...MENU]); // word for word, in order, all inside one Gather
-    expect(gatherOf(xml)).toMatch(/<Gather [^>]*input="dtmf speech"[^>]*numDigits="1"/);
+    expect(gatherOf(xml)).toMatch(/<Gather [^>]*input="dtmf"[^>]*numDigits="1"/); // keys only
     expect(gatherOf(xml).split("pause-750ms.wav").length - 1).toBe(MENU.length); // 0.75 s after each line
   });
   it("any valid key works at any time: the whole menu, greeting included, is one Gather", async () => {
@@ -77,9 +77,8 @@ describe("Abraham's main menu wording (approved Nov 8, 2026)", () => {
     expect(xml.indexOf("</Gather>")).toBeGreaterThan(xml.lastIndexOf(MENU[MENU.length - 1]));
     for (const k of ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "*"]) expect(await press(k)).not.toContain("Oops");
   });
-  it("star (or saying 'repeat') replays the entire main menu, from the greeting", async () => {
+  it("star replays the entire main menu, from the greeting", async () => {
     expect(redirect(await press("*"))).toBe("menu?first=1");
-    expect(redirect(await call("menu-choice", { SpeechResult: "repeat", Confidence: "0.9" }))).toBe("menu?first=1");
     expect(saidIn(await call("menu", {}, "first=1"))).toEqual([GREETING, ...MENU]);
   });
   it("waits 4 seconds after the last line; no choice replays the whole menu; after 3 plays, the goodbye line and hang up", async () => {
@@ -153,6 +152,49 @@ describe("every key, office open", () => {
     expect(book).toContain("To go back to the main menu, press star.");
     expect(redirect(await call("book-choice", { Digits: "9" }))).toBe("cart");
     expect(redirect(await call("book-choice", { Digits: "*" }))).toBe("menu");
+  });
+});
+
+describe("menus are keys only (Abraham): no speech in any menu", () => {
+  const OLD_OOPS = "Oops, that's not one of the choices. No problem, let's try again.";
+  const NOT_VALID = "Sorry, that is not a valid selection. Please try again.";
+  it("the main menu and the key 1 rental list listen for keys only, and # comes in as a key", async () => {
+    for (const xml of [await call("menu", {}, "first=1"), await call("book")]) {
+      const tag = xml.match(/<Gather [^>]*>/)![0];
+      expect(tag).toContain('input="dtmf"');
+      expect(tag).not.toMatch(/speech|hints=/);
+      expect(tag).toContain('finishOnKey=""');
+    }
+  });
+  it("anything a caller says in a menu is ignored (counts as no choice); the old Oops line is gone", async () => {
+    const xml = await call("menu-choice", { SpeechResult: "jumping balloons", Confidence: "0.9" });
+    expect(redirect(xml)).toBe("menu?first=1&n=1");
+    expect(xml).not.toContain("Oops");
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    expect(Object.values(PROMPTS).map((p) => p.text)).not.toContain(OLD_OOPS);
+  });
+  it("# and other wrong keys in every menu: Abraham's approved line, then that menu again", async () => {
+    const [cat] = await db.insert(schema.categories).values({ name: "Paddle Boats", spokenName: "Paddle Boats", ivrDigit: 3, sortOrder: 3, active: true }).returning();
+    const [prod] = await db.insert(schema.products).values({ categoryId: cat.id, name: "Paddle Boat", priceCents: 4500, quantity: 8, active: true, sortOrder: 1 }).returning();
+    const cases: [string, Record<string, string>, string, string][] = [
+      ["menu-choice", { Digits: "#" }, "", "menu"],
+      ["book-choice", { Digits: "#" }, "", "book"],
+      ["book-choice", { Digits: "7" }, "", "book"],
+      ["category-choice", { Digits: "#" }, `c=${cat.id}`, `category?c=${cat.id}`],
+      ["product-choice", { Digits: "#" }, `p=${prod.id}`, `product?p=${prod.id}&again=1`],
+    ];
+    for (const [action, body, query, back] of cases) {
+      const xml = await call(action, body, query);
+      expect(xml, action).toContain(NOT_VALID);
+      expect(xml, action).not.toContain("Oops");
+      expect(redirect(xml), action).toBe(back);
+    }
+  });
+  it("speech stays only where a prompt asks the caller to say something", async () => {
+    const { readFileSync } = await import("node:fs");
+    const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
+    expect(flow).not.toContain("category-speech");
+    expect((flow.match(/= speech\(vr, url\("(\w|-)+"/g) || []).map((m) => m.match(/url\("([\w-]+)"/)![1]).sort()).toEqual(["date-heard", "heard", "promo-consent-answer", "sms-consent-answer"]);
   });
 });
 
