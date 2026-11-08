@@ -253,25 +253,16 @@ const handlers: Record<string, Handler> = {
       return vr;
     }
     await ensureSession(ctx.callSid, ctx.from);
-    sp(vr, ctx, "greeting");
-    // Booking by phone is available 24/7; outside office hours (Jewish calendar + business hours) callers are told
-    // the office is closed and the live-person option is not offered.
-    const settings = await getSettings();
-    if (!officeOpenNow(new Date(), settings)) sp(vr, ctx, "office_closed");
-    else {
-      // Chol Hamoed and Chanukah: Abraham's approved "open late" line (no closing time is spoken).
-      const late = lateHoursToday(new Date(), settings);
-      if (late === "cholHamoed") sp(vr, ctx, "late_cholhamoed");
-      else if (late === "chanukah") sp(vr, ctx, "late_chanukah");
-    }
-    shortPause(vr); // three-quarters of a second after the greeting, before the menu options (Abraham)
-    return back(vr, "menu");
+    // The greeting is part of the main menu so callers can press a key at any time, even during the greeting.
+    return back(vr, "menu", { first: 1 });
   },
 
   /**
-   * Abraham's main menu. 1 bookings (rental list), 2/4/5/6/0 ring a live employee (each key's own list), 9 general
-   * voicemail, * repeats. Until Abraham approves their messages: 3 opens the rental list, 7 rings the operator.
-   * Voice commands keep working in the background (not announced).
+   * Abraham's main menu (approved Nov 8, 2026). 1 bookings (rental list), 2/4/5/6/8/0 ring a live employee (each
+   * key's own list), 9 general voicemail, * repeats. Until Abraham approves their messages: 3 opens the rental list,
+   * 7 rings the operator. Voice commands keep working in the background (not announced).
+   * On the first pass (?first=1, from the incoming call) the greeting and the closed / open-late line play inside the
+   * same Gather, so a key pressed during the greeting works. Replays (star, a wrong key, silence) skip the greeting.
    */
   async menu(ctx, vr) {
     const cats = await phoneCategories();
@@ -287,10 +278,37 @@ const handlers: Record<string, Handler> = {
       speechTimeout: "auto",
       hints: menuSpeechHints(cats),
     });
-    const keys = ["main_1", "main_2", "main_3", "main_4", "main_5", "main_6", "main_7", "main_9", "main_0"] as const;
-    keys.forEach((k, i) => {
+    if (ctx.query.get("first") === "1") {
+      sp(g, ctx, "greeting");
+      shortPause(g);
+      // Booking by phone is available 24/7; outside office hours (Jewish calendar + business hours) callers are told
+      // the office is closed. Chol Hamoed and Chanukah: Abraham's approved "open late" line.
+      const settings = await getSettings();
+      const late = lateHoursToday(new Date(), settings);
+      const status = !officeOpenNow(new Date(), settings) ? "office_closed" : late === "cholHamoed" ? "late_cholhamoed" : late === "chanukah" ? "late_chanukah" : null;
+      if (status) {
+        sp(g, ctx, status);
+        shortPause(g);
+      }
+    }
+    const lines = [
+      "main_extension",
+      "main_book",
+      "main_equipment",
+      "main_learn",
+      "main_service",
+      "main_rental_help",
+      "main_6",
+      "main_hours",
+      "main_organizations",
+      "main_9",
+      "main_0",
+      "main_star",
+      "main_thanks",
+    ] as const;
+    lines.forEach((k, i) => {
       sp(g, ctx, k);
-      if (i < keys.length - 1) shortPause(g); // 0.75 s between options (Abraham)
+      if (i < lines.length - 1) shortPause(g); // 0.75 s after each line (Abraham)
     });
     return noInput(vr, ctx, "menu");
   },
@@ -315,10 +333,11 @@ const handlers: Record<string, Handler> = {
         return back(vr, "book");
       case "3": // stand-in until Abraham approves the key 3 message
         return back(vr, "book");
-      case "2":
+      case "2": // equipment instructions and guidance (own list; empty rings the operator list)
       case "4":
       case "5":
       case "6":
+      case "8": // schools, corporate events and organizations (the list key 2 had before)
       case "0":
         return back(vr, "ring", { k: d });
       case "7": // stand-in until Abraham approves the key 7 hours message
@@ -899,7 +918,7 @@ const handlers: Record<string, Handler> = {
   },
 
   /**
-   * Ring a live employee for main-menu key k (2, 4, 5, 6 or 0), using that key's list from Settings (an empty list
+   * Ring a live employee for main-menu key k (2, 4, 5, 6, 8 or 0), using that key's list from Settings (an empty list
    * rings the operator list). Each person must press 1 to take the call. Office closed or no one to ring: Abraham's
    * missed-call line, then the general voicemail.
    */

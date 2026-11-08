@@ -18,15 +18,21 @@ export const PROMPTS = {
   // Welcome & main menu
   // Abraham's exact main menu (greeting, then one line per key, with a 0.75-second pause after each)
   greeting: { group: "Welcome & main menu", label: "Welcome greeting (Abraham)", text: "Hi! Thank you for calling Hup Up Attractions, bringing something special to every occasion!" },
-  main_1: { group: "Welcome & main menu", label: "Main menu key 1 (Abraham)", text: "For bookings with our automatic easy system, press 1." },
-  main_2: { group: "Welcome & main menu", label: "Main menu key 2 (Abraham)", text: "For corporates & organizations, press 2." },
-  main_3: { group: "Welcome & main menu", label: "Main menu key 3 (Abraham)", text: "To learn more about our entertainment rentals, press 3." },
-  main_4: { group: "Welcome & main menu", label: "Main menu key 4 (Abraham)", text: "For customer service, press 4." },
-  main_5: { group: "Welcome & main menu", label: "Main menu key 5 (Abraham)", text: "For questions or problems during your rental, press 5." },
+  // Abraham's main menu, approved Nov 8, 2026 (word for word). Lines with new wording have new names, so an old
+  // recording or edit saved for a different meaning can never play by mistake.
+  main_extension: { group: "Welcome & main menu", label: "Main menu: press your extension any time (Abraham)", text: "If you know your desired extension, you may press it at any time." },
+  main_book: { group: "Welcome & main menu", label: "Main menu key 1 (Abraham)", text: "For reservations and bookings, press 1." },
+  main_equipment: { group: "Welcome & main menu", label: "Main menu key 2 (Abraham)", text: "For instructions and guidance on using our rental equipment, press 2." },
+  main_learn: { group: "Welcome & main menu", label: "Main menu key 3 (Abraham)", text: "To learn more about our rental attractions and the services we offer, press 3." },
+  main_service: { group: "Welcome & main menu", label: "Main menu key 4 (Abraham)", text: "For customer service and general inquiries, press 4." },
+  main_rental_help: { group: "Welcome & main menu", label: "Main menu key 5 (Abraham)", text: "For questions or assistance with any issues during your rental, press 5." },
   main_6: { group: "Welcome & main menu", label: "Main menu key 6 (Abraham)", text: "For delivery and pickup information, press 6." },
-  main_7: { group: "Welcome & main menu", label: "Main menu key 7 (Abraham)", text: "For our hours of operation, press 7." },
+  main_hours: { group: "Welcome & main menu", label: "Main menu key 7 (Abraham)", text: "To hear our hours of operation, press 7." },
+  main_organizations: { group: "Welcome & main menu", label: "Main menu key 8 (Abraham)", text: "For schools, corporate events, and organizational bookings, press 8." },
   main_9: { group: "Welcome & main menu", label: "Main menu key 9 (Abraham)", text: "To leave a message in our general voicemail, press 9." },
   main_0: { group: "Welcome & main menu", label: "Main menu key 0 (Abraham)", text: "To speak with an operator, press 0." },
+  main_star: { group: "Welcome & main menu", label: "Main menu: hear it again (Abraham)", text: "To hear the menu again, press the star key." },
+  main_thanks: { group: "Welcome & main menu", label: "Main menu: closing line (Abraham)", text: "Thank you for choosing Hup Up Attractions. We look forward to serving you!" },
   main_invalid: { group: "Welcome & main menu", label: "Main menu: a key with no action (Abraham)", text: "Oops, that's not an option. Let's try that again!" },
   menu_category: { group: "Welcome & main menu", label: "Menu option for a category", text: "For {category}, press {key}.", vars: ["category", "key"] },
   menu_cart: { group: "Welcome & main menu", label: "Menu option: review cart", text: "Ready to check out? Press 9 to hear your cart." },

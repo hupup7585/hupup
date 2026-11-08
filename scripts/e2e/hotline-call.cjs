@@ -82,7 +82,7 @@ const addDays = (n) => {
   ]);
   const all = run.said.join(" | ");
   if (process.env.E2E_DEBUG) console.log("DEBUG", JSON.stringify({ error: run.error, open: run.open, hungUp: run.hungUp, said: run.said.slice(0, 4), xml: (run.xml || "").slice(0, 300) }));
-  check("call: greeting and menu spoken", /Thank you for calling Hup Up Attractions/i.test(all) && /For bookings with our automatic easy system, press 1/i.test(all) && /For Jumping Balloons, press 1/i.test(all));
+  check("call: greeting and menu spoken", /Thank you for calling Hup Up Attractions/i.test(all) && /For reservations and bookings, press 1/i.test(all) && /For schools, corporate events, and organizational bookings, press 8/i.test(all) && /For Jumping Balloons, press 1/i.test(all));
   check("call: item added, held for the call", /I added one/i.test(all));
   check("call: order-text consent question asked", /Can Hup Up Attractions text you at this number/i.test(all));
   check("call: terms notice played", all.includes("By pressing #, you agree to our Terms and Conditions"));

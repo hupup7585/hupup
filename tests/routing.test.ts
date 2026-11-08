@@ -95,14 +95,12 @@ describe("the staff member's side", () => {
 describe("pauses between menu options (Abraham)", () => {
   it("three-quarters of a second after the greeting and between options (750 ms silent clip)", async () => {
     const pause = "<Play>https://hupup.example/audio/pause-750ms.wav</Play>";
-    const greet = await call("incoming");
-    expect(greet).toContain(`${pause}<Redirect`);
-    expect(greet).not.toContain("<Pause");
-    const xml = await call("menu");
+    // The greeting now opens the main menu (first pass): a pause after it and between every line, none after the last
+    const xml = await call("menu", {}, "first=1");
     const menu = xml.slice(xml.indexOf("<Gather"), xml.indexOf("</Gather>"));
-    const options = (menu.match(/<Say /g) || []).length;
-    expect(options).toBeGreaterThan(1);
-    expect(menu.split(pause).length - 1).toBe(options - 1); // between options, not after "press star"
+    const lines = (menu.match(/<Say /g) || []).length;
+    expect(lines).toBeGreaterThan(1);
+    expect(menu.split(pause).length - 1).toBe(lines - 1);
     expect(menu).not.toContain("<Pause");
   });
   it("the clip is exactly 0.75 seconds of silence", async () => {

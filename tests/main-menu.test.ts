@@ -38,28 +38,49 @@ beforeEach(async () => {
   await saveSetting("operatorTargets", "Operator | (845) 777-7585 | 20");
   await saveSetting("operatorMode", "sequential");
   await saveSetting("operatorAcceptPrompt", true);
-  await saveSetting("ringTargets2", "Corporate desk | (845) 555-0102 | 25");
-  for (const k of ["4", "5", "6"] as const) await saveSetting(`ringTargets${k}`, "");
+  await saveSetting("ringTargets8", "Corporate desk | (845) 555-0102 | 25");
+  for (const k of ["2", "4", "5", "6"] as const) await saveSetting(`ringTargets${k}`, "");
 });
 
-describe("Abraham's main menu wording", () => {
-  it("greeting, then every option exactly as dictated, with a 0.75-second pause between them", async () => {
-    expect(await call("incoming")).toContain("Hi! Thank you for calling Hup Up Attractions, bringing something special to every occasion!");
-    const xml = await call("menu");
-    const menu = xml.slice(xml.indexOf("<Gather"), xml.indexOf("</Gather>"));
-    const said = [...menu.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&amp;/g, "&"));
-    expect(said).toEqual([
-      "For bookings with our automatic easy system, press 1.",
-      "For corporates & organizations, press 2.",
-      "To learn more about our entertainment rentals, press 3.",
-      "For customer service, press 4.",
-      "For questions or problems during your rental, press 5.",
-      "For delivery and pickup information, press 6.",
-      "For our hours of operation, press 7.",
-      "To leave a message in our general voicemail, press 9.",
-      "To speak with an operator, press 0.",
-    ]);
-    expect(menu.split("pause-750ms.wav").length - 1).toBe(8);
+const MENU = [
+  "If you know your desired extension, you may press it at any time.",
+  "For reservations and bookings, press 1.",
+  "For instructions and guidance on using our rental equipment, press 2.",
+  "To learn more about our rental attractions and the services we offer, press 3.",
+  "For customer service and general inquiries, press 4.",
+  "For questions or assistance with any issues during your rental, press 5.",
+  "For delivery and pickup information, press 6.",
+  "To hear our hours of operation, press 7.",
+  "For schools, corporate events, and organizational bookings, press 8.",
+  "To leave a message in our general voicemail, press 9.",
+  "To speak with an operator, press 0.",
+  "To hear the menu again, press the star key.",
+  "Thank you for choosing Hup Up Attractions. We look forward to serving you!",
+];
+const GREETING = "Hi! Thank you for calling Hup Up Attractions, bringing something special to every occasion!";
+const gatherOf = (xml: string) => xml.slice(xml.indexOf("<Gather"), xml.indexOf("</Gather>"));
+const saidIn = (xml: string) => [...gatherOf(xml).matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&amp;/g, "&"));
+
+describe("Abraham's main menu wording (approved Nov 8, 2026)", () => {
+  it("the call starts with the greeting inside the menu, so a key pressed during the greeting works", async () => {
+    const incoming = await call("incoming");
+    expect(redirect(incoming)).toBe("menu?first=1");
+    expect(incoming).not.toContain("<Say"); // nothing plays before the keypad listens
+    const xml = await call("menu", {}, "first=1");
+    expect(saidIn(xml)).toEqual([GREETING, ...MENU]); // word for word, in order, all inside one Gather
+    expect(gatherOf(xml)).toMatch(/<Gather [^>]*input="dtmf speech"[^>]*numDigits="1"/);
+    expect(gatherOf(xml).split("pause-750ms.wav").length - 1).toBe(MENU.length); // 0.75 s after each line
+  });
+  it("star, a wrong key or silence replays the menu without the greeting", async () => {
+    expect(redirect(await press("*"))).toBe("menu");
+    expect(saidIn(await call("menu"))).toEqual(MENU);
+  });
+  it("office closed: the approved closed line plays right after the greeting, inside the menu", async () => {
+    h.open = false;
+    const said = saidIn(await call("menu", {}, "first=1"));
+    expect(said[0]).toBe(GREETING);
+    expect(said[1]).toBe("Our office is closed right now, but you can book anytime using this automated system.");
+    expect(said.slice(2)).toEqual(MENU);
   });
 });
 
@@ -68,18 +89,22 @@ describe("every key, office open", () => {
     expect(redirect(await press("1"))).toBe("book");
     expect(redirect(await press("3"))).toBe("book");
   });
-  it("2, 4, 5, 6 and 0 ring a live employee; 7 rings the operator until its message is approved", async () => {
-    for (const k of ["2", "4", "5", "6", "0"]) expect(redirect(await press(k))).toBe(`ring?k=${k}`);
+  it("2, 4, 5, 6, 8 and 0 ring a live employee; 7 rings the operator until its message is approved", async () => {
+    for (const k of ["2", "4", "5", "6", "8", "0"]) expect(redirect(await press(k))).toBe(`ring?k=${k}`);
     expect(redirect(await press("7"))).toBe("ring?k=0");
   });
-  it("2 rings its own list; 4, 5 and 6 (empty) fall back to the operator list; press 1 to accept", async () => {
-    const two = await call("ring", {}, "k=2");
-    expect(two).toContain(">+18455550102</Number>");
-    expect(two).toContain("whisper");
-    for (const k of ["4", "5", "6", "0"]) expect(await call("ring", {}, `k=${k}`)).toContain(">+18457777585</Number>");
+  it("8 rings the corporate list key 2 used to ring; 2 (equipment, empty), 4, 5 and 6 fall back to the operator list", async () => {
+    const eight = await call("ring", {}, "k=8");
+    expect(eight).toContain(">+18455550102</Number>");
+    expect(eight).toContain("whisper");
+    for (const k of ["2", "4", "5", "6", "0"]) expect(await call("ring", {}, `k=${k}`)).toContain(">+18457777585</Number>");
+  });
+  it("2 rings its own list once the owner adds one", async () => {
+    await saveSetting("ringTargets2", "Equipment help | (845) 555-0123 | 20");
+    expect(await call("ring", {}, "k=2")).toContain(">+18455550123</Number>");
   });
   it("no one answers: Abraham's missed-call line, then the general voicemail beep", async () => {
-    const xml = await call("operator-done", { DialCallStatus: "no-answer" }, "i=0&k=2");
+    const xml = await call("operator-done", { DialCallStatus: "no-answer" }, "i=0&k=8");
     expect(xml).toContain(MISSED);
     expect(redirect(xml)).toBe("voicemail?after=1");
   });
@@ -89,10 +114,10 @@ describe("every key, office open", () => {
     expect(vm).toMatch(/<Record /);
     expect(vm).not.toContain("<Dial");
   });
-  it("8 is not an option: Abraham's line, then the main menu again; star repeats the menu", async () => {
-    const eight = await press("8");
-    expect(eight).toContain("Oops, that's not an option. Let's try that again!");
-    expect(redirect(eight)).toBe("menu");
+  it("# is not an option: Abraham's line, then the main menu again; star repeats the menu", async () => {
+    const hash = await press("#");
+    expect(hash).toContain("Oops, that's not an option. Let's try that again!");
+    expect(redirect(hash)).toBe("menu");
     expect(redirect(await press("*"))).toBe("menu");
   });
   it("the rental list uses the existing lines; 9 there is the cart and star goes back", async () => {
@@ -106,11 +131,11 @@ describe("every key, office open", () => {
 });
 
 describe("every key, office closed", () => {
-  it("1 and 3 still book (24/7); 2, 4, 5, 6, 7 and 0 play the missed-call line and go to voicemail; 9 is voicemail", async () => {
+  it("1 and 3 still book (24/7); 2, 4, 5, 6, 7, 8 and 0 play the missed-call line and go to voicemail; 9 is voicemail", async () => {
     h.open = false;
     expect(redirect(await press("1"))).toBe("book");
     expect(redirect(await press("3"))).toBe("book");
-    for (const k of ["2", "4", "5", "6", "0"]) {
+    for (const k of ["2", "4", "5", "6", "8", "0"]) {
       const xml = await call("ring", {}, `k=${k}`);
       expect(xml).toContain(MISSED);
       expect(xml).not.toContain("<Dial");

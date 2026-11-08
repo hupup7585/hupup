@@ -64,8 +64,9 @@ export const SETTING_DEFAULTS = {
   operatorAcceptPrompt: true,
   operatorAcceptText: "Call from the Hup Up Attractions hotline. To accept, press 1. To pass, press 2.",
   /*
-   * Ring lists for main-menu keys 2 (corporates & organizations), 4 (customer service), 5 (problems during a
-   * rental) and 6 (delivery and pickup). Same format as operatorTargets. Empty = ring the operator list (key 0).
+   * Ring lists for main-menu keys 2 (equipment instructions and guidance), 4 (customer service), 5 (issues during a
+   * rental), 6 (delivery and pickup) and 8 (schools, corporate events and organizations; the list key 2 had before
+   * Nov 8, 2026). Same format as operatorTargets. Empty = ring the operator list (key 0).
    */
   ringTargets2: "",
   ringMode2: "sequential",
@@ -79,6 +80,9 @@ export const SETTING_DEFAULTS = {
   ringTargets6: "",
   ringMode6: "sequential",
   ringAccept6: true,
+  ringTargets8: "",
+  ringMode8: "sequential",
+  ringAccept8: true,
   /**
    * Caller blocking (checked first on every call). One per line: pattern | note.
    * Patterns: an exact number, * for any digits (+1845*), ? for one digit (+1845555????), or "withheld".

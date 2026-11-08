@@ -29,7 +29,7 @@ export default async function SettingsPage() {
         <CalendarSettingsForm initial={calInitial} />
       </section>
       <section className="card mb-6 p-5" id="routing">
-        <h2 className="mb-1 text-lg font-extrabold">Live employee ring lists (main menu keys 2, 4, 5, 6 and 0)</h2>
+        <h2 className="mb-1 text-lg font-extrabold">Live employee ring lists (main menu keys 2, 4, 5, 6, 8 and 0)</h2>
         <p className="mb-4 text-sm text-muted">Key 9 goes straight to the general voicemail, no ringing.</p>
         <div className="grid gap-8">
           {RING_KEYS.map((k) => {

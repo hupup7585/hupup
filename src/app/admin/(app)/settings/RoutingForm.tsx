@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { saveRoutingAction } from "./routing-actions";
+import type { RingKey } from "@/lib/ivr/routing";
 
 /** One main-menu key's ring list: numbers, order or all at once, and the press-1 accept step. */
 export default function RoutingForm({
@@ -9,7 +10,7 @@ export default function RoutingForm({
   initial,
   summary,
 }: {
-  ringKey: "2" | "4" | "5" | "6" | "0";
+  ringKey: RingKey;
   initial: { targets: string; mode: string; accept: boolean; acceptText?: string };
   summary: string;
 }) {

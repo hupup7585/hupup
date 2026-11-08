@@ -22,7 +22,8 @@ const at = (iso: string) => new Date(iso); // EST = UTC-5 in December
 const greet = async (iso: string) => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(iso));
-  return handleVoice({ action: "incoming", query: new URLSearchParams(), body: { CallSid: "CAlate" }, callSid: "CAlate", from: "+18455550100" });
+  // The greeting and its open-late / closed line play at the top of the main menu (first pass), so a key works any time
+  return handleVoice({ action: "menu", query: new URLSearchParams("first=1"), body: { CallSid: "CAlate" }, callSid: "CAlate", from: "+18455550100" });
 };
 afterEach(() => vi.useRealTimers());
 

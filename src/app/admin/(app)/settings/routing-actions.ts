@@ -13,7 +13,7 @@ function names(k: RingKey) {
     : ({ targets: `ringTargets${k}`, mode: `ringMode${k}`, accept: `ringAccept${k}` } as const);
 }
 
-/** Owner only: who rings for a main-menu key (2, 4, 5, 6 or 0). Validated and audited. */
+/** Owner only: who rings for a main-menu key (2, 4, 5, 6, 8 or 0). Validated and audited. */
 export async function saveRoutingAction(_prev: { ok?: boolean; message?: string } | null, form: FormData): Promise<{ ok?: boolean; message?: string }> {
   const owner = await requireOwner();
   const k = String(form.get("ringKey") || "0") as RingKey;

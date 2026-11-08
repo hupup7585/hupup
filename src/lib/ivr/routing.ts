@@ -48,22 +48,23 @@ export function routeSummary(targets: RouteTarget[], mode: string) {
 }
 
 /** Main-menu keys that ring a live employee. "0" is the operator list (operatorTargets). */
-export const RING_KEYS = ["2", "4", "5", "6", "0"] as const;
+export const RING_KEYS = ["2", "4", "5", "6", "8", "0"] as const;
 export type RingKey = (typeof RING_KEYS)[number];
 export const RING_KEY_LABELS: Record<RingKey, string> = {
-  "2": "Key 2: Corporates & organizations",
+  "2": "Key 2: Equipment instructions and guidance",
   "4": "Key 4: Customer service",
   "5": "Key 5: Questions or problems during a rental",
   "6": "Key 6: Delivery and pickup information",
+  "8": "Key 8: Schools, corporate events and organizations",
   "0": "Key 0: Operator",
 };
 
 type RingSettings = Pick<Settings, "operatorTargets" | "operatorMode" | "operatorAcceptPrompt"> &
-  Partial<Record<`ringTargets${"2" | "4" | "5" | "6"}`, string>> &
-  Partial<Record<`ringMode${"2" | "4" | "5" | "6"}`, string>> &
-  Partial<Record<`ringAccept${"2" | "4" | "5" | "6"}`, boolean>>;
+  Partial<Record<`ringTargets${"2" | "4" | "5" | "6" | "8"}`, string>> &
+  Partial<Record<`ringMode${"2" | "4" | "5" | "6" | "8"}`, string>> &
+  Partial<Record<`ringAccept${"2" | "4" | "5" | "6" | "8"}`, boolean>>;
 
-/** The list a key rings. An empty list for 2, 4, 5 or 6 falls back to the operator list (0). */
+/** The list a key rings. An empty list for 2, 4, 5, 6 or 8 falls back to the operator list (0). */
 export function ringListFor(s: RingSettings, key: RingKey): { targets: RouteTarget[]; mode: string; accept: boolean; usesOperatorList: boolean } {
   if (key !== "0") {
     const own = parseTargets(s[`ringTargets${key}`] || "").targets;
