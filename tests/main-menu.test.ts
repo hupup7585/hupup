@@ -109,12 +109,13 @@ describe("Abraham's main menu wording (approved Nov 8, 2026)", () => {
 });
 
 describe("every key, office open", () => {
-  it("1 opens the rental list; 3 does too until its message is approved", async () => {
+  it("1 opens the rental list; 2 opens instructions and 3 learn about our rentals (Abraham W)", async () => {
     expect(redirect(await press("1"))).toBe("book");
-    expect(redirect(await press("3"))).toBe("book");
+    expect(redirect(await press("2"))).toBe("instructions");
+    expect(redirect(await press("3"))).toBe("learn");
   });
-  it("2, 4, 5, 6, 8 and 0 ring a live employee; 7 rings the operator until its message is approved", async () => {
-    for (const k of ["2", "4", "5", "6", "8", "0"]) expect(redirect(await press(k))).toBe(`ring?k=${k}`);
+  it("4, 5, 6, 8 and 0 ring a live employee; 7 rings the operator until its message is approved", async () => {
+    for (const k of ["4", "5", "6", "8", "0"]) expect(redirect(await press(k))).toBe(`ring?k=${k}`);
     expect(redirect(await press("7"))).toBe("ring?k=0");
   });
   it("8 rings the corporate list key 2 used to ring; 2 (equipment, empty), 4, 5 and 6 fall back to the operator list", async () => {
@@ -244,10 +245,11 @@ describe("menus are keys only (Abraham): no speech in any menu", () => {
 });
 
 describe("every key, office closed", () => {
-  it("1 and 3 still book (24/7); 2, 4, 5, 6, 7, 8 and 0 play the missed-call line and go to voicemail; 9 is voicemail", async () => {
+  it("1 books and 2 and 3 play their information 24/7; 4, 5, 6, 7, 8 and 0 play the missed-call line and go to voicemail; 9 is voicemail", async () => {
     h.open = false;
     expect(redirect(await press("1"))).toBe("book");
-    expect(redirect(await press("3"))).toBe("book");
+    expect(redirect(await press("2"))).toBe("instructions");
+    expect(redirect(await press("3"))).toBe("learn");
     for (const k of ["2", "4", "5", "6", "8", "0"]) {
       const xml = await call("ring", {}, `k=${k}`);
       expect(xml).toContain(MISSED);

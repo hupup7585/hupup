@@ -34,6 +34,46 @@ export const PROMPTS = {
   main_star_again: { group: "Welcome & main menu", label: "Main menu: hear it again (Abraham)", text: "To hear this menu again, press the star key." },
   main_thanks: { group: "Welcome & main menu", label: "Main menu: closing line (Abraham)", text: "Thank you for choosing Hup Up Attractions. We look forward to serving you!" },
   not_valid: { group: "Welcome & main menu", label: "Any menu: a key that is not a choice (Abraham)", text: "Sorry, that is not a valid selection. Please try again." },
+  // Main menu key 2 (Abraham W): instructions for each type of attraction. Editable here like every other prompt.
+  attraction_choice: { group: "Key 2: Instructions", label: "Which attraction (keys 2 and 3, Abraham)", text: "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3." },
+  attraction_menu_back: { group: "Key 2: Instructions", label: "Which attraction: star for the main menu", text: "To go back to the main menu, press the star key." },
+  instr_intro: { group: "Key 2: Instructions", label: "Key 2 opening line", text: "We're happy to help you get the most out of your rental." },
+  instr_balloons: {
+    group: "Key 2: Instructions",
+    label: "Instructions: jumping balloons",
+    text: "Here's how to enjoy your jumping balloon safely. Setup: our team sets it up on a flat, open area, away from trees, fences, power lines and anything sharp. Keep the blower running and its cord and air tube clear the whole time it's in use. Safe use: everyone takes off their shoes, glasses and anything in their pockets. No food, drinks, gum, silly string or sharp toys inside. Keep big and small children apart, and don't overcrowd it. No flips, wrestling or climbing on the walls. Supervision: a responsible adult must watch the jumping balloon at all times while it's in use. Please follow the age and rider limits printed on the unit. Weather: if the wind picks up, if it rains, or if you hear thunder, have everyone get out right away and unplug the blower. Getting ready for pickup: make sure everyone is out, unplug the blower, remove any toys or trash, and leave the unit where it is. We'll take care of folding it. Thank you!",
+  },
+  instr_laser: {
+    group: "Key 2: Instructions",
+    label: "Instructions: laser tag",
+    text: "Here's how to enjoy your laser tag safely. Setup: our team sets up the maze and gets the blasters and vests ready. Keep the blower running and its cord clear, and charge the equipment as our team shows you. Safe use: players walk, never run, inside the maze, and no shoes inside the inflatable. Never point the blasters at anyone's eyes up close, and keep vests fastened. No food or drinks inside. Supervision: a responsible adult must supervise the game at all times. Laser tag is best for children around age six and up, and teens and adults love it too. Weather: if it gets windy, starts to rain, or you hear thunder, stop the game, have everyone get out, and unplug the blower. Bring the blasters and vests inside, out of the rain. Getting ready for pickup: collect every blaster and vest, count them, and put them back in their bins. Make sure the maze is empty and unplugged. We'll take care of the rest. Thank you!",
+  },
+  instr_paddle: {
+    group: "Key 2: Instructions",
+    label: "Instructions: paddle boats",
+    text: "Here's how to enjoy your paddle boats safely. Setup: our team places the boats in the pool or water area and shows you how they work. Safe use: one rider per boat, unless the boat says otherwise. Riders stay seated, keep their hands and feet inside, and never stand up or bump boats hard. Children who can't swim should wear a life jacket. Supervision: a responsible adult must watch the water at all times while the boats are in use, and stay close enough to reach a child right away. Please follow the age and weight limits on each boat. Weather: if it gets windy, starts to rain, or you hear thunder, have everyone get out of the water right away. Getting ready for pickup: take the boats out of the water if you can, line them up in one place, and remove any toys or trash. We'll take care of the rest. Thank you!",
+  },
+  attraction_after: { group: "Key 2: Instructions", label: "After instructions or a description: options (keys 2 and 3)", text: "To hear this again, press the star key. To choose another attraction, press 1. To go back to the main menu, press 2." },
+  // Main menu key 3 (Abraham W): a description of each type; the items list comes from Admin, so it always matches the website.
+  learn_intro: { group: "Key 3: Learn about our rentals", label: "Key 3 opening line", text: "We'd love to tell you about our rentals." },
+  learn_balloons: {
+    group: "Key 3: Learn about our rentals",
+    label: "About jumping balloons",
+    text: "Our jumping balloons are inflatable bounce houses, and many come with slides or play areas. They're a favorite for birthday parties, family simchas, school events and community celebrations, with options for toddlers and for older kids. Jumping balloons are mostly set up outdoors on grass or a flat, open area. Some smaller units can go indoors in a large room with a high ceiling. Each unit needs open space around it and a nearby power outlet for the blower.",
+  },
+  learn_laser: {
+    group: "Key 3: Learn about our rentals",
+    label: "About laser tag",
+    text: "Our laser tag comes with blasters and vests, and our inflatable mazes make the game even more exciting. It's a hit with kids around age six and up, teens, and adults, and it's great for parties, schools, camps and group events. Laser tag can be played outdoors, or indoors in a large hall or gym. The maze needs a good amount of open space and a power outlet for the blower.",
+  },
+  learn_paddle: {
+    group: "Key 3: Learn about our rentals",
+    label: "About paddle boats",
+    text: "Our paddle boats are small, easy-to-steer boats that kids pedal or paddle around the water. They're a fun, special attraction for summer parties, camps and outdoor events. Paddle boats are used outdoors, in a pool or a calm water area with an adult watching. You can rent as many as you need for your space.",
+  },
+  learn_items: { group: "Key 3: Learn about our rentals", label: "Our items in this category (from Admin)", text: "Our {category} include: {items}.", vars: ["category", "items"] },
+  learn_deliver: { group: "Key 3: Learn about our rentals", label: "We deliver (key 3)", text: "We deliver, set up, and pick up, so you can relax and enjoy your event. To book, go back to the main menu and press 1." },
+  learn_none: { group: "Key 3: Learn about our rentals", label: "No items in this category right now", text: "We're updating this part of our catalog right now. Please check back with us soon." },
   menu_category: { group: "Welcome & main menu", label: "Menu option for a category", text: "For {category}, press {key}.", vars: ["category", "key"] },
   menu_cart: { group: "Welcome & main menu", label: "Menu option: review cart", text: "Ready to check out? Press 9 to hear your cart." },
   menu_operator: { group: "Welcome & main menu", label: "Menu option: talk to a person", text: "To talk with someone from our team, press 0." },

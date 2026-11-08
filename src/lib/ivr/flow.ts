@@ -221,11 +221,37 @@ async function customerByPhone(phone: string) {
   return c ?? null;
 }
 
+/** The three types of attraction on keys 2 and 3 (Abraham W). */
+const ATTRACTIONS = {
+  "1": { label: "jumping balloons", instr: "instr_balloons", learn: "learn_balloons", match: /balloon|bounce|jump|inflatable(?!.*maze)/i },
+  "2": { label: "laser tag", instr: "instr_laser", learn: "learn_laser", match: /laser/i },
+  "3": { label: "paddle boats", instr: "instr_paddle", learn: "learn_paddle", match: /paddle|boat/i },
+} as const;
+
+function attractionMenu(ctx: Ctx, vr: VR, m: "i" | "l") {
+  const g = keypad(vr, url("attraction-choice", { m }));
+  if (!ctx.query.get("again")) sp(g, ctx, m === "i" ? "instr_intro" : "learn_intro");
+  sp(g, ctx, "attraction_choice");
+  sp(g, ctx, "attraction_menu_back");
+  return noInput(vr, ctx, m === "i" ? "instructions" : "learn", { again: 1 });
+}
+
+/** The Admin category for a type (by name, so a rename in Admin still works; else the one on that booking key). */
+async function attractionCategory(t: "1" | "2" | "3") {
+  const cats = await phoneCategories();
+  return cats.find((c) => ATTRACTIONS[t].match.test(c.name)) ?? cats.find((c) => String(c.ivrDigit) === t) ?? null;
+}
+
+/** "a, b and c" */
+function listPhrase(names: string[]) {
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
 /** Call log labels for main-menu keys (not spoken). */
 const MAIN_KEY_LABELS: Record<string, string> = {
   "1": "book a rental",
-  "2": "equipment instructions and guidance",
-  "3": "book a rental (key 3 stand-in)",
+  "2": "instructions",
+  "3": "learn about our rentals",
   "4": "staff line 4",
   "5": "staff line 5",
   "6": "staff line 6",
@@ -390,9 +416,10 @@ const handlers: Record<string, Handler> = {
         return back(vr, "menu", { first: 1 });
       case "1":
         return back(vr, "book");
-      case "3": // stand-in until Abraham approves the key 3 message
-        return back(vr, "book");
-      case "2": // equipment instructions and guidance (own list; empty rings the operator list)
+      case "2": // Abraham W: instructions for each type of attraction
+        return back(vr, "instructions");
+      case "3": // Abraham W: learn about our rentals
+        return back(vr, "learn");
       case "4":
       case "5":
       case "6":
@@ -408,6 +435,69 @@ const handlers: Record<string, Handler> = {
         sp(vr, ctx, "not_valid");
         return back(vr, "menu");
     }
+  },
+
+  /* ---- Keys 2 and 3 (Abraham W): instructions, and learn about our rentals. m = "i" (instructions) or "l" (learn). ---- */
+
+  instructions(ctx, vr) {
+    return attractionMenu(ctx, vr, "i");
+  },
+
+  learn(ctx, vr) {
+    return attractionMenu(ctx, vr, "l");
+  },
+
+  async "attraction-choice"(ctx, vr) {
+    const m = ctx.query.get("m") === "l" ? "l" : "i";
+    const d = ctx.body.Digits;
+    const menu = m === "l" ? "learn" : "instructions";
+    if (!d) return noInput(vr, ctx, menu, { again: 1 });
+    if (d === "*") return back(vr, "menu");
+    if (["1", "2", "3"].includes(d)) return back(vr, "attraction", { m, t: d });
+    sp(vr, ctx, "not_valid"); // # or any other key
+    return back(vr, menu, { again: 1 });
+  },
+
+  async attraction(ctx, vr) {
+    const m = ctx.query.get("m") === "l" ? "l" : "i";
+    const t = (["1", "2", "3"].includes(ctx.query.get("t") ?? "") ? ctx.query.get("t") : "1") as "1" | "2" | "3";
+    const g = keypad(vr, url("attraction-after", { m, t }));
+    const type = ATTRACTIONS[t];
+    if (m === "i") {
+      sp(g, ctx, type.instr);
+      await track(ctx.callSid, "category_heard", `Heard the instructions for ${type.label}`, { category: type.label, kind: "instructions" });
+    } else {
+      sp(g, ctx, type.learn);
+      const cat = await attractionCategory(t);
+      const items = cat ? await phoneProducts(cat.id) : [];
+      if (cat && items.length) sp(g, ctx, "learn_items", { category: cat.spokenName || cat.name, items: listPhrase(items.map((p) => p.name)) });
+      else sp(g, ctx, "learn_none");
+      sp(g, ctx, "learn_deliver");
+      await track(ctx.callSid, "category_heard", `Heard about ${cat?.name ?? type.label}`, { category: cat?.name ?? type.label, items: items.map((p) => p.name), kind: "learn" });
+    }
+    pause(g);
+    sp(g, ctx, "attraction_after");
+    return noInput(vr, ctx, "attraction-options", { m, t });
+  },
+
+  "attraction-options"(ctx, vr) {
+    const m = ctx.query.get("m") === "l" ? "l" : "i";
+    const t = ctx.query.get("t") ?? "1";
+    const g = keypad(vr, url("attraction-after", { m, t }));
+    sp(g, ctx, "attraction_after");
+    return noInput(vr, ctx, "attraction-options", { m, t });
+  },
+
+  async "attraction-after"(ctx, vr) {
+    const m = ctx.query.get("m") === "l" ? "l" : "i";
+    const t = ctx.query.get("t") ?? "1";
+    const d = ctx.body.Digits;
+    if (!d) return noInput(vr, ctx, "attraction-options", { m, t });
+    if (d === "*") return back(vr, "attraction", { m, t }); // hear it again
+    if (d === "1") return back(vr, m === "l" ? "learn" : "instructions", { again: 1 }); // another attraction
+    if (d === "2") return back(vr, "menu"); // main menu
+    sp(vr, ctx, "not_valid");
+    return back(vr, "attraction-options", { m, t });
   },
 
   /** Key 1: the rentals to book (existing approved lines), the cart when it has items, star for the main menu. */
