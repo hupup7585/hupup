@@ -49,7 +49,7 @@ export default function Sidebar({ logout, role = "owner", name }: { logout: () =
           {/* Logo on a white panel (never directly on navy) */}
           <div className="rounded-xl bg-white p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/hupup-logo-320.png" alt="Hup Up Attractions" className="mx-auto h-24 w-auto" />
+            <img src="/brand/hupup-logo-h96@1x.png" srcSet="/brand/hupup-logo-h96@1x.png 1x, /brand/hupup-logo-h96@2x.png 2x, /brand/hupup-logo-h96@3x.png 3x" width={91} height={96} alt="Hup Up Attractions" className="mx-auto h-24 w-auto" />
           </div>
           <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky">Staff portal</div>
           {name && <div className="mt-3 text-sm text-white/80">{name} · <span className="capitalize">{role}</span></div>}
