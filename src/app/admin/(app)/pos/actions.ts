@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { asc, eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
@@ -102,9 +103,13 @@ export async function createBookingAction(input: {
   }
 
   // Log the customer's acceptance of the Terms, as chosen by staff (only while the Terms flow is on).
+  const reqHeaders = await headers();
   if (termsActive()) await recordTermsAcceptance({
     orderId: r.orderId,
     phone,
+    // The staff member's device (who entered it is userId); the customer's own channel is in the method
+    ip: (reqHeaders.get("x-forwarded-for") || "").split(",")[0].trim() || null,
+    userAgent: reqHeaders.get("user-agent")?.slice(0, 500) ?? null,
     termsVersion: CURRENT_TERMS_VERSION,
     termsText: TERMS_TEXT,
     method: `staff_${input.termsVia}` as "staff_phone",

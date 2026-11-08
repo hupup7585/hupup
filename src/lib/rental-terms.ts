@@ -46,6 +46,8 @@ export type AcceptanceInput = {
   userAgent?: string | null;
   pageUrl?: string | null;
   userId?: number | null;
+  callerPhone?: string | null;
+  callSid?: string | null;
 };
 
 export async function recordTermsAcceptance(input: AcceptanceInput) {
@@ -68,6 +70,8 @@ export async function recordTermsAcceptance(input: AcceptanceInput) {
       userAgent: input.userAgent ?? null,
       pageUrl: input.pageUrl ?? null,
       userId: input.userId ?? null,
+      callerPhone: input.callerPhone ?? null,
+      callSid: input.callSid ?? null,
     })
     .returning({ id: schema.termsAcceptances.id });
   return row.id;

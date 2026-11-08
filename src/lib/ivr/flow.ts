@@ -882,15 +882,20 @@ const handlers: Record<string, Handler> = {
     }
     if (ctx.body.Digits === "#") {
       const notice = promptText(ctx.prompts, "terms_notice");
-      await recordTermsAcceptance({
-        orderId: order.order.id,
-        phone: ctx.session?.data.phone ?? toE164(ctx.from),
-        termsVersion: CURRENT_TERMS_VERSION,
-        termsText: TERMS_TEXT,
-        method: "phone_hash",
-        acceptanceStatement: `Pressed "#" for reservation #${orderNumber(order.order.id)} after hearing: "${notice}"`,
-        amountCents: order.order.subtotalCents,
-      });
+      // One record per rental day on this call, each with the caller ID and the call id (Abraham: every reservation)
+      for (const day of await callOrders(ctx)) {
+        await recordTermsAcceptance({
+          orderId: day.order.id,
+          phone: ctx.session?.data.phone ?? toE164(ctx.from),
+          callerPhone: toE164(ctx.from) ?? (ctx.from || null),
+          callSid: ctx.callSid,
+          termsVersion: CURRENT_TERMS_VERSION,
+          termsText: TERMS_TEXT,
+          method: "phone_hash",
+          acceptanceStatement: `Pressed "#" for reservation #${orderNumber(order.order.id)}${day.order.id !== order.order.id ? ` (rental day #${orderNumber(day.order.id)})` : ""} after hearing: "${notice}"`,
+          amountCents: day.order.subtotalCents,
+        });
+      }
       await updateSession(ctx.callSid, { data: { termsAccepted: true } }, ctx.session);
       return back(vr, "finalize");
     }

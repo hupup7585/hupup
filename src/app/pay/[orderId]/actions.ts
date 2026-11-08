@@ -22,18 +22,21 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
   const due = group.due;
   if (due <= 0) return { error: "Nothing left to pay." };
   const h = await headers();
-  await recordTermsAcceptance({
-    orderId,
-    customerId: full.customer?.id ?? null,
-    phone: full.customer?.phone ?? null,
-    termsVersion: CURRENT_TERMS_VERSION,
-    termsText: TERMS_TEXT,
-    method: "web_checkbox",
-    acceptanceStatement: `Checked "${PAY_AGREE_LABEL}" (unchecked by default) and continued to payment`,
-    amountCents: due,
-    ip: (h.get("x-forwarded-for") || "").split(",")[0].trim() || null,
-    userAgent: h.get("user-agent")?.slice(0, 500) ?? null,
-    pageUrl: `${config.baseUrl()}/pay/${orderId}`,
-  });
+  // One record per rental day paid together (Abraham: every reservation), each with date, time, IP and version
+  for (const day of group.orders.filter((x) => x.order.status === "PENDING_PAYMENT")) {
+    await recordTermsAcceptance({
+      orderId: day.order.id,
+      customerId: full.customer?.id ?? null,
+      phone: full.customer?.phone ?? null,
+      termsVersion: CURRENT_TERMS_VERSION,
+      termsText: TERMS_TEXT,
+      method: "web_checkbox",
+      acceptanceStatement: `Checked "${PAY_AGREE_LABEL}" (unchecked by default) and continued to payment`,
+      amountCents: day.order.id === full.order.id ? due : null,
+      ip: (h.get("x-forwarded-for") || "").split(",")[0].trim() || null,
+      userAgent: h.get("user-agent")?.slice(0, 500) ?? null,
+      pageUrl: `${config.baseUrl()}/pay/${orderId}`,
+    });
+  }
   redirect(paymentLink({ orderId: full.order.id, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone: full.customer?.phone }));
 }

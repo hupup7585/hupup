@@ -410,6 +410,9 @@ export const termsAcceptances = pgTable(
     userAgent: text("user_agent"),
     pageUrl: text("page_url"),
     userId: integer("user_id"),
+    /** Phone acceptances: the number the call came from (caller ID) and the Twilio call id */
+    callerPhone: text("caller_phone"),
+    callSid: text("call_sid"),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("terms_acceptances_order_idx").on(t.orderId, t.acceptedAt)],
