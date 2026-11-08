@@ -3,6 +3,8 @@ import { paymentLink } from "@/lib/sola";
 import { getPaymentGroup, orderNumber } from "@/lib/orders";
 import { termsActive, verifyPayToken } from "@/lib/rental-terms";
 import PayForm from "./PayForm";
+import { webConsentCopy } from "@/lib/sms-terms-v2";
+import { smsNumberDisplay } from "@/lib/sms-number";
 import DualDate from "@/components/DualDate";
 
 export const dynamic = "force-dynamic";
@@ -60,7 +62,7 @@ export default async function PayPage({ params, searchParams }: { params: Promis
           <li className="flex justify-between border-t pt-2 text-base font-bold"><span>Total due</span><span>{money(due)}</span></li>
         </ul>
         <div className="mt-6">
-          {o.status === "PENDING_PAYMENT" && due > 0 ? <PayForm orderId={id} token={t!} /> : <p className="font-semibold">This order isn&rsquo;t waiting for payment. Questions? Call (845) 777-7585.</p>}
+          {o.status === "PENDING_PAYMENT" && due > 0 ? <PayForm orderId={id} token={t!} consent={{ transactionalText: webConsentCopy().transactional, marketingText: webConsentCopy().marketing, smsNumber: smsNumberDisplay() }} /> : <p className="font-semibold">This order isn&rsquo;t waiting for payment. Questions? Call (845) 777-7585.</p>}
         </div>
       </div>
     </main>

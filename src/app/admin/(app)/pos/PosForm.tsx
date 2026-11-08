@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import TextConsentBoxes from "@/components/TextConsentBoxes";
 import { availabilityFor, createBookingAction, type PosResult , calendarFor, checkDateFor, type CalendarDay, type DateCheck } from "./actions";
 import DualDate, { HebrewDay } from "@/components/DualDate";
 import { englishDate } from "@/lib/dual-date";
@@ -19,10 +20,12 @@ export default function PosForm(props: {
   products: P[];
   /** Ask how the customer accepted the Terms (off on the live site until the final Terms are in) */
   askTerms?: boolean;
+  consent?: { transactionalText: string; marketingText: string; smsNumber: string };
 }) {
   const [date, setDate] = useState(props.initialDate);
   const [avail, setAvail] = useState<Record<string, number>>({});
   const [qty, setQty] = useState<Record<string, number>>(props.initialProduct ? { [props.initialProduct]: 1 } : {});
+  const [sms, setSms] = useState({ transactional: false, marketing: false });
   const [form, setForm] = useState({ name: "", termsVia: "", phone: "", email: "", address: "", deliveryTime: "", notes: "", amountPaid: "" });
   const [payment, setPayment] = useState<"link" | "cash" | "check" | "later">("link");
   const [result, setResult] = useState<PosResult | null>(null);
@@ -57,11 +60,12 @@ export default function PosForm(props: {
 
   const submit = () =>
     start(async () => {
-      const r = await createBookingAction({ date, items: qty, ...form, payment });
+      const r = await createBookingAction({ date, items: qty, ...form, payment, smsTransactional: sms.transactional, smsMarketing: sms.marketing });
       setResult(r);
       if (r.ok) {
         setQty({});
         setForm({ name: "", phone: "", email: "", address: "", deliveryTime: "", notes: "", amountPaid: "", termsVia: "" });
+        setSms({ transactional: false, marketing: false });
       }
     });
 
@@ -154,6 +158,10 @@ export default function PosForm(props: {
             <option value="in_person">In person</option>
           </select>
         </label>
+        )}
+
+        {props.consent && (
+          <TextConsentBoxes staff transactionalText={props.consent.transactionalText} marketingText={props.consent.marketingText} transactional={sms.transactional} marketing={sms.marketing} onChange={setSms} smsNumber={props.consent.smsNumber} />
         )}
 
         <h2 className="pt-2 font-bold">Payment</h2>

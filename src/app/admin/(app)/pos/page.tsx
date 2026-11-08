@@ -1,4 +1,6 @@
 import { asc, eq } from "drizzle-orm";
+import { webConsentCopy } from "@/lib/sms-terms-v2";
+import { smsNumberDisplay } from "@/lib/sms-number";
 import { db, schema } from "@/lib/db";
 import { isValidISO, todayISO } from "@/lib/dates";
 import { termsActive } from "@/lib/rental-terms";
@@ -20,6 +22,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
         categories={cats.map((c) => ({ id: c.id, name: c.name }))}
         products={prods.map((p) => ({ id: p.id, categoryId: p.categoryId, name: p.name, priceCents: p.priceCents, quantity: p.quantity }))}
         askTerms={termsActive()}
+        consent={{ transactionalText: webConsentCopy().transactional, marketingText: webConsentCopy().marketing, smsNumber: smsNumberDisplay() }}
       />
     </div>
   );

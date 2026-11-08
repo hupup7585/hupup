@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { recordBookingConsents } from "@/lib/booking-consent";
 import { revalidatePath } from "next/cache";
 import { asc, eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
@@ -66,6 +67,9 @@ export async function createBookingAction(input: {
   amountPaid: string;
   /** How the customer accepted the Terms and Conditions (required). */
   termsVia: string;
+  /** The two optional text-consent boxes (both unchecked by default; never required) */
+  smsTransactional?: boolean;
+  smsMarketing?: boolean;
 }): Promise<PosResult> {
   const session = await requireAdmin();
   if (!isValidISO(input.date)) return { ok: false, message: "Pick an event date." };
@@ -116,7 +120,19 @@ export async function createBookingAction(input: {
     acceptanceStatement: `Staff recorded that the customer accepted the Terms and Conditions by ${input.termsVia.replace("_", " ")} for reservation #${orderNumber(r.orderId)}`,
     userId: session.userId ?? null,
   });
+  // Text consent the staff member checked after reading the approved wording to the customer
+  const consents = await recordBookingConsents({
+    phone,
+    transactional: input.smsTransactional === true,
+    marketing: input.smsMarketing === true,
+    source: "pos",
+    orderId: r.orderId,
+    userId: session.userId ?? null,
+    ip: (reqHeaders.get("x-forwarded-for") || "").split(",")[0].trim() || null,
+    userAgent: reqHeaders.get("user-agent")?.slice(0, 500) ?? null,
+  });
   let message = `Booked order #${orderNumber(r.orderId)}.`;
+  if (consents.stopped) message += " Text consent wasn't saved: this number replied STOP (the customer can text START to get texts again).";
   if (input.payment === "link" && phone) {
     const full = await getOrderWithItems(r.orderId);
     const link = payPageLink(r.orderId); // review-and-pay page: Terms box, then Sola

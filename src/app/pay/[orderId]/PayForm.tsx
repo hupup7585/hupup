@@ -3,9 +3,11 @@
 import { useState, useTransition } from "react";
 import { agreeAndPayAction } from "./actions";
 import { PAY_AGREE_LABEL } from "./label";
+import TextConsentBoxes from "@/components/TextConsentBoxes";
 
-export default function PayForm({ orderId, token }: { orderId: number; token: string }) {
+export default function PayForm({ orderId, token, consent }: { orderId: number; token: string; consent: { transactionalText: string; marketingText: string; smsNumber: string } }) {
   const [agreed, setAgreed] = useState(false);
+  const [sms, setSms] = useState({ transactional: false, marketing: false });
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   return (
@@ -14,7 +16,7 @@ export default function PayForm({ orderId, token }: { orderId: number; token: st
       onSubmit={(e) => {
         e.preventDefault();
         start(async () => {
-          const r = await agreeAndPayAction(orderId, token, agreed);
+          const r = await agreeAndPayAction(orderId, token, agreed, sms);
           if (r?.error) setError(r.error);
         });
       }}
@@ -29,6 +31,7 @@ export default function PayForm({ orderId, token }: { orderId: number; token: st
           )
         </span>
       </label>
+      <TextConsentBoxes transactionalText={consent.transactionalText} marketingText={consent.marketingText} transactional={sms.transactional} marketing={sms.marketing} onChange={setSms} smsNumber={consent.smsNumber} />
       {error && (
         <p role="alert" className="rounded-lg bg-red-50 p-3 font-semibold text-red-800">
           {error}
