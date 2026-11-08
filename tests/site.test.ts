@@ -494,6 +494,11 @@ describe("website Hours (Abraham's simple list)", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
     const hours = page.slice(page.indexOf('id="hours"'), page.indexOf('id="contact"'));
     expect(hours).toContain("WEBSITE_HOURS.map(");
+    // phones: a time and its range never split across lines; the words stay exactly the same
+    const { keepTimesTogether } = await import("@/lib/site-copy");
+    expect(keepTimesTogether("Winter: 2 hours after Shabbos - 11:00 PM")).toBe("Winter: 2 hours after Shabbos\u00A0-\u00A011:00\u00A0PM");
+    for (const l of WEBSITE_HOURS) expect(keepTimesTogether(l).replace(/\u00A0/g, " ")).toBe(l);
+    expect(hours).toContain("keepTimesTogether(line.slice(i + 2))");
     expect(hours).toContain("{WEBSITE_HOURS_NOTE}");
     // Abraham: left column centered against the card; the 24/7 box is white with a thin navy border and navy text, not yellow
     expect(hours).toMatch(/data-hours-grid className="[^"]*md:items-center/);

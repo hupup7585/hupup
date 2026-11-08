@@ -28,3 +28,11 @@ describe("staff logo is sharp on every screen", () => {
     });
   }
 });
+
+describe("staff pages have their own description", () => {
+  it("never the customer home page's description, and never indexed", async () => {
+    const { metadata } = await import("@/app/admin/layout");
+    expect(metadata.description).toBe("Staff sign-in and tools for Hup Up Attractions.");
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
+});

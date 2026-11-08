@@ -28,6 +28,14 @@ export const WEBSITE_HOURS = [
 ] as const;
 export const WEBSITE_HOURS_NOTE = "Book by phone anytime, 24/7.";
 
+/**
+ * Display only (the words never change): keep "11:00 PM" and "Shabbos - 11:00 PM" from breaking across lines on
+ * phones, by joining a time to its AM/PM and a " - " to the words on both sides with non-breaking spaces.
+ */
+export function keepTimesTogether(text: string): string {
+  return text.replace(/ (AM|PM)\b/g, "\u00A0$1").replace(/ - /g, "\u00A0-\u00A0");
+}
+
 /** How It Works, under the three steps (Abraham's approved wording, exact). */
 export const HOW_IT_WORKS_DELIVERY = "We deliver our rentals right to your door.";
 /** Kiryas Joel box only (Abram 10:46 PM). */

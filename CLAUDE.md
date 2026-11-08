@@ -5,6 +5,12 @@
 - Business name is always "Hup Up Attractions".
 - Before pushing: `npm run typecheck` and `npm test`.
 
+## Go-live rule (Abraham, standing)
+- Every piece that passes its tests goes live right away (push to the live branch `claude/nifty-mendel-7hlzdb` and keep the preview branch `claude/nifty-mendel-7hlzdb-website` in sync), no waiting for approval. Send Abraham a screenshot afterwards for anything visual.
+- Only two things still wait for Abraham's OK: new or changed customer-facing wording he hasn't approved (website, phone prompts, customer texts and emails), and switching the public email to info@hupupattractions.com (`NEW_EMAIL_LIVE` in `src/lib/config.ts`).
+- Work through the open to-do list without pausing between items.
+- Never buy usage credits, upgrade a plan, or turn on anything that costs money.
+
 ## Website SEO and tone rule (Abraham, applies to every website step)
 - Follow Google's helpful, people-first content guidelines.
 - Copy is humanized, friendly, warm and customer-friendly, in simple but professional English, with natural long-tail keywords (e.g. "bounce house rental in Kiryas Joel", "laser tag party rental Orange County NY", "paddle boat rental Monroe NY"). No keyword stuffing.
