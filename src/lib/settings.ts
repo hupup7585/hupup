@@ -88,6 +88,11 @@ export const SETTING_DEFAULTS = {
    * Patterns: an exact number, * for any digits (+1845*), ? for one digit (+1845555????), or "withheld".
    */
   blockedCallers: "",
+  /**
+   * Call recording (Abraham O): OFF until he approves the notice wording and turns it on himself (Owner-only switch
+   * in Settings). When on, every call hears the recording notice first; recording starts only after it.
+   */
+  callRecording: false,
   /** Stock / warehouse address: where the delivery run starts and ends (Delivery screen route links). Owner only. */
   stockAddress: "",
   /** Website note under the hours (Abraham's wording). */

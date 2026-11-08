@@ -6,6 +6,8 @@ import { requireOwner } from "@/lib/auth";
 import RoutingForm from "./RoutingForm";
 import BlockingForm from "./BlockingForm";
 import StockAddressForm from "./StockAddressForm";
+import RecordingForm from "./RecordingForm";
+import { PROMPTS } from "@/lib/ivr/prompts";
 import { RING_KEYS, RING_KEY_LABELS, ringListFor, routeSummary, routeTargets } from "@/lib/ivr/routing";
 
 function Row({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
@@ -48,6 +50,11 @@ export default async function SettingsPage() {
           })}
         </div>
       </section>
+      <section className="card mb-6 p-5" id="recording">
+        <h2 className="mb-3 text-lg font-extrabold">Call recording</h2>
+        <RecordingForm on={settings.callRecording} notice={PROMPTS.recording_notice.text} />
+      </section>
+
       <section className="card mb-6 p-5" id="stock">
         <h2 className="mb-3 text-lg font-extrabold">Delivery routes: stock address</h2>
         <StockAddressForm initial={settings.stockAddress} />

@@ -43,6 +43,7 @@ import { matchBlock, parseBlockList } from "./caller-filter";
 import { PROMPTS, loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
+import { startRecording } from "@/lib/call-recording";
 
 const { categories, products, orders } = schema;
 type VR = InstanceType<typeof twilio.twiml.VoiceResponse>;
@@ -280,8 +281,28 @@ const handlers: Record<string, Handler> = {
       return vr;
     }
     await ensureSession(ctx.callSid, ctx.from);
+    // Call recording (off unless the Owner turns it on): the notice plays first, recording starts only after it.
+    if ((await getSettings()).callRecording) {
+      sp(vr, ctx, "recording_notice");
+      return back(vr, "record-start");
+    }
     // The greeting is part of the main menu so callers can press a key at any time, even during the greeting.
     return back(vr, "menu", { first: 1 });
+  },
+
+  /** After the recording notice: start recording the call, then the main menu. */
+  async "record-start"(ctx, vr) {
+    const ok = await startRecording(ctx.callSid);
+    await updateSession(ctx.callSid, { data: { recording: ok } }, ctx.session);
+    return back(vr, "menu", { first: 1 });
+  },
+
+  /** Twilio: a call recording finished. Saved on the call for the call log (recording itself stays in Twilio). */
+  async "call-recording"(ctx, vr) {
+    if (ctx.body.RecordingStatus === "completed" && ctx.body.RecordingSid) {
+      await updateSession(ctx.callSid, { data: { recordingSid: ctx.body.RecordingSid, recordingUrl: ctx.body.RecordingUrl ?? null } }, ctx.session);
+    }
+    return vr;
   },
 
   /**

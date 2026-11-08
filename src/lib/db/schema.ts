@@ -168,6 +168,10 @@ export type CallData = {
   menuKeys?: string[];
   /** A department or operator was asked for and no one took the call: "closed" (office closed / no one on the list) or "no_answer" */
   missed?: "closed" | "no_answer";
+  /** Call recording (only when the Owner has turned it on): started, and the finished recording */
+  recording?: boolean;
+  recordingSid?: string;
+  recordingUrl?: string | null;
   /** Key 1 booking: the rental day being shopped for now (date first, then items) */
   day?: string;
   /** Key 1 booking: every held order on this call, one per rental day (paid together with one charge) */
