@@ -99,6 +99,7 @@ export async function addEntryAction(f: FormData) {
         invoiceId: n(f, "invoiceId"),
         billId: n(f, "billId"),
         productId: n(f, "productId"),
+        projectId: n(f, "projectId"),
         county: s(f, "county") || null,
         taxExempt: s(f, "taxExempt") === "on",
         notes: s(f, "notes") || null,

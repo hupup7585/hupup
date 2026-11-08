@@ -536,6 +536,8 @@ export const bookEntries = pgTable(
     ref: text("ref"),
     notes: text("notes"),
     fileId: integer("file_id"),
+    /** Task Manager project this expense belongs to (Abraham DD) */
+    projectId: integer("project_id"),
     /** auto | manual */
     source: text("source").notNull().default("manual"),
     correctsId: integer("corrects_id"),
@@ -672,3 +674,68 @@ export const bookFiles = pgTable("book_files", {
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/* ---------------- Task Manager (Abraham CC, DD) ---------------- */
+
+/** A job for staff. A subtask has parentId. Deadline = dueDate (+ optional dueTime "HH:MM"). */
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: serial("id").primaryKey(),
+    title: text("title").notNull(),
+    notes: text("notes"),
+    dueDate: date("due_date", { mode: "string" }),
+    dueTime: text("due_time"),
+    /** low | normal | high */
+    priority: text("priority").notNull().default("normal"),
+    /** todo | in_progress | done */
+    status: text("status").notNull().default("todo"),
+    assignedTo: integer("assigned_to"),
+    orderId: integer("order_id"),
+    projectId: integer("project_id"),
+    parentId: integer("parent_id"),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+  },
+  (t) => [index("tasks_assigned_idx").on(t.assignedTo, t.status), index("tasks_due_idx").on(t.dueDate), index("tasks_parent_idx").on(t.parentId), index("tasks_project_idx").on(t.projectId)],
+);
+
+/** A group of tasks (an event or a booking), with its own profitability. */
+export const taskProjects = pgTable("task_projects", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  notes: text("notes"),
+  /** Bookings whose income counts toward this project */
+  orderIds: jsonb("order_ids").$type<number[]>().notNull().default([]),
+  /** open | closed */
+  status: text("status").notNull().default("open"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Hourly rate per staff member (Owner only sets and sees it). */
+export const staffRates = pgTable("staff_rates", {
+  userId: integer("user_id").primaryKey(),
+  hourlyCents: integer("hourly_cents").notNull(),
+  updatedBy: integer("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Time worked on a task: a running timer (endedAt null) or entered hours. The rate is copied at the time it's logged. */
+export const timeLogs = pgTable(
+  "time_logs",
+  {
+    id: serial("id").primaryKey(),
+    taskId: integer("task_id").notNull(),
+    userId: integer("user_id"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    minutes: integer("minutes"),
+    rateCents: integer("rate_cents").notNull().default(0),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("time_logs_task_idx").on(t.taskId), index("time_logs_user_idx").on(t.userId)],
+);

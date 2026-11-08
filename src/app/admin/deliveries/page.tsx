@@ -2,6 +2,7 @@ import Link from "next/link";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { Clock, MapPin, Navigation, Route, Warehouse } from "lucide-react";
 import { requireStaff } from "@/lib/auth";
+import MyTasksCard from "@/components/MyTasksCard";
 import { db, schema } from "@/lib/db";
 import { addDays, todayISO } from "@/lib/dates";
 import { orderNumber } from "@/lib/orders";
@@ -75,6 +76,9 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
               Back to admin
             </Link>
           )}
+          <Link href="/admin/tasks" className="font-semibold text-sky hover:underline">
+            Tasks
+          </Link>
           <form action={logoutAction}>
             <button className="font-semibold text-white/80 hover:text-white">Sign out</button>
           </form>
@@ -92,6 +96,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
             </>
           }
         />
+        <MyTasksCard staff={staff} />
         {!stops.length && <p className="card p-6 text-muted">No deliveries or pickups on this day.</p>}
         {stops.length > 0 && (
           <section data-route-card className="no-print card mb-5 p-4" aria-label="Today's route">

@@ -87,7 +87,7 @@ describe("Abraham's spellings and examples", () => {
 describe("screens only", () => {
   const files = (dir: string): string[] => readdirSync(dir).flatMap((f) => (statSync(join(dir, f)).isDirectory() ? files(join(dir, f)) : [join(dir, f)]));
   it("never on the phone line, the public website, texts or emails", () => {
-    const allowed = /src\/(app\/admin|components\/(DualDate|DateInputHints|CallYiddishDay)\.tsx|lib\/(yiddish-day|hup-calendar\/parsha)\.ts)/;
+    const allowed = /src\/(app\/admin|components\/(DualDate|DateInputHints|CallYiddishDay|MyTasksCard)\.tsx|lib\/(yiddish-day|tasks-reports|hup-calendar\/parsha)\.ts)/; // staff screens and staff exports only
     for (const f of files("src")) {
       const t = readFileSync(f, "utf8");
       if (/yiddish-day|hup-calendar\/parsha|YiddishDay|CallYiddishDay/.test(t)) expect(f).toMatch(allowed);

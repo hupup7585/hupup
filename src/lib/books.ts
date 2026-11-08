@@ -102,6 +102,7 @@ export type NewEntry = {
   invoiceId?: number | null;
   billId?: number | null;
   productId?: number | null;
+  projectId?: number | null;
   personName?: string | null;
   county?: string | null;
   taxExempt?: boolean;
@@ -162,6 +163,7 @@ export async function reverseEntry(id: number, reason: string, userId: number | 
       invoiceId: o.invoiceId,
       billId: o.billId,
       productId: o.productId,
+      projectId: o.projectId,
       personName: o.personName,
       county: o.county,
       taxExempt: o.taxExempt,

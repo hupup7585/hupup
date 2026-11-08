@@ -275,11 +275,18 @@ async function Invoices({ today }: { today: string }) {
 
 async function Expenses({ cats }: { cats: string[] }) {
   const rec = await db.select().from(schema.bookRecurring).orderBy(asc(schema.bookRecurring.nextDate));
+  const projects = await db.select({ id: schema.taskProjects.id, name: schema.taskProjects.name }).from(schema.taskProjects).where(eq(schema.taskProjects.status, "open"));
   const products = await db.select({ id: schema.products.id, name: schema.products.name }).from(schema.products).orderBy(asc(schema.products.name));
   return (
     <>
       <Card title="Record an expense" note="Repairs on a rental item: choose the item so it counts against that item's profit.">
         <EntryForm tab="expenses" kinds={["expense"]} cats={cats}>
+          <Field label="Project (Tasks)">
+            <select name="projectId" className="input" defaultValue="">
+              <option value="">—</option>
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </Field>
           <Field label="Rental item (repairs)">
             <select name="productId" className="input" defaultValue="">
               <option value="">—</option>

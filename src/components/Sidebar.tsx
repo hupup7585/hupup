@@ -3,18 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Calculator, CalendarClock, CalendarDays, Contact, History, ClipboardList, LayoutDashboard, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PlusCircle, Settings, ShieldCheck, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
+import { Calculator, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, LayoutDashboard, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PlusCircle, Settings, ShieldCheck, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
 import type { Role } from "@/lib/db/schema";
 
 const O: Role[] = ["owner"];
 const OS: Role[] = ["owner", "secretary"];
+const ALL: Role[] = ["owner", "secretary", "delivery"];
 /** Each role sees only the screens it can use (the server enforces the same rules). */
 const NAV: [string, LucideIcon, string, Role[]][] = [
   ["/admin", LayoutDashboard, "Dashboard", O],
   ["/admin/calendar", CalendarDays, "Calendar", OS],
   ["/admin/orders", ClipboardList, "Orders", OS],
   ["/admin/pos", PlusCircle, "New booking", OS],
-  ["/admin/deliveries", Truck, "Deliveries", OS],
+  ["/admin/deliveries", Truck, "Deliveries", ALL],
+  ["/admin/tasks", ListChecks, "Tasks", ALL],
   ["/admin/customers", Contact, "Customers", OS],
   ["/admin/catalog", Package, "Catalog", O],
   ["/admin/calls", PhoneCall, "Call log", OS],
@@ -31,7 +33,7 @@ const NAV: [string, LucideIcon, string, Role[]][] = [
 ];
 
 /** Staff navigation: navy bar, yellow marker on the current page. Hidden when printing. */
-export default function Sidebar({ logout, role = "owner", name }: { logout: () => Promise<void>; role?: Role; name?: string }) {
+export default function Sidebar({ logout, role = "owner", name, taskBadge }: { logout: () => Promise<void>; role?: Role; name?: string; taskBadge?: { open: number; overdue: number } }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const active = (href: string) => (href === "/admin" ? path === "/admin" : path.startsWith(href));
@@ -45,7 +47,7 @@ export default function Sidebar({ logout, role = "owner", name }: { logout: () =
           {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </div>
-      <aside className={`${open ? "block" : "hidden"} no-print bg-navy px-3 py-5 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col`}>
+      <aside className={`${open ? "block" : "hidden"} no-print bg-navy px-3 py-5 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:overflow-y-auto`}>
         <div className="mb-8 hidden px-1 lg:block">
           {/* Logo on a white panel (never directly on navy) */}
           <div className="rounded-xl bg-white p-3">
@@ -69,6 +71,16 @@ export default function Sidebar({ logout, role = "owner", name }: { logout: () =
                 {on && <span className="absolute inset-y-1.5 left-0 w-1 rounded-full bg-sun" aria-hidden />}
                 <Icon className={`h-[18px] w-[18px] shrink-0 ${on ? "text-sun" : "text-sky"}`} strokeWidth={2} aria-hidden />
                 {label}
+                {href === "/admin/tasks" && taskBadge && taskBadge.open > 0 && (
+                  <span
+                    data-task-badge
+                    className={`ml-auto rounded-full px-2 py-0.5 text-xs font-bold ${taskBadge.overdue ? "bg-[#C83A2F] text-white" : "bg-white/15 text-white"}`}
+                    title={`${taskBadge.open} open task${taskBadge.open === 1 ? "" : "s"}${taskBadge.overdue ? `, ${taskBadge.overdue} overdue` : ""}`}
+                  >
+                    {taskBadge.open}
+                    <span className="sr-only"> open tasks{taskBadge.overdue ? `, ${taskBadge.overdue} overdue` : ""}</span>
+                  </span>
+                )}
               </Link>
             );
           })}

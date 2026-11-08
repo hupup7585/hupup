@@ -21,7 +21,8 @@ export default function DateInputHints() {
         input.insertAdjacentElement("afterend", hint);
       }
       const v = input.value;
-      hint.textContent = /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${hebrewDate(v)} · ${yiddishDay(v)}` : "";
+      const text = /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${hebrewDate(v)} · ${yiddishDay(v)}` : "";
+      if (hint.textContent !== text) hint.textContent = text; // only write when it changes (no observer loop)
     };
     const scan = () => document.querySelectorAll<HTMLInputElement>('main input[type="date"]').forEach(update);
     const onInput = (e: Event) => {
@@ -31,7 +32,11 @@ export default function DateInputHints() {
     scan();
     document.addEventListener("input", onInput, true);
     document.addEventListener("change", onInput, true);
-    const mo = new MutationObserver(() => scan());
+    // Rescan when the page adds new date fields; ignore changes to our own hints
+    const mo = new MutationObserver((records) => {
+      if (records.every((r) => (r.target as Element).closest?.("[data-date-hint]") || [...r.addedNodes].every((n) => (n as Element).hasAttribute?.("data-date-hint")))) return;
+      scan();
+    });
     const main = document.querySelector("main");
     if (main) mo.observe(main, { childList: true, subtree: true });
     return () => {

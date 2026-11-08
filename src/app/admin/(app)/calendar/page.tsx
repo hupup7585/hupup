@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requireAdmin } from "@/lib/auth";
+import MyTasksCard from "@/components/MyTasksCard";
 import { asc } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getUsage, freeOnDay, bookableQty } from "@/lib/availability";
@@ -16,6 +18,7 @@ export default async function CalendarPage({
 }: {
   searchParams: Promise<{ start?: string; day?: string; span?: string }>;
 }) {
+  const staff = await requireAdmin();
   const sp = await searchParams;
   const today = todayISO();
   const span = sp.span === "14" ? 14 : sp.span === "28" ? 28 : 7;
@@ -37,6 +40,7 @@ export default async function CalendarPage({
 
   return (
     <div className="mx-auto max-w-7xl">
+      {staff.role === "secretary" && <MyTasksCard staff={staff} />}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black sm:text-3xl">
           Availability · <DualDate yi iso={start} style="short" /> – <DualDate yi iso={end} style="short" />
