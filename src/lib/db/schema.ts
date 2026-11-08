@@ -162,6 +162,8 @@ export type CallData = {
   placedOrderId?: number;
   /** Caller pressed # to accept the Terms and Conditions on this call */
   termsAccepted?: boolean;
+  /** Main-menu keys pressed on this call, in order (call analytics: which departments callers choose) */
+  menuKeys?: string[];
 };
 
 export const callSessions = pgTable("call_sessions", {

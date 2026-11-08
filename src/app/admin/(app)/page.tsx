@@ -8,6 +8,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { orderNumber } from "@/lib/orders";
 import DualDate, { HebrewDay } from "@/components/DualDate";
 import { dualDate } from "@/lib/dual-date";
+import { callAnalytics } from "@/lib/call-analytics";
+import CallsCard from "./CallsCard";
 
 const RANGES = { week: "This week", month: "This month", year: "This year" } as const;
 type Range = keyof typeof RANGES;
@@ -35,13 +37,14 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const range: Range = (sp.range as Range) in RANGES ? (sp.range as Range) : "month";
   const today = todayISO();
   const [from, to] = rangeDates(range, today);
-  const [k, runs, weeks, board, split, upcoming] = await Promise.all([
+  const [k, runs, weeks, board, split, upcoming, calls] = await Promise.all([
     kpis(from, to),
     todaysRuns(today),
     weeklyRevenue(today),
     leaderboard(from, to),
     channelSplit(from, to),
     listOrders({ status: "OPEN", from: today, limit: 8 }),
+    callAnalytics(range === "week" ? 7 : range === "year" ? 365 : 30),
   ]);
   const thisWeek = startOfWeek(today);
   const maxWeek = Math.max(1, ...weeks.map((w) => Math.max(w.phone, w.pos)));
@@ -136,6 +139,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           ))}
         </div>
       </div>
+
+      <CallsCard a={calls} periodLabel={range === "week" ? "Last 7 days" : range === "year" ? "Last 365 days" : "Last 30 days"} />
 
       <div className="card overflow-x-auto p-5">
         <div className="mb-3 flex items-center justify-between">

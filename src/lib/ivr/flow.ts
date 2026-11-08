@@ -329,6 +329,10 @@ const handlers: Record<string, Handler> = {
   async "menu-choice"(ctx, vr) {
     const d = ctx.body.Digits; // keys only (Abraham): anything said is ignored
     if (!d) return menuNoChoice(vr, ctx);
+    // Call analytics: remember each valid main-menu choice (not shown to callers, nothing spoken)
+    if (/^[0-9*]$/.test(d) && ctx.session) {
+      await updateSession(ctx.callSid, { data: { menuKeys: [...(ctx.session.data?.menuKeys ?? []), d] } }, ctx.session);
+    }
     switch (d) {
       case "*": // Abraham: star replays the entire main menu, from the greeting
         return back(vr, "menu", { first: 1 });

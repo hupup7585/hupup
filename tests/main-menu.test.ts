@@ -123,6 +123,13 @@ describe("every key, office open", () => {
     expect(eight).toContain("whisper");
     for (const k of ["2", "4", "5", "6", "0"]) expect(await call("ring", {}, `k=${k}`)).toContain(">+18457777585</Number>");
   });
+  it("each main-menu choice is recorded on the call for the dashboard (nothing spoken)", async () => {
+    h.session.data = {};
+    await press("8");
+    await press("*");
+    await press("#"); // not a choice: not recorded
+    expect(h.session.data.menuKeys).toEqual(["8", "*"]);
+  });
   it("2 rings its own list once the owner adds one", async () => {
     await saveSetting("ringTargets2", "Equipment help | (845) 555-0123 | 20");
     expect(await call("ring", {}, "k=2")).toContain(">+18455550123</Number>");
