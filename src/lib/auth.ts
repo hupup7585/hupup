@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config, BUSINESS_NAME } from "@/lib/config";
-import { sendSms } from "@/lib/notify";
+import { sendEmail, sendSms } from "@/lib/notify";
 import { toE164 } from "@/lib/phone";
 import type { Role } from "@/lib/db/schema";
 
@@ -68,6 +68,31 @@ async function audit(action: string, userId: number | null, after: Record<string
 }
 
 const GENERIC = "If that number belongs to a staff account, a code is on its way.";
+/** Abraham: the Owner can also get the sign-in code by email; it always goes to this address. */
+export const OWNER_CODE_EMAIL = "hupupattractions@gmail.com";
+const GENERIC_EMAIL = "If that number belongs to the Owner account, a code is on its way to the Owner's email.";
+export const EMAIL_NOT_SET_UP = "Email sign-in isn't set up yet. Please use \"Text me a code\" or your password.";
+
+/**
+ * Owner only: email the sign-in code to OWNER_CODE_EMAIL. Same 10-minute expiry, 5 attempts and send limit as the
+ * text code. The reply never reveals whether the number is the Owner's.
+ */
+export async function sendLoginEmailCode(rawPhone: string): Promise<{ ok: boolean; message: string; devCode?: string }> {
+  const staff = await staffForPhone(rawPhone);
+  if (!staff || staff.role !== "owner") {
+    await audit("login.email_code_refused", staff?.userId ?? null, { phone: toE164(rawPhone), role: staff?.role ?? null });
+    return { ok: true, message: GENERIC_EMAIL };
+  }
+  const channel = `email:${staff.phone}`;
+  const recent = await db.execute(sql`SELECT COUNT(*)::int AS n FROM login_codes WHERE channel = ${channel} AND created_at > now() - interval '10 minutes'`);
+  if ((recent.rows[0] as { n: number }).n >= MAX_SENDS_PER_10_MIN) return { ok: false, message: "Too many codes requested. Please wait a few minutes." };
+  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+  const res = await sendEmail(OWNER_CODE_EMAIL, `${BUSINESS_NAME} sign-in code: ${code}`, `${BUSINESS_NAME} Owner sign-in code: ${code}\n\nIt expires in ${CODE_TTL_MIN} minutes. If you didn't request it, ignore this email.`);
+  await audit("login.email_code_sent", staff.userId, { role: staff.role, sent: res.sent });
+  if (!res.sent) return { ok: false, message: EMAIL_NOT_SET_UP };
+  await db.insert(loginCodes).values({ userId: staff.userId, channel, codeHash: hmac(code), expiresAt: new Date(Date.now() + CODE_TTL_MIN * 60_000) });
+  return { ok: true, message: GENERIC_EMAIL, devCode: res.dev ? code : undefined };
+}
 
 /** Text a sign-in code. The reply never reveals whether the number has an account. */
 export async function sendLoginCode(rawPhone: string): Promise<{ ok: boolean; message: string; devCode?: string }> {
@@ -89,7 +114,7 @@ export async function sendLoginCode(rawPhone: string): Promise<{ ok: boolean; me
   return { ok: true, message: GENERIC, devCode: res.dev ? code : undefined };
 }
 
-async function startSession(staff: StaffUser, method: "sms_code" | "password", trustDevice: boolean) {
+async function startSession(staff: StaffUser, method: "sms_code" | "email_code" | "password", trustDevice: boolean) {
   const token = crypto.randomBytes(32).toString("base64url");
   const ms = trustDevice ? TRUSTED_DAYS * 86_400_000 : SHORT_SESSION_HOURS * 3_600_000;
   const expiresAt = new Date(Date.now() + ms);
@@ -100,15 +125,15 @@ async function startSession(staff: StaffUser, method: "sms_code" | "password", t
   await audit("login.success", staff.userId, { role: staff.role, method });
 }
 
-export async function verifyLoginCode(rawPhone: string, code: string, trustDevice: boolean): Promise<{ ok: boolean; error?: string; role?: Role }> {
+export async function verifyLoginCode(rawPhone: string, code: string, trustDevice: boolean, via: "sms" | "email" = "sms"): Promise<{ ok: boolean; error?: string; role?: Role }> {
   const clean = code.replace(/\D/g, "");
   if (clean.length !== 6) return { ok: false, error: "Enter the 6-digit code." };
   const staff = await staffForPhone(rawPhone);
-  if (!staff) return { ok: false, error: "That code is not valid. Request a new one." };
+  if (!staff || (via === "email" && staff.role !== "owner")) return { ok: false, error: "That code is not valid. Request a new one." };
   const [latest] = await db
     .select()
     .from(loginCodes)
-    .where(and(eq(loginCodes.channel, `sms:${staff.phone}`), isNull(loginCodes.usedAt), gt(loginCodes.expiresAt, new Date())))
+    .where(and(eq(loginCodes.channel, `${via}:${staff.phone}`), isNull(loginCodes.usedAt), gt(loginCodes.expiresAt, new Date())))
     .orderBy(desc(loginCodes.createdAt))
     .limit(1);
   if (!latest) return { ok: false, error: "That code expired. Request a new one." };
@@ -119,7 +144,7 @@ export async function verifyLoginCode(rawPhone: string, code: string, trustDevic
     return { ok: false, error: "Incorrect code. Try again." };
   }
   await db.update(loginCodes).set({ usedAt: new Date() }).where(eq(loginCodes.id, latest.id));
-  await startSession(staff, "sms_code", trustDevice);
+  await startSession(staff, via === "email" ? "email_code" : "sms_code", trustDevice);
   return { ok: true, role: staff.role };
 }
 

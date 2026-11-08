@@ -10,7 +10,7 @@ const rnd = () => String(1000 + Math.floor(Math.random() * 8999));
 async function codeSignIn(page, phone) {
   await page.goto(BASE + "/admin/login");
   await page.fill('input[inputmode="tel"]', phone);
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByRole("button", { name: "Send code", exact: true }).click();
   const el = await page.waitForSelector("text=/Dev mode code/", { timeout: 30000 });
   await page.fill('input[inputmode="numeric"]', (await el.textContent()).match(/\d{6}/)[0]);
   await page.getByRole("button", { name: "Sign in" }).click();

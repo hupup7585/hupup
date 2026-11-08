@@ -8,7 +8,7 @@ const check = (name, ok, info = "") => (results.push({ name, ok }), console.log(
 async function signIn(page, phone = "(845) 777-7585") {
   await page.goto(BASE + "/admin/login");
   await page.fill('input[inputmode="tel"]', phone);
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByRole("button", { name: "Send code", exact: true }).click();
   const codeEl = await page.waitForSelector("text=/Dev mode code/", { timeout: 30000 });
   const code = (await codeEl.textContent()).match(/\d{6}/)[0];
   await page.fill('input[inputmode="numeric"]', code);

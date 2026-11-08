@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { KeyRound, MessageSquareText } from "lucide-react";
-import { passwordAction, sendCodeAction, verifyCodeAction } from "./actions";
+import { passwordAction, sendCodeAction, sendEmailCodeAction, verifyCodeAction } from "./actions";
 
 /** Staff sign-in: phone number, then a texted code (everyone) or a password (Owner and Secretary). */
 export default function LoginForm() {
   const [phone, setPhone] = useState("");
   const [mode, setMode] = useState<"code" | "password">("code");
   const [sent, setSent] = useState(false);
+  const [via, setVia] = useState<"sms" | "email">("sms");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [trust, setTrust] = useState(false);
@@ -17,10 +18,11 @@ export default function LoginForm() {
   const [devCode, setDevCode] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const send = () =>
+  const send = (how: "sms" | "email" = "sms") =>
     start(async () => {
       setError(null);
-      const r = await sendCodeAction(phone);
+      setVia(how);
+      const r = how === "email" ? await sendEmailCodeAction(phone) : await sendCodeAction(phone);
       if (!r.ok) return setError(r.message);
       setSent(true);
       setMsg(r.message);
@@ -58,9 +60,15 @@ export default function LoginForm() {
         )}
 
         {mode === "code" && !sent && (
-          <button className="btn-dark w-full py-3" onClick={send} disabled={pending || phone.replace(/\D/g, "").length < 10}>
-            {pending ? "Sending…" : "Send code"}
-          </button>
+          <>
+            <button className="btn-dark w-full py-3" onClick={() => send("sms")} disabled={pending || phone.replace(/\D/g, "").length < 10}>
+              {pending ? "Sending…" : "Send code"}
+            </button>
+            {/* Abraham: Owner only; the code always goes to the business email (hupupattractions@gmail.com) */}
+            <button type="button" data-email-code className="btn-ghost w-full py-2.5" onClick={() => send("email")} disabled={pending || phone.replace(/\D/g, "").length < 10}>
+              Send code by email <span className="font-normal text-muted">(Owner)</span>
+            </button>
+          </>
         )}
 
         {mode === "code" && sent && (
@@ -69,7 +77,7 @@ export default function LoginForm() {
               e.preventDefault();
               start(async () => {
                 setError(null);
-                const r = await verifyCodeAction(phone, code, trust);
+                const r = await verifyCodeAction(phone, code, trust, via);
                 if (r && !r.ok) setError(r.error ?? "Could not sign in.");
               });
             }}
