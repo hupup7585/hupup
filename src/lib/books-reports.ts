@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { todayISO } from "@/lib/dates";
 import { KIND_LABEL, agingBucket, countyFor, openBills, openInvoices, salesTaxPeriods, solaFee, type EntryKind } from "@/lib/books";
 import type { Sheet } from "@/lib/xlsx";
+import { getSettings } from "@/lib/settings";
 
 /** Bookkeeping reports (Abraham T). All amounts in cents; cash basis (money counted on the day it moves). */
 
@@ -252,15 +253,58 @@ export function processorView(entries: Entry[], percent: string, fixed: string) 
   };
 }
 
+/**
+ * Balance sheet as of a date (cash basis, Abraham DD). Assets: cash (opening balance from Settings plus every money
+ * movement in the books since), money customers owe (open invoices), equipment at book value. Liabilities: bills I
+ * owe, and sales tax collected but not yet paid (payments entered as expenses in a "Sales tax" category). Equity is
+ * what's left.
+ */
+export async function balanceSheet(asOf: string) {
+  const st = await getSettings();
+  const opening = Number(st.bookOpeningCashCents) || 0;
+  const since = /^\d{4}-\d{2}-\d{2}$/.test(st.bookOpeningDate) ? st.bookOpeningDate : "2000-01-01";
+  const entries = await entriesBetween(since, asOf);
+  const cash = opening + entries.reduce((s, e) => s + (["income", "deposit", "cancellation_fee"].includes(e.kind) ? e.amountCents : -e.amountCents), 0);
+  const ar = (await receivablesAging(asOf)).reduce((s, i) => s + i.balanceCents, 0);
+  const equipment = (await depreciation(Number(asOf.slice(0, 4)))).filter((q) => q.purchaseDate <= asOf).reduce((s, q) => s + q.bookValueCents, 0);
+  const ap = (await payablesAging(asOf)).reduce((s, b) => s + b.balanceCents, 0);
+  const all = await entriesBetween("2000-01-01", asOf);
+  const taxCollected = all.reduce((s, e) => s + (e.kind === "refund" ? -e.taxCents : ["income", "deposit", "cancellation_fee"].includes(e.kind) ? e.taxCents : 0), 0);
+  const taxPaid = all.filter((e) => e.kind === "expense" && /sales tax/i.test(e.category ?? "")).reduce((s, e) => s + e.amountCents, 0);
+  const taxPayable = Math.max(0, taxCollected - taxPaid);
+  const assets = cash + ar + equipment;
+  const liabilities = ap + taxPayable;
+  return { asOf, openingDate: since === "2000-01-01" ? null : since, cash, ar, equipment, assets, ap, taxPayable, liabilities, equity: assets - liabilities };
+}
+
+/** Date presets for every report: this month, last month, this quarter, year to date, last year. */
+export function datePresets(today: string): { key: string; label: string; from: string; to: string }[] {
+  const y = Number(today.slice(0, 4));
+  const m = Number(today.slice(5, 7));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const lastDay = (yy: number, mm: number) => new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+  const pm = m === 1 ? 12 : m - 1;
+  const py = m === 1 ? y - 1 : y;
+  const qStart = Math.floor((m - 1) / 3) * 3 + 1;
+  return [
+    { key: "this-month", label: "This month", from: `${y}-${pad(m)}-01`, to: `${y}-${pad(m)}-${pad(lastDay(y, m))}` },
+    { key: "last-month", label: "Last month", from: `${py}-${pad(pm)}-01`, to: `${py}-${pad(pm)}-${pad(lastDay(py, pm))}` },
+    { key: "quarter", label: "This quarter", from: `${y}-${pad(qStart)}-01`, to: `${y}-${pad(qStart + 2)}-${pad(lastDay(y, qStart + 2))}` },
+    { key: "ytd", label: "Year to date", from: `${y}-01-01`, to: today },
+    { key: "last-year", label: "Last year", from: `${y - 1}-01-01`, to: `${y - 1}-12-31` },
+  ];
+}
+
 /* ---------------- exports ---------------- */
 
 const $ = (c: number) => Math.round(c) / 100;
 
-export const BOOK_REPORTS = ["ledger", "pnl", "cashflow", "by-item", "by-channel", "expenses", "aging", "sales-tax", "equipment", "1099", "mileage"] as const;
+export const BOOK_REPORTS = ["ledger", "pnl", "balance-sheet", "cashflow", "by-item", "by-channel", "expenses", "aging", "sales-tax", "equipment", "1099", "mileage"] as const;
 export type BookReport = (typeof BOOK_REPORTS)[number];
 export const BOOK_REPORT_LABEL: Record<BookReport, string> = {
   ledger: "All entries (ledger)",
   pnl: "Profit and loss",
+  "balance-sheet": "Balance sheet",
   cashflow: "Cash flow",
   "by-item": "Income and profit by item",
   "by-channel": "Income by channel",
@@ -291,6 +335,29 @@ export async function buildBookReport(report: BookReport, from: string, to: stri
           name: "Profit and loss",
           header: ["Period", "Rental", "Delivery", "Tips", "Other income", "Deposits", "Cancellation fees", "Refunds", "Total income", ...cats, "Processor fees", "Staff and contractors", "Total expenses", "Net profit", "Sales tax collected (not income)"],
           rows: rows.map((r) => [r.period, $(r.rental), $(r.delivery), $(r.tips), $(r.otherIncome), $(r.deposits), $(r.cancellationFees), $(-r.refunds), $(r.totalIncome), ...cats.map((c) => $(r.expenses[c] ?? 0)), $(r.processorFees), $(r.contractors), $(r.totalExpenses), $(r.net), $(r.taxCollected)]),
+        },
+      ];
+    }
+    case "balance-sheet": {
+      const b = await balanceSheet(to);
+      return [
+        {
+          name: "Balance sheet",
+          header: ["", `As of ${to}`],
+          rows: [
+            ["ASSETS", null],
+            [`Cash${b.openingDate ? ` (opening balance ${b.openingDate} plus the books)` : " (from the books; set the opening balance in Settings)"}`, $(b.cash)],
+            ["Customers owe (open invoices)", $(b.ar)],
+            ["Equipment (book value)", $(b.equipment)],
+            ["Total assets", $(b.assets)],
+            ["LIABILITIES", null],
+            ["Bills I owe", $(b.ap)],
+            ["Sales tax collected, not yet paid", $(b.taxPayable)],
+            ["Total liabilities", $(b.liabilities)],
+            ["EQUITY", null],
+            ["Owner's equity", $(b.equity)],
+            ["Total liabilities and equity", $(b.liabilities + b.equity)],
+          ],
         },
       ];
     }

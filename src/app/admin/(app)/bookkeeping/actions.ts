@@ -299,7 +299,12 @@ export async function saveBookSettingsAction(f: FormData) {
     await saveSetting("solaFeePercent", pct, userId);
     await saveSetting("solaFeeCents", String(fixed), userId);
     await saveSetting("bookReminderDays", String(days), userId);
-    await bookAudit(userId, "settings_saved", "settings", null, { pct, fixed, days });
+    const opening = parseMoney(s(f, "openingCash") || "0");
+    if (opening === null) throw new BooksError("Enter the opening cash balance, for example 2500.00.");
+    const openingDate = isoDate(s(f, "openingDate")) ?? "";
+    await saveSetting("bookOpeningCashCents", String(opening), userId);
+    await saveSetting("bookOpeningDate", openingDate, userId);
+    await bookAudit(userId, "settings_saved", "settings", null, { pct, fixed, days, openingCash: s(f, "openingCash"), openingDate: s(f, "openingDate") });
     return "Settings saved.";
   });
 }

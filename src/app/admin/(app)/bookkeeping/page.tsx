@@ -7,7 +7,9 @@ import { KIND_LABEL, openBills, openInvoices, reminders, requireBooks, salesTaxP
 import {
   BOOK_REPORTS,
   BOOK_REPORT_LABEL,
+  balanceSheet,
   cashFlow,
+  datePresets,
   depreciation,
   entriesBetween,
   expensesByCategory,
@@ -85,13 +87,21 @@ export default async function BookkeepingPage({ searchParams }: { searchParams: 
       {tab === "mileage" && <Mileage from={from} to={to} />}
       {tab === "reports" && <Reports from={from} to={to} group={(["month", "quarter", "year"].includes(sp.group ?? "") ? sp.group : "month") as "month"} />}
       {tab === "ledger" && <Ledger from={from} to={to} />}
-      {tab === "settings" && <SettingsTab categories={categories} pct={settings.solaFeePercent} fixed={settings.solaFeeCents} days={settings.bookReminderDays} />}
+      {tab === "settings" && <SettingsTab categories={categories} pct={settings.solaFeePercent} fixed={settings.solaFeeCents} days={settings.bookReminderDays} openingCash={settings.bookOpeningCashCents} openingDate={settings.bookOpeningDate} />}
     </div>
   );
 }
 
-function RangeForm({ tab, from, to, extra }: { tab: string; from: string; to: string; extra?: React.ReactNode }) {
+function RangeForm({ tab, from, to, extra, group }: { tab: string; from: string; to: string; extra?: React.ReactNode; group?: string }) {
   return (
+    <>
+    <div className="mb-2 flex flex-wrap gap-2" data-date-presets>
+      {datePresets(todayISO()).map((p) => (
+        <Link key={p.key} href={`/admin/bookkeeping?tab=${tab}&from=${p.from}&to=${p.to}${group ? `&group=${group}` : ""}`} className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ring-line ${p.from === from && p.to === to ? "bg-navy text-white" : "bg-white text-navy hover:bg-bg"}`}>
+          {p.label}
+        </Link>
+      ))}
+    </div>
     <form className="mb-4 flex flex-wrap items-end gap-3" method="get">
       <input type="hidden" name="tab" value={tab} />
       <Field label="From"><input type="date" name="from" defaultValue={from} className="input" /></Field>
@@ -99,6 +109,7 @@ function RangeForm({ tab, from, to, extra }: { tab: string; from: string; to: st
       {extra}
       <button className="btn-dark">Show</button>
     </form>
+    </>
   );
 }
 
@@ -603,6 +614,7 @@ async function Reports({ from, to, group }: { from: string; to: string; group: "
         tab="reports"
         from={from}
         to={to}
+        group={group}
         extra={
           <Field label="Group by">
             <select name="group" defaultValue={group} className="input"><option value="month">Month</option><option value="quarter">Quarter</option><option value="year">Year</option></select>
@@ -620,6 +632,7 @@ async function Reports({ from, to, group }: { from: string; to: string; group: "
           ]}
         />
       </Card>
+      <BalanceSheetCard to={to} />
       <Card title="Profit and loss">
         <Table
           head={["Period", "Income", ...cats, "Processor fees", "Staff", "Expenses", "Net profit", "Sales tax collected"]}
@@ -641,6 +654,19 @@ async function Reports({ from, to, group }: { from: string; to: string; group: "
   );
 }
 
+async function BalanceSheetCard({ to }: { to: string }) {
+  const b = await balanceSheet(to);
+  const row = (label: string, v: number, strong = false) => [strong ? <b key="l">{label}</b> : label, strong ? <b key="v">{money(v)}</b> : money(v)];
+  return (
+    <Card title={`Balance sheet as of ${to}`} note={b.openingDate ? `Cash starts from your opening balance on ${b.openingDate}.` : "Set your opening cash balance under Settings so cash matches the bank."}>
+      <div className="grid gap-5 md:grid-cols-2" data-balance-sheet>
+        <Table head={["Assets", ""]} empty="" minWidth={300} rows={[row("Cash", b.cash), row("Customers owe (open invoices)", b.ar), row("Equipment (book value)", b.equipment), row("Total assets", b.assets, true)]} />
+        <Table head={["Liabilities and equity", ""]} empty="" minWidth={300} rows={[row("Bills I owe", b.ap), row("Sales tax collected, not yet paid", b.taxPayable), row("Total liabilities", b.liabilities, true), row("Owner's equity", b.equity, true)]} />
+      </div>
+    </Card>
+  );
+}
+
 async function Ledger({ from, to }: { from: string; to: string }) {
   const entries = (await entriesBetween(from, to)).reverse();
   return (
@@ -653,7 +679,7 @@ async function Ledger({ from, to }: { from: string; to: string }) {
   );
 }
 
-async function SettingsTab({ categories, pct, fixed, days }: { categories: (typeof schema.bookCategories.$inferSelect)[]; pct: string; fixed: string; days: string }) {
+async function SettingsTab({ categories, pct, fixed, days, openingCash, openingDate }: { categories: (typeof schema.bookCategories.$inferSelect)[]; pct: string; fixed: string; days: string; openingCash: string; openingDate: string }) {
   const locks = await db.select().from(schema.bookLocks).orderBy(desc(schema.bookLocks.month));
   return (
     <>
@@ -663,6 +689,8 @@ async function SettingsTab({ categories, pct, fixed, days }: { categories: (type
             <Field label="Sola rate (%)"><input name="solaFeePercent" defaultValue={pct} className="input" /></Field>
             <Field label="Sola fee per payment ($)"><input name="solaFeeFixed" defaultValue={((Number(fixed) || 0) / 100).toFixed(2)} className="input" /></Field>
             <Field label="Remind me this many days before"><input name="bookReminderDays" type="number" defaultValue={days} className="input" /></Field>
+            <Field label="Opening cash balance ($)"><input name="openingCash" defaultValue={((Number(openingCash) || 0) / 100).toFixed(2)} className="input" /></Field>
+            <Field label="Opening balance date"><input type="date" name="openingDate" defaultValue={openingDate} className="input" /></Field>
           </Grid>
           <Save />
         </form>

@@ -98,6 +98,9 @@ export const SETTING_DEFAULTS = {
   solaFeeCents: "0",
   /** Bookkeeping reminders: days before a bill, sales tax or estimated tax due date. */
   bookReminderDays: "7",
+  /** Balance sheet: cash in the bank on the day the books start (Owner enters it; cents) and that date. */
+  bookOpeningCashCents: "0",
+  bookOpeningDate: "",
   /** Stock / warehouse address: where the delivery run starts and ends (Delivery screen route links). Owner only. */
   stockAddress: "",
   /** Website note under the hours (Abraham's wording). */
