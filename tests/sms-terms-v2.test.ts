@@ -1,0 +1,158 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { renderToStaticMarkup } from "react-dom/server";
+
+/* SMS Terms Version 2 (Abraham Q): preview only. Written promotional consent = website box or a YES reply. Nothing is sent. */
+const h = vi.hoisted(() => ({
+  sent: [] as { to: string; body: string; event?: string }[],
+  session: { callSid: "CAv2", fromNumber: "+18455550177", orderId: null, data: { phone: "+18455550177" } as Record<string, unknown>, status: "in_progress", outcome: "browsing" },
+}));
+vi.mock("@/lib/db", async () => {
+  const { createMemoryDb } = await import("./helpers/memory-db");
+  const m = await createMemoryDb();
+  return { db: m.db, schema: m.schema };
+});
+vi.mock("@/lib/sms", async (orig) => ({
+  ...(await orig<typeof import("@/lib/sms")>()),
+  sendMessage: async (m: { to: string; body: string; event?: string }) => (h.sent.push(m), { sent: true }),
+  cancelQueuedPromotions: async () => {},
+}));
+vi.mock("@/lib/ivr/session", () => ({
+  ensureSession: async () => h.session,
+  getSession: async () => h.session,
+  updateSession: async (_s: string, patch: Record<string, unknown> & { data?: Record<string, unknown> }) => Object.assign(h.session, { ...patch, data: { ...h.session.data, ...(patch.data ?? {}) } }),
+}));
+vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
+
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
+import { handleVoice } from "@/lib/ivr/flow";
+import { detectKeywordDetail, handleInboundSms } from "@/lib/sms-inbound";
+import { assertApprovedEnrollment } from "@/lib/sms-consent";
+import { PROMPTS } from "@/lib/ivr/prompts";
+import * as v2 from "@/lib/sms-terms-v2";
+import SmsTerms from "@/app/sms-terms/page";
+
+const PHONE = "+18455550177";
+const call = (action: string, body: Record<string, string> = {}) =>
+  handleVoice({ action, query: new URLSearchParams(), body: { CallSid: "CAv2", ...body }, callSid: "CAv2", from: PHONE });
+const text = (Body: string, sid: string) => handleInboundSms({ From: PHONE, To: "+18454157585", Body, MessageSid: sid });
+const customer = async () => (await db.select().from(schema.customers).where(eq(schema.customers.phone, PHONE)))[0];
+const marketingRows = async () => (await db.select().from(schema.smsConsents).where(eq(schema.smsConsents.phone, PHONE))).filter((r) => r.scope === "marketing");
+
+beforeAll(() => {
+  process.env.PUBLIC_BASE_URL = "https://hupup.example";
+  process.env.SMS_TERMS_V2 = "1";
+});
+afterAll(() => {
+  delete process.env.SMS_TERMS_V2;
+});
+beforeEach(() => {
+  h.sent.length = 0;
+});
+
+describe("SMS Terms v2 switch", () => {
+  it("is on for previews only until Abraham approves", () => {
+    expect(v2.SMS_TERMS_V2_LIVE).toBe(false);
+    expect(v2.smsTermsV2Active({ VERCEL_ENV: "production" })).toBe(false);
+    expect(v2.smsTermsV2Active({ VERCEL_ENV: "preview" })).toBe(true);
+    expect(v2.smsTermsV2Active({})).toBe(false);
+    expect(v2.webConsentCopy({ VERCEL_ENV: "production" }).version).toBe("web-2026-11-05");
+    expect(v2.webConsentCopy({ VERCEL_ENV: "preview" }).marketing).toContain("Checking this box is my express written consent.");
+  });
+});
+
+describe("written promotional consent (phone keypress only sends a confirmation text)", () => {
+  it("press 1 sends the confirmation text and enrolls nothing; YES enrolls; a second YES does nothing", async () => {
+    const ask = await call("promo-consent");
+    expect(ask.replace(/&apos;/g, "'")).toContain(PROMPTS.consent_marketing_v2.text);
+
+    const after = await call("promo-consent-answer", { Digits: "1" });
+    expect(after.replace(/&apos;/g, "'")).toContain(PROMPTS.consent_marketing_sent.text);
+    expect(h.sent.map((m) => m.body)).toEqual([v2.PROMO_CONFIRM_REQUEST_SMS]);
+    expect(await marketingRows()).toHaveLength(0); // a keypress is not consent
+    expect((await customer())?.marketingOptIn ?? false).toBe(false);
+
+    await call("promo-consent-answer", { Digits: "1" }); // pressing again doesn't send a second text
+    expect(h.sent).toHaveLength(1);
+
+    h.sent.length = 0;
+    await text("Yes", "SMv2yes1");
+    const rows = await marketingRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ action: "opt_in", source: "sms_reply", method: "sms_reply", wording: v2.PROMO_CONFIRM_REQUEST_SMS, wordingVersion: v2.PROMO_CONFIRM_VERSION });
+    expect(rows[0].response).toContain("pressed 1 on call CAv2");
+    expect((await customer()).marketingOptIn).toBe(true);
+    expect(h.sent.map((m) => m.body)).toEqual([v2.PROMO_ENROLLED_SMS]);
+    expect(v2.PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You're signed up for promotional texts. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.");
+    expect(v2.PROMO_CONFIRM_REQUEST_SMS).toBe("Hup Up Attractions: Reply YES to get our promotional texts, such as special offers, discounts, and catalog updates. Consent is not required to buy. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.");
+
+    h.sent.length = 0;
+    await text("YES", "SMv2yes2");
+    expect(await marketingRows()).toHaveLength(1);
+    expect(h.sent).toHaveLength(0);
+  });
+
+  it("STOP cancels a waiting confirmation, so a late YES enrolls nothing", async () => {
+    await db.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.phone, PHONE));
+    await call("promo-consent-answer", { Digits: "1" });
+    await text("STOP", "SMv2stop");
+    await text("YES", "SMv2late");
+    expect((await customer()).marketingOptIn).toBe(false);
+    expect((await marketingRows()).filter((r) => r.action === "opt_in")).toHaveLength(1); // only the earlier one
+  });
+
+  it("a text reply can enroll only as YES to the promotional confirmation", () => {
+    expect(() => assertApprovedEnrollment({ action: "opt_in", scope: "marketing", source: "sms_reply", method: "sms_reply" })).toThrow();
+    expect(() => assertApprovedEnrollment({ action: "opt_in", scope: "transactional", source: "sms_reply", method: "sms_reply", viaPromoConfirmation: true })).toThrow();
+    expect(() => assertApprovedEnrollment({ action: "opt_in", scope: "marketing", source: "sms_reply", method: "sms_reply", viaPromoConfirmation: true })).not.toThrow();
+  });
+
+  it("staff can't enroll promotions in v2: a yes only sends the confirmation text", () => {
+    const a = readFileSync("src/app/admin/(app)/orders/consent-actions.ts", "utf8");
+    expect(a).toContain("requestPromoConfirmation");
+    expect(v2.staffDisclosure({ VERCEL_ENV: "preview" }).marketing).toContain("you'll be signed up only after you reply YES to that text");
+  });
+});
+
+describe("WRONG NUMBER (v2) and the terms page", () => {
+  it("WRONG NUMBER removes the number in v2 only", () => {
+    expect(detectKeywordDetail("Wrong number", true)).toEqual({ keyword: "stop", exact: false });
+    expect(detectKeywordDetail("sorry wrong number!", true).keyword).toBe("stop");
+    expect(detectKeywordDetail("Wrong number", false).keyword).toBeNull();
+    expect(detectKeywordDetail("Is the bounce house the wrong size?", true).keyword).toBeNull();
+  });
+
+  it("the nine sections render, and everything kept from v1 is still there", async () => {
+    const page = SmsTerms() as unknown as { type: (p: unknown) => Promise<React.ReactElement>; props: unknown }; // LegalPage is async
+    const html = renderToStaticMarkup(await page.type(page.props)).replace(/&#x27;|&rsquo;|’/g, "'");
+    for (const t of v2.SERVICE_TEXT_TYPES) expect(html).toContain(t);
+    for (const m of v2.MESSAGE_EXAMPLES) expect(html).toContain(m);
+    for (const s of ["Picture messages (MMS)", "Automated and staff messages", "discounts, special offers, and catalog updates", "Written consent for promotional texts", "Wrong number", "reply STOP or WRONG NUMBER"]) expect(html).toContain(s);
+    expect(html).toContain(v2.PRIVACY_V2);
+    for (const kept of ["NOPROMO", "Replying START", "8:00 a.m. and 9:00 p.m.", "24 months", "never a condition of purchase", "Reply HELP"]) expect(html).toContain(kept);
+  });
+});
+
+describe("Abraham U checks", () => {
+  it("delivery staff text only approved templates, only for a current stop, only to that order's phone", async () => {
+    const { isCurrentStop } = await import("@/lib/delivery-stops");
+    const now = new Date("2026-11-08T15:00:00Z");
+    expect(isCurrentStop({ status: "CONFIRMED", eventDate: "2026-11-08", pickupDate: "2026-11-09" }, now)).toBe(true);
+    expect(isCurrentStop({ status: "DELIVERED", eventDate: "2026-11-07", pickupDate: "2026-11-08" }, now)).toBe(true);
+    expect(isCurrentStop({ status: "CONFIRMED", eventDate: "2026-11-20", pickupDate: "2026-11-22" }, now)).toBe(false);
+    expect(isCurrentStop({ status: "CANCELLED", eventDate: "2026-11-08", pickupDate: "2026-11-09" }, now)).toBe(false);
+    const a = readFileSync("src/app/admin/deliveries/actions.ts", "utf8");
+    expect(a).toContain("const t = DELIVERY_TEMPLATES[key]");
+    expect(a).toContain("body: t.body");
+    expect(a).toContain("phone: full.customer.phone");
+    expect(a).toContain('staff.role === "delivery" && !isCurrentStop(full.order)');
+  });
+
+  it("HELP uses the same email as the live SMS Terms and Privacy Policy", async () => {
+    const { HELP_REPLY, HELP_EMAIL } = await import("@/lib/sms-inbound");
+    const { publicEmail } = await import("@/lib/config");
+    expect(HELP_EMAIL).toBe(publicEmail({ VERCEL_ENV: "production" }));
+    expect(HELP_REPLY).toContain(HELP_EMAIL);
+  });
+});

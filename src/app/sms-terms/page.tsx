@@ -3,6 +3,7 @@ import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 import { OPT_OUT_KEYWORDS, PROMO_OPENING, PROVIDER_DISCLOSURE, RECORD_RETENTION_MONTHS } from "@/lib/sms-consent-copy";
 import { smsNumberDisplay } from "@/lib/sms-number";
 import { publicEmail } from "@/lib/config";
+import { MESSAGE_EXAMPLES, PRIVACY_V2, SERVICE_TEXT_TYPES, smsTermsV2Active } from "@/lib/sms-terms-v2";
 
 export const metadata = {
   title: "SMS Terms | Hup Up Attractions",
@@ -14,6 +15,7 @@ export const revalidate = 3600;
 /** SMS program terms (A2P 10DLC): SMS messages only. Business and rental terms are on /terms. */
 export default function SmsTerms() {
   const sms = smsNumberDisplay();
+  const v2 = smsTermsV2Active(); // Version 2: previews only until Abraham approves it
   return (
     <LegalPage title="SMS Terms" updated="November 2026">
       <p>
@@ -23,9 +25,29 @@ export default function SmsTerms() {
 
       <h2>Order and service texts (transactional)</h2>
       <p>Texts about your reservations, orders, payments, deliveries, pickups, and customer service. You can agree on our website, on our phone line, or with our team.</p>
+      {v2 && (
+        <>
+          <p>Order and service texts may include:</p>
+          <ul data-v2="service-types">
+            {SERVICE_TEXT_TYPES.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+
+          <h2>Picture messages (MMS)</h2>
+          <p>If you agree to order and service texts, you may also receive picture messages from us, such as a photo confirming that your rental was delivered.</p>
+
+          <h2>Automated and staff messages</h2>
+          <p>
+            Some texts are sent automatically by our booking system. Authorized {BUSINESS_NAME_NB} staff may also send texts on our behalf using approved message templates, and may reply
+            to your questions. Some messages may be scheduled so they reach you at an appropriate time.
+          </p>
+        </>
+      )}
 
       <h2>Promotional texts</h2>
       <p>Offers and news from {BUSINESS_NAME_NB}, sent only if you agree to receive them. Agreeing is not required to book or buy anything.</p>
+      {v2 && <p>Promotional texts may include discounts, special offers, and catalog updates.</p>}
       <ul>
         <li>
           Every promotional text begins with <strong>&ldquo;{PROMO_OPENING}&rdquo;</strong>, followed by the offer.
@@ -36,6 +58,17 @@ export default function SmsTerms() {
           outside these hours.
         </li>
       </ul>
+
+      {v2 && (
+        <>
+          <h2>Written consent for promotional texts</h2>
+          <p>
+            We send promotional texts only with your express written consent. You can give it in one of two ways: by checking the separate promotional box on our website (it is never checked
+            for you), or by replying YES to our confirmation text. Pressing a key on our phone line, or telling our team yes, does not sign you up by itself. It only sends you that
+            confirmation text, and you are signed up for promotional texts only after you reply YES to it.
+          </p>
+        </>
+      )}
 
       <h2>Message frequency and cost</h2>
       <p>Message frequency varies. Message and data rates may apply. Carriers are not liable for delayed or undelivered messages.</p>
@@ -56,10 +89,31 @@ export default function SmsTerms() {
         promotional texts again after opting out, a separate new promotional opt-in is required.
       </p>
 
+      {v2 && (
+        <>
+          <h2>Wrong number</h2>
+          <p>
+            If you get a text from us that wasn&rsquo;t meant for you, reply STOP or WRONG NUMBER to {sms}, call (845) 777-7585, or email {publicEmail()}. We will remove the number and
+            stop texting it.
+          </p>
+        </>
+      )}
+
       <h2>Help</h2>
       <p>
         Reply HELP to {sms}, call (845) 777-7585, or email {publicEmail()}. A HELP response identifies Hup Up Attractions and provides our customer support telephone number and email address.
       </p>
+
+      {v2 && (
+        <>
+          <h2>Message examples</h2>
+          <ul data-v2="examples">
+            {MESSAGE_EXAMPLES.map((m) => (
+              <li key={m}>&ldquo;{m}&rdquo;</li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <h2>Service providers</h2>
       <p>{PROVIDER_DISCLOSURE}</p>
@@ -86,6 +140,7 @@ export default function SmsTerms() {
         . Text messaging originator opt-in data and consent will not be shared with any third parties, except service providers as described
         above.
       </p>
+      {v2 && <p>{PRIVACY_V2}</p>}
     </LegalPage>
   );
 }

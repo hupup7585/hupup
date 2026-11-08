@@ -405,7 +405,7 @@ export const smsReenrollRequests = pgTable(
     id: serial("id").primaryKey(),
     phone: text("phone").notNull(),
     customerId: integer("customer_id").references(() => customers.id),
-    /** Program being restored: always "transactional" (START never restores promotions) */
+    /** "transactional" (START -> YES; START never restores promotions) or "marketing" (SMS Terms v2 promotional confirmation -> YES) */
     scope: text("scope").notNull().default("transactional"),
     /** pending | confirmed | expired | canceled */
     status: text("status").notNull().default("pending"),

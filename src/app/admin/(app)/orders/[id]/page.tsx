@@ -6,7 +6,7 @@ import { formatPhone } from "@/lib/phone";
 import { StatusBadge } from "@/components/StatusBadge";
 import OrderActions from "./OrderActions";
 import ConsentPanel from "./ConsentPanel";
-import { STAFF_DISCLOSURE } from "@/lib/sms-consent-copy";
+import { staffDisclosure } from "@/lib/sms-terms-v2";
 import { NO_TEXT_CONSENT, hasTransactionalConsent } from "@/lib/sms";
 import DualDate from "@/components/DualDate";
 
@@ -70,7 +70,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               {textStatus === "ok" ? "Order texts: customer has given text consent." : textStatus === "stopped" ? "Customer replied STOP: no texts of any kind. They must text START and reply YES. Call or email instead." : NO_TEXT_CONSENT}
             </div>
           )}
-          {customer?.phone && <ConsentPanel orderId={o.id} phoneDisplay={formatPhone(customer.phone)} disclosures={STAFF_DISCLOSURE} stopped={textStatus === "stopped"} />}
+          {customer?.phone && <ConsentPanel orderId={o.id} phoneDisplay={formatPhone(customer.phone)} disclosures={staffDisclosure()} stopped={textStatus === "stopped"} />}
         </div>
         <OrderActions
           orderId={o.id}

@@ -15,7 +15,7 @@ export const CONSENT_WORDING_VERSION = "2026-11-05";
 
 export type ConsentScope = "transactional" | "marketing";
 export type ConsentAction = "opt_in" | "opt_out" | "declined";
-export type ConsentMethod = "keypad" | "speech" | "keyword" | "checkbox" | "staff";
+export type ConsentMethod = "keypad" | "speech" | "keyword" | "checkbox" | "staff" | "sms_reply";
 export type ConsentAnswer = "yes" | "no" | "unclear";
 
 /** Spoken answers below this Twilio confidence are asked again instead of being recorded. */
@@ -84,7 +84,7 @@ export type RecordConsentInput = {
   phone: string;
   scope: ConsentScope;
   action: ConsentAction;
-  source: "phone" | "pos" | "staff" | "keyword" | "web";
+  source: "phone" | "pos" | "staff" | "keyword" | "web" | "sms_reply";
   method: ConsentMethod;
   wording: string;
   wordingVersion: string;
@@ -100,6 +100,8 @@ export type RecordConsentInput = {
   disclosureRead?: boolean | null;
   /** Only the START -> YES confirmation may re-enroll a number that replied STOP. */
   viaStartConfirmation?: boolean;
+  /** SMS Terms v2: a YES reply to the promotional confirmation text (the written promotional consent). */
+  viaPromoConfirmation?: boolean;
 };
 
 /**
@@ -108,8 +110,12 @@ export type RecordConsentInput = {
  *    disclosure; or
  *  - the carrier-standard START keyword, for order and service texts only (never promotions).
  */
-export function assertApprovedEnrollment(input: Pick<RecordConsentInput, "action" | "scope" | "source" | "method" | "disclosureRead" | "viaStartConfirmation">) {
+export function assertApprovedEnrollment(input: Pick<RecordConsentInput, "action" | "scope" | "source" | "method" | "disclosureRead" | "viaStartConfirmation" | "viaPromoConfirmation">) {
   if (input.action !== "opt_in") return;
+  if (input.source === "sms_reply") {
+    if (input.scope !== "marketing" || !input.viaPromoConfirmation) throw new Error("A text reply only enrolls as a YES to the promotional confirmation text.");
+    return;
+  }
   if (input.source === "keyword" && input.scope === "marketing") throw new Error("Promotional texts can't be re-enrolled by keyword; new consent is required.");
   if (input.source === "keyword" && !input.viaStartConfirmation) throw new Error("A keyword alone can't enroll anyone: START must be confirmed with YES.");
   if ((input.source === "staff" || input.source === "pos") && !input.disclosureRead) throw new Error("Staff consent requires the entire disclosure to be read first.");

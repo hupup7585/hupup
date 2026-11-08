@@ -137,8 +137,9 @@ describe("website enrollment and SMS Terms page", () => {
     expect(a).toContain("Please check at least one box");
     expect(a).toContain('process.env.VERCEL_ENV === "preview"');
     expect(a).toContain("MAX_PER_PHONE_PER_DAY");
-    expect(a).toContain("wording: WEB_CONSENT_MARKETING");
-    expect(a).toContain("wording: WEB_CONSENT_TRANSACTIONAL");
+    // exact wording in force (v1 on live, v2 on previews until approved; see sms-terms-v2.ts)
+    expect(a).toContain("wording: copy.marketing");
+    expect(a).toContain("wording: copy.transactional");
   });
   it("SMS Terms page covers hours, opening, keywords, frequency, rates, help, providers and records", () => {
     for (const part of ["8:00 a.m. and 9:00 p.m. in your local time zone", "{PROMO_OPENING}", "OPT_OUT_KEYWORDS", "Message frequency varies", "Message and data rates may apply", "Reply HELP", "{PROVIDER_DISCLOSURE}", "RECORD_RETENTION_MONTHS", "never a condition of purchase"])

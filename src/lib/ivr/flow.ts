@@ -25,6 +25,8 @@ import { getSettings } from "@/lib/settings";
 import { computeTotals, deliveryZone } from "@/lib/pricing";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
+import { PROMO_CONFIRM_REQUEST_SMS, smsTermsV2Active } from "@/lib/sms-terms-v2";
+import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import {
   MARKETING_CONFIRMATION_SMS,
   TRANSACTIONAL_FOOTER,
@@ -220,7 +222,7 @@ async function customerByPhone(phone: string) {
 
 /** Store a phone consent decision with the exact language the caller heard. */
 async function recordPhoneConsent(ctx: Ctx, scope: "transactional" | "marketing", action: "opt_in" | "declined", phone: string) {
-  const key = scope === "transactional" ? "consent_transactional" : "consent_marketing";
+  const key = scope === "transactional" ? "consent_transactional" : smsTermsV2Active() ? "consent_marketing_v2" : "consent_marketing";
   const wording = promptText(ctx.prompts, key);
   const digits = ctx.body.Digits || "";
   const said = (ctx.body.SpeechResult || "").trim();
@@ -945,7 +947,7 @@ const handlers: Record<string, Handler> = {
       if (!shouldAskMarketing(await consentState(phone), customer)) return back(vr, "goodbye");
     }
     const g = speech(vr, url("promo-consent-answer", { n: ctx.query.get("n") ?? undefined }), CONSENT_HINTS, { dtmf: true, numDigits: 1 });
-    sp(g, ctx, retry ? "consent_unclear" : "consent_marketing");
+    sp(g, ctx, retry ? "consent_unclear" : smsTermsV2Active() ? "consent_marketing_v2" : "consent_marketing");
     return vr;
   },
 
@@ -955,6 +957,26 @@ const handlers: Record<string, Handler> = {
     const n = Number(ctx.query.get("n") || 0);
     const answer = parseConsentAnswer({ digits: ctx.body.Digits, speech: ctx.body.SpeechResult, confidence: ctx.body.Confidence });
     if (answer === "unclear" && n < 1) return back(vr, "promo-consent", { n: n + 1 });
+    if (smsTermsV2Active()) {
+      // SMS Terms v2: a keypress is not written consent. It only sends the confirmation text; a YES reply enrolls.
+      if (answer === "yes") {
+        const said = ctx.body.Digits ? `pressed ${ctx.body.Digits}` : `said "${(ctx.body.SpeechResult || "").trim()}"`;
+        const how = `phone: ${said} on call ${ctx.callSid} after hearing: ${promptText(ctx.prompts, "consent_marketing_v2")}`;
+        const r = await db.transaction(async (tx) => {
+          const [c] = await tx.select().from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1).for("update");
+          return requestPromoConfirmation(tx, c ?? null, phone, how);
+        });
+        if (r.sendConfirmation) {
+          const c = await customerByPhone(phone);
+          await sendMessage({ to: phone, body: PROMO_CONFIRM_REQUEST_SMS, kind: "system", event: "promo_confirm_request", customerId: c?.id ?? null, callSid: ctx.callSid });
+        }
+        sp(vr, ctx, "consent_marketing_sent");
+        return back(vr, "goodbye");
+      }
+      await recordPhoneConsent(ctx, "marketing", "declined", phone);
+      if (answer === "no") sp(vr, ctx, "consent_marketing_no");
+      return back(vr, "goodbye");
+    }
     // Never auto-enroll: only a clear "yes" (key 1, or a confident spoken yes) opts in.
     const customerId = await recordPhoneConsent(ctx, "marketing", answer === "yes" ? "opt_in" : "declined", phone);
     if (answer === "yes") {

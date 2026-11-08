@@ -8,7 +8,7 @@ import { toE164 } from "@/lib/phone";
 import { sendMessage } from "@/lib/sms";
 import { MARKETING_CONFIRMATION_SMS, TRANSACTIONAL_CONFIRMATION_SMS, recordConsent, setCustomerTimeZone } from "@/lib/sms-consent";
 import { isSelectableTimeZone } from "@/lib/area-code-tz";
-import { WEB_CONSENT_MARKETING, WEB_CONSENT_TRANSACTIONAL, WEB_CONSENT_VERSION } from "@/lib/sms-consent-copy";
+import { webConsentCopy } from "@/lib/sms-terms-v2";
 
 export type SignUpState = { ok?: boolean; error?: string; stopped?: boolean; promo?: boolean; orders?: boolean };
 
@@ -58,10 +58,11 @@ export async function signUpForTexts(_prev: SignUpState, form: FormData): Promis
   const [customer] = await db.select().from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1);
   if (customer?.smsOptOut) return { stopped: true };
 
-  const base = { phone, source: "web" as const, method: "checkbox" as const, wordingVersion: WEB_CONSENT_VERSION, response: "checked", ip, userAgent, pageUrl };
+  const copy = webConsentCopy();
+  const base = { phone, source: "web" as const, method: "checkbox" as const, wordingVersion: copy.version, response: "checked", ip, userAgent, pageUrl };
   let customerId = customer?.id;
-  if (orders) customerId = await recordConsent({ ...base, scope: "transactional", action: "opt_in", wording: WEB_CONSENT_TRANSACTIONAL });
-  if (promo) customerId = await recordConsent({ ...base, scope: "marketing", action: "opt_in", wording: WEB_CONSENT_MARKETING });
+  if (orders) customerId = await recordConsent({ ...base, scope: "transactional", action: "opt_in", wording: copy.transactional });
+  if (promo) customerId = await recordConsent({ ...base, scope: "marketing", action: "opt_in", wording: copy.marketing });
 
   if (isSelectableTimeZone(timeZone)) await setCustomerTimeZone(phone, timeZone, "web_form");
 

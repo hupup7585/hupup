@@ -2,6 +2,7 @@ import LegalPage from "@/components/site/LegalPage";
 import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 import { PROVIDER_DISCLOSURE, RECORD_RETENTION_MONTHS } from "@/lib/sms-consent-copy";
 import { publicEmail } from "@/lib/config";
+import { PRIVACY_V2, smsTermsV2Active } from "@/lib/sms-terms-v2";
 
 export const metadata = {
   title: "Privacy Policy | Hup Up Attractions",
@@ -34,6 +35,7 @@ export default function Privacy() {
         parties, except service providers as described here. We keep records of text consent, opt-outs, and the texts we send for at least {RECORD_RETENTION_MONTHS} months. See our{" "}
         <a className="underline" href="/sms-terms">SMS Terms</a>.
       </p>
+      {smsTermsV2Active() && <p>{PRIVACY_V2}</p>}
       <h2>Sharing</h2>
       <p>We share information only with service providers that help us run our business, such as our phone, text messaging, and payment providers, and only as needed to provide our services.</p>
       <h2>Contact</h2>

@@ -96,6 +96,7 @@ export const SYSTEM_EVENTS: Record<string, { afterStop: boolean }> = {
   consent_confirmation: { afterStop: false }, // confirmation right after a customer opts in
   opt_out_confirmation: { afterStop: true }, // the single permitted confirmation of an opt-out
   reenroll_request: { afterStop: true }, // the START confirmation asking the customer to reply YES
+  promo_confirm_request: { afterStop: false }, // SMS Terms v2: asks for a YES reply (written promotional consent)
 };
 
 export type Customer = typeof schema.customers.$inferSelect;

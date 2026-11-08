@@ -8,7 +8,10 @@ import { db, schema } from "@/lib/db";
 import { getOrderWithItems } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { ConsentBlockedError, recordStaffConsent, type ConsentScope, type StaffResponse } from "@/lib/sms-consent";
-import { STAFF_CONSENT_VERSION, STAFF_DISCLOSURE } from "@/lib/sms-consent-copy";
+import { STAFF_CONSENT_VERSION } from "@/lib/sms-consent-copy";
+import { PROMO_CONFIRM_REQUEST_SMS, smsTermsV2Active, staffDisclosure } from "@/lib/sms-terms-v2";
+import { requestPromoConfirmation } from "@/lib/sms-reenroll";
+import { sendMessage } from "@/lib/sms";
 
 export type ConsentActionResult = { ok: boolean; message: string };
 
@@ -30,7 +33,32 @@ export async function recordStaffConsentAction(orderId: number, form: { scope: C
   const phone = full?.customer?.phone;
   if (!phone) return { ok: false, message: "This order has no customer phone number." };
 
-  const wording = STAFF_DISCLOSURE[form.scope].replace("{phone}", formatPhone(phone));
+  const wording = staffDisclosure()[form.scope].replace("{phone}", formatPhone(phone));
+  // SMS Terms v2: a spoken yes to promotions is not written consent. Staff only trigger the confirmation text;
+  // the customer is enrolled when they reply YES to it.
+  if (smsTermsV2Active() && form.scope === "marketing" && form.response === "clear_yes") {
+    const how = `staff user ${session.userId ?? "?"} on order ${orderId} after reading: ${wording}`;
+    const r = await db.transaction(async (tx) => {
+      const [c] = await tx.select().from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1).for("update");
+      return requestPromoConfirmation(tx, c ?? null, phone, how);
+    });
+    if (r.sendConfirmation) await sendMessage({ to: phone, body: PROMO_CONFIRM_REQUEST_SMS, kind: "system", event: "promo_confirm_request", customerId: full!.customer!.id, orderId });
+    await db.insert(schema.auditLog).values({
+      userId: session.userId ?? null,
+      action: "sms_consent.promo_confirmation_requested",
+      entityType: "customer",
+      entityId: String(full!.customer!.id),
+      after: { orderId, result: r.reason },
+    });
+    revalidatePath(`/admin/orders/${orderId}`);
+    const why: Record<string, string> = {
+      pending_created: "Confirmation text sent. The customer is signed up for promotional texts only after they reply YES to it.",
+      already_pending: "A confirmation text is already waiting for the customer's YES reply.",
+      already_enrolled: "This customer is already signed up for promotional texts.",
+      opted_out: "This number replied STOP, so no confirmation text can be sent.",
+    };
+    return { ok: r.reason !== "opted_out", message: why[r.reason] ?? r.reason };
+  }
   try {
     await recordStaffConsent({
     phone,

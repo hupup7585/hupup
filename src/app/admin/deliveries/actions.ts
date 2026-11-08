@@ -7,6 +7,7 @@ import { getOrderWithItems, setOrderStatus, orderNumber } from "@/lib/orders";
 import { sendOrderText } from "@/lib/notify";
 import { BUSINESS_NAME } from "@/lib/config";
 import { DELIVERY_TEMPLATES, type TemplateKey } from "@/lib/delivery-templates";
+import { isCurrentStop } from "@/lib/delivery-stops";
 
 export type DeliveryResult = { ok: boolean; message: string };
 
@@ -17,6 +18,9 @@ export async function sendTemplateAction(orderId: number, key: TemplateKey): Pro
   if (!t) return { ok: false, message: "Choose an approved message." };
   const full = await getOrderWithItems(orderId);
   if (!full?.customer?.phone) return { ok: false, message: "No customer phone on this order." };
+  // Delivery staff (Abraham U): only for an order that is one of their current stops (delivery or pickup today,
+  // or yesterday's late stop), and only to that order's own phone number (taken from the order, never the browser).
+  if (staff.role === "delivery" && !isCurrentStop(full.order)) return { ok: false, message: "You can only text the customer of one of today's stops." };
   const r = await sendOrderText({
     phone: full.customer.phone,
     email: full.customer.email,
