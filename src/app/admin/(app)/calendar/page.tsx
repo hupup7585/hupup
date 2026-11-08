@@ -9,6 +9,7 @@ import { orderNumber } from "@/lib/orders";
 import { StatusBadge } from "@/components/StatusBadge";
 import DualDate, { HebrewDay } from "@/components/DualDate";
 import { dualDate } from "@/lib/dual-date";
+import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
 
 export default async function CalendarPage({
   searchParams,
@@ -146,7 +147,7 @@ export default async function CalendarPage({
               {list.length === 0 && <p className="text-sm text-muted">None.</p>}
               {list.map((r) => (
                 <Link key={r.id} href={`/admin/orders/${r.id}`} className="mb-2 flex items-start gap-3 rounded-xl bg-bg p-3 hover:bg-[#ECF1F9]">
-                  <b className="min-w-14">{r.delivery_time || (kind === "delivery" ? "AM" : "—")}</b>
+                  <b className="min-w-14 whitespace-nowrap">{kind === "delivery" ? "9–12" : `By ${PICKUP_BY}`}</b>
                   <span className="min-w-0 flex-1">
                     <span className="font-semibold">{r.items}</span>
                     <span className="block text-sm text-muted">

@@ -81,7 +81,6 @@ export async function updateDetailsAction(orderId: number, form: FormData): Prom
     .update(schema.orders)
     .set({
       deliveryAddress: String(form.get("deliveryAddress") || "") || null,
-      deliveryTime: String(form.get("deliveryTime") || "") || null,
       notes: String(form.get("notes") || "") || null,
       updatedAt: new Date(),
     })

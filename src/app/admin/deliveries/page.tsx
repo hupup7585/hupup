@@ -12,6 +12,7 @@ import PrintButton from "@/components/staff/PrintButton";
 import { logoutAction } from "../login/actions";
 import StopActions from "./StopActions";
 import DualDate from "@/components/DualDate";
+import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Deliveries · Hup Up Attractions", robots: { index: false } };
@@ -135,7 +136,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 font-bold">
                       <Clock className="h-4 w-4" aria-hidden />
-                      <span>{o.deliveryTime || "Time not set"}</span>
+                      <span>{stop === "delivery" ? DELIVERY_WINDOW : `By ${PICKUP_BY}`}</span>
                       <span className="text-muted">· {stop === "delivery" ? "Delivery" : "Pickup"} · #{orderNumber(o.id)}</span>
                     </div>
                     <Badge tone={tone}>{done ? (stop === "delivery" ? "Delivered" : "Picked up") : stop === "delivery" ? "Scheduled" : "To pick up"}</Badge>

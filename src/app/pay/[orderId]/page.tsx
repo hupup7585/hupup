@@ -53,6 +53,9 @@ export default async function PayPage({ params, searchParams }: { params: Promis
             </ul>
           </section>
         ))}
+        <p data-rental-window className="mt-3 rounded-lg bg-hu-tint px-3 py-2 text-sm">
+          We deliver between 9:00 AM and 12:00 PM on your delivery day. On your pickup day, please have the rental outside your door by 9:00 AM.
+        </p>
         <ul className="mt-3 text-sm">
           <li className="flex justify-between border-t pt-2 text-base font-bold"><span>Total due</span><span>{money(due)}</span></li>
         </ul>

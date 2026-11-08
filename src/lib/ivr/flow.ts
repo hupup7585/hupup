@@ -491,7 +491,7 @@ const handlers: Record<string, Handler> = {
       return back(vr, "date", { p, n: Number(ctx.query.get("n") || 0) + 1 });
     }
     const g = keypad(vr, url("date-confirm", { p, d: r.date }));
-    sp(g, ctx, "date_confirm", { date: longDate(r.date), pickup: longDate(pickupDateFor(r.date, cal)) });
+    sp(g, ctx, "date_confirm_day", { date: longDate(r.date), pickup: longDate(pickupDateFor(r.date, cal)) });
     return noInput(vr, ctx, "date", { p });
   },
 

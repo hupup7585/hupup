@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import type { OrderStatus } from "@/lib/db/schema";
 import { recordPaymentAction, sendPayLinkAction, updateDetailsAction, updateStatusAction, type ActionResult } from "../actions";
+import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
 
 const NEXT: { status: OrderStatus; label: string; cls: string }[] = [
   { status: "CONFIRMED", label: "✅ Confirmed", cls: "btn-ghost" },
@@ -71,7 +72,7 @@ export default function OrderActions(props: {
       <form className="card space-y-3 p-5" action={(fd) => run(() => updateDetailsAction(props.orderId, fd))}>
         <h2 className="font-bold">Delivery details</h2>
         <div><label className="label">Address</label><input name="deliveryAddress" defaultValue={props.deliveryAddress} className="input" /></div>
-        <div><label className="label">Delivery time</label><input name="deliveryTime" defaultValue={props.deliveryTime} placeholder="e.g. 9:00 AM" className="input" /></div>
+        <p className="text-sm text-muted">Delivery {DELIVERY_WINDOW} · pickup by {PICKUP_BY} (whole rental days)</p>
         <div><label className="label">Notes</label><textarea name="notes" defaultValue={props.notes} rows={3} className="input" /></div>
         <button className="btn-dark w-full" disabled={pending}>Save</button>
       </form>

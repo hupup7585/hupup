@@ -5,9 +5,10 @@ import { getSettings } from "@/lib/settings";
 import { calendarDefaults, nextOpenDay, type CalendarSettings } from "@/lib/jewish-calendar";
 
 /**
- * Inventory rule: a rented unit is OUT on its event (delivery) day AND the
- * next day (pickup day). A booking for day D therefore needs a free unit on
- * both D and D+1.
+ * Inventory rule (Abraham, Nov 8, 2026): bookings are whole rental days. A rented unit is OUT from its delivery day
+ * (delivered 9:00 AM to 12:00 PM) through its pickup day (out the door by 9:00 AM), and on every day in between.
+ * There is no pickup on Shabbos or Yom Tov, so a Friday booking is picked up Sunday and holds the unit Friday,
+ * Shabbos and Sunday. A booking for day D needs a free unit on every day from D through its pickup day.
  *
  * Orders that occupy inventory:
  *  - CONFIRMED, DELIVERED                       always
@@ -50,7 +51,11 @@ export async function getUsage(
            SUM(CASE WHEN o.status = 'HOLD' THEN oi.qty ELSE 0 END)::int AS held
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
-    CROSS JOIN LATERAL (VALUES (o.event_date, 'event'), (o.pickup_date, 'pickup')) AS d(day, kind)
+    -- every day from delivery through pickup (a Friday booking holds Friday, Shabbos and Sunday)
+    CROSS JOIN LATERAL (
+      SELECT g::date AS day, CASE WHEN g::date = o.event_date THEN 'event' ELSE 'pickup' END AS kind
+      FROM generate_series(o.event_date::timestamp, greatest(o.pickup_date, o.event_date)::timestamp, interval '1 day') AS g
+    ) AS d
     WHERE ${ACTIVE_ORDER_SQL}
       AND d.day BETWEEN ${fromISO}::date AND ${toISO}::date
       ${productFilter}
@@ -87,9 +92,11 @@ export function pickupDateFor(eventDate: string, cal: CalendarSettings = calenda
   return nextOpenDay(addDays(eventDate, 1), cal);
 }
 
-/** Units that can be booked for an event on `eventDate` (needs the event day and the pickup day). */
+/** Units that can be booked for an event on `eventDate`: free on every day from delivery through pickup. */
 export function bookableQty(quantity: number, usage: UsageMap, productId: number, eventDate: string, pickupDate: string = addDays(eventDate, 1)): number {
-  return Math.min(freeOnDay(quantity, usage, productId, eventDate), freeOnDay(quantity, usage, productId, pickupDate));
+  let free = quantity;
+  for (let d = eventDate; d <= pickupDate; d = addDays(d, 1)) free = Math.min(free, freeOnDay(quantity, usage, productId, d));
+  return free;
 }
 
 /** Bookable units for one product on one event date (fresh DB read). Pass `pickupDate` when inside a transaction. */

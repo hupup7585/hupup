@@ -27,7 +27,7 @@ describe("hotline prompts", () => {
   });
   it("recordings only replace prompts without placeholders", () => {
     expect(promptAudio({ greeting: { text: null, audioUrl: "https://x/a.mp3" } }, "greeting")).toBe("https://x/a.mp3");
-    expect(promptAudio({ date_confirm: { text: null, audioUrl: "https://x/b.mp3" } }, "date_confirm")).toBeNull();
+    expect(promptAudio({ date_confirm_day: { text: null, audioUrl: "https://x/b.mp3" } }, "date_confirm_day")).toBeNull();
   });
   it("the business name is never misspelled anywhere in the source", () => {
     const bad = /h[o0]p[\s_-]?up/i;

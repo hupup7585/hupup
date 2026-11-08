@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { availabilityFor, createBookingAction, type PosResult , calendarFor, checkDateFor, type CalendarDay, type DateCheck } from "./actions";
 import DualDate, { HebrewDay } from "@/components/DualDate";
 import { englishDate } from "@/lib/dual-date";
+import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
 
 type P = { id: number; categoryId: number; name: string; priceCents: number; quantity: number };
 
@@ -139,7 +140,8 @@ export default function PosForm(props: {
         <input className="input" placeholder="Mobile phone" inputMode="tel" value={form.phone} onChange={set("phone")} />
         <input className="input" placeholder="Email (optional)" type="email" value={form.email} onChange={set("email")} />
         <input className="input" placeholder="Delivery address" value={form.address} onChange={set("address")} />
-        <input className="input" placeholder="Delivery time (optional, e.g. 9:00 AM)" value={form.deliveryTime} onChange={set("deliveryTime")} />
+        {/* Whole rental days (Abraham): no delivery time; delivery is always 9:00 AM - 12:00 PM, pickup by 9:00 AM */}
+        <p data-rental-window className="text-sm text-muted">Delivery {DELIVERY_WINDOW} · pickup by {PICKUP_BY} on the pickup day</p>
         <textarea className="input" placeholder="Notes" rows={2} value={form.notes} onChange={set("notes")} />
         {props.askTerms !== false && (
         <label className="block">

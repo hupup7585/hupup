@@ -61,7 +61,7 @@ export const PROMPTS = {
   date_past: { group: "Date & quantity", label: "Date already passed", text: "Hmm, that date has already passed. Let's pick another one." },
   date_too_far: { group: "Date & quantity", label: "Date too far ahead", text: "We can book up to one year ahead. Let's pick a date a little sooner." },
   date_unclear: { group: "Date & quantity", label: "Didn't understand the date", text: "Sorry, I didn't quite get that date. Let's try that again." },
-  date_confirm: { group: "Date & quantity", label: "Confirm the date", text: "Got it, {date}! We'll deliver that day and pick up on {pickup}. Press 1 if that's right, or 2 to pick a different date.", vars: ["date", "pickup"] },
+  date_confirm_day: { group: "Date & quantity", label: "Confirm the date (whole rental day, delivery and pickup times)", text: "Got it, {date}! We'll deliver that day between 9 AM and noon, and pick up on {pickup}. Please have the rental outside your door by 9 AM that morning. Press 1 if that's right, or 2 to pick a different date.", vars: ["date", "pickup"] },
   sold_out: { group: "Date & quantity", label: "Item booked up", text: "Oh no, the {item} is all booked up on {date}.", vars: ["item", "date"] },
   sold_out_options_cart: { group: "Date & quantity", label: "Booked-up options (has cart)", text: "To look at other rentals, press 1. To hear your cart, press 9. For the main menu, press star." },
   sold_out_options: { group: "Date & quantity", label: "Booked-up options (no cart)", text: "To try a different date, press 1. To look at other rentals, press 2. For the main menu, press star." },
