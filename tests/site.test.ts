@@ -478,13 +478,24 @@ describe("logo mock-up (Abraham)", () => {
 
 describe("website Hours (Abraham's simple list)", () => {
   it("shows exactly his lines and the 24/7 note, with nothing about holidays", async () => {
-    const { WEBSITE_HOURS, WEBSITE_HOURS_NOTE } = await import("@/lib/site-copy");
+    const { WEBSITE_HOURS_NOTE } = await import("@/lib/site-copy");
+    // Built from Admin Settings, the same hours the phone line uses (with the default settings: Abraham's lines)
+    const { websiteHoursLines, hoursDefaults } = await import("@/lib/business-hours");
+    const WEBSITE_HOURS = websiteHoursLines(hoursDefaults());
     expect(WEBSITE_HOURS).toEqual([
       "Sunday: 11:30 AM - 7:00 PM",
       "Monday - Thursday: 10:30 AM - 7:00 PM",
       "Friday: 10:30 AM - Chatzos",
       "Shabbos: Closed",
       "Motzei Shabbos: Winter: 2 hours after Shabbos - 11:00 PM\nSummer: 12:00 AM",
+    ]);
+    // A change in Admin Settings shows on the website too (the two can never differ)
+    expect(websiteHoursLines({ ...hoursDefaults(), hoursMonThu: "10:00-20:00", hoursSunday: "12:00-18:30", hoursFridayOpen: "9:30", hoursMotzeiOpen: "tzeis+90", hoursMotzeiCloseWinter: "23:30", hoursMotzeiCloseSummer: "01:00" })).toEqual([
+      "Sunday: 12:00 PM - 6:30 PM",
+      "Monday - Thursday: 10:00 AM - 8:00 PM",
+      "Friday: 9:30 AM - Chatzos",
+      "Shabbos: Closed",
+      "Motzei Shabbos: Winter: 90 minutes after Shabbos - 11:30 PM\nSummer: 1:00 AM",
     ]);
     expect(WEBSITE_HOURS_NOTE).toBe("Book by phone anytime, 24/7.");
     // The card splits each line at the first ": " (day label, then hours), so Motzei Shabbos shows Abraham's two lines
@@ -493,7 +504,9 @@ describe("website Hours (Abraham's simple list)", () => {
     expect(motzei.slice(motzei.indexOf(": ") + 2).split("\n")).toEqual(["Winter: 2 hours after Shabbos - 11:00 PM", "Summer: 12:00 AM"]);
     const page = readFileSync("src/app/page.tsx", "utf8");
     const hours = page.slice(page.indexOf('id="hours"'), page.indexOf('id="contact"'));
-    expect(hours).toContain("WEBSITE_HOURS.map(");
+    expect(hours).toContain("websiteHoursLines(settings).map(");
+    expect(readFileSync("src/lib/site-copy.ts", "utf8")).not.toMatch(/AM - 7:00 PM|Chatzos"/); // no fixed hours text left
+    expect(readFileSync("src/app/admin/(app)/settings/calendar-actions.ts", "utf8")).toContain('revalidatePath("/")');
     // phones: a time and its range never split across lines; the words stay exactly the same
     const { keepTimesTogether } = await import("@/lib/site-copy");
     expect(keepTimesTogether("Winter: 2 hours after Shabbos - 11:00 PM")).toBe("Winter: 2 hours after Shabbos\u00A0-\u00A011:00\u00A0PM");

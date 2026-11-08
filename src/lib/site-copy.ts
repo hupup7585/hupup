@@ -18,14 +18,8 @@ export const STEPS = [
 /** Delivery always costs extra. Never state an amount (not supplied yet) or suggest it costs nothing. */
 export const DELIVERY_FEE_NOTE = "Delivery available. Call for pricing.";
 /** Website Hours (Abraham's exact lines). No holidays on the website: holiday rules live in the phone system and admin. */
-export const WEBSITE_HOURS = [
-  "Sunday: 11:30 AM - 7:00 PM",
-  "Monday - Thursday: 10:30 AM - 7:00 PM",
-  "Friday: 10:30 AM - Chatzos",
-  "Shabbos: Closed",
-  // Abraham's layout: two lines under Motzei Shabbos
-  "Motzei Shabbos: Winter: 2 hours after Shabbos - 11:00 PM\nSummer: 12:00 AM",
-] as const;
+/* The hours themselves come from Admin Settings (websiteHoursLines in src/lib/business-hours.ts), the same hours the
+   phone line uses, so the website and the phone can never differ. */
 export const WEBSITE_HOURS_NOTE = "Book by phone anytime, 24/7.";
 
 /**

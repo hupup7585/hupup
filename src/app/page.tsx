@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { websiteHoursLines } from "@/lib/business-hours";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
-import { BUSINESS_NAME_NB, keepName, whyLabel, whyRows, HOW_IT_WORKS_DELIVERY, WEBSITE_HOURS, WEBSITE_HOURS_NOTE, keepTimesTogether, noLonelyWord, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces, SERVICE_AREA_MAP_URL } from "@/lib/site-copy";
+import { BUSINESS_NAME_NB, keepName, whyLabel, whyRows, HOW_IT_WORKS_DELIVERY, WEBSITE_HOURS_NOTE, keepTimesTogether, noLonelyWord, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces, SERVICE_AREA_MAP_URL } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -240,7 +241,7 @@ export default async function Home() {
               </a>
             </div>
             <ul data-hours-list className="divide-y-2 divide-hu-deep/10 rounded-2xl border-2 border-hu-deep/10 bg-white px-5 text-lg">
-              {WEBSITE_HOURS.map((line) => {
+              {websiteHoursLines(settings).map((line) => {
                 const i = line.indexOf(": ");
                 return (
                   <li key={line} className="py-3">

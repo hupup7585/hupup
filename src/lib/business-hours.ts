@@ -155,6 +155,31 @@ export function hoursLines(s: HoursSettings = hoursDefaults()): string[] {
   ];
 }
 
+/**
+ * The website "Our Hours" card (Abraham): built from the same Admin Settings hours the phone line uses, so the two
+ * can never differ. Same layout as Abraham's list: "Day: hours", with Motzei Shabbos on two lines.
+ */
+export function websiteHoursLines(s: HoursSettings = hoursDefaults()): string[] {
+  const dash = (r: string) => {
+    const [a, b] = r.split("-");
+    return `${ampm(a)} - ${ampm(b)}`;
+  };
+  const after = s.hoursMotzeiOpen.trim().match(/^tzeis(?:\+(\d+))?$/);
+  const n = after ? Number(after[1] ?? 0) : 0;
+  const motzeiOpen = after
+    ? n === 0
+      ? "When Shabbos ends"
+      : `${n % 60 === 0 ? `${n / 60} hour${n === 60 ? "" : "s"}` : `${n} minutes`} after Shabbos`
+    : ampm(s.hoursMotzeiOpen);
+  return [
+    `Sunday: ${dash(s.hoursSunday)}`,
+    `Monday - Thursday: ${dash(s.hoursMonThu)}`,
+    `Friday: ${ampm(s.hoursFridayOpen)} - Chatzos`,
+    "Shabbos: Closed",
+    `Motzei Shabbos: Winter: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseWinter)}\nSummer: ${ampm(s.hoursMotzeiCloseSummer)}`,
+  ];
+}
+
 /** Today's office hours as one line, e.g. "Today: 10:30 AM to 7:00 PM" or "Closed today (Shabbos). Open tonight from 7:22 PM to 11:00 PM." */
 export function todayHours(at: Date = new Date(), s: HoursSettings = hoursDefaults()): string {
   const iso = localISO(at);
