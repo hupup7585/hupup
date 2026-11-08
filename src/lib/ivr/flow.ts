@@ -280,7 +280,7 @@ const handlers: Record<string, Handler> = {
    * With ?first=1 (the incoming call, star, and each replay after silence) the greeting and the closed / open-late
    * line play inside the same Gather, so any key works at any time, even during the greeting. After the last line it
    * waits 4 seconds; no choice replays the whole menu, and after 3 plays the existing goodbye line plays and the call
-   * ends. A wrong key ("Oops…") replays the menu lines without the greeting, as before.
+   * ends. A wrong key ("Sorry, that is not a valid selection…") replays the menu lines without the greeting, as before.
    */
   async menu(ctx, vr) {
     const cats = await phoneCategories();
@@ -310,7 +310,7 @@ const handlers: Record<string, Handler> = {
       }
     }
     const lines = [
-      "main_extension",
+      "main_enter_extension",
       "main_book",
       "main_equipment",
       "main_learn",
@@ -321,7 +321,7 @@ const handlers: Record<string, Handler> = {
       "main_organizations",
       "main_9",
       "main_0",
-      "main_star",
+      "main_star_again",
       "main_thanks",
     ] as const;
     lines.forEach((k, i) => {
@@ -364,7 +364,7 @@ const handlers: Record<string, Handler> = {
         return back(vr, "voicemail");
       default:
         // Abraham: any key with no action says this, then the main menu plays again
-        sp(vr, ctx, "main_invalid");
+        sp(vr, ctx, "main_not_valid");
         return back(vr, "menu");
     }
   },

@@ -43,7 +43,7 @@ beforeEach(async () => {
 });
 
 const MENU = [
-  "If you know your desired extension, you may press it at any time.",
+  "If you know your desired extension, you may enter it at any time.",
   "For reservations and bookings, press 1.",
   "For instructions and guidance on using our rental equipment, press 2.",
   "To learn more about our rental attractions and the services we offer, press 3.",
@@ -54,7 +54,7 @@ const MENU = [
   "For schools, corporate events, and organizational bookings, press 8.",
   "To leave a message in our general voicemail, press 9.",
   "To speak with an operator, press 0.",
-  "To hear the menu again, press the star key.",
+  "To hear this menu again, press the star key.",
   "Thank you for choosing Hup Up Attractions. We look forward to serving you!",
 ];
 const GREETING = "Hi! Thank you for calling Hup Up Attractions, bringing something special to every occasion!";
@@ -141,7 +141,8 @@ describe("every key, office open", () => {
   });
   it("# is not an option: Abraham's line, then the main menu again; star repeats the whole menu", async () => {
     const hash = await press("#");
-    expect(hash).toContain("Oops, that's not an option. Let's try that again!");
+    expect(hash).toContain("Sorry, that is not a valid selection. Please try again.");
+    expect(hash).not.toContain("Oops");
     expect(redirect(hash)).toBe("menu");
     expect(redirect(await press("*"))).toBe("menu?first=1");
   });
