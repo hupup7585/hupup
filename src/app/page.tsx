@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
-import { BUSINESS_NAME_NB, keepName, whyLabel, whyRows, HOW_IT_WORKS_DELIVERY, WEBSITE_HOURS, WEBSITE_HOURS_NOTE, keepTimesTogether, noLonelyWord, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces } from "@/lib/site-copy";
+import { BUSINESS_NAME_NB, keepName, whyLabel, whyRows, HOW_IT_WORKS_DELIVERY, WEBSITE_HOURS, WEBSITE_HOURS_NOTE, keepTimesTogether, noLonelyWord, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces, SERVICE_AREA_MAP_URL } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -291,12 +291,17 @@ export default async function Home() {
                 <IconTile icon={MapPin} tone="sky" />
                 <div>
                   <p className="text-sm font-bold uppercase tracking-wider opacity-70">Service area</p>
-                  <div className="font-semibold">
+                  <a
+                    href={SERVICE_AREA_MAP_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${c.serviceArea.main}, plus nearby ${c.serviceArea.region} towns: open in Google Maps (opens in a new tab)`}
+                    data-service-area-map
+                    className="block font-semibold hover:underline focus-visible:underline"
+                  >
                     {c.serviceArea.main}
-                    <a href="#service-area" className="block text-base font-medium underline underline-offset-4">
-                      Plus nearby {c.serviceArea.region} towns
-                    </a>
-                  </div>
+                    <span className="block text-base font-medium underline underline-offset-4">Plus nearby {c.serviceArea.region} towns</span>
+                  </a>
                 </div>
               </li>
               {c.hours && (

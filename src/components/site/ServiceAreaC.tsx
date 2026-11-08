@@ -1,6 +1,6 @@
 import { MapPin, Truck } from "lucide-react";
 import type { SiteContent } from "@/lib/site-content";
-import { DELIVERY_FEE_SHORT, SERVICE_AREA_DELIVERY_NOTE, noLonelyWord } from "@/lib/site-copy";
+import { DELIVERY_FEE_SHORT, SERVICE_AREA_DELIVERY_NOTE, SERVICE_AREA_MAP_URL, noLonelyWord } from "@/lib/site-copy";
 import { CallButton, ICON_STROKE, IconTile, SectionTitle } from "./parts";
 
 /**
@@ -27,7 +27,16 @@ export default function ServiceAreaC({ c, badge }: { c: SiteContent; badge?: str
               <li className="flex items-center gap-4 py-4">
                 <IconTile icon={MapPin} tone="sky" />
                 <span>
-                  <span className="block text-3xl font-extrabold leading-tight sm:text-4xl">{c.serviceArea.main}</span>
+                  <a
+                    href={SERVICE_AREA_MAP_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${c.serviceArea.main}: open in Google Maps (opens in a new tab)`}
+                    data-service-area-map
+                    className="block text-3xl font-extrabold leading-tight underline-offset-4 hover:underline focus-visible:underline sm:text-4xl"
+                  >
+                    {c.serviceArea.main}
+                  </a>
                   <span className="block text-base font-medium text-hu-deep/80">{c.serviceArea.mainSub}</span>
                 </span>
               </li>

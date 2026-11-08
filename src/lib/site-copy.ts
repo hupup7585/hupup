@@ -98,3 +98,6 @@ export function whyLabel(text: string): string {
   if (!parts) return noLonelyWord(text);
   return parts.map((p) => p.replace(/ /g, " ")).join(" ");
 }
+
+/** Abraham X: the service area opens Google Maps (new tab). */
+export const SERVICE_AREA_MAP_URL = "https://www.google.com/maps/search/?api=1&query=Kiryas%20Joel%2C%20NY";
