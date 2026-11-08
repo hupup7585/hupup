@@ -28,13 +28,15 @@ export default function LoginForm() {
     });
 
   return (
-    <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-xl">
-      <div className="border-b border-line px-6 py-5">
+    // Abraham's sign-in design: bigger card and logo; logo on light blue #8CCBFF (never on navy); yellow #FFD84D accent; navy #123D73 and white.
+    <div data-signin-card className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
+      <div data-signin-logo-panel className="bg-sky px-8 pb-6 pt-8 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/hupup-logo-h80@1x.png" srcSet="/brand/hupup-logo-h80@1x.png 1x, /brand/hupup-logo-h80@2x.png 2x, /brand/hupup-logo-h80@3x.png 3x" width={76} height={80} alt="Hup Up Attractions" className="h-20 w-auto" />
-        <div className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-muted">Staff sign-in</div>
+        <img src="/brand/hupup-logo-h128@1x.png" srcSet="/brand/hupup-logo-h128@1x.png 1x, /brand/hupup-logo-h128@2x.png 2x, /brand/hupup-logo-h128@3x.png 3x" width={122} height={128} alt="Hup Up Attractions" className="mx-auto h-32 w-auto" />
+        <div className="mt-4 text-sm font-extrabold uppercase tracking-[0.2em] text-navy">Staff sign-in</div>
       </div>
-      <div className="space-y-4 px-6 py-6">
+      <div data-signin-accent className="h-1.5 bg-sun" aria-hidden />
+      <div className="space-y-5 px-8 py-8">
         <label className="block">
           <span className="label">Your mobile number</span>
           <input className="input" inputMode="tel" autoComplete="tel-national" placeholder="(845) 555-0123" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={sent} />
