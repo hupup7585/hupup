@@ -553,6 +553,7 @@ const handlers: Record<string, Handler> = {
 
   async "after-add"(ctx, vr) {
     const d = ctx.body.Digits;
+    if (d === "*") return back(vr, "menu"); // star always returns to the main menu (as in the other sub-menus)
     if (d === "9") return back(vr, "cart");
     if (d === "1") return back(vr, "menu");
     return noInput(vr, ctx, "cart");
@@ -573,6 +574,7 @@ const handlers: Record<string, Handler> = {
 
   async "cart-choice"(ctx, vr) {
     const d = ctx.body.Digits;
+    if (d === "*") return back(vr, "menu"); // star always returns to the main menu (as in the other sub-menus)
     if (d === "1") return back(vr, "ask", { f: "name" });
     if (d === "2") return back(vr, "menu");
     if (d === "3") {
@@ -914,6 +916,7 @@ const handlers: Record<string, Handler> = {
     const settings = await getSettings();
     const list = ringListFor(settings, k);
     if (!list.targets.length || !officeOpenNow(new Date(), settings)) {
+      await updateSession(ctx.callSid, { data: { missed: "closed" } }, ctx.session); // dashboard: missed call
       sp(vr, ctx, "operator_unavailable");
       return back(vr, "voicemail", { after: 1 });
     }
@@ -938,6 +941,7 @@ const handlers: Record<string, Handler> = {
     const next = Number(ctx.query.get("i") ?? -1) + 1;
     if (list.mode !== "simultaneous" && next > 0 && next < list.targets.length) return dialTargets(vr, list, k, next, ctx.session?.fromNumber ?? ctx.from);
     // Abraham's missed-call line, then straight to the voicemail beep
+    await updateSession(ctx.callSid, { data: { missed: "no_answer" } }, ctx.session); // dashboard: missed call
     sp(vr, ctx, "transfer_failed");
     return back(vr, "voicemail", { after: 1 });
   },

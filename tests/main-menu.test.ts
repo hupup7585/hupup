@@ -139,6 +139,17 @@ describe("every key, office open", () => {
     expect(xml).toContain(MISSED);
     expect(redirect(xml)).toBe("voicemail?after=1");
   });
+  it("missed calls are marked for the dashboard: no answer, or office closed", async () => {
+    h.session.data = {};
+    await call("operator-done", { DialCallStatus: "no-answer" }, "i=0&k=8");
+    expect(h.session.data.missed).toBe("no_answer");
+    h.session.data = {};
+    await call("operator-done", { DialCallStatus: "completed" }, "i=0&k=8");
+    expect(h.session.data.missed).toBeUndefined(); // answered: not missed
+    h.open = false;
+    await call("ring", {}, "k=4");
+    expect(h.session.data.missed).toBe("closed");
+  });
   it("9 goes straight to the general voicemail, no ringing", async () => {
     expect(redirect(await press("9"))).toBe("voicemail");
     const vm = await call("voicemail");
@@ -159,6 +170,14 @@ describe("every key, office open", () => {
     expect(book).toContain("To go back to the main menu, press star.");
     expect(redirect(await call("book-choice", { Digits: "9" }))).toBe("cart");
     expect(redirect(await call("book-choice", { Digits: "*" }))).toBe("menu");
+  });
+});
+
+describe("star returns to the main menu from the sub-menus", () => {
+  it("rental list, cart and after-adding an item", async () => {
+    expect(redirect(await call("book-choice", { Digits: "*" }))).toBe("menu");
+    expect(redirect(await call("cart-choice", { Digits: "*" }))).toBe("menu");
+    expect(redirect(await call("after-add", { Digits: "*" }))).toBe("menu");
   });
 });
 

@@ -15,6 +15,10 @@ export type CallAnalytics = {
   /** One entry per day in the window, oldest first: { day: "YYYY-MM-DD", calls } */
   byDay: { day: string; calls: number }[];
   outcomes: { booked: number; toStaff: number; voicemail: number; abandonedCart: number; noChoice: number };
+  /** Calls where a department or the operator was asked for and no one took the call (closed or no answer) */
+  missed: number;
+  /** Voicemail messages actually left (recordings saved) */
+  voicemailsLeft: number;
   /** Calls that chose each main-menu key at least once */
   keys: Record<string, number>;
   avgSeconds: number | null;
@@ -39,6 +43,7 @@ export async function callAnalytics(days = 30, now: Date = new Date()): Promise<
         count(*) FILTER (WHERE outcome = 'voicemail')::int AS voicemail,
         count(*) FILTER (WHERE outcome IN ('dropped', 'carted'))::int AS abandoned,
         count(*) FILTER (WHERE outcome = 'browsing' AND coalesce(jsonb_array_length(data->'menuKeys'), 0) = 0)::int AS no_choice,
+        count(*) FILTER (WHERE data ? 'missed')::int AS missed,
         avg(extract(epoch FROM (ended_at - started_at))) FILTER (WHERE ended_at IS NOT NULL) AS avg_seconds
       FROM call_sessions WHERE ${where}`)
   ).rows as Record<string, unknown>[];
@@ -57,6 +62,10 @@ export async function callAnalytics(days = 30, now: Date = new Date()): Promise<
       FROM call_sessions, jsonb_array_elements_text(coalesce(data->'menuKeys', '[]'::jsonb)) AS k
       WHERE ${where} GROUP BY k`)
   ).rows as { key: string; calls: number }[];
+
+  const [vm] = (
+    await db.execute(sql`SELECT count(*)::int AS n FROM voicemails WHERE created_at >= ${since.toISOString()}::timestamptz AND created_at <= ${now.toISOString()}::timestamptz`)
+  ).rows as { n: number }[];
 
   const [busy] = (
     await db.execute(sql`
@@ -77,6 +86,8 @@ export async function callAnalytics(days = 30, now: Date = new Date()): Promise<
       abandonedCart: num(totals?.abandoned),
       noChoice: num(totals?.no_choice),
     },
+    missed: num(totals?.missed),
+    voicemailsLeft: num(vm?.n),
     keys: Object.fromEntries(keyRows.map((r) => [r.key, num(r.calls)])),
     avgSeconds: avg === null || avg === undefined ? null : Math.round(Number(avg)),
     busiestHour: busy ? { hour: num(busy.hour), calls: num(busy.calls) } : null,

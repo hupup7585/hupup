@@ -42,9 +42,11 @@ export default function CallsCard({ a, periodLabel }: { a: CallAnalytics; period
           Call log →
         </Link>
       </div>
-      <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label="Calls" value={a.total} />
         <Stat label="Today" value={a.today} />
+        <Stat label="Missed" value={a.missed} note="no one took the call" />
+        <Stat label="Voicemails left" value={a.voicemailsLeft} />
         <Stat label="Average call" value={length(a.avgSeconds)} />
         <Stat label="Busiest hour" value={a.busiestHour ? hourLabel(a.busiestHour.hour) : "—"} note={a.busiestHour ? `${a.busiestHour.calls} call${a.busiestHour.calls === 1 ? "" : "s"}` : undefined} />
       </div>

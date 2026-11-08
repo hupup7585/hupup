@@ -164,6 +164,8 @@ export type CallData = {
   termsAccepted?: boolean;
   /** Main-menu keys pressed on this call, in order (call analytics: which departments callers choose) */
   menuKeys?: string[];
+  /** A department or operator was asked for and no one took the call: "closed" (office closed / no one on the list) or "no_answer" */
+  missed?: "closed" | "no_answer";
 };
 
 export const callSessions = pgTable("call_sessions", {

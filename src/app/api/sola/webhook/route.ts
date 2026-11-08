@@ -2,7 +2,8 @@ import { field, isApproved, orderIdFromInvoice, verifyWebhookSignature } from "@
 import { getOrderWithItems, markPaid, orderNumber } from "@/lib/orders";
 import { linkPaymentToAcceptance } from "@/lib/rental-terms";
 import { sendEmail, sendSms } from "@/lib/notify";
-import { BUSINESS_NAME } from "@/lib/config";
+import { BUSINESS_NAME, config } from "@/lib/config";
+import { businessOrderEmail } from "@/lib/order-email";
 import { parseMoneyToCents } from "@/lib/money";
 import { messageDate } from "@/lib/dual-date";
 
@@ -45,6 +46,11 @@ export async function POST(req: Request) {
     if (before.customer?.email) await sendEmail(before.customer.email, `Order #${num} confirmed`, msg);
     if (process.env.ADMIN_PHONE) {
       await sendSms(process.env.ADMIN_PHONE, `New paid order #${num}: $${(cents / 100).toFixed(2)} for ${messageDate(before.order.eventDate)}.`, { kind: "system", event: "owner_alert" });
+    }
+    // The business gets the full order details by email (sent once an email sender is connected; nothing else changes)
+    if (config.adminEmail()) {
+      const mail = businessOrderEmail(before, cents);
+      await sendEmail(config.adminEmail(), mail.subject, mail.text);
     }
   }
   return new Response("ok");

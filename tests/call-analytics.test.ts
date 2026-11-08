@@ -21,18 +21,25 @@ describe("call analytics", () => {
       { callSid: "CA2", outcome: "forwarded", startedAt: at("2026-11-08T15:30:00Z"), endedAt: at("2026-11-08T15:32:00Z"), data: { menuKeys: ["8"] } },
       { callSid: "CA3", outcome: "browsing", startedAt: at("2026-11-08T19:10:00Z"), endedAt: at("2026-11-08T19:11:00Z"), data: {} }, // hung up in the menu
       // Nov 7 at 9 PM New York = Nov 8 02:00 UTC: still Nov 7 locally
-      { callSid: "CA4", outcome: "voicemail", startedAt: at("2026-11-08T02:00:00Z"), endedAt: at("2026-11-08T02:02:00Z"), data: { menuKeys: ["*", "9"] } },
+      { callSid: "CA4", outcome: "voicemail", startedAt: at("2026-11-08T02:00:00Z"), endedAt: at("2026-11-08T02:02:00Z"), data: { menuKeys: ["*", "4"], missed: "closed" } },
       { callSid: "CA5", outcome: "dropped", startedAt: at("2026-11-05T16:00:00Z"), endedAt: at("2026-11-05T16:06:00Z"), data: { menuKeys: ["1", "1"] } },
       // outside a 7-day window
       { callSid: "CA6", outcome: "checked_out", startedAt: at("2026-10-20T16:00:00Z"), endedAt: at("2026-10-20T16:01:00Z"), data: { menuKeys: ["1"] } },
     ];
     await db.insert(schema.callSessions).values(rows);
+    const [box] = await db.insert(schema.voicemailBoxes).values({ name: "Main", isMain: true }).returning();
+    await db.insert(schema.voicemails).values([
+      { boxId: box.id, recordingSid: "RE1", recordingUrl: "https://api.twilio.com/x/RE1", durationSec: 20, createdAt: at("2026-11-08T02:01:00Z") },
+      { boxId: box.id, recordingSid: "RE2", recordingUrl: "https://api.twilio.com/x/RE2", durationSec: 9, createdAt: at("2026-10-01T12:00:00Z") }, // outside 7 days
+    ]);
 
     const week = await callAnalytics(7, NOW);
     expect(week.total).toBe(5);
     expect(week.today).toBe(3);
     expect(week.outcomes).toEqual({ booked: 1, toStaff: 1, voicemail: 1, abandonedCart: 1, noChoice: 1 });
-    expect(week.keys).toEqual({ "1": 2, "8": 1, "*": 1, "9": 1 }); // a key pressed twice on one call counts once
+    expect(week.keys).toEqual({ "1": 2, "8": 1, "*": 1, "4": 1 }); // a key pressed twice on one call counts once
+    expect(week.missed).toBe(1);
+    expect(week.voicemailsLeft).toBe(1);
     expect(week.avgSeconds).toBe(Math.round((240 + 120 + 60 + 120 + 360) / 5));
     expect(week.busiestHour).toEqual({ hour: 10, calls: 2 }); // 15:00 and 15:30 UTC = 10 AM New York
     expect(week.byDay).toHaveLength(7);
