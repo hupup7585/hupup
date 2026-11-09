@@ -1,7 +1,8 @@
 import { Download, Phone } from "lucide-react";
 import { requireStaff } from "@/lib/auth";
 import { formatPhone } from "@/lib/phone";
-import { listVoicemails, mainBox } from "@/lib/voicemail";
+import { TEXT_ALERTS_NOT_ACTIVE, listVoicemails, mainBox, textingActive } from "@/lib/voicemail";
+import { getSettings } from "@/lib/settings";
 import { deleteVoicemailAction, saveBoxAction, setHeardAction, setUrgentAction } from "./actions";
 import { dualDateTime } from "@/lib/dual-date";
 
@@ -89,7 +90,7 @@ export default async function VoicemailPage() {
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex items-center gap-2 font-semibold">
-              <input type="checkbox" name="transcribe" defaultChecked={box.transcribe} /> Transcribe messages to text
+              <input type="checkbox" name="transcribe" defaultChecked={box.transcribe} /> Transcribe messages to text (costs extra on Twilio; please ask before turning it on)
             </label>
             <label className="block">
               <span className="label">Longest message (seconds)</span>
@@ -98,11 +99,23 @@ export default async function VoicemailPage() {
           </div>
           <label className="block">
             <span className="label">Text a new-message alert to (one number per line)</span>
+            {!textingActive() && (
+              <span data-not-active="voicemail-text" className="mb-1 block rounded-lg bg-[#FFF8E1] px-3 py-2 text-sm text-[#5C4600]">
+                <b>{TEXT_ALERTS_NOT_ACTIVE}.</b> Until then every voicemail goes by email with the recording attached. Text alerts start by themselves once texting is approved.
+              </span>
+            )}
             <textarea name="notifySms" defaultValue={box.notifySms.map((p) => formatPhone(p)).join("\n")} rows={2} className="input" />
           </label>
           <label className="block">
             <span className="label">Email a new-message alert to (one email per line)</span>
             <textarea name="notifyEmail" defaultValue={box.notifyEmail.join("\n")} rows={2} className="input" />
+          </label>
+          <label className="flex items-start gap-2 font-semibold" data-voicemail-mms>
+            <input type="checkbox" name="voicemailMms" defaultChecked={Boolean((await getSettings()).voicemailMms)} className="mt-1" />
+            <span>
+              Attach the recording (MP3) to the text alert
+              <span className="block text-sm font-normal text-muted">A text with a recording is a picture/audio message (MMS), which costs more per message than a plain text. Off until you turn it on. Long recordings go as a link only.</span>
+            </span>
           </label>
           <button className="btn-dark w-fit">Save voicemail settings</button>
         </form>

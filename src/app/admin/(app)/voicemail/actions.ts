@@ -1,5 +1,6 @@
 "use server";
 
+import { saveSetting } from "@/lib/settings";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -48,6 +49,7 @@ export async function saveBoxAction(form: FormData) {
     notifyEmail: emails,
   };
   await db.update(schema.voicemailBoxes).set(after).where(eq(schema.voicemailBoxes.id, id));
+  await saveSetting("voicemailMms", form.get("voicemailMms") === "on", s.userId);
   await db.insert(schema.auditLog).values({ userId: s.userId, action: "voicemail_box.updated", entityType: "voicemail_box", entityId: String(id), after });
   revalidatePath("/admin/voicemail");
 }

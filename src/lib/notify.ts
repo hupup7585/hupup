@@ -26,10 +26,12 @@ export async function sendOrderText(input: { phone: string; email?: string | nul
   return { texted: false, emailed: false, message: r.error || "SMS failed" };
 }
 
-export async function sendEmail(to: string, subject: string, text: string): Promise<SendResult> {
+export type EmailAttachment = { filename: string; content: string /* base64 */ };
+
+export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = []): Promise<SendResult> {
   if (!config.resendConfigured()) {
     if (config.isProd()) return { sent: false, error: "Email (Resend) is not configured" };
-    console.log(`[dev EMAIL to ${to}] ${subject}\n${text}`);
+    console.log(`[dev EMAIL to ${to}] ${subject}\n${text}${attachments.length ? `\n[attachments: ${attachments.map((a) => a.filename).join(", ")}]` : ""}`);
     return { sent: true, dev: true };
   }
   try {
@@ -41,6 +43,7 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
         to,
         subject,
         text,
+        ...(attachments.length ? { attachments } : {}),
       }),
     });
     if (!res.ok) return { sent: false, error: `Resend ${res.status}: ${await res.text()}` };

@@ -4,6 +4,8 @@ import { BUSINESS_NAME, config } from "@/lib/config";
 import { sendEmail, sendSms } from "@/lib/notify";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { getTwilio } from "@/lib/twilio-client";
+import { voicemailPlayLink } from "@/lib/signed-link";
+import { getSettings } from "@/lib/settings";
 
 /**
  * Hotline voicemail (plan Round 1, Main box). Audio stays in Twilio; staff play and download it through
@@ -66,13 +68,62 @@ export async function saveTranscription(recordingSid: string, status: string, te
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-export function voicemailAlertText(v: Pick<Voicemail, "fromNumber" | "durationSec" | "transcription" | "urgent">, box: Pick<VoicemailBox, "name" | "isMain">, link: string) {
-  const who = v.fromNumber ? formatPhone(v.fromNumber) : "a withheld number";
-  const said = v.transcription ? ` "${v.transcription.length > 240 ? v.transcription.slice(0, 237) + "..." : v.transcription}"` : "";
-  return `${v.urgent ? "URGENT: " : ""}${BUSINESS_NAME}: new voicemail${box.isMain ? "" : ` (${box.name})`} from ${who}, ${mmss(v.durationSec)}.${said} Listen: ${link}`;
+
+/** Texting is live once Twilio approves our texting registration (A2P) and the messaging service is set. */
+export const textingActive = (env: Record<string, string | undefined> = process.env) => Boolean(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_MESSAGING_SERVICE_SID);
+export const TEXT_ALERTS_NOT_ACTIVE = "Not active yet: waiting for Twilio A2P";
+
+/** Carriers often reject audio MMS above about 600 KB; bigger recordings go by text with the play link only. */
+export const MMS_AUDIO_MAX_BYTES = 600_000;
+
+/** "Mon, Nov 9, 2026, 3:15 PM" (New York time). */
+export function alertDateTime(d: Date): string {
+  const tz = process.env.BUSINESS_TIMEZONE || "America/New_York";
+  const date = d.toLocaleDateString("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  const time = d.toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" });
+  return `${date}, ${time}`;
 }
 
-/** Text and email the box's recipients. Runs once per message (claims notified_at atomically). */
+/** Which key or box the message came from, e.g. "Key 0 (no one answered)", "Key 9 (voicemail)", "Main voicemail". */
+export function voicemailSource(box: Pick<VoicemailBox, "name" | "isMain">, data: { menuKeys?: string[]; missed?: string } | null | undefined): string {
+  const key = data?.menuKeys?.at(-1);
+  if (!box.isMain) return box.name;
+  if (key && data?.missed) return `Key ${key} (${data.missed === "closed" ? "office closed" : "no one answered"})`;
+  if (key === "9") return "Key 9 (voicemail)";
+  return "Main voicemail";
+}
+
+export type VoicemailAlert = { subject: string; email: string; text: string };
+
+/** The words of one voicemail alert (email and text). */
+export function voicemailAlert(
+  v: Pick<Voicemail, "fromNumber" | "durationSec" | "transcription" | "urgent" | "createdAt">,
+  info: { callerName?: string | null; source: string; playLink: string; attached: boolean },
+): VoicemailAlert {
+  const caller = v.fromNumber ? formatPhone(v.fromNumber) : "a withheld number";
+  const who = info.callerName ? `${info.callerName} ${caller}` : caller;
+  const when = alertDateTime(v.createdAt);
+  const urgent = v.urgent ? "URGENT: " : "";
+  const subject = `${urgent}New voicemail from ${who}, ${when}`;
+  const email = [
+    `New voicemail for ${BUSINESS_NAME}.`,
+    "",
+    `Caller: ${who}`,
+    `Key or box: ${info.source}`,
+    `Date and time: ${when}`,
+    `Length: ${mmss(v.durationSec)}`,
+    "",
+    info.attached ? "The recording is attached as an MP3 file." : "Recording attached failed, use the link.",
+    `Play it here (private link, expires in 14 days): ${info.playLink}`,
+    ...(v.transcription ? ["", "Transcription:", v.transcription] : []),
+    "",
+    `All voicemails: ${config.baseUrl()}/admin/voicemail`,
+  ].join("\n");
+  const text = `${urgent}${BUSINESS_NAME}: new voicemail from ${who}, ${info.source}, ${when}, ${mmss(v.durationSec)}. Play: ${info.playLink}`;
+  return { subject, email, text };
+}
+
+/** Email (with the MP3 attached) and text the box's recipients. Runs once per message (claims notified_at atomically). */
 export async function notifyVoicemail(id: number): Promise<{ sent: number }> {
   const [v] = await db
     .update(schema.voicemails)
@@ -81,13 +132,28 @@ export async function notifyVoicemail(id: number): Promise<{ sent: number }> {
     .returning();
   if (!v) return { sent: 0 };
   const box = await boxById(v.boxId);
-  const link = `${config.baseUrl()}/admin/voicemail`;
-  const text = voicemailAlertText(v, box, link);
+  const [session] = v.callSid ? await db.select({ data: schema.callSessions.data }).from(schema.callSessions).where(eq(schema.callSessions.callSid, v.callSid)).limit(1) : [];
+  const phone = toE164(v.fromNumber || "");
+  const [cust] = phone ? await db.select({ name: schema.customers.name }).from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1) : [];
+  const playLink = voicemailPlayLink(v.id);
+  // The recording itself, fetched once from Twilio; if that fails the alert still goes out with the play link.
+  let mp3: Buffer | null = null;
+  try {
+    const res = await fetchRecordingAudio(v);
+    if (res) mp3 = Buffer.from(await res.arrayBuffer());
+  } catch (e) {
+    console.error("voicemail alert: recording download failed", e);
+  }
+  const alert = voicemailAlert(v, { callerName: cust?.name ?? null, source: voicemailSource(box, session?.data), playLink, attached: Boolean(mp3?.length) });
+  const stamp = alertDateTime(v.createdAt).replace(/[^0-9A-Za-z]+/g, "-").replace(/-+$/, "");
+  const attachments = mp3?.length ? [{ filename: `voicemail-${stamp}-${(v.fromNumber || "unknown").replace(/\D/g, "")}.mp3`, content: mp3.toString("base64") }] : [];
   let sent = 0;
-  for (const to of box.notifySms) if ((await sendSms(to, text, { kind: "system", event: "owner_alert" })).sent) sent++;
-  for (const to of box.notifyEmail) {
-    const body = `${text}\n\nFull message:\n${v.transcription || "(no transcription)"}\n\nCaller: ${v.fromNumber ? formatPhone(v.fromNumber) : "withheld"}\nLength: ${mmss(v.durationSec)}\n${link}`;
-    if ((await sendEmail(to, `${v.urgent ? "URGENT: " : ""}New voicemail from ${v.fromNumber ? formatPhone(v.fromNumber) : "a caller"}`, body)).sent) sent++;
+  for (const to of box.notifyEmail) if ((await sendEmail(to, alert.subject, alert.email, attachments)).sent) sent++;
+  // Text alerts start by themselves once Twilio approves texting. The MP3 rides along as an MMS only when the Owner
+  // has turned that on (it costs more per message) and the file is small enough for carriers; the link is always there.
+  if (textingActive()) {
+    const mms = Boolean((await getSettings()).voicemailMms) && Boolean(mp3?.length) && mp3!.length <= MMS_AUDIO_MAX_BYTES;
+    for (const to of box.notifySms) if ((await sendSms(to, alert.text, { kind: "system", event: "owner_alert", ...(mms ? { mediaUrls: [playLink] } : {}) })).sent) sent++;
   }
   return { sent };
 }
