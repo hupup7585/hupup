@@ -26,7 +26,7 @@ import { computeTotals, deliveryZone } from "@/lib/pricing";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
 import { STEP_LABELS, track, trackStep } from "@/lib/call-journey";
-import { PROMO_CONFIRM_REQUEST_SMS, smsTermsV2Active } from "@/lib/sms-terms-v2";
+import { promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import {
   MARKETING_CONFIRMATION_SMS,
@@ -1102,7 +1102,7 @@ const handlers: Record<string, Handler> = {
         });
         if (r.sendConfirmation) {
           const c = await customerByPhone(phone);
-          await sendMessage({ to: phone, body: PROMO_CONFIRM_REQUEST_SMS, kind: "system", event: "promo_confirm_request", customerId: c?.id ?? null, callSid: ctx.callSid });
+          await sendMessage({ to: phone, body: promoConfirmRequestSms(), kind: "system", event: "promo_confirm_request", customerId: c?.id ?? null, callSid: ctx.callSid });
         }
         sp(vr, ctx, "consent_marketing_sent");
         return back(vr, "goodbye");

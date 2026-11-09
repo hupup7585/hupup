@@ -9,7 +9,7 @@ import { getOrderWithItems } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { ConsentBlockedError, recordStaffConsent, type ConsentScope, type StaffResponse } from "@/lib/sms-consent";
 import { STAFF_CONSENT_VERSION } from "@/lib/sms-consent-copy";
-import { PROMO_CONFIRM_REQUEST_SMS, smsTermsV2Active, staffDisclosure } from "@/lib/sms-terms-v2";
+import { promoConfirmRequestSms, smsTermsV2Active, staffDisclosure } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import { sendMessage } from "@/lib/sms";
 
@@ -42,7 +42,7 @@ export async function recordStaffConsentAction(orderId: number, form: { scope: C
       const [c] = await tx.select().from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1).for("update");
       return requestPromoConfirmation(tx, c ?? null, phone, how);
     });
-    if (r.sendConfirmation) await sendMessage({ to: phone, body: PROMO_CONFIRM_REQUEST_SMS, kind: "system", event: "promo_confirm_request", customerId: full!.customer!.id, orderId });
+    if (r.sendConfirmation) await sendMessage({ to: phone, body: promoConfirmRequestSms(), kind: "system", event: "promo_confirm_request", customerId: full!.customer!.id, orderId });
     await db.insert(schema.auditLog).values({
       userId: session.userId ?? null,
       action: "sms_consent.promo_confirmation_requested",

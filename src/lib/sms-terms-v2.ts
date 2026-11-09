@@ -1,3 +1,4 @@
+import { config } from "@/lib/config";
 /**
  * SMS Terms Version 2 (Abraham Q, Nov 8, 2026). Built on previews only; it goes live only after Abraham approves the
  * exact text. Flip SMS_TERMS_V2_LIVE to true then. The two promotional confirmation texts are Abraham's exact words (U);
@@ -27,12 +28,19 @@ export const WEB_CONSENT_TRANSACTIONAL_V2 =
   "I agree to receive transactional text messages from Hup Up Attractions, including picture messages such as delivery confirmation photos, regarding my reservations, orders, payments, deliveries, pickups, and customer service, and authorize Hup Up Attractions to share my phone number with service providers only as necessary to deliver these messages. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help.";
 
 /** Confirmation text sent after a phone keypress or a staff-recorded yes. Only a YES reply enrolls the number. */
-export const PROMO_CONFIRM_REQUEST_SMS =
-  "Hup Up Attractions: Reply YES to get our promotional texts, such as special offers, discounts, and catalog updates. Consent is not required to buy. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.";
+/**
+ * Abraham's approved promotional confirmation text (Nov 9, 2026): up to 6 a year, confirm with JOIN. The Terms link
+ * follows the live site address, so it becomes https://hupupattractions.com/sms-terms by itself once that domain is live.
+ */
+export function promoConfirmRequestSms(base = config.baseUrl()): string {
+  return `Hup Up Attractions: You requested to join our seasonal promotional text program. You may receive up to 6 promotional messages per year, including seasonal offers, discount codes, and rental deals. Message and data rates may apply. Reply JOIN to confirm. Reply STOP to unsubscribe. Reply HELP for assistance. Terms: ${base}/sms-terms`;
+}
+/** @deprecated kept for older records: the text current at build time. */
+export const PROMO_CONFIRM_REQUEST_SMS = promoConfirmRequestSms();
 /** Sent after that YES (Abraham U, exact). */
 export const PROMO_ENROLLED_SMS =
   "Hup Up Attractions: You're signed up for promotional texts. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.";
-export const PROMO_CONFIRM_VERSION = "promo-confirm-2026-11-08-u";
+export const PROMO_CONFIRM_VERSION = "promo-confirm-2026-11-09-join-6";
 /** How long the YES reply counts. */
 export const PROMO_CONFIRM_WINDOW_HOURS = 24;
 

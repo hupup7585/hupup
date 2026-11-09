@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { schema } from "@/lib/db";
 import { recordConsentDetailed, type Exec } from "@/lib/sms-consent";
 import { REENROLL_WINDOW_HOURS, START_CONFIRMATION_SMS, START_CONFIRMATION_VERSION } from "@/lib/sms-consent-copy";
-import { PROMO_CONFIRM_REQUEST_SMS, PROMO_CONFIRM_VERSION, PROMO_CONFIRM_WINDOW_HOURS } from "@/lib/sms-terms-v2";
+import { promoConfirmRequestSms, PROMO_CONFIRM_VERSION, PROMO_CONFIRM_WINDOW_HOURS } from "@/lib/sms-terms-v2";
 
 /**
  * START -> YES re-enrollment (order/service texts only). Every function runs inside the caller's transaction,
@@ -102,7 +102,7 @@ export async function requestPromoConfirmation(
     customerId: customer?.id ?? null,
     scope: "marketing",
     status: "pending",
-    promptText: PROMO_CONFIRM_REQUEST_SMS,
+    promptText: promoConfirmRequestSms(),
     startMessage: how,
     requestedAt: now,
     expiresAt: new Date(now.getTime() + PROMO_CONFIRM_WINDOW_HOURS * 3600 * 1000),
@@ -110,7 +110,7 @@ export async function requestPromoConfirmation(
   return { sendConfirmation: true, reason: "pending_created" };
 }
 
-async function handlePromoYes(tx: Exec, customer: Customer, phone: string, text: string, now: Date) {
+export async function handlePromoYes(tx: Exec, customer: Customer, phone: string, text: string, now: Date) {
   const pending = await activePending(tx, phone, now, "marketing");
   if (!pending) return { confirmed: false, reason: "no_active_confirmation" };
   const { consentId } = await recordConsentDetailed(

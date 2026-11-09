@@ -5,9 +5,9 @@ import { LIVE_PUBLIC_EMAIL, NEW_EMAIL_LIVE, NEW_PUBLIC_EMAIL } from "@/lib/confi
 import { getSettings } from "@/lib/settings";
 import { cancelQueuedPromotions, sendMessage } from "@/lib/sms";
 import { TRANSACTIONAL_CONFIRMATION_SMS } from "@/lib/sms-consent";
-import { PROMO_ENROLLED_SMS, smsTermsV2Active } from "@/lib/sms-terms-v2";
+import { PROMO_ENROLLED_SMS, promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { START_CONFIRMATION_SMS } from "@/lib/sms-consent-copy";
-import { cancelPendingReenroll, handleStart, handleYes } from "@/lib/sms-reenroll";
+import { cancelPendingReenroll, handlePromoYes, handleStart, handleYes, requestPromoConfirmation } from "@/lib/sms-reenroll";
 
 export const STOP_WORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "REVOKE", "OPTOUT"];
 export const START_WORDS = ["START", "UNSTOP"];
@@ -15,8 +15,10 @@ export const START_WORDS = ["START", "UNSTOP"];
 export const YES_WORDS = ["YES"];
 export const HELP_WORDS = ["HELP", "INFO"];
 export const NOPROMO_WORDS = ["NOPROMO"];
+/** SMS Terms v2 (Abraham, Nov 9, 2026): JOIN asks for (or confirms) the promotional program. */
+export const JOIN_WORDS = ["JOIN"];
 
-export type Keyword = "stop" | "start" | "yes" | "help" | "nopromo" | null;
+export type Keyword = "stop" | "start" | "yes" | "help" | "nopromo" | "join" | null;
 
 /** Unambiguous opt-out words that also count anywhere in a short message ("unsubscribe me", "opt me out"). */
 const OPT_OUT_IN_PHRASE = ["STOPALL", "UNSUBSCRIBE", "OPTOUT", "REVOKE"];
@@ -49,6 +51,7 @@ export function detectKeywordDetail(body: string, v2 = smsTermsV2Active()): { ke
   if (YES_WORDS.includes(w)) return { keyword: "yes", exact: true };
   if (HELP_WORDS.includes(w)) return { keyword: "help", exact: true };
   if (NOPROMO_WORDS.includes(w)) return { keyword: "nopromo", exact: true };
+  if (v2 && JOIN_WORDS.includes(w)) return { keyword: "join", exact: true };
   const words = body.toUpperCase().replace(/\bOPT[\s-]+(?:ME[\s-]+)?OUT\b/g, "OPTOUT").replace(/[^A-Z\s]/g, " ").split(/\s+/).filter(Boolean);
   const joined = words.join(" ").replace(/\bDON T\b/g, "DONT");
   if (words.length <= MAX_PHRASE_WORDS && (words.some((x) => OPT_OUT_IN_PHRASE.includes(x)) || STOP_PHRASE.test(joined) || STOP_REQUESTS.some((r) => r.test(joined))))
@@ -121,7 +124,7 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
 
   // Consent changes run in one transaction that locks this customer's row, so a STOP and a START/YES arriving at
   // the same time are applied one after the other and a YES can never restore consent after a STOP.
-  const effects = { cancelPromos: false, sendStartConfirmation: false, sendReenrolled: false, sendPromoEnrolled: false };
+  const effects = { cancelPromos: false, sendStartConfirmation: false, sendReenrolled: false, sendPromoEnrolled: false, sendPromoConfirm: false };
   if (customer && keyword) {
     await db.transaction(async (tx) => {
       const [c] = await tx.select().from(schema.customers).where(eq(schema.customers.id, customer.id)).for("update");
@@ -144,6 +147,12 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
         const r = await handleYes(tx, c, from, text);
         if (r.confirmed && r.scope === "marketing") effects.sendPromoEnrolled = true;
         else effects.sendReenrolled = r.confirmed;
+      } else if (keyword === "join") {
+        // JOIN (SMS Terms v2): confirms a promotional confirmation text sent in the last 24 hours; otherwise it sends
+        // that confirmation text. Only a JOIN or YES reply to it signs the number up. Never after STOP.
+        const r = c.smsOptOut ? { confirmed: false } : await handlePromoYes(tx, c, from, text, new Date());
+        if (r.confirmed) effects.sendPromoEnrolled = true;
+        else effects.sendPromoConfirm = (await requestPromoConfirmation(tx, c, from, "texted JOIN")).sendConfirmation;
       } else if (keyword === "nopromo") {
         // Internal keyword: promotions only. It never clears or weakens a STOP (smsOptOut stays as it is).
         await tx.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.id, c.id));
@@ -162,13 +171,15 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
     await sendMessage({ to: from, body: START_CONFIRMATION_SMS, kind: "system", event: "reenroll_request", customerId: customer.id });
   if (effects.sendReenrolled && customer)
     await sendMessage({ to: from, body: TRANSACTIONAL_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId: customer.id });
+  if (effects.sendPromoConfirm && customer)
+    await sendMessage({ to: from, body: promoConfirmRequestSms(), kind: "system", event: "promo_confirm_request", customerId: customer.id });
   if (effects.sendPromoEnrolled && customer)
     await sendMessage({ to: from, body: PROMO_ENROLLED_SMS, kind: "system", event: "consent_confirmation", customerId: customer.id });
 
   // Forward a copy to the owner (not for STOP/START, which Twilio handles, and not the owner's own texts).
   let forwarded = false;
   const fwd = toE164(settings.smsForwardPhone);
-  if (settings.smsForwardEnabled && fwd && fwd !== from && keyword !== "stop" && keyword !== "start" && !(keyword === "yes" && (effects.sendReenrolled || effects.sendPromoEnrolled))) {
+  if (settings.smsForwardEnabled && fwd && fwd !== from && keyword !== "stop" && keyword !== "start" && !((keyword === "yes" || keyword === "join") && (effects.sendReenrolled || effects.sendPromoEnrolled || effects.sendPromoConfirm))) {
     const who = customer?.name ? `${customer.name} ${formatPhone(from)}` : formatPhone(from);
     const r = await sendMessage({
       to: fwd,

@@ -69,7 +69,7 @@ describe("written promotional consent (phone keypress only sends a confirmation 
 
     const after = await call("promo-consent-answer", { Digits: "1" });
     expect(after.replace(/&apos;/g, "'")).toContain(PROMPTS.consent_marketing_sent.text);
-    expect(h.sent.map((m) => m.body)).toEqual([v2.PROMO_CONFIRM_REQUEST_SMS]);
+    expect(h.sent.map((m) => m.body)).toEqual([v2.promoConfirmRequestSms()]);
     expect(await marketingRows()).toHaveLength(0); // a keypress is not consent
     expect((await customer())?.marketingOptIn ?? false).toBe(false);
 
@@ -80,12 +80,11 @@ describe("written promotional consent (phone keypress only sends a confirmation 
     await text("Yes", "SMv2yes1");
     const rows = await marketingRows();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ action: "opt_in", source: "sms_reply", method: "sms_reply", wording: v2.PROMO_CONFIRM_REQUEST_SMS, wordingVersion: v2.PROMO_CONFIRM_VERSION });
+    expect(rows[0]).toMatchObject({ action: "opt_in", source: "sms_reply", method: "sms_reply", wording: v2.promoConfirmRequestSms(), wordingVersion: v2.PROMO_CONFIRM_VERSION });
     expect(rows[0].response).toContain("pressed 1 on call CAv2");
     expect((await customer()).marketingOptIn).toBe(true);
     expect(h.sent.map((m) => m.body)).toEqual([v2.PROMO_ENROLLED_SMS]);
     expect(v2.PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You're signed up for promotional texts. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.");
-    expect(v2.PROMO_CONFIRM_REQUEST_SMS).toBe("Hup Up Attractions: Reply YES to get our promotional texts, such as special offers, discounts, and catalog updates. Consent is not required to buy. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.");
 
     h.sent.length = 0;
     await text("YES", "SMv2yes2");
@@ -154,5 +153,46 @@ describe("Abraham U checks", () => {
     const { publicEmail } = await import("@/lib/config");
     expect(HELP_EMAIL).toBe(publicEmail({ VERCEL_ENV: "production" }));
     expect(HELP_REPLY).toContain(HELP_EMAIL);
+  });
+});
+
+describe("JOIN and NO PROMO (Abraham, Nov 9, 2026)", () => {
+  it("JOIN and NO PROMO are recognized in any case, with or without the space (JOIN only with SMS Terms v2)", async () => {
+    const { detectKeywordDetail } = await import("@/lib/sms-inbound");
+    expect(detectKeywordDetail("join", true).keyword).toBe("join");
+    expect(detectKeywordDetail(" Join! ", true).keyword).toBe("join");
+    expect(detectKeywordDetail("JOIN", false).keyword).toBe(null); // live site: waits for the SMS Terms v2 approval
+    expect(detectKeywordDetail("No Promo", true).keyword).toBe("nopromo");
+    expect(detectKeywordDetail("nopromo", false).keyword).toBe("nopromo");
+  });
+  it("the confirmation text is Abraham's approved wording, 6 a year, JOIN to confirm, with the live Terms link", () => {
+    expect(v2.promoConfirmRequestSms("https://hupupattractions.com")).toBe(
+      "Hup Up Attractions: You requested to join our seasonal promotional text program. You may receive up to 6 promotional messages per year, including seasonal offers, discount codes, and rental deals. Message and data rates may apply. Reply JOIN to confirm. Reply STOP to unsubscribe. Reply HELP for assistance. Terms: https://hupupattractions.com/sms-terms",
+    );
+  });
+});
+
+describe("JOIN by text, end to end (SMS Terms v2)", () => {
+  const J = "+18455550188";
+  const t = (Body: string, sid: string) => handleInboundSms({ From: J, To: "+18454157585", Body, MessageSid: sid });
+  const promo = async () => (await db.select().from(schema.smsConsents).where(eq(schema.smsConsents.phone, J))).filter((r) => r.scope === "marketing");
+  it("JOIN sends the confirmation; JOIN again within 24 hours signs up; a plain question never signs anyone up", async () => {
+    h.sent.length = 0;
+    await t("Do you have paddle boats on Sunday?", "SMj0");
+    expect(await promo()).toHaveLength(0);
+    expect(h.sent.filter((m) => m.event === "promo_confirm_request")).toHaveLength(0);
+    await t("join", "SMj1");
+    expect(h.sent.at(-1)!.body).toBe(v2.promoConfirmRequestSms());
+    expect(await promo()).toHaveLength(0);
+    await t("JOIN", "SMj2");
+    expect((await promo()).map((r) => r.action)).toEqual(["opt_in"]);
+    expect(h.sent.at(-1)!.body).toBe(v2.PROMO_ENROLLED_SMS);
+  });
+  it("after STOP, JOIN signs nothing up and sends nothing", async () => {
+    await t("STOP", "SMj3");
+    h.sent.length = 0;
+    await t("JOIN", "SMj4");
+    expect(h.sent).toHaveLength(0);
+    expect((await promo()).at(-1)!.action).toBe("opt_out");
   });
 });
