@@ -21,10 +21,13 @@ export default function RoutingForm({
       <p className="rounded-lg bg-bg p-3 text-sm font-semibold" data-route-summary>{summary}</p>
       <label className="block">
         <span className="label">Numbers to ring, one per line: Name | phone | seconds to ring (5 to 60)</span>
-        <textarea name="targets" rows={3} defaultValue={initial.targets} className="input font-mono text-sm" placeholder={"Abraham | (845) 777-7585 | 20\nOffice | (845) 555-0100 | 15"} />
+        <textarea name="targets" rows={3} defaultValue={initial.targets} className="input font-mono text-sm" placeholder={"Sara office phone | (845) 555-0123 | 20\nMoshe mobile | (845) 555-0145 | 15"} />
+        <span className="mt-1 block text-xs text-muted" data-ring-example>
+          Example: <code>Sara office phone | (845) 555-0123 | 20</code> rings Sara for 20 seconds. Use each person&rsquo;s own phone, never the hotline (845) 415-7585 or the public number (845) 777-7585 (both lead back into the phone menu).
+        </span>
         <span className="mt-1 block text-xs text-muted">
           {ringKey === "0"
-            ? "Leave empty to ring the main forwarding number. When the office is closed or no one answers, callers hear the missed-call line and go to the general voicemail."
+            ? "If this list is empty, no one is rung: callers hear the missed-call line and go to the general voicemail. The same happens when the office is closed or no one answers."
             : "Leave empty to ring the operator list (key 0)."}
         </span>
       </label>

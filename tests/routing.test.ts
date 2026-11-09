@@ -122,3 +122,13 @@ describe("pauses between menu options (Abraham)", () => {
     expect(wav.subarray(44).every((b) => b === 0)).toBe(true);
   });
 });
+
+describe("Phone settings ring list form", () => {
+  it("shows a safe example (never the hotline or the public number as a number to ring)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const f = readFileSync("src/app/admin/(app)/settings/RoutingForm.tsx", "utf8");
+    expect(f).toContain('placeholder={"Sara office phone | (845) 555-0123 | 20');
+    expect(f).not.toMatch(/placeholder=\{"[^"]*777-7585/);
+    expect(f).toContain("data-ring-example");
+  });
+});
