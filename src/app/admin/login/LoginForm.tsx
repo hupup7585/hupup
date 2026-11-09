@@ -7,7 +7,7 @@ import { passwordAction, sendCodeAction, sendEmailCodeAction, verifyCodeAction }
 /** Staff sign-in: phone number, then a texted code (everyone) or a password (Owner and Secretary). */
 export default function LoginForm({ smsActive = true, emailActive = true }: { smsActive?: boolean; emailActive?: boolean }) {
   const [phone, setPhone] = useState("");
-  const [mode, setMode] = useState<"code" | "password">(smsActive ? "code" : "password");
+  const [mode, setMode] = useState<"code" | "password">("password");
   const [sent, setSent] = useState(false);
   const [via, setVia] = useState<"sms" | "email">("sms");
   const [code, setCode] = useState("");
@@ -45,35 +45,37 @@ export default function LoginForm({ smsActive = true, emailActive = true }: { sm
         </label>
 
         {!sent && (
-          <div className="flex rounded-lg bg-bg p-1" role="tablist" aria-label="Sign-in method">
+          <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="How do you want to sign in?" data-signin-choice>
             {(
               [
-                ["code", "Text me a code", MessageSquareText],
-                ["password", "Use password", KeyRound],
+                ["password", "Sign in with password", KeyRound],
+                ["code", "Send me a code", MessageSquareText],
               ] as const
             ).map(([m, label, Icon]) => (
-              <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => (setMode(m), setError(null))} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-sm font-bold ${mode === m ? "bg-white text-navy shadow-sm" : "text-muted"}`}>
-                <Icon className="h-4 w-4" aria-hidden /> {label}
+              <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => (setMode(m), setError(null))} className={`flex items-center justify-center gap-1.5 rounded-xl border-2 px-2 py-3 text-sm font-bold ${mode === m ? "border-navy bg-navy text-white" : "border-line bg-white text-navy hover:border-navy"}`}>
+                <Icon className="h-4 w-4 shrink-0" aria-hidden /> {label}
               </button>
             ))}
           </div>
         )}
 
         {mode === "code" && !sent && (
-          <>
-            {!smsActive && (
-              <p data-not-active="sms-login" className="rounded-lg bg-[#FFF8E1] p-3 text-sm text-[#5C4600]">
-                <b>Not active yet:</b> text codes start once Twilio approves our texting registration (A2P). <b>Owner:</b> use &ldquo;Send code by email&rdquo; below. <b>Owner and Secretary:</b> use your password. <b>Delivery:</b> sign-in starts when text codes do.
-              </p>
+          <div className="space-y-3" data-code-ways>
+            <p className="text-sm font-bold text-navy">Send the code how?</p>
+            <button type="button" data-email-code className="btn-dark w-full py-3" onClick={() => send("email")} disabled={!emailActive || pending || phone.replace(/\D/g, "").length < 10}>
+              {pending && via === "email" ? "Sending…" : "By email"}
+            </button>
+            {!emailActive && (
+              <p data-not-active="email-login" className="rounded-lg bg-[#FFF8E1] p-3 text-sm text-[#5C4600]"><b>Not active yet:</b> email codes need the email sender set up. Use your password instead.</p>
             )}
-            <button className="btn-dark w-full py-3" onClick={() => send("sms")} disabled={!smsActive || pending || phone.replace(/\D/g, "").length < 10}>
-              {pending ? "Sending…" : "Send code"}
+            <button type="button" data-sms-code className="btn-ghost w-full py-3" onClick={() => send("sms")} disabled={!smsActive || pending || phone.replace(/\D/g, "").length < 10}>
+              {pending && via === "sms" ? "Sending…" : "By text (SMS)"}
             </button>
-            {/* Abraham: Owner only; the code always goes to the business email (hupupattractions@gmail.com) */}
-            <button type="button" data-email-code className="btn-ghost w-full py-2.5" onClick={() => send("email")} disabled={!emailActive || pending || phone.replace(/\D/g, "").length < 10}>
-              Send code by email <span className="font-normal text-muted">(Owner)</span>
-            </button>
-          </>
+            {!smsActive && (
+              <p data-not-active="sms-login" className="rounded-lg bg-[#FFF8E1] p-3 text-sm text-[#5C4600]"><b>Not active yet:</b> text codes start once Twilio approves our texting registration (A2P). Use &ldquo;By email&rdquo; or your password instead. Delivery staff sign in by text code only, so Delivery sign-in starts when text codes do.</p>
+            )}
+            <p className="text-xs text-muted">The code goes to the email or mobile number saved on your staff account. Delivery staff: text code only.</p>
+          </div>
         )}
 
         {mode === "code" && sent && (
@@ -122,7 +124,7 @@ export default function LoginForm({ smsActive = true, emailActive = true }: { sm
             <button className="btn-dark w-full py-3" disabled={pending || !password || phone.replace(/\D/g, "").length < 10}>
               {pending ? "Checking…" : "Sign in"}
             </button>
-            <p className="text-xs text-muted">Delivery accounts sign in with a texted code. No password yet? Owner: sign in with &ldquo;Send code by email&rdquo;, then set one under My account. Secretary: ask the Owner to set one on the Staff page.</p>
+            <p className="text-xs text-muted">No password yet? Choose &ldquo;Send me a code&rdquo;, sign in, then set one under My account (or ask the Owner to set it on the Staff page). Delivery staff sign in by text code only.</p>
           </form>
         )}
 

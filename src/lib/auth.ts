@@ -70,7 +70,16 @@ async function audit(action: string, userId: number | null, after: Record<string
 const GENERIC = "If that number belongs to a staff account, a code is on its way.";
 /** Abraham: the Owner can also get the sign-in code by email; it always goes to this address. */
 export const OWNER_CODE_EMAIL = "hupupattractions@gmail.com";
-const GENERIC_EMAIL = "If that number belongs to the Owner account, a code is on its way to the Owner's email.";
+
+/** Where a staff member's email code goes: their saved email; the Owner falls back to the business email. */
+async function staffEmail(staff: StaffUser): Promise<string | null> {
+  if (staff.userId) {
+    const [u] = await db.select({ email: adminUsers.email }).from(adminUsers).where(eq(adminUsers.id, staff.userId)).limit(1);
+    if (u?.email?.trim()) return u.email.trim();
+  }
+  return staff.role === "owner" ? OWNER_CODE_EMAIL : null;
+}
+const GENERIC_EMAIL = "If that number has a staff account with a saved email, a code is on its way to that email.";
 /**
  * Text codes only work once Twilio approves our texting registration (A2P 10DLC); until then carriers drop the texts.
  * On the live site we say so plainly instead of pretending a code is on its way. (Test and preview builds keep the
@@ -84,25 +93,29 @@ export function emailLoginActive(env: Record<string, string | undefined> = proce
   return env.VERCEL_ENV !== "production" || Boolean(env.RESEND_API_KEY);
 }
 export const SMS_LOGIN_NOT_ACTIVE =
-  "Not active yet: text codes start once Twilio approves our texting registration (A2P). Owner: use \"Send code by email\". Owner and Secretary: use your password.";
+  "Not active yet: text codes start once Twilio approves our texting registration (A2P). Use \"By email\" or your password instead.";
 
-export const EMAIL_NOT_SET_UP = "Email sign-in isn't set up yet. Please use \"Text me a code\" or your password.";
+export const EMAIL_NOT_SET_UP = "Not active yet: email codes need the email sender set up. Use your password instead.";
 
 /**
  * Owner only: email the sign-in code to OWNER_CODE_EMAIL. Same 10-minute expiry, 5 attempts and send limit as the
  * text code. The reply never reveals whether the number is the Owner's.
  */
 export async function sendLoginEmailCode(rawPhone: string): Promise<{ ok: boolean; message: string; devCode?: string }> {
+  if (!emailLoginActive()) return { ok: false, message: EMAIL_NOT_SET_UP };
   const staff = await staffForPhone(rawPhone);
-  if (!staff || staff.role !== "owner") {
-    await audit("login.email_code_refused", staff?.userId ?? null, { phone: toE164(rawPhone), role: staff?.role ?? null });
+  // Abraham: the code goes to that staff member's saved email (the Owner: the business email if none is saved).
+  // Delivery staff sign in by text code only.
+  const to = !staff || staff.role === "delivery" ? null : await staffEmail(staff);
+  if (!staff || !to) {
+    await audit("login.email_code_refused", staff?.userId ?? null, { phone: toE164(rawPhone), role: staff?.role ?? null, reason: !staff ? "unknown" : staff.role === "delivery" ? "delivery_text_only" : "no_email" });
     return { ok: true, message: GENERIC_EMAIL };
   }
   const channel = `email:${staff.phone}`;
   const recent = await db.execute(sql`SELECT COUNT(*)::int AS n FROM login_codes WHERE channel = ${channel} AND created_at > now() - interval '10 minutes'`);
   if ((recent.rows[0] as { n: number }).n >= MAX_SENDS_PER_10_MIN) return { ok: false, message: "Too many codes requested. Please wait a few minutes." };
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
-  const res = await sendEmail(OWNER_CODE_EMAIL, `${BUSINESS_NAME} sign-in code: ${code}`, `${BUSINESS_NAME} Owner sign-in code: ${code}\n\nIt expires in ${CODE_TTL_MIN} minutes. If you didn't request it, ignore this email.`);
+  const res = await sendEmail(to, `${BUSINESS_NAME} sign-in code: ${code}`, `${BUSINESS_NAME} staff sign-in code: ${code}\n\nIt expires in ${CODE_TTL_MIN} minutes. If you didn't request it, ignore this email.`);
   await audit("login.email_code_sent", staff.userId, { role: staff.role, sent: res.sent });
   if (!res.sent) return { ok: false, message: EMAIL_NOT_SET_UP };
   await db.insert(loginCodes).values({ userId: staff.userId, channel, codeHash: hmac(code), expiresAt: new Date(Date.now() + CODE_TTL_MIN * 60_000) });
@@ -152,7 +165,7 @@ export async function verifyLoginCode(rawPhone: string, code: string, trustDevic
   const clean = code.replace(/\D/g, "");
   if (clean.length !== 6) return { ok: false, error: "Enter the 6-digit code." };
   const staff = await staffForPhone(rawPhone);
-  if (!staff || (via === "email" && staff.role !== "owner")) return { ok: false, error: "That code is not valid. Request a new one." };
+  if (!staff || (via === "email" && staff.role === "delivery")) return { ok: false, error: "That code is not valid. Request a new one." };
   const [latest] = await db
     .select()
     .from(loginCodes)

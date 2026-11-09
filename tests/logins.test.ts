@@ -50,6 +50,7 @@ describe("staff sign-in on the live site", () => {
   it("Owner today: email code -> becomes a real account -> sets a password -> signs in with the password", async () => {
     process.env.VERCEL_ENV = "production";
     process.env.RESEND_API_KEY = "re_test";
+    process.env.RESEND_API_KEY = "re_test";
     await sendLoginEmailCode(OWNER);
     const code = h.emails.at(-1)!.text.match(/\b(\d{6})\b/)![1];
     expect(await verifyLoginCode(OWNER, code, false, "email")).toEqual({ ok: true, role: "owner" });
@@ -81,7 +82,11 @@ describe("staff sign-in on the live site", () => {
   it("the sign-in page says plainly what works today", () => {
     const form = readFileSync("src/app/admin/login/LoginForm.tsx", "utf8");
     expect(form).toContain('data-not-active="sms-login"');
-    expect(form).toContain('useState<"code" | "password">(smsActive ? "code" : "password")');
+    expect(form).toContain('["password", "Sign in with password", KeyRound]');
+    expect(form).toContain('["code", "Send me a code", MessageSquareText]');
+    expect(form).toContain('"By email"');
+    expect(form).toContain('"By text (SMS)"');
+    expect(form).toContain('data-not-active="email-login"');
     expect(readFileSync("src/app/admin/login/page.tsx", "utf8")).toContain("smsActive={smsLoginActive()}");
   });
 });

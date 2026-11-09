@@ -51,7 +51,8 @@ describe("staff sign-in design (Abraham)", () => {
     expect(css).toContain("--color-sun: #ffd84d");
     expect(css).toContain("--color-navy: #123d73");
   });
-  it("wording unchanged", () => {
-    for (const w of ["Staff sign-in", "Your mobile number", "Text me a code", "Use password", "Send code", "6-digit code", "Keep me signed in on this device for 30 days"]) expect(form).toContain(w);
+  it("wording (Abraham's sign-in choices)", () => {
+    // Abraham (Nov 9): front page offers "Sign in with password" or "Send me a code", then "By email" or "By text (SMS)"
+    for (const w of ["Staff sign-in", "Your mobile number", "Sign in with password", "Send me a code", "By email", "By text (SMS)", "6-digit code", "Keep me signed in on this device for 30 days"]) expect(form).toContain(w);
   });
 });

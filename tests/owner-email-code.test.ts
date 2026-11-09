@@ -47,12 +47,20 @@ describe("Owner: Send code by email", () => {
     expect(await verifyLoginCode(OWNER, codeFrom(), false, "email")).toEqual({ ok: true, role: "owner" });
   });
 
-  it("Owner only: other staff get the same generic reply and no email", async () => {
-    const r = await sendLoginEmailCode("(845) 555-0188");
+  it("other staff: the code goes to their own saved email; no saved email or Delivery = same generic reply and no email", async () => {
+    const r = await sendLoginEmailCode("(845) 555-0188"); // Sara has no saved email
     expect(r.ok).toBe(true);
-    expect(r.message).toMatch(/If that number belongs to the Owner account/);
+    expect(r.message).toMatch(/If that number has a staff account with a saved email/);
     expect(h.emails).toHaveLength(0);
     expect(await verifyLoginCode("(845) 555-0188", "123456", false, "email")).toMatchObject({ ok: false });
+    await db.insert(schema.adminUsers).values({ name: "Rivky", phone: "+18455550199", role: "secretary", active: true, email: "rivky@example.org" });
+    await sendLoginEmailCode("(845) 555-0199");
+    expect(h.emails.at(-1)!.to).toBe("rivky@example.org");
+    expect(await verifyLoginCode("(845) 555-0199", codeFrom(), false, "email")).toEqual({ ok: true, role: "secretary" });
+    h.emails.length = 0;
+    await db.insert(schema.adminUsers).values({ name: "Dovid", phone: "+18455550177", role: "delivery", active: true, email: "dovid@example.org" });
+    expect((await sendLoginEmailCode("(845) 555-0177")).message).toMatch(/If that number has a staff account/);
+    expect(h.emails).toHaveLength(0); // Delivery: text code only
   });
 
   it("5 wrong tries and the code stops working (same as the text code)", async () => {

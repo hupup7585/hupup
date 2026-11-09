@@ -487,7 +487,7 @@ describe("website Hours (Abraham's simple list)", () => {
       "Monday - Thursday: 10:30 AM - 7:00 PM",
       "Friday: 10:30 AM - Chatzos",
       "Shabbos: Closed",
-      "Motzei Shabbos: Winter: 2 hours after Shabbos - 11:00 PM\nSummer: 12:00 AM",
+      "Motzei Shabbos: Winter: 2 hours after Shabbos - 11:00 PM\nSummer: 2 hours after Shabbos - 12:00 AM",
     ]);
     // A change in Admin Settings shows on the website too (the two can never differ)
     expect(websiteHoursLines({ ...hoursDefaults(), hoursMonThu: "10:00-20:00", hoursSunday: "12:00-18:30", hoursFridayOpen: "9:30", hoursMotzeiOpen: "tzeis+90", hoursMotzeiCloseWinter: "23:30", hoursMotzeiCloseSummer: "01:00" })).toEqual([
@@ -495,13 +495,13 @@ describe("website Hours (Abraham's simple list)", () => {
       "Monday - Thursday: 10:00 AM - 8:00 PM",
       "Friday: 9:30 AM - Chatzos",
       "Shabbos: Closed",
-      "Motzei Shabbos: Winter: 90 minutes after Shabbos - 11:30 PM\nSummer: 1:00 AM",
+      "Motzei Shabbos: Winter: 90 minutes after Shabbos - 11:30 PM\nSummer: 90 minutes after Shabbos - 1:00 AM",
     ]);
     expect(WEBSITE_HOURS_NOTE).toBe("Book by phone anytime, 24/7.");
     // The card splits each line at the first ": " (day label, then hours), so Motzei Shabbos shows Abraham's two lines
     const motzei = WEBSITE_HOURS[4];
     expect(motzei.slice(0, motzei.indexOf(": "))).toBe("Motzei Shabbos");
-    expect(motzei.slice(motzei.indexOf(": ") + 2).split("\n")).toEqual(["Winter: 2 hours after Shabbos - 11:00 PM", "Summer: 12:00 AM"]);
+    expect(motzei.slice(motzei.indexOf(": ") + 2).split("\n")).toEqual(["Winter: 2 hours after Shabbos - 11:00 PM", "Summer: 2 hours after Shabbos - 12:00 AM"]);
     const page = readFileSync("src/app/page.tsx", "utf8");
     const hours = page.slice(page.indexOf('id="hours"'), page.indexOf('id="contact"'));
     expect(hours).toContain("websiteHoursLines(settings).map(");

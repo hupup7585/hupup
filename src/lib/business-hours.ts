@@ -176,7 +176,7 @@ export function websiteHoursLines(s: HoursSettings = hoursDefaults()): string[] 
     `Monday - Thursday: ${dash(s.hoursMonThu)}`,
     `Friday: ${ampm(s.hoursFridayOpen)} - Chatzos`,
     "Shabbos: Closed",
-    `Motzei Shabbos: Winter: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseWinter)}\nSummer: ${ampm(s.hoursMotzeiCloseSummer)}`,
+    `Motzei Shabbos: Winter: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseWinter)}\nSummer: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseSummer)}`,
   ];
 }
 
