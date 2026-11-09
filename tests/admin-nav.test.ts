@@ -14,7 +14,7 @@ describe("grouped admin menu", () => {
       "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Catalog"],
       Deliveries: ["Deliveries", "Delivery settings"],
       "Phone system": ["Call log", "Voicemail", "Messages", "Hotline prompts", "Compliance", "Phone settings"],
-      Bookkeeping: ["Bookkeeping"],
+      Bookkeeping: ["Overview", "Income", "Invoices", "Expenses", "Bills I owe", "Sola fees", "Bank & card", "Sales tax", "Equipment", "Staff & 1099", "Mileage", "Reports", "All entries", "General ledger", "Settings"],
       Staff: ["Staff", "Tasks", "Activity"],
       Settings: ["Business hours & holidays", "General settings", "System status", "Staff screens (preview)"],
     });
@@ -36,7 +36,9 @@ describe("grouped admin menu", () => {
     expect(isActive("/admin/delivery-settings", "/admin/deliveries")).toBe(false);
     expect(isActive("/admin/orders/12", "/admin/orders")).toBe(true);
     const s = readFileSync("src/components/Sidebar.tsx", "utf8");
-    expect(s).toContain("text-[11px] font-bold uppercase tracking-[0.14em] text-sky");
+    // Section titles look like "Dashboard" (same size, weight, color), in capital letters, no wide spacing
+    expect(s).toContain("px-3 py-2.5 text-[15px] font-semibold uppercase text-white/75");
+    expect(s).not.toContain("tracking-[0.14em] text-sky");
     expect(s).toContain('data-nav-group={g.title} className="mt-4"');
     expect(s).toContain("aria-expanded={openNow}");
     expect(s).toContain("return here || (g.title ? toggled[g.title] === true : true);");
@@ -56,5 +58,30 @@ describe("grouped admin menu", () => {
     const act = readFileSync("src/app/admin/(app)/settings/pricing-actions.ts", "utf8");
     expect(act.match(/await requireOwner\(\)/g)).toHaveLength(2);
     expect(act).toContain("auditLog");
+  });
+});
+
+describe("Bookkeeping in the side menu (Abraham, Nov 9, 2026)", () => {
+  it("every Bookkeeping page is its own item with its own link, in small groups; the open page is marked", async () => {
+    const { BOOK_GROUPS } = await import("@/lib/bookkeeping-tabs");
+    expect(BOOK_GROUPS.map((g) => [g.label, g.tabs.map(([, l]) => l)])).toEqual([
+      ["Money in", ["Overview", "Income", "Invoices"]],
+      ["Money out", ["Expenses", "Bills I owe", "Sola fees"]],
+      ["Bank and tax", ["Bank & card", "Sales tax"]],
+      ["Business", ["Equipment", "Staff & 1099", "Mileage"]],
+      ["Records", ["Reports", "All entries", "General ledger", "Settings"]],
+    ]);
+    const book = navFor("owner").find((g) => g.title === "Bookkeeping")!;
+    expect(book.items.map(([h]) => h)).toContain("/admin/bookkeeping?tab=bills");
+    expect(book.items.every(([, , , , sub]) => Boolean(sub))).toBe(true);
+    expect(isActive("/admin/bookkeeping", "/admin/bookkeeping?tab=bills", "bills")).toBe(true);
+    expect(isActive("/admin/bookkeeping", "/admin/bookkeeping?tab=bills", "income")).toBe(false);
+    expect(isActive("/admin/bookkeeping", "/admin/bookkeeping?tab=overview", null)).toBe(true);
+    expect(readFileSync("src/components/Sidebar.tsx", "utf8")).toContain("data-nav-sublabel");
+  });
+  it("each page's big title is its own name; the tab row shows only on phones", () => {
+    const page = readFileSync("src/app/admin/(app)/bookkeeping/page.tsx", "utf8");
+    expect(page).toContain("data-book-title>{bookTabLabel(tab)}</h1>");
+    expect(page).toContain('className="mb-5 flex flex-wrap gap-2 lg:hidden" aria-label="Bookkeeping sections"');
   });
 });

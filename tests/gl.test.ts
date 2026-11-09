@@ -89,6 +89,6 @@ describe("general ledger", () => {
 
   it("the screen shows 'Not active yet: needs accountant setup' until it's done", () => {
     expect(readFileSync("src/app/admin/(app)/bookkeeping/Ledger.tsx", "utf8")).toContain("Not active yet: needs accountant setup.");
-    expect(readFileSync("src/app/admin/(app)/bookkeeping/page.tsx", "utf8")).toContain('["gl", "General ledger"]');
+    expect(readFileSync("src/lib/bookkeeping-tabs.ts", "utf8")).toContain('["gl", "General ledger"]');
   });
 });

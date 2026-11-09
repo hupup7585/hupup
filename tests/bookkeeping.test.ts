@@ -84,7 +84,7 @@ describe("14. safety", () => {
     expect(await B.canUseBooks({ role: "secretary", userId: u.id })).toBe(false);
     await db.insert(schema.userPermissionOverrides).values({ userId: u.id, permission: "bookkeeping", allowed: true });
     expect(await B.canUseBooks({ role: "secretary", userId: u.id })).toBe(true);
-    expect(readFileSync("src/components/Sidebar.tsx", "utf8")).toContain('["/admin/bookkeeping", Calculator, "Bookkeeping", O]');
+    expect(readFileSync("src/components/Sidebar.tsx", "utf8")).toContain('bookTabHref(tab), BOOK_ICONS[tab] ?? List, label, O, g.label');
     expect(readFileSync("src/app/admin/(app)/bookkeeping/page.tsx", "utf8")).toContain("await requireBooks()");
     const actions = readFileSync("src/app/admin/(app)/bookkeeping/actions.ts", "utf8");
     expect(actions.match(/export async function \w+Action/g)!.length).toBe((actions.match(/return run\(/g) || []).length);

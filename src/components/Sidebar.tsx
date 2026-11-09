@@ -1,21 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Activity, Calculator, CircleUser, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, ChevronDown, LayoutDashboard, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PhoneForwarded, PlusCircle, Settings, ShieldCheck, SlidersHorizontal, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { BOOK_GROUPS, bookTabHref } from "@/lib/bookkeeping-tabs";
+import { Fragment, useEffect, useState } from "react";
+import { Activity, ArrowDownToLine, BadgePercent, BookOpen, Car, ChartColumn, FileClock, FileText, Gauge, IdCard, Landmark, List, Percent, Receipt, Settings2, Wrench, CircleUser, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, ChevronDown, LayoutDashboard, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PhoneForwarded, PlusCircle, Settings, ShieldCheck, SlidersHorizontal, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
 import type { Role } from "@/lib/db/schema";
 
 const O: Role[] = ["owner"];
 const OS: Role[] = ["owner", "secretary"];
 const ALL: Role[] = ["owner", "secretary", "delivery"];
-type Item = [string, LucideIcon, string, Role[]];
+/** [link, icon, label, roles, small group label shown above it (Bookkeeping only)] */
+type Item = [string, LucideIcon, string, Role[], string?];
 type Group = { title: string | null; items: Item[] };
 
 /**
  * Side menu in titled groups (Abraham). Each role sees only the screens it can use (the server enforces the same
  * rules); a group with nothing for that role is hidden. My account and Sign out sit at the bottom.
  */
+const BOOK_ICONS: Record<string, LucideIcon> = {
+  overview: Gauge,
+  income: ArrowDownToLine,
+  invoices: FileText,
+  expenses: Receipt,
+  bills: FileClock,
+  processor: Percent,
+  bank: Landmark,
+  tax: BadgePercent,
+  equipment: Wrench,
+  people: IdCard,
+  mileage: Car,
+  reports: ChartColumn,
+  ledger: List,
+  gl: BookOpen,
+  settings: Settings2,
+};
+
 export const NAV_GROUPS: Group[] = [
   { title: null, items: [["/admin", LayoutDashboard, "Dashboard", O]] },
   {
@@ -46,7 +66,7 @@ export const NAV_GROUPS: Group[] = [
       ["/admin/phone/settings", PhoneForwarded, "Phone settings", O],
     ],
   },
-  { title: "Bookkeeping", items: [["/admin/bookkeeping", Calculator, "Bookkeeping", O]] },
+  { title: "Bookkeeping", items: BOOK_GROUPS.flatMap((g) => g.tabs.map(([tab, label]): Item => [bookTabHref(tab), BOOK_ICONS[tab] ?? List, label, O, g.label])) },
   {
     title: "Staff",
     items: [
@@ -72,13 +92,22 @@ export function navFor(role: Role): Group[] {
   return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter(([, , , roles]) => roles.includes(role)) })).filter((g) => g.items.length > 0);
 }
 
-export const isActive = (path: string, href: string) => (href === "/admin" ? path === "/admin" : path === href || path.startsWith(href + "/"));
+/** Is this menu item the page that's open? Bookkeeping pages are told apart by their tab (no tab = Overview). */
+export const isActive = (path: string, href: string, tab: string | null = null) => {
+  const [base, query] = href.split("?");
+  if (query) {
+    const want = new URLSearchParams(query).get("tab");
+    return path === base && (tab || "overview") === want;
+  }
+  return href === "/admin" ? path === "/admin" : path === href || path.startsWith(href + "/");
+};
 
 /** Staff navigation: navy bar, yellow marker on the current page. Hidden when printing. */
 export default function Sidebar({ logout, role = "owner", name, taskBadge }: { logout: () => Promise<void>; role?: Role; name?: string; taskBadge?: { open: number; overdue: number } }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
-  const active = (href: string) => isActive(path, href);
+  const tab = useSearchParams()?.get("tab") ?? null;
+  const active = (href: string) => isActive(path, href, tab);
   const groups = navFor(role);
   // Which groups are open: the group of the current page starts open; a click opens or closes any group.
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
@@ -89,7 +118,7 @@ export default function Sidebar({ logout, role = "owner", name, taskBadge }: { l
     } catch {}
   }, []);
   const isOpen = (g: Group) => {
-    const here = g.items.some(([href]) => active(href));
+    const here = g.items.some(([href]) => active(href) || path.startsWith(href.split("?")[0] + "/"));
     return here || (g.title ? toggled[g.title] === true : true);
   };
   const toggle = (title: string, now: boolean) => {
@@ -159,14 +188,23 @@ export default function Sidebar({ logout, role = "owner", name, taskBadge }: { l
                   onClick={() => toggle(g.title!, openNow)}
                   aria-expanded={openNow}
                   aria-controls={id}
-                  className="flex w-full items-center justify-between rounded-md px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-sky hover:text-white"
+                  className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-[15px] font-semibold uppercase text-white/75 transition hover:bg-white/5 hover:text-white"
                 >
                   {g.title}
                   <ChevronDown className={`h-3.5 w-3.5 transition ${openNow ? "" : "-rotate-90"}`} aria-hidden />
                 </button>
                 {openNow && (
                   <div id={id} className="mt-1 space-y-0.5">
-                    {g.items.map(link)}
+                    {g.items.map((it, i) => (
+                      <Fragment key={it[0]}>
+                        {it[4] && it[4] !== g.items[i - 1]?.[4] && (
+                          <div data-nav-sublabel className={`px-3 pb-0.5 text-xs font-semibold text-white/55 ${i ? "pt-3" : "pt-1"}`}>
+                            {it[4]}
+                          </div>
+                        )}
+                        {link(it)}
+                      </Fragment>
+                    ))}
                   </div>
                 )}
               </div>

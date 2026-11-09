@@ -33,25 +33,11 @@ import GeneralLedger from "./Ledger";
 import { Card, CategorySelect, Field, FileInput, Grid, MethodSelect, Save, Stat, Table, money } from "./ui";
 
 export const metadata = { title: "Bookkeeping | Hup Up Attractions" };
+import { BOOK_TABS, bookTabLabel } from "@/lib/bookkeeping-tabs";
+
 export const dynamic = "force-dynamic";
 
-const TABS: [string, string][] = [
-  ["overview", "Overview"],
-  ["income", "Income"],
-  ["invoices", "Invoices"],
-  ["expenses", "Expenses"],
-  ["bills", "Bills I owe"],
-  ["processor", "Sola fees"],
-  ["bank", "Bank & card"],
-  ["tax", "Sales tax"],
-  ["equipment", "Equipment"],
-  ["people", "Staff & 1099"],
-  ["mileage", "Mileage"],
-  ["reports", "Reports"],
-  ["ledger", "All entries"],
-  ["gl", "General ledger"],
-  ["settings", "Settings"],
-];
+const TABS = BOOK_TABS;
 
 type SP = { asOf?: string; account?: string; tab?: string; from?: string; to?: string; group?: string; msg?: string; err?: string; year?: string };
 
@@ -69,9 +55,10 @@ export default async function BookkeepingPage({ searchParams }: { searchParams: 
 
   return (
     <div className="mx-auto max-w-7xl" data-bookkeeping>
-      <h1 className="mb-1 text-2xl font-black sm:text-3xl">Bookkeeping</h1>
+      <h1 className="mb-1 text-2xl font-black sm:text-3xl" data-book-title>{bookTabLabel(tab)}</h1>
       <p className="mb-4 text-muted">Owner only. Nothing here is ever deleted: a mistake is fixed with a correction entry, and closed months can be locked.</p>
-      <nav className="mb-5 flex flex-wrap gap-2" aria-label="Bookkeeping sections">
+      {/* On big screens the side menu lists every Bookkeeping page; this row shows only on phones */}
+      <nav className="mb-5 flex flex-wrap gap-2 lg:hidden" aria-label="Bookkeeping sections">
         {TABS.map(([k, label]) => (
           <Link key={k} href={`/admin/bookkeeping?tab=${k}`} className={`rounded-full px-3 py-1.5 text-sm font-bold ${k === tab ? "bg-navy text-white" : "bg-white text-navy ring-1 ring-line hover:bg-bg"}`}>
             {label}

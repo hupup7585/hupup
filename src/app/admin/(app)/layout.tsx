@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { myTaskBadge } from "@/lib/tasks";
 import Sidebar from "@/components/Sidebar";
@@ -11,7 +12,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const staff = await requireAdmin();
   return (
     <div className="min-h-screen bg-bg lg:flex">
-      <Sidebar logout={logoutAction} role={staff.role} name={staff.name} taskBadge={await myTaskBadge(staff)} />
+      <Suspense fallback={null}>
+        <Sidebar logout={logoutAction} role={staff.role} name={staff.name} taskBadge={await myTaskBadge(staff)} />
+      </Suspense>
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-8">{children}</main>
       <DateInputHints />
     </div>
