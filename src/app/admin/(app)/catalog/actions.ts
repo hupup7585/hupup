@@ -64,6 +64,10 @@ export async function saveProductAction(fd: FormData) {
     spokenDescription: s(fd, "spokenDescription"),
     imageUrl: s(fd, "imageUrl") || null,
     sortOrder: Number(fd.get("sortOrder") || 0),
+    sizeOrder: (() => {
+      const n = Number(fd.get("sizeOrder"));
+      return String(fd.get("sizeOrder") ?? "").trim() && Number.isInteger(n) && n >= 1 && n <= 99 ? n : null;
+    })(),
     active: fd.get("active") === "on",
   };
   if (id) await db.update(schema.products).set(values).where(eq(schema.products.id, id));

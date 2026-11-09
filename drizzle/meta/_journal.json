@@ -183,6 +183,13 @@
       "when": 1794251436259,
       "tag": "0025_sms_campaigns",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794256190987,
+      "tag": "0026_product_size_order",
+      "breakpoints": true
     }
   ]
 }

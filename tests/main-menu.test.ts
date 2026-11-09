@@ -164,12 +164,11 @@ describe("every key, office open", () => {
     expect(redirect(hash)).toBe("menu");
     expect(redirect(await press("*"))).toBe("menu?first=1");
   });
-  it("key 1 asks the date first; then the rental list with the existing lines, Abraham's cart line, 0 = cart, star goes back", async () => {
+  it("key 1 lists the categories first (item first, then the date); cart line, 0 = cart, star goes back", async () => {
     h.session.data = {};
-    expect(redirect(await call("book"))).toBe("date");
-    h.session.data = { day: "2026-12-01" };
     await db.insert(schema.categories).values({ name: "Jumping Balloons", spokenName: "Jumping Balloons", ivrDigit: 1, sortOrder: 1, active: true });
     const book = await call("book");
+    expect(book).toContain("Let's find the right rental for your event.");
     expect(book).toContain("For Jumping Balloons, press 1.");
     expect(book).toContain("To go back to the main menu, press star.");
     expect(book).toContain("To go to your shopping cart, press 0.");
@@ -240,7 +239,7 @@ describe("menus are keys only (Abraham): no speech in any menu", () => {
     const { readFileSync } = await import("node:fs");
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(flow).not.toContain("category-speech");
-    expect((flow.match(/= speech\(vr, url\("(\w|-)+"/g) || []).map((m) => m.match(/url\("([\w-]+)"/)![1]).sort()).toEqual(["date-heard", "heard", "promo-consent-answer", "sms-consent-answer"]);
+    expect((flow.match(/= speech\(vr, url\("(\w|-)+"/g) || []).map((m) => m.match(/url\("([\w-]+)"/)![1]).sort()).toEqual(["heard", "promo-consent-answer", "sms-consent-answer"]); // the booking date is keys only (Abraham, Nov 9)
   });
 });
 

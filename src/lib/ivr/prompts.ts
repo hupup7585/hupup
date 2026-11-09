@@ -96,6 +96,24 @@ export const PROMPTS = {
   product_options: { group: "Browsing", label: "Item options", text: "To hear more about it, press 1. To add it to your cart, press 2. To go back, press star." },
   product_default_desc: { group: "Browsing", label: "Description when an item has none", text: "The {item} is one of our most popular rentals. Kids love it!", vars: ["item"] },
 
+  // Booking by item (Abraham, Nov 9, 2026): category, item, date; if booked, the nearest options
+  book_intro: { group: "Booking by item (key 1)", label: "Before the categories", text: "Let's find the right rental for your event." },
+  book_category_list: { group: "Booking by item (key 1)", label: "Before the items in a category", text: "Here are our {category}.", vars: ["category"] },
+  book_date_prompt: { group: "Booking by item (key 1)", label: "Ask for the event date (keypad)", text: "Please enter your event date: two digits for the month, then two digits for the day. For example, for March 5th, press 0, 3, 0, 5." },
+  book_date_entered: { group: "Booking by item (key 1)", label: "Confirm the date", text: "You entered {date}. If that's correct, press 1. To enter a different date, press 2.", vars: ["date"] },
+  booked_intro: { group: "Booking by item (key 1)", label: "Item booked that day", text: "I'm sorry, the {item} is already booked on {date}.", vars: ["item", "date"] },
+  booked_closest: { group: "Booking by item (key 1)", label: "Closest options intro", text: "Here are the closest options for that day." },
+  booked_bigger: { group: "Booking by item (key 1)", label: "Next size up", text: "For the next size up, the {item}, press 1.", vars: ["item"] },
+  booked_smaller: { group: "Booking by item (key 1)", label: "Next size down", text: "For the next size down, the {item}, press 2.", vars: ["item"] },
+  booked_keep: { group: "Booking by item (key 1)", label: "Keep the item, choose another date", text: "To keep the {item} and choose a different date, press 3.", vars: ["item"] },
+  altdate_before: { group: "Booking by item (key 1)", label: "Available the day before", text: "The {item} is available on {date}, the day before. To choose that day, press 1.", vars: ["item", "date"] },
+  altdate_after_also: { group: "Booking by item (key 1)", label: "Also available the day after", text: "It's also available on {date}, the day after. To choose that day, press 2.", vars: ["date"] },
+  altdate_after: { group: "Booking by item (key 1)", label: "Available the day after (only)", text: "The {item} is available on {date}, the day after. To choose that day, press 2.", vars: ["item", "date"] },
+  altdate_not_near: { group: "Booking by item (key 1)", label: "Not available the day before or after", text: "The {item} isn't available the day before or after.", vars: ["item"] },
+  altdate_nearest_before: { group: "Booking by item (key 1)", label: "Nearest date before", text: "The nearest date before your date is {date}. To choose it, press 1.", vars: ["date"] },
+  altdate_nearest_after: { group: "Booking by item (key 1)", label: "Nearest date after", text: "The nearest date after your date is {date}. To choose it, press 2.", vars: ["date"] },
+  altdate_other: { group: "Booking by item (key 1)", label: "Try a different date", text: "To try a different date, press 3." },
+
   // Date & quantity
   date_prompt: { group: "Date & quantity", label: "Ask for the party date", text: "What day is your party? Just say the date, like November 8th. Or type the month and day on your keypad. For November 8th, that's 1, 1, 0, 8." },
   date_past: { group: "Date & quantity", label: "Date already passed", text: "Hmm, that date has already passed. Let's pick another one." },

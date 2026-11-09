@@ -45,6 +45,8 @@ export const products = pgTable(
     quantity: integer("quantity").notNull().default(1),
     imageUrl: text("image_url"),
     sortOrder: integer("sort_order").notNull().default(0),
+    /** Size within its category (1 = smallest); the phone line offers the next size up or down when an item is booked */
+    sizeOrder: integer("size_order"),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

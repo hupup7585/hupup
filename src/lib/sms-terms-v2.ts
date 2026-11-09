@@ -37,9 +37,9 @@ export function promoConfirmRequestSms(base = config.baseUrl()): string {
 }
 /** @deprecated kept for older records: the text current at build time. */
 export const PROMO_CONFIRM_REQUEST_SMS = promoConfirmRequestSms();
-/** Sent after that YES (Abraham U, exact). */
+/** Sent after that JOIN or YES (Abraham, Nov 9, 2026, exact). */
 export const PROMO_ENROLLED_SMS =
-  "Hup Up Attractions: You're signed up for promotional texts. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.";
+  "Hup Up Attractions: You're signed up for seasonal promo texts, up to 6 per year. Msg & data rates may apply. Reply NO PROMO to stop promos, STOP to stop all texts, HELP for help.";
 export const PROMO_CONFIRM_VERSION = "promo-confirm-2026-11-09-join-6";
 /** How long the YES reply counts. */
 export const PROMO_CONFIRM_WINDOW_HOURS = 24;

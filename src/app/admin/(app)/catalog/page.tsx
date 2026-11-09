@@ -36,6 +36,11 @@ function ProductForm({ p, categories, categoryId }: { p?: Product; categories: C
       <div className="sm:col-span-2"><label className="label">Price per rental ($) *</label><input name="price" defaultValue={p ? (p.priceCents / 100).toFixed(2) : ""} className="input" inputMode="decimal" required /></div>
       <div className="sm:col-span-2"><label className="label">Units owned *</label><input name="quantity" type="number" min={0} defaultValue={p?.quantity ?? 1} className="input" required /></div>
       <div className="sm:col-span-2"><label className="label">Phone menu order</label><input name="sortOrder" type="number" defaultValue={p?.sortOrder ?? 0} className="input" /></div>
+      <div className="sm:col-span-2" data-size-order>
+        <label className="label" htmlFor={`size-${p?.id ?? "new"}`}>Size order (1 = smallest)</label>
+        <input id={`size-${p?.id ?? "new"}`} name="sizeOrder" type="number" min={1} max={99} defaultValue={p?.sizeOrder ?? ""} className="input" placeholder="Leave empty if not a size" />
+        <span className="mt-1 block text-xs text-muted">When this item is booked, the phone line offers the next size up or down in the same category.</span>
+      </div>
       <div className="sm:col-span-6"><label className="label">Description</label><input name="description" defaultValue={p?.description} className="input" /></div>
       <div className="sm:col-span-6"><label className="label">What the phone voice says for “hear description”</label><textarea name="spokenDescription" defaultValue={p?.spokenDescription} rows={2} className="input" /></div>
       <div className="sm:col-span-4"><label className="label">Photo URL</label><input name="imageUrl" defaultValue={p?.imageUrl ?? ""} className="input" /></div>

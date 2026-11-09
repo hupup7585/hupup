@@ -84,7 +84,7 @@ describe("written promotional consent (phone keypress only sends a confirmation 
     expect(rows[0].response).toContain("pressed 1 on call CAv2");
     expect((await customer()).marketingOptIn).toBe(true);
     expect(h.sent.map((m) => m.body)).toEqual([v2.PROMO_ENROLLED_SMS]);
-    expect(v2.PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You're signed up for promotional texts. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.");
+    expect(v2.PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You're signed up for seasonal promo texts, up to 6 per year. Msg & data rates may apply. Reply NO PROMO to stop promos, STOP to stop all texts, HELP for help.");
 
     h.sent.length = 0;
     await text("YES", "SMv2yes2");

@@ -104,6 +104,52 @@ function keypad(vr: VR, action: string, opts: { numDigits?: number; timeout?: nu
   });
 }
 
+/** "Tuesday, March 5th": day name, month and day number, for the booking steps (Abraham). */
+export function spokenDate(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  const wd = d.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long" });
+  const mo = d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long" });
+  const n = d.getUTCDate();
+  const v = n % 100;
+  const suf = v >= 11 && v <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${wd}, ${mo} ${n}${n % 10 > 3 ? "th" : suf}`;
+}
+
+/** Booking steps (Abraham): no key pressed -> repeat the options once; still nothing -> the general voicemail. */
+function bookNoInput(vr: VR, ctx: Ctx, retryAction: string, retryParams: Record<string, string | number | undefined> = {}) {
+  const n = Number(ctx.query.get("n") || 0) + 1;
+  if (n >= 2) return back(vr, "voicemail");
+  vr.redirect({ method: "POST" }, url(retryAction, { ...retryParams, n }));
+  return vr;
+}
+
+/** The item is free on that day, and the day is open (not past, not Shabbos/Yom Tov/closed, pickup rules applied). */
+async function itemFreeOn(p: { id: number; quantity: number }, date: string, cal: Awaited<ReturnType<typeof getSettings>>): Promise<boolean> {
+  if (date < todayISO()) return false;
+  if (!checkEventDate(date, cal).ok) return false;
+  return (await checkBookable(p.id, p.quantity, date)) > 0;
+}
+
+/** Next size up (+1) or down (-1) in the same category that's free that day; null if none. */
+async function nearestSize(p: { id: number; categoryId: number; sizeOrder: number | null }, date: string, dir: 1 | -1, cal: Awaited<ReturnType<typeof getSettings>>) {
+  if (p.sizeOrder == null) return null;
+  const sizes = (await phoneProducts(p.categoryId))
+    .filter((x) => x.id !== p.id && x.sizeOrder != null && (dir > 0 ? x.sizeOrder! > p.sizeOrder! : x.sizeOrder! < p.sizeOrder!))
+    .sort((a, b) => dir * (a.sizeOrder! - b.sizeOrder!));
+  for (const x of sizes) if (await itemFreeOn(x, date, cal)) return x;
+  return null;
+}
+
+/** Nearest open day with the item free, searching back (-1) or forward (+1) from a date (skipping closed days). */
+async function nearestFreeDay(p: { id: number; quantity: number }, date: string, dir: 1 | -1, cal: Awaited<ReturnType<typeof getSettings>>, start = 2, limit = dir > 0 ? 90 : 60) {
+  for (let i = start; i <= limit; i++) {
+    const d = addDays(date, dir * i);
+    if (dir < 0 && d < todayISO()) return null;
+    if (await itemFreeOn(p, d, cal)) return d;
+  }
+  return null;
+}
+
 /** Speech (plus optional keypad) gather tuned for phone audio. */
 function speech(vr: VR, action: string, hints: string, opts: { dtmf?: boolean; numDigits?: number; finishOnKey?: string } = {}) {
   return vr.gather({
@@ -316,6 +362,12 @@ function dialTargets(vr: VR, list: ReturnType<typeof ringListFor>, k: RingKey, i
   return vr;
 }
 
+/** This day becomes the one being shopped for on the call; an order already held for the same day is reused. */
+async function chooseDay(ctx: Ctx, date: string) {
+  const sameDay = (await callOrders(ctx)).find((o) => o.order.eventDate === date);
+  await updateSession(ctx.callSid, { orderId: sameDay?.order.id ?? null, data: { day: date } }, ctx.session);
+}
+
 /* ------------------------------------------------------------------ handlers */
 
 type Handler = (ctx: Ctx, vr: VR) => Promise<VR> | VR;
@@ -514,11 +566,12 @@ const handlers: Record<string, Handler> = {
    * For another day, press 2." Each day is its own held order; checkout charges all of them together (one payment).
    * Every booking menu ends with "To go to your shopping cart, press 0."; star returns to the main menu.
    */
+  /** Key 1 (Abraham, Nov 9, 2026): choose a category, then the item, then the date. */
   async book(ctx, vr) {
-    if (!ctx.session?.data.day) return back(vr, "date");
     const cats = await phoneCategories();
     const g = keypad(vr, url("book-choice")); // keys only (Abraham); # is an invalid choice
     if (!cats.length) sp(g, ctx, "menu_empty");
+    else sp(g, ctx, "book_intro");
     for (const c of cats) {
       sp(g, ctx, "menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
       shortPause(g);
@@ -526,12 +579,12 @@ const handlers: Record<string, Handler> = {
     sp(g, ctx, "back_to_menu");
     shortPause(g);
     sp(g, ctx, "cart_key");
-    return noInput(vr, ctx, "book");
+    return bookNoInput(vr, ctx, "book");
   },
 
   async "book-choice"(ctx, vr) {
     const d = ctx.body.Digits; // keys only (Abraham)
-    if (!d) return noInput(vr, ctx, "book", {});
+    if (!d) return bookNoInput(vr, ctx, "book", {});
     if (d === "*") return back(vr, "menu");
     if (d === "0") return back(vr, "cart");
     const cat = (await phoneCategories()).find((c) => String(c.ivrDigit) === d);
@@ -552,17 +605,17 @@ const handlers: Record<string, Handler> = {
     }
     await track(ctx.callSid, "category_heard", `Listened to ${cat.name}`, { category: cat.name, items: items.map((p) => p.name) });
     const g = keypad(vr, url("category-choice", { c }));
-    sp(g, ctx, "category_intro", { category: cat.spokenName || cat.name });
+    sp(g, ctx, "book_category_list", { category: cat.spokenName || cat.name });
     items.forEach((p, i) => sp(g, ctx, "category_item", { item: p.name, key: i + 1 }));
     sp(g, ctx, "back_to_menu");
     sp(g, ctx, "cart_key");
-    return noInput(vr, ctx, "category", { c });
+    return bookNoInput(vr, ctx, "category", { c });
   },
 
   async "category-choice"(ctx, vr) {
     const c = Number(ctx.query.get("c"));
     const d = ctx.body.Digits;
-    if (!d) return noInput(vr, ctx, "category", { c });
+    if (!d) return bookNoInput(vr, ctx, "category", { c });
     if (d === "*") return back(vr, "menu");
     if (d === "0") return back(vr, "cart");
     const items = await phoneProducts(c);
@@ -571,7 +624,10 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "not_valid");
       return back(vr, "category", { c });
     }
-    return back(vr, "product", { p: p.id });
+    await track(ctx.callSid, "item_heard", `Chose ${p.name}`, { item: p.name, productId: p.id });
+    // Item first, then the date (Abraham). Adding more items for a day already chosen on this call skips the date.
+    const day = ctx.session?.data.day;
+    return day ? back(vr, "qty", { p: p.id, d: day }) : back(vr, "date", { p: p.id });
   },
 
   async product(ctx, vr) {
@@ -609,48 +665,132 @@ const handlers: Record<string, Handler> = {
     return back(vr, "product", { p: p.id, again: 1 });
   },
 
-  /** The rental day (asked first). p = a product the caller already picked (then straight on to its quantity). */
+  /** The event date, keys only (Abraham): MMDD. p = the item chosen (then its availability). */
   date(ctx, vr) {
     const p = ctx.query.get("p") ?? undefined;
-    const g = speech(vr, url("date-heard", { p, n: ctx.query.get("n") ?? undefined }), "today, tomorrow, Sunday, Monday, January, February, March, April, May, June, July, August, September, October, November, December", { dtmf: true, numDigits: 4 });
-    sp(g, ctx, "date_prompt");
-    return vr;
+    const g = keypad(vr, url("date-heard", { p }), { numDigits: 4, timeout: 8 });
+    sp(g, ctx, "book_date_prompt");
+    return bookNoInput(vr, ctx, "date", { p });
   },
 
   async "date-heard"(ctx, vr) {
     const p = ctx.query.get("p") ?? undefined;
     const digits = ctx.body.Digits;
-    const speechResult = ctx.body.SpeechResult;
-    if (!digits && !speechResult) return noInput(vr, ctx, "date", { p });
+    if (!digits) return bookNoInput(vr, ctx, "date", { p });
     const today = todayISO();
-    const r = parseDateInput({ digits, speech: speechResult }, today);
+    const r = parseDateInput({ digits }, today);
     if (!r.ok) {
-      await track(ctx.callSid, "date_unclear", `Date not usable (${r.reason})`, { said: speechResult ?? null, key: digits ?? null, reason: r.reason });
+      await track(ctx.callSid, "date_unclear", `Date not usable (${r.reason})`, { key: digits, reason: r.reason });
       sp(vr, ctx, r.reason === "past" ? "date_past" : r.reason === "too_far" ? "date_too_far" : "date_unclear");
-      return back(vr, "date", { p, n: Number(ctx.query.get("n") || 0) + 1 });
+      return back(vr, "date", { p });
     }
     const cal = await getSettings();
     const chk = checkEventDate(r.date, cal);
     if (!chk.ok) {
       await track(ctx.callSid, "date_closed", `Asked for ${longDate(r.date)}: closed`, { date: r.date, reason: chk.day.reasonEn ?? chk.day.reason ?? null });
-      sp(vr, ctx, "date_closed", { date: longDate(r.date), reason: chk.day.reasonEn ?? chk.day.reason ?? "a holiday" }); // Ashkenazi English names (Abraham)
-      return back(vr, "date", { p, n: Number(ctx.query.get("n") || 0) + 1 });
+      sp(vr, ctx, "date_closed", { date: spokenDate(r.date), reason: chk.day.reasonEn ?? chk.day.reason ?? "a holiday" }); // Ashkenazi English names (Abraham)
+      return back(vr, "date", { p });
     }
-    await track(ctx.callSid, "date_asked", `Asked about ${longDate(r.date)}`, { date: r.date, said: speechResult ?? null, key: digits ?? null });
-    const g = keypad(vr, url("date-confirm", { p, d: r.date }));
-    sp(g, ctx, "date_confirm_day", { date: longDate(r.date), pickup: longDate(pickupDateFor(r.date, cal)) });
-    return noInput(vr, ctx, "date", { p });
+    await track(ctx.callSid, "date_asked", `Asked about ${longDate(r.date)}`, { date: r.date, key: digits });
+    return back(vr, "date-ask", { p, d: r.date });
+  },
+
+  /** "You entered Tuesday, March 5th. If that's correct, press 1. To enter a different date, press 2." */
+  async "date-ask"(ctx, vr) {
+    const p = ctx.query.get("p") ?? undefined;
+    const date = ctx.query.get("d")!;
+    const g = keypad(vr, url("date-confirm", { p, d: date }));
+    sp(g, ctx, "book_date_entered", { date: spokenDate(date) });
+    return bookNoInput(vr, ctx, "date-ask", { p, d: date });
   },
 
   async "date-confirm"(ctx, vr) {
     const p = ctx.query.get("p") ?? undefined;
     const date = ctx.query.get("d")!;
     const d = ctx.body.Digits;
-    if (d !== "1") return back(vr, "date", { p });
-    // This day becomes the one being shopped for; an order already held for the same day is reused.
-    const sameDay = (await callOrders(ctx)).find((o) => o.order.eventDate === date);
-    await updateSession(ctx.callSid, { orderId: sameDay?.order.id ?? null, data: { day: date } }, ctx.session);
+    if (d === "2") return back(vr, "date", { p });
+    if (d !== "1") {
+      if (d) sp(vr, ctx, "not_valid");
+      return back(vr, "date-ask", { p, d: date });
+    }
+    await chooseDay(ctx, date);
     return p ? back(vr, "qty", { p, d: date }) : back(vr, "book");
+  },
+
+  /** The item is booked on that day: next size up / down that's free, or keep the item and pick another date. */
+  async booked(ctx, vr) {
+    const p = await getProduct(Number(ctx.query.get("p")));
+    const date = ctx.query.get("d")!;
+    if (!p) return back(vr, "menu");
+    const cal = await getSettings();
+    const [big, small] = await Promise.all([nearestSize(p, date, 1, cal), nearestSize(p, date, -1, cal)]);
+    const g = keypad(vr, url("booked-choice", { p: p.id, d: date, b: big?.id, s: small?.id }));
+    sp(g, ctx, "booked_intro", { item: p.name, date: spokenDate(date) });
+    if (big || small) sp(g, ctx, "booked_closest");
+    if (big) sp(g, ctx, "booked_bigger", { item: big.name });
+    if (small) sp(g, ctx, "booked_smaller", { item: small.name });
+    sp(g, ctx, "booked_keep", { item: p.name });
+    return bookNoInput(vr, ctx, "booked", { p: p.id, d: date });
+  },
+
+  async "booked-choice"(ctx, vr) {
+    const p = Number(ctx.query.get("p"));
+    const date = ctx.query.get("d")!;
+    const b = ctx.query.get("b");
+    const sm = ctx.query.get("s");
+    const d = ctx.body.Digits;
+    if (d === "1" && b) return back(vr, "qty", { p: b, d: date });
+    if (d === "2" && sm) return back(vr, "qty", { p: sm, d: date });
+    if (d === "3") return back(vr, "altdates", { p, d: date });
+    if (d === "*") return back(vr, "menu");
+    if (d === "0") return back(vr, "cart");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "booked", { p, d: date });
+  },
+
+  /** Same item, another date: the day before / after, else the nearest open dates before and after. */
+  async altdates(ctx, vr) {
+    const p = await getProduct(Number(ctx.query.get("p")));
+    const date = ctx.query.get("d")!;
+    if (!p) return back(vr, "menu");
+    const cal = await getSettings();
+    const before = addDays(date, -1);
+    const after = addDays(date, 1);
+    const [okBefore, okAfter] = await Promise.all([itemFreeOn(p, before, cal), itemFreeOn(p, after, cal)]);
+    const near = okBefore || okAfter;
+    const [one, two] = near
+      ? [okBefore ? before : null, okAfter ? after : null]
+      : await Promise.all([nearestFreeDay(p, date, -1, cal), nearestFreeDay(p, date, 1, cal)]);
+    const g = keypad(vr, url("altdate-choice", { p: p.id, d: date, one: one ?? undefined, two: two ?? undefined }));
+    if (near) {
+      if (one) sp(g, ctx, "altdate_before", { item: p.name, date: spokenDate(one) });
+      if (two) sp(g, ctx, one ? "altdate_after_also" : "altdate_after", { item: p.name, date: spokenDate(two) });
+    } else {
+      sp(g, ctx, "altdate_not_near", { item: p.name });
+      if (one) sp(g, ctx, "altdate_nearest_before", { date: spokenDate(one) });
+      if (two) sp(g, ctx, "altdate_nearest_after", { date: spokenDate(two) });
+    }
+    sp(g, ctx, "altdate_other");
+    await track(ctx.callSid, "step", `Other dates offered for ${p.name}`, { item: p.name, date, before: one, after: two });
+    return bookNoInput(vr, ctx, "altdates", { p: p.id, d: date });
+  },
+
+  async "altdate-choice"(ctx, vr) {
+    const p = ctx.query.get("p")!;
+    const date = ctx.query.get("d")!;
+    const one = ctx.query.get("one");
+    const two = ctx.query.get("two");
+    const d = ctx.body.Digits;
+    const pick = d === "1" && one ? one : d === "2" && two ? two : null;
+    if (pick) {
+      await chooseDay(ctx, pick);
+      return back(vr, "qty", { p, d: pick });
+    }
+    if (d === "3") return back(vr, "date", { p });
+    if (d === "*") return back(vr, "menu");
+    if (d === "0") return back(vr, "cart");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "altdates", { p, d: date });
   },
 
   async qty(ctx, vr) {
@@ -660,11 +800,7 @@ const handlers: Record<string, Handler> = {
     const free = await checkBookable(p.id, p.quantity, date);
     if (free <= 0) {
       await track(ctx.callSid, "unavailable", `${p.name} not available on ${longDate(date)}`, { item: p.name, productId: p.id, date });
-      const g = keypad(vr, url("soldout-choice", { p: p.id }));
-      sp(g, ctx, "sold_out", { item: p.name, date: longDate(date) });
-      const order = await currentOrder(ctx);
-      sp(g, ctx, order ? "sold_out_options_cart" : "sold_out_options");
-      return noInput(vr, ctx, "menu");
+      return back(vr, "booked", { p: p.id, d: date });
     }
     if (free === 1) return back(vr, "add", { p: p.id, d: date, q: 1 });
     const max = Math.min(free, 9);

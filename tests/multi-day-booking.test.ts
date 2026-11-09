@@ -53,10 +53,11 @@ beforeAll(async () => {
 });
 
 describe("key 1: date first, several days, one charge", () => {
-  it("asks the date first, then the rental list for that day", async () => {
+  it("item first, then the date (Abraham, Nov 9); the chosen day is kept for more items", async () => {
     expect(redirect(await call("menu-choice", { Digits: "1" }))).toBe("book");
-    expect(redirect(await call("book"))).toBe("date"); // no day yet: the date comes first
-    expect(said(await call("date"))[0]).toMatch(/^What day is your party\?/);
+    expect(said(await call("book"))[0]).toBe("Let's find the right rental for your event.");
+    expect(redirect(await call("category-choice", { Digits: "1" }, "c=1"))).toBe(`date?p=${productId}`);
+    expect(said(await call("date", {}, `p=${productId}`))[0]).toMatch(/^Please enter your event date: two digits for the month/);
     expect(redirect(await call("date-confirm", { Digits: "1" }, `d=${DAY1}`))).toBe("book");
     expect(h.session.data.day).toBe(DAY1);
     expect(said(await call("book"))).toContain("To go to your shopping cart, press 0.");
