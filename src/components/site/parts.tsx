@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { Phone, type LucideIcon } from "lucide-react";
 export { categoryIcon } from "@/lib/category-icons";
 import { keepName } from "@/lib/site-copy";
@@ -11,13 +10,28 @@ import type { SiteContent } from "@/lib/site-content";
 
 export const ICON_STROKE = 2;
 
-/** Official logo (transparent PNG). Abraham's rule: only on a white area, never on navy. */
+/** Official logo (transparent PNG). Abraham's rule: on light blue #8CCBFF, never on navy. */
 export const LOGO_SRC = "/brand/hupup-logo-320.png";
+/** Sharp header logo files (96px tall at 1x, 2x and 3x), served as-is with no image compression. */
+export const HEADER_LOGO = { src: "/brand/hupup-logo-h96@1x.png", srcSet: "/brand/hupup-logo-h96@1x.png 1x, /brand/hupup-logo-h96@2x.png 2x, /brand/hupup-logo-h96@3x.png 3x" };
 
 export function Wordmark({ logoUrl, light = false }: { logoUrl: string | null; light?: boolean }) {
-  // On light backgrounds show the logo; on navy (light = true) keep the text name instead.
+  // On light backgrounds show the logo on its light blue tile; on navy (light = true) keep the text name instead.
   if (!light) {
-    return <Image src={logoUrl || LOGO_SRC} alt="Hup Up Attractions" width={320} height={337} sizes="(min-width: 640px) 61px, 54px" className="h-14 w-auto sm:h-16" priority />;
+    return (
+      <span data-logo-tile className="inline-block rounded-2xl bg-[#8CCBFF] p-1.5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoUrl || HEADER_LOGO.src}
+          srcSet={logoUrl ? undefined : HEADER_LOGO.srcSet}
+          alt="Hup Up Attractions"
+          width={91}
+          height={96}
+          fetchPriority="high"
+          className="block h-[72px] w-auto sm:h-24"
+        />
+      </span>
+    );
   }
   return (
     <span className={`whitespace-nowrap font-display text-lg font-extrabold leading-none tracking-tight min-[400px]:text-xl sm:text-2xl ${light ? "text-white" : "text-hu-deep"}`}>

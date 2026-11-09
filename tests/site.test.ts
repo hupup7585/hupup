@@ -580,7 +580,7 @@ describe("Google optimization fixes (no wording changes)", () => {
     expect(page).toContain("<ul data-contact-list");
     const parts = readFileSync("src/components/site/parts.tsx", "utf8");
     expect(parts).toContain("tracking-[0.18em] text-hu-deep`}>{keepName(kicker)}");
-    expect(parts).toContain('sizes="(min-width: 640px) 61px, 54px"');
+    expect(parts).toContain("width={91}") // plain sharp img (1x/2x/3x) with fixed size: no layout shift;
     for (const [f, c] of [["src/app/page.tsx", "/"], ["src/app/text-alerts/page.tsx", "/text-alerts"], ["src/app/privacy/page.tsx", "/privacy"], ["src/app/terms/page.tsx", "/terms"], ["src/app/sms-terms/page.tsx", "/sms-terms"]]) {
       expect(readFileSync(f, "utf8"), f).toContain(`alternates: { canonical: "${c}" }`);
     }
