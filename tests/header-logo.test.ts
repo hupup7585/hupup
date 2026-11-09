@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 
-/* Abraham: the website header logo is bigger and sharp, on light blue #8CCBFF. */
+/* Abraham: the website header logo is bigger and sharp, straight on the white header with a very soft shadow (Nov 9, 2026). */
 describe("website header logo", () => {
   const parts = readFileSync("src/components/site/parts.tsx", "utf8");
   it("uses the sharp 96px files at 1x, 2x and 3x as a plain image (no Next image compression)", () => {
@@ -10,8 +10,9 @@ describe("website header logo", () => {
     expect(parts).not.toMatch(/from "next\/image"/);
     expect(parts).toContain("<img");
   });
-  it("72px tall on phones, 96px on desktop, on a light blue #8CCBFF tile (never navy)", () => {
-    expect(parts).toContain('className="block h-[72px] w-auto sm:h-24"');
-    expect(parts).toMatch(/data-logo-tile className="[^"]*bg-\[#8CCBFF\]/);
+  it("72px tall on phones, 96px on desktop, on white (no light-blue tile) with a tiny soft shadow", () => {
+    expect(parts).toContain('className="block h-[72px] w-auto sm:h-24 [filter:drop-shadow(0_1px_1px_rgba(18,61,115,0.22))]"');
+    expect(parts).toContain('<span data-logo-white className="inline-block">');
+    expect(parts).not.toContain("8CCBFF");
   });
 });

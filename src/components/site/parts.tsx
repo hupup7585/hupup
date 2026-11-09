@@ -10,16 +10,17 @@ import type { SiteContent } from "@/lib/site-content";
 
 export const ICON_STROKE = 2;
 
-/** Official logo (transparent PNG). Abraham's rule: on light blue #8CCBFF, never on navy. */
+/** Official logo (transparent PNG). Abraham (Nov 9, 2026): straight on the white header with a very soft shadow; never on navy. */
 export const LOGO_SRC = "/brand/hupup-logo-320.png";
 /** Sharp header logo files (96px tall at 1x, 2x and 3x), served as-is with no image compression. */
 export const HEADER_LOGO = { src: "/brand/hupup-logo-h96@1x.png", srcSet: "/brand/hupup-logo-h96@1x.png 1x, /brand/hupup-logo-h96@2x.png 2x, /brand/hupup-logo-h96@3x.png 3x" };
 
 export function Wordmark({ logoUrl, light = false }: { logoUrl: string | null; light?: boolean }) {
-  // On light backgrounds show the logo on its light blue tile; on navy (light = true) keep the text name instead.
+  // On white the logo sits straight on the header, with a tiny soft shadow so "Hup up" reads a little darker;
+  // on navy (light = true) keep the text name instead.
   if (!light) {
     return (
-      <span data-logo-tile className="inline-block rounded-2xl bg-[#8CCBFF] p-1.5">
+      <span data-logo-white className="inline-block">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={logoUrl || HEADER_LOGO.src}
@@ -28,7 +29,7 @@ export function Wordmark({ logoUrl, light = false }: { logoUrl: string | null; l
           width={91}
           height={96}
           fetchPriority="high"
-          className="block h-[72px] w-auto sm:h-24"
+          className="block h-[72px] w-auto sm:h-24 [filter:drop-shadow(0_1px_1px_rgba(18,61,115,0.22))]"
         />
       </span>
     );
