@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
+import StaffGreeting from "@/components/StaffGreeting";
 import MyTasksCard from "@/components/MyTasksCard";
 import { asc } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -40,6 +41,7 @@ export default async function CalendarPage({
 
   return (
     <div className="mx-auto max-w-7xl">
+      {staff.role !== "owner" && <StaffGreeting staff={staff} as="p" className="mb-3 text-xl font-black sm:text-2xl" />}
       {staff.role === "secretary" && <MyTasksCard staff={staff} />}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black sm:text-3xl">

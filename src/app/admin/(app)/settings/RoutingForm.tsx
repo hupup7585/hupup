@@ -21,7 +21,7 @@ export default function RoutingForm({
       <p className="rounded-lg bg-bg p-3 text-sm font-semibold" data-route-summary>{summary}</p>
       <label className="block">
         <span className="label">Numbers to ring, one per line: Name | phone | seconds to ring (5 to 60)</span>
-        <textarea name="targets" rows={3} defaultValue={initial.targets} className="input font-mono text-sm" placeholder={"Abram | (845) 777-7585 | 20\nOffice | (845) 555-0100 | 15"} />
+        <textarea name="targets" rows={3} defaultValue={initial.targets} className="input font-mono text-sm" placeholder={"Abraham | (845) 777-7585 | 20\nOffice | (845) 555-0100 | 15"} />
         <span className="mt-1 block text-xs text-muted">
           {ringKey === "0"
             ? "Leave empty to ring the main forwarding number. When the office is closed or no one answers, callers hear the missed-call line and go to the general voicemail."

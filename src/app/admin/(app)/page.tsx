@@ -1,5 +1,6 @@
 import { requireOwner } from "@/lib/auth";
 import MyTasksCard from "@/components/MyTasksCard";
+import StaffGreeting from "@/components/StaffGreeting";
 import SectionNotActive from "@/components/SectionNotActive";
 import { safeSection } from "@/lib/safe-section";
 import NotActive from "@/components/NotActive";
@@ -32,11 +33,6 @@ function delta(cur: number, prev: number) {
   return `${pct >= 0 ? "▲" : "▼"} ${Math.abs(pct)}% vs previous`;
 }
 
-function greeting() {
-  const h = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: process.env.BUSINESS_TIMEZONE || "America/New_York" }).format(new Date()));
-  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
-}
-
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const staff = await requireOwner(); // Owner only (finances, catalog, hotline prompts)
   const sp = await searchParams;
@@ -62,7 +58,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   return (
     <div className="mx-auto max-w-7xl">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-black sm:text-3xl">{greeting()}, Abram 👋</h1>
+        <StaffGreeting staff={staff} />
         <div className="flex flex-wrap gap-2">
           {(Object.keys(RANGES) as Range[]).map((r) => (
             <Link key={r} href={`/admin?range=${r}`} className={`btn-ghost ${r === range ? "!border-navy" : ""}`}>

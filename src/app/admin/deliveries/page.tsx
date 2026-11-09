@@ -2,6 +2,7 @@ import Link from "next/link";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { Clock, MapPin, Navigation, Route, Warehouse } from "lucide-react";
 import { requireStaff } from "@/lib/auth";
+import StaffGreeting from "@/components/StaffGreeting";
 import MyTasksCard from "@/components/MyTasksCard";
 import { db, schema } from "@/lib/db";
 import { addDays, todayISO } from "@/lib/dates";
@@ -85,6 +86,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 py-6">
+        {staff.role === "delivery" && <StaffGreeting staff={staff} as="p" className="mb-3 text-xl font-black sm:text-2xl" />}
         <PageHeader
           title="Deliveries"
           subtitle={<DualDate yi iso={day} className="text-lg font-extrabold text-navy" />}

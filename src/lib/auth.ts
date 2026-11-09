@@ -4,7 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { config, BUSINESS_NAME } from "@/lib/config";
+import { config, BUSINESS_NAME, OWNER_FULL_NAME } from "@/lib/config";
 import { sendEmail, sendSms } from "@/lib/notify";
 import { toE164 } from "@/lib/phone";
 import type { Role } from "@/lib/db/schema";
@@ -51,7 +51,7 @@ export async function staffForPhone(rawPhone: string): Promise<StaffUser | null>
   if (!phone) return null;
   const [u] = await db.select().from(adminUsers).where(eq(adminUsers.phone, phone)).limit(1);
   if (u) return u.active ? { userId: u.id, role: u.role, name: u.name, phone } : null;
-  if (toE164(config.adminPhone()) === phone) return { userId: null, role: "owner", name: "Owner", phone };
+  if (toE164(config.adminPhone()) === phone) return { userId: null, role: "owner", name: OWNER_FULL_NAME, phone };
   return null;
 }
 
@@ -148,7 +148,7 @@ async function startSession(staffIn: StaffUser, method: "sms_code" | "email_code
   let staff = staffIn;
   if (staff.role === "owner" && !staff.userId) {
     const [row] = await db.select().from(adminUsers).where(eq(adminUsers.phone, staff.phone)).limit(1);
-    const owner = row ?? (await db.insert(adminUsers).values({ name: "Owner", phone: staff.phone, role: "owner", active: true }).returning())[0];
+    const owner = row ?? (await db.insert(adminUsers).values({ name: OWNER_FULL_NAME, phone: staff.phone, role: "owner", active: true }).returning())[0];
     staff = { ...staff, userId: owner.id };
   }
   const token = crypto.randomBytes(32).toString("base64url");
@@ -232,7 +232,7 @@ export async function getSession() {
 export async function currentStaff(): Promise<(StaffUser & { sessionId: number }) | null> {
   const s = await getSession();
   if (!s) return null;
-  if (!s.userId) return { userId: null, role: "owner", name: "Owner", phone: toE164(config.adminPhone()) ?? "", sessionId: s.id };
+  if (!s.userId) return { userId: null, role: "owner", name: OWNER_FULL_NAME, phone: toE164(config.adminPhone()) ?? "", sessionId: s.id };
   const [u] = await db.select().from(adminUsers).where(eq(adminUsers.id, s.userId)).limit(1);
   if (!u?.active) return null;
   return { userId: u.id, role: u.role, name: u.name, phone: u.phone, sessionId: s.id };

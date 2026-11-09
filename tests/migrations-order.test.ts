@@ -31,7 +31,7 @@ describe("database updates (migrations)", () => {
     expect(m).toContain('CREATE TABLE IF NOT EXISTS "call_events"');
     expect(m).toContain('CREATE INDEX IF NOT EXISTS "call_events_call_idx"');
     expect(m).not.toMatch(/\bDROP\b|\bDELETE\b|\bTRUNCATE\b/i);
-    expect(journal.at(-1)!.tag).toBe("0023_restore_call_events");
+    expect(journal.map((e) => e.tag)).toContain("0023_restore_call_events");
   });
 });
 

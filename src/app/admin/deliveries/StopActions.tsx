@@ -31,7 +31,7 @@ export default function StopActions({ orderId, phone, stop, done }: { orderId: n
             <MessageSquareText className="h-4 w-4" aria-hidden /> Send template text
           </button>
         </div>
-        <button type="button" className="btn-ghost" disabled title="Photo storage is waiting for Abram's approval">
+        <button type="button" className="btn-ghost" disabled title="Photo storage is waiting for Abraham's approval">
           <Camera className="h-4 w-4" aria-hidden /> Add photo
         </button>
       </div>

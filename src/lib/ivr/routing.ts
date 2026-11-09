@@ -40,7 +40,7 @@ export function routeTargets(s: Pick<Settings, "operatorTargets">): RouteTarget[
   return fallback ? [{ label: "Office", phone: fallback, ringSeconds: 25 }] : [];
 }
 
-/** One-line summary for the settings page, e.g. "Rings Abram (20s) → Office (15s) → voicemail". */
+/** One-line summary for the settings page, e.g. "Rings Abraham (20s) → Office (15s) → voicemail". */
 export function routeSummary(targets: RouteTarget[], mode: string) {
   if (!targets.length) return "No one to ring: callers go straight to voicemail.";
   const names = targets.map((t) => `${t.label} (${t.ringSeconds}s)`);

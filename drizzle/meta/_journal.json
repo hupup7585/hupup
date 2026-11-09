@@ -169,6 +169,13 @@
       "when": 1794196097127,
       "tag": "0023_restore_call_events",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794198540084,
+      "tag": "0024_owner_name",
+      "breakpoints": true
     }
   ]
 }

@@ -25,7 +25,7 @@ import { parseTargets, routeSummary, routeTargets } from "@/lib/ivr/routing";
 
 const call = (action: string, body: Record<string, string> = {}, query = "", sid = "CArt1") =>
   handleVoice({ action, query: new URLSearchParams(query), body: { CallSid: sid, ...body }, callSid: sid, from: body.From ?? "+18455550199" });
-const TARGETS = "Abram | (845) 777-7585 | 20\nOffice | 845-555-0100 | 15\nYossi | +1 845 555 0111 | 10";
+const TARGETS = "Abraham | (845) 777-7585 | 20\nOffice | 845-555-0100 | 15\nYossi | +1 845 555 0111 | 10";
 
 beforeEach(async () => {
   process.env.PUBLIC_BASE_URL = "https://hupup.example";
@@ -38,10 +38,10 @@ beforeEach(async () => {
 describe("routing list", () => {
   it("parses label | phone | seconds, reports bad lines, and summarizes", () => {
     const { targets, errors } = parseTargets(`${TARGETS}\nBad | 123 | 20\nSlow | 8455550122 | 200`);
-    expect(targets.map((t) => [t.label, t.phone, t.ringSeconds])).toEqual([["Abram", "+18457777585", 20], ["Office", "+18455550100", 15], ["Yossi", "+18455550111", 10]]);
+    expect(targets.map((t) => [t.label, t.phone, t.ringSeconds])).toEqual([["Abraham", "+18457777585", 20], ["Office", "+18455550100", 15], ["Yossi", "+18455550111", 10]]);
     expect(errors).toHaveLength(2);
-    expect(routeSummary(targets, "sequential")).toBe("Rings Abram (20s) → Office (15s) → Yossi (10s) → voicemail");
-    expect(routeSummary(targets, "simultaneous")).toBe("Rings Abram (20s) + Office (15s) + Yossi (10s) at the same time → voicemail");
+    expect(routeSummary(targets, "sequential")).toBe("Rings Abraham (20s) → Office (15s) → Yossi (10s) → voicemail");
+    expect(routeSummary(targets, "simultaneous")).toBe("Rings Abraham (20s) + Office (15s) + Yossi (10s) at the same time → voicemail");
     process.env.FORWARD_PHONE = "+18457777585";
     expect(routeTargets({ operatorTargets: "" })).toEqual([{ label: "Office", phone: "+18457777585", ringSeconds: 25 }]);
     delete process.env.FORWARD_PHONE;
