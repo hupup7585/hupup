@@ -7,6 +7,8 @@ import { requireStaff } from "@/lib/auth";
 import { blockCallerAction } from "../settings/blocking-actions";
 import { StatusBadge } from "@/components/StatusBadge";
 import DualDate from "@/components/DualDate";
+import SectionNotActive from "@/components/SectionNotActive";
+import { safeSection } from "@/lib/safe-section";
 import CallYiddishDay from "@/components/CallYiddishDay";
 import { callJourneys, type JourneyEvent } from "@/lib/call-journey";
 
@@ -65,11 +67,13 @@ const OUTCOME: Record<string, [string, string]> = {
 export default async function CallsPage() {
   const staff = await requireStaff(["owner", "secretary"]);
   const calls = await recentCalls();
-  const journeys = await callJourneys(calls.map((c) => c.call_sid));
+  const journeySection = await safeSection("call journeys", callJourneys(calls.map((c) => c.call_sid)));
+  const journeys = journeySection.ok ? journeySection.value : new Map<string, JourneyEvent[]>();
   const tz = process.env.BUSINESS_TIMEZONE || "America/New_York";
   return (
     <div className="mx-auto max-w-6xl">
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Call log</h1>
+      {!journeySection.ok && <SectionNotActive title="Call journeys" reason={journeySection.reason} />}
       <p className="mb-5 text-muted">Every call to the hotline. Callers who hung up with items in their cart are listed so you can call them back. Open &ldquo;Journey&rdquo; on a call to see every menu, key, item, date and answer, and where the caller hung up.</p>
       <div className="card overflow-x-auto p-4">
         <table className="w-full min-w-[760px] text-sm">

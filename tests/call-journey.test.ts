@@ -92,6 +92,6 @@ describe("caller journey", () => {
 
   it("the call log shows each call's journey; the dashboard shows the counts", () => {
     expect(readFileSync("src/app/admin/(app)/calls/page.tsx", "utf8")).toContain("<Timeline events={ev}");
-    expect(readFileSync("src/app/admin/(app)/page.tsx", "utf8")).toContain("<JourneyCard j={journey}");
+    expect(readFileSync("src/app/admin/(app)/page.tsx", "utf8")).toContain("<JourneyCard j={journey.value}");
   });
 });

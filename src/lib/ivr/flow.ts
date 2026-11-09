@@ -1365,7 +1365,8 @@ export async function handleCallStatus(callSid: string, status: string) {
     .from(schema.callEvents)
     .where(and(eq(schema.callEvents.callSid, callSid), eq(schema.callEvents.kind, "step")))
     .orderBy(desc(schema.callEvents.id))
-    .limit(1);
+    .limit(1)
+    .catch(() => []); // journey logging must never break the hang-up handling
   const booked = s.outcome === "checked_out";
   await track(callSid, "hung_up", booked ? "Call ended after booking" : `Hung up at: ${last ? (STEP_LABELS[last.step ?? ""] ?? last.label) : "before any menu"}`, {
     lastStep: last?.step ?? null,

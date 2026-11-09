@@ -1,5 +1,7 @@
 import { requireOwner } from "@/lib/auth";
 import MyTasksCard from "@/components/MyTasksCard";
+import SectionNotActive from "@/components/SectionNotActive";
+import { safeSection } from "@/lib/safe-section";
 import NotActive from "@/components/NotActive";
 import Link from "next/link";
 import { kpis, leaderboard, listOrders, todaysRuns, weeklyRevenue, channelSplit } from "@/lib/admin-queries";
@@ -48,8 +50,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     leaderboard(from, to),
     channelSplit(from, to),
     listOrders({ status: "OPEN", from: today, limit: 8 }),
-    callAnalytics(range === "week" ? 7 : range === "year" ? 365 : 30),
-    journeyStats(range === "week" ? 7 : range === "year" ? 365 : 30),
+    safeSection("call analytics", callAnalytics(range === "week" ? 7 : range === "year" ? 365 : 30)),
+    safeSection("caller journeys", journeyStats(range === "week" ? 7 : range === "year" ? 365 : 30)),
   ]);
   const thisWeek = startOfWeek(today);
   const maxWeek = Math.max(1, ...weeks.map((w) => Math.max(w.phone, w.pos)));
@@ -149,8 +151,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </div>
       </div>
 
-      <CallsCard a={calls} periodLabel={range === "week" ? "Last 7 days" : range === "year" ? "Last 365 days" : "Last 30 days"} />
-      <JourneyCard j={journey} periodLabel={range === "week" ? "Last 7 days" : range === "year" ? "Last 365 days" : "Last 30 days"} />
+      {calls.ok ? <CallsCard a={calls.value} periodLabel={range === "week" ? "Last 7 days" : range === "year" ? "Last 365 days" : "Last 30 days"} /> : <SectionNotActive title="Hotline calls" reason={calls.reason} />}
+      {journey.ok ? <JourneyCard j={journey.value} periodLabel={range === "week" ? "Last 7 days" : range === "year" ? "Last 365 days" : "Last 30 days"} /> : <SectionNotActive title="What callers ask for" reason={journey.reason} />}
 
       <div className="card overflow-x-auto p-5">
         <div className="mb-3 flex items-center justify-between">
