@@ -176,6 +176,13 @@
       "when": 1794198540084,
       "tag": "0024_owner_name",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794251436259,
+      "tag": "0025_sms_campaigns",
+      "breakpoints": true
     }
   ]
 }

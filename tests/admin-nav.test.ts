@@ -13,7 +13,7 @@ describe("grouped admin menu", () => {
       top: ["Dashboard"],
       "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Catalog"],
       Deliveries: ["Deliveries", "Delivery settings"],
-      "Phone system": ["Call log", "Voicemail", "Messages", "Hotline prompts", "Compliance", "Phone settings"],
+      "Phone system": ["Call log", "Voicemail", "Messages", "Campaigns", "Hotline prompts", "Compliance", "Phone settings"],
       Bookkeeping: ["Overview", "Income", "Invoices", "Expenses", "Bills I owe", "Sola fees", "Bank & card", "Sales tax", "Equipment", "Staff & 1099", "Mileage", "Reports", "All entries", "General ledger", "Settings"],
       Staff: ["Staff", "Tasks", "Activity"],
       Settings: ["Business hours & holidays", "General settings", "System status", "Staff screens (preview)"],
@@ -24,7 +24,7 @@ describe("grouped admin menu", () => {
     expect(labels("secretary")).toEqual({
       "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers"],
       Deliveries: ["Deliveries"],
-      "Phone system": ["Call log", "Voicemail", "Messages", "Compliance"],
+      "Phone system": ["Call log", "Voicemail", "Messages", "Campaigns", "Compliance"],
       Staff: ["Tasks"],
     });
     expect(labels("delivery")).toEqual({ Deliveries: ["Deliveries"], Staff: ["Tasks"] });

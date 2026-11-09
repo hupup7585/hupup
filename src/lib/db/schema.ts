@@ -834,3 +834,35 @@ export const journalLines = pgTable(
   },
   (t) => [index("journal_lines_entry_idx").on(t.entryId), index("journal_lines_account_idx").on(t.accountId)],
 );
+
+/** Seasonal promo campaigns (Abraham, Nov 9, 2026): the Owner approves the wording; Owner or Secretary sends to eligible customers only. */
+export const smsCampaigns = pgTable("sms_campaigns", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  body: text("body").notNull(),
+  /** draft | approved | sent | canceled */
+  status: text("status").notNull().default("draft"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  approvedBy: integer("approved_by"),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  sentBy: integer("sent_by"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  eligibleCount: integer("eligible_count"),
+  sentCount: integer("sent_count"),
+  heldCount: integer("held_count"),
+  skippedCount: integer("skipped_count"),
+});
+
+/** One row per customer per campaign (never twice). */
+export const smsCampaignSends = pgTable("sms_campaign_sends", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaign_id").notNull().references(() => smsCampaigns.id),
+  customerId: integer("customer_id").notNull(),
+  phone: text("phone").notNull(),
+  messageId: integer("message_id"),
+  /** sent | held | skipped */
+  status: text("status").notNull(),
+  reason: text("reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

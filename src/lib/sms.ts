@@ -1,10 +1,11 @@
-import { and, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
 import { getTwilio } from "@/lib/twilio-client";
 import { inRecipientPromoHours } from "@/lib/area-code-tz";
-import { PROMO_OPENING } from "@/lib/sms-consent-copy";
+import { PROMOS_PER_YEAR, PROMO_ENDING_V2, PROMO_OPENING, PROMO_PREFIX_V2 } from "@/lib/sms-consent-copy";
+import { smsTermsV2Active } from "@/lib/sms-terms-v2";
 
 export type MessageKind = "transactional" | "marketing" | "system";
 
@@ -30,7 +31,7 @@ export type SendResult = {
   messageId?: number;
   sid?: string;
   dev?: boolean;
-  blocked?: "opted_out" | "no_marketing_consent" | "no_transactional_consent" | "not_allowed" | "card_number" | "quiet_hours";
+  blocked?: "opted_out" | "no_marketing_consent" | "no_transactional_consent" | "not_allowed" | "card_number" | "quiet_hours" | "yearly_limit";
   /** A promotion outside quiet hours: saved and sent in the next window (after rechecking consent). */
   held?: boolean;
   error?: string;
@@ -66,12 +67,46 @@ export function inMarketingHours(to: string, now = new Date(), customerTimeZone?
 }
 
 /** Every promotional text begins with "Hup Up Attractions: Reply STOP to opt out." and then the offer. */
-export function marketingBody(body: string): string {
+export function marketingBody(body: string, v2 = smsTermsV2Active()): string {
+  if (v2) return marketingBodyV2(body);
   let offer = body.trim();
   if (offer.startsWith(PROMO_OPENING)) return offer;
   offer = offer.replace(/^hup up attractions\s*[:\-]\s*/i, "");
   offer = offer.replace(/\s*reply stop to opt out\.?\s*$/i, "");
   return `${PROMO_OPENING} ${offer}`.trim();
+}
+
+/** SMS Terms v2: "Hup Up Attractions: <offer> Reply NO PROMO to stop promos, STOP to end all texts." */
+export function marketingBodyV2(body: string): string {
+  let offer = body.trim();
+  offer = offer.replace(/^hup up attractions\s*[:\-]\s*/i, "");
+  offer = offer.replace(/\s*reply stop to opt out\.?\s*/i, " ").trim();
+  if (offer.endsWith(PROMO_ENDING_V2)) offer = offer.slice(0, -PROMO_ENDING_V2.length).trim();
+  return `${PROMO_PREFIX_V2} ${offer} ${PROMO_ENDING_V2}`;
+}
+
+/** Start of the current calendar year in New York. */
+function yearStart(now = new Date()): Date {
+  const y = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric" }).format(now));
+  // Jan 1 00:00 New York is 05:00 UTC (EST)
+  return new Date(Date.UTC(y, 0, 1, 5, 0, 0));
+}
+
+/** Promotional texts this number has been sent (or has waiting) this calendar year. Blocked, failed and canceled ones don't count. */
+export async function promosThisYear(phone: string, now = new Date()): Promise<number> {
+  const [r] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.messages)
+    .where(
+      and(
+        eq(schema.messages.contactPhone, phone),
+        eq(schema.messages.kind, "marketing"),
+        eq(schema.messages.direction, "out"),
+        gte(schema.messages.createdAt, yearStart(now)),
+        sql`${schema.messages.status} not in ('blocked', 'failed', 'undelivered', 'canceled')`,
+      ),
+    );
+  return r?.n ?? 0;
 }
 
 async function customerByPhone(phone: string) {
@@ -120,7 +155,7 @@ export async function hasTransactionalConsent(phone: string): Promise<boolean> {
  *  - order/service texts need order/service consent;
  *  - promotional texts need promotional consent and the 8 AM - 9 PM window.
  */
-export async function checkEligibility(input: { to: string; kind: MessageKind; event?: string | null; customer: Customer | null; now?: Date }): Promise<Blocked | null> {
+export async function checkEligibility(input: { to: string; kind: MessageKind; event?: string | null; customer: Customer | null; now?: Date; heldRecheck?: boolean }): Promise<Blocked | null> {
   const { to, kind, customer } = input;
   if (kind === "system") {
     const rule = input.event ? SYSTEM_EVENTS[input.event] : undefined;
@@ -131,6 +166,7 @@ export async function checkEligibility(input: { to: string; kind: MessageKind; e
   if (customer?.smsOptOut) return "opted_out";
   if (kind === "transactional") return (await hasTransactionalConsent(to)) ? null : "no_transactional_consent";
   if (!customer?.marketingOptIn) return "no_marketing_consent";
+  if (!input.heldRecheck && (await promosThisYear(to, input.now)) >= PROMOS_PER_YEAR) return "yearly_limit";
   if (!inMarketingHours(to, input.now, customer.timeZone)) return "quiet_hours";
   return null;
 }
@@ -248,7 +284,7 @@ export async function processHeldPromotions(now = new Date()): Promise<{ sent: n
   for (const m of due) {
     const to = m.toNumber || m.contactPhone || "";
     const customer = m.customerId ? ((await db.select().from(schema.customers).where(eq(schema.customers.id, m.customerId)))[0] ?? null) : await customerByPhone(to);
-    const blocked = await checkEligibility({ to, kind: "marketing", customer, now });
+    const blocked = await checkEligibility({ to, kind: "marketing", customer, now, heldRecheck: true }); // already counted toward the yearly limit
     if (blocked === "quiet_hours") {
       await db.update(schema.messages).set({ sendAfter: nextPromoWindow(to, now, customer?.timeZone) }).where(eq(schema.messages.id, m.id));
       out.rescheduled++;
@@ -303,6 +339,7 @@ const BLOCK_REASON: Record<Blocked, string> = {
   not_allowed: "This kind of automatic message is not allowed.",
   card_number: "Message looks like it contains a card number and was not sent.",
   quiet_hours: "Held: promotional texts are sent only between 8 AM and 9 PM in the customer's local time.",
+  yearly_limit: `Not sent: this customer already got ${PROMOS_PER_YEAR} promotional texts this year (the most allowed).`,
 };
 
 async function markFailed(messageId: number | undefined, code: unknown, message: string | undefined) {

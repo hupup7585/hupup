@@ -10,6 +10,16 @@ export const WEB_CONSENT_VERSION = "web-2026-11-05";
 /** Every promotional text begins with exactly this, before the offer (Requirement 2). */
 export const PROMO_OPENING = "Hup Up Attractions: Reply STOP to opt out.";
 
+/** Abraham (Nov 9, 2026): no customer gets more than this many promotional texts in a calendar year. */
+export const PROMOS_PER_YEAR = 6;
+
+/**
+ * SMS Terms v2 promo format (Abraham, Nov 9, 2026): starts with the business name, ends with the NO PROMO and STOP
+ * line. Used on preview until the SMS Terms v2 lines are approved; the live site keeps PROMO_OPENING until then.
+ */
+export const PROMO_PREFIX_V2 = "Hup Up Attractions:";
+export const PROMO_ENDING_V2 = "Reply NO PROMO to stop promos, STOP to end all texts.";
+
 /** Website checkbox: promotional (Abram's suggested consent wording, Requirement 3, verbatim). Unchecked by default. */
 export const WEB_CONSENT_MARKETING =
   "I agree to receive promotional text messages from Hup Up Attractions and authorize Hup Up Attractions to share my phone number with service providers only as necessary to deliver these messages. Consent is not a condition of purchase. Message and data rates may apply. Message frequency varies. Reply STOP to opt out or HELP for help.";
