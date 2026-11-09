@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { BOOK_GROUPS, bookTabHref } from "@/lib/bookkeeping-tabs";
 import { Fragment, useEffect, useState } from "react";
-import { Activity, ArrowDownToLine, BadgePercent, BookOpen, Car, ChartColumn, FileClock, FileText, Gauge, IdCard, Landmark, List, Percent, Receipt, Settings2, Wrench, CircleUser, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, ChevronDown, LayoutDashboard, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PhoneForwarded, PlusCircle, Settings, ShieldCheck, SlidersHorizontal, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
+import { Activity, ArrowDownToLine, BadgePercent, BookOpen, Car, ChartColumn, FileClock, FileText, Gauge, IdCard, Landmark, List, Percent, Receipt, Settings2, Wrench, CircleUser, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, ChevronDown, ChevronRight, LayoutDashboard, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PhoneForwarded, PlusCircle, Settings, ShieldCheck, SlidersHorizontal, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
 import type { Role } from "@/lib/db/schema";
 
 const O: Role[] = ["owner"];
@@ -92,6 +92,18 @@ export function navFor(role: Role): Group[] {
   return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter(([, , , roles]) => roles.includes(role)) })).filter((g) => g.items.length > 0);
 }
 
+/** Group a section's items into folders by their small group name (items without one stay as plain links). */
+export function folders(items: Item[]): { label: string | null; items: Item[] }[] {
+  const out: { label: string | null; items: Item[] }[] = [];
+  for (const it of items) {
+    const label = it[4] ?? null;
+    const last = out.at(-1);
+    if (last && last.label === label && label !== null) last.items.push(it);
+    else out.push({ label, items: [it] });
+  }
+  return out;
+}
+
 /** Is this menu item the page that's open? Bookkeeping pages are told apart by their tab (no tab = Overview). */
 export const isActive = (path: string, href: string, tab: string | null = null) => {
   const [base, query] = href.split("?");
@@ -111,6 +123,10 @@ export default function Sidebar({ logout, role = "owner", name, taskBadge }: { l
   const groups = navFor(role);
   // Which groups are open: the group of the current page starts open; a click opens or closes any group.
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
+  // Bookkeeping folders: the one the Owner clicked open ("" = all closed); otherwise the one holding the open page.
+  const [folder, setFolder] = useState<string | null>(null);
+  useEffect(() => setFolder(null), [path, tab]); // after moving to a page, its folder is the open one
+  const folderOpen = (label: string, items: Item[]) => (folder === null ? items.some(([href]) => active(href)) : folder === label);
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem("hupup-nav-groups") || "{}");
@@ -195,16 +211,25 @@ export default function Sidebar({ logout, role = "owner", name, taskBadge }: { l
                 </button>
                 {openNow && (
                   <div id={id} className="mt-1 space-y-0.5">
-                    {g.items.map((it, i) => (
-                      <Fragment key={it[0]}>
-                        {it[4] && it[4] !== g.items[i - 1]?.[4] && (
-                          <div data-nav-sublabel className={`px-3 pb-0.5 text-xs font-semibold text-white/55 ${i ? "pt-3" : "pt-1"}`}>
-                            {it[4]}
-                          </div>
-                        )}
-                        {link(it)}
-                      </Fragment>
-                    ))}
+                    {/* Bookkeeping: items sit in folders (Money in, Money out, ...); only one folder opens at a time */}
+                    {folders(g.items).map(({ label, items }) =>
+                      label === null ? (
+                        <Fragment key={items[0][0]}>{items.map(link)}</Fragment>
+                      ) : (
+                        <div key={label} data-nav-folder={label}>
+                          <button
+                            type="button"
+                            onClick={() => setFolder(folderOpen(label, items) ? "" : label)}
+                            aria-expanded={folderOpen(label, items)}
+                            className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-[15px] font-semibold text-white/75 transition hover:bg-white/5 hover:text-white"
+                          >
+                            {label}
+                            <ChevronRight className={`h-4 w-4 transition ${folderOpen(label, items) ? "rotate-90" : ""}`} aria-hidden />
+                          </button>
+                          {folderOpen(label, items) && <div className="ml-4 space-y-0.5 border-l border-white/10 pl-1">{items.map(link)}</div>}
+                        </div>
+                      ),
+                    )}
                   </div>
                 )}
               </div>

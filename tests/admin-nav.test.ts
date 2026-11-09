@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { NAV_GROUPS, isActive, navFor } from "@/components/Sidebar";
+import { NAV_GROUPS, folders, isActive, navFor } from "@/components/Sidebar";
 
 /* Admin side menu in titled groups (Abraham). */
 const titles = (role: "owner" | "secretary" | "delivery") => navFor(role).map((g) => g.title);
@@ -77,7 +77,14 @@ describe("Bookkeeping in the side menu (Abraham, Nov 9, 2026)", () => {
     expect(isActive("/admin/bookkeeping", "/admin/bookkeeping?tab=bills", "bills")).toBe(true);
     expect(isActive("/admin/bookkeeping", "/admin/bookkeeping?tab=bills", "income")).toBe(false);
     expect(isActive("/admin/bookkeeping", "/admin/bookkeeping?tab=overview", null)).toBe(true);
-    expect(readFileSync("src/components/Sidebar.tsx", "utf8")).toContain("data-nav-sublabel");
+    // Folders (Abraham): Money in, Money out, Bank and tax, Business, Records, each holding its own pages
+    expect(folders(book.items).map((f) => [f.label, f.items.length])).toEqual([["Money in", 3], ["Money out", 3], ["Bank and tax", 2], ["Business", 3], ["Records", 4]]);
+    const sb = readFileSync("src/components/Sidebar.tsx", "utf8");
+    expect(sb).toContain("data-nav-folder={label}");
+    expect(sb).toContain('onClick={() => setFolder(folderOpen(label, items) ? "" : label)}'); // only one open; click again closes
+    expect(sb).toContain("folder === null ? items.some(([href]) => active(href)) : folder === label"); // the open page's folder stays open
+    expect(sb).toContain('className="ml-4 space-y-0.5 border-l border-white/10 pl-1"'); // items slightly indented
+    expect(sb).not.toContain("data-nav-sublabel");
   });
   it("each page's big title is its own name; the tab row shows only on phones", () => {
     const page = readFileSync("src/app/admin/(app)/bookkeeping/page.tsx", "utf8");
