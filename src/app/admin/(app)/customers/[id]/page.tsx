@@ -11,6 +11,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { saveCustomerAction } from "../actions";
 import DualDate from "@/components/DualDate";
 import { dualDateTime, localISO } from "@/lib/dual-date";
+import { SOURCE_LABEL, customerConsent, senderNames } from "@/lib/customer-consent";
+import { alertDateTime, textingActive } from "@/lib/voicemail";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +34,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     .where(eq(schema.orders.customerId, id))
     .orderBy(desc(schema.orders.eventDate));
   const msgs = await db
-    .select({ at: schema.messages.createdAt, direction: schema.messages.direction, body: schema.messages.body, status: schema.messages.status })
+    .select({ at: schema.messages.createdAt, direction: schema.messages.direction, body: schema.messages.body, status: schema.messages.status, userId: schema.messages.userId, kind: schema.messages.kind })
     .from(schema.messages)
     .where(eq(schema.messages.contactPhone, phone))
     .orderBy(desc(schema.messages.createdAt))
@@ -45,8 +47,14 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     .where(eq(schema.voicemails.fromNumber, phone))
     .limit(50)
     .catch(() => []);
+  const consent = await customerConsent({ id: c.id, phone: c.phone, smsOptOut: c.smsOptOut });
+  const senders = await senderNames(msgs.map((m) => m.userId));
   const timeline: Event[] = [
-    ...msgs.map((m) => ({ at: m.at, kind: m.direction === "in" ? "Text from customer" : "Text sent", text: m.body + (m.direction === "out" ? ` (${m.status})` : "") })),
+    ...msgs.map((m) => ({
+      at: m.at,
+      kind: m.direction === "in" ? "Text from customer" : m.kind === "marketing" ? "Promo text sent" : "Text sent",
+      text: m.body + (m.direction === "out" ? ` (${m.status}; sent by ${m.userId ? senders.get(m.userId) ?? "staff" : "System"})` : ""),
+    })),
     ...calls.map((k) => ({ at: new Date(k.started_at), kind: "Call", text: k.outcome.replace(/_/g, " ") })),
     ...vms.map((v) => ({ at: v.at, kind: "Voicemail", text: v.transcription || `${v.durationSec}s message`, href: "/admin/voicemail" })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
@@ -72,7 +80,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           <label className="block"><span className="label">Address</span><input name="address" defaultValue={c.address ?? ""} className="input" /></label>
           <label className="block"><span className="label">Notes</span><textarea name="notes" rows={3} defaultValue={c.notes ?? ""} className="input" /></label>
           <p className="text-sm text-muted">
-            Texts: {c.smsOptOut ? <b className="text-[#C83A2F]">replied STOP (no texts)</b> : c.marketingOptIn ? "agreed to promotional texts" : "no promotional consent"}. Customer since <DualDate yi iso={localISO(new Date(c.createdAt))} />.
+            Customer since <DualDate yi iso={localISO(new Date(c.createdAt))} />.
           </p>
           <button className="btn-dark w-fit">Save</button>
         </form>
@@ -94,6 +102,36 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             ))}
           </ul>
         </div>
+      </div>
+
+      <div className="card mt-4 p-5" data-text-consent>
+        <h2 className="mb-3 text-lg font-black">Text messages</h2>
+        {!textingActive() && <p className="mb-3 rounded-lg bg-[#FFF8E1] px-3 py-2 text-sm text-[#5C4600]"><b>Not active yet: waiting for Twilio A2P approval.</b> No texts go out until then; consent is still recorded.</p>}
+        {consent.blocked && <p className="mb-3 rounded-lg bg-[#FFE6E4] px-3 py-2 text-sm font-semibold text-[#C83A2F]">Blocked: this number replied STOP, so no texts of any kind go to it.</p>}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {([["Order texts", consent.order], ["Promo texts", consent.promo]] as const).map(([label, p]) => (
+            <div key={label} className="rounded-xl border border-line p-4" data-consent-program={label}>
+              <div className="text-sm text-muted">{label}</div>
+              <div className="text-lg font-black">{p.status}</div>
+              {p.since && <div className="text-sm">Since {alertDateTime(p.since)}{p.source ? `, ${p.source}` : ""}</div>}
+              {p.lastOptOut && <div className="text-sm text-muted">Last unsubscribed {alertDateTime(p.lastOptOut.at)} ({p.lastOptOut.how})</div>}
+            </div>
+          ))}
+        </div>
+        {consent.history.length > 0 && (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-sm font-semibold">Consent history ({consent.history.length}), kept as proof</summary>
+            <ul className="mt-2 divide-y divide-line text-sm">
+              {consent.history.map((h) => (
+                <li key={h.id} className="py-2">
+                  <b>{alertDateTime(h.createdAt)}</b>: {h.scope === "marketing" ? "Promo texts" : "Order texts"} {h.action === "opt_in" ? "yes" : "no"}, {SOURCE_LABEL[h.source] ?? h.source}
+                  {h.keyword ? ` (texted ${h.keyword})` : ""}{h.response ? `, ${h.response}` : ""}
+                  {h.wording ? <span className="block text-muted">Wording: &ldquo;{h.wording}&rdquo;</span> : null}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
 
       <div className="card mt-4 p-5">
