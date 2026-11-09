@@ -122,7 +122,8 @@ export default async function Home() {
         <section id="rentals" className="scroll-mt-20 bg-white py-14 sm:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <SectionTitle kicker="What we rent" title="Our Rentals" />
-            <div className="mt-10 border-t-[3px] border-hu-deep">
+            {/* Same faint divider as Hours, Contact and Service Area (Abraham): no strong navy line under the heading */}
+            <div className="mt-10 border-t-2 border-hu-deep/10" data-rentals-list>
               {c.categories.map((cat, i) => (
                 <article
                   id={cat.slug}
