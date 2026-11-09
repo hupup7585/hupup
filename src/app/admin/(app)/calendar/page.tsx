@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import StaffGreeting from "@/components/StaffGreeting";
+import DateRangeHeading from "@/components/DateRangeHeading";
 import MyTasksCard from "@/components/MyTasksCard";
 import { asc } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getUsage, freeOnDay, bookableQty } from "@/lib/availability";
 import { runsForDay } from "@/lib/admin-queries";
-import { addDays, dayOfMonth, daysBetween, isValidISO, startOfWeek, todayISO, weekdayShort } from "@/lib/dates";
+import { addDays, dayOfMonth, daysBetween, isValidISO, todayISO, weekdayShort } from "@/lib/dates";
+
+/** The Sunday that starts this date's week (weeks run Sunday to Shabbos). */
+const sundayOf = (iso: string) => addDays(iso, -new Date(`${iso}T12:00:00Z`).getUTCDay());
 import { formatPhone } from "@/lib/phone";
 import { orderNumber } from "@/lib/orders";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -24,7 +28,7 @@ export default async function CalendarPage({
   const today = todayISO();
   const span = sp.span === "14" ? 14 : sp.span === "28" ? 28 : 7;
   const dayParam = sp.day && isValidISO(sp.day) ? sp.day : null;
-  const start = sp.start && isValidISO(sp.start) ? sp.start : dayParam && dayParam > addDays(today, 6) ? startOfWeek(dayParam) : today;
+  const start = sp.start && isValidISO(sp.start) ? sp.start : sundayOf(dayParam ?? today); // Sunday-Shabbos weeks (Abraham)
   const end = addDays(start, span - 1);
   const days = daysBetween(start, end);
   const selected = dayParam ?? (days.includes(today) ? today : start);
@@ -44,12 +48,10 @@ export default async function CalendarPage({
       {staff.role !== "owner" && <StaffGreeting staff={staff} as="p" className="mb-3 text-xl font-black sm:text-2xl" />}
       {staff.role === "secretary" && <MyTasksCard staff={staff} />}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-black sm:text-3xl">
-          Availability · <DualDate yi iso={start} style="short" /> – <DualDate yi iso={end} style="short" />
-        </h1>
+        <DateRangeHeading title="Availability" from={start} to={end} />
         <div className="flex flex-wrap items-center gap-2">
           <Link className="btn-ghost" href={q({ start: addDays(start, -span) })}>◀</Link>
-          <Link className="btn-ghost" href={q({ start: today, day: today })}>Today</Link>
+          <Link className="btn-ghost" href={q({ start: sundayOf(today), day: today })}>Today</Link>
           <Link className="btn-ghost" href={q({ start: addDays(start, span) })}>▶</Link>
           {[7, 14, 28].map((s) => (
             <Link key={s} className={`btn-ghost ${s === span ? "!border-navy" : ""}`} href={q({ span: s })}>
@@ -71,7 +73,7 @@ export default async function CalendarPage({
                 <th key={d} className={`border-b border-l border-line px-1 py-2 text-center text-xs font-semibold ${d === today ? "text-coral" : "text-muted"}`}>
                   <Link href={q({ day: d })} className={`block rounded-lg py-1 ${d === selected ? "bg-navy text-white" : ""}`}>
                     {weekdayShort(d)} {dayOfMonth(d)}
-                    <HebrewDay yi iso={d} className="block text-[10px] font-normal" />
+                    <HebrewDay yi dayOnly iso={d} className="block text-[10px] font-normal" />
                   </Link>
                 </th>
               ))}

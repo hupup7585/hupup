@@ -1,5 +1,5 @@
 import { dualDateTimeParts, dualParts, type DualParts } from "@/lib/dual-date";
-import { yiddishDay, yiddishMoment } from "@/lib/yiddish-day";
+import { DAY_YI, yiddishDay, yiddishMoment } from "@/lib/yiddish-day";
 
 /**
  * A date in both calendars, side by side: "Sunday, Nov 8, 2026 / כ״ח חשון תשפ״ז".
@@ -39,13 +39,19 @@ export function YiddishDay({ iso, at, className = "" }: { iso?: string; at?: Dat
 }
 
 /** Just the Hebrew day and month, for small spots like calendar column headers: "כ״ח חשון". */
-export function HebrewDay({ iso, yi = false, className = "" }: { iso: string; yi?: boolean; className?: string }) {
+export function HebrewDay({ iso, yi = false, dayOnly = false, className = "" }: { iso: string; yi?: boolean; dayOnly?: boolean; className?: string }) {
   return (
     <>
       <bdi dir="rtl" lang="yi" data-hebrew-day className={className}>
         {dualParts(iso, "short").he}
       </bdi>
-      {yi && <YiddishDay iso={iso} className="block text-[0.85em] font-normal opacity-80" />}
+      {yi && !dayOnly && <YiddishDay iso={iso} className="block text-[0.85em] font-normal opacity-80" />}
+      {/* Grids whose heading already names the week's parsha show just the Yiddish day (parsha once, Abraham) */}
+      {yi && dayOnly && (
+        <bdi dir="rtl" lang="yi" data-yiddish-day className="block whitespace-nowrap text-[0.85em] font-normal opacity-80">
+          {DAY_YI[new Date(`${iso}T12:00:00Z`).getUTCDay()]}
+        </bdi>
+      )}
     </>
   );
 }

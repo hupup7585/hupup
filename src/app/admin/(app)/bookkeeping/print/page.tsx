@@ -1,4 +1,5 @@
 import { requireBooks } from "@/lib/books";
+import DateRangeHeading from "@/components/DateRangeHeading";
 import { BOOK_REPORTS, BOOK_REPORT_LABEL, buildBookReport, type BookReport } from "@/lib/books-reports";
 import { todayISO } from "@/lib/dates";
 import PrintButton from "./PrintButton";
@@ -23,7 +24,8 @@ export default async function PrintReport({ searchParams }: { searchParams: Prom
         <div>
           <h1 className="text-2xl font-black">Hup Up Attractions</h1>
           <p className="text-lg font-bold">{BOOK_REPORT_LABEL[report]}</p>
-          <p className="text-sm text-muted">{from} to {to} · printed {today}</p>
+          <DateRangeHeading from={from} to={to} parsha={false} className="mt-1" />
+          <p className="text-sm text-muted">Printed {today}</p>
         </div>
         <PrintButton />
       </div>

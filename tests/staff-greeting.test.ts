@@ -50,7 +50,9 @@ describe("staff greeting", () => {
 describe("sidebar top (Abraham)", () => {
   it("centered under the logo: STAFF PORTAL, full name, role; the Owner's name becomes Abraham Schwartz (update only)", () => {
     const s = readFileSync("src/components/Sidebar.tsx", "utf8");
-    expect(s).toContain('text-center lg:block" data-sidebar-head');
+    expect(s).toContain('className="mb-8 flex flex-col items-center px-1 text-center" data-sidebar-head');
+    expect(s).not.toMatch(/hidden[^"]*data-sidebar-head/); // shown in the phone menu too
+    for (const t of ["Staff portal</div>", "{name}</div>", "{role}</div>"]) expect(s.slice(s.indexOf(t) - 120, s.indexOf(t))).toContain("w-full text-center");
     expect(s).not.toContain("{name} · ");
     const m = readFileSync("drizzle/0024_owner_name.sql", "utf8");
     expect(m).toContain(`SET "name" = 'Abraham Schwartz' WHERE "role" = 'owner'`);

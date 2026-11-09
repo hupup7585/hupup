@@ -50,15 +50,16 @@ export default function Sidebar({ logout, role = "owner", name, taskBadge }: { l
         </button>
       </div>
       <aside className={`${open ? "block" : "hidden"} no-print bg-navy px-3 py-5 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:overflow-y-auto`}>
-        <div className="mb-8 hidden px-1 text-center lg:block" data-sidebar-head>
+        {/* Centered under the logo on desktop and in the phone menu (Abraham) */}
+        <div className="mb-8 flex flex-col items-center px-1 text-center" data-sidebar-head>
           {/* Logo on a white panel (never directly on navy) */}
-          <div className="rounded-xl bg-white p-3">
+          <div className="w-full rounded-xl bg-white p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/hupup-logo-h96@1x.png" srcSet="/brand/hupup-logo-h96@1x.png 1x, /brand/hupup-logo-h96@2x.png 2x, /brand/hupup-logo-h96@3x.png 3x" width={91} height={96} alt="Hup Up Attractions" className="mx-auto h-24 w-auto" />
           </div>
-          <div className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-sky">Staff portal</div>
-          {name && <div className="mt-2 text-sm font-bold text-white">{name}</div>}
-          <div className="text-xs capitalize text-white/70">{role}</div>
+          <div className="mt-3 w-full text-center text-xs font-semibold uppercase tracking-[0.16em] text-sky">Staff portal</div>
+          {name && <div className="mt-2 w-full text-center text-sm font-bold text-white">{name}</div>}
+          <div className="w-full text-center text-xs capitalize text-white/70">{role}</div>
         </div>
         <nav className="space-y-0.5">
           {NAV.filter(([, , , roles]) => roles.includes(role)).map(([href, Icon, label]) => {
