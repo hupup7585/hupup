@@ -42,7 +42,7 @@ export async function saveHolidayRowsAction(rows: RowInput[]): Promise<{ ok: boo
     after: { calendarOverrides: text },
   });
   revalidatePath("/admin/holidays");
-  revalidatePath("/admin/settings");
+  revalidatePath("/admin", "layout");
   return { ok: true, message: "Saved. The phone system uses these right away." };
 }
 

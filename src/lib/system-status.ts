@@ -43,8 +43,8 @@ export async function blockers(env: Record<string, string | undefined> = process
       key: "recording",
       area: "Call recording",
       active: Boolean(s?.callRecording),
-      reason: "Off until Abraham approves the recording notice wording and turns it on himself (Settings).",
-      where: "/admin/settings",
+      reason: "Off until Abraham approves the recording notice wording and turns it on himself (Phone settings).",
+      where: "/admin/phone/settings",
     },
     {
       key: "info-email",

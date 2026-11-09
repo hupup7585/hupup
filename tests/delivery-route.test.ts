@@ -132,7 +132,7 @@ describe("stock / warehouse address setting (owner only)", () => {
     }
   });
   it("the form sits on the owner-only Settings page; the Delivery screen uses only the free links", () => {
-    expect(readFileSync("src/app/admin/(app)/settings/page.tsx", "utf8")).toMatch(/await requireOwner\(\)[\s\S]*<StockAddressForm/);
+    expect(readFileSync("src/app/admin/(app)/delivery-settings/page.tsx", "utf8")).toMatch(/await requireOwner\(\)[\s\S]*<StockAddressForm/);
     const page = readFileSync("src/app/admin/deliveries/page.tsx", "utf8");
     for (const part of ["dayRunLinks(", "nextLeg(", "firstLeg(", 'data-nav="google"', 'data-nav="waze"']) expect(page).toContain(part);
     const lib = readFileSync("src/lib/delivery-route.ts", "utf8");

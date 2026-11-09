@@ -14,7 +14,7 @@ export async function saveStockAddressAction(_prev: { ok?: boolean; message?: st
   const before = (await getSettings()).stockAddress;
   await saveSetting("stockAddress", value, owner.userId);
   await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.stock_address_updated", entityType: "settings", entityId: "stock_address", before: { stockAddress: before }, after: { stockAddress: value } });
-  revalidatePath("/admin/settings");
+  revalidatePath("/admin", "layout");
   revalidatePath("/admin/deliveries");
   return { ok: true, message: value ? "Saved." : "Cleared. Routes will start from the driver's location." };
 }

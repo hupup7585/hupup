@@ -13,6 +13,6 @@ export async function saveRecordingAction(_prev: { ok?: boolean; message?: strin
   const before = (await getSettings()).callRecording;
   await saveSetting("callRecording", on, owner.userId);
   await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.call_recording_updated", entityType: "settings", entityId: "call_recording", before: { callRecording: before }, after: { callRecording: on } });
-  revalidatePath("/admin/settings");
+  revalidatePath("/admin", "layout");
   return { ok: true, message: on ? "Call recording is ON. Every call now hears the notice first." : "Call recording is OFF." };
 }

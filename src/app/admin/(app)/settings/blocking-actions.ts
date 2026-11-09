@@ -9,7 +9,7 @@ import { matchBlock, normalizePattern, parseBlockList } from "@/lib/ivr/caller-f
 async function store(text: string, userId: number | null, before: string) {
   await saveSetting("blockedCallers", text, userId);
   await db.insert(schema.auditLog).values({ userId, action: "settings.blocked_callers_updated", entityType: "settings", entityId: "blocked_callers", before: { blockedCallers: before }, after: { blockedCallers: text } });
-  revalidatePath("/admin/settings");
+  revalidatePath("/admin", "layout");
   revalidatePath("/admin/calls");
 }
 

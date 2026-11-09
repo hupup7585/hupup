@@ -40,6 +40,6 @@ export async function saveRoutingAction(_prev: { ok?: boolean; message?: string 
     before: { targets: before[n.targets], mode: before[n.mode], accept: before[n.accept] },
     after: { targets: normalized, mode, accept },
   });
-  revalidatePath("/admin/settings");
+  revalidatePath("/admin", "layout");
   return { ok: true, message: "Saved." };
 }

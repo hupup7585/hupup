@@ -65,7 +65,7 @@ describe("the admin list", () => {
     const a = readFileSync("src/app/admin/(app)/holidays/actions.ts", "utf8");
     expect((a.match(/await requireOwner\(\)/g) || []).length).toBe(2);
     expect(a).toContain('saveSetting("calendarOverrides"');
-    expect(readFileSync("src/components/Sidebar.tsx", "utf8")).toContain('["/admin/holidays", CalendarClock, "Holidays & hours", O]');
+    expect(readFileSync("src/components/Sidebar.tsx", "utf8")).toContain('["/admin/holidays", CalendarClock, "Business hours & holidays", O]');
     for (const f of ["src/app/page.tsx", "src/components/site/SiteFooter.tsx", "src/components/site/SiteHeader.tsx"]) expect(readFileSync(f, "utf8")).not.toMatch(/admin\/holidays|calendarOverrides|overrideFor|holidayRows/);
   });
 });
