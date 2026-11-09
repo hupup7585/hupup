@@ -10,7 +10,7 @@ import ServiceAreaC from "@/components/site/ServiceAreaC";
 import { getSettings } from "@/lib/settings";
 import { CallButton, ICON_STROKE, IconTile, SectionTitle, Wave, categoryIcon } from "@/components/site/parts";
 
-export const revalidate = 300;
+export const revalidate = 60; // hours and catalog come from Admin; saves also refresh right away
 
 export const metadata: Metadata = {
   title: "Bounce House & Party Rentals in Kiryas Joel, NY | Hup Up Attractions",

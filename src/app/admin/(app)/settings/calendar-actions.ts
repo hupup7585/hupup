@@ -34,6 +34,6 @@ export async function saveCalendarSettingsAction(values: Record<string, string>)
   }
   if (Object.keys(changed).length) await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.calendar_changed", entityType: "settings", after: changed });
   revalidatePath("/admin", "layout");
-  revalidatePath("/"); // the website's Our Hours card reads these same settings
+  revalidatePath("/", "layout"); // the website's Our Hours card reads these same settings (every public page)
   return { ok: true, message: Object.keys(changed).length ? "Calendar settings saved." : "No changes." };
 }

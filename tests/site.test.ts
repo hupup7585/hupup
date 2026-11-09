@@ -506,7 +506,7 @@ describe("website Hours (Abraham's simple list)", () => {
     const hours = page.slice(page.indexOf('id="hours"'), page.indexOf('id="contact"'));
     expect(hours).toContain("websiteHoursLines(settings).map(");
     expect(readFileSync("src/lib/site-copy.ts", "utf8")).not.toMatch(/AM - 7:00 PM|Chatzos"/); // no fixed hours text left
-    expect(readFileSync("src/app/admin/(app)/settings/calendar-actions.ts", "utf8")).toContain('revalidatePath("/")');
+    expect(readFileSync("src/app/admin/(app)/settings/calendar-actions.ts", "utf8")).toContain('revalidatePath("/", "layout")');
     // phones: a time and its range never split across lines; the words stay exactly the same
     const { keepTimesTogether } = await import("@/lib/site-copy");
     expect(keepTimesTogether("Winter: 2 hours after Shabbos - 11:00 PM")).toBe("Winter: 2 hours after Shabbos\u00A0-\u00A011:00\u00A0PM");
