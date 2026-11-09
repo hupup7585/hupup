@@ -7,6 +7,10 @@ import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
 import ServiceAreaC from "@/components/site/ServiceAreaC";
+import StayInformed from "@/components/site/StayInformed";
+import { smsSignupNotActive, smsTermsV2Active, webConsentCopy } from "@/lib/sms-terms-v2";
+import { smsNumberDisplay } from "@/lib/sms-number";
+import { signUpsDisabledReason } from "@/app/text-alerts/actions";
 import { getSettings } from "@/lib/settings";
 import { CallButton, ICON_STROKE, IconTile, SectionTitle, Wave, categoryIcon } from "@/components/site/parts";
 
@@ -320,6 +324,10 @@ export default async function Home() {
         </section>
       </main>
 
+      {/* Stay Informed (Abraham, SMS v3): promo sign-up above the footer, only with the v3 SMS Terms */}
+      {smsTermsV2Active() && (
+        <StayInformed marketingText={webConsentCopy().marketing} smsNumber={smsNumberDisplay()} notActive={smsSignupNotActive()} disabledReason={await signUpsDisabledReason()} />
+      )}
       <SiteFooter c={c} />
     </div>
   );

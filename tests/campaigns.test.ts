@@ -33,18 +33,18 @@ beforeAll(async () => {
     .returning();
   ids = rows.map((r) => r.id);
   await db.insert(schema.smsConsents).values({ customerId: ids[0], phone: "+18455550301", scope: "marketing", action: "opt_in", source: "web", method: "checkbox", wording: "x" });
-  // Busy customer: already 6 promos this year
-  for (let i = 0; i < 6; i++)
+  // Busy customer: already 5 promos this year
+  for (let i = 0; i < 5; i++)
     await db.insert(schema.messages).values({ direction: "out", toNumber: "+18455550304", contactPhone: "+18455550304", body: "promo", kind: "marketing", status: "delivered", customerId: ids[3], createdAt: new Date(`2026-0${i + 1}-15T17:00:00Z`) });
 });
 
-describe("6 promo texts per customer per year", () => {
-  it("the 7th promo of the year is refused; blocked or failed ones don't count; a new year starts fresh", async () => {
-    expect(await promosThisYear("+18455550304", NOON)).toBe(6);
+describe("5 promo texts per customer per year (SMS v3)", () => {
+  it("the 6th promo of the year is refused; blocked or failed ones don't count; a new year starts fresh", async () => {
+    expect(await promosThisYear("+18455550304", NOON)).toBe(5);
     const r = await sendMessage({ to: "+18455550304", body: "Another deal", kind: "marketing", now: NOON });
     expect(r).toMatchObject({ sent: false, blocked: "yearly_limit" });
-    expect(await promosThisYear("+18455550304", NOON)).toBe(6);
-    expect(await promosThisYear("+18455550304", new Date("2027-01-02T17:00:00Z"))).toBe(0);
+    expect(await promosThisYear("+18455550304", NOON)).toBe(5);
+    expect(await promosThisYear("+18455550304", new Date("2027-01-02T17:00:00Z"))).toBe(0); // January 1 reset
   });
 });
 
@@ -55,7 +55,7 @@ describe("campaigns", () => {
       expect.arrayContaining([
         ["Signed up", "Active", 0],
         ["Replied STOP", "Stopped all texts", 0],
-        ["Busy promo year", "At yearly limit", 6],
+        ["Busy promo year", "At yearly limit", 5],
       ]),
     );
     expect(list.find((s) => s.name === "Signed up")!.source).toBe("web");
@@ -69,10 +69,18 @@ describe("campaigns", () => {
     await approveCampaign(c.id, 1);
     const done = await sendCampaign(c.id, 2, NOON);
     expect(done).toMatchObject({ status: "sent", sentCount: 1, eligibleCount: 1, sentBy: 2 });
+    const { campaignRecipients } = await import("@/lib/campaigns");
+    expect((await campaignRecipients(c.id)).map((r) => r.name)).toEqual(["Signed up", "Replied STOP", "Busy promo year"]);
     expect(h.sent.map((m) => m.to)).toEqual(["+18455550301"]);
     await expect(sendCampaign(c.id, 2, NOON)).rejects.toThrow(/Only an approved campaign/);
     const sends = await db.select().from(schema.smsCampaignSends).where(eq(schema.smsCampaignSends.campaignId, c.id));
-    expect(sends.map((s) => s.status)).toEqual(["sent"]);
+    // History keeps the skipped customers and why
+    expect(sends.map((s) => [s.status, s.reason])).toEqual([
+      ["sent", null],
+      ["skipped", "Replied STOP (no texts)"],
+      ["skipped", "Already got 5 promo texts this year"],
+    ]);
+    expect(done.skippedCount).toBe(2);
     const [msg] = await db.select().from(schema.messages).where(eq(schema.messages.id, sends[0].messageId!));
     expect(msg).toMatchObject({ kind: "marketing", userId: 2, event: `campaign:${c.id}` });
     const d2 = await createCampaign({ name: "Never mind", body: "Spring deals coming soon to Hup Up." }, 1);
@@ -82,7 +90,7 @@ describe("campaigns", () => {
 
   it("SMS Terms v2 promo format and length; sending waits for Twilio approval on the live site", () => {
     const t = marketingBodyV2("Summer special! 15% off paddle boat rentals booked by June 30. Call (845) 415-7585.");
-    expect(t).toBe("Hup Up Attractions: Summer special! 15% off paddle boat rentals booked by June 30. Call (845) 415-7585. Reply NO PROMO to stop promos, STOP to end all texts.");
+    expect(t).toBe("Hup Up Attractions: Summer special! 15% off paddle boat rentals booked by June 30. Call (845) 415-7585. Reply NOPROMO to stop promos, STOP to stop all texts.");
     expect(segments(t)).toEqual({ chars: 157, segments: 1 });
     expect(segments("x".repeat(161)).segments).toBe(2);
     expect(campaignsCanSend({ VERCEL_ENV: "production" })).toBe(false);

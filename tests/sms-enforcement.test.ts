@@ -208,7 +208,7 @@ describe("2D. promotional hours: held for the next window, rechecked before send
     const r = await sms.processHeldPromotions(new Date("2026-07-02T13:00:00Z"));
     expect(r.sent).toBeGreaterThanOrEqual(1);
     expect(await msgStatus(id)).toBe("queued");
-    expect(sent.find((x) => x.to === p)?.body).toBe("Hup Up Attractions: Reply STOP to opt out. Spring sale");
+    expect(sent.find((x) => x.to === p)?.body).toBe("Hup Up Attractions: Spring sale Reply NOPROMO to stop promos, STOP to stop all texts.");
   });
   it("a held promotion whose customer lost consent is canceled, never sent", async () => {
     const p = newPhone();

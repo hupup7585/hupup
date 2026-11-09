@@ -93,10 +93,13 @@ describe("opt-out words (STOP and NY GBL 399-z list)", () => {
 });
 
 describe("promotional text rules (Abram's SMS Terms requirements 1 and 2)", () => {
-  it("every promo begins with exactly 'Hup Up Attractions: Reply STOP to opt out.' and then the offer", () => {
-    expect(marketingBody("20% off jumping balloons this week!")).toBe("Hup Up Attractions: Reply STOP to opt out. 20% off jumping balloons this week!");
-    expect(marketingBody("Hup Up Attractions: Sale on paddle boats! Reply STOP to opt out.")).toBe("Hup Up Attractions: Reply STOP to opt out. Sale on paddle boats!");
-    expect(marketingBody("Hup Up Attractions: Reply STOP to opt out. Spring deals")).toBe("Hup Up Attractions: Reply STOP to opt out. Spring deals");
+  it("SMS v3: every promo begins with 'Hup Up Attractions:' and ends with the NOPROMO / STOP line (never twice)", () => {
+    const end = "Reply NOPROMO to stop promos, STOP to stop all texts.";
+    expect(marketingBody("20% off jumping balloons this week!")).toBe(`Hup Up Attractions: 20% off jumping balloons this week! ${end}`);
+    expect(marketingBody("Hup Up Attractions: Sale on paddle boats! Reply STOP to opt out.")).toBe(`Hup Up Attractions: Sale on paddle boats! ${end}`);
+    expect(marketingBody(`Hup Up Attractions: Spring deals ${end}`)).toBe(`Hup Up Attractions: Spring deals ${end}`);
+    // the earlier format, kept for reference
+    expect(marketingBody("Spring deals", false)).toBe("Hup Up Attractions: Reply STOP to opt out. Spring deals");
   });
   it("New York numbers: 8 AM to 9 PM Eastern (DST aware)", () => {
     const ny = "+18455550100";

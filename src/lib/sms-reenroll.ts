@@ -141,3 +141,23 @@ export async function cancelPendingReenroll(tx: Exec, phone: string, now = new D
     .set({ status: "canceled", resolvedAt: now, resolution: reason })
     .where(and(eq(schema.smsReenrollRequests.phone, phone), eq(schema.smsReenrollRequests.status, "pending")));
 }
+
+/**
+ * SMS v3: a promotional request from the website box, New booking, the pay page or staff. It records the request
+ * (with how it was made and the exact wording shown) and texts the confirmation; nothing is enrolled until the
+ * customer replies YES within 24 hours. Returns false when a request is already waiting, the customer is already
+ * signed up, or the number replied STOP.
+ */
+export async function requestPromoByCustomer(phone: string, how: string): Promise<{ sent: boolean; reason: string }> {
+  const { db: d, schema: s } = await import("@/lib/db");
+  const { eq: eqq } = await import("drizzle-orm");
+  const { sendMessage } = await import("@/lib/sms");
+  let [c] = await d.select().from(s.customers).where(eqq(s.customers.phone, phone)).limit(1);
+  if (!c) [c] = await d.insert(s.customers).values({ phone, name: null }).returning();
+  const r = await d.transaction(async (tx) => {
+    const [locked] = await tx.select().from(s.customers).where(eqq(s.customers.id, c.id)).for("update");
+    return requestPromoConfirmation(tx as unknown as Exec, locked, phone, how);
+  });
+  if (r.sendConfirmation) await sendMessage({ to: phone, body: promoConfirmRequestSms(), kind: "system", event: "promo_confirm_request", customerId: c.id });
+  return { sent: r.sendConfirmation, reason: r.reason };
+}

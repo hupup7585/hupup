@@ -3,11 +3,11 @@ import { db, schema } from "@/lib/db";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { LIVE_PUBLIC_EMAIL, NEW_EMAIL_LIVE, NEW_PUBLIC_EMAIL } from "@/lib/config";
 import { getSettings } from "@/lib/settings";
-import { cancelQueuedPromotions, sendMessage } from "@/lib/sms";
+import { cancelQueuedMessages, cancelQueuedPromotions, sendMessage } from "@/lib/sms";
 import { TRANSACTIONAL_CONFIRMATION_SMS } from "@/lib/sms-consent";
 import { PROMO_ENROLLED_SMS, promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { START_CONFIRMATION_SMS } from "@/lib/sms-consent-copy";
-import { cancelPendingReenroll, handlePromoYes, handleStart, handleYes, requestPromoConfirmation } from "@/lib/sms-reenroll";
+import { cancelPendingReenroll, handleStart, handleYes, requestPromoConfirmation } from "@/lib/sms-reenroll";
 
 export const STOP_WORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "REVOKE", "OPTOUT"];
 export const START_WORDS = ["START", "UNSTOP"];
@@ -124,7 +124,7 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
 
   // Consent changes run in one transaction that locks this customer's row, so a STOP and a START/YES arriving at
   // the same time are applied one after the other and a YES can never restore consent after a STOP.
-  const effects = { cancelPromos: false, sendStartConfirmation: false, sendReenrolled: false, sendPromoEnrolled: false, sendPromoConfirm: false };
+  const effects = { cancelAll: false, cancelPromos: false, sendStartConfirmation: false, sendReenrolled: false, sendPromoEnrolled: false, sendPromoConfirm: false };
   if (customer && keyword) {
     await db.transaction(async (tx) => {
       const [c] = await tx.select().from(schema.customers).where(eq(schema.customers.id, customer.id)).for("update");
@@ -137,6 +137,7 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
         await consent("marketing", "opt_out");
         await cancelPendingReenroll(tx, from); // a pending START confirmation dies; a late YES does nothing
         effects.cancelPromos = true;
+        effects.cancelAll = smsTermsV2Active(); // SMS v3: STOP cancels every queued and scheduled message
         if (!exact) reply = OPT_OUT_CONFIRMATION;
       } else if (keyword === "start") {
         // START alone enrolls no one: it asks the customer to confirm with YES (order/service texts only).
@@ -148,11 +149,9 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
         if (r.confirmed && r.scope === "marketing") effects.sendPromoEnrolled = true;
         else effects.sendReenrolled = r.confirmed;
       } else if (keyword === "join") {
-        // JOIN (SMS Terms v2): confirms a promotional confirmation text sent in the last 24 hours; otherwise it sends
-        // that confirmation text. Only a JOIN or YES reply to it signs the number up. Never after STOP.
-        const r = c.smsOptOut ? { confirmed: false } : await handlePromoYes(tx, c, from, text, new Date());
-        if (r.confirmed) effects.sendPromoEnrolled = true;
-        else effects.sendPromoConfirm = (await requestPromoConfirmation(tx, c, from, "texted JOIN")).sendConfirmation;
+        // SMS v3: JOIN only requests the confirmation text; it never confirms. Only YES within 24 hours signs up.
+        // A request already waiting isn't repeated (no duplicate confirmations); never after STOP.
+        effects.sendPromoConfirm = (await requestPromoConfirmation(tx, c, from, `texted "${text.trim()}"`)).sendConfirmation;
       } else if (keyword === "nopromo") {
         // Internal keyword: promotions only. It never clears or weakens a STOP (smsOptOut stays as it is).
         await tx.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.id, c.id));
@@ -166,7 +165,8 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
     });
   }
   // Immediately after the opt-out is saved: no promotion that was queued, held or scheduled may still go out.
-  if (effects.cancelPromos) await cancelQueuedPromotions(from);
+  if (effects.cancelAll) await cancelQueuedMessages(from);
+  else if (effects.cancelPromos) await cancelQueuedPromotions(from);
   if (effects.sendStartConfirmation && customer)
     await sendMessage({ to: from, body: START_CONFIRMATION_SMS, kind: "system", event: "reenroll_request", customerId: customer.id });
   if (effects.sendReenrolled && customer)

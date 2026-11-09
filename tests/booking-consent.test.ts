@@ -18,7 +18,9 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { recordBookingConsents } from "@/lib/booking-consent";
 import { MARKETING_CONFIRMATION_SMS, TRANSACTIONAL_CONFIRMATION_SMS } from "@/lib/sms-consent";
-import { WEB_CONSENT_MARKETING, WEB_CONSENT_TRANSACTIONAL, WEB_CONSENT_VERSION } from "@/lib/sms-consent-copy";
+import { webConsentCopy, promoConfirmRequestSms } from "@/lib/sms-terms-v2";
+const { marketing: WEB_CONSENT_MARKETING, transactional: WEB_CONSENT_TRANSACTIONAL, version: WEB_CONSENT_VERSION } = webConsentCopy();
+const requests = async (phone: string) => db.select().from(schema.smsReenrollRequests).where(eq(schema.smsReenrollRequests.phone, phone));
 
 const rows = async (phone: string) => db.select().from(schema.smsConsents).where(eq(schema.smsConsents.phone, phone));
 beforeEach(() => {
@@ -26,14 +28,17 @@ beforeEach(() => {
 });
 
 describe("text-consent boxes on bookings", () => {
-  it("pay page: each checked box is saved with the exact approved wording, version, time, IP and page, then confirmed by text", async () => {
+  it("pay page: order box saved with the exact wording, version, time, IP and page; promo box only requests the confirmation text (SMS v3)", async () => {
     const r = await recordBookingConsents({ phone: "(845) 777-1001", transactional: true, marketing: true, source: "web", orderId: 5, ip: "1.2.3.4", userAgent: "UA", pageUrl: "https://hupup.example/pay/5" });
-    expect(r).toEqual({ saved: ["transactional", "marketing"], stopped: false });
+    expect(r).toEqual({ saved: ["transactional"], stopped: false });
     const saved = await rows("+18457771001");
     expect(saved.find((x) => x.scope === "transactional")).toMatchObject({ action: "opt_in", source: "web", method: "checkbox", wording: WEB_CONSENT_TRANSACTIONAL, wordingVersion: WEB_CONSENT_VERSION, ip: "1.2.3.4", orderId: 5, pageUrl: "https://hupup.example/pay/5" });
-    expect(saved.find((x) => x.scope === "marketing")).toMatchObject({ wording: WEB_CONSENT_MARKETING, source: "web" });
+    expect(saved.find((x) => x.scope === "marketing")).toBeUndefined(); // no promo consent until YES
+    expect((await requests("+18457771001")).map((q) => [q.scope, q.status])).toEqual([["marketing", "pending"]]);
+    expect((await requests("+18457771001"))[0].startMessage).toContain(WEB_CONSENT_MARKETING);
     expect(saved[0].createdAt).toBeInstanceOf(Date);
-    expect(h.sent.map((m) => m.body)).toEqual([TRANSACTIONAL_CONFIRMATION_SMS, MARKETING_CONFIRMATION_SMS]);
+    expect(h.sent.map((m) => m.body)).toEqual([TRANSACTIONAL_CONFIRMATION_SMS, promoConfirmRequestSms()]);
+    void MARKETING_CONFIRMATION_SMS;
   });
 
   it("promotional is optional: order texts alone, or nothing at all, never blocks booking or paying", async () => {
@@ -43,10 +48,14 @@ describe("text-consent boxes on bookings", () => {
     expect(await rows("+18457771003")).toEqual([]);
   });
 
-  it("staff New booking: saved with the staff member who checked it after reading the wording", async () => {
+  it("staff New booking: the promo box requests the confirmation text, noting the staff member and order (SMS v3)", async () => {
     await recordBookingConsents({ phone: "+18457771004", transactional: false, marketing: true, source: "pos", orderId: 9, userId: 3, ip: "10.0.0.1" });
-    const [x] = await rows("+18457771004");
-    expect(x).toMatchObject({ scope: "marketing", source: "pos", method: "staff", userId: 3, orderId: 9, disclosureRead: true, wording: WEB_CONSENT_MARKETING });
+    expect(await rows("+18457771004")).toEqual([]);
+    const [q] = await requests("+18457771004");
+    expect(q.scope).toBe("marketing");
+    expect(q.startMessage).toContain("New booking (staff)");
+    expect(q.startMessage).toContain("order 9");
+    expect(q.startMessage).toContain("staff user 3");
   });
 
   it("a number that replied STOP isn't changed (only START + YES can re-enroll)", async () => {

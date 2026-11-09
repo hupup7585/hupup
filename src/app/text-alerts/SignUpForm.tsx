@@ -10,7 +10,7 @@ import { signUpForTexts, type SignUpState } from "./actions";
  * Website SMS enrollment. Two separate checkboxes, both unchecked by default; neither is required by the other,
  * and promotional consent is never tied to a purchase.
  */
-export default function SignUpForm({ transactionalText, marketingText, smsNumber, disabledReason }: { transactionalText: string; marketingText: string; smsNumber: string; disabledReason: string | null }) {
+export default function SignUpForm({ transactionalText, marketingText, smsNumber, disabledReason, v3 = false, notActive = null }: { transactionalText: string; marketingText: string; smsNumber: string; disabledReason: string | null; v3?: boolean; notActive?: string | null }) {
   const [state, action, pending] = useActionState<SignUpState, FormData>(signUpForTexts, {});
   // Pre-select the time zone this device reports; the customer can change it.
   const [zone, setZone] = useState("");
@@ -23,6 +23,16 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
     }
   }, []);
 
+  if (state.ok && v3) {
+    return (
+      <div data-signup-done className="rounded-2xl border-2 border-hu-deep bg-hu-tint p-6">
+        <p className="text-xl font-bold">{state.promo ? "Almost done!" : "Thank you, you\u2019re signed up."}</p>
+        {state.promo && <p className="mt-2">Check your phone and reply YES to our text to confirm.</p>}
+        {state.orders && <p className="mt-2">We just texted you a confirmation for order and service texts.</p>}
+        <p className="mt-2">Reply STOP to {smsNumber} at any time to stop all texts, or HELP for help.</p>
+      </div>
+    );
+  }
   if (state.ok) {
     return (
       <div data-signup-done className="rounded-2xl border-2 border-hu-deep bg-hu-tint p-6">
@@ -71,7 +81,7 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-base">{PROMO_BENEFITS_NOTE}</p>
+          <p className="mt-2 text-base">{v3 ? "Up to 5 promo texts a year, never more." : PROMO_BENEFITS_NOTE}</p>
           <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-white p-4">
             <input type="checkbox" name="marketing" className="mt-1 h-6 w-6 shrink-0 accent-hu-deep" />
             <span>
@@ -90,7 +100,7 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
       </fieldset>
 
       <label className="block">
-        <span className="font-bold">Your time zone</span> <span className="opacity-70">(required for promotional texts)</span>
+        <span className="font-bold">Your time zone</span> <span className="opacity-70">{v3 ? "(optional)" : "(required for promotional texts)"}</span>
         <span className="mt-1 block text-base">We send promotional texts only between 8:00 a.m. and 9:00 p.m. in your time zone.</span>
         <select name="timeZone" value={zone} onChange={(e) => setZone(e.target.value)} className="mt-2 block w-full rounded-xl border-2 border-hu-deep/30 bg-white px-4 py-3 text-lg focus:border-hu-deep focus:outline-none">
           <option value="">Choose your time zone</option>
@@ -103,6 +113,11 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
       </label>
 
       <p className="text-base">
+        {v3 && (
+          <span data-join-instructions className="mb-2 block">
+            You can also text JOIN to {smsNumber}. You are signed up only when you reply YES to that confirmation text within 24 hours.
+          </span>
+        )}
         Text HELP to {smsNumber} for help. Text STOP to opt out. See our{" "}
         <a href="/sms-terms" className="font-semibold underline underline-offset-4">
           SMS Terms
@@ -114,9 +129,15 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
         .
       </p>
 
-      <button type="submit" disabled={pending || Boolean(disabledReason)} className="hu-btn disabled:opacity-60">
-        {pending ? "Signing up..." : "SIGN UP"}
-      </button>
+      {notActive ? (
+        <p data-not-active="sms-signup" className="rounded-xl bg-hu-yellow/40 p-3 font-semibold">
+          {notActive}
+        </p>
+      ) : (
+        <button type="submit" disabled={pending || Boolean(disabledReason)} className="hu-btn disabled:opacity-60">
+          {pending ? "Signing up..." : "SIGN UP"}
+        </button>
+      )}
     </form>
   );
 }

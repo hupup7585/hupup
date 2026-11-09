@@ -1,4 +1,5 @@
 import LegalPage from "@/components/site/LegalPage";
+import SmsTermsV3 from "./SmsTermsV3";
 import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 import { OPT_OUT_KEYWORDS, PROMO_OPENING, PROVIDER_DISCLOSURE, RECORD_RETENTION_MONTHS } from "@/lib/sms-consent-copy";
 import { smsNumberDisplay } from "@/lib/sms-number";
@@ -15,8 +16,10 @@ export const revalidate = 3600;
 
 /** SMS program terms (A2P 10DLC): SMS messages only. Business and rental terms are on /terms. */
 export default function SmsTerms() {
+  // SMS Terms v3 (Abraham's final text) replaces the whole page wherever it is switched on
+  if (smsTermsV2Active()) return <SmsTermsV3 />;
   const sms = smsNumberDisplay();
-  const v2 = smsTermsV2Active(); // Version 2: previews only until Abraham approves it
+  const v2 = false;
   // v2 (Abraham, Nov 9, 2026): the email that works today until info@ is switched on
   const email = v2 ? (NEW_EMAIL_LIVE ? NEW_PUBLIC_EMAIL : LIVE_PUBLIC_EMAIL) : publicEmail();
   return (

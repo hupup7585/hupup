@@ -31,7 +31,7 @@ export type SendResult = {
   messageId?: number;
   sid?: string;
   dev?: boolean;
-  blocked?: "opted_out" | "no_marketing_consent" | "no_transactional_consent" | "not_allowed" | "card_number" | "quiet_hours" | "yearly_limit";
+  blocked?: "opted_out" | "no_marketing_consent" | "no_transactional_consent" | "not_allowed" | "card_number" | "quiet_hours" | "yearly_limit" | "not_active";
   /** A promotion outside quiet hours: saved and sent in the next window (after rechecking consent). */
   held?: boolean;
   error?: string;
@@ -92,9 +92,13 @@ function yearStart(now = new Date()): Date {
   return new Date(Date.UTC(y, 0, 1, 5, 0, 0));
 }
 
-/** Promotional texts this number has been sent (or has waiting) this calendar year. Blocked, failed and canceled ones don't count. */
-export async function promosThisYear(phone: string, now = new Date()): Promise<number> {
-  const [r] = await db
+/**
+ * Promotional texts accepted for sending to this number this calendar year (Jan 1 - Dec 31, New York time), all
+ * campaigns combined. A text counts once it is accepted (queued, held for the morning, sent, delivered, even if the
+ * carrier later fails it); only texts we blocked or canceled before sending don't count, so retries never add more.
+ */
+export async function promosThisYear(phone: string, now = new Date(), exec: Pick<typeof db, "select"> = db): Promise<number> {
+  const [r] = await exec
     .select({ n: sql<number>`count(*)::int` })
     .from(schema.messages)
     .where(
@@ -103,7 +107,7 @@ export async function promosThisYear(phone: string, now = new Date()): Promise<n
         eq(schema.messages.kind, "marketing"),
         eq(schema.messages.direction, "out"),
         gte(schema.messages.createdAt, yearStart(now)),
-        sql`${schema.messages.status} not in ('blocked', 'failed', 'undelivered', 'canceled')`,
+        sql`${schema.messages.status} not in ('blocked', 'canceled')`,
       ),
     );
   return r?.n ?? 0;
@@ -184,7 +188,7 @@ export async function hasTransactionalConsent(phone: string): Promise<boolean> {
  *  - order/service texts need order/service consent;
  *  - promotional texts need promotional consent and the 8 AM - 9 PM window.
  */
-export async function checkEligibility(input: { to: string; kind: MessageKind; event?: string | null; customer: Customer | null; now?: Date; heldRecheck?: boolean }): Promise<Blocked | null> {
+export async function checkEligibility(input: { to: string; kind: MessageKind; event?: string | null; customer: Customer | null; now?: Date; heldRecheck?: boolean; exec?: Pick<typeof db, "select"> }): Promise<Blocked | null> {
   const { to, kind, customer } = input;
   if (kind === "system") {
     const rule = input.event ? SYSTEM_EVENTS[input.event] : undefined;
@@ -195,7 +199,7 @@ export async function checkEligibility(input: { to: string; kind: MessageKind; e
   if (customer?.smsOptOut) return "opted_out";
   if (kind === "transactional") return (await hasTransactionalConsent(to)) ? null : "no_transactional_consent";
   if (!customer?.marketingOptIn) return "no_marketing_consent";
-  if (!input.heldRecheck && (await promosThisYear(to, input.now)) >= PROMOS_PER_YEAR) return "yearly_limit";
+  if (!input.heldRecheck && (await promosThisYear(to, input.now, input.exec)) >= PROMOS_PER_YEAR) return "yearly_limit";
   if (!inMarketingHours(to, input.now, customer.timeZone)) return "quiet_hours";
   return null;
 }
@@ -232,35 +236,45 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
     ? (await db.select().from(schema.customers).where(eq(schema.customers.id, input.customerId)))[0] ?? null
     : await customerByPhone(to);
 
-  const blocked = await checkEligibility({ to, kind, event: input.event, customer, now: input.now });
-  const held = blocked === "quiet_hours";
-  const sendAfter = held ? nextPromoWindow(to, input.now ?? new Date(), customer?.timeZone) : null;
+  // SMS v3: until Twilio approves texting (A2P), no customer text goes out on the live site. Owner alerts and sign-in
+  // codes to staff are not customer texts.
+  const a2pOff = smsTermsV2Active() && process.env.VERCEL_ENV === "production" && !process.env.TWILIO_MESSAGING_SERVICE_SID && !STAFF_EVENTS.has(input.event ?? "");
 
-  let messageId: number | undefined;
-  if (log || held) {
-    const [row] = await db
-      .insert(schema.messages)
-      .values({
-        direction: "out",
-        fromNumber: process.env.TWILIO_PHONE_NUMBER ?? null,
-        toNumber: to,
-        contactPhone: to,
-        body: input.body,
-        mediaUrls: input.mediaUrls ?? [],
-        kind,
-        event: input.event ?? null,
-        status: held ? "held" : blocked ? "blocked" : "queued",
-        errorMessage: blocked ? BLOCK_REASON[blocked] : null,
-        sendAfter,
-        customerId: customer?.id ?? null,
-        orderId: input.orderId ?? null,
-        callSid: input.callSid ?? null,
-        userId: input.userId ?? null,
-        templateId: input.templateId ?? null,
-      })
-      .returning({ id: schema.messages.id });
-    messageId = row.id;
-  }
+  // Promotions: the count and the save happen under a lock on this number, so campaigns running at the same time can
+  // never push a customer past the yearly limit.
+  const decideAndSave = async (exec: typeof db) => {
+    if (kind === "marketing" && typeof exec.execute === "function") await exec.execute(sql`select pg_advisory_xact_lock(hashtext(${"promo:" + to}))`);
+    const blocked: Blocked | null = a2pOff ? "not_active" : await checkEligibility({ to, kind, event: input.event, customer, now: input.now, exec });
+    const held = blocked === "quiet_hours";
+    const sendAfter = held ? nextPromoWindow(to, input.now ?? new Date(), customer?.timeZone) : null;
+    let messageId: number | undefined;
+    if (log || held || kind === "marketing") {
+      const [row] = await exec
+        .insert(schema.messages)
+        .values({
+          direction: "out",
+          fromNumber: process.env.TWILIO_PHONE_NUMBER ?? null,
+          toNumber: to,
+          contactPhone: to,
+          body: input.body,
+          mediaUrls: input.mediaUrls ?? [],
+          kind,
+          event: input.event ?? null,
+          status: held ? "held" : blocked ? "blocked" : "queued",
+          errorMessage: blocked ? BLOCK_REASON[blocked] : null,
+          sendAfter,
+          customerId: customer?.id ?? null,
+          orderId: input.orderId ?? null,
+          callSid: input.callSid ?? null,
+          userId: input.userId ?? null,
+          templateId: input.templateId ?? null,
+        })
+        .returning({ id: schema.messages.id });
+      messageId = row.id;
+    }
+    return { blocked, held, messageId };
+  };
+  const { blocked, held, messageId } = kind === "marketing" && typeof db.transaction === "function" ? await db.transaction((tx) => decideAndSave(tx as unknown as typeof db)) : await decideAndSave(db);
   if (blocked) return { sent: false, blocked, held, messageId, error: BLOCK_REASON[blocked] };
   return deliver({ messageId, to, body: input.body, mediaUrls: input.mediaUrls, customer, logBody: log, retry: () => sendMessage({ ...input, mediaUrls: [] }) });
 }
@@ -338,10 +352,19 @@ const PENDING_STATUSES = ["held", "scheduled", "queued", "accepted"];
  * Twilio confirms). Every send also rechecks consent at the moment of sending.
  */
 export async function cancelQueuedPromotions(phone: string): Promise<number> {
+  return cancelPending(phone, ["marketing"]);
+}
+
+/** SMS v3 STOP: cancel every outgoing text to this number that hasn't gone out yet (order texts and promos). */
+export async function cancelQueuedMessages(phone: string): Promise<number> {
+  return cancelPending(phone, ["marketing", "transactional", "system"]);
+}
+
+async function cancelPending(phone: string, kinds: string[]): Promise<number> {
   const pending = await db
     .select({ id: schema.messages.id, sid: schema.messages.twilioSid, status: schema.messages.status })
     .from(schema.messages)
-    .where(and(eq(schema.messages.contactPhone, phone), eq(schema.messages.kind, "marketing"), eq(schema.messages.direction, "out"), inArray(schema.messages.status, PENDING_STATUSES)));
+    .where(and(eq(schema.messages.contactPhone, phone), inArray(schema.messages.kind, kinds), eq(schema.messages.direction, "out"), inArray(schema.messages.status, PENDING_STATUSES)));
   const client = getTwilio();
   let canceled = 0;
   for (const m of pending) {
@@ -361,6 +384,10 @@ export async function cancelQueuedPromotions(phone: string): Promise<number> {
 }
 
 export const NO_TEXT_CONSENT = "No text consent; call or email.";
+/** SMS v3: the exact note on every texting screen until Twilio approves texting. */
+export const TEXTING_NOT_ACTIVE = "Not active yet: waiting for Twilio A2P approval";
+/** Texts to our own staff (not customers): allowed before A2P approval. */
+const STAFF_EVENTS = new Set(["owner_alert", "owner_forward", "compliance_alert", "login_code"]);
 
 const BLOCK_REASON: Record<Blocked, string> = {
   opted_out: "Customer replied STOP. They must text START and reply YES to receive order texts again.",
@@ -370,6 +397,7 @@ const BLOCK_REASON: Record<Blocked, string> = {
   card_number: "Message looks like it contains a card number and was not sent.",
   quiet_hours: "Held: promotional texts are sent only between 8 AM and 9 PM in the customer's local time.",
   yearly_limit: `Not sent: this customer already got ${PROMOS_PER_YEAR} promotional texts this year (the most allowed).`,
+  not_active: TEXTING_NOT_ACTIVE,
 };
 
 async function markFailed(messageId: number | undefined, code: unknown, message: string | undefined) {

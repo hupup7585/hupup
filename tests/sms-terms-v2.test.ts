@@ -52,13 +52,13 @@ beforeEach(() => {
 });
 
 describe("SMS Terms v2 switch", () => {
-  it("is on for previews only until Abraham approves", () => {
-    expect(v2.SMS_TERMS_V2_LIVE).toBe(false);
-    expect(v2.smsTermsV2Active({ VERCEL_ENV: "production" })).toBe(false);
+  it("SMS v3 is on everywhere (Abraham approved it as final, Nov 9, 2026)", () => {
+    expect(v2.SMS_TERMS_V2_LIVE).toBe(true);
+    expect(v2.smsTermsV2Active({ VERCEL_ENV: "production" })).toBe(true);
     expect(v2.smsTermsV2Active({ VERCEL_ENV: "preview" })).toBe(true);
-    expect(v2.smsTermsV2Active({})).toBe(false);
-    expect(v2.webConsentCopy({ VERCEL_ENV: "production" }).version).toBe("web-2026-11-05");
-    expect(v2.webConsentCopy({ VERCEL_ENV: "preview" }).marketing).toContain("Checking this box is my express written consent.");
+    expect(v2.smsTermsV2Active({})).toBe(true);
+    expect(v2.webConsentCopy({ VERCEL_ENV: "production" }).version).toBe("web-2026-11-09-v3");
+    expect(v2.webConsentCopy({ VERCEL_ENV: "preview" }).marketing).toContain("I am signed up only when I reply YES to that confirmation text within 24 hours.");
   });
 });
 
@@ -84,7 +84,7 @@ describe("written promotional consent (phone keypress only sends a confirmation 
     expect(rows[0].response).toContain("pressed 1 on call CAv2");
     expect((await customer()).marketingOptIn).toBe(true);
     expect(h.sent.map((m) => m.body)).toEqual([v2.PROMO_ENROLLED_SMS]);
-    expect(v2.PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You're signed up for seasonal promo texts, up to 6 per year. Msg & data rates may apply. Reply NO PROMO to stop promos, STOP to stop all texts, HELP for help.");
+    expect(v2.PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You're signed up for seasonal promo texts, up to 5 per year. Msg & data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, HELP for help.");
 
     h.sent.length = 0;
     await text("YES", "SMv2yes2");
@@ -122,15 +122,11 @@ describe("WRONG NUMBER (v2) and the terms page", () => {
     expect(detectKeywordDetail("Is the bounce house the wrong size?", true).keyword).toBeNull();
   });
 
-  it("the nine sections render, and everything kept from v1 is still there", async () => {
-    const page = SmsTerms() as unknown as { type: (p: unknown) => Promise<React.ReactElement>; props: unknown }; // LegalPage is async
-    const html = renderToStaticMarkup(await page.type(page.props)).replace(/&#x27;|&rsquo;|’/g, "'");
-    for (const t of v2.SERVICE_TEXT_TYPES) expect(html).toContain(t);
-    for (const m of v2.MESSAGE_EXAMPLES) expect(html).toContain(m);
-    for (const s of ["Picture messages (MMS)", "Automated and staff messages", "discounts, special offers, and catalog updates", "Written consent for promotional texts", "Wrong number", "reply STOP or WRONG NUMBER"]) expect(html).toContain(s);
-    expect(html).toContain(v2.PRIVACY_V2);
-    for (const kept of ["NOPROMO", "Replying START", "8:00 a.m. and 9:00 p.m.", "24 months", "never a condition of purchase", "Reply HELP"]) expect(html).toContain(kept);
+  it("SMS Terms v3 replaces the whole page (word-for-word check in sms-terms-v2-lines.test.ts)", async () => {
+    const page = SmsTerms() as unknown as { type: (p: unknown) => unknown; props: unknown };
+    expect(String(page.type)).toContain("SmsTermsV3");
   });
+
 });
 
 describe("Abraham U checks", () => {
@@ -165,9 +161,9 @@ describe("JOIN and NO PROMO (Abraham, Nov 9, 2026)", () => {
     expect(detectKeywordDetail("No Promo", true).keyword).toBe("nopromo");
     expect(detectKeywordDetail("nopromo", false).keyword).toBe("nopromo");
   });
-  it("the confirmation text is Abraham's approved wording, 6 a year, JOIN to confirm, with the live Terms link", () => {
+  it("the confirmation text is Abraham's v3 wording, 5 a year, YES within 24 hours, with the live Terms link", () => {
     expect(v2.promoConfirmRequestSms("https://hupupattractions.com")).toBe(
-      "Hup Up Attractions: You requested to join our seasonal promotional text program. You may receive up to 6 promotional messages per year, including seasonal offers, discount codes, and rental deals. Message and data rates may apply. Reply JOIN to confirm. Reply STOP to unsubscribe. Reply HELP for assistance. Terms: https://hupupattractions.com/sms-terms",
+      "Hup Up Attractions: You requested to join our seasonal promotional text program. You may receive up to 5 promotional messages per calendar year, including seasonal offers, discount codes, and rental deals. Message and data rates may apply. Reply YES within 24 hours to confirm. Reply STOP to unsubscribe. Reply HELP for assistance. Terms: https://hupupattractions.com/sms-terms",
     );
   });
 });
@@ -176,7 +172,7 @@ describe("JOIN by text, end to end (SMS Terms v2)", () => {
   const J = "+18455550188";
   const t = (Body: string, sid: string) => handleInboundSms({ From: J, To: "+18454157585", Body, MessageSid: sid });
   const promo = async () => (await db.select().from(schema.smsConsents).where(eq(schema.smsConsents.phone, J))).filter((r) => r.scope === "marketing");
-  it("JOIN sends the confirmation; JOIN again within 24 hours signs up; a plain question never signs anyone up", async () => {
+  it("JOIN only requests the confirmation (v3): a second JOIN neither confirms nor repeats it; YES confirms; a plain question never signs anyone up", async () => {
     h.sent.length = 0;
     await t("Do you have paddle boats on Sunday?", "SMj0");
     expect(await promo()).toHaveLength(0);
@@ -184,7 +180,11 @@ describe("JOIN by text, end to end (SMS Terms v2)", () => {
     await t("join", "SMj1");
     expect(h.sent.at(-1)!.body).toBe(v2.promoConfirmRequestSms());
     expect(await promo()).toHaveLength(0);
+    const before = h.sent.length;
     await t("JOIN", "SMj2");
+    expect(await promo()).toHaveLength(0); // JOIN is never the confirmation reply
+    expect(h.sent.length).toBe(before); // no duplicate confirmation while one is waiting
+    await t("YES", "SMj2b");
     expect((await promo()).map((r) => r.action)).toEqual(["opt_in"]);
     expect(h.sent.at(-1)!.body).toBe(v2.PROMO_ENROLLED_SMS);
   });

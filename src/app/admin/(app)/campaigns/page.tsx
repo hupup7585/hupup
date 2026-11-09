@@ -1,5 +1,5 @@
 import { requireStaff } from "@/lib/auth";
-import { CAMPAIGNS_NOT_ACTIVE, campaignPreview, campaignsCanSend, eligibleOf, listCampaigns, promoSignups, segments } from "@/lib/campaigns";
+import { CAMPAIGNS_NOT_ACTIVE, campaignPreview, campaignRecipients, campaignsCanSend, eligibleOf, listCampaigns, promoSignups, segments } from "@/lib/campaigns";
 import { PROMOS_PER_YEAR } from "@/lib/sms-consent-copy";
 import { formatPhone } from "@/lib/phone";
 import { alertDateTime } from "@/lib/voicemail";
@@ -25,7 +25,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
         <p className="text-muted">Seasonal promo texts. Only customers who signed up for promos get them, at most {PROMOS_PER_YEAR} a year each. Texts go out between 8 AM and 9 PM in the customer&rsquo;s time.</p>
       </div>
       {!canSend && (
-        <p data-not-active="campaigns" className="rounded-xl bg-[#FFF8E1] px-4 py-3 text-sm text-[#5C4600]"><b>{CAMPAIGNS_NOT_ACTIVE}.</b> You can write and approve campaigns now; sending starts once texting is approved.</p>
+        <p data-not-active="campaigns" className="rounded-xl bg-[#FFF8E1] px-4 py-3 text-sm text-[#5C4600]"><b>{CAMPAIGNS_NOT_ACTIVE}</b><span className="block">You can write and approve campaigns now; sending starts once texting is approved.</span></p>
       )}
       {sp.msg && <p className="rounded-xl bg-[#E3F8EF] px-4 py-3 text-sm font-semibold text-[#13895C]" role="status">{sp.msg}</p>}
       {sp.err && <p className="rounded-xl bg-[#FFE6E4] px-4 py-3 text-sm font-semibold text-[#C83A2F]" role="alert">{sp.err}</p>}
@@ -52,6 +52,11 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                     <span className="rounded-full bg-bg px-3 py-1 text-xs font-bold">{STATUS[c.status] ?? c.status}</span>
                   </div>
                   <p className="mt-2 rounded-lg bg-bg p-3 text-sm" data-campaign-preview>{text}</p>
+                  {seg.segments > 1 && (
+                    <p data-segment-flag className="mt-1 rounded-lg bg-[#FFF8E1] px-3 py-1.5 text-sm font-semibold text-[#5C4600]">
+                      Longer than one text segment ({seg.chars} characters). Each customer is charged for {seg.segments} segments. Shorten the offer to fit in one.
+                    </p>
+                  )}
                   <p className="mt-1 text-xs text-muted">
                     {seg.chars} characters, {seg.segments === 1 ? "1 text segment" : `${seg.segments} text segments (each customer is billed for each segment)`}. Written {alertDateTime(c.createdAt)}
                     {c.approvedAt ? `. Approved ${alertDateTime(c.approvedAt)}` : ""}
@@ -69,6 +74,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                         </button>
                       </form>
                     )}
+                    {c.status === "sent" && <CampaignHistory id={c.id} />}
                     {owner && (c.status === "draft" || c.status === "approved") && (
                       <form action={cancelCampaignAction}><input type="hidden" name="id" value={c.id} /><button className="btn-ghost">Cancel campaign</button></form>
                     )}
@@ -123,5 +129,33 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
         )}
       </div>
     </div>
+  );
+}
+
+const RESULT: Record<string, string> = { sent: "Sent", held: "Waiting for 8 AM their time", skipped: "Skipped", pending: "Sending" };
+
+/** Campaign history: recipients, skipped customers and why, and delivery results. */
+async function CampaignHistory({ id }: { id: number }) {
+  const rows = await campaignRecipients(id);
+  return (
+    <details className="w-full" data-campaign-history>
+      <summary className="cursor-pointer text-sm font-semibold">Recipients and results ({rows.length})</summary>
+      <table className="mt-2 w-full text-sm">
+        <thead>
+          <tr><th className="th">Customer</th><th className="th">Phone</th><th className="th">Result</th><th className="th">Delivery</th><th className="th">Why</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.customerId} className="border-t border-line">
+              <td className="py-1.5">{r.name || "No name yet"}</td>
+              <td>{formatPhone(r.phone)}</td>
+              <td>{RESULT[r.status] ?? r.status}</td>
+              <td>{r.delivery ?? ""}</td>
+              <td>{r.reason ?? ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
   );
 }

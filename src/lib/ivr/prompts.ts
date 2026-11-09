@@ -184,13 +184,13 @@ export const PROMPTS = {
   },
   consent_marketing_v2: {
     group: "Text message consent",
-    label: "Ask for promotional texts, written consent (SMS Terms v2, preview only)",
+    label: "Ask for promotional texts, written consent (SMS v3)",
     textOnly: true,
-    text: "One more question. Would you like promotional text messages from Hup Up Attractions at this number, such as discounts, special offers, and catalog updates? If you say yes, we'll text you a confirmation, and you'll be signed up only after you reply YES to that text. By agreeing, you also authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages. Consent is not a condition of purchase. Message and data rates may apply. Message frequency varies. You can reply STOP to opt out, or HELP for help, at any time. To get the confirmation text, press 1 or say yes. To skip, press 2 or say no.",
+    text: "One more question. Would you like promotional text messages from Hup Up Attractions at this number: seasonal offers, discount codes, and rental deals, up to 5 per calendar year? If you say yes, we'll text you a confirmation, and you'll be signed up only after you reply YES to that text within 24 hours. Agreeing is never required to book or buy. Message and data rates may apply. You can reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help, at any time. To get the confirmation text, press 1 or say yes. To skip, press 2 or say no.",
   },
   consent_marketing_sent: {
     group: "Text message consent",
-    label: "Promotional confirmation text sent (SMS Terms v2, preview only)",
+    label: "Promotional confirmation text sent (SMS v3)",
     text: "Thank you. We just texted you a confirmation. Reply YES to that text within 24 hours to sign up for promotional texts.",
   },
   consent_unclear: { group: "Text message consent", label: "Didn't understand the answer", text: "Sorry, I didn't get that. Please press 1 for yes, or 2 for no." },

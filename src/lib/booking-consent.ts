@@ -3,7 +3,8 @@ import { db, schema } from "@/lib/db";
 import { toE164 } from "@/lib/phone";
 import { sendMessage } from "@/lib/sms";
 import { ConsentBlockedError, MARKETING_CONFIRMATION_SMS, TRANSACTIONAL_CONFIRMATION_SMS, recordConsent } from "@/lib/sms-consent";
-import { webConsentCopy } from "@/lib/sms-terms-v2";
+import { smsTermsV2Active, webConsentCopy } from "@/lib/sms-terms-v2";
+import { requestPromoByCustomer } from "@/lib/sms-reenroll";
 
 /**
  * Text consent boxes on the pay page and the staff New booking screen (Abraham, approved): two separate boxes, both
@@ -49,7 +50,7 @@ export async function recordBookingConsents(input: BookingConsentInput): Promise
       customerId = await recordConsent({ ...base, scope: "transactional", action: "opt_in", wording: copy.transactional });
       saved.push("transactional");
     }
-    if (input.marketing) {
+    if (input.marketing && !smsTermsV2Active()) {
       customerId = await recordConsent({ ...base, scope: "marketing", action: "opt_in", wording: copy.marketing });
       saved.push("marketing");
     }
@@ -60,5 +61,8 @@ export async function recordBookingConsents(input: BookingConsentInput): Promise
   // One confirmation text per program joined (non-promotional), same as the /text-alerts sign-up
   if (saved.includes("transactional")) await sendMessage({ to: phone, body: TRANSACTIONAL_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId, orderId: input.orderId ?? null });
   if (saved.includes("marketing")) await sendMessage({ to: phone, body: MARKETING_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId, orderId: input.orderId ?? null });
+  // SMS v3: the promo box only requests the confirmation text (YES within 24 hours signs up)
+  if (input.marketing && smsTermsV2Active())
+    await requestPromoByCustomer(phone, `${input.source === "web" ? "pay page box" : "New booking (staff)"} (wording ${copy.version}: "${copy.marketing}")${input.orderId ? `, order ${input.orderId}` : ""}${input.userId ? `, staff user ${input.userId}` : ""}`);
   return { saved, stopped: false };
 }

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gt, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 
 /**
@@ -46,9 +46,23 @@ export async function customerConsent(c: { id: number; phone: string | null; sms
     ? await db
         .select({ scope: schema.smsReenrollRequests.scope })
         .from(schema.smsReenrollRequests)
-        .where(and(eq(schema.smsReenrollRequests.phone, c.phone), eq(schema.smsReenrollRequests.status, "pending")))
+        .where(and(eq(schema.smsReenrollRequests.phone, c.phone), eq(schema.smsReenrollRequests.status, "pending"), gt(schema.smsReenrollRequests.expiresAt, new Date())))
     : [];
+  const requests = c.phone
+    ? await db.select().from(schema.smsReenrollRequests).where(eq(schema.smsReenrollRequests.phone, c.phone)).orderBy(asc(schema.smsReenrollRequests.requestedAt))
+    : [];
+  const now = new Date();
   return {
+    // Every confirmation text we sent: why, when, when it expires, and what happened (confirmed / expired / canceled)
+    requests: [...requests].reverse().map((r) => ({
+      id: r.id,
+      program: r.scope === "marketing" ? "Promo texts" : "Order texts",
+      how: r.startMessage,
+      requestedAt: r.requestedAt,
+      expiresAt: r.expiresAt,
+      status: r.status === "pending" && r.expiresAt < now ? "Expired (no YES within 24 hours)" : r.status === "pending" ? "Waiting for YES" : r.status === "confirmed" ? "Confirmed with YES" : r.status === "canceled" ? "Canceled (STOP)" : r.status,
+      resolvedAt: r.resolvedAt,
+    })),
     order: program(rows, "transactional", c.smsOptOut, pend.some((p) => p.scope === "transactional")),
     promo: program(rows, "marketing", c.smsOptOut, pend.some((p) => p.scope === "marketing")),
     blocked: c.smsOptOut,

@@ -192,18 +192,20 @@ describe("finalize sends texts only with consent", () => {
 });
 
 describe("promotional consent (separate, never automatic)", () => {
-  it("asked after the order with its own disclosure", async () => {
+  it("asked after the order with its own disclosure (SMS v3)", async () => {
     const xml = await call("promo-consent");
-    expect(xml).toContain("Consent is not a condition of purchase.");
-    expect(xml).toContain("service providers only as necessary to deliver these messages");
+    expect(xml).toContain("Agreeing is never required to book or buy.");
+    expect(xml).toContain("up to 5 per calendar year");
+    expect(xml).toContain("you'll be signed up only after you reply YES to that text within 24 hours");
     expect(xml).toContain("/api/voice/promo-consent-answer");
   });
-  it("yes: records marketing opt-in and texts the confirmation", async () => {
+  it("yes: only texts the confirmation; nothing is enrolled until the customer replies YES (SMS v3)", async () => {
     const xml = await call("promo-consent-answer", { Digits: "1" });
-    expect(h.recorded[0]).toMatchObject({ scope: "marketing", action: "opt_in", method: "keypad", wording: PROMPTS.consent_marketing.text });
-    expect(h.messages).toHaveLength(1);
-    expect(String(h.messages[0].body)).toContain("You're now enrolled in promotional text messages");
-    expect(xml).toContain("/api/voice/tz");
+    expect(h.recorded.filter((r) => r.scope === "marketing" && r.action === "opt_in")).toEqual([]);
+    // The confirmation text itself is checked on a real database in sms-terms-v2.test.ts (press 1 sends it)
+    expect(h.messages.every((m) => m.event !== "consent_confirmation")).toBe(true);
+    expect(xml).toContain("Reply YES to that text within 24 hours");
+    void PROMPTS;
   });
   it("no, silence or an unclear answer never enrolls", async () => {
     await call("promo-consent-answer", { Digits: "2" });

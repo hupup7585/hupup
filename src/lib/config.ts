@@ -19,7 +19,9 @@ export const NEW_EMAIL_LIVE = false;
  * gmail on the live site until NEW_EMAIL_LIVE. `stored` is an owner-saved site email, used on the live site only.
  */
 export function publicEmail(env: Record<string, string | undefined> = process.env, stored?: string | null): string {
-  if (NEW_EMAIL_LIVE || env.VERCEL_ENV !== "production") return NEW_PUBLIC_EMAIL;
+  // SMS v3 (Abraham): hupupattractions@gmail.com everywhere, previews included, until info@ works
+  if (NEW_EMAIL_LIVE) return NEW_PUBLIC_EMAIL;
+  void env;
   return stored || LIVE_PUBLIC_EMAIL;
 }
 

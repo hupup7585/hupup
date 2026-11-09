@@ -106,7 +106,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
 
       <div className="card mt-4 p-5" data-text-consent>
         <h2 className="mb-3 text-lg font-black">Text messages</h2>
-        {!textingActive() && <p className="mb-3 rounded-lg bg-[#FFF8E1] px-3 py-2 text-sm text-[#5C4600]"><b>Not active yet: waiting for Twilio A2P approval.</b> No texts go out until then; consent is still recorded.</p>}
+        {!textingActive() && <p className="mb-3 rounded-lg bg-[#FFF8E1] px-3 py-2 text-sm text-[#5C4600]"><b>Not active yet: waiting for Twilio A2P approval</b><span className="block">No texts go out until then; consent is still recorded.</span></p>}
         {consent.blocked && <p className="mb-3 rounded-lg bg-[#FFE6E4] px-3 py-2 text-sm font-semibold text-[#C83A2F]">Blocked: this number replied STOP, so no texts of any kind go to it.</p>}
         <div className="grid gap-3 sm:grid-cols-2">
           {([["Order texts", consent.order], ["Promo texts", consent.promo]] as const).map(([label, p]) => (
@@ -118,6 +118,20 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             </div>
           ))}
         </div>
+        {consent.requests.length > 0 && (
+          <div className="mt-3" data-confirmation-requests>
+            <h3 className="text-sm font-bold">Confirmation texts</h3>
+            <ul className="mt-1 divide-y divide-line text-sm">
+              {consent.requests.map((r) => (
+                <li key={r.id} className="py-2">
+                  <b>{alertDateTime(r.requestedAt)}</b>: {r.program}, {r.status}. Expires {alertDateTime(r.expiresAt)}
+                  {r.resolvedAt ? `; resolved ${alertDateTime(r.resolvedAt)}` : ""}.
+                  {r.how ? <span className="block text-muted">Requested: {r.how}</span> : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {consent.history.length > 0 && (
           <details className="mt-3">
             <summary className="cursor-pointer text-sm font-semibold">Consent history ({consent.history.length}), kept as proof</summary>

@@ -122,7 +122,15 @@ export async function sendCampaign(id: number, userId: number | null, now = new 
     else skipped++;
     await db.update(schema.smsCampaignSends).set({ status, messageId: r.messageId ?? null, reason: status === "skipped" ? r.error ?? r.blocked ?? null : null }).where(eq(schema.smsCampaignSends.id, claim.id));
   }
-  skipped += list.length - eligible.length;
+  // Signed-up customers who can't get this one are recorded too, with the reason (campaign history)
+  for (const s of list.filter((x) => x.status !== "Active")) {
+    const [row] = await db
+      .insert(schema.smsCampaignSends)
+      .values({ campaignId: id, customerId: s.customerId, phone: s.phone, status: "skipped", reason: s.status === "At yearly limit" ? `Already got ${PROMOS_PER_YEAR} promo texts this year` : "Replied STOP (no texts)" })
+      .onConflictDoNothing()
+      .returning();
+    if (row) skipped++;
+  }
   const [done] = await db.update(schema.smsCampaigns).set({ eligibleCount: eligible.length, sentCount: sent, heldCount: held, skippedCount: skipped }).where(eq(schema.smsCampaigns.id, id)).returning();
   await audit(userId, "campaign.sent", id, { eligible: eligible.length, sent, held, skipped });
   return done;
@@ -130,3 +138,17 @@ export async function sendCampaign(id: number, userId: number | null, now = new 
 
 /** What customers will actually receive (the required opening/ending added). */
 export const campaignPreview = (body: string) => marketingBody(body);
+
+export type CampaignRecipient = { customerId: number; name: string | null; phone: string; status: string; reason: string | null; delivery: string | null; at: Date };
+
+/** Campaign history: everyone it was sent to or skipped (with why), and the delivery result from the carrier. */
+export async function campaignRecipients(id: number): Promise<CampaignRecipient[]> {
+  const rows = await db
+    .select({ s: schema.smsCampaignSends, name: schema.customers.name, delivery: schema.messages.status, err: schema.messages.errorMessage })
+    .from(schema.smsCampaignSends)
+    .leftJoin(schema.customers, eq(schema.customers.id, schema.smsCampaignSends.customerId))
+    .leftJoin(schema.messages, eq(schema.messages.id, schema.smsCampaignSends.messageId))
+    .where(eq(schema.smsCampaignSends.campaignId, id))
+    .orderBy(schema.smsCampaignSends.id);
+  return rows.map((r) => ({ customerId: r.s.customerId, name: r.name, phone: r.s.phone, status: r.s.status, reason: r.s.reason ?? r.err ?? null, delivery: r.delivery, at: r.s.createdAt }));
+}

@@ -45,6 +45,6 @@ describe("customer text consent", () => {
     expect(page).toContain("data-text-consent");
     expect(page).toContain('[["Order texts", consent.order], ["Promo texts", consent.promo]]');
     expect(page).toContain('sent by ${m.userId ? senders.get(m.userId) ?? "staff" : "System"}');
-    expect(page).toContain("Not active yet: waiting for Twilio A2P approval.");
+    expect(page).toContain("<b>Not active yet: waiting for Twilio A2P approval</b>");
   });
 });

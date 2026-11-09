@@ -1,7 +1,7 @@
 import { getSiteContent } from "@/lib/site-content";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
-import { webConsentCopy } from "@/lib/sms-terms-v2";
+import { smsSignupNotActive, smsTermsV2Active, webConsentCopy } from "@/lib/sms-terms-v2";
 import { smsNumberDisplay } from "@/lib/sms-number";
 import SignUpForm from "./SignUpForm";
 import { signUpsDisabledReason } from "./actions";
@@ -24,7 +24,14 @@ export default async function TextAlerts() {
         <h1 className="text-4xl font-extrabold">Get text updates</h1>
         <p className="mt-3 text-lg leading-relaxed">Choose the texts you&rsquo;d like from Hup&nbsp;Up&nbsp;Attractions. You can opt out at any time.</p>
         <div className="mt-8">
-          <SignUpForm transactionalText={copy.transactional} marketingText={copy.marketing} smsNumber={smsNumberDisplay()} disabledReason={await signUpsDisabledReason()} />
+          <SignUpForm
+            transactionalText={copy.transactional}
+            marketingText={copy.marketing}
+            smsNumber={smsNumberDisplay()}
+            disabledReason={await signUpsDisabledReason()}
+            v3={smsTermsV2Active()}
+            notActive={smsSignupNotActive()}
+          />
         </div>
       </main>
       <SiteFooter c={c} />
