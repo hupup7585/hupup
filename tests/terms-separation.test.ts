@@ -25,9 +25,11 @@ describe("Abram's five final /sms-terms corrections", () => {
       "We use the customer's confirmed local time zone whenever available. If it is unavailable, promotional messages will be sent only when the permitted hours are satisfied in both the telephone number's area-code time zone and Eastern Time.",
       "A HELP response identifies Hup Up Attractions and provides our customer support telephone number and email address.",
       "We use reasonable administrative, technical, and organizational safeguards designed to protect customer information against unauthorized access, use, alteration, or disclosure.",
-      'See our Privacy Policy at{" "} <a className="underline" href="/privacy-policy"> https://hupupattractions.com/privacy-policy </a>',
     ])
       expect(page).toContain(s);
+    // Live page keeps its Privacy Policy link; SMS Terms v2 (preview) links the live /privacy page
+    expect(page).toContain('<a className="underline" href="/privacy-policy"> https://hupupattractions.com/privacy-policy </a>');
+    expect(page).toContain('<a className="underline" href="/privacy"> {config.baseUrl()}/privacy </a>');
   });
   it("replaced wording is gone (nothing stated twice)", () => {
     for (const old of ["To start again, reply START", "We use the time zone you give us", "New York (Eastern) time", "stored securely", "See our <a", "until you reply START", "separate, dated correction entry"]) expect(page).not.toContain(old);

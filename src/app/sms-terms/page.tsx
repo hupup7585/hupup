@@ -2,7 +2,8 @@ import LegalPage from "@/components/site/LegalPage";
 import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 import { OPT_OUT_KEYWORDS, PROMO_OPENING, PROVIDER_DISCLOSURE, RECORD_RETENTION_MONTHS } from "@/lib/sms-consent-copy";
 import { smsNumberDisplay } from "@/lib/sms-number";
-import { publicEmail } from "@/lib/config";
+import { LIVE_PUBLIC_EMAIL, NEW_EMAIL_LIVE, NEW_PUBLIC_EMAIL, config, publicEmail } from "@/lib/config";
+import { PROMOS_PER_YEAR, PROMO_ENDING_V2, PROMO_PREFIX_V2 } from "@/lib/sms-consent-copy";
 import { MESSAGE_EXAMPLES, PRIVACY_V2, SERVICE_TEXT_TYPES, smsTermsV2Active } from "@/lib/sms-terms-v2";
 
 export const metadata = {
@@ -16,6 +17,8 @@ export const revalidate = 3600;
 export default function SmsTerms() {
   const sms = smsNumberDisplay();
   const v2 = smsTermsV2Active(); // Version 2: previews only until Abraham approves it
+  // v2 (Abraham, Nov 9, 2026): the email that works today until info@ is switched on
+  const email = v2 ? (NEW_EMAIL_LIVE ? NEW_PUBLIC_EMAIL : LIVE_PUBLIC_EMAIL) : publicEmail();
   return (
     <LegalPage title="SMS Terms" updated="November 2026">
       <p>
@@ -49,9 +52,15 @@ export default function SmsTerms() {
       <p>Offers and news from {BUSINESS_NAME_NB}, sent only if you agree to receive them. Agreeing is not required to book or buy anything.</p>
       {v2 && <p>Promotional texts may include discounts, special offers, and catalog updates.</p>}
       <ul>
-        <li>
-          Every promotional text begins with <strong>&ldquo;{PROMO_OPENING}&rdquo;</strong>, followed by the offer.
-        </li>
+        {v2 ? (
+          <li data-v2="promo-format">
+            Every promotional text begins with <strong>&ldquo;{PROMO_PREFIX_V2}&rdquo;</strong> and ends with <strong>&ldquo;{PROMO_ENDING_V2}&rdquo;</strong>
+          </li>
+        ) : (
+          <li>
+            Every promotional text begins with <strong>&ldquo;{PROMO_OPENING}&rdquo;</strong>, followed by the offer.
+          </li>
+        )}
         <li>
           Promotional texts are sent only between 8:00 a.m. and 9:00 p.m. in your local time zone. We use the customer&rsquo;s confirmed local time zone whenever available. If it is unavailable,
           promotional messages will be sent only when the permitted hours are satisfied in both the telephone number&rsquo;s area-code time zone and Eastern Time. Our system blocks promotional texts
@@ -63,15 +72,22 @@ export default function SmsTerms() {
         <>
           <h2>Written consent for promotional texts</h2>
           <p>
-            We send promotional texts only with your express written consent. You can give it in one of two ways: by checking the separate promotional box on our website (it is never checked
-            for you), or by replying YES to our confirmation text. Pressing a key on our phone line, or telling our team yes, does not sign you up by itself. It only sends you that
-            confirmation text, and you are signed up for promotional texts only after you reply YES to it.
+            We send promotional texts only with your express written consent, given by replying JOIN or YES to our confirmation text within 24 hours. You can ask for that confirmation
+            text by checking the separate promotional box on our website (it is never checked for you), by pressing a key on our phone line, by telling our team, or by texting JOIN to {sms}.
+            None of these signs you up by itself: you are signed up for promotional texts only after you reply JOIN or YES to the confirmation text.
           </p>
         </>
       )}
 
       <h2>Message frequency and cost</h2>
-      <p>Message frequency varies. Message and data rates may apply. Carriers are not liable for delayed or undelivered messages.</p>
+      {v2 ? (
+        <p data-v2="frequency">
+          Order and service texts: message frequency varies. Promotional texts: up to {PROMOS_PER_YEAR} promotional texts per year. Message and data rates may apply. Carriers are not liable for
+          delayed or undelivered messages.
+        </p>
+      ) : (
+        <p>Message frequency varies. Message and data rates may apply. Carriers are not liable for delayed or undelivered messages.</p>
+      )}
 
       <h2>How to stop texts</h2>
       <p>
@@ -85,15 +101,24 @@ export default function SmsTerms() {
         our phone line, or our team. Re-enrollment applies only to the messaging program for which you provide new consent. Your previous opt-out remains documented in our records.
       </p>
       <p>
+        {v2 ? (
+          <span data-v2="nopromo">
+            NO PROMO (or NOPROMO) is our own keyword that stops promotional texts only, while order texts continue. It does not restart promotional messages after a STOP and never undoes a
+            STOP. To receive promotional texts again after opting out, a separate new promotional opt-in is required.
+          </span>
+        ) : (
+          <>
         NOPROMO is our own keyword that stops promotional texts only, while order texts continue. NOPROMO does not restart promotional messages after a STOP and never undoes a STOP. To receive
         promotional texts again after opting out, a separate new promotional opt-in is required.
+          </>
+        )}
       </p>
 
       {v2 && (
         <>
           <h2>Wrong number</h2>
           <p>
-            If you get a text from us that wasn&rsquo;t meant for you, reply STOP or WRONG NUMBER to {sms}, call (845) 777-7585, or email {publicEmail()}. We will remove the number and
+            If you get a text from us that wasn&rsquo;t meant for you, reply STOP or WRONG NUMBER to {sms}, call (845) 777-7585, or email {v2 ? email : publicEmail()}. We will remove the number and
             stop texting it.
           </p>
         </>
@@ -101,7 +126,7 @@ export default function SmsTerms() {
 
       <h2>Help</h2>
       <p>
-        Reply HELP to {sms}, call (845) 777-7585, or email {publicEmail()}. A HELP response identifies Hup Up Attractions and provides our customer support telephone number and email address.
+        Reply HELP to {sms}, call (845) 777-7585, or email {v2 ? email : publicEmail()}. A HELP response identifies Hup Up Attractions and provides our customer support telephone number and email address.
       </p>
 
       {v2 && (
@@ -134,9 +159,15 @@ export default function SmsTerms() {
       <h2>Privacy</h2>
       <p>
         See our Privacy Policy at{" "}
-        <a className="underline" href="/privacy-policy">
-          https://hupupattractions.com/privacy-policy
-        </a>
+        {v2 ? (
+          <a className="underline" href="/privacy">
+            {config.baseUrl()}/privacy
+          </a>
+        ) : (
+          <a className="underline" href="/privacy-policy">
+            https://hupupattractions.com/privacy-policy
+          </a>
+        )}
         . Text messaging originator opt-in data and consent will not be shared with any third parties, except service providers as described
         above.
       </p>

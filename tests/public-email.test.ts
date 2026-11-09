@@ -17,8 +17,8 @@ describe("public email (preview: info@, live: gmail until Abraham confirms)", ()
     expect(readFileSync("src/lib/site-content.ts", "utf8")).toContain("publicEmail(process.env");
     for (const f of ["src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/app/sms-terms/page.tsx"]) {
       const s = readFileSync(f, "utf8");
-      expect(s, f).toContain("{publicEmail()}");
-      expect(s, f).not.toContain("hupupattractions@gmail.com");
+      expect(s, f).toMatch(/\{(?:v2 \? email : )?publicEmail\(\)\}/); // SMS Terms v2 (preview) uses the email that works today
+      expect(s, f).not.toContain('"hupupattractions@gmail.com"');
     }
     const home = readFileSync("src/app/page.tsx", "utf8");
     expect(home).toContain("email: c.email");
