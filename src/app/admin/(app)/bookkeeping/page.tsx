@@ -27,6 +27,8 @@ import {
 } from "@/lib/books-reports";
 import * as A from "./actions";
 import * as G from "./gl-actions";
+import * as I from "./invoice-actions";
+import { KIND_NAME, listDocs, type DocKind } from "@/lib/invoices";
 import GeneralLedger from "./Ledger";
 import { Card, CategorySelect, Field, FileInput, Grid, MethodSelect, Save, Stat, Table, money } from "./ui";
 
@@ -228,61 +230,98 @@ async function Income({ cats }: { cats: string[] }) {
 }
 
 async function Invoices({ today }: { today: string }) {
-  const inv = await db.select().from(schema.bookInvoices).orderBy(desc(schema.bookInvoices.id)).limit(100);
-  const open = new Map((await openInvoices()).map((i) => [i.id, i]));
+  const docs = await listDocs();
+  const invoices = docs.filter((d) => d.kind === "invoice");
+  const ar = await receivablesAging(today);
+  const buckets = ["current", "1-30", "31-60", "61-90", "90+"] as const;
+  const customers = [...new Set(docs.filter((d) => d.status === "open").map((d) => d.customerName))].sort();
   return (
     <>
-      <Card title="New invoice" note="For schools and institutions that pay by check. Tax-exempt customers: enter the certificate number and attach the certificate.">
-        <form action={A.addInvoiceAction} className="space-y-3">
-          <Grid>
-            <Field label="Customer or school"><input name="customerName" className="input" required /></Field>
-            <Field label="Amount ($)"><input name="amount" inputMode="decimal" className="input" required /></Field>
-            <Field label="Invoice date"><input type="date" name="issueDate" defaultValue={today} className="input" /></Field>
-            <Field label="Due date"><input type="date" name="dueDate" className="input" required /></Field>
-            <Field label="Booking # (if any)"><input name="orderId" inputMode="numeric" className="input" /></Field>
-            <Field label="Tax exempt"><input type="checkbox" name="taxExempt" className="h-5 w-5" /></Field>
-            <Field label="Exempt certificate #"><input name="exemptCertNo" className="input" /></Field>
-            <Field label="Certificate (PDF or photo)"><FileInput /></Field>
-            <Field label="Notes" wide><input name="notes" className="input" /></Field>
-          </Grid>
-          <Save label="Save invoice" />
+      <p data-not-active="invoice-email" className="mb-4 rounded-xl border border-[#E8B400]/50 bg-[#FFF8E1] px-4 py-3 text-sm text-[#5C4600]">
+        <b>Not active yet:</b> emailing invoices, reminders and online invoice payment. Invoice emails and reminders wait for Abraham&rsquo;s approval of the wording customers see; online payment needs Sola connected. Print or save the PDF and send it yourself for now.
+      </p>
+      <Card title="Make one from a booking" note="Copies the booking's items, delivery fee and sales tax exactly as charged. Saved as a draft for you to check.">
+        <form action={I.fromBookingAction} className="flex flex-wrap items-end gap-3">
+          <Field label="Booking #"><input name="orderId" inputMode="numeric" className="input w-28" required /></Field>
+          <Field label="Type"><select name="kind" className="input"><option value="invoice">Invoice</option><option value="quote">Quote</option></select></Field>
+          <Field label="Payment terms (days)"><input name="termsDays" type="number" min={0} defaultValue={0} className="input w-24" /></Field>
+          <Save label="Make draft" />
         </form>
       </Card>
-      <Card title="Invoices and balances">
+      <Card title="New invoice, quote or credit note" note="Schools and institutions that pay by check: set payment terms. Tax-exempt customers: enter the certificate number (attach the certificate on the old form below if needed).">
+        <form action={I.createDocAction} className="space-y-3">
+          <Grid>
+            <Field label="Type"><select name="kind" className="input"><option value="invoice">Invoice</option><option value="quote">Quote</option><option value="credit_note">Credit note</option></select></Field>
+            <Field label="Customer or school"><input name="customerName" list="book-customers" className="input" required /><datalist id="book-customers">{customers.map((c) => <option key={c} value={c} />)}</datalist></Field>
+            <Field label="Email"><input name="customerEmail" type="email" className="input" /></Field>
+            <Field label="Phone"><input name="customerPhone" className="input" /></Field>
+            <Field label="Billing address" wide><input name="billingAddress" className="input" /></Field>
+            <Field label="Date"><input type="date" name="issueDate" defaultValue={today} className="input" /></Field>
+            <Field label="Payment terms (days)"><input name="termsDays" type="number" min={0} defaultValue={0} className="input" /></Field>
+            <Field label="Booking # (optional)"><input name="orderId" inputMode="numeric" className="input" /></Field>
+            <Field label="Credit note for invoice">
+              <select name="relatedInvoiceId" className="input" defaultValue="">
+                <option value="">—</option>
+                {invoices.filter((i) => i.status === "open").map((i) => <option key={i.id} value={i.id}>{i.number ?? `#${i.id}`} · {i.customerName}</option>)}
+              </select>
+            </Field>
+          </Grid>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead><tr><th className="th">Description</th><th className="th">Qty</th><th className="th">Price each ($)</th></tr></thead>
+              <tbody>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <tr key={i}>
+                    <td className="td"><input name={`desc${i}`} className="input py-1" /></td>
+                    <td className="td w-24"><input name={`qty${i}`} type="number" min={1} defaultValue={1} className="input py-1" /></td>
+                    <td className="td w-40"><input name={`price${i}`} inputMode="decimal" className="input py-1" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Grid>
+            <Field label="Discount ($)"><input name="discount" inputMode="decimal" className="input" /></Field>
+            <Field label="Sales tax ($, as charged)"><input name="tax" inputMode="decimal" className="input" /></Field>
+            <Field label="Deposit required ($)"><input name="deposit" inputMode="decimal" className="input" /></Field>
+            <Field label="Tax exempt"><input type="checkbox" name="taxExempt" className="h-5 w-5" /></Field>
+            <Field label="Exempt certificate #"><input name="exemptCertNo" className="input" /></Field>
+            <Field label="Notes on the document" wide><input name="notes" className="input" /></Field>
+          </Grid>
+          <label className="block text-sm"><input type="checkbox" name="issue" /> Issue now (otherwise it&rsquo;s saved as a draft)</label>
+          <Save label="Save" />
+        </form>
+      </Card>
+      <Card title="Receivables aging" note="What customers owe on issued invoices, by how late it is.">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+          {buckets.map((b) => <Stat key={b} label={b === "current" ? "Not due yet" : `${b} days late`} value={money(ar.filter((x) => x.bucket === b).reduce((s, x) => s + x.balanceCents, 0))} />)}
+        </div>
+      </Card>
+      <Card title="Invoices, quotes and credit notes">
         <Table
-          head={["#", "Customer", "Due", "Amount", "Paid", "Balance", "Tax exempt", "Record a payment", "Void"]}
-          empty="No invoices yet."
-          minWidth={1100}
-          rows={inv.map((i) => {
-            const o = open.get(i.id);
-            const overdue = o && o.balanceCents > 0 && i.dueDate < today;
-            return [
-              i.id,
-              i.customerName,
-              <span className={overdue ? "font-bold text-[#C83A2F]" : ""}>{i.dueDate}{overdue ? " · overdue" : ""}</span>,
-              money(i.amountCents),
-              o ? money(o.paidCents) : "—",
-              i.status === "void" ? <span className="text-muted">void</span> : <b>{money(o?.balanceCents ?? 0)}</b>,
-              i.taxExempt ? <>{i.exemptCertNo ?? "yes"}{i.exemptFileId ? <> · <a className="text-navy underline" href={`/admin/bookkeeping/files/${i.exemptFileId}`} target="_blank">certificate</a></> : null}</> : "—",
-              i.status === "open" && (o?.balanceCents ?? 0) > 0 ? (
-                <form action={A.payInvoiceAction} className="flex flex-wrap gap-1">
-                  <input type="hidden" name="invoiceId" value={i.id} />
-                  <input type="date" name="date" defaultValue={today} className="input w-36 py-1 text-xs" />
-                  <input name="amount" placeholder="Amount" className="input w-20 py-1 text-xs" />
-                  <select name="method" className="input w-20 py-1 text-xs" defaultValue="check"><option value="check">Check</option><option value="zelle">Zelle</option><option value="cash">Cash</option><option value="bank">Bank</option><option value="other">Other</option></select>
-                  <input name="checkNo" placeholder="Check #" className="input w-20 py-1 text-xs" />
-                  <button className="text-xs font-bold text-navy">Save</button>
-                </form>
-              ) : "—",
-              i.status === "open" ? (
-                <form action={A.voidInvoiceAction} className="flex gap-1">
-                  <input type="hidden" name="id" value={i.id} />
-                  <input name="reason" placeholder="Why" className="input w-20 py-1 text-xs" />
-                  <button className="text-xs font-bold text-[#C83A2F]">Void</button>
-                </form>
-              ) : "—",
-            ];
-          })}
+          head={["Number", "Type", "Customer", "Date", "Due", "Total", "Balance", "Status", "Record a payment"]}
+          empty="Nothing yet."
+          minWidth={1150}
+          rows={docs.map((d) => [
+            <a key="n" className="font-bold text-navy underline" href={`/admin/bookkeeping/invoice/${d.id}`}>{d.number ?? `#${d.id}`}</a>,
+            KIND_NAME[d.kind as DocKind] ?? d.kind,
+            <a key="c" className="underline" href={`/admin/bookkeeping/statement?c=${encodeURIComponent(d.customerName)}`}>{d.customerName}</a>,
+            d.issueDate,
+            d.kind === "invoice" ? d.dueDate : "—",
+            money(d.amountCents),
+            d.kind === "invoice" ? <b key="b">{money(d.balanceCents)}</b> : "—",
+            <span key="s" className={d.display === "Overdue" ? "font-bold text-[#C83A2F]" : d.display === "Paid" ? "font-bold text-[#13895C]" : ""}>{d.display}</span>,
+            d.kind === "invoice" && d.status === "open" && d.balanceCents > 0 ? (
+              <form key="p" action={A.payInvoiceAction} className="flex flex-wrap gap-1">
+                <input type="hidden" name="invoiceId" value={d.id} />
+                <input type="date" name="date" defaultValue={today} className="input w-36 py-1 text-xs" />
+                <input name="amount" placeholder="Amount" className="input w-20 py-1 text-xs" />
+                <select name="method" className="input w-20 py-1 text-xs" defaultValue="check"><option value="check">Check</option><option value="zelle">Zelle</option><option value="cash">Cash</option><option value="bank">Bank</option><option value="other">Other</option></select>
+                <input name="checkNo" placeholder="Check #" className="input w-20 py-1 text-xs" />
+                <button className="text-xs font-bold text-navy">Save</button>
+              </form>
+            ) : "",
+          ])}
         />
       </Card>
     </>

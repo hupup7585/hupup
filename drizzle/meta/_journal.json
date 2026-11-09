@@ -148,6 +148,13 @@
       "when": 1794170761366,
       "tag": "0020_general_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794194573387,
+      "tag": "0021_invoices_full",
+      "breakpoints": true
     }
   ]
 }

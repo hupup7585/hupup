@@ -285,10 +285,27 @@ export async function reminders(days: number, today = todayISO()): Promise<Remin
   return out.sort((a, b) => a.due.localeCompare(b.due));
 }
 
+/** Issued customer invoices (not quotes, drafts or credit notes), with payments and credit notes applied. */
 export async function openInvoices() {
-  const inv = await db.select().from(schema.bookInvoices).where(eq(schema.bookInvoices.status, "open"));
+  const inv = (await db.select().from(schema.bookInvoices).where(eq(schema.bookInvoices.status, "open"))).filter((i) => i.kind === "invoice" && i.manualStatus !== "written_off");
   const paid = await paidBy("invoice_id", inv.map((i) => i.id));
-  return inv.map((i) => ({ ...i, paidCents: paid.get(i.id) ?? 0, balanceCents: i.amountCents - (paid.get(i.id) ?? 0) }));
+  const credits = await creditsFor(inv.map((i) => i.id));
+  return inv.map((i) => {
+    const p = paid.get(i.id) ?? 0;
+    const c = credits.get(i.id) ?? 0;
+    return { ...i, paidCents: p, creditCents: c, balanceCents: i.amountCents - p - c };
+  });
+}
+
+/** Credit notes issued against invoices (Bookkeeping spec 3.1). */
+export async function creditsFor(ids: number[]) {
+  const m = new Map<number, number>();
+  if (!ids.length) return m;
+  const rows = (
+    await db.execute(sql`SELECT related_invoice_id AS id, sum(amount_cents)::int AS cents FROM book_invoices WHERE kind = 'credit_note' AND status = 'open' AND related_invoice_id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)}) GROUP BY 1`)
+  ).rows as { id: number; cents: number }[];
+  for (const r of rows) m.set(Number(r.id), Number(r.cents));
+  return m;
 }
 
 export async function openBills() {

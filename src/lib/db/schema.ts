@@ -572,11 +572,45 @@ export const bookInvoices = pgTable("book_invoices", {
   exemptCertNo: text("exempt_cert_no"),
   exemptFileId: integer("exempt_file_id"),
   notes: text("notes"),
-  /** open | void (never deleted) */
+  /** draft | open (sent / issued) | void (never deleted). Paid, partly paid and overdue are worked out from payments. */
   status: text("status").notNull().default("open"),
+  /** Bookkeeping spec 3.1: INV-1001, Q-1001 (quote), CN-1001 (credit note). Older invoices show their id. */
+  number: text("number").unique(),
+  /** invoice | quote | credit_note */
+  kind: text("kind").notNull().default("invoice"),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  billingAddress: text("billing_address"),
+  subtotalCents: integer("subtotal_cents"),
+  discountCents: integer("discount_cents").notNull().default(0),
+  /** Tax entered or copied from the booking; never calculated by guesswork (accountant rules) */
+  taxCents: integer("tax_cents").notNull().default(0),
+  depositRequiredCents: integer("deposit_required_cents").notNull().default(0),
+  /** Payment terms in days (due date = issue date + terms) */
+  termsDays: integer("terms_days"),
+  /** disputed | written_off | refunded (set by the Owner; otherwise worked out from payments and dates) */
+  manualStatus: text("manual_status"),
+  /** A credit note applies to this invoice; a quote turned into this invoice */
+  relatedInvoiceId: integer("related_invoice_id"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const bookInvoiceLines = pgTable(
+  "book_invoice_lines",
+  {
+    id: serial("id").primaryKey(),
+    invoiceId: integer("invoice_id").notNull(),
+    description: text("description").notNull(),
+    qty: integer("qty").notNull().default(1),
+    unitCents: integer("unit_cents").notNull(),
+    lineCents: integer("line_cents").notNull(),
+    productId: integer("product_id"),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [index("book_invoice_lines_inv_idx").on(t.invoiceId)],
+);
 
 /** Bills the business owes. Payments are expense entries with billId. */
 export const bookBills = pgTable("book_bills", {
