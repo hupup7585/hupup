@@ -6,7 +6,8 @@ import RoutingForm from "../../settings/RoutingForm";
 import BlockingForm from "../../settings/BlockingForm";
 import RecordingForm from "../../settings/RecordingForm";
 import { PROMPTS } from "@/lib/ivr/prompts";
-import { RING_KEYS, RING_KEY_LABELS, ringListFor, routeSummary, routeTargets } from "@/lib/ivr/routing";
+import { RING_KEYS, RING_KEY_LABELS, isLoopNumber, last4, ringListFor, routeSummary, routeTargets } from "@/lib/ivr/routing";
+import { toE164 } from "@/lib/phone";
 
 /** Phone System → Phone settings: ring lists (extensions, call routing, ring times), recording, caller blocking, Twilio setup. Owner only. */
 export default async function PhoneSettingsPage() {
@@ -17,6 +18,16 @@ export default async function PhoneSettingsPage() {
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Phone settings</h1>
       <p className="mb-5 text-muted">Who rings for each main-menu key, how long each phone rings, call recording and caller blocking.</p>
+      {(() => {
+        const fwd = toE164(config.forwardPhone());
+        return fwd && isLoopNumber(fwd) && !routeTargets(settings).length ? (
+          <div data-ring-warning className="mb-5 rounded-xl border border-[#E8B4AE] bg-[#FDF1EF] p-4 text-sm text-[#7A2318]">
+            <b>No one to ring yet.</b> The old default rang &ldquo;Office&rdquo; at {last4(fwd)}, but that number forwards back to the hotline, so calls looped and went to
+            voicemail within seconds. It is no longer rung. Add a staff member&rsquo;s own mobile number to the Key 0 (Operator) list below; the other keys use it
+            until they get their own list.
+          </div>
+        ) : null;
+      })()}
       <NotActive k="sms" />
       <NotActive k="recording" />
       <section className="card mb-6 p-5" id="routing">

@@ -7,7 +7,7 @@ import { spokenMoney } from "@/lib/money";
 import { last4, spokenDigits, toE164 } from "@/lib/phone";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
 import { checkEventDate } from "@/lib/jewish-calendar";
-import { lateHoursToday, officeOpenNow } from "@/lib/business-hours";
+import { lateHoursToday, officeOpenNow, websiteHoursLines } from "@/lib/business-hours";
 import {
   PAYMENT_HOLD_MINUTES,
   PHONE_HOLD_MINUTES,
@@ -255,7 +255,7 @@ const MAIN_KEY_LABELS: Record<string, string> = {
   "4": "staff line 4",
   "5": "staff line 5",
   "6": "staff line 6",
-  "7": "hours (rings the operator for now)",
+  "7": "hours of operation",
   "8": "schools, corporate events and organizations",
   "9": "voicemail",
   "0": "speak to someone",
@@ -292,6 +292,11 @@ async function recordPhoneConsent(ctx: Ctx, scope: "transactional" | "marketing"
 export const SHORT_PAUSE_FILE = "/audio/pause-750ms.wav";
 function shortPause(target: VR | Gather) {
   target.play(`${config.baseUrl()}${SHORT_PAUSE_FILE}`);
+}
+
+/** The website hours lines, as spoken: "11:30 AM - 7:00 PM" -> "11:30 AM to 7:00 PM", one sentence per line. */
+export function hoursForSpeech(s: Parameters<typeof websiteHoursLines>[0]): string[] {
+  return websiteHoursLines(s).flatMap((l) => l.split("\n")).map((l) => `${l.replace(/ - /g, " to ").trim()}.`);
 }
 
 /** Ring one step of a key's list (one after another) or everyone at once. */
@@ -375,7 +380,10 @@ const handlers: Record<string, Handler> = {
       // the office is closed. Chol Hamoed and Chanukah: Abraham's approved "open late" line.
       const settings = await getSettings();
       const late = lateHoursToday(new Date(), settings);
-      const status = !officeOpenNow(new Date(), settings) ? "office_closed" : late === "cholHamoed" ? "late_cholhamoed" : late === "chanukah" ? "late_chanukah" : null;
+      const open = officeOpenNow(new Date(), settings);
+      // Call journey (Abraham): what the system decided about office hours for this call
+      await track(ctx.callSid, "step", open ? "Office open" : "Office closed", { open });
+      const status = !open ? "office_closed" : late === "cholHamoed" ? "late_cholhamoed" : late === "chanukah" ? "late_chanukah" : null;
       if (status) {
         sp(g, ctx, status);
         shortPause(g);
@@ -426,8 +434,8 @@ const handlers: Record<string, Handler> = {
       case "8": // schools, corporate events and organizations (the list key 2 had before)
       case "0":
         return back(vr, "ring", { k: d });
-      case "7": // stand-in until Abraham approves the key 7 hours message
-        return back(vr, "ring", { k: "0" });
+      case "7": // hours of operation, read from Admin (never rings the operator)
+        return back(vr, "hours");
       case "9":
         return back(vr, "voicemail");
       default:
@@ -1174,6 +1182,24 @@ const handlers: Record<string, Handler> = {
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "forwarded" }, ctx.session);
     sp(vr, ctx, "transfer_connecting");
     return dialTargets(vr, list, k, 0, ctx.session?.fromNumber ?? ctx.from);
+  },
+
+  /**
+   * Key 7 (Abraham, Nov 9, 2026): our hours, built from the same Admin settings as the website (Business hours &
+   * holidays), word for word as Abraham approved them for the website; dashes are read as "to". If the office is closed
+   * right now, the approved "office closed" line plays first. Then the main menu again.
+   */
+  async hours(ctx, vr) {
+    const settings = await getSettings();
+    const open = officeOpenNow(new Date(), settings);
+    await track(ctx.callSid, "step", open ? "Office open" : "Office closed", { open, key: "7" });
+    if (!open) {
+      sp(vr, ctx, "office_closed");
+      shortPause(vr);
+    }
+    for (const line of hoursForSpeech(settings)) say(vr, line);
+    shortPause(vr);
+    return back(vr, "menu");
   },
 
   /** Older links and voice commands ("operator"): same as key 0. */

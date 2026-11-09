@@ -74,6 +74,7 @@ export const STEP_LABELS: Record<string, string> = {
   "tz-pick": "Time zone: picked",
   goodbye: "Goodbye",
   ring: "Ringing staff",
+  hours: "Heard our hours (key 7)",
   operator: "Asked for a person",
   "operator-done": "Staff didn't answer",
   "voicemail-offer": "Offered voicemail",

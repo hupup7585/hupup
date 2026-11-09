@@ -25,7 +25,7 @@ import { parseTargets, routeSummary, routeTargets } from "@/lib/ivr/routing";
 
 const call = (action: string, body: Record<string, string> = {}, query = "", sid = "CArt1") =>
   handleVoice({ action, query: new URLSearchParams(query), body: { CallSid: sid, ...body }, callSid: sid, from: body.From ?? "+18455550199" });
-const TARGETS = "Abraham | (845) 777-7585 | 20\nOffice | 845-555-0100 | 15\nYossi | +1 845 555 0111 | 10";
+const TARGETS = "Abraham | (845) 555-0177 | 20\nOffice | 845-555-0100 | 15\nYossi | +1 845 555 0111 | 10";
 
 beforeEach(async () => {
   process.env.PUBLIC_BASE_URL = "https://hupup.example";
@@ -38,13 +38,24 @@ beforeEach(async () => {
 describe("routing list", () => {
   it("parses label | phone | seconds, reports bad lines, and summarizes", () => {
     const { targets, errors } = parseTargets(`${TARGETS}\nBad | 123 | 20\nSlow | 8455550122 | 200`);
-    expect(targets.map((t) => [t.label, t.phone, t.ringSeconds])).toEqual([["Abraham", "+18457777585", 20], ["Office", "+18455550100", 15], ["Yossi", "+18455550111", 10]]);
+    expect(targets.map((t) => [t.label, t.phone, t.ringSeconds])).toEqual([["Abraham", "+18455550177", 20], ["Office", "+18455550100", 15], ["Yossi", "+18455550111", 10]]);
     expect(errors).toHaveLength(2);
-    expect(routeSummary(targets, "sequential")).toBe("Rings Abraham (20s) → Office (15s) → Yossi (10s) → voicemail");
-    expect(routeSummary(targets, "simultaneous")).toBe("Rings Abraham (20s) + Office (15s) + Yossi (10s) at the same time → voicemail");
-    process.env.FORWARD_PHONE = "+18457777585";
-    expect(routeTargets({ operatorTargets: "" })).toEqual([{ label: "Office", phone: "+18457777585", ringSeconds: 25 }]);
+    expect(routeSummary(targets, "sequential")).toBe("Rings Abraham •••0177 (20s) → Office •••0100 (15s) → Yossi •••0111 (10s) → voicemail");
+    expect(routeSummary(targets, "simultaneous")).toBe("Rings Abraham •••0177 (20s) + Office •••0100 (15s) + Yossi •••0111 (10s) at the same time → voicemail");
+    process.env.FORWARD_PHONE = "+18455550188";
+    expect(routeTargets({ operatorTargets: "" })).toEqual([{ label: "Office", phone: "+18455550188", ringSeconds: 25 }]);
     delete process.env.FORWARD_PHONE;
+  });
+
+  it("never rings a number that forwards back to the hotline (the Nov 9 loop: Office rang the public number)", () => {
+    process.env.TWILIO_PHONE_NUMBER = "+18454157585";
+    process.env.FORWARD_PHONE = "+18457777585"; // the public number, forwarded to the hotline
+    expect(routeTargets({ operatorTargets: "" })).toEqual([]);
+    const { targets, errors } = parseTargets("Me | (845) 777-7585 | 25\nHotline | 845-415-7585 | 25\nSara | 845-555-0101 | 25");
+    expect(targets.map((t) => t.label)).toEqual(["Sara"]);
+    expect(errors[0]).toContain("•••7585 forwards back to the hotline");
+    delete process.env.FORWARD_PHONE;
+    delete process.env.TWILIO_PHONE_NUMBER;
   });
 });
 
@@ -52,7 +63,7 @@ describe("sequential: one after another, each must press 1", () => {
   it("rings #1 for its own time with the accept prompt, then #2, then #3, then the missed-call line and voicemail", async () => {
     const first = await call("ring", {}, "k=0");
     expect(first).toMatch(/<Dial [^>]*timeout="20"[^>]*action="[^"]*operator-done\?i=0&amp;k=0"/);
-    expect(first).toContain(`<Number url="https://hupup.example/api/voice/whisper?from=%2B18455550199" method="POST">+18457777585</Number>`);
+    expect(first).toContain(`<Number url="https://hupup.example/api/voice/whisper?from=%2B18455550199" method="POST">+18455550177</Number>`);
     const second = await call("operator-done", { DialCallStatus: "no-answer" }, "i=0&k=0");
     expect(second).toMatch(/timeout="15"[^>]*operator-done\?i=1&amp;k=0/);
     expect(second).toContain(">+18455550100</Number>");
@@ -88,7 +99,7 @@ describe("the staff member's side", () => {
   });
   it("accept prompt off: numbers ring straight through", async () => {
     await saveSetting("operatorAcceptPrompt", false);
-    expect(await call("ring", {}, "k=0")).toContain("<Number>+18457777585</Number>");
+    expect(await call("ring", {}, "k=0")).toContain("<Number>+18455550177</Number>");
   });
 });
 

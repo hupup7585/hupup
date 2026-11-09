@@ -57,7 +57,7 @@ describe("main menu: every key goes through", () => {
     ["4", "ring?k=4"],
     ["5", "ring?k=5"],
     ["6", "ring?k=6"],
-    ["7", "ring?k=0"],
+    ["7", "hours"],
     ["8", "ring?k=8"],
     ["9", "voicemail"],
     ["0", "ring?k=0"],

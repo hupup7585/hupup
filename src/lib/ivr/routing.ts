@@ -8,6 +8,19 @@ export type RouteTarget = { label: string; phone: string; ringSeconds: number };
 export const RING_MIN = 5;
 export const RING_MAX = 60;
 
+/**
+ * Numbers that lead back into the hotline: the hotline itself and the public number that is forwarded to it.
+ * Ringing one of these makes the call loop into our own phone menu and end within seconds (Abraham, Nov 9, 2026),
+ * so they are never rung.
+ */
+export function loopNumbers(env: Record<string, string | undefined> = process.env): Set<string> {
+  return new Set([toE164(env.TWILIO_PHONE_NUMBER || ""), toE164(env.NEXT_PUBLIC_HOTLINE_E164 || config.hotlineE164)].filter((x): x is string => Boolean(x)));
+}
+export const isLoopNumber = (phone: string, env: Record<string, string | undefined> = process.env) => loopNumbers(env).has(toE164(phone) ?? phone);
+
+/** "•••7585" */
+export const last4 = (phone: string) => `•••${phone.replace(/\D/g, "").slice(-4)}`;
+
 /** Parse "Label | phone | seconds" lines. Bad lines are reported, not silently dropped. */
 export function parseTargets(text: string): { targets: RouteTarget[]; errors: string[] } {
   const targets: RouteTarget[] = [];
@@ -27,6 +40,10 @@ export function parseTargets(text: string): { targets: RouteTarget[]; errors: st
       errors.push(`Ring time must be ${RING_MIN} to ${RING_MAX} seconds: "${line}"`);
       continue;
     }
+    if (isLoopNumber(phone)) {
+      errors.push(`${last4(phone)} forwards back to the hotline, so it can't ring a person. Use a staff member's own mobile number: "${line}"`);
+      continue;
+    }
     targets.push({ label: label || phone, phone, ringSeconds: sec });
   }
   return { targets, errors };
@@ -37,13 +54,13 @@ export function routeTargets(s: Pick<Settings, "operatorTargets">): RouteTarget[
   const { targets } = parseTargets(s.operatorTargets || "");
   if (targets.length) return targets;
   const fallback = toE164(config.forwardPhone());
-  return fallback ? [{ label: "Office", phone: fallback, ringSeconds: 25 }] : [];
+  return fallback && !isLoopNumber(fallback) ? [{ label: "Office", phone: fallback, ringSeconds: 25 }] : [];
 }
 
 /** One-line summary for the settings page, e.g. "Rings Abraham (20s) → Office (15s) → voicemail". */
 export function routeSummary(targets: RouteTarget[], mode: string) {
   if (!targets.length) return "No one to ring: callers go straight to voicemail.";
-  const names = targets.map((t) => `${t.label} (${t.ringSeconds}s)`);
+  const names = targets.map((t) => `${t.label} ${last4(t.phone)} (${t.ringSeconds}s)`);
   return mode === "simultaneous" ? `Rings ${names.join(" + ")} at the same time → voicemail` : `Rings ${names.join(" → ")} → voicemail`;
 }
 

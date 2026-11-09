@@ -35,7 +35,7 @@ const MISSED = "Sorry, we missed your call, our team is busy helping others righ
 beforeEach(async () => {
   process.env.PUBLIC_BASE_URL = "https://hupup.example";
   h.open = true;
-  await saveSetting("operatorTargets", "Operator | (845) 777-7585 | 20");
+  await saveSetting("operatorTargets", "Operator | (845) 555-0175 | 20");
   await saveSetting("operatorMode", "sequential");
   await saveSetting("operatorAcceptPrompt", true);
   await saveSetting("ringTargets8", "Corporate desk | (845) 555-0102 | 25");
@@ -114,15 +114,15 @@ describe("every key, office open", () => {
     expect(redirect(await press("2"))).toBe("instructions");
     expect(redirect(await press("3"))).toBe("learn");
   });
-  it("4, 5, 6, 8 and 0 ring a live employee; 7 rings the operator until its message is approved", async () => {
+  it("4, 5, 6, 8 and 0 ring a live employee; 7 plays our hours (never rings the operator)", async () => {
     for (const k of ["4", "5", "6", "8", "0"]) expect(redirect(await press(k))).toBe(`ring?k=${k}`);
-    expect(redirect(await press("7"))).toBe("ring?k=0");
+    expect(redirect(await press("7"))).toBe("hours");
   });
   it("8 rings the corporate list key 2 used to ring; 2 (equipment, empty), 4, 5 and 6 fall back to the operator list", async () => {
     const eight = await call("ring", {}, "k=8");
     expect(eight).toContain(">+18455550102</Number>");
     expect(eight).toContain("whisper");
-    for (const k of ["2", "4", "5", "6", "0"]) expect(await call("ring", {}, `k=${k}`)).toContain(">+18457777585</Number>");
+    for (const k of ["2", "4", "5", "6", "0"]) expect(await call("ring", {}, `k=${k}`)).toContain(">+18455550175</Number>");
   });
   it("each main-menu choice is recorded on the call for the dashboard (nothing spoken)", async () => {
     h.session.data = {};
@@ -256,7 +256,7 @@ describe("every key, office closed", () => {
       expect(xml).not.toContain("<Dial");
       expect(redirect(xml)).toBe("voicemail?after=1");
     }
-    expect(redirect(await press("7"))).toBe("ring?k=0");
+    expect(redirect(await press("7"))).toBe("hours");
     expect(redirect(await press("9"))).toBe("voicemail");
   });
 });
@@ -280,5 +280,25 @@ describe("Terms switch for going live (Abraham: /terms stays on preview until fi
     const pos = readFileSync("src/app/admin/(app)/pos/actions.ts", "utf8");
     expect(pos).toContain("if (termsActive() && !TERMS_VIA.includes(");
     expect(pos).toContain("if (termsActive()) await recordTermsAcceptance({");
+  });
+});
+
+describe("key 7: our hours (Abraham, Nov 9, 2026)", () => {
+  it("reads the hours from Admin as approved for the website (dashes read as 'to'), then the main menu; logs Open or Closed", async () => {
+    const { hoursForSpeech } = await import("@/lib/ivr/flow");
+    const { getSettings } = await import("@/lib/settings");
+    const lines = hoursForSpeech(await getSettings());
+    expect(lines).toContain("Monday - Thursday: 10:30 AM to 7:00 PM.".replace("Monday - Thursday", "Monday to Thursday"));
+    expect(lines).toContain("Motzei Shabbos: Winter: 2 hours after Shabbos to 11:00 PM.");
+    expect(lines).toContain("Summer: 2 hours after Shabbos to 12:00 AM.");
+    h.open = true;
+    const xml = await call("hours", { CallSid: "CAhours1" });
+    expect(xml).toContain("10:30 AM to 7:00 PM.");
+    expect(xml).not.toContain("<Dial");
+    expect(redirect(xml)).toBe("menu");
+    h.open = false;
+    const closed = await call("hours", { CallSid: "CAhours2" });
+    expect(closed).not.toContain("<Dial");
+    expect(redirect(closed)).toBe("menu");
   });
 });
