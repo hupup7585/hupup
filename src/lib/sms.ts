@@ -109,6 +109,35 @@ export async function promosThisYear(phone: string, now = new Date()): Promise<n
   return r?.n ?? 0;
 }
 
+/** Abraham (Nov 9, 2026): the first order text a customer gets, and the first after 30 days without one, ends with this. */
+export const ORDER_STOP_LINE = "Reply STOP to opt out.";
+export const ORDER_STOP_GAP_DAYS = 30;
+
+/** True when this number hasn't been sent an order text (that went out) in the last 30 days, including never. */
+export async function needsOrderStopLine(phone: string, now = new Date()): Promise<boolean> {
+  const since = new Date(now.getTime() - ORDER_STOP_GAP_DAYS * 86_400_000);
+  const [r] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.messages)
+    .where(
+      and(
+        eq(schema.messages.contactPhone, phone),
+        eq(schema.messages.kind, "transactional"),
+        eq(schema.messages.direction, "out"),
+        gte(schema.messages.createdAt, since),
+        sql`${schema.messages.status} not in ('blocked', 'failed', 'undelivered', 'canceled')`,
+      ),
+    );
+  return (r?.n ?? 0) === 0;
+}
+
+/** Order text body: the STOP line only on the first text or after a 30-day gap; never twice. */
+export function withOrderStopLine(body: string, needed: boolean): string {
+  const b = body.trim();
+  if (!needed || /\bSTOP\b/i.test(b)) return b;
+  return `${b} ${ORDER_STOP_LINE}`;
+}
+
 async function customerByPhone(phone: string) {
   const [c] = await db.select().from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1);
   return c ?? null;
@@ -193,6 +222,7 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   const kind = input.kind ?? "transactional";
   const log = input.log !== false;
   if (kind === "marketing") input = { ...input, body: marketingBody(input.body) };
+  if (kind === "transactional") input = { ...input, body: withOrderStopLine(input.body, await needsOrderStopLine(to, input.now)) };
 
   if (containsCardNumber(input.body)) {
     return { sent: false, blocked: "card_number", error: "Message looks like it contains a card number and was not sent." };

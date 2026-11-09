@@ -1054,7 +1054,8 @@ const handlers: Record<string, Handler> = {
     let texted = false;
     let emailed = false;
     if (phone && consented) {
-      const res = await sendSms(phone, `${details} ${TRANSACTIONAL_FOOTER}`, { kind: "transactional", event: "order_payment_link", customerId, orderId: primary.id, callSid: ctx.callSid });
+      // The STOP line is added by the text system on the first order text (or after 30 days without one)
+      const res = await sendSms(phone, details, { kind: "transactional", event: "order_payment_link", customerId, orderId: primary.id, callSid: ctx.callSid });
       texted = res.sent;
     } else if (!consented && data.email) {
       const res = await sendEmail(data.email, `${BUSINESS_NAME} order #${num}`, details);

@@ -165,11 +165,12 @@ describe("transactional consent step (before the payment link)", () => {
 });
 
 describe("finalize sends texts only with consent", () => {
-  it("with consent: order text with HELP/STOP footer, then the promotional question", async () => {
+  it("with consent: order text (STOP line added by the text system when due), then the promotional question", async () => {
     h.session.data.smsConsent = "yes";
     const xml = await call("finalize");
     expect(h.sms).toHaveLength(1);
-    expect(h.sms[0].body).toContain("Reply HELP for help, STOP to opt out.");
+    // The STOP line is added by the text system (first order text, or after 30 days without one): see tests/order-stop-line.test.ts
+    expect(h.sms[0].body).not.toContain("Reply HELP for help, STOP to opt out.");
     expect(h.sms[0].opts).toMatchObject({ kind: "transactional", orderId: 7, callSid: "CA1" });
     expect(xml).toContain("/api/voice/promo-consent");
     expect(xml).not.toContain("<Hangup");
