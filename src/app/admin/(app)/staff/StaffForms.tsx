@@ -59,7 +59,10 @@ export function StaffRowActions({ userId, role, active }: { userId: number; role
             <button type="button" className="btn-ghost" disabled={pending || !pw} onClick={() => start(async () => (setMsg(await setPasswordAction(userId, pw)), setPw("")))}>Set password</button>
           </>
         )}
-        <button type="button" className={active ? "btn-ghost" : "btn"} disabled={pending} onClick={() => start(async () => setMsg(await setActiveAction(userId, !active)))}>
+        <button type="button" className={active ? "btn-ghost" : "btn"} disabled={pending} onClick={() => {
+          if (active && !window.confirm("Deactivate this staff member? They are signed out and can't sign in until reactivated.")) return;
+          start(async () => setMsg(await setActiveAction(userId, !active)));
+        }}>
           {active ? "Deactivate" : "Reactivate"}
         </button>
       </div>

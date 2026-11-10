@@ -30,7 +30,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
   const edit = staff.role !== "delivery";
   const overdue = isOverdue(t);
   const money = seesMoney(staff);
-  const show = (k: string, v: unknown) => (k === "assignedTo" ? (v ? names.get(Number(v)) ?? `#${v}` : "Unassigned") : k === "status" ? STATUS_LABEL[String(v)] ?? v : k === "priority" ? PRIORITY_LABEL[String(v)] ?? v : v === null || v === "" ? "—" : String(v));
+  const show = (k: string, v: unknown) => (k === "assignedTo" ? (v ? names.get(Number(v)) ?? `Number ${v}` : "Unassigned") : k === "status" ? STATUS_LABEL[String(v)] ?? v : k === "priority" ? PRIORITY_LABEL[String(v)] ?? v : v === null || v === "" ? "—" : String(v));
   return (
     <div className="mx-auto max-w-4xl" data-task-detail>
       <Link href="/admin/tasks" className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-navy"><ArrowLeft className="h-4 w-4" aria-hidden /> All tasks</Link>
@@ -67,7 +67,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
             </>
           )}
           {!edit && t.notes && <p className="text-sm sm:col-span-2">{t.notes}</p>}
-          {t.orderId && <p className="text-sm sm:col-span-2">Booking: <Link className="font-bold text-navy underline" href={`/admin/orders/${t.orderId}`}>#{t.orderId}</Link></p>}
+          {t.orderId && <p className="text-sm sm:col-span-2">Booking: <Link className="font-bold text-navy underline" href={`/admin/orders/${t.orderId}`}>Booking number {t.orderId}</Link></p>}
           <div><button className="btn-dark">Save</button></div>
         </form>
       </section>

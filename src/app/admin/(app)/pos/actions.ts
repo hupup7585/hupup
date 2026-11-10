@@ -131,7 +131,7 @@ export async function createBookingAction(input: {
     ip: (reqHeaders.get("x-forwarded-for") || "").split(",")[0].trim() || null,
     userAgent: reqHeaders.get("user-agent")?.slice(0, 500) ?? null,
   });
-  let message = `Booked order #${orderNumber(r.orderId)}.`;
+  let message = `Booked order number ${orderNumber(r.orderId)}.`;
   if (consents.stopped) message += " Text consent wasn't saved: this number replied STOP (the customer can text START to get texts again).";
   if (input.payment === "link" && phone) {
     const full = await getOrderWithItems(r.orderId);

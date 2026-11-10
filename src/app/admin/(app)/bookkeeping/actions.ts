@@ -107,14 +107,14 @@ export async function addEntryAction(f: FormData) {
       },
       userId,
     );
-    return `Saved entry #${row.id}.`;
+    return `Saved entry number ${row.id}.`;
   });
 }
 
 export async function reverseEntryAction(f: FormData) {
   return run(s(f, "tab") || "ledger", async (userId) => {
     const r = await reverseEntry(Number(s(f, "id")), s(f, "reason"), userId);
-    return `Correction #${r.id} added. The original entry is kept.`;
+    return `Correction number ${r.id} added. The original entry is kept.`;
   });
 }
 
@@ -144,7 +144,7 @@ export async function addInvoiceAction(f: FormData) {
       })
       .returning();
     await bookAudit(userId, "invoice_added", "book_invoice", inv.id, { ...inv });
-    return `Invoice #${inv.id} saved.`;
+    return `Invoice number ${inv.id} saved.`;
   });
 }
 
@@ -169,7 +169,7 @@ export async function payInvoiceAction(f: FormData) {
       },
       userId,
     );
-    return `Payment #${row.id} recorded on invoice #${inv.id}.`;
+    return `Payment number ${row.id} recorded on invoice number ${inv.id}.`;
   });
 }
 
@@ -179,7 +179,7 @@ export async function voidInvoiceAction(f: FormData) {
     if (!s(f, "reason")) throw new BooksError("Say why the invoice is being voided.");
     await db.update(schema.bookInvoices).set({ status: "void", notes: `VOID: ${s(f, "reason")}` }).where(eq(schema.bookInvoices.id, id));
     await bookAudit(userId, "invoice_voided", "book_invoice", id, { reason: s(f, "reason") });
-    return `Invoice #${id} voided (kept on record).`;
+    return `Invoice number ${id} voided (kept on record).`;
   });
 }
 
@@ -196,7 +196,7 @@ export async function addBillAction(f: FormData) {
       .values({ vendor, category: s(f, "category") || null, billDate: date(f, "billDate", "bill date"), dueDate: date(f, "dueDate", "due date"), amountCents: money(f, "amount"), notes: s(f, "notes") || null, fileId, createdBy: userId })
       .returning();
     await bookAudit(userId, "bill_added", "book_bill", b.id, { ...b });
-    return `Bill #${b.id} saved.`;
+    return `Bill number ${b.id} saved.`;
   });
 }
 
@@ -208,7 +208,7 @@ export async function payBillAction(f: FormData) {
       { entryDate: date(f, "date"), kind: "expense", category: b.category, amountCents: money(f, "amount"), method: s(f, "method") || null, checkNo: s(f, "checkNo") || null, party: b.vendor, billId: b.id, notes: s(f, "notes") || null },
       userId,
     );
-    return `Payment #${row.id} recorded on bill #${b.id}.`;
+    return `Payment number ${row.id} recorded on bill number ${b.id}.`;
   });
 }
 
@@ -218,7 +218,7 @@ export async function voidBillAction(f: FormData) {
     if (!s(f, "reason")) throw new BooksError("Say why the bill is being voided.");
     await db.update(schema.bookBills).set({ status: "void", notes: `VOID: ${s(f, "reason")}` }).where(eq(schema.bookBills.id, id));
     await bookAudit(userId, "bill_voided", "book_bill", id, { reason: s(f, "reason") });
-    return `Bill #${id} voided (kept on record).`;
+    return `Bill number ${id} voided (kept on record).`;
   });
 }
 
@@ -360,7 +360,7 @@ export async function matchLineAction(f: FormData) {
     if (!ignore && !ids.length) throw new BooksError("Enter the entry number(s) this line matches.");
     await db
       .update(schema.bookBankLines)
-      .set(ignore ? { status: "ignored", matchNote: s(f, "note") || "Ignored (e.g. transfer between accounts)" } : { status: "matched", matchedEntryIds: ids, matchNote: `Matched by hand to #${ids.join(", #")}` })
+      .set(ignore ? { status: "ignored", matchNote: s(f, "note") || "Ignored (e.g. transfer between accounts)" } : { status: "matched", matchedEntryIds: ids, matchNote: `Matched by hand to number ${ids.join(", #")}` })
       .where(eq(schema.bookBankLines.id, id));
     await bookAudit(userId, ignore ? "line_ignored" : "line_matched", "book_bank_line", id, { ids });
     return ignore ? "Line marked as ignored." : "Line matched.";
@@ -405,7 +405,7 @@ export async function reverseMileageAction(f: FormData) {
     if (!s(f, "reason")) throw new BooksError("Say why it's being corrected.");
     const [c] = await db
       .insert(schema.bookMileage)
-      .values({ tripDate: todayISO(), vehicle: t.vehicle, driver: t.driver, milesTenths: -t.milesTenths, purpose: t.purpose, orderId: t.orderId, notes: `Correction of trip #${t.id}: ${s(f, "reason")}`, correctsId: t.id, createdBy: userId })
+      .values({ tripDate: todayISO(), vehicle: t.vehicle, driver: t.driver, milesTenths: -t.milesTenths, purpose: t.purpose, orderId: t.orderId, notes: `Correction of trip number ${t.id}: ${s(f, "reason")}`, correctsId: t.id, createdBy: userId })
       .returning();
     await bookAudit(userId, "mileage_corrected", "book_mileage", c.id, { corrects: t.id, reason: s(f, "reason") });
     return "Correction added.";
@@ -438,8 +438,8 @@ export async function categorizeLineAction(f: FormData) {
       },
       userId,
     );
-    await db.update(schema.bookBankLines).set({ status: "matched", matchedEntryIds: [row.id], matchNote: `Added to the books as #${row.id} (${category})` }).where(eq(schema.bookBankLines.id, id));
+    await db.update(schema.bookBankLines).set({ status: "matched", matchedEntryIds: [row.id], matchNote: `Added to the books as number ${row.id} (${category})` }).where(eq(schema.bookBankLines.id, id));
     await bookAudit(userId, "line_categorized", "book_bank_line", id, { entry: row.id, category });
-    return `Added to the books as entry #${row.id}.`;
+    return `Added to the books as entry number ${row.id}.`;
   });
 }

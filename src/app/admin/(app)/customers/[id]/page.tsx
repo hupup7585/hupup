@@ -1,3 +1,4 @@
+import ConfirmSubmit from "@/components/ConfirmSubmit";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { desc, eq, sql } from "drizzle-orm";
@@ -76,7 +77,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             <form action={setTestEntryAction}>
               <input type="hidden" name="id" value={c.id} />
               <input type="hidden" name="isTest" value={c.isTest ? "0" : "1"} />
-              <button className="btn-ghost">{c.isTest ? "Not a test entry" : "Mark as test entry"}</button>
+              <ConfirmSubmit message={c.isTest ? "Mark this customer as real (not a test entry)?" : "Mark this customer as a test entry? Test entries get no promo texts."} className="btn-ghost">{c.isTest ? "Not a test entry" : "Mark as test entry"}</ConfirmSubmit>
             </form>
           )}
         </div>
@@ -105,7 +106,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                   {orderNumber(o.id)} <StatusBadge status={o.status} />
                 </Link>
                 <span className="text-sm text-muted">
-                  {o.eventDate} · {o.channel}
+                  <DualDate iso={o.eventDate} /> · {o.channel === "PHONE" ? "Booked by phone" : "Booked in person"}
                   {showMoney && ` · ${formatMoney(o.subtotalCents)} (paid ${formatMoney(o.paidCents)})`}
                 </span>
               </li>

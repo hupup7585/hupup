@@ -159,7 +159,7 @@ export default async function CalendarPage({
                   <span className="min-w-0 flex-1">
                     <span className="font-semibold">{r.items}</span>
                     <span className="block text-sm text-muted">
-                      #{orderNumber(r.id)} {r.customer_name} · {formatPhone(r.customer_phone)} · {r.delivery_address}
+                      Order number {orderNumber(r.id)} · {r.customer_name} · {formatPhone(r.customer_phone)} · {r.delivery_address}
                     </span>
                   </span>
                   <StatusBadge status={r.status} />

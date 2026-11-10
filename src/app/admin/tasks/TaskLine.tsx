@@ -33,7 +33,7 @@ export default function TaskLine({ t, names, back, subCount }: { t: Task; names:
           <span>{STATUS_LABEL[t.status]}</span>
           <span className={t.priority === "high" ? "font-bold text-[#C83A2F]" : ""}>{PRIORITY_LABEL[t.priority]} priority</span>
           <span>{t.assignedTo ? names.get(t.assignedTo) ?? "Staff" : "Unassigned"}</span>
-          {t.orderId && <Link className="underline" href={`/admin/orders/${t.orderId}`}>Booking #{t.orderId}</Link>}
+          {t.orderId && <Link className="underline" href={`/admin/orders/${t.orderId}`}>Booking number {t.orderId}</Link>}
           {subCount && subCount[0] > 0 && <span>{subCount[1]}/{subCount[0]} subtasks done</span>}
         </div>
       </div>

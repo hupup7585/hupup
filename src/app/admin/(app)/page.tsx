@@ -162,14 +162,14 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <table className="w-full min-w-[720px] text-sm">
             <thead>
               <tr>
-                <th className="th">Order</th><th className="th">Customer</th><th className="th">Event date</th>
+                <th className="th">Order number</th><th className="th">Customer</th><th className="th">Event date</th>
                 <th className="th">Items</th><th className="th">Channel</th><th className="th">Total</th><th className="th">Status</th>
               </tr>
             </thead>
             <tbody>
               {upcoming.map((o) => (
                 <tr key={o.id} className="hover:bg-bg">
-                  <td className="td font-bold"><Link href={`/admin/orders/${o.id}`}>#{orderNumber(o.id)}</Link></td>
+                  <td className="td font-bold"><Link href={`/admin/orders/${o.id}`}>{orderNumber(o.id)}</Link></td>
                   <td className="td">{o.customer_name ?? "—"}<div className="text-xs text-muted">{formatPhone(o.customer_phone)}</div></td>
                   <td className="td whitespace-nowrap"><DualDate yi iso={o.event_date} style="short" /> <span className="text-muted">→ pickup <DualDate yi iso={o.pickup_date} style="short" /></span></td>
                   <td className="td">{o.items}</td>

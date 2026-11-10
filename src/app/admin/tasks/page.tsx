@@ -197,7 +197,7 @@ async function ProjectsView({ staff, projects }: { staff: Awaited<ReturnType<typ
           <table className="w-full min-w-[720px] text-sm">
             <thead>
               <tr>
-                <th className="th">Project</th><th className="th">Tasks</th><th className="th">Bookings</th>
+                <th className="th">Project</th><th className="th">Tasks</th><th className="th">Booking numbers</th>
                 {money && <><th className="th">Income</th><th className="th">Expenses</th><th className="th">Labor</th><th className="th">Profit</th></>}
                 <th className="th"></th>
               </tr>
@@ -209,7 +209,7 @@ async function ProjectsView({ staff, projects }: { staff: Awaited<ReturnType<typ
                   <tr key={p.id}>
                     <td className="td"><Link className="font-bold text-navy underline" href={`/admin/tasks?project=${p.id}&status=all`}>{p.name}</Link>{p.status === "closed" && <span className="ml-2 text-xs text-muted">closed</span>}</td>
                     <td className="td">{c ? `${c.d}/${c.n} done` : "—"}</td>
-                    <td className="td">{p.orderIds.length ? p.orderIds.map((o) => <Link key={o} className="mr-1 underline" href={`/admin/orders/${o}`}>#{o}</Link>) : "—"}</td>
+                    <td className="td">{p.orderIds.length ? p.orderIds.map((o) => <Link key={o} className="mr-1 underline" href={`/admin/orders/${o}`}>{o}</Link>) : "—"}</td>
                     {money && (
                       <>
                         <td className="td">{formatMoney(profits[i].incomeCents)}</td>
@@ -264,7 +264,7 @@ async function TimeView({ staff, names }: { staff: Awaited<ReturnType<typeof req
               <tr key={l.id}>
                 <td className="td">{l.endedAt === null && l.minutes !== null ? <DualDate yi iso={l.startedAt.toISOString().slice(0, 10)} style="short" /> : <DualDate yi at={l.startedAt} />}</td>
                 <td className="td">{l.userId ? names.get(l.userId) ?? "Staff" : "Owner"}</td>
-                <td className="td"><Link className="text-navy underline" href={`/admin/tasks/${l.taskId}`}>{titles.get(l.taskId) ?? `#${l.taskId}`}</Link></td>
+                <td className="td"><Link className="text-navy underline" href={`/admin/tasks/${l.taskId}`}>{titles.get(l.taskId) ?? `Number ${l.taskId}`}</Link></td>
                 <td className="td">{l.endedAt || l.minutes !== null ? `${(minutesOf(l) / 60).toFixed(2)} h` : <b>Running…</b>}</td>
                 {money && <td className="td">{formatMoney(laborCents(l))}</td>}
                 <td className="td">{l.note ?? ""}</td>

@@ -1,4 +1,6 @@
+import ConfirmSubmit from "@/components/ConfirmSubmit";
 import Link from "next/link";
+import DualDate from "@/components/DualDate";
 import NotActive from "@/components/NotActive";
 import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -172,7 +174,7 @@ async function recent(kinds: string[], limit = 30) {
 function EntryRows({ entries, tab }: { entries: (typeof schema.bookEntries.$inferSelect)[]; tab: string }) {
   return (
     <Table
-      head={["#", "Date", "Type", "From / to", "Method", "Amount", "Split", "Booking", "Receipt", "Correct"]}
+      head={["Number", "Date", "Type", "From / to", "Method", "Amount", "Split", "Booking", "Receipt", "Correct"]}
       empty="No entries yet."
       minWidth={980}
       rows={entries.map((e) => [
@@ -180,17 +182,17 @@ function EntryRows({ entries, tab }: { entries: (typeof schema.bookEntries.$infe
         e.entryDate,
         <>{KIND_LABEL[e.kind as EntryKind] ?? e.kind}{e.category ? <span className="text-muted"> · {e.category}</span> : null}{e.source === "auto" ? <span className="ml-1 rounded bg-bg px-1 text-xs">auto</span> : null}</>,
         e.party || e.personName || "—",
-        <>{e.method ?? "—"}{e.checkNo ? ` #${e.checkNo}` : ""}</>,
+        <>{e.method ?? "—"}{e.checkNo ? ` number ${e.checkNo}` : ""}</>,
         <b>{money(e.amountCents)}</b>,
         e.rentalCents || e.deliveryCents || e.taxCents || e.tipCents ? <span className="text-xs text-muted">rental {money(e.rentalCents)} · delivery {money(e.deliveryCents)} · tax {money(e.taxCents)} · tip {money(e.tipCents)}</span> : "",
-        e.orderId ? <Link className="text-navy underline" href={`/admin/orders/${e.orderId}`}>#{e.orderId}</Link> : "—",
+        e.orderId ? <Link className="text-navy underline" href={`/admin/orders/${e.orderId}`}>Booking number {e.orderId}</Link> : "—",
         e.fileId ? <a className="text-navy underline" href={`/admin/bookkeeping/files/${e.fileId}`} target="_blank">View</a> : "—",
-        e.correctsId ? <span className="text-xs text-muted">corrects #{e.correctsId}</span> : (
+        e.correctsId ? <span className="text-xs text-muted">corrects entry number {e.correctsId}</span> : (
           <form action={A.reverseEntryAction} className="flex gap-1">
             <input type="hidden" name="id" value={e.id} />
             <input type="hidden" name="tab" value={tab} />
             <input name="reason" placeholder="Why" className="input w-24 py-1 text-xs" />
-            <button className="text-xs font-bold text-[#C83A2F]">Correct</button>
+            <ConfirmSubmit message="Add a correction for this entry? The original entry is kept." className="text-xs font-bold text-[#C83A2F]">Correct</ConfirmSubmit>
           </form>
         ),
       ])}
@@ -249,7 +251,7 @@ async function Invoices({ today }: { today: string }) {
             <Field label="Credit note for invoice">
               <select name="relatedInvoiceId" className="input" defaultValue="">
                 <option value="">—</option>
-                {invoices.filter((i) => i.status === "open").map((i) => <option key={i.id} value={i.id}>{i.number ?? `#${i.id}`} · {i.customerName}</option>)}
+                {invoices.filter((i) => i.status === "open").map((i) => <option key={i.id} value={i.id}>{i.number ?? `Number ${i.id}`} · {i.customerName}</option>)}
               </select>
             </Field>
           </Grid>
@@ -290,7 +292,7 @@ async function Invoices({ today }: { today: string }) {
           empty="Nothing yet."
           minWidth={1150}
           rows={docs.map((d) => [
-            <a key="n" className="font-bold text-navy underline" href={`/admin/bookkeeping/invoice/${d.id}`}>{d.number ?? `#${d.id}`}</a>,
+            <a key="n" className="font-bold text-navy underline" href={`/admin/bookkeeping/invoice/${d.id}`}>{d.number ?? `Number ${d.id}`}</a>,
             KIND_NAME[d.kind as DocKind] ?? d.kind,
             <a key="c" className="underline" href={`/admin/bookkeeping/statement?c=${encodeURIComponent(d.customerName)}`}>{d.customerName}</a>,
             d.issueDate,
@@ -405,7 +407,7 @@ async function Bills({ cats, today }: { cats: string[]; today: string }) {
       </Card>
       <Card title="Bills">
         <Table
-          head={["#", "Vendor", "Due", "Amount", "Paid", "Balance", "Pay", "Void"]}
+          head={["Number", "Vendor", "Due", "Amount", "Paid", "Balance", "Pay", "Void"]}
           empty="No bills yet."
           minWidth={1000}
           rows={bills.map((b) => {
@@ -428,7 +430,7 @@ async function Bills({ cats, today }: { cats: string[]; today: string }) {
                 </form>
               ) : "—",
               b.status === "open" ? (
-                <form action={A.voidBillAction} className="flex gap-1"><input type="hidden" name="id" value={b.id} /><input name="reason" placeholder="Why" className="input w-20 py-1 text-xs" /><button className="text-xs font-bold text-[#C83A2F]">Void</button></form>
+                <form action={A.voidBillAction} className="flex gap-1"><input type="hidden" name="id" value={b.id} /><input name="reason" placeholder="Why" className="input w-20 py-1 text-xs" /><ConfirmSubmit message="Void this bill? It stays on record as voided." className="text-xs font-bold text-[#C83A2F]">Void</ConfirmSubmit></form>
               ) : "—",
             ];
           })}
@@ -454,7 +456,7 @@ async function Processor({ from, to, pct, fixed }: { from: string; to: string; p
         <Table
           head={["Date", "Booking", "Sola ref", "Payment", "Est. fee", "Net deposit"]}
           empty="No Sola payments in this range."
-          rows={v.rows.map((r) => [r.date, r.orderId ? <Link className="text-navy underline" href={`/admin/orders/${r.orderId}`}>#{r.orderId}</Link> : "—", r.ref ?? "—", money(r.grossCents), money(r.feeCents), <b>{money(r.netCents)}</b>])}
+          rows={v.rows.map((r) => [r.date, r.orderId ? <Link className="text-navy underline" href={`/admin/orders/${r.orderId}`}>Booking number {r.orderId}</Link> : "—", r.ref ?? "—", money(r.grossCents), money(r.feeCents), <b>{money(r.netCents)}</b>])}
         />
       </Card>
     </>
@@ -629,7 +631,7 @@ async function Mileage({ from, to }: { from: string; to: string }) {
             t.driver ?? "—",
             (t.milesTenths / 10).toFixed(1),
             <>{t.purpose}{t.notes ? <span className="text-muted"> · {t.notes}</span> : null}</>,
-            t.orderId ? `#${t.orderId}` : "—",
+            t.orderId ? `Number ${t.orderId}` : "—",
             t.correctsId ? "" : <form action={A.reverseMileageAction} className="flex gap-1"><input type="hidden" name="id" value={t.id} /><input name="reason" placeholder="Why" className="input w-20 py-1 text-xs" /><button className="text-xs font-bold text-[#C83A2F]">Correct</button></form>,
           ])}
         />
@@ -687,7 +689,7 @@ async function Reports({ from, to, group }: { from: string; to: string; group: "
         <Card title="Income by channel" note="The website has no online booking; payments for phone bookings made on the website's pay page count under Phone line.">
           <Table head={["Channel", "Income"]} empty="—" minWidth={300} rows={byCh.map((r) => [r.channel, money(r.cents)])} />
         </Card>
-        <Card title="Receivables aging"><Table head={["Invoice", "Customer", "Balance", "Aging"]} empty="Nothing owed." minWidth={400} rows={ar.map((i) => [`#${i.id}`, i.customerName, money(i.balanceCents), i.bucket])} /></Card>
+        <Card title="Receivables aging"><Table head={["Invoice", "Customer", "Balance", "Aging"]} empty="Nothing owed." minWidth={400} rows={ar.map((i) => [`Number ${i.id}`, i.customerName, money(i.balanceCents), i.bucket])} /></Card>
       </div>
       <Card title="Income by item"><Table head={["Item", "Rentals", "Income", "Repairs", "Profit"]} empty="—" rows={byItem.map((r) => [r.name, r.rentals, money(r.incomeCents), money(r.repairsCents), money(r.profitCents)])} /></Card>
     </>
@@ -770,9 +772,9 @@ async function SettingsTab({ categories, pct, fixed, days, openingCash, openingD
             minWidth={520}
             rows={locks.map((l) => [
               l.month,
-              l.status === "locked" ? "Locked" : `Reopened ${l.reopenedAt ? l.reopenedAt.toISOString().slice(0, 10) : ""}: ${l.reopenReason ?? ""}`,
+              l.status === "locked" ? "Locked" : <span key="r">Reopened {l.reopenedAt ? <DualDate at={l.reopenedAt} /> : null}: {l.reopenReason ?? ""}</span>,
               l.status === "locked" ? (
-                <form key="o" action={G.reopenMonthAction} className="flex gap-1"><input type="hidden" name="month" value={l.month} /><input name="reason" placeholder="Why (Owner only)" className="input w-40 py-1 text-xs" /><button className="text-xs font-bold text-[#C83A2F]">Reopen</button></form>
+                <form key="o" action={G.reopenMonthAction} className="flex gap-1"><input type="hidden" name="month" value={l.month} /><input name="reason" placeholder="Why (Owner only)" className="input w-40 py-1 text-xs" /><ConfirmSubmit message="Reopen this locked month? Entries dated in it can be added or changed again." className="text-xs font-bold text-[#C83A2F]">Reopen</ConfirmSubmit></form>
               ) : (
                 <form key="l" action={G.reopenMonthAction}><input type="hidden" name="month" value={l.month} /><input type="hidden" name="relock" value="1" /><button className="text-xs font-bold text-navy">Lock again</button></form>
               ),

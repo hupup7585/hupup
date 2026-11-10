@@ -1,3 +1,4 @@
+import ConfirmSubmit from "@/components/ConfirmSubmit";
 import { notFound } from "next/navigation";
 import { requireBooks } from "@/lib/books";
 import { docDetail, KIND_NAME, type DocKind } from "@/lib/invoices";
@@ -37,7 +38,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
           </form>
         )}
         {doc.status !== "void" && (
-          <form action={A.voidInvoiceAction} className="flex items-center gap-1"><input type="hidden" name="id" value={doc.id} /><input name="reason" placeholder="Why void" className="input w-32 py-1 text-sm" /><button className="text-sm font-bold text-[#C83A2F]">Void</button></form>
+          <form action={A.voidInvoiceAction} className="flex items-center gap-1"><input type="hidden" name="id" value={doc.id} /><input name="reason" placeholder="Why void" className="input w-32 py-1 text-sm" /><ConfirmSubmit message="Void this invoice? It stays on record as voided." className="text-sm font-bold text-[#C83A2F]">Void</ConfirmSubmit></form>
         )}
       </div>
 

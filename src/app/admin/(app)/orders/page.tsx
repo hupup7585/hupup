@@ -42,14 +42,14 @@ export default async function OrdersPage({
         <table className="w-full min-w-[860px] text-sm">
           <thead>
             <tr>
-              <th className="th">Order</th><th className="th">Customer</th><th className="th">Event → pickup</th>
+              <th className="th">Order number</th><th className="th">Customer</th><th className="th">Event → pickup</th>
               <th className="th">Items</th><th className="th">Channel</th><th className="th">Total</th><th className="th">Paid</th><th className="th">Status</th>
             </tr>
           </thead>
           <tbody>
             {list.map((o) => (
               <tr key={o.id} className="hover:bg-bg">
-                <td className="td font-bold"><Link className="text-navy underline-offset-2 hover:underline" href={`/admin/orders/${o.id}`}>#{orderNumber(o.id)}</Link></td>
+                <td className="td font-bold"><Link className="text-navy underline-offset-2 hover:underline" href={`/admin/orders/${o.id}`}>{orderNumber(o.id)}</Link></td>
                 <td className="td">{o.customer_name ?? <span className="text-muted">Caller in progress</span>}<div className="text-xs text-muted">{formatPhone(o.customer_phone)}</div></td>
                 <td className="td whitespace-nowrap"><DualDate yi iso={o.event_date} style="short" /><div className="text-xs text-muted">→ <DualDate yi iso={o.pickup_date} style="short" /></div></td>
                 <td className="td">{o.items}</td>

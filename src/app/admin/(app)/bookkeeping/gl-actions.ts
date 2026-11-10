@@ -97,27 +97,27 @@ export async function createJournalAction(f: FormData) {
     if (s(f, "post") === "on") {
       try {
         await postJournal(e.id, userId);
-        return `Journal entry #${e.id} posted.`;
+        return `Journal entry number ${e.id} posted.`;
       } catch (err) {
-        if (err instanceof BooksError) return `Journal entry #${e.id} saved as a draft. ${err.message}`;
+        if (err instanceof BooksError) return `Journal entry number ${e.id} saved as a draft. ${err.message}`;
         throw err;
       }
     }
-    return `Journal entry #${e.id} saved as a draft.`;
+    return `Journal entry number ${e.id} saved as a draft.`;
   });
 }
 
 export async function postJournalAction(f: FormData) {
   return run(async (userId) => {
     await postJournal(Number(s(f, "id")), userId);
-    return `Journal entry #${s(f, "id")} posted.`;
+    return `Journal entry number ${s(f, "id")} posted.`;
   });
 }
 
 export async function reverseJournalAction(f: FormData) {
   return run(async (userId) => {
     const r = await reverseJournal(Number(s(f, "id")), s(f, "reason"), userId, todayISO());
-    return r.status === "posted" ? `Reversed: entry #${r.id} posted.` : `Reversal #${r.id} saved; it posts once approved.`;
+    return r.status === "posted" ? `Reversed: entry number ${r.id} posted.` : `Reversal number ${r.id} saved; it posts once approved.`;
   });
 }
 

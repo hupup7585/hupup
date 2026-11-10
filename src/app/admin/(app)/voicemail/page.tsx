@@ -1,3 +1,4 @@
+import ConfirmSubmit from "@/components/ConfirmSubmit";
 import { Download, Phone } from "lucide-react";
 import { requireStaff } from "@/lib/auth";
 import { formatPhone } from "@/lib/phone";
@@ -71,7 +72,7 @@ export default async function VoicemailPage() {
                 <button className="btn-ghost">{v.urgent ? "Not urgent" : "Mark urgent"}</button>
               </form>
               <form action={deleteVoicemailAction.bind(null, v.id)}>
-                <button className="btn-ghost text-[#C83A2F]">Delete</button>
+                <ConfirmSubmit message="Delete this voicemail? The recording will be gone for good." className="btn-ghost text-[#C83A2F]">Delete</ConfirmSubmit>
               </form>
             </div>
           </li>

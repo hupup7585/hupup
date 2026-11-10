@@ -144,7 +144,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
                     <div className="flex items-center gap-2 font-bold">
                       <Clock className="h-4 w-4" aria-hidden />
                       <span>{stop === "delivery" ? DELIVERY_WINDOW : `By ${PICKUP_BY}`}</span>
-                      <span className="text-muted">· {stop === "delivery" ? "Delivery" : "Pickup"} · #{orderNumber(o.id)}</span>
+                      <span className="text-muted">· {stop === "delivery" ? "Delivery" : "Pickup"} · Order number {orderNumber(o.id)}</span>
                     </div>
                     <Badge tone={tone}>{done ? (stop === "delivery" ? "Delivered" : "Picked up") : stop === "delivery" ? "Scheduled" : "To pick up"}</Badge>
                   </div>

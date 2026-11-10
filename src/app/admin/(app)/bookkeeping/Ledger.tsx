@@ -1,3 +1,4 @@
+import ConfirmSubmit from "@/components/ConfirmSubmit";
 import { asc, desc } from "drizzle-orm";
 import { CircleAlert } from "lucide-react";
 import { db, schema } from "@/lib/db";
@@ -140,7 +141,7 @@ export default async function Ledger({ asOf, accountId, from, to, owner }: { asO
 
       <Card title="Journal entries">
         <Table
-          head={["#", "Date", "Memo", "Lines", "Amount", "Status", ""]}
+          head={["Number", "Date", "Memo", "Lines", "Amount", "Status", ""]}
           empty="No journal entries yet."
           minWidth={900}
           rows={entries.map((e) => [
@@ -157,7 +158,7 @@ export default async function Ledger({ asOf, accountId, from, to, owner }: { asO
             e.status === "draft" || e.status === "pending" ? (
               <form key="p" action={G.postJournalAction}><input type="hidden" name="id" value={e.id} /><button className="text-xs font-bold text-navy">Approve and post</button></form>
             ) : e.status === "posted" ? (
-              <form key="r" action={G.reverseJournalAction} className="flex gap-1"><input type="hidden" name="id" value={e.id} /><input name="reason" placeholder="Why" className="input w-24 py-1 text-xs" /><button className="text-xs font-bold text-[#C83A2F]">Reverse</button></form>
+              <form key="r" action={G.reverseJournalAction} className="flex gap-1"><input type="hidden" name="id" value={e.id} /><input name="reason" placeholder="Why" className="input w-24 py-1 text-xs" /><ConfirmSubmit message="Reverse this journal entry? A reversing entry is added; the original is kept." className="text-xs font-bold text-[#C83A2F]">Reverse</ConfirmSubmit></form>
             ) : "",
           ])}
         />
@@ -181,7 +182,7 @@ export default async function Ledger({ asOf, accountId, from, to, owner }: { asO
           <Table
             head={["Date", "Entry", "Memo", "Debit", "Credit", "Balance"]}
             empty="No activity in this period."
-            rows={detail.rows.map((r) => [r.entry.entryDate, `#${r.entry.id}`, r.line.memo || r.entry.memo, r.line.debitCents ? money(r.line.debitCents) : "", r.line.creditCents ? money(r.line.creditCents) : "", money(r.balanceCents)])}
+            rows={detail.rows.map((r) => [r.entry.entryDate, `Number ${r.entry.id}`, r.line.memo || r.entry.memo, r.line.debitCents ? money(r.line.debitCents) : "", r.line.creditCents ? money(r.line.creditCents) : "", money(r.balanceCents)])}
           />
         </Card>
       )}

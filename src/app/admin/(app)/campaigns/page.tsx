@@ -1,3 +1,4 @@
+import ConfirmSubmit from "@/components/ConfirmSubmit";
 import { requireStaff } from "@/lib/auth";
 import { CAMPAIGNS_NOT_ACTIVE, campaignPreview, campaignRecipients, campaignsCanSend, eligibleOf, listCampaigns, promoSignups, segments } from "@/lib/campaigns";
 import { PROMOS_PER_YEAR } from "@/lib/sms-consent-copy";
@@ -81,14 +82,14 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                     {c.status === "approved" && (
                       <form action={sendCampaignAction}>
                         <input type="hidden" name="id" value={c.id} />
-                        <button className="btn" disabled={!canSend || eligible.length === 0} title={!canSend ? CAMPAIGNS_NOT_ACTIVE : eligible.length === 0 ? "No customer can get a promo right now" : undefined}>
+                        <ConfirmSubmit message={`Send this campaign to ${eligible.length} customer${eligible.length === 1 ? "" : "s"} now? This can't be undone.`} className="btn" disabled={!canSend || eligible.length === 0} title={!canSend ? CAMPAIGNS_NOT_ACTIVE : eligible.length === 0 ? "No customer can get a promo right now" : undefined}>
                           Send to {eligible.length} customer{eligible.length === 1 ? "" : "s"}
-                        </button>
+                        </ConfirmSubmit>
                       </form>
                     )}
                     {c.status === "sent" && <CampaignHistory id={c.id} />}
                     {owner && (c.status === "draft" || c.status === "approved") && (
-                      <form action={cancelCampaignAction}><input type="hidden" name="id" value={c.id} /><button className="btn-ghost">Cancel campaign</button></form>
+                      <form action={cancelCampaignAction}><input type="hidden" name="id" value={c.id} /><ConfirmSubmit message="Cancel this campaign? It will not be sent." className="btn-ghost">Cancel campaign</ConfirmSubmit></form>
                     )}
                   </div>
                 </li>

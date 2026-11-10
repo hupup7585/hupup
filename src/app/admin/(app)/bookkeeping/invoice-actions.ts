@@ -75,7 +75,7 @@ export async function fromBookingAction(f: FormData) {
   return run(async (userId) => {
     const kind = s(f, "kind") === "quote" ? "quote" : "invoice";
     const doc = await docFromBooking(Number(s(f, "orderId")), kind, userId, Number(s(f, "termsDays") || 0));
-    return { msg: `${doc.number} drafted from booking #${s(f, "orderId")}. Check it, then issue it.`, to: `/admin/bookkeeping/invoice/${doc.id}` };
+    return { msg: `${doc.number} drafted from booking number ${s(f, "orderId")}. Check it, then issue it.`, to: `/admin/bookkeeping/invoice/${doc.id}` };
   });
 }
 

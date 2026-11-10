@@ -101,7 +101,7 @@ export default async function CallsPage() {
                   <td className="td">
                     {c.order_id ? (
                       <Link href={`/admin/orders/${c.order_id}`} className="flex items-center gap-2">
-                        <b className="text-navy underline-offset-2 hover:underline">#{orderNumber(c.order_id)}</b>
+                        <b className="text-navy underline-offset-2 hover:underline">Order number {orderNumber(c.order_id)}</b>
                         {c.order_status && <StatusBadge status={c.order_status} />}
                         {c.subtotal_cents ? <span className="text-muted">{formatMoney(c.subtotal_cents)}</span> : null}
                       </Link>

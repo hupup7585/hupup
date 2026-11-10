@@ -33,7 +33,7 @@ export default function OrderActions(props: {
       <div className="card p-5">
         <h2 className="mb-3 font-bold">Update status</h2>
         {props.holdExpiresAt && (props.status === "PENDING_PAYMENT" || props.status === "HOLD") && (
-          <p className="mb-3 text-sm text-muted">Held until {new Date(props.holdExpiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} — released automatically if unpaid. Mark Confirmed to keep it regardless.</p>
+          <p className="mb-3 text-sm text-muted">Held until {new Date(props.holdExpiresAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })} : released automatically if unpaid. Mark Confirmed to keep it regardless.</p>
         )}
         <div className="grid grid-cols-2 gap-2">
           {NEXT.filter((n) => n.status !== props.status).map((n) => (

@@ -59,15 +59,15 @@ export default async function PhoneSettingsPage() {
         <h2 className="mb-3 text-lg font-extrabold">Caller blocking</h2>
         <BlockingForm initial={settings.blockedCallers} />
       </section>
-      <div className="card p-5">
-        <h2 className="mb-2 font-bold">Twilio phone number setup</h2>
-        <ol className="list-decimal space-y-1.5 pl-5 text-sm">
+      <details className="card p-5" data-developer-notes>
+        <summary className="cursor-pointer font-bold">Developer notes: Twilio phone number setup</summary>
+        <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm">
           <li>Voice → “A call comes in”: <b>Webhook</b>, <code className="rounded bg-bg px-1">{base}/api/voice/incoming</code>, HTTP POST</li>
           <li>Voice → “Call status changes”: <code className="rounded bg-bg px-1">{base}/api/voice/status</code> (releases cart holds when callers hang up)</li>
           <li>Hotline voice: <b>{config.voice()}</b> (change with IVR_VOICE)</li>
           <li>“Press 0” rings: <b>{routeSummary(routeTargets(settings), settings.operatorMode)}</b> (edit above)</li>
         </ol>
-      </div>
+      </details>
     </div>
   );
 }

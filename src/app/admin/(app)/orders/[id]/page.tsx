@@ -25,7 +25,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     <div className="mx-auto max-w-5xl">
       <Link href="/admin/orders" className="text-sm font-bold text-navy underline-offset-2 hover:underline">← All orders</Link>
       <div className="mb-5 mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-black sm:text-3xl">Order #{orderNumber(o.id)}</h1>
+        <h1 className="text-2xl font-black sm:text-3xl">Order number {orderNumber(o.id)}</h1>
         <StatusBadge status={o.status} />
         <span className="text-sm text-muted">{o.channel === "PHONE" ? "Booked by phone" : "Booked in person"} · <DualDate yi at={o.createdAt} /></span>
       </div>
