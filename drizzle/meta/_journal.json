@@ -204,6 +204,13 @@
       "when": 1794277255201,
       "tag": "0028_voicemail_mms_on",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794282648774,
+      "tag": "0029_promo_pictures",
+      "breakpoints": true
     }
   ]
 }

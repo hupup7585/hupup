@@ -208,13 +208,13 @@ describe("the 6 limit, January 1 reset, promo hours, segment length", () => {
     expect(inMarketingHours("+13105550100", at("2026-11-11T02:30:00Z"), null)).toBe(false); // 6:30 PM LA, but 9:30 PM in New York
     expect(inMarketingHours("+13105550100", at("2026-11-10T13:30:00Z"), null)).toBe(false); // 8:30 AM New York, but 5:30 AM LA
   });
-  it("promo format and the one-segment flag", () => {
+  it("promo format; segments counted for the SMS cost (texts up to 1,600 characters are allowed, Abraham section 7)", () => {
     const t = marketingBodyV2("Spring sale: 10% off jumping balloons booked this week.");
     expect(t.startsWith("Hup Up Attractions:")).toBe(true);
     expect(t.endsWith("Reply NOPROMO to stop promos, STOP to stop all texts.")).toBe(true);
     expect(segments(t).segments).toBe(1);
     expect(segments(marketingBodyV2("x ".repeat(60))).segments).toBe(2);
-    expect(readFileSync("src/app/admin/(app)/campaigns/page.tsx", "utf8")).toContain("data-segment-flag");
+    expect(readFileSync("src/app/admin/(app)/campaigns/page.tsx", "utf8")).toContain("segment${seg.segments === 1");
   });
 });
 

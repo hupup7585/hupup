@@ -861,7 +861,37 @@ export const smsCampaigns = pgTable("sms_campaigns", {
   sentCount: integer("sent_count"),
   heldCount: integer("held_count"),
   skippedCount: integer("skipped_count"),
+  /** Up to two promo_pictures ids (sent as MMS); empty = plain SMS */
+  pictureIds: jsonb("picture_ids").$type<number[]>().notNull().default([]),
+  /** Add the Rentals page link to the end of the offer */
+  rentalsLink: boolean("rentals_link").notNull().default(false),
 });
+
+/** Promo pictures: the phone-ready JPG (about 1080 px wide, at most about 500 KB) and the full-size original in chunks. */
+export const promoPictures = pgTable("promo_pictures", {
+  id: serial("id").primaryKey(),
+  /** Unguessable id in the public picture link Twilio fetches */
+  token: text("token").notNull().unique(),
+  /** upload | catalog */
+  source: text("source").notNull(),
+  productId: integer("product_id"),
+  fileName: text("file_name"),
+  jpg: bytea("jpg").notNull(),
+  jpgBytes: integer("jpg_bytes").notNull(),
+  width: integer("width"),
+  height: integer("height"),
+  originalType: text("original_type"),
+  originalBytes: integer("original_bytes"),
+  originalComplete: boolean("original_complete").notNull().default(false),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const promoPictureChunks = pgTable("promo_picture_chunks", {
+  pictureId: integer("picture_id").notNull().references(() => promoPictures.id),
+  idx: integer("idx").notNull(),
+  data: bytea("data").notNull(),
+}, (t) => [primaryKey({ columns: [t.pictureId, t.idx] })]);
 
 /** One row per customer per campaign (never twice). */
 export const smsCampaignSends = pgTable("sms_campaign_sends", {

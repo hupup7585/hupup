@@ -3,6 +3,9 @@ import { db, schema } from "@/lib/db";
 import { PROMOS_PER_YEAR } from "@/lib/sms-consent-copy";
 import { marketingBody, promosThisYear, sendMessage } from "@/lib/sms";
 import { textingActive } from "@/lib/voicemail";
+import { config } from "@/lib/config";
+import { PROMO_MAX_CHARS, PROMO_MAX_PICTURES, offerWithLink, promoTextV2 } from "@/lib/promo-text";
+import { pictureUrl, picturesByIds } from "@/lib/promo-pictures";
 
 /**
  * Seasonal promo campaigns (Abraham, Nov 9, 2026).
@@ -16,12 +19,7 @@ export type Campaign = typeof schema.smsCampaigns.$inferSelect;
 export const campaignsCanSend = (env: Record<string, string | undefined> = process.env) => textingActive(env) || env.VERCEL_ENV !== "production";
 export const CAMPAIGNS_NOT_ACTIVE = "Not active yet: waiting for Twilio A2P approval";
 
-/** GSM-7 text: 160 characters in one segment, 153 per segment after that (anything else: 70 / 67). */
-export function segments(text: string): { chars: number; segments: number } {
-  const gsm = /^[\x20-\x7E\n\r£¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ¤¡ÄÖÑÜ§¿äöñüà€]*$/.test(text);
-  const [one, many] = gsm ? [160, 153] : [70, 67];
-  return { chars: text.length, segments: text.length <= one ? 1 : Math.ceil(text.length / many) };
-}
+export { segments } from "@/lib/promo-text";
 
 export type PromoSignup = {
   customerId: number;
@@ -72,16 +70,28 @@ async function audit(userId: number | null, action: string, id: number, after: R
   await db.insert(schema.auditLog).values({ userId, action, entityType: "sms_campaign", entityId: String(id), after });
 }
 
-/** Owner: a new campaign (draft). The wording is checked for length and card numbers when it's sent. */
-export async function createCampaign(input: { name: string; body: string }, userId: number | null): Promise<Campaign> {
+/** Owner: a new campaign (draft): the offer, up to two pictures, and the optional Rentals page link. */
+export async function createCampaign(input: { name: string; body: string; pictureIds?: number[]; rentalsLink?: boolean }, userId: number | null): Promise<Campaign> {
   const name = input.name.replace(/\s+/g, " ").trim().slice(0, 80);
   const body = input.body.replace(/\s+/g, " ").trim();
+  const pictureIds = [...new Set((input.pictureIds ?? []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  const rentalsLink = Boolean(input.rentalsLink);
   if (!name) throw new Error("Give the campaign a name, like 'Summer 2027'.");
   if (body.length < 10) throw new Error("Write the offer (at least a few words).");
-  if (body.length > 600) throw new Error("That's too long for a text. Keep it under 600 characters.");
-  const [c] = await db.insert(schema.smsCampaigns).values({ name, body, createdBy: userId }).returning();
-  await audit(userId, "campaign.created", c.id, { name, body });
+  const full = promoTextV2(offerWithLink(body, rentalsLink, config.baseUrl()));
+  if (full.length > PROMO_MAX_CHARS) throw new Error(`Too long: ${full.length} characters with the required start and ending. The most is ${PROMO_MAX_CHARS}.`);
+  if (pictureIds.length > PROMO_MAX_PICTURES) throw new Error(`At most ${PROMO_MAX_PICTURES} pictures per promo text.`);
+  if ((await picturesByIds(pictureIds)).length !== pictureIds.length) throw new Error("A picture is missing. Add it again.");
+  const [c] = await db.insert(schema.smsCampaigns).values({ name, body, pictureIds, rentalsLink, createdBy: userId }).returning();
+  await audit(userId, "campaign.created", c.id, { name, body, pictureIds, rentalsLink });
   return c;
+}
+
+/** The exact text customers get, and the picture links (MMS when there are pictures). */
+export async function campaignMessage(c: Pick<Campaign, "body" | "pictureIds" | "rentalsLink">) {
+  const offer = offerWithLink(c.body, c.rentalsLink, config.baseUrl());
+  const pictures = await picturesByIds(c.pictureIds ?? []);
+  return { offer, text: promoTextV2(offer), pictures, mediaUrls: pictures.map((p) => pictureUrl(p.token)) };
 }
 
 /** Owner: approve the wording. Only approved campaigns can be sent (by the Owner or the Secretary). */
@@ -109,13 +119,15 @@ export async function sendCampaign(id: number, userId: number | null, now = new 
   // Claim the campaign so two clicks can't send it twice.
   const [c] = await db.update(schema.smsCampaigns).set({ status: "sent", sentBy: userId, sentAt: now }).where(and(eq(schema.smsCampaigns.id, id), eq(schema.smsCampaigns.status, "approved"))).returning();
   if (!c) throw new Error("Only an approved campaign that hasn't been sent can be sent.");
+  const msg = await campaignMessage(c);
+  if (msg.text.length > PROMO_MAX_CHARS) throw new Error(`Too long to send (${msg.text.length} characters; the most is ${PROMO_MAX_CHARS}).`);
   const list = await promoSignups(now);
   const eligible = eligibleOf(list);
   let sent = 0, held = 0, skipped = 0;
   for (const s of eligible) {
     const [claim] = await db.insert(schema.smsCampaignSends).values({ campaignId: id, customerId: s.customerId, phone: s.phone, status: "pending" }).onConflictDoNothing().returning();
     if (!claim) continue; // already sent this campaign to this customer
-    const r = await sendMessage({ to: s.phone, body: c.body, kind: "marketing", event: `campaign:${id}`, customerId: s.customerId, userId, now });
+    const r = await sendMessage({ to: s.phone, body: msg.offer, mediaUrls: msg.mediaUrls, kind: "marketing", event: `campaign:${id}`, customerId: s.customerId, userId, now });
     const status = r.sent ? "sent" : r.held ? "held" : "skipped";
     if (status === "sent") sent++;
     else if (status === "held") held++;

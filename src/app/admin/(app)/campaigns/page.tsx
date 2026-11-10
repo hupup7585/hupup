@@ -1,11 +1,18 @@
 import ConfirmSubmit from "@/components/ConfirmSubmit";
 import { requireStaff } from "@/lib/auth";
-import { CAMPAIGNS_NOT_ACTIVE, campaignPreview, campaignRecipients, campaignsCanSend, eligibleOf, listCampaigns, promoSignups, segments } from "@/lib/campaigns";
+import { CAMPAIGNS_NOT_ACTIVE, campaignMessage, campaignRecipients, campaignsCanSend, eligibleOf, listCampaigns, promoSignups, segments } from "@/lib/campaigns";
 import { PROMOS_PER_YEAR } from "@/lib/sms-consent-copy";
 import { JOIN_INVITE_ON, joinInviteText } from "@/lib/join-invite";
+import { and, asc, eq, isNotNull } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
+import { config } from "@/lib/config";
+import { smsNumberDisplay } from "@/lib/sms-number";
+import { PROMO_MAX_CHARS, dollars, promoCostEstimate } from "@/lib/promo-text";
+import { kb } from "@/lib/picture-shrink";
+import CampaignComposer from "./CampaignComposer";
 import { formatPhone } from "@/lib/phone";
 import { alertDateTime } from "@/lib/voicemail";
-import { approveCampaignAction, cancelCampaignAction, createCampaignAction, sendCampaignAction } from "./actions";
+import { approveCampaignAction, cancelCampaignAction, sendCampaignAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +27,10 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   const [signups, campaigns] = await Promise.all([promoSignups(), listCampaigns()]);
   const eligible = eligibleOf(signups);
   const canSend = campaignsCanSend();
+  const messages = new Map(await Promise.all(campaigns.map(async (c) => [c.id, await campaignMessage(c)] as const)));
+  const catalog = owner
+    ? await db.select({ id: schema.products.id, name: schema.products.name }).from(schema.products).where(and(eq(schema.products.active, true), isNotNull(schema.products.imageUrl))).orderBy(asc(schema.products.name))
+    : [];
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <div>
@@ -56,22 +67,39 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
         ) : (
           <ul className="divide-y divide-line">
             {campaigns.map((c) => {
-              const text = campaignPreview(c.body);
+              const m = messages.get(c.id)!;
+              const text = m.text;
               const seg = segments(text);
+              const cost = promoCostEstimate(text, m.pictures.length, eligible.length);
               return (
                 <li key={c.id} className="py-4" data-campaign={c.id}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-bold">{c.name}</div>
                     <span className="rounded-full bg-bg px-3 py-1 text-xs font-bold">{STATUS[c.status] ?? c.status}</span>
                   </div>
-                  <p className="mt-2 rounded-lg bg-bg p-3 text-sm" data-campaign-preview>{text}</p>
-                  {seg.segments > 1 && (
-                    <p data-segment-flag className="mt-1 rounded-lg bg-[#FFF8E1] px-3 py-1.5 text-sm font-semibold text-[#5C4600]">
-                      Longer than one text segment ({seg.chars} characters). Each customer is charged for {seg.segments} segments. Shorten the offer to fit in one.
-                    </p>
+                  {m.pictures.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2" data-campaign-pictures>
+                      {m.pictures.map((p, i) => (
+                        <figure key={p.id} className="w-32 text-xs">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={`/api/media/promo/${p.token}.jpg`} alt={p.fileName ?? "Promo picture"} className="h-24 w-32 rounded-lg object-cover" />
+                          <figcaption className="mt-0.5 text-muted">
+                            {kb(p.jpgBytes)} JPG
+                            {owner && p.source === "upload" && p.originalComplete && (
+                              <>
+                                {" "}
+                                · <a className="underline" href={`/api/admin/promo-pictures/${p.id}/original`}>Original</a>
+                              </>
+                            )}
+                          </figcaption>
+                        </figure>
+                      ))}
+                    </div>
                   )}
+                  <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-bg p-3 text-sm" data-campaign-preview>{text}</p>
                   <p className="mt-1 text-xs text-muted">
-                    {seg.chars} characters, {seg.segments === 1 ? "1 text segment" : `${seg.segments} text segments (each customer is billed for each segment)`}. Written {alertDateTime(c.createdAt)}
+                    {seg.chars.toLocaleString("en-US")} of {PROMO_MAX_CHARS.toLocaleString("en-US")} characters. Sends as {cost.kind}
+                    {cost.kind === "SMS" ? ` (${seg.segments} segment${seg.segments === 1 ? "" : "s"})` : ` with ${m.pictures.length} picture${m.pictures.length === 1 ? "" : "s"}`} from {smsNumberDisplay()}. Estimated cost {dollars(cost.perCustomer)} per customer, about {dollars(cost.total)} for {eligible.length}. Written {alertDateTime(c.createdAt)}
                     {c.approvedAt ? `. Approved ${alertDateTime(c.approvedAt)}` : ""}
                     {c.sentAt ? `. Sent ${alertDateTime(c.sentAt)}: ${c.sentCount ?? 0} sent, ${c.heldCount ?? 0} waiting for 8 AM, ${c.skippedCount ?? 0} skipped` : ""}.
                   </p>
@@ -82,7 +110,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                     {c.status === "approved" && (
                       <form action={sendCampaignAction}>
                         <input type="hidden" name="id" value={c.id} />
-                        <ConfirmSubmit message={`Send this campaign to ${eligible.length} customer${eligible.length === 1 ? "" : "s"} now? This can't be undone.`} className="btn" disabled={!canSend || eligible.length === 0} title={!canSend ? CAMPAIGNS_NOT_ACTIVE : eligible.length === 0 ? "No customer can get a promo right now" : undefined}>
+                        <ConfirmSubmit message={`Send this campaign to ${eligible.length} customer${eligible.length === 1 ? "" : "s"} now, as ${cost.kind}? Estimated cost about ${dollars(cost.total)}. This can't be undone.`} className="btn" disabled={!canSend || eligible.length === 0} title={!canSend ? CAMPAIGNS_NOT_ACTIVE : eligible.length === 0 ? "No customer can get a promo right now" : undefined}>
                           Send to {eligible.length} customer{eligible.length === 1 ? "" : "s"}
                         </ConfirmSubmit>
                       </form>
@@ -102,18 +130,8 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
       {owner && (
         <div className="card p-5">
           <h2 className="mb-1 text-lg font-extrabold">Write a campaign</h2>
-          <p className="mb-3 text-sm text-muted">Write only the offer. The required opening and opt-out line are added for you; the preview shows the exact text. After you approve it, you or the Secretary can send it.</p>
-          <form action={createCampaignAction} className="grid gap-3">
-            <label className="block" htmlFor="campaign-name">
-              <span className="label">Name (only staff see this)</span>
-              <input id="campaign-name" name="name" className="input" placeholder="Summer 2027" required />
-            </label>
-            <label className="block" htmlFor="campaign-body">
-              <span className="label">Offer</span>
-              <textarea id="campaign-body" name="body" rows={3} className="input" placeholder="Summer special! 15% off paddle boat rentals booked by June 30. Call (845) 415-7585." required />
-            </label>
-            <button className="btn-dark w-fit">Save draft</button>
-          </form>
+          <p className="mb-3 text-sm text-muted">Write only the offer. The required start and ending are added for you, up to {PROMO_MAX_CHARS.toLocaleString("en-US")} characters in all. Add up to two pictures (catalog photos or your own); the preview shows exactly what customers get. After you approve it, you or the Secretary can send it.</p>
+          <CampaignComposer products={catalog} eligibleCount={eligible.length} baseUrl={config.baseUrl()} fromNumber={smsNumberDisplay()} />
         </div>
       )}
 

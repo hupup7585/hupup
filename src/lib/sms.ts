@@ -4,6 +4,7 @@ import { config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
 import { getTwilio } from "@/lib/twilio-client";
 import { inRecipientPromoHours } from "@/lib/area-code-tz";
+import { promoTextV2 } from "@/lib/promo-text";
 import { PROMOS_PER_YEAR, PROMO_ENDING_V2, PROMO_OPENING, PROMO_PREFIX_V2 } from "@/lib/sms-consent-copy";
 import { smsTermsV2Active } from "@/lib/sms-terms-v2";
 
@@ -76,14 +77,8 @@ export function marketingBody(body: string, v2 = smsTermsV2Active()): string {
   return `${PROMO_OPENING} ${offer}`.trim();
 }
 
-/** SMS Terms v2: "Hup Up Attractions: <offer> Reply NO PROMO to stop promos, STOP to end all texts." */
-export function marketingBodyV2(body: string): string {
-  let offer = body.trim();
-  offer = offer.replace(/^hup up attractions\s*[:\-]\s*/i, "");
-  offer = offer.replace(/\s*reply stop to opt out\.?\s*/i, " ").trim();
-  if (offer.endsWith(PROMO_ENDING_V2)) offer = offer.slice(0, -PROMO_ENDING_V2.length).trim();
-  return `${PROMO_PREFIX_V2} ${offer} ${PROMO_ENDING_V2}`;
-}
+/** SMS Terms v2/v3: "Hup Up Attractions: <offer> Reply NOPROMO to stop promos, STOP to stop all texts." (shared with the Campaigns screen) */
+export const marketingBodyV2 = promoTextV2;
 
 /** Start of the current calendar year in New York. */
 function yearStart(now = new Date()): Date {
