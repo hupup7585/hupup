@@ -30,7 +30,7 @@ export default function SmsTermsV3() {
         <p>{`To resume order and service texts after STOP, reply START, then reply YES to our confirmation text within 24 hours. START never resumes promotional texts. To receive them again, request a new confirmation and reply YES within 24 hours.`}</p>
 
         <h2>Help and Wrong Number</h2>
-        <p>{`Reply HELP to (845) 415-7585, call (845) 777-7585, or email hupupattractions@gmail.com. If you received a text in error, reply STOP or WRONG NUMBER, and we will remove the number from our messaging system.`}</p>
+        <p>{`Reply HELP to (845) 415-7585, call (845) 777-7585, or email info@hupupattractions.com. If you received a text in error, reply STOP or WRONG NUMBER, and we will remove the number from our messaging system.`}</p>
 
         <h2>Message Examples</h2>
         <p>{`"Your order is confirmed." "Your delivery is on the way." "Here is your delivery confirmation photo." "Your pickup is scheduled." "A seasonal offer is available."`}</p>

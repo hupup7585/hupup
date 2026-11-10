@@ -12,7 +12,7 @@ export const PUBLIC_PHONE_E164 = "+18457777585";
 export const LIVE_PUBLIC_EMAIL = "hupupattractions@gmail.com";
 export const NEW_PUBLIC_EMAIL = "info@hupupattractions.com";
 /** Flip to true once Abraham says info@hupupattractions.com works; then the live site shows it too. */
-export const NEW_EMAIL_LIVE = false;
+export const NEW_EMAIL_LIVE = true; // Abraham, Nov 10, 2026: "info@hupupattractions.com already exists. Change it every place."
 
 /**
  * The email the public website shows (footer, contact, legal pages, business schema): info@ on previews,

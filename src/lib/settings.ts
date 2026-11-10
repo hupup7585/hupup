@@ -12,7 +12,7 @@ export const SETTING_DEFAULTS = {
   incomingTextEmail: true,
   smsForwardPhone: "",
   smsHelpReplyEnabled: true,
-  smsHelpText: `${BUSINESS_NAME}: For help, call (845) 777-7585 or email hupupattractions@gmail.com. Msg & data rates may apply. Reply STOP to opt out.`,
+  smsHelpText: `${BUSINESS_NAME}: For help, call (845) 777-7585 or email info@hupupattractions.com. Msg & data rates may apply. Reply STOP to opt out.`,
   supportPhone: "",
   /* Checkout pricing (Abram's decisions; editable in admin). Lists are one place per line. */
   deliveryFeeKjCents: "1000",

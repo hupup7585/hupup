@@ -42,12 +42,12 @@ describe("Abram's five final /sms-terms corrections", () => {
 describe("HELP auto-reply matches the SMS Terms", async () => {
   const { helpReply, HELP_REPLY } = await import("@/lib/sms-inbound");
   it("identifies Hup Up Attractions and gives the support phone and email", () => {
-    for (const s of ["Hup Up Attractions", "(845) 777-7585", "hupupattractions@gmail.com"]) expect(HELP_REPLY).toContain(s);
+    for (const s of ["Hup Up Attractions", "(845) 777-7585", "info@hupupattractions.com"]) expect(HELP_REPLY).toContain(s);
   });
   it("a custom text missing any of them falls back to the compliant reply", () => {
     expect(helpReply("Hup Up Attractions: for help call or text us at this number. Reply STOP to opt out.")).toBe(HELP_REPLY);
     expect(helpReply("")).toBe(HELP_REPLY);
-    const ok = "Hup Up Attractions help: (845) 777-7585, hupupattractions@gmail.com. Reply STOP to opt out.";
+    const ok = "Hup Up Attractions help: (845) 777-7585, info@hupupattractions.com. Reply STOP to opt out.";
     expect(helpReply(ok)).toBe(ok);
   });
   it("HELP is always answered (not behind an off-by-default switch)", () => {

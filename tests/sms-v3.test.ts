@@ -161,10 +161,10 @@ describe("START then YES, and HELP", () => {
     expect(after.smsOptOut).toBe(false);
     expect(after.marketingOptIn).toBe(false);
   });
-  it("HELP replies with the business name, (845) 777-7585 and hupupattractions@gmail.com", async () => {
+  it("HELP replies with the business name, (845) 777-7585 and info@hupupattractions.com", async () => {
     const r = await text("+18455551002", "HELP");
     expect(r.reply).toBe(HELP_REPLY);
-    for (const part of ["Hup Up Attractions", "(845) 777-7585", "hupupattractions@gmail.com"]) expect(HELP_REPLY).toContain(part);
+    for (const part of ["Hup Up Attractions", "(845) 777-7585", "info@hupupattractions.com"]) expect(HELP_REPLY).toContain(part);
   });
 });
 
