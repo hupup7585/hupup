@@ -165,6 +165,7 @@ export const SYSTEM_EVENTS: Record<string, { afterStop: boolean }> = {
   opt_out_confirmation: { afterStop: true }, // the single permitted confirmation of an opt-out
   reenroll_request: { afterStop: true }, // the START confirmation asking the customer to reply YES
   promo_confirm_request: { afterStop: false }, // SMS Terms v2: asks for a YES reply (written promotional consent)
+  join_invite: { afterStop: false }, // JOIN invitation: once per customer, separate text, only while JOIN_INVITE_ON (off until Abraham picks the wording)
 };
 
 export type Customer = typeof schema.customers.$inferSelect;

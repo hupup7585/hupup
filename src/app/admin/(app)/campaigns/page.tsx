@@ -1,6 +1,7 @@
 import { requireStaff } from "@/lib/auth";
 import { CAMPAIGNS_NOT_ACTIVE, campaignPreview, campaignRecipients, campaignsCanSend, eligibleOf, listCampaigns, promoSignups, segments } from "@/lib/campaigns";
 import { PROMOS_PER_YEAR } from "@/lib/sms-consent-copy";
+import { JOIN_INVITE_ON, joinInviteText } from "@/lib/join-invite";
 import { formatPhone } from "@/lib/phone";
 import { alertDateTime } from "@/lib/voicemail";
 import { approveCampaignAction, cancelCampaignAction, createCampaignAction, sendCampaignAction } from "./actions";
@@ -35,6 +36,17 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
         <div className="card p-4"><div className="text-sm text-muted">Can get the next campaign</div><div className="text-2xl font-black">{eligible.length}</div></div>
         <div className="card p-4"><div className="text-sm text-muted">Reached {PROMOS_PER_YEAR} this year</div><div className="text-2xl font-black">{signups.filter((s) => s.status === "At yearly limit").length}</div></div>
       </div>
+
+      {owner && (
+        <div className="card p-5" data-join-invite>
+          <h2 className="mb-1 text-lg font-extrabold">JOIN invitation</h2>
+          <p className="mb-2 text-sm">
+            <b>{JOIN_INVITE_ON ? "On" : "Off"}</b>
+            {JOIN_INVITE_ON ? "" : ": waiting for Abraham to choose the exact wording."} One separate text per customer (never inside an order text), to customers with order-text consent who aren&rsquo;t on promos. A JOIN reply only sends the confirmation text; YES within 24 hours signs up.
+          </p>
+          <p className="text-sm text-muted">Draft (not sent): &ldquo;{joinInviteText()}&rdquo;</p>
+        </div>
+      )}
 
       <div className="card p-5">
         <h2 className="mb-3 text-lg font-extrabold">Campaigns</h2>
