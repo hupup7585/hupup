@@ -195,7 +195,7 @@ describe("promotional consent (separate, never automatic)", () => {
   it("asked after the order with its own disclosure (SMS v3)", async () => {
     const xml = await call("promo-consent");
     expect(xml).toContain("Agreeing is never required to book or buy.");
-    expect(xml).toContain("up to 5 per calendar year");
+    expect(xml).toContain("up to 6 per calendar year");
     expect(xml).toContain("you'll be signed up only after you reply YES to that text within 24 hours");
     expect(xml).toContain("/api/voice/promo-consent-answer");
   });

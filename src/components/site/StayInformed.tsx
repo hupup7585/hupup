@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { signUpForTexts, type SignUpState } from "@/app/text-alerts/actions";
 import ConsentText from "@/components/ConsentText";
+import { SectionTitle } from "@/components/site/parts";
 
 /**
  * Homepage "Stay Informed" (Abraham, SMS v3): promo sign-up only. The box is never checked for the customer; signing
@@ -12,10 +13,12 @@ export default function StayInformed({ marketingText, smsNumber, notActive, disa
   const [state, action, pending] = useActionState<SignUpState, FormData>(signUpForTexts, {});
   return (
     <section id="stay-informed" data-stay-informed className="scroll-mt-20 bg-hu-tint py-14 sm:py-20">
-      <div className="mx-auto max-w-3xl px-4 sm:px-6">
-        <h2 className="font-display text-[1.7rem] font-extrabold leading-tight text-hu-deep min-[370px]:text-3xl sm:text-4xl">Stay Informed</h2>
+      {/* Abraham: same page width, small line and title size as the other homepage sections; the form stays narrower inside */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div data-stay-informed-body className="max-w-3xl">
+        <SectionTitle kicker="Never miss a deal" title="Stay Informed" />
         <p className="mt-3 text-lg leading-relaxed">Be the first to hear about seasonal deals, specials, and new rentals from Hup Up Attractions.</p>
-        <p className="mt-1 text-sm font-semibold opacity-80">Up to 5 promo texts a year, never more.</p>
+        <p className="mt-1 text-sm font-semibold opacity-80">Up to 6 promo texts a year, never more.</p>
         {state.ok ? (
           <div data-stay-informed-done className="mt-6 rounded-2xl border-2 border-hu-deep bg-white p-5">
             <p className="text-lg font-bold">Almost done! Check your phone and reply YES to our text to confirm.</p>
@@ -56,6 +59,7 @@ export default function StayInformed({ marketingText, smsNumber, notActive, disa
           </form>
         )}
         <p className="mt-4 text-base">Or text JOIN to {smsNumber}.</p>
+        </div>
       </div>
     </section>
   );

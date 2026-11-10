@@ -57,8 +57,8 @@ describe("SMS Terms v2 switch", () => {
     expect(v2.smsTermsV2Active({ VERCEL_ENV: "production" })).toBe(true);
     expect(v2.smsTermsV2Active({ VERCEL_ENV: "preview" })).toBe(true);
     expect(v2.smsTermsV2Active({})).toBe(true);
-    expect(v2.webConsentCopy({ VERCEL_ENV: "production" }).version).toBe("web-2026-11-10-v3-approved");
-    expect(v2.webConsentCopy({ VERCEL_ENV: "preview" }).marketing).toBe("Text me a confirmation to join Hup Up Attractions promotional texts: seasonal offers, discount codes, and rental deals, up to 5 per calendar year. I am signed up only when I reply YES to that confirmation text within 24 hours. Consent is not a condition of purchase. Message and data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help. See our SMS Terms and Privacy Policy.");
+    expect(v2.webConsentCopy({ VERCEL_ENV: "production" }).version).toBe("web-2026-11-10-v3-6yr");
+    expect(v2.webConsentCopy({ VERCEL_ENV: "preview" }).marketing).toBe("Text me a confirmation to join Hup Up Attractions promotional texts: seasonal offers, discount codes, and rental deals, up to 6 per calendar year. I am signed up only when I reply YES to that confirmation text within 24 hours. Consent is not a condition of purchase. Message and data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help. See our SMS Terms and Privacy Policy.");
   });
 });
 
@@ -84,7 +84,7 @@ describe("written promotional consent (phone keypress only sends a confirmation 
     expect(rows[0].response).toContain("pressed 1 on call CAv2");
     expect((await customer()).marketingOptIn).toBe(true);
     expect(h.sent.map((m) => m.body)).toEqual([v2.PROMO_ENROLLED_SMS]);
-    expect(v2.PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You're signed up for seasonal promo texts, up to 5 per year. Msg & data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, HELP for help.");
+    expect(v2.PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You're signed up for seasonal promo texts, up to 6 per year. Msg & data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, HELP for help.");
 
     h.sent.length = 0;
     await text("YES", "SMv2yes2");
@@ -161,9 +161,9 @@ describe("JOIN and NO PROMO (Abraham, Nov 9, 2026)", () => {
     expect(detectKeywordDetail("No Promo", true).keyword).toBe("nopromo");
     expect(detectKeywordDetail("nopromo", false).keyword).toBe("nopromo");
   });
-  it("the confirmation text is Abraham's v3 wording, 5 a year, YES within 24 hours, with the live Terms link", () => {
+  it("the confirmation text is Abraham's v3 wording, 6 a year, YES within 24 hours, with the live Terms link", () => {
     expect(v2.promoConfirmRequestSms("https://hupupattractions.com")).toBe(
-      "Hup Up Attractions: You requested to join our seasonal promotional text program. You may receive up to 5 promotional messages per calendar year, including seasonal offers, discount codes, and rental deals. Message and data rates may apply. Reply YES within 24 hours to confirm. Reply STOP to unsubscribe. Reply HELP for assistance. Terms: https://hupupattractions.com/sms-terms",
+      "Hup Up Attractions: You requested to join our seasonal promotional text program. You may receive up to 6 promotional messages per calendar year, including seasonal offers, discount codes, and rental deals. Message and data rates may apply. Reply YES within 24 hours to confirm. Reply STOP to unsubscribe. Reply HELP for assistance. Terms: https://hupupattractions.com/sms-terms",
     );
   });
 });

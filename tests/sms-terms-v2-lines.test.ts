@@ -28,7 +28,7 @@ const V3 = [
   "Order and Service Texts",
   "Texts about your reservations, orders, payments, deliveries, pickups, and questions, including verification codes. You may agree on our website, on our phone line, or with our team. These may include picture messages (MMS), such as a photo confirming your delivery. Message frequency varies.",
   "Promotional Texts",
-  "Seasonal offers, discount codes, and rental deals, limited to 5 per customer per calendar year. Each promotional text begins with \"Hup Up Attractions:\" and ends with \"Reply NOPROMO to stop promos, STOP to stop all texts.\" Promotional texts are sent only between 8:00 AM and 9:00 PM your local time. If your time zone is unknown, we send only when both your area code's time zone and Eastern Time are within those hours.",
+  "Seasonal offers, discount codes, and rental deals, limited to 6 per customer per calendar year. Each promotional text begins with \"Hup Up Attractions:\" and ends with \"Reply NOPROMO to stop promos, STOP to stop all texts.\" Promotional texts are sent only between 8:00 AM and 9:00 PM your local time. If your time zone is unknown, we send only when both your area code's time zone and Eastern Time are within those hours.",
   "How to Join Promotional Texts",
   "You may request our confirmation text by checking the promotional box on our website, pressing a key on our phone line, asking our team, or texting JOIN to (845) 415-7585. You are enrolled only when you reply YES to that confirmation text within 24 hours. Your YES reply is your express written consent. Texting JOIN alone does not enroll you.",
   "Automated and Staff Messages",
@@ -65,5 +65,13 @@ describe("Abraham's approved website wording (Nov 10, 2026)", () => {
     expect(si).toContain("Almost done! Check your phone and reply YES to our text to confirm.");
     expect(si).toContain("Or text JOIN to {smsNumber}.");
     expect(readFileSync("src/components/ConsentText.tsx", "utf8")).toContain('href="/privacy"');
+  });
+
+  it("Stay Informed title matches the other homepage sections (small line, size, page width)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const si = readFileSync("src/components/site/StayInformed.tsx", "utf8");
+    expect(si).toContain('<SectionTitle kicker="Never miss a deal" title="Stay Informed" />');
+    expect(si).toContain('className="mx-auto max-w-6xl px-4 sm:px-6"');
+    expect(si).not.toMatch(/<h2/);
   });
 });

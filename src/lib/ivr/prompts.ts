@@ -186,7 +186,7 @@ export const PROMPTS = {
     group: "Text message consent",
     label: "Ask for promotional texts, written consent (SMS v3)",
     textOnly: true,
-    text: "One more question. Would you like promotional text messages from Hup Up Attractions at this number: seasonal offers, discount codes, and rental deals, up to 5 per calendar year? If you say yes, we'll text you a confirmation, and you'll be signed up only after you reply YES to that text within 24 hours. Agreeing is never required to book or buy. Message and data rates may apply. You can reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help, at any time. To get the confirmation text, press 1 or say yes. To skip, press 2 or say no.",
+    text: "One more question. Would you like promotional text messages from Hup Up Attractions at this number: seasonal offers, discount codes, and rental deals, up to 6 per calendar year? If you say yes, we'll text you a confirmation, and you'll be signed up only after you reply YES to that text within 24 hours. Agreeing is never required to book or buy. Message and data rates may apply. You can reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help, at any time. To get the confirmation text, press 1 or say yes. To skip, press 2 or say no.",
   },
   consent_marketing_sent: {
     group: "Text message consent",
