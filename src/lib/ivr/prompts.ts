@@ -184,7 +184,7 @@ export const PROMPTS = {
   },
   consent_marketing_v2: {
     group: "Text message consent",
-    label: "Ask for promotional texts, written consent (SMS v3)",
+    label: "Ask for promotional texts, long version (no longer played; replaced by the keys-only steps)",
     textOnly: true,
     text: "One more question. Would you like promotional text messages from Hup Up Attractions at this number: seasonal offers, discount codes, and rental deals, up to 6 per calendar year? If you say yes, we'll text you a confirmation, and you'll be signed up only after you reply YES to that text within 24 hours. Agreeing is never required to book or buy. Message and data rates may apply. You can reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help, at any time. To get the confirmation text, press 1 or say yes. To skip, press 2 or say no.",
   },
@@ -193,6 +193,14 @@ export const PROMPTS = {
     label: "Promotional confirmation text sent (SMS v3)",
     text: "Thank you. We just texted you a confirmation. Reply YES to that text within 24 hours to sign up for promotional texts.",
   },
+  // Promo texts by phone, keys only (Abraham, Nov 10, 2026): replaces consent_marketing_v2, which is no longer played.
+  promo_ask: { group: "Promo texts by phone (keys only)", label: "Step 1: after the order", text: "To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1. To skip, press pound." },
+  promo_which: { group: "Promo texts by phone (keys only)", label: "Step 2: which number", text: "To get texts at the number you're calling from, press 1. To use a different phone number, press 2." },
+  promo_enter: { group: "Promo texts by phone (keys only)", label: "Step 3: enter a number", text: "Please enter the 10-digit mobile number, then press pound." },
+  promo_heard: { group: "Promo texts by phone (keys only)", label: "Step 3: read the number back", text: "You entered {number}. To confirm, press 1. To enter it again, press 2.", vars: ["number"] },
+  promo_bad: { group: "Promo texts by phone (keys only)", label: "Step 3: not 10 digits", text: "Sorry, that number didn't work. Please try again." },
+  promo_final: { group: "Promo texts by phone (keys only)", label: "Final line", text: "Thanks! We just sent a text. Reply YES within 24 hours to finish signing up." },
+  promo_disclosure: { group: "Promo texts by phone (keys only)", label: "Disclosure line (right after the Final line)", text: "Message and data rates may apply, and you're signed up only after you reply YES to our confirmation text." },
   consent_unclear: { group: "Text message consent", label: "Didn't understand the answer", text: "Sorry, I didn't get that. Please press 1 for yes, or 2 for no." },
   consent_stopped: { group: "Text message consent", label: "Number replied STOP before", text: "This number has opted out of our text messages, so we won't text you. To get our texts again, text the word START to this hotline number." },
   consent_marketing_yes: { group: "Text message consent", label: "Signed up for promotional texts", text: "Thank you, you're signed up for promotional texts. We just texted you a confirmation." },

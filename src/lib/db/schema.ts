@@ -184,6 +184,8 @@ export type CallData = {
   day?: string;
   /** Key 1 booking: every held order on this call, one per rental day (paid together with one charge) */
   dayOrderIds?: number[];
+  /** Promo texts by phone (keys only): the mobile number typed in Step 3, waiting for the caller to confirm */
+  promoHeard?: string;
 };
 
 export const callSessions = pgTable("call_sessions", {

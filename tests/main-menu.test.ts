@@ -239,7 +239,7 @@ describe("menus are keys only (Abraham): no speech in any menu", () => {
     const { readFileSync } = await import("node:fs");
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(flow).not.toContain("category-speech");
-    expect((flow.match(/= speech\(vr, url\("(\w|-)+"/g) || []).map((m) => m.match(/url\("([\w-]+)"/)![1]).sort()).toEqual(["heard", "promo-consent-answer", "sms-consent-answer"]); // the booking date is keys only (Abraham, Nov 9)
+    expect((flow.match(/= speech\(vr, url\("(\w|-)+"/g) || []).map((m) => m.match(/url\("([\w-]+)"/)![1]).sort()).toEqual(["heard", "sms-consent-answer"]); // the booking date is keys only (Abraham, Nov 9)
   });
 });
 

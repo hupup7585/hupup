@@ -5,6 +5,7 @@ import { BUSINESS_NAME, config } from "@/lib/config";
 import { addDays, longDate, todayISO } from "@/lib/dates";
 import { spokenMoney } from "@/lib/money";
 import { last4, spokenDigits, toE164 } from "@/lib/phone";
+import { logStamp, phonePromoMode, phonePromoOn, readBack, tenDigitNumber } from "@/lib/phone-promo";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
 import { checkEventDate } from "@/lib/jewish-calendar";
 import { lateHoursToday, officeOpenNow, websiteHoursLines } from "@/lib/business-hours";
@@ -310,8 +311,8 @@ const MAIN_KEY_LABELS: Record<string, string> = {
 };
 
 /** Store a phone consent decision with the exact language the caller heard. */
-async function recordPhoneConsent(ctx: Ctx, scope: "transactional" | "marketing", action: "opt_in" | "declined", phone: string) {
-  const key = scope === "transactional" ? "consent_transactional" : smsTermsV2Active() ? "consent_marketing_v2" : "consent_marketing";
+async function recordPhoneConsent(ctx: Ctx, scope: "transactional" | "marketing", action: "opt_in" | "declined", phone: string, keyOverride?: PromptKey) {
+  const key: PromptKey = keyOverride ?? (scope === "transactional" ? "consent_transactional" : smsTermsV2Active() ? "consent_marketing_v2" : "consent_marketing");
   const wording = promptText(ctx.prompts, key);
   const digits = ctx.body.Digits || "";
   const said = (ctx.body.SpeechResult || "").trim();
@@ -330,6 +331,33 @@ async function recordPhoneConsent(ctx: Ctx, scope: "transactional" | "marketing"
     callSid: ctx.callSid,
     orderId: ctx.session?.orderId ?? ctx.session?.data.placedOrderId ?? null,
   });
+}
+
+/**
+ * Promo texts by phone: send the approved confirmation text (word for word) to the chosen number and log the request:
+ * source phone, which number (caller's or entered), and the date, time and year. Only a YES from that number within
+ * 24 hours signs it up (handled by the text system).
+ */
+async function promoSend(ctx: Ctx, vr: VR, to: string, chosen: "caller" | "entered") {
+  const caller = toE164(ctx.from);
+  const how =
+    `phone (keys only): pressed 1 for promo texts, then ${chosen === "caller" ? "1 for the number calling" : `2 and entered ${to}, confirmed with 1`}; ` +
+    `number chosen: ${chosen === "caller" ? "caller's number" : "entered number"} ${to}; caller ID ${caller ?? "withheld"}; call ${ctx.callSid}; ${logStamp()}; ` +
+    `heard: "${promptText(ctx.prompts, "promo_ask")}"`;
+  const r = await db.transaction(async (tx) => {
+    const [c] = await tx.select().from(schema.customers).where(eq(schema.customers.phone, to)).limit(1).for("update");
+    return requestPromoConfirmation(tx, c ?? null, to, how);
+  });
+  if (r.reason === "opted_out") {
+    sp(vr, ctx, "consent_stopped");
+    return back(vr, "goodbye");
+  }
+  if (!r.sendConfirmation) return back(vr, "goodbye"); // already signed up, or a confirmation is already waiting
+  const c = await customerByPhone(to);
+  await sendMessage({ to, body: promoConfirmRequestSms(), kind: "system", event: "promo_confirm_request", customerId: c?.id ?? null, callSid: ctx.callSid });
+  sp(vr, ctx, "promo_final");
+  sp(vr, ctx, "promo_disclosure");
+  return back(vr, "goodbye");
 }
 
 /**
@@ -1210,53 +1238,77 @@ const handlers: Record<string, Handler> = {
     return back(vr, "promo-consent");
   },
 
+  /*
+   * Promo texts by phone, keys only (Abraham, Nov 10, 2026). Step 1 after the order: press 1 for promo texts, pound
+   * (or nothing) skips. Step 2: the number you're calling from (1) or a different one (2). Step 3: type the 10-digit
+   * mobile number, hear it read back, press 1 to confirm. Then the approved confirmation text goes to the chosen
+   * number; only a YES from that number within 24 hours signs it up. Who hears it: PHONE_PROMO_MODE.
+   */
   async "promo-consent"(ctx, vr) {
-    const phone = ctx.session?.data.phone;
-    const retry = Number(ctx.query.get("n") || 0) > 0;
-    if (!phone) return back(vr, "goodbye");
-    if (!retry) {
-      const customer = await customerByPhone(phone);
-      if (!shouldAskMarketing(await consentState(phone), customer)) return back(vr, "goodbye");
+    const mode = phonePromoMode();
+    if (!phonePromoOn(ctx.from, mode)) return back(vr, "goodbye");
+    if (mode === "live") {
+      const caller = toE164(ctx.from);
+      if (caller && !shouldAskMarketing(await consentState(caller), await customerByPhone(caller))) return back(vr, "goodbye");
     }
-    const g = speech(vr, url("promo-consent-answer", { n: ctx.query.get("n") ?? undefined }), CONSENT_HINTS, { dtmf: true, numDigits: 1 });
-    sp(g, ctx, retry ? "consent_unclear" : smsTermsV2Active() ? "consent_marketing_v2" : "consent_marketing");
-    return vr;
+    const g = keypad(vr, url("promo-consent-answer"), { numDigits: 1, timeout: 6 });
+    sp(g, ctx, "promo_ask");
+    return back(vr, "promo-consent-answer"); // nothing pressed = skip
   },
 
   async "promo-consent-answer"(ctx, vr) {
-    const phone = ctx.session?.data.phone;
-    if (!phone) return back(vr, "goodbye");
-    const n = Number(ctx.query.get("n") || 0);
-    const answer = parseConsentAnswer({ digits: ctx.body.Digits, speech: ctx.body.SpeechResult, confidence: ctx.body.Confidence });
-    if (answer === "unclear" && n < 1) return back(vr, "promo-consent", { n: n + 1 });
-    if (smsTermsV2Active()) {
-      // SMS Terms v2: a keypress is not written consent. It only sends the confirmation text; a YES reply enrolls.
-      if (answer === "yes") {
-        const said = ctx.body.Digits ? `pressed ${ctx.body.Digits}` : `said "${(ctx.body.SpeechResult || "").trim()}"`;
-        const how = `phone: ${said} on call ${ctx.callSid} after hearing: ${promptText(ctx.prompts, "consent_marketing_v2")}`;
-        const r = await db.transaction(async (tx) => {
-          const [c] = await tx.select().from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1).for("update");
-          return requestPromoConfirmation(tx, c ?? null, phone, how);
-        });
-        if (r.sendConfirmation) {
-          const c = await customerByPhone(phone);
-          await sendMessage({ to: phone, body: promoConfirmRequestSms(), kind: "system", event: "promo_confirm_request", customerId: c?.id ?? null, callSid: ctx.callSid });
-        }
-        sp(vr, ctx, "consent_marketing_sent");
-        return back(vr, "goodbye");
-      }
-      await recordPhoneConsent(ctx, "marketing", "declined", phone);
-      if (answer === "no") sp(vr, ctx, "consent_marketing_no");
-      return back(vr, "goodbye");
+    if (ctx.body.Digits === "1") return back(vr, "promo-which");
+    const caller = toE164(ctx.from);
+    if (caller) await recordPhoneConsent(ctx, "marketing", "declined", caller, "promo_ask");
+    return back(vr, "goodbye");
+  },
+
+  "promo-which"(ctx, vr) {
+    const g = keypad(vr, url("promo-which-answer"), { numDigits: 1, timeout: 6 });
+    sp(g, ctx, "promo_which");
+    return back(vr, "goodbye"); // nothing pressed: skip and end the call normally
+  },
+
+  async "promo-which-answer"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (d === "1") {
+      const caller = toE164(ctx.from);
+      if (!caller) return back(vr, "promo-enter"); // caller ID withheld: type the number instead
+      return promoSend(ctx, vr, caller, "caller");
     }
-    // Never auto-enroll: only a clear "yes" (key 1, or a confident spoken yes) opts in.
-    const customerId = await recordPhoneConsent(ctx, "marketing", answer === "yes" ? "opt_in" : "declined", phone);
-    if (answer === "yes") {
-      await sendMessage({ to: phone, body: MARKETING_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId, callSid: ctx.callSid });
-      sp(vr, ctx, "consent_marketing_yes");
-      return back(vr, "tz");
+    if (d === "2") return back(vr, "promo-enter");
+    return back(vr, "goodbye");
+  },
+
+  "promo-enter"(ctx, vr) {
+    const tries = Number(ctx.query.get("t") || 0);
+    const g = keypad(vr, url("promo-heard", { t: tries }), { numDigits: 10, timeout: 10, finishOnKey: "#" });
+    sp(g, ctx, "promo_enter");
+    vr.redirect({ method: "POST" }, url("promo-heard", { t: tries })); // nothing typed counts as a try
+    return vr;
+  },
+
+  async "promo-heard"(ctx, vr) {
+    const tries = Number(ctx.query.get("t") || 0);
+    const e164 = tenDigitNumber(ctx.body.Digits);
+    if (!e164) {
+      if (tries + 1 >= 2) return back(vr, "goodbye"); // two tries that didn't work: skip
+      sp(vr, ctx, "promo_bad");
+      return back(vr, "promo-enter", { t: tries + 1 });
     }
-    if (answer === "no") sp(vr, ctx, "consent_marketing_no");
+    await updateSession(ctx.callSid, { data: { promoHeard: e164 } }, ctx.session);
+    const g = keypad(vr, url("promo-confirm"), { numDigits: 1, timeout: 6 });
+    sp(g, ctx, "promo_heard", { number: readBack(e164) });
+    return back(vr, "goodbye");
+  },
+
+  async "promo-confirm"(ctx, vr) {
+    const heard = ctx.session?.data.promoHeard;
+    if (ctx.body.Digits === "1" && heard) {
+      await updateSession(ctx.callSid, { data: { promoHeard: undefined } }, ctx.session);
+      return promoSend(ctx, vr, heard, "entered");
+    }
+    if (ctx.body.Digits === "2") return back(vr, "promo-enter");
     return back(vr, "goodbye");
   },
 

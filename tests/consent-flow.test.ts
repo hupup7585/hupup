@@ -15,13 +15,16 @@ const h = vi.hoisted(() => ({
   messages: [] as Record<string, unknown>[],
   zones: [] as { phone: string; zone: string; source: string }[],
   terms: [] as Record<string, unknown>[],
+  promoMode: "owner_test" as "off" | "owner_test" | "live",
+  promoRequests: [] as { to: string; how: string }[],
+  promoResult: { sendConfirmation: true, reason: "pending_created" } as { sendConfirmation: boolean; reason: string },
 }));
 
 vi.mock("@/lib/db", async () => {
   const schema = await vi.importActual<typeof import("@/lib/db/schema")>("@/lib/db/schema");
   const chain = (): unknown =>
     new Proxy(() => undefined, {
-      get: (_t, k) => (k === "then" ? (res: (v: unknown) => void) => res(h.customer ? [h.customer] : []) : () => chain()),
+      get: (_t, k) => (k === "transaction" ? (cb: (tx: unknown) => unknown) => cb(chain()) : k === "then" ? (res: (v: unknown) => void) => res(h.customer ? [h.customer] : []) : () => chain()),
       apply: () => chain(),
     });
   return { db: chain(), schema };
@@ -45,6 +48,11 @@ vi.mock("@/lib/sms-consent", async (orig) => ({
     h.zones.push({ phone, zone, source });
     return true;
   },
+}));
+vi.mock("@/lib/phone-promo", async (orig) => ({ ...(await orig<typeof import("@/lib/phone-promo")>()), phonePromoMode: () => h.promoMode }));
+vi.mock("@/lib/sms-reenroll", async (orig) => ({
+  ...(await orig<typeof import("@/lib/sms-reenroll")>()),
+  requestPromoConfirmation: async (_tx: unknown, _c: unknown, to: string, how: string) => (h.promoRequests.push({ to, how }), h.promoResult),
 }));
 vi.mock("@/lib/notify", () => ({
   sendSms: async (to: string, body: string, opts?: Record<string, unknown>) => {
@@ -100,6 +108,10 @@ beforeEach(() => {
   h.emails = [];
   h.messages = [];
   h.zones = [];
+  h.promoMode = "owner_test";
+  h.promoRequests = [];
+  h.promoResult = { sendConfirmation: true, reason: "pending_created" };
+  process.env.ADMIN_PHONE = "+18455550100"; // owner test mode: this test caller is the Owner
   process.env.PUBLIC_BASE_URL = "https://hupup.vercel.app";
   process.env.AUTH_SECRET = "test-secret-at-least-24-characters-long";
 });
@@ -191,33 +203,94 @@ describe("finalize sends texts only with consent", () => {
   });
 });
 
-describe("promotional consent (separate, never automatic)", () => {
-  it("asked after the order with its own disclosure (SMS v3)", async () => {
-    const xml = await call("promo-consent");
-    expect(xml).toContain("Agreeing is never required to book or buy.");
-    expect(xml).toContain("up to 6 per calendar year");
-    expect(xml).toContain("you'll be signed up only after you reply YES to that text within 24 hours");
+describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
+  const plain = (x: string) => x.replace(/&apos;/g, "'");
+  it("Step 1 after the order: exact wording, keys only (no speech), pound or nothing skips", async () => {
+    const xml = plain(await call("promo-consent"));
+    expect(xml).toContain("To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1. To skip, press pound.");
+    expect(xml).toContain('input="dtmf"');
+    expect(xml).not.toContain("speech");
+    expect(xml).not.toContain("say yes");
     expect(xml).toContain("/api/voice/promo-consent-answer");
-  });
-  it("yes: only texts the confirmation; nothing is enrolled until the customer replies YES (SMS v3)", async () => {
-    const xml = await call("promo-consent-answer", { Digits: "1" });
-    expect(h.recorded.filter((r) => r.scope === "marketing" && r.action === "opt_in")).toEqual([]);
-    // The confirmation text itself is checked on a real database in sms-terms-v2.test.ts (press 1 sends it)
-    expect(h.messages.every((m) => m.event !== "consent_confirmation")).toBe(true);
-    expect(xml).toContain("Reply YES to that text within 24 hours");
-    void PROMPTS;
-  });
-  it("no, silence or an unclear answer never enrolls", async () => {
-    await call("promo-consent-answer", { Digits: "2" });
-    await call("promo-consent-answer", {}, "n=1");
-    await call("promo-consent-answer", { SpeechResult: "yes", Confidence: "0.2" }, "n=1");
-    expect(h.recorded.map((r) => r.action)).toEqual(["declined", "declined", "declined"]);
+    for (const body of [{ Digits: "#" }, {}] as Record<string, string>[]) {
+      const out = await call("promo-consent-answer", body);
+      expect(out).toContain("/api/voice/goodbye");
+    }
+    expect(h.recorded.map((r) => [r.scope, r.action, r.wording])).toEqual([
+      ["marketing", "declined", PROMPTS.promo_ask.text],
+      ["marketing", "declined", PROMPTS.promo_ask.text],
+    ]);
     expect(h.messages).toHaveLength(0);
   });
-  it("skipped when already decided recently", async () => {
+  it("the long spoken question is never played", async () => {
+    const xml = plain(await call("promo-consent"));
+    expect(xml).not.toContain(PROMPTS.consent_marketing_v2.text);
+    expect(xml).not.toContain("One more question");
+  });
+  it("Step 2: press 1 texts the approved confirmation to the caller's number, then the Final and Disclosure lines", async () => {
+    expect(await call("promo-consent-answer", { Digits: "1" })).toContain("/api/voice/promo-which");
+    expect(plain(await call("promo-which"))).toContain("To get texts at the number you're calling from, press 1. To use a different phone number, press 2.");
+    const xml = plain(await call("promo-which-answer", { Digits: "1" }));
+    expect(h.promoRequests).toHaveLength(1);
+    expect(h.promoRequests[0].to).toBe("+18455550100");
+    expect(h.promoRequests[0].how).toContain("number chosen: caller's number +18455550100");
+    expect(h.promoRequests[0].how).toMatch(/phone \(keys only\)/);
+    expect(h.promoRequests[0].how).toMatch(/20\d\d/); // the year
+    expect(h.promoRequests[0].how).toMatch(/New York time/); // date and time
+    const m = h.messages.find((x) => x.event === "promo_confirm_request")!;
+    expect(m.to).toBe("+18455550100");
+    const { promoConfirmRequestSms } = await import("@/lib/sms-terms-v2");
+    expect(m.body).toBe(promoConfirmRequestSms()); // word for word as approved
+    const fin = xml.indexOf("Thanks! We just sent a text. Reply YES within 24 hours to finish signing up.");
+    const dis = xml.indexOf("Message and data rates may apply, and you're signed up only after you reply YES to our confirmation text.");
+    expect(fin).toBeGreaterThan(-1);
+    expect(dis).toBeGreaterThan(fin);
+    expect(xml).toContain("/api/voice/goodbye");
+    expect(h.recorded.filter((r) => r.action === "opt_in")).toEqual([]); // nothing is signed up until YES
+  });
+  it("Step 3: a different number is read back in groups, confirmed with 1, and the text goes to that number", async () => {
+    expect(await call("promo-which-answer", { Digits: "2" })).toContain("/api/voice/promo-enter");
+    const ask = await call("promo-enter");
+    expect(ask).toContain("Please enter the 10-digit mobile number, then press pound.");
+    expect(ask).toContain('finishOnKey="#"');
+    const heard = await call("promo-heard", { Digits: "8455551234" });
+    expect(heard).toContain("You entered 8 4 5, 5 5 5, 1 2 3 4. To confirm, press 1. To enter it again, press 2.");
+    const xml = await call("promo-confirm", { Digits: "1" });
+    expect(h.promoRequests[0].to).toBe("+18455551234");
+    expect(h.promoRequests[0].how).toContain("number chosen: entered number +18455551234");
+    expect(h.messages.find((x) => x.event === "promo_confirm_request")!.to).toBe("+18455551234");
+    expect(xml).toContain("Thanks! We just sent a text.");
+  });
+  it("Step 3: press 2 enters it again; not 10 digits says sorry, and after 2 tries skips", async () => {
+    await call("promo-heard", { Digits: "8455551234" });
+    expect(await call("promo-confirm", { Digits: "2" })).toContain("/api/voice/promo-enter");
+    const bad = plain(await call("promo-heard", { Digits: "84555" }));
+    expect(bad).toContain("Sorry, that number didn't work. Please try again.");
+    expect(bad).toContain("/api/voice/promo-enter?t=1");
+    const second = await handleVoice({ action: "promo-heard", query: new URLSearchParams("t=1"), body: { Digits: "123" }, callSid: "CA1", from: "+18455550100" });
+    expect(second).toContain("/api/voice/goodbye");
+    expect(second).not.toContain("didn&apos;t work");
+    expect(h.messages).toHaveLength(0);
+  });
+  it("a number that replied STOP gets no text and no 'we just sent a text'", async () => {
+    h.promoResult = { sendConfirmation: false, reason: "opted_out" };
+    const xml = await call("promo-which-answer", { Digits: "1" });
+    expect(h.messages).toHaveLength(0);
+    expect(xml).not.toContain("We just sent a text");
+  });
+  it("not live yet: other callers skip straight to goodbye; only the Owner's own phone hears it (owner test)", async () => {
+    process.env.ADMIN_PHONE = "+18457777585";
+    expect(await call("promo-consent")).toContain("/api/voice/goodbye");
+    h.promoMode = "off";
+    process.env.ADMIN_PHONE = "+18455550100";
+    expect(await call("promo-consent")).not.toContain("seasonal offers");
+  });
+  it("once live: skipped when the caller already decided recently", async () => {
+    h.promoMode = "live";
     h.state.marketing = { action: "declined", at: new Date() };
+    process.env.ADMIN_PHONE = "+18457777585";
     const xml = await call("promo-consent");
-    expect(xml).not.toContain("promotional text messages");
+    expect(xml).not.toContain("seasonal offers");
     expect(xml).toContain("/api/voice/goodbye");
   });
   it("goodbye reads the delivery and pickup dates and hangs up", async () => {

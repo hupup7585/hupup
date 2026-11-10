@@ -22,6 +22,7 @@ vi.mock("@/lib/ivr/session", () => ({
   getSession: async () => h.session,
   updateSession: async (_s: string, patch: Record<string, unknown> & { data?: Record<string, unknown> }) => Object.assign(h.session, { ...patch, data: { ...h.session.data, ...(patch.data ?? {}) } }),
 }));
+vi.mock("@/lib/phone-promo", async (orig) => ({ ...(await orig<typeof import("@/lib/phone-promo")>()), phonePromoMode: () => "live" as const }));
 vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
 
 import { eq } from "drizzle-orm";
@@ -65,15 +66,17 @@ describe("SMS Terms v2 switch", () => {
 describe("written promotional consent (phone keypress only sends a confirmation text)", () => {
   it("press 1 sends the confirmation text and enrolls nothing; YES enrolls; a second YES does nothing", async () => {
     const ask = await call("promo-consent");
-    expect(ask.replace(/&apos;/g, "'")).toContain(PROMPTS.consent_marketing_v2.text);
+    expect(ask.replace(/&apos;/g, "'")).toContain(PROMPTS.promo_ask.text);
+    expect(await call("promo-consent-answer", { Digits: "1" })).toContain("/api/voice/promo-which");
 
-    const after = await call("promo-consent-answer", { Digits: "1" });
-    expect(after.replace(/&apos;/g, "'")).toContain(PROMPTS.consent_marketing_sent.text);
+    const after = await call("promo-which-answer", { Digits: "1" });
+    expect(after.replace(/&apos;/g, "'")).toContain(PROMPTS.promo_final.text);
+    expect(after.replace(/&apos;/g, "'")).toContain(PROMPTS.promo_disclosure.text);
     expect(h.sent.map((m) => m.body)).toEqual([v2.promoConfirmRequestSms()]);
     expect(await marketingRows()).toHaveLength(0); // a keypress is not consent
     expect((await customer())?.marketingOptIn ?? false).toBe(false);
 
-    await call("promo-consent-answer", { Digits: "1" }); // pressing again doesn't send a second text
+    await call("promo-which-answer", { Digits: "1" }); // pressing again doesn't send a second text
     expect(h.sent).toHaveLength(1);
 
     h.sent.length = 0;
@@ -81,7 +84,8 @@ describe("written promotional consent (phone keypress only sends a confirmation 
     const rows = await marketingRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ action: "opt_in", source: "sms_reply", method: "sms_reply", wording: v2.promoConfirmRequestSms(), wordingVersion: v2.PROMO_CONFIRM_VERSION });
-    expect(rows[0].response).toContain("pressed 1 on call CAv2");
+    expect(rows[0].response).toContain("call CAv2");
+    expect(rows[0].response).toContain("number chosen: caller's number +18455550177");
     expect((await customer()).marketingOptIn).toBe(true);
     expect(h.sent.map((m) => m.body)).toEqual([v2.PROMO_ENROLLED_SMS]);
     expect(v2.PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You're signed up for seasonal promo texts, up to 6 per year. Msg & data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, HELP for help.");
@@ -94,7 +98,7 @@ describe("written promotional consent (phone keypress only sends a confirmation 
 
   it("STOP cancels a waiting confirmation, so a late YES enrolls nothing", async () => {
     await db.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.phone, PHONE));
-    await call("promo-consent-answer", { Digits: "1" });
+    await call("promo-which-answer", { Digits: "1" });
     await text("STOP", "SMv2stop");
     await text("YES", "SMv2late");
     expect((await customer()).marketingOptIn).toBe(false);
