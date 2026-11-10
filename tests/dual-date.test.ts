@@ -6,7 +6,7 @@ import { MESSAGE_DUAL_DATES, dualDate, dualDateTime, englishDate, hebrewDate, he
 describe("double dates", () => {
   it("calendar days: 'Sunday, Nov 8, 2026 / כ״ח חשון תשפ״ז'", () => {
     expect(dualDate("2026-11-08")).toBe("Sunday, Nov 8, 2026 / כ״ח חשון תשפ״ז");
-    expect(dualDate("2026-11-08", "short")).toBe("Sun, Nov 8 / כ״ח חשון");
+    expect(dualDate("2026-11-08", "short")).toBe("Sun, Nov 8, 2026 / כ״ח חשון"); // Abraham: dates always with the year
     expect(englishDate("2026-11-08")).toBe("Sunday, Nov 8, 2026");
     expect(dualDate("2026-09-12")).toBe("Saturday, Sep 12, 2026 / א׳ תשרי תשפ״ז");
     expect(hebrewDate("2026-12-05")).toBe("כ״ה כסלו תשפ״ז");

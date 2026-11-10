@@ -46,7 +46,7 @@ describe("business gets the order details by email when an order is paid", () =>
     expect(res.status).toBe(200);
     const mail = h.emails.filter((e) => e.to === "owner@example.com");
     expect(mail).toHaveLength(1);
-    expect(mail[0].subject).toMatch(/^Hup Up Attractions: new paid order #\d+ for Sun, Nov 15 \/ /);
+    expect(mail[0].subject).toMatch(/^Hup Up Attractions: new paid order #\d+ for Sun, Nov 15, 2026 \/ /);
     for (const part of ["booked by phone", "Delivery: Sunday, Nov 15, 2026 / ", "Pickup: Monday, Nov 16, 2026 / ", "Address: 5 Sample Rd, Monroe, NY", "Customer: Sample Customer", "Phone: (845) 555-0123", "2 x Paddle Boat at $45.00", "Rentals: $90.00", "Delivery: $10.00", "Sales tax: $8.13", "Total: $108.13", "Paid now: $108.13", `https://hupup.example/admin/orders/${orderId}`]) {
       expect(mail[0].text).toContain(part);
     }

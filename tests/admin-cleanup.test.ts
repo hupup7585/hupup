@@ -27,6 +27,7 @@ describe("Admin cleanup", () => {
       ["campaigns/page.tsx", 2],
       ["customers/[id]/page.tsx", 1],
       ["voicemail/page.tsx", 1],
+      ["calls/page.tsx", 1], // Block
     ] as const)
       expect((read(B + f).match(/<ConfirmSubmit /g) || []).length, f).toBeGreaterThanOrEqual(n);
     expect(read(B + "staff/StaffForms.tsx")).toContain('window.confirm("Deactivate this staff member?');

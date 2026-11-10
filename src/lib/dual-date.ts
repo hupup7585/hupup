@@ -50,13 +50,13 @@ const asUTC = (iso: string) => {
 /** long: "Sunday, Nov 8, 2026"   short: "Sun, Nov 8" */
 export function englishDate(iso: string, style: "long" | "short" = "long"): string {
   const o: Intl.DateTimeFormatOptions =
-    style === "long" ? { timeZone: "UTC", weekday: "long", month: "short", day: "numeric", year: "numeric" } : { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" };
+    style === "long" ? { timeZone: "UTC", weekday: "long", month: "short", day: "numeric", year: "numeric" } : { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", year: "numeric" }; // Abraham: always with the year
   return asUTC(iso).toLocaleDateString("en-US", o);
 }
 
 export type DualParts = { en: string; he: string };
 
-/** Both dates for a calendar day. long: with years; short: day and month only (for tables). */
+/** Both dates for a calendar day. long: full; short (tables): short day and month, English with the year. */
 export function dualParts(iso: string, style: "long" | "short" = "long"): DualParts {
   return { en: englishDate(iso, style), he: hebrewDate(iso, { year: style === "long" }) };
 }

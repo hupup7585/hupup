@@ -19,7 +19,7 @@ import { promoConfirmRequestSms } from "@/lib/sms-terms-v2";
 import { PROMPTS } from "@/lib/ivr/prompts";
 
 const NOON = new Date("2026-11-10T17:00:00Z");
-const P = { ok: "+18455550601", promo: "+18455550602", stop: "+18455550603", test: "+18455550604", noOrder: "+18455550605", noConsent: "+18455550606" };
+const P = { declined: "+18455550607", nopromo: "+18455550608", ok: "+18455550601", promo: "+18455550602", stop: "+18455550603", test: "+18455550604", noOrder: "+18455550605", noConsent: "+18455550606" };
 
 beforeAll(async () => {
   process.env.TWILIO_PHONE_NUMBER = "+18454157585";
@@ -34,11 +34,15 @@ beforeAll(async () => {
       { name: "Test entry", phone: P.test, isTest: true, timeZone: "America/New_York" },
       { name: "No order", phone: P.noOrder, timeZone: "America/New_York" },
       { name: "No consent", phone: P.noConsent, timeZone: "America/New_York" },
+      { name: "Declined promos", phone: P.declined, timeZone: "America/New_York" },
+      { name: "Sent NOPROMO", phone: P.nopromo, timeZone: "America/New_York" },
     ])
     .returning();
   for (const c of rows) {
     if (c.phone !== P.noConsent)
       await db.insert(schema.smsConsents).values({ customerId: c.id, phone: c.phone!, scope: "transactional", action: "opt_in", source: "web", method: "checkbox", wording: "x" });
+    if (c.phone === P.declined) await db.insert(schema.smsConsents).values({ customerId: c.id, phone: c.phone, scope: "marketing", action: "declined", source: "phone", method: "keypad", wording: "x" });
+    if (c.phone === P.nopromo) await db.insert(schema.smsConsents).values({ customerId: c.id, phone: c.phone, scope: "marketing", action: "opt_out", source: "keyword", method: "keyword", wording: "NOPROMO" });
     if (c.phone !== P.noOrder) await db.insert(schema.orders).values({ customerId: c.id, eventDate: "2026-11-01", pickupDate: "2026-11-02", status: "PICKED_UP", channel: "PHONE" });
   }
 });
@@ -55,7 +59,7 @@ describe("JOIN invitation", () => {
     expect(promoConfirmRequestSms()).toContain(`up to ${PROMOS_PER_YEAR} promotional messages per calendar year`);
     expect(PROMPTS.promo_ask.text).toContain(`up to ${PROMOS_PER_YEAR} a year`);
   });
-  it("when turned on: one text per eligible customer, once ever; skips promos, STOP, test entries, no order, no consent", async () => {
+  it("when turned on: one text per eligible customer, once ever; skips anyone who joined, declined, sent NOPROMO or STOP, test entries, no order, no consent", async () => {
     const r = await sendJoinInvites(NOON, true);
     expect(r.sent).toBe(1);
     expect(h.sent.map((m) => m.to)).toEqual([P.ok]);

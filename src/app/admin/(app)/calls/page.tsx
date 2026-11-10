@@ -1,3 +1,4 @@
+import ConfirmSubmit from "@/components/ConfirmSubmit";
 import Link from "next/link";
 import { recentCalls } from "@/lib/admin-queries";
 import { formatPhone } from "@/lib/phone";
@@ -92,7 +93,7 @@ export default async function CallsPage() {
                     {c.from_number ? <a className="text-navy underline-offset-2 hover:underline" href={`tel:${c.from_number}`}>{formatPhone(c.from_number)}</a> : "Unknown"}
                     {staff.role === "owner" && c.from_number && (
                       <form action={blockCallerAction.bind(null, c.from_number)} className="inline">
-                        <button className="ml-2 text-xs font-semibold text-muted hover:text-[#C83A2F]" title="Blocked callers hear a busy signal (Settings → Caller blocking)">Block</button>
+                        <ConfirmSubmit message={`Block ${formatPhone(c.from_number)}? Calls from this number will hear a busy signal.`} className="ml-2 text-xs font-semibold text-muted hover:text-[#C83A2F]" title="Blocked callers hear a busy signal (Phone settings, Caller blocking)">Block</ConfirmSubmit>
                       </form>
                     )}
                   </td>

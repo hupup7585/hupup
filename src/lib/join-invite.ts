@@ -22,7 +22,7 @@ export function joinInviteText(template = JOIN_INVITE_DRAFT): string {
 
 type Candidate = { id: number; phone: string; smsOptOut: boolean; marketingOptIn: boolean; isTest: boolean; timeZone: string | null };
 
-/** Who may get the invitation: order-text consent, a confirmed or finished order, not on promos, no STOP, not a test entry, never invited. */
+/** Who may get the invitation: order-text consent, a confirmed or finished order, no promo decision ever (joined, declined, NOPROMO), no STOP, not a test entry, never invited. */
 export async function joinInviteEligible(c: Candidate): Promise<boolean> {
   if (c.smsOptOut || c.marketingOptIn || c.isTest) return false;
   if (!(await hasTransactionalConsent(c.phone))) return false;
@@ -32,12 +32,19 @@ export async function joinInviteEligible(c: Candidate): Promise<boolean> {
     .where(and(eq(schema.messages.contactPhone, c.phone), eq(schema.messages.event, JOIN_INVITE_EVENT)))
     .limit(1);
   if (invited) return false;
-  const [pending] = await db
+  // Never to anyone who joined, asked to join, declined, or sent NOPROMO or STOP: any promo decision on record ends it.
+  const [promoDecision] = await db
+    .select({ id: schema.smsConsents.id })
+    .from(schema.smsConsents)
+    .where(and(eq(schema.smsConsents.phone, c.phone), eq(schema.smsConsents.scope, "marketing")))
+    .limit(1);
+  if (promoDecision) return false;
+  const [askedBefore] = await db
     .select({ id: schema.smsReenrollRequests.id })
     .from(schema.smsReenrollRequests)
-    .where(and(eq(schema.smsReenrollRequests.phone, c.phone), eq(schema.smsReenrollRequests.scope, "marketing"), eq(schema.smsReenrollRequests.status, "pending")))
+    .where(and(eq(schema.smsReenrollRequests.phone, c.phone), eq(schema.smsReenrollRequests.scope, "marketing")))
     .limit(1);
-  return !pending;
+  return !askedBefore;
 }
 
 /**

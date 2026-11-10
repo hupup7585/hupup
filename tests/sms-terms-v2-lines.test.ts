@@ -75,3 +75,15 @@ describe("Abraham's approved website wording (Nov 10, 2026)", () => {
     expect(si).not.toMatch(/<h2/);
   });
 });
+
+describe("consent links read cleanly (Abraham, Nov 9 all-in-one)", () => {
+  it('never "ourSMS TermsandPrivacy Policy"', async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { default: ConsentText } = await import("@/components/ConsentText");
+    const { WEB_CONSENT_MARKETING_V2 } = await import("@/lib/sms-terms-v2");
+    const text = renderToStaticMarkup(createElement(ConsentText, { text: WEB_CONSENT_MARKETING_V2 })).replace(/<[^>]+>/g, "");
+    expect(text).toContain("See our SMS Terms and Privacy Policy.");
+    expect(WEB_CONSENT_MARKETING_V2).toContain("up to 6 per calendar year");
+  });
+});
