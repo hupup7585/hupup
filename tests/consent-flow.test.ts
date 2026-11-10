@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   messages: [] as Record<string, unknown>[],
   zones: [] as { phone: string; zone: string; source: string }[],
   terms: [] as Record<string, unknown>[],
+  sendOk: true,
   promoMode: "owner_test" as "off" | "owner_test" | "live",
   promoRequests: [] as { to: string; how: string }[],
   promoResult: { sendConfirmation: true, reason: "pending_created" } as { sendConfirmation: boolean; reason: string },
@@ -68,7 +69,7 @@ vi.mock("@/lib/sms", async (orig) => ({
   ...(await orig<typeof import("@/lib/sms")>()),
   sendMessage: async (input: Record<string, unknown>) => {
     h.messages.push(input);
-    return { sent: true };
+    return { sent: h.sendOk };
   },
 }));
 vi.mock("@/lib/settings", async (orig) => {
@@ -109,6 +110,7 @@ beforeEach(() => {
   h.messages = [];
   h.zones = [];
   h.promoMode = "owner_test";
+  h.sendOk = true;
   h.promoRequests = [];
   h.promoResult = { sendConfirmation: true, reason: "pending_created" };
   process.env.ADMIN_PHONE = "+18455550100"; // owner test mode: this test caller is the Owner
@@ -284,6 +286,13 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
     h.promoMode = "off";
     process.env.ADMIN_PHONE = "+18455550100";
     expect(await call("promo-consent")).not.toContain("seasonal offers");
+  });
+  it("once live: no 'we just sent a text' unless the text really went out (texting off until A2P)", async () => {
+    h.promoMode = "live";
+    h.sendOk = false;
+    const xml = await call("promo-which-answer", { Digits: "1" });
+    expect(xml).not.toContain("We just sent a text");
+    expect(xml).toContain("/api/voice/goodbye");
   });
   it("once live: skipped when the caller already decided recently", async () => {
     h.promoMode = "live";

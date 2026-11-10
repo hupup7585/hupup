@@ -9,7 +9,20 @@ import type { ConsentScope, StaffResponse } from "@/lib/sms-consent";
  * Staff records text consent by phone or in person. The full disclosure is shown to read aloud; a yes can only
  * be recorded after confirming it was read in full. Silence or an unclear answer is recorded as no consent.
  */
-export default function ConsentPanel({ orderId, phoneDisplay, disclosures, stopped = false }: { orderId: number; phoneDisplay: string; disclosures: Record<ConsentScope, string>; stopped?: boolean }) {
+export default function ConsentPanel({
+  orderId,
+  phoneDisplay,
+  disclosures,
+  stopped = false,
+  scopes = ["transactional", "marketing"],
+}: {
+  orderId: number;
+  phoneDisplay: string;
+  disclosures: Record<ConsentScope, string>;
+  stopped?: boolean;
+  /** Promo sign-up has its own box (PromoSignupPanel); the order page shows order texts only here. */
+  scopes?: ConsentScope[];
+}) {
   const [scope, setScope] = useState<ConsentScope>("transactional");
   const [read, setRead] = useState(false);
   const [response, setResponse] = useState<StaffResponse | "">("");
@@ -29,8 +42,8 @@ export default function ConsentPanel({ orderId, phoneDisplay, disclosures, stopp
         </p>
       )}
       <p className="mb-3 text-sm text-muted">Read the whole disclosure to the customer, word for word, before recording their answer. If they are silent, unsure, or unclear, record &ldquo;No clear answer&rdquo;: that is not consent.</p>
-      <div className="mb-3 flex gap-2">
-        {(["transactional", "marketing"] as const).map((s) => (
+      {scopes.length > 1 && <div className="mb-3 flex gap-2">
+        {scopes.map((s) => (
           <button
             key={s}
             type="button"
@@ -40,12 +53,12 @@ export default function ConsentPanel({ orderId, phoneDisplay, disclosures, stopp
               setResponse("");
               setMsg(null);
             }}
-            className={`rounded-full px-3 py-1.5 text-sm font-bold ${scope === s ? "bg-ink text-white" : "bg-bg"}`}
+            className={`rounded-full px-3 py-1.5 text-sm font-bold ${scope === s ? "bg-[#123D73] text-white" : "bg-bg"}`}
           >
             {s === "transactional" ? "Order texts" : "Promotional texts"}
           </button>
         ))}
-      </div>
+      </div>}
       <blockquote data-disclosure className="mb-3 rounded-xl border-l-4 border-sky bg-bg p-3 text-sm leading-relaxed">{text}</blockquote>
       <label className="mb-3 flex items-start gap-2 text-sm font-semibold">
         <input type="checkbox" checked={read} onChange={(e) => setRead(e.target.checked)} className="mt-0.5 h-4 w-4" />I read the entire disclosure above to the customer, word for word.

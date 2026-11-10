@@ -26,6 +26,8 @@ export async function recordStaffConsentAction(orderId: number, form: { scope: C
     if (!user?.active || user.role === "delivery") return { ok: false, message: "Your account can't record text consent." };
   }
   if (form.scope !== "transactional" && form.scope !== "marketing") return { ok: false, message: "Choose which texts." };
+  // Promo texts use the short three-step sign-up (Promo texts sign-up box); the long read-aloud is retired (Abraham).
+  if (form.scope === "marketing" && smsTermsV2Active()) return { ok: false, message: "Use the Promo texts sign-up box for promo texts." };
   if (!["clear_yes", "said_no", "unclear_or_silent"].includes(form.response)) return { ok: false, message: "Choose the customer's answer." };
   if (form.response === "clear_yes" && !form.disclosureRead) return { ok: false, message: "Read the entire disclosure to the customer, then check the box, before recording a yes." };
 

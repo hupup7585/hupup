@@ -6,12 +6,16 @@ import { formatPhone } from "@/lib/phone";
 import { StatusBadge } from "@/components/StatusBadge";
 import OrderActions from "./OrderActions";
 import ConsentPanel from "./ConsentPanel";
+import PromoSignupPanel from "./PromoSignupPanel";
+import { requireAdmin } from "@/lib/auth";
+import { STAFF_PROMO_MODE, staffPromoStep2, staffPromoVisible } from "@/lib/staff-promo";
 import { staffDisclosure } from "@/lib/sms-terms-v2";
 import { NO_TEXT_CONSENT, hasTransactionalConsent } from "@/lib/sms";
 import DualDate from "@/components/DualDate";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const staff = await requireAdmin();
   const full = await getOrderWithItems(Number(id));
   if (!full) notFound();
   const { order: o, items, customer } = full;
@@ -70,7 +74,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               {textStatus === "ok" ? "Order texts: customer has given text consent." : textStatus === "stopped" ? "Customer replied STOP: no texts of any kind. They must text START and reply YES. Call or email instead." : NO_TEXT_CONSENT}
             </div>
           )}
-          {customer?.phone && <ConsentPanel orderId={o.id} phoneDisplay={formatPhone(customer.phone)} disclosures={staffDisclosure()} stopped={textStatus === "stopped"} />}
+          {customer?.phone && <ConsentPanel orderId={o.id} phoneDisplay={formatPhone(customer.phone)} disclosures={staffDisclosure()} stopped={textStatus === "stopped"} scopes={["transactional"]} />}
+          {staffPromoVisible(staff.role) && (
+            <PromoSignupPanel orderId={o.id} phoneDisplay={customer?.phone ? formatPhone(customer.phone) : ""} step2={customer?.phone ? staffPromoStep2(customer.phone) : "Should we text your number, or a different number?"} preview={STAFF_PROMO_MODE !== "live"} stopped={textStatus === "stopped"} />
+          )}
         </div>
         <OrderActions
           orderId={o.id}

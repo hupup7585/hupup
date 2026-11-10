@@ -354,7 +354,9 @@ async function promoSend(ctx: Ctx, vr: VR, to: string, chosen: "caller" | "enter
   }
   if (!r.sendConfirmation) return back(vr, "goodbye"); // already signed up, or a confirmation is already waiting
   const c = await customerByPhone(to);
-  await sendMessage({ to, body: promoConfirmRequestSms(), kind: "system", event: "promo_confirm_request", customerId: c?.id ?? null, callSid: ctx.callSid });
+  const res = await sendMessage({ to, body: promoConfirmRequestSms(), kind: "system", event: "promo_confirm_request", customerId: c?.id ?? null, callSid: ctx.callSid });
+  // Live: "We just sent a text" only when it really went out. Owner test calls hear every line even while texting is off.
+  if (!res.sent && phonePromoMode() === "live") return back(vr, "goodbye");
   sp(vr, ctx, "promo_final");
   sp(vr, ctx, "promo_disclosure");
   return back(vr, "goodbye");
