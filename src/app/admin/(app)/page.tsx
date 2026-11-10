@@ -1,3 +1,4 @@
+import { Download, Trophy } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
 import MyTasksCard from "@/components/MyTasksCard";
 import StaffGreeting from "@/components/StaffGreeting";
@@ -65,7 +66,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               {RANGES[r]}
             </Link>
           ))}
-          <a href={`/api/admin/orders.csv?from=${from}&to=${to}`} className="btn-ghost">⬇ Export CSV</a>
+          <a href={`/api/admin/orders.csv?from=${from}&to=${to}`} className="btn-ghost"><Download className="inline-block h-4 w-4 align-[-0.15em]" strokeWidth={2} aria-hidden /> Download CSV</a>
         </div>
       </div>
 
@@ -126,7 +127,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
         <div className="card p-5">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-bold">🏆 Leaderboard</h2>
+            <h2 className="text-lg font-bold"><Trophy className="inline-block h-4 w-4 align-[-0.15em]" strokeWidth={2} aria-hidden /> Leaderboard</h2>
             <span className="text-xs font-semibold text-muted">by revenue · {RANGES[range].toLowerCase()}</span>
           </div>
           {board.length === 0 && <p className="py-8 text-center text-muted">No booked orders in this period yet.</p>}
@@ -172,7 +173,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                   <td className="td">{o.customer_name ?? "—"}<div className="text-xs text-muted">{formatPhone(o.customer_phone)}</div></td>
                   <td className="td whitespace-nowrap"><DualDate yi iso={o.event_date} style="short" /> <span className="text-muted">→ pickup <DualDate yi iso={o.pickup_date} style="short" /></span></td>
                   <td className="td">{o.items}</td>
-                  <td className="td">{o.channel === "PHONE" ? "📞 Phone" : "🖥 POS"}</td>
+                  <td className="td">{o.channel === "PHONE" ? "Phone" : "In person"}</td>
                   <td className="td font-bold">{formatMoney(o.subtotal_cents)}</td>
                   <td className="td"><StatusBadge status={o.status} /></td>
                 </tr>

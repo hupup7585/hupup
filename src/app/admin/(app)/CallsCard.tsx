@@ -1,3 +1,4 @@
+import { Phone } from "lucide-react";
 import Link from "next/link";
 import type { CallAnalytics } from "@/lib/call-analytics";
 import { HebrewDay } from "@/components/DualDate";
@@ -36,7 +37,7 @@ export default function CallsCard({ a, periodLabel }: { a: CallAnalytics; period
     <div className="card mb-5 p-5" data-calls-card>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-bold">
-          📞 Hotline calls <span className="text-xs font-semibold text-muted">· {periodLabel.toLowerCase()}</span>
+          <Phone className="inline-block h-4 w-4 align-[-0.15em]" strokeWidth={2} aria-hidden /> Hotline calls <span className="text-xs font-semibold text-muted">· {periodLabel.toLowerCase()}</span>
         </h2>
         <Link href="/admin/calls" className="text-sm font-bold text-navy underline-offset-2 hover:underline">
           Call log →

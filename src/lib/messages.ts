@@ -73,5 +73,6 @@ export const CUSTOMER_COLS = {
   notes: schema.customers.notes,
   smsOptOut: schema.customers.smsOptOut,
   marketingOptIn: schema.customers.marketingOptIn,
+  isTest: schema.customers.isTest,
   createdAt: schema.customers.createdAt,
 };

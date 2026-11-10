@@ -6,7 +6,7 @@ import { formatPhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
-type Row = { id: number; name: string | null; phone: string; email: string | null; bookings: number; last_event: string | null; marketing_opt_in: boolean; sms_opt_out: boolean };
+type Row = { id: number; name: string | null; phone: string; email: string | null; bookings: number; last_event: string | null; marketing_opt_in: boolean; sms_opt_out: boolean ; is_test: boolean };
 
 /** Customer records (Owner and Secretary). No customer login exists anywhere. */
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
@@ -16,7 +16,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const digits = q?.replace(/\D/g, "") || "";
   const rows = (
     await db.execute(sql`
-      SELECT c.id, c.name, c.phone, c.email, c.marketing_opt_in, c.sms_opt_out,
+      SELECT c.id, c.name, c.phone, c.email, c.marketing_opt_in, c.sms_opt_out, c.is_test,
              (SELECT COUNT(*)::int FROM orders o WHERE o.customer_id = c.id AND o.status <> 'CANCELLED') AS bookings,
              (SELECT MAX(o.event_date)::text FROM orders o WHERE o.customer_id = c.id AND o.status <> 'CANCELLED') AS last_event
       FROM customers c
@@ -40,7 +40,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           <tbody>
             {rows.map((c) => (
               <tr key={c.id} className="border-t border-line">
-                <td className="py-2.5 font-semibold"><Link className="hover:underline" href={`/admin/customers/${c.id}`}>{c.name || "Unknown caller"}</Link></td>
+                <td className="py-2.5 font-semibold"><Link className="hover:underline" href={`/admin/customers/${c.id}`}>{c.name || "Unknown caller"}</Link>{c.is_test && <span data-test-entry className="ml-2 rounded-full bg-bg px-2 py-0.5 text-xs font-bold text-muted ring-1 ring-line">Test entry</span>}</td>
                 <td>{formatPhone(c.phone)}</td>
                 <td className="max-w-[220px] truncate">{c.email}</td>
                 <td>{c.bookings}</td>

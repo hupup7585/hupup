@@ -24,14 +24,12 @@ describe("staff greeting", () => {
     expect(staffFirstName({ role: "delivery", name: "  Dovid  " })).toBe("Dovid");
   });
 
-  it("uses the yellow line icon (no emoji) on every staff landing page", () => {
+  it("no emoji and no hand icon (Abraham); the greeting is on every staff landing page", () => {
     const c = readFileSync("src/components/StaffGreeting.tsx", "utf8");
-    expect(c).toContain('fill="#FFD84D"');
-    expect(c).toContain('stroke="#123D73"');
-    expect(c).toContain("h-[1em] w-[1em]");
+    expect(c).not.toContain("WavingHand");
+    expect(c).not.toMatch(/<svg/);
     const dash = readFileSync("src/app/admin/(app)/page.tsx", "utf8");
     expect(dash).toContain("<StaffGreeting staff={staff} />");
-    expect(dash).not.toContain("👋");
     expect(readFileSync("src/app/admin/(app)/calendar/page.tsx", "utf8")).toContain("<StaffGreeting staff={staff}");
     expect(readFileSync("src/app/admin/deliveries/page.tsx", "utf8")).toContain("<StaffGreeting staff={staff}");
   });

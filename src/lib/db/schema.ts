@@ -65,6 +65,8 @@ export const customers = pgTable(
     notes: text("notes"),
     /** Replied STOP: Twilio blocks every message from our number until START. */
     smsOptOut: boolean("sms_opt_out").notNull().default(false),
+    /** A test entry (Abraham marks these instead of deleting them); left out of campaigns */
+    isTest: boolean("is_test").notNull().default(false),
     marketingOptIn: boolean("marketing_opt_in").notNull().default(false),
     marketingOptInAt: timestamp("marketing_opt_in_at", { withTimezone: true }),
     /** The customer's own time zone (IANA), as they told us; used for promotional quiet hours */

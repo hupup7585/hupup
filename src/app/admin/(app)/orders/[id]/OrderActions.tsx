@@ -6,10 +6,10 @@ import { recordPaymentAction, sendPayLinkAction, updateDetailsAction, updateStat
 import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
 
 const NEXT: { status: OrderStatus; label: string; cls: string }[] = [
-  { status: "CONFIRMED", label: "✅ Confirmed", cls: "btn-ghost" },
-  { status: "DELIVERED", label: "🚚 Delivered", cls: "btn-ghost" },
-  { status: "PICKED_UP", label: "↩️ Picked up", cls: "btn-ghost" },
-  { status: "CANCELLED", label: "✖ Cancel order", cls: "btn-ghost !text-coral" },
+  { status: "CONFIRMED", label: "Confirmed", cls: "btn-ghost" },
+  { status: "DELIVERED", label: "Delivered", cls: "btn-ghost" },
+  { status: "PICKED_UP", label: "Picked up", cls: "btn-ghost" },
+  { status: "CANCELLED", label: "Cancel order", cls: "btn-ghost !text-coral" },
 ];
 
 export default function OrderActions(props: {
@@ -55,7 +55,7 @@ export default function OrderActions(props: {
       <div className="card p-5">
         <h2 className="mb-3 font-bold">Payment</h2>
         <button className="btn-dark mb-4 w-full" disabled={pending || !props.hasPhone || props.due <= 0} onClick={() => run(() => sendPayLinkAction(props.orderId))}>
-          💬 Text Sola payment link
+          Send payment link by text
         </button>
         <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
           <input className="input" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" inputMode="decimal" />

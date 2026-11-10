@@ -150,7 +150,7 @@ export default async function CalendarPage({
           return (
             <div key={kind}>
               <h2 className="mb-3 font-bold">
-                {kind === "delivery" ? "🚚 Deliveries" : "↩️ Pickups"} · <DualDate yi iso={selected} />
+                {kind === "delivery" ? "Deliveries" : "Pickups"} · <DualDate yi iso={selected} />
               </h2>
               {list.length === 0 && <p className="text-sm text-muted">None.</p>}
               {list.map((r) => (

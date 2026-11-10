@@ -8,7 +8,7 @@ import { formatMoney } from "@/lib/money";
 import { orderNumber } from "@/lib/orders";
 import { CUSTOMER_COLS } from "@/lib/messages";
 import { StatusBadge } from "@/components/StatusBadge";
-import { saveCustomerAction } from "../actions";
+import { saveCustomerAction, setTestEntryAction } from "../actions";
 import DualDate from "@/components/DualDate";
 import { dualDateTime, localISO } from "@/lib/dual-date";
 import { SOURCE_LABEL, customerConsent, senderNames } from "@/lib/customer-consent";
@@ -64,11 +64,21 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     <div className="mx-auto max-w-5xl">
       <Link href="/admin/customers" className="text-sm font-semibold text-navy hover:underline">← Customers</Link>
       <div className="mb-5 mt-1 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-black sm:text-3xl">{c.name || "Unknown caller"}</h1>
+        <h1 className="text-2xl font-black sm:text-3xl">
+          {c.name || "Unknown caller"}
+          {c.isTest && <span data-test-entry className="ml-3 rounded-full bg-bg px-3 py-1 align-middle text-sm font-bold text-muted ring-1 ring-line">Test entry</span>}
+        </h1>
         <div className="flex flex-wrap gap-2 text-sm">
           {phone && <a className="btn-ghost" href={`tel:${phone}`}>Call {formatPhone(phone)}</a>}
           {phone && <Link className="btn-ghost" href={`/admin/messages?p=${encodeURIComponent(phone)}`}>Texts</Link>}
           <Link className="btn" href="/admin/pos">+ New booking</Link>
+          {staff.role === "owner" && (
+            <form action={setTestEntryAction}>
+              <input type="hidden" name="id" value={c.id} />
+              <input type="hidden" name="isTest" value={c.isTest ? "0" : "1"} />
+              <button className="btn-ghost">{c.isTest ? "Not a test entry" : "Mark as test entry"}</button>
+            </form>
+          )}
         </div>
       </div>
 

@@ -20,11 +20,11 @@ export function smsTermsV2Active(env: Record<string, string | undefined> = proce
   return SMS_TERMS_V2_LIVE || env.VERCEL_ENV === "preview" || env.SMS_TERMS_V2 === "1";
 }
 
-export const WEB_CONSENT_VERSION_V2 = "web-2026-11-09-v3";
+export const WEB_CONSENT_VERSION_V2 = "web-2026-11-10-v3-approved";
 
 /** SMS v3 website promotional box: it requests the confirmation text; only the YES reply signs the customer up. */
 export const WEB_CONSENT_MARKETING_V2 =
-  "Text me a confirmation to join Hup Up Attractions promotional texts: seasonal offers, discount codes, and rental deals, up to 5 per calendar year. I am signed up only when I reply YES to that confirmation text within 24 hours. Agreeing is never required to book or buy. Message and data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help.";
+  "Text me a confirmation to join Hup Up Attractions promotional texts: seasonal offers, discount codes, and rental deals, up to 5 per calendar year. I am signed up only when I reply YES to that confirmation text within 24 hours. Consent is not a condition of purchase. Message and data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help. See our SMS Terms and Privacy Policy.";
 
 export const WEB_CONSENT_TRANSACTIONAL_V2 =
   "I agree to receive transactional text messages from Hup Up Attractions, including picture messages such as delivery confirmation photos, regarding my reservations, orders, payments, deliveries, pickups, and customer service, and authorize Hup Up Attractions to share my phone number with service providers only as necessary to deliver these messages. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help.";

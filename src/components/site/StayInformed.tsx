@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { signUpForTexts, type SignUpState } from "@/app/text-alerts/actions";
+import ConsentText from "@/components/ConsentText";
 
 /**
  * Homepage "Stay Informed" (Abraham, SMS v3): promo sign-up only. The box is never checked for the customer; signing
@@ -40,15 +41,7 @@ export default function StayInformed({ marketingText, smsNumber, notActive, disa
             <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-white p-4">
               <input type="checkbox" name="marketing" className="mt-1 h-6 w-6 shrink-0 accent-hu-deep" />
               <span className="text-base leading-relaxed">
-                {marketingText} See our{" "}
-                <a href="/sms-terms" className="font-semibold underline underline-offset-4">
-                  SMS Terms
-                </a>{" "}
-                and{" "}
-                <a href="/privacy" className="font-semibold underline underline-offset-4">
-                  Privacy Policy
-                </a>
-                .
+                <ConsentText text={marketingText} />
               </span>
             </label>
             {notActive ? (

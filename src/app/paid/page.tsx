@@ -20,7 +20,7 @@ export default async function Paid({ searchParams }: { searchParams: Promise<Rec
           </>
         ) : (
           <>
-            <h1 className="mt-5 text-2xl font-black">Thank you! 🎉</h1>
+            <h1 className="mt-5 text-2xl font-black">Thank you!</h1>
             <p className="mt-2 text-muted">
               {invoice ? `Order ${invoice.replace(/^HU-/, "#")}` : "Your order"} is being confirmed. You&apos;ll receive a
               text as soon as it&apos;s done.

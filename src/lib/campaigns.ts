@@ -38,7 +38,7 @@ export async function promoSignups(now = new Date()): Promise<PromoSignup[]> {
   const rows = await db
     .select()
     .from(schema.customers)
-    .where(and(eq(schema.customers.marketingOptIn, true), isNotNull(schema.customers.phone)))
+    .where(and(eq(schema.customers.marketingOptIn, true), isNotNull(schema.customers.phone), eq(schema.customers.isTest, false)))
     .orderBy(desc(schema.customers.marketingOptInAt));
   const out: PromoSignup[] = [];
   for (const c of rows) {

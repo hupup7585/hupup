@@ -1,3 +1,4 @@
+import { Compass } from "lucide-react";
 import type { JourneyStats } from "@/lib/call-journey";
 import { longDate } from "@/lib/dates";
 
@@ -6,7 +7,7 @@ export default function JourneyCard({ j, periodLabel }: { j: JourneyStats; perio
   return (
     <div className="card mb-5 p-5" data-journey-card>
       <h2 className="mb-4 text-lg font-bold">
-        🧭 What callers ask for <span className="text-xs font-semibold text-muted">· {periodLabel.toLowerCase()} · {j.finished} booking{j.finished === 1 ? "" : "s"} finished</span>
+        <Compass className="inline-block h-4 w-4 align-[-0.15em]" strokeWidth={2} aria-hidden /> What callers ask for <span className="text-xs font-semibold text-muted">· {periodLabel.toLowerCase()} · {j.finished} booking{j.finished === 1 ? "" : "s"} finished</span>
       </h2>
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <List title="Most-requested items" empty="No items heard yet." rows={j.topItems.map((r) => [r.name, `${r.heard} heard · ${r.added} added`, r.heard])} />

@@ -96,7 +96,7 @@ describe("hotline voicemail", () => {
     expect(h.sms[0].to).toBe("+18457777585");
     expect(h.sms[0].body).toMatch(new RegExp(`^Hup Up Attractions: new voicemail from \\(845\\) 555-0199, Main voicemail, ${when.replace(/[()]/g, "\\$&")}, 0:42\\. Play: https://hupup\\.example/api/voicemail/play/${rows[0].id}\\?exp=\\d+&sig=[0-9a-f]{32}$`));
     expect(h.sms[0].opts).toMatchObject({ kind: "system" });
-    expect(h.sms[0].opts?.mediaUrls).toBeUndefined(); // MMS stays off until the Owner turns it on
+    expect((h.sms[0].opts?.mediaUrls as string[])[0]).toMatch(/\/api\/voicemail\/play\//); // MMS on (Abraham, Nov 10)
     expect(h.emails).toHaveLength(1);
     expect(h.emails[0].to).toBe("owner@example.com");
     expect(h.emails[0].subject).toBe(`New voicemail from (845) 555-0199, ${when}`);
@@ -203,7 +203,7 @@ describe("Voicemail settings screen (Abraham, Nov 9, 2026)", () => {
     const { readFileSync } = await import("node:fs");
     const { SETTING_DEFAULTS } = await import("@/lib/settings");
     const { textingActive, TEXT_ALERTS_NOT_ACTIVE } = await import("@/lib/voicemail");
-    expect(SETTING_DEFAULTS.voicemailMms).toBe(false);
+    expect(SETTING_DEFAULTS.voicemailMms).toBe(true); // Abraham turned it on (Nov 10, 2026)
     expect(TEXT_ALERTS_NOT_ACTIVE).toBe("Not active yet: waiting for Twilio A2P");
     expect(textingActive({ TWILIO_ACCOUNT_SID: "AC", TWILIO_AUTH_TOKEN: "t" })).toBe(false);
     expect(textingActive({ TWILIO_ACCOUNT_SID: "AC", TWILIO_AUTH_TOKEN: "t", TWILIO_MESSAGING_SERVICE_SID: "MG" })).toBe(true);

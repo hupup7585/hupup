@@ -1,3 +1,4 @@
+import { Download } from "lucide-react";
 import Link from "next/link";
 import { listOrders } from "@/lib/admin-queries";
 import { formatMoney } from "@/lib/money";
@@ -20,12 +21,12 @@ export default async function OrdersPage({
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black sm:text-3xl">All orders</h1>
         <div className="flex flex-wrap gap-2">
-          <a className="btn-ghost" href={`/api/admin/orders.csv?${csv}`}>⬇ Export CSV</a>
+          <a className="btn-ghost" href={`/api/admin/orders.csv?${csv}`}><Download className="inline-block h-4 w-4 align-[-0.15em]" strokeWidth={2} aria-hidden /> Download CSV</a>
           <Link className="btn" href="/admin/pos">+ New booking</Link>
         </div>
       </div>
       <form className="card mb-5 grid gap-3 p-4 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
-        <input name="q" defaultValue={sp.q} placeholder="🔍 Name, phone, address or order #" className="input" />
+        <input name="q" defaultValue={sp.q} placeholder="Name, phone, address or order number" className="input" />
         <select name="status" defaultValue={sp.status || "ALL"} className="input">
           <option value="ALL">All (except abandoned carts)</option>
           <option value="OPEN">Open (unpaid, confirmed, out)</option>
@@ -52,7 +53,7 @@ export default async function OrdersPage({
                 <td className="td">{o.customer_name ?? <span className="text-muted">Caller in progress</span>}<div className="text-xs text-muted">{formatPhone(o.customer_phone)}</div></td>
                 <td className="td whitespace-nowrap"><DualDate yi iso={o.event_date} style="short" /><div className="text-xs text-muted">→ <DualDate yi iso={o.pickup_date} style="short" /></div></td>
                 <td className="td">{o.items}</td>
-                <td className="td">{o.channel === "PHONE" ? "📞 Phone" : "🖥 POS"}</td>
+                <td className="td">{o.channel === "PHONE" ? "Phone" : "In person"}</td>
                 <td className="td font-bold">{formatMoney(o.subtotal_cents)}</td>
                 <td className={`td ${o.paid_cents >= o.subtotal_cents && o.subtotal_cents > 0 ? "text-mint font-bold" : "text-muted"}`}>{formatMoney(o.paid_cents)}</td>
                 <td className="td"><StatusBadge status={o.status} /></td>

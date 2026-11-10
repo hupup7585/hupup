@@ -34,7 +34,7 @@ export async function saveCategoryAction(fd: FormData) {
     name,
     spokenName: s(fd, "spokenName") || name.replace(/&/g, "and"),
     description: s(fd, "description"),
-    emoji: s(fd, "emoji") || "🎉",
+    // The old category emoji field is no longer shown or edited (no emoji, Abraham); the stored value is kept
     imageUrl: s(fd, "imageUrl") || null,
     ivrDigit,
     sortOrder: Number(fd.get("sortOrder") || 0),

@@ -167,10 +167,10 @@ export default function PosForm(props: {
         <h2 className="pt-2 font-bold">Payment</h2>
         <div className="grid grid-cols-2 gap-2">
           {([
-            ["link", "💬 Text Sola pay link"],
-            ["cash", "💵 Paid cash"],
-            ["check", "🧾 Paid check"],
-            ["later", "⏳ Pay on delivery"],
+            ["link", "Send payment link by text"],
+            ["cash", "Cash"],
+            ["check", "Check"],
+            ["later", "Pay on delivery"],
           ] as const).map(([v, l]) => (
             <button key={v} type="button" onClick={() => setPayment(v)} className={`btn-ghost text-sm ${payment === v ? "!border-navy !bg-bg" : ""}`}>
               {l}

@@ -57,8 +57,8 @@ describe("SMS Terms v2 switch", () => {
     expect(v2.smsTermsV2Active({ VERCEL_ENV: "production" })).toBe(true);
     expect(v2.smsTermsV2Active({ VERCEL_ENV: "preview" })).toBe(true);
     expect(v2.smsTermsV2Active({})).toBe(true);
-    expect(v2.webConsentCopy({ VERCEL_ENV: "production" }).version).toBe("web-2026-11-09-v3");
-    expect(v2.webConsentCopy({ VERCEL_ENV: "preview" }).marketing).toContain("I am signed up only when I reply YES to that confirmation text within 24 hours.");
+    expect(v2.webConsentCopy({ VERCEL_ENV: "production" }).version).toBe("web-2026-11-10-v3-approved");
+    expect(v2.webConsentCopy({ VERCEL_ENV: "preview" }).marketing).toBe("Text me a confirmation to join Hup Up Attractions promotional texts: seasonal offers, discount codes, and rental deals, up to 5 per calendar year. I am signed up only when I reply YES to that confirmation text within 24 hours. Consent is not a condition of purchase. Message and data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help. See our SMS Terms and Privacy Policy.");
   });
 });
 

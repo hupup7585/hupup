@@ -132,7 +132,7 @@ export default async function VoicemailPage() {
             <input type="checkbox" name="voicemailMms" defaultChecked={Boolean(alertSettings.voicemailMms)} className="mt-1" />
             <span>
               Attach the recording (MP3) to the text alert
-              <span className="block text-sm font-normal text-muted">A text with a recording is a picture/audio message (MMS), which costs more per message than a plain text. Off until you turn it on. Long recordings go as a link only.</span>
+              <span className="block text-sm font-normal text-muted">A text with a recording is a picture/audio message (MMS), which costs more per message than a plain text. Sends once Twilio texting is approved. Long recordings go as a link only.</span>
             </span>
           </label>
           <button className="btn-dark w-fit">Save voicemail settings</button>

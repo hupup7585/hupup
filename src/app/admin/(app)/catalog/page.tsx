@@ -11,7 +11,6 @@ function CategoryForm({ c }: { c?: Category }) {
       {c && <input type="hidden" name="id" value={c.id} />}
       <div className="sm:col-span-3"><label className="label">Name *</label><input name="name" defaultValue={c?.name} className="input" required /></div>
       <div><label className="label">Phone key</label><input name="ivrDigit" type="number" min={1} max={8} defaultValue={c?.ivrDigit ?? ""} className="input" placeholder="1-8" /></div>
-      <div><label className="label">Emoji</label><input name="emoji" defaultValue={c?.emoji ?? "🎉"} className="input" /></div>
       <div><label className="label">Sort</label><input name="sortOrder" type="number" defaultValue={c?.sortOrder ?? 0} className="input" /></div>
       <div className="sm:col-span-3"><label className="label">Spoken on phone as</label><input name="spokenName" defaultValue={c?.spokenName} className="input" placeholder="e.g. Laser Tag and Inflatable Mazes" /></div>
       <div className="sm:col-span-3"><label className="label">Photo URL (landing page)</label><input name="imageUrl" defaultValue={c?.imageUrl ?? ""} className="input" placeholder="https://…" /></div>
@@ -72,7 +71,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           <section key={c.id} className={`card mb-5 p-5 ${c.active ? "" : "opacity-60"}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-xl font-black">
-                {c.emoji} {c.name}{" "}
+                {c.name}{" "}
                 <span className="ml-2 rounded-full bg-bg px-2.5 py-1 text-xs font-bold text-muted">
                   {c.ivrDigit ? `Phone key ${c.ivrDigit}` : "Not on phone menu"}
                 </span>

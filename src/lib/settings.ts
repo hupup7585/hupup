@@ -5,8 +5,8 @@ import { BUSINESS_NAME } from "@/lib/config";
 /** Admin-editable settings with defaults. Stored in app_settings (key -> jsonb). */
 export const SETTING_DEFAULTS = {
   smsForwardEnabled: true,
-  /** Voicemail text alerts also carry the MP3 as an MMS (costs more per message; off until the Owner turns it on). */
-  voicemailMms: false,
+  /** Voicemail text alerts also carry the MP3 as an MMS (Abraham turned it on, Nov 10, 2026; sends once Twilio texting works). */
+  voicemailMms: true,
   /** Owner alerts (Abraham, Nov 9, 2026): a missed-call alert, and an email copy of every text to the hotline. */
   missedCallAlerts: true,
   incomingTextEmail: true,

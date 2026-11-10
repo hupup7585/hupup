@@ -190,6 +190,20 @@
       "when": 1794256190987,
       "tag": "0026_product_size_order",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794276861620,
+      "tag": "0027_customer_test_entries",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1794277255201,
+      "tag": "0028_voicemail_mms_on",
+      "breakpoints": true
     }
   ]
 }

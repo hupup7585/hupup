@@ -1,5 +1,7 @@
 "use client";
 
+import ConsentText from "@/components/ConsentText";
+
 /**
  * The two text-consent boxes (Abraham, approved): separate, both unchecked by default, with the approved
  * /text-alerts wording and links to the SMS Terms and Privacy Policy. Neither is required.
@@ -24,7 +26,9 @@ export default function TextConsentBoxes({
   const box = (checked: boolean, set: (v: boolean) => void, text: string, name: string) => (
     <label className="flex items-start gap-3 text-sm leading-relaxed" data-consent-box={name}>
       <input type="checkbox" name={name} checked={checked} onChange={(e) => set(e.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-hu-deep" />
-      <span>{text}</span>
+      <span>
+        <ConsentText text={text} newTab />
+      </span>
     </label>
   );
   return (

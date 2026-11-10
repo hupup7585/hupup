@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { SELECTABLE_TIME_ZONES } from "@/lib/area-code-tz";
 import { PROMO_BENEFITS, PROMO_BENEFITS_NOTE, PROMO_HEADING, PROMO_TITLE } from "@/lib/sms-consent-copy";
 import { signUpForTexts, type SignUpState } from "./actions";
+import ConsentText from "@/components/ConsentText";
 
 /**
  * Website SMS enrollment. Two separate checkboxes, both unchecked by default; neither is required by the other,
@@ -86,7 +87,9 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
             <input type="checkbox" name="marketing" className="mt-1 h-6 w-6 shrink-0 accent-hu-deep" />
             <span>
               <span className="block text-lg font-bold">Promotional text messages</span>
-              <span className="mt-1 block text-base leading-relaxed">{marketingText}</span>
+              <span className="mt-1 block text-base leading-relaxed">
+                <ConsentText text={marketingText} />
+              </span>
             </span>
           </label>
         </div>
@@ -115,7 +118,7 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
       <p className="text-base">
         {v3 && (
           <span data-join-instructions className="mb-2 block">
-            You can also text JOIN to {smsNumber}. You are signed up only when you reply YES to that confirmation text within 24 hours.
+            You can also text JOIN to {smsNumber} to request a confirmation text. You are signed up only when you reply YES to that text within 24 hours.
           </span>
         )}
         Text HELP to {smsNumber} for help. Text STOP to opt out. See our{" "}
