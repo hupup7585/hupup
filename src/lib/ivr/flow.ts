@@ -26,6 +26,7 @@ import { computeTotals, deliveryZone } from "@/lib/pricing";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
 import { STEP_LABELS, track, trackStep } from "@/lib/call-journey";
+import { alertMissedCall } from "@/lib/owner-alerts";
 import { promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import {
@@ -1416,7 +1417,10 @@ const handlers: Record<string, Handler> = {
 
   async "voicemail-done"(ctx, vr) {
     if (Number(ctx.body.RecordingDuration || 0) < 1) sp(vr, ctx, "voicemail_none");
-    else sp(vr, ctx, "voicemail_thanks");
+    else {
+      await updateSession(ctx.callSid, { data: { leftMessage: true } }, ctx.session); // a voicemail alert replaces the missed-call alert
+      sp(vr, ctx, "voicemail_thanks");
+    }
     vr.hangup();
     return vr;
   },
@@ -1531,6 +1535,15 @@ export async function handleCallStatus(callSid: string, status: string) {
     .limit(1)
     .catch(() => []); // journey logging must never break the hang-up handling
   const booked = s.outcome === "checked_out";
+  // Owner alert (Abraham): missed call = reached voicemail and hung up without a message, or hung up while ringing.
+  // Once per call; never when a voicemail was left (that one gets the voicemail alert).
+  if (!s.data?.missedAlerted && !s.data?.leftMessage) {
+    const how = s.outcome === "voicemail" || last?.step === "voicemail" ? "voicemail_no_message" : last?.step === "ring" ? "hung_up_ringing" : null;
+    if (how) {
+      await updateSession(callSid, { data: { missedAlerted: true } }, s);
+      await alertMissedCall({ callSid, from: s.fromNumber, at: new Date(), how, data: s.data }).catch((e) => console.error("missed-call alert failed", e));
+    }
+  }
   await track(callSid, "hung_up", booked ? "Call ended after booking" : `Hung up at: ${last ? (STEP_LABELS[last.step ?? ""] ?? last.label) : "before any menu"}`, {
     lastStep: last?.step ?? null,
     lastStepLabel: last ? (STEP_LABELS[last.step ?? ""] ?? last.label) : "Before any menu",

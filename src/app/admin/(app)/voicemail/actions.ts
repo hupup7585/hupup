@@ -50,6 +50,8 @@ export async function saveBoxAction(form: FormData) {
   };
   await db.update(schema.voicemailBoxes).set(after).where(eq(schema.voicemailBoxes.id, id));
   await saveSetting("voicemailMms", form.get("voicemailMms") === "on", s.userId);
+  await saveSetting("missedCallAlerts", form.get("missedCallAlerts") === "on", s.userId);
+  await saveSetting("incomingTextEmail", form.get("incomingTextEmail") === "on", s.userId);
   await db.insert(schema.auditLog).values({ userId: s.userId, action: "voicemail_box.updated", entityType: "voicemail_box", entityId: String(id), after });
   revalidatePath("/admin/voicemail");
 }

@@ -7,6 +7,9 @@ export const SETTING_DEFAULTS = {
   smsForwardEnabled: true,
   /** Voicemail text alerts also carry the MP3 as an MMS (costs more per message; off until the Owner turns it on). */
   voicemailMms: false,
+  /** Owner alerts (Abraham, Nov 9, 2026): a missed-call alert, and an email copy of every text to the hotline. */
+  missedCallAlerts: true,
+  incomingTextEmail: true,
   smsForwardPhone: "",
   smsHelpReplyEnabled: true,
   smsHelpText: `${BUSINESS_NAME}: For help, call (845) 777-7585 or email hupupattractions@gmail.com. Msg & data rates may apply. Reply STOP to opt out.`,

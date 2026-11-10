@@ -14,6 +14,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
 
 /** Hotline voicemail: play, download, mark heard, urgent, call back, delete. Owner also edits the box settings. */
 export default async function VoicemailPage() {
+  const alertSettings = await getSettings();
   const staff = await requireStaff(["owner", "secretary"]);
   let box, list;
   try {
@@ -110,8 +111,25 @@ export default async function VoicemailPage() {
             <span className="label">Email a new-message alert to (one email per line)</span>
             <textarea name="notifyEmail" defaultValue={box.notifyEmail.join("\n")} rows={2} className="input" />
           </label>
+          <fieldset className="grid gap-2" data-owner-alerts>
+            <legend className="label">Other alerts to the same addresses</legend>
+            <label className="flex items-start gap-2 font-semibold">
+              <input type="checkbox" name="missedCallAlerts" defaultChecked={Boolean(alertSettings.missedCallAlerts)} className="mt-1" />
+              <span>
+                Missed calls
+                <span className="block text-sm font-normal text-muted">The caller reached voicemail and hung up without a message, or hung up while the phone was ringing. One alert per call.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 font-semibold">
+              <input type="checkbox" name="incomingTextEmail" defaultChecked={Boolean(alertSettings.incomingTextEmail)} className="mt-1" />
+              <span>
+                Email a copy of every text to (845) 415-7585
+                <span className="block text-sm font-normal text-muted">The sender&rsquo;s number and the full text, with a link to any photo.</span>
+              </span>
+            </label>
+          </fieldset>
           <label className="flex items-start gap-2 font-semibold" data-voicemail-mms>
-            <input type="checkbox" name="voicemailMms" defaultChecked={Boolean((await getSettings()).voicemailMms)} className="mt-1" />
+            <input type="checkbox" name="voicemailMms" defaultChecked={Boolean(alertSettings.voicemailMms)} className="mt-1" />
             <span>
               Attach the recording (MP3) to the text alert
               <span className="block text-sm font-normal text-muted">A text with a recording is a picture/audio message (MMS), which costs more per message than a plain text. Off until you turn it on. Long recordings go as a link only.</span>

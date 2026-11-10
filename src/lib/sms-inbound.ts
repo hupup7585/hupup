@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { LIVE_PUBLIC_EMAIL, NEW_EMAIL_LIVE, NEW_PUBLIC_EMAIL } from "@/lib/config";
 import { getSettings } from "@/lib/settings";
+import { emailIncomingText } from "@/lib/owner-alerts";
 import { cancelQueuedMessages, cancelQueuedPromotions, sendMessage } from "@/lib/sms";
 import { TRANSACTIONAL_CONFIRMATION_SMS } from "@/lib/sms-consent";
 import { PROMO_ENROLLED_SMS, promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
@@ -190,6 +191,8 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
     forwarded = r.sent;
   }
 
+  // Owner alert (Abraham): an email copy of every text to the hotline (not STOP/START/YES/JOIN keywords), photos as a link
+  if (!keyword || keyword === "help") await emailIncomingText({ from, body: text, mediaUrls, at: new Date() }).catch((e) => console.error("incoming text email failed", e));
   return { messageId: row.id, keyword, reply, forwarded };
 }
 

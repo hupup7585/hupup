@@ -171,6 +171,9 @@ export type CallData = {
   menuKeys?: string[];
   /** A department or operator was asked for and no one took the call: "closed" (office closed / no one on the list) or "no_answer" */
   missed?: "closed" | "no_answer";
+  /** A voicemail was left on this call / the missed-call alert went out (once per call) */
+  leftMessage?: boolean;
+  missedAlerted?: boolean;
   /** Call recording (only when the Owner has turned it on): started, and the finished recording */
   recording?: boolean;
   recordingSid?: string;
