@@ -17,22 +17,24 @@ export type PromptDef = {
 export const PROMPTS = {
   // Welcome & main menu
   // Abraham's exact main menu (greeting, then one line per key, with a 0.75-second pause after each)
-  greeting: { group: "Welcome & main menu", label: "Welcome greeting (Abraham)", text: "Hi! Thank you for calling Hup Up Attractions, bringing something special to every occasion!" },
-  // Abraham's main menu, approved Nov 8, 2026 (word for word). Lines with new wording have new names, so an old
-  // recording or edit saved for a different meaning can never play by mistake.
-  main_enter_extension: { group: "Welcome & main menu", label: "Main menu: enter your extension any time (Abraham)", text: "If you know your desired extension, you may enter it at any time." },
+  // Main menu (Abraham, Nov 11, 2026), approved word for word. Half-second pauses between the greeting lines.
+  main_hi: { group: "Welcome & main menu", label: "Greeting, line 1 (Abraham)", text: "Hi! Thank you for calling Hup Up Attractions!" },
+  main_slogan: { group: "Welcome & main menu", label: "Greeting, line 2 (Abraham)", text: "Bringing something special to every occasion!" },
+  main_any_time: { group: "Welcome & main menu", label: "Greeting, line 3 (Abraham)", text: "If you know your desired extension, you may press it at any time." },
+  main_catalog: { group: "Welcome & main menu", label: "Main menu key 8, catalog (Abraham; said twice)", text: "To receive our catalog by text or email, press 8." },
   main_book: { group: "Welcome & main menu", label: "Main menu key 1 (Abraham)", text: "For reservations and bookings, press 1." },
   main_equipment: { group: "Welcome & main menu", label: "Main menu key 2 (Abraham)", text: "For instructions and guidance on using our rental equipment, press 2." },
-  main_learn: { group: "Welcome & main menu", label: "Main menu key 3 (Abraham)", text: "To learn more about our rental attractions and the services we offer, press 3." },
-  main_service: { group: "Welcome & main menu", label: "Main menu key 4 (Abraham)", text: "For customer service and general inquiries, press 4." },
+  main_service_3: { group: "Welcome & main menu", label: "Main menu key 3 (Abraham)", text: "For customer service and general inquiries, press 3." },
+  main_learn_4: { group: "Welcome & main menu", label: "Main menu key 4 (Abraham)", text: "To learn more about our rental attractions and the services we offer, press 4." },
   main_rental_help: { group: "Welcome & main menu", label: "Main menu key 5 (Abraham)", text: "For questions or assistance with any issues during your rental, press 5." },
   main_6: { group: "Welcome & main menu", label: "Main menu key 6 (Abraham)", text: "For delivery and pickup information, press 6." },
   main_hours: { group: "Welcome & main menu", label: "Main menu key 7 (Abraham)", text: "To hear our hours of operation, press 7." },
-  main_organizations: { group: "Welcome & main menu", label: "Main menu key 8 (Abraham)", text: "For schools, corporate events, and organizational bookings, press 8." },
   main_9: { group: "Welcome & main menu", label: "Main menu key 9 (Abraham)", text: "To leave a message in our general voicemail, press 9." },
   main_0: { group: "Welcome & main menu", label: "Main menu key 0 (Abraham)", text: "To speak with an operator, press 0." },
-  main_star_again: { group: "Welcome & main menu", label: "Main menu: hear it again (Abraham)", text: "To hear this menu again, press the star key." },
-  main_thanks: { group: "Welcome & main menu", label: "Main menu: closing line (Abraham)", text: "Thank you for choosing Hup Up Attractions. We look forward to serving you!" },
+  // Bookings menu after pressing 1 (Abraham, Nov 11, 2026), approved word for word; categories come from Admin.
+  book_note: { group: "Booking by item (key 1)", label: "Bookings menu: first line (Abraham)", text: "Please note, orders can be placed only through our automated system. For information or questions, press 0 for customer service." },
+  book_corporate: { group: "Booking by item (key 1)", label: "Bookings menu key 9 (Abraham)", text: "For schools, corporate events, and organizational bookings, press 9." },
+  book_back: { group: "Booking by item (key 1)", label: "Bookings menu: go back (Abraham)", text: "To go back, press star." },
   not_valid: { group: "Welcome & main menu", label: "Any menu: a key that is not a choice (Abraham)", text: "Sorry, that is not a valid selection. Please try again." },
   // Main menu key 2 (Abraham W): instructions for each type of attraction. Editable here like every other prompt.
   attraction_choice: { group: "Key 2: Instructions", label: "Which attraction (keys 2 and 3, Abraham)", text: "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3." },
@@ -238,13 +240,20 @@ export const PROMPTS = {
   // Abraham, Nov 11, 2026, approved word for word, every voicemail box (main and each extension).
   vm_greeting: {
     group: "Voicemail",
-    label: "Greeting (every box except key 9)",
+    label: "Greeting while the office is open (every box except key 9)",
     text: "We apologize that we are unable to answer your call. Our team is assisting other customers right now. Please feel free to leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.",
   },
   // Key 9 (Abraham, Nov 11, 2026, word for word): feedback and comments only.
+  // Key 8 catalog: PROPOSED wording, heard only on the Owner's test calls until Abraham approves it.
+  catalog_choose: { group: "Catalog (key 8, proposed)", label: "Text or email", text: "We'd love to send you our catalog. To get it by email, press 1. To get it by text, press 2. To go back, press star." },
+  catalog_text_not_yet: { group: "Catalog (key 8, proposed)", label: "Texts not available yet", text: "Sorry, we can't send it by text just yet. Let's send it by email instead." },
+  catalog_ask_email: { group: "Catalog (key 8, proposed)", label: "Ask for the email", text: "Please say your email address, like john at gmail dot com. Or press star to type it on the keypad." },
+  catalog_email_heard: { group: "Catalog (key 8, proposed)", label: "Read back the email", text: "I heard {value}. If that's correct, press 1. To try again, press 2.", vars: ["value"] },
+  catalog_emailed: { group: "Catalog (key 8, proposed)", label: "Catalog emailed", text: "Done! We just emailed you our catalog. Thank you for calling Hup Up Attractions!" },
+  catalog_texted: { group: "Catalog (key 8, proposed)", label: "Catalog texted", text: "Done! We just texted you our catalog. Thank you for calling Hup Up Attractions!" },
   vm9_greeting: {
     group: "Voicemail",
-    label: "Key 9 greeting (feedback and comments)",
+    label: "Key 9 greeting (general voicemail: feedback and comments)",
     text: "Thank you for your time. We love to hear from you, and your feedback helps us improve our service. Please share your comments after the tone. If you would like a call back, please say your name and phone number. When you are finished, you may hang up or press the pound key.",
   },
   vm9_sent: { group: "Voicemail", label: "Key 9 message sent (after pressing 1)", text: "Thank you for your feedback! We truly appreciate it. Goodbye!" },
@@ -252,6 +261,12 @@ export const PROMPTS = {
     group: "Voicemail",
     label: "Options after the caller presses #",
     text: "Thank you!\nTo send your message, press 1.\nTo listen to it, press 2.\nTo delete and re-record, press 3.",
+  },
+  vm_none_retry: { group: "Voicemail", label: "Nothing was recorded (Abraham)", text: "We didn't receive a message. To try again, press 3. Otherwise, you may hang up." },
+  vm_closed: {
+    group: "Voicemail",
+    label: "Greeting when the office is closed (every box except key 9; same hours as the website and key 7)",
+    text: "Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.",
   },
   vm_sent: { group: "Voicemail", label: "Message sent (after pressing 1)", text: "Thank you! Your message has been sent. We will get back to you as soon as possible. Goodbye!" },
   voicemail_prompt: { group: "Voicemail", label: "Before the beep (no longer played; replaced by the Greeting)", text: "Please leave your name, phone number, and a short message after the beep. Press pound when you're done." },

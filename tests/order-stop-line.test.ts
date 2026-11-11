@@ -15,7 +15,8 @@ import { db, schema } from "@/lib/db";
 import { sendMessage, withOrderStopLine } from "@/lib/sms";
 
 const PHONE = "+18455550501";
-const day = (d: number) => new Date(Date.UTC(2026, 10, 1 + d, 17));
+const START = Date.now(); // texts are stamped with the real time, so the days count from now
+const day = (d: number) => new Date(START + d * 86_400_000);
 
 describe("STOP line on order texts", () => {
   it("first order text has it; the next ones don't; it comes back after 30 days without an order text", async () => {

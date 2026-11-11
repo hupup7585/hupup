@@ -38,7 +38,8 @@ export async function boxById(id: number | null | undefined): Promise<VoicemailB
 /** The voicemail box for a main-menu key (2, 4, 5, 6, 8, and 9 for feedback), made on first use with the Main box's alert recipients. Key 0 uses the Main box. */
 export async function boxForKey(key: string | null | undefined, name?: string): Promise<VoicemailBox> {
   if (!key || !["2", "4", "5", "6", "8", "9"].includes(key)) return mainBox();
-  const label = `Extension ${key}${name ? `, ${name}` : ""}`;
+  const { EXTENSION_NUMBER } = await import("@/lib/ivr/routing");
+  const label = `Extension ${EXTENSION_NUMBER[key as "4"] ?? key}${name ? `, ${name}` : ""}`;
   const [found] = await db.select().from(schema.voicemailBoxes).where(eq(schema.voicemailBoxes.extensionKey, key)).limit(1);
   if (found) {
     if (name && found.name !== label) {

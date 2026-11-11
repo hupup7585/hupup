@@ -64,19 +64,27 @@ export function routeSummary(targets: RouteTarget[], mode: string) {
   return mode === "simultaneous" ? `Rings ${names.join(" + ")} at the same time → voicemail` : `Rings ${names.join(" → ")} → voicemail`;
 }
 
-/** Main-menu keys that ring a live employee. "0" is the operator list (operatorTargets). */
+/**
+ * Lines that ring a live employee. The id is fixed (it names the ring list, voicemail box and alerts in Admin and the
+ * database); the number callers press can change (Abraham, Nov 11, 2026 menu): customer service (id 4) is main-menu
+ * key 3; schools and corporate bookings (id 8) is key 9 inside the bookings menu (extension 19); 0 is the operator.
+ */
 export const RING_KEYS = ["2", "4", "5", "6", "8", "0"] as const;
 export type RingKey = (typeof RING_KEYS)[number];
+
+/** The extension number callers press (and staff hear) for each line, plus key 9's voicemail-only box. */
+export const EXTENSION_NUMBER: Record<RingKey | "9", string> = { "2": "2", "4": "3", "5": "5", "6": "6", "8": "19", "0": "0", "9": "9" };
+
 export const RING_KEY_LABELS: Record<RingKey, string> = {
-  "2": "Key 2: Equipment instructions and guidance",
-  "4": "Key 4: Customer service",
-  "5": "Key 5: Questions or problems during a rental",
-  "6": "Key 6: Delivery and pickup information",
-  "8": "Key 8: Schools, corporate events and organizations",
-  "0": "Key 0: Operator",
+  "2": "Extension 2: Equipment instructions and guidance",
+  "4": "Extension 3: Customer service",
+  "5": "Extension 5: Questions or problems during a rental",
+  "6": "Extension 6: Delivery and pickup information",
+  "8": "Bookings menu 9 (extension 19): Schools, corporate events and organizations",
+  "0": "Extension 0: Operator",
 };
 
-/** Each extension's name as staff hear it (Admin, Phone settings; empty uses these). */
+/** Each line's name as staff hear it (Admin, Phone settings; empty uses these). */
 export const RING_KEY_DEFAULT_NAMES: Record<RingKey, string> = {
   "2": "Equipment Instructions and Guidance",
   "4": "Customer Service",
@@ -86,23 +94,23 @@ export const RING_KEY_DEFAULT_NAMES: Record<RingKey, string> = {
   "0": "Operator",
 };
 
-/** Key 9 is the feedback and comments voicemail (no one rings). */
-export const FEEDBACK_KEY_DEFAULT_NAME = "Feedback and Comments";
+/** Key 9 is the general voicemail (feedback and comments greeting; no one rings). */
+export const FEEDBACK_KEY_DEFAULT_NAME = "General Voicemail";
 
 export function extensionName(s: Partial<Record<`ringName${RingKey | "9"}`, string>>, k: RingKey | "9"): string {
   return (s[`ringName${k}`] || "").replace(/\s+/g, " ").trim() || (k === "9" ? FEEDBACK_KEY_DEFAULT_NAME : RING_KEY_DEFAULT_NAMES[k]);
 }
 
-/** "Extension 4, Customer Service": how a box is shown in alerts (the name always fresh from Admin). */
-export const extensionLabel = (s: Partial<Record<`ringName${RingKey | "9"}`, string>>, k: RingKey | "9") => `Extension ${k}, ${extensionName(s, k)}`;
+/** "Extension 3, Customer Service": how a line or box is shown in alerts (the name always fresh from Admin). */
+export const extensionLabel = (s: Partial<Record<`ringName${RingKey | "9"}`, string>>, k: RingKey | "9") => `Extension ${EXTENSION_NUMBER[k]}, ${extensionName(s, k)}`;
 
 /**
  * What a staff member hears when they answer a forwarded call (Abraham, approved word for word; the extension number
- * and name come from Admin): "Call from Hup Up Attractions, extension 4, Customer Service. Press 1 to accept, or
+ * and name come from Admin): "Call from Hup Up Attractions, extension 3, Customer Service. Press 1 to accept, or
  * press 2 to reject."
  */
 export function staffAnnouncement(k: RingKey, name: string): string {
-  return `Call from Hup Up Attractions, extension ${k}, ${name}. Press 1 to accept, or press 2 to reject.`;
+  return `Call from Hup Up Attractions, extension ${EXTENSION_NUMBER[k]}, ${name}. Press 1 to accept, or press 2 to reject.`;
 }
 
 type RingSettings = Pick<Settings, "operatorTargets" | "operatorMode" | "operatorAcceptPrompt"> &

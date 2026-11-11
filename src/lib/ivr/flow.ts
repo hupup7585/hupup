@@ -42,7 +42,9 @@ import {
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
-import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState } from "@/lib/voicemail";
+import { voicemailPlayLink } from "@/lib/signed-link";
+import { catalogStepsOn, catalogText, sendCatalogEmail } from "@/lib/catalog-send";
+import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState, textingActive } from "@/lib/voicemail";
 import { RING_KEYS, extensionName, ringListFor, staffAnnouncement, type RingKey } from "./routing";
 import { matchBlock, parseBlockList } from "./caller-filter";
 import { PROMPTS, loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
@@ -299,13 +301,13 @@ function listPhrase(names: string[]) {
 const MAIN_KEY_LABELS: Record<string, string> = {
   "1": "book a rental",
   "2": "instructions",
-  "3": "learn about our rentals",
-  "4": "staff line 4",
-  "5": "staff line 5",
-  "6": "staff line 6",
+  "3": "customer service",
+  "4": "learn about our rentals",
+  "5": "questions or problems during a rental",
+  "6": "delivery and pickup",
   "7": "hours of operation",
-  "8": "schools, corporate events and organizations",
-  "9": "voicemail",
+  "8": "catalog by text or email",
+  "9": "general voicemail",
   "0": "speak to someone",
   "*": "repeat the main menu",
 };
@@ -371,6 +373,12 @@ function shortPause(target: VR | Gather) {
   target.play(`${config.baseUrl()}${SHORT_PAUSE_FILE}`);
 }
 
+/** Abraham (Nov 11, 2026 menu): pauses between greeting and menu lines are half a second or less. */
+export const HALF_PAUSE_FILE = "/audio/pause-500ms.wav";
+function halfPause(target: VR | Gather) {
+  target.play(`${config.baseUrl()}${HALF_PAUSE_FILE}`);
+}
+
 /** The website hours lines, as spoken: "11:30 AM - 7:00 PM" -> "11:30 AM to 7:00 PM", one sentence per line. */
 export function hoursForSpeech(s: Parameters<typeof websiteHoursLines>[0]): string[] {
   return websiteHoursLines(s).flatMap((l) => l.split("\n")).map((l) => `${l.replace(/ - /g, " to ").trim()}.`);
@@ -405,12 +413,15 @@ async function vmBox(x: string | null | undefined) {
   return mainBox();
 }
 
-/** Key 9 is feedback and comments (Abraham): its own greeting and confirmation; every other box uses the standard ones. */
-const vmGreeting = (x: string | null | undefined) => (x === "9" ? "vm9_greeting" : "vm_greeting");
+/**
+ * Key 9 (general voicemail) has its own feedback greeting. Every other box: the standard greeting while the office is
+ * open, and Abraham's "office is closed" greeting after hours, Shabbos and Yom Tov (same hours as the website and key 7).
+ */
+async function vmGreeting(x: string | null | undefined): Promise<PromptKey> {
+  if (x === "9") return "vm9_greeting";
+  return officeOpenNow(new Date(), await getSettings()) ? "vm_greeting" : "vm_closed";
+}
 const vmSent = (x: string | null | undefined) => (x === "9" ? "vm9_sent" : "vm_sent");
-
-/** Abraham: options repeat for wrong or missing keys, then the message is saved and the call ends. */
-export const VM_OPTION_TRIES = 3;
 
 /** The tone, then recording until # or hang-up (Twilio posts the recording back to vm-recorded). */
 function vmRecord(vr: VR, box: { id: number; maxLengthSec: number; transcribe: boolean }, x: string | null | undefined) {
@@ -428,6 +439,19 @@ function vmRecord(vr: VR, box: { id: number; maxLengthSec: number; transcribe: b
     ...(box.transcribe ? { transcribeCallback: url("vm-transcription", { b: box.id }) } : {}),
   });
   // Reached only if the caller stayed silent and nothing was recorded.
+  return vr;
+}
+
+/** Key 8: read the email back, then 1 sends the catalog, 2 tries again. */
+async function catalogReadBack(ctx: Ctx, vr: VR, value: string | null) {
+  if (!value) {
+    sp(vr, ctx, "email_unclear");
+    return back(vr, "catalog-email");
+  }
+  await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
+  const g = keypad(vr, url("catalog-email-confirm"));
+  sp(g, ctx, "catalog_email_heard", { value: FIELDS.email.readBack(value) });
+  vr.redirect({ method: "POST" }, url("catalog-email"));
   return vr;
 }
 
@@ -489,8 +513,10 @@ const handlers: Record<string, Handler> = {
       method: "POST",
     });
     if (ctx.query.get("first") === "1") {
-      sp(g, ctx, "greeting");
-      shortPause(g);
+      sp(g, ctx, "main_hi");
+      halfPause(g);
+      sp(g, ctx, "main_slogan");
+      halfPause(g);
       // Booking by phone is available 24/7; outside office hours (Jewish calendar + business hours) callers are told
       // the office is closed. Chol Hamoed and Chanukah: Abraham's approved "open late" line.
       const settings = await getSettings();
@@ -501,27 +527,18 @@ const handlers: Record<string, Handler> = {
       const status = !open ? "office_closed" : late === "cholHamoed" ? "late_cholhamoed" : late === "chanukah" ? "late_chanukah" : null;
       if (status) {
         sp(g, ctx, status);
-        shortPause(g);
+        halfPause(g);
       }
+      sp(g, ctx, "main_any_time");
+      halfPause(g);
+      sp(g, ctx, "main_catalog");
+      halfPause(g);
     }
-    const lines = [
-      "main_enter_extension",
-      "main_book",
-      "main_equipment",
-      "main_learn",
-      "main_service",
-      "main_rental_help",
-      "main_6",
-      "main_hours",
-      "main_organizations",
-      "main_9",
-      "main_0",
-      "main_star_again",
-      "main_thanks",
-    ] as const;
+    // Abraham's main menu (Nov 11, 2026), word for word. Any key works at any time, even during the greeting.
+    const lines = ["main_book", "main_equipment", "main_service_3", "main_learn_4", "main_rental_help", "main_6", "main_hours", "main_catalog", "main_9", "main_0"] as const;
     lines.forEach((k, i) => {
       sp(g, ctx, k);
-      if (i < lines.length - 1) shortPause(g); // 0.75 s after each line (Abraham)
+      if (i < lines.length - 1) halfPause(g);
     });
     return menuNoChoice(vr, ctx);
   },
@@ -541,14 +558,16 @@ const handlers: Record<string, Handler> = {
         return back(vr, "book");
       case "2": // Abraham W: instructions for each type of attraction
         return back(vr, "instructions");
-      case "3": // Abraham W: learn about our rentals
+      case "3": // customer service: the line (ring list, voicemail, alerts) that was key 4
+        return back(vr, "ring", { k: "4" });
+      case "4": // learn about our rentals (was key 3)
         return back(vr, "learn");
-      case "4":
       case "5":
       case "6":
-      case "8": // schools, corporate events and organizations (the list key 2 had before)
       case "0":
         return back(vr, "ring", { k: d });
+      case "8": // catalog by text or email
+        return back(vr, "catalog");
       case "7": // hours of operation, read from Admin (never rings the operator)
         return back(vr, "hours");
       case "9":
@@ -558,6 +577,70 @@ const handlers: Record<string, Handler> = {
         sp(vr, ctx, "not_valid");
         return back(vr, "menu");
     }
+  },
+
+  /* ---- Key 8 (Abraham, Nov 11, 2026): our catalog by email or text. Proposed wording: Owner's test calls only. ---- */
+
+  catalog(ctx, vr) {
+    if (!catalogStepsOn(ctx.from)) return back(vr, "ring", { k: "4" }); // until approved: customer service
+    const g = keypad(vr, url("catalog-choice"));
+    sp(g, ctx, "catalog_choose");
+    vr.redirect({ method: "POST" }, url("catalog")); // repeats until a key or hang-up
+    return vr;
+  },
+
+  async "catalog-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (d === "*") return back(vr, "menu");
+    if (d === "1") return back(vr, "catalog-email");
+    if (d === "2") {
+      const to = toE164(ctx.from);
+      if (to && (textingActive() || process.env.VERCEL_ENV !== "production")) {
+        const r = await sendMessage({ to, body: catalogText(), kind: "system", event: "catalog_request", callSid: ctx.callSid });
+        if (r.sent) {
+          await track(ctx.callSid, "step", "Catalog texted", { to });
+          sp(vr, ctx, "catalog_texted");
+          vr.hangup();
+          return vr;
+        }
+      }
+      sp(vr, ctx, "catalog_text_not_yet");
+      return back(vr, "catalog-email");
+    }
+    if (d) sp(vr, ctx, "not_valid");
+    return back(vr, "catalog");
+  },
+
+  "catalog-email"(ctx, vr) {
+    const g = speech(vr, url("catalog-email-heard"), FIELDS.email.hints, { dtmf: true, numDigits: 1, finishOnKey: "" });
+    sp(g, ctx, "catalog_ask_email");
+    return vr;
+  },
+
+  async "catalog-email-heard"(ctx, vr) {
+    if (ctx.body.Digits === "*") {
+      const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 15, action: url("catalog-email-typed"), method: "POST" });
+      sp(g, ctx, "type_instructions");
+      sp(g, ctx, "type_email_symbols");
+      return back(vr, "catalog-email");
+    }
+    const value = normalizeSpokenEmail((ctx.body.SpeechResult || "").trim());
+    return catalogReadBack(ctx, vr, value);
+  },
+
+  async "catalog-email-typed"(ctx, vr) {
+    const raw = decodeMultitap(ctx.body.Digits || "", "email");
+    return catalogReadBack(ctx, vr, raw ? normalizeSpokenEmail(raw) : null);
+  },
+
+  async "catalog-email-confirm"(ctx, vr) {
+    const email = ctx.session?.data.heard;
+    if (ctx.body.Digits !== "1" || !email) return back(vr, "catalog-email");
+    await sendCatalogEmail(email);
+    await track(ctx.callSid, "step", "Catalog emailed", { email });
+    sp(vr, ctx, "catalog_emailed");
+    vr.hangup();
+    return vr;
   },
 
   /* ---- Keys 2 and 3 (Abraham W): instructions, and learn about our rentals. m = "i" (instructions) or "l" (learn). ---- */
@@ -633,25 +716,28 @@ const handlers: Record<string, Handler> = {
   async book(ctx, vr) {
     const cats = await phoneCategories();
     const g = keypad(vr, url("book-choice")); // keys only (Abraham); # is an invalid choice
+    // Abraham (Nov 11, 2026), word for word. Categories, their names and order come from Admin; numbered 1, 2, 3...
+    sp(g, ctx, "book_note");
+    halfPause(g);
     if (!cats.length) sp(g, ctx, "menu_empty");
-    else sp(g, ctx, "book_intro");
-    for (const c of cats) {
-      sp(g, ctx, "menu_category", { category: c.spokenName || c.name, key: c.ivrDigit! });
-      shortPause(g);
-    }
-    sp(g, ctx, "back_to_menu");
-    shortPause(g);
-    sp(g, ctx, "cart_key");
+    cats.forEach((c, i) => {
+      sp(g, ctx, "menu_category", { category: c.spokenName || c.name, key: i + 1 });
+      halfPause(g);
+    });
+    sp(g, ctx, "book_corporate");
+    halfPause(g);
+    sp(g, ctx, "book_back");
     return bookNoInput(vr, ctx, "book");
   },
 
   async "book-choice"(ctx, vr) {
     const d = ctx.body.Digits; // keys only (Abraham)
     if (!d) return bookNoInput(vr, ctx, "book", {});
-    if (d === "*") return back(vr, "menu");
-    if (d === "0") return back(vr, "cart");
-    const cat = (await phoneCategories()).find((c) => String(c.ivrDigit) === d);
-    if (!cat) {
+    if (d === "*") return back(vr, "menu"); // star goes back one step
+    if (d === "0") return back(vr, "ring", { k: "4" }); // customer service (main menu key 3's line)
+    if (d === "9") return back(vr, "ring", { k: "8" }); // schools, corporate events and organizations
+    const cat = (await phoneCategories())[Number(d) - 1];
+    if (!cat || !/^[1-8]$/.test(d)) {
       sp(vr, ctx, "not_valid");
       return back(vr, "book");
     }
@@ -1483,7 +1569,7 @@ const handlers: Record<string, Handler> = {
       return back(vr, "menu");
     }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail" }, ctx.session);
-    sp(vr, ctx, vmGreeting(x));
+    sp(vr, ctx, await vmGreeting(x));
     return vmRecord(vr, box, x);
   },
 
@@ -1499,9 +1585,7 @@ const handlers: Record<string, Handler> = {
     const has = Boolean(b.RecordingSid && b.RecordingUrl) && Number(b.RecordingDuration || 0) >= 1;
     if (!has) {
       if (hungUp) return vr;
-      sp(vr, ctx, "voicemail_none");
-      vr.hangup();
-      return vr;
+      return back(vr, "vm-none", { b: box.id, x: x ?? undefined }); // never the confirmation
     }
     // Pressing 3 replaced the earlier take
     const previous = ctx.session?.data.vmSid;
@@ -1521,43 +1605,58 @@ const handlers: Record<string, Handler> = {
     return back(vr, "vm-options");
   },
 
-  /** "Thank you! To send your message, press 1. To listen to it, press 2. To delete and re-record, press 3." */
+  /**
+   * "Thank you! To send your message, press 1. To listen to it, press 2. To delete and re-record, press 3."
+   * Abraham: repeats until the caller presses a valid key or hangs up (hanging up keeps the message).
+   */
   "vm-options"(ctx, vr) {
-    const n = Number(ctx.query.get("n") || 0);
-    if (n >= VM_OPTION_TRIES) return back(vr, "vm-option", { auto: 1 }); // no key after a few tries: save and end
-    const g = keypad(vr, url("vm-option", { n }), { numDigits: 1, timeout: 6 });
+    const g = keypad(vr, url("vm-option"), { numDigits: 1, timeout: 6 });
     sp(g, ctx, "vm_options");
-    vr.redirect({ method: "POST" }, url("vm-options", { n: n + 1 }));
+    vr.redirect({ method: "POST" }, url("vm-options"));
     return vr;
+  },
+
+  /** Nothing was recorded (Abraham): "We didn't receive a message. To try again, press 3. Otherwise, you may hang up." */
+  "vm-none"(ctx, vr) {
+    const b = ctx.query.get("b") ?? undefined;
+    const x = ctx.query.get("x") ?? undefined;
+    const g = keypad(vr, url("vm-none-choice", { b, x }), { numDigits: 1, timeout: 6 });
+    sp(g, ctx, "vm_none_retry");
+    vr.redirect({ method: "POST" }, url("vm-none", { b, x }));
+    return vr;
+  },
+
+  async "vm-none-choice"(ctx, vr) {
+    const b = ctx.query.get("b") ?? undefined;
+    const x = ctx.query.get("x") ?? undefined;
+    if (ctx.body.Digits === "3") return vmRecord(vr, await boxById(Number(b) || null), x);
+    return back(vr, "vm-none", { b, x });
   },
 
   async "vm-option"(ctx, vr) {
     const sid = ctx.session?.data.vmSid;
-    if (!sid) {
-      sp(vr, ctx, "voicemail_none");
-      vr.hangup();
-      return vr;
-    }
-    const d = ctx.query.get("auto") ? "1" : ctx.body.Digits;
+    if (!sid) return back(vr, "vm-none", { b: ctx.session?.data.vmBox, x: ctx.session?.data.vmKey });
+    const d = ctx.body.Digits;
     if (d === "1") {
       const row = await setRecordingState(sid, "submitted");
       const [kept] = row ? [row] : await db.select().from(schema.voicemails).where(eq(schema.voicemails.recordingSid, sid)).limit(1);
-      if (kept && kept.state === "submitted") sp(vr, ctx, vmSent(ctx.session?.data.vmKey)); // only once the message is really saved
-      else sp(vr, ctx, "voicemail_none");
+      if (!kept || kept.state !== "submitted") return back(vr, "vm-none", { b: ctx.session?.data.vmBox, x: ctx.session?.data.vmKey });
+      sp(vr, ctx, vmSent(ctx.session?.data.vmKey)); // only once the message is really saved
       vr.hangup();
       return vr;
     }
     if (d === "2") {
-      const u = ctx.session?.data.vmUrl;
-      if (u) vr.play(`${u}.mp3`);
+      // Played through our own server with the Twilio account login (works even if Twilio locks recordings).
+      const [row] = await db.select({ id: schema.voicemails.id }).from(schema.voicemails).where(eq(schema.voicemails.recordingSid, sid)).limit(1);
+      if (row) vr.play(voicemailPlayLink(row.id));
       return back(vr, "vm-options");
     }
     if (d === "3") {
       const box = await boxById(ctx.session?.data.vmBox ?? null);
       return vmRecord(vr, box, ctx.session?.data.vmKey ?? null);
     }
-    // Wrong key: the options again (counts toward the tries)
-    return back(vr, "vm-options", { n: Number(ctx.query.get("n") || 0) + 1 });
+    // Wrong key: the options again
+    return back(vr, "vm-options");
   },
 
   /** Older link: the message was saved when the recording finished. */

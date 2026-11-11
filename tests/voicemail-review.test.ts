@@ -7,7 +7,9 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   session: { callSid: "CArv", fromNumber: "+18455550166", orderId: null, data: {} as Record<string, unknown>, status: "in_progress", outcome: "browsing" },
   emails: [] as { to: string; subject: string; text?: string }[],
+  open: true,
 }));
+vi.mock("@/lib/business-hours", async (orig) => ({ ...(await orig<typeof import("@/lib/business-hours")>()), officeOpenNow: () => h.open }));
 vi.mock("@/lib/db", async () => {
   const { createMemoryDb } = await import("./helpers/memory-db");
   const m = await createMemoryDb();
@@ -52,6 +54,7 @@ beforeEach(() => {
   h.session.callSid = `CArv${++sidN}`;
   h.session.data = {};
   h.session.status = "in_progress";
+  h.open = true;
   vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
 });
 
@@ -65,14 +68,14 @@ describe("approved wording, every box", () => {
     const main = await mainBox();
     const xml = plain(await call("voicemail", {}, "x=4"));
     const b4 = await boxForKey("4");
-    expect(b4.name).toBe("Extension 4, Customer Service");
+    expect(b4.name).toBe("Extension 3, Customer Service"); // customer service is key 3 now (same box as before)
     expect(b4.notifyEmail).toEqual(main.notifyEmail);
     expect(b4.id).not.toBe(main.id);
     expect(xml).toContain(PROMPTS.vm_greeting.text);
     expect(xml).toContain(`vm-recorded?b=${b4.id}&x=4`);
     await saveSetting("ringName4", "Customer Care");
     await call("voicemail", {}, "x=4");
-    expect((await boxForKey("4")).name).toBe("Extension 4, Customer Care"); // renamed in Admin: the box follows
+    expect((await boxForKey("4")).name).toBe("Extension 3, Customer Care"); // renamed in Admin: the box follows
     await saveSetting("ringName4", "");
     expect((await boxForKey("0")).id).toBe(main.id); // key 0 and 9 use Main
   });
@@ -102,11 +105,13 @@ describe("every path", () => {
     expect(h.emails).toHaveLength(1);
   });
 
-  it("# then 2: plays the recording, then the options again", async () => {
+  it("# then 2: plays the recording through our own server (signed link, Twilio login on our side), then the options again", async () => {
     const b = (await mainBox()).id;
     await call("vm-recorded", rec("RE2", { Digits: "#" }), `b=${b}`);
     const listen = plain(await call("vm-option", { Digits: "2" }));
-    expect(listen).toContain("<Play>https://api.twilio.com/2010-04-01/Accounts/AC1/Recordings/RE2.mp3</Play>");
+    const id = (await row("RE2")).id;
+    expect(listen).toMatch(new RegExp(`<Play>https://hupup\\.example/api/voicemail/play/${id}\\?exp=\\d+&sig=[0-9a-f]+</Play>`));
+    expect(listen).not.toContain("api.twilio.com");
     expect(listen).toContain("/api/voice/vm-options");
     expect((await row("RE2")).state).toBe("reviewing");
   });
@@ -150,27 +155,50 @@ describe("every path", () => {
     expect(h.emails[0].text).toContain(HUNG_UP_UNCONFIRMED_NOTE);
   });
 
-  it("no recording: never the confirmation", async () => {
+  it("no recording: Abraham's line, 3 tries again, anything else repeats it; never the confirmation", async () => {
     const b = (await mainBox()).id;
     const none = plain(await call("vm-recorded", { RecordingDuration: "0" }, `b=${b}`));
-    expect(none).toContain("We didn't get a message.");
-    expect(none).not.toContain(PROMPTS.vm_sent.text);
+    expect(none).toContain(`/api/voice/vm-none?b=${b}`);
+    const line = plain(await call("vm-none", {}, `b=${b}`));
+    expect(line).toContain("We didn't receive a message. To try again, press 3. Otherwise, you may hang up.");
+    expect(line).not.toContain(PROMPTS.vm_sent.text);
+    expect(line).toContain("/api/voice/vm-none?b="); // repeats until a key or hang-up
+    expect(plain(await call("vm-none-choice", { Digits: "3" }, `b=${b}`))).toMatch(/<Record [^>]*finishOnKey="#"/);
+    expect(plain(await call("vm-none-choice", { Digits: "5" }, `b=${b}`))).toContain("/api/voice/vm-none");
     expect(await call("vm-option", { Digits: "1" })).not.toContain("Your message has been sent");
+    expect(PROMPTS.vm_none_retry.text).toBe("We didn't receive a message. To try again, press 3. Otherwise, you may hang up.");
   });
 
-  it("no key or wrong keys: the options repeat, then the message is saved and the call ends", async () => {
+  it("no key or wrong keys: the options repeat until a valid key or hang-up (Abraham); hanging up still saves it", async () => {
     const b = (await mainBox()).id;
     await call("vm-recorded", rec("RE6", { Digits: "#" }), `b=${b}`);
     await ready("RE6", b);
-    expect(plain(await call("vm-option", { Digits: "7" }, "n=0"))).toContain("/api/voice/vm-options?n=1");
-    expect(plain(await call("vm-options", {}, "n=1"))).toContain("/api/voice/vm-options?n=2"); // silence
-    const last = plain(await call("vm-options", {}, "n=3"));
-    expect(last).toContain("/api/voice/vm-option?auto=1");
-    const end = plain(await call("vm-option", {}, "auto=1"));
-    expect(end).toContain(PROMPTS.vm_sent.text);
-    expect(end).toContain("<Hangup/>");
+    expect(plain(await call("vm-option", { Digits: "7" }))).toContain("/api/voice/vm-options");
+    for (let i = 0; i < 10; i++) expect(plain(await call("vm-options"))).toContain("/api/voice/vm-options"); // silence: again and again
+    expect((await row("RE6")).state).toBe("reviewing");
+    expect(h.emails).toHaveLength(0);
+    await handleCallStatus(h.session.callSid, "completed");
     expect((await row("RE6")).state).toBe("submitted");
     expect(h.emails).toHaveLength(1);
+  });
+
+  it("office closed (after hours, Shabbos, Yom Tov): Abraham's closed greeting in every box except key 9", async () => {
+    h.open = false;
+    const closed = plain(await call("voicemail", {}, "x=4"));
+    expect(closed).toContain("Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.");
+    expect(closed).not.toContain("Our team is assisting other customers right now");
+    expect(plain(await call("voicemail", {}, "x=0"))).toContain("Our office is closed right now.");
+    expect(plain(await call("voicemail", {}, "x=9"))).toContain(PROMPTS.vm9_greeting.text); // key 9 keeps its own greeting
+    h.open = true;
+    expect(plain(await call("voicemail", {}, "x=4"))).toContain("Our team is assisting other customers right now.");
+  });
+
+  it("every greeting and confirmation is editable in Admin (Hotline prompts), starting from the approved wording", async () => {
+    const { promptText } = await import("@/lib/ivr/prompts");
+    for (const k of ["vm_greeting", "vm_closed", "vm9_greeting", "vm_options", "vm_sent", "vm9_sent", "vm_none_retry"] as const) {
+      expect(PROMPTS[k].group).toBe("Voicemail");
+      expect(promptText({ [k]: { text: "Edited in Admin", audioUrl: null } }, k)).toBe("Edited in Admin");
+    }
   });
 
   it("messages the caller is still deciding on never show in Admin", async () => {
@@ -191,7 +219,7 @@ describe("key 9: feedback and comments (Abraham, word for word)", () => {
     expect(xml).not.toContain(PROMPTS.vm_greeting.text);
     expect(xml).toMatch(/<Record [^>]*finishOnKey="#"/);
     const b9 = await boxForKey("9");
-    expect(b9.name).toBe("Extension 9, Feedback and Comments");
+    expect(b9.name).toBe("Extension 9, General Voicemail");
     expect(b9.id).not.toBe((await mainBox()).id);
     await call("vm-recorded", rec("RE9", { Digits: "#" }), `b=${b9.id}&x=9`);
     expect(plain(await call("vm-options"))).toContain("To delete and re-record, press 3.");
@@ -207,20 +235,20 @@ describe("alerts say which box, first (Abraham)", () => {
     const b4 = await boxForKey("4");
     await call("vm-recorded", rec("REa4", { Digits: "hangup" }), `b=${b4.id}&x=4`);
     await ready("REa4", b4.id);
-    expect(h.emails.at(-1)!.subject).toBe("New voicemail - Extension 4, Customer Service - (845) 555-0166");
-    expect(h.emails.at(-1)!.text!.startsWith("New voicemail on Extension 4, Customer Service.")).toBe(true);
+    expect(h.emails.at(-1)!.subject).toBe("New voicemail - Extension 3, Customer Service - (845) 555-0166");
+    expect(h.emails.at(-1)!.text!.startsWith("New voicemail on Extension 3, Customer Service.")).toBe(true);
     expect(h.emails.at(-1)!.text).toMatch(/Date and time: [A-Z][a-z]{2} \d{1,2}, 20\d\d at \d{1,2}:\d\d [AP]M \(Eastern\)/);
     expect(h.emails.at(-1)!.text).toContain("Length: 0:09");
     await saveSetting("ringName4", "Customer Care");
     h.session.callSid = "CArename";
     await call("vm-recorded", rec("REa4b", { Digits: "hangup" }), `b=${b4.id}&x=4`);
     await ready("REa4b", b4.id);
-    expect(h.emails.at(-1)!.subject).toBe("New voicemail - Extension 4, Customer Care - (845) 555-0166");
+    expect(h.emails.at(-1)!.subject).toBe("New voicemail - Extension 3, Customer Care - (845) 555-0166");
     await saveSetting("ringName4", "");
     const b9 = await boxForKey("9");
     h.session.callSid = "CAfeedback";
     await call("vm-recorded", rec("REa9", { Digits: "hangup" }), `b=${b9.id}&x=9`);
     await ready("REa9", b9.id);
-    expect(h.emails.at(-1)!.subject).toBe("New voicemail - Extension 9, Feedback and Comments - (845) 555-0166");
+    expect(h.emails.at(-1)!.subject).toBe("New voicemail - Extension 9, General Voicemail - (845) 555-0166");
   });
 });

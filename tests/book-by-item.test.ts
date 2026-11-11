@@ -51,7 +51,12 @@ beforeAll(async () => {
 
 describe("key 1: booking by item", () => {
   it("categories from Admin, then the items, then the date (keys only), confirmed with the day name and day number", async () => {
-    expect(said(await call("book"))).toEqual(["Let's find the right rental for your event.", "For bounce houses, press 1.", "To go back to the main menu, press star.", "To go to your shopping cart, press 0."]);
+    expect(said(await call("book"))).toEqual([
+      "Please note, orders can be placed only through our automated system. For information or questions, press 0 for customer service.",
+      "For bounce houses, press 1.",
+      "For schools, corporate events, and organizational bookings, press 9.",
+      "To go back, press star.",
+    ]); // Abraham, Nov 11, 2026: rental first, then the date
     const items = said(await call("category", {}, `c=${catId}`));
     expect(items.slice(0, 4)).toEqual(["Here are our bounce houses.", "For the Small Castle, press 1.", "For the Medium Castle, press 2.", "For the Large Castle, press 3."]);
     h.session.data = {};

@@ -62,6 +62,7 @@ describe("hotline voicemail", () => {
     const first = await mainBox();
     expect(first.transcribe).toBe(false); // off by default (extra Twilio charge); the owner turns it on
     await db.update(schema.voicemailBoxes).set({ transcribe: true }).where(eq(schema.voicemailBoxes.id, first.id));
+    h.open = true;
     const xml = await call("voicemail");
     const box = await mainBox();
     expect(box.notifySms).toEqual(["+18457777585"]);
@@ -149,12 +150,15 @@ describe("hotline voicemail", () => {
   it("every box uses Abraham's approved greeting (an old custom greeting is not used); nothing recorded = no confirmation", async () => {
     const box = await mainBox();
     await db.update(schema.voicemailBoxes).set({ greetingText: "You reached Hup Up Attractions after hours. Leave a message!" }).where(eq(schema.voicemailBoxes.id, box.id));
+    h.open = true;
     const xml = await call("voicemail");
     expect(xml).not.toContain("after hours");
     expect(xml).toContain("We apologize that we are unable to answer your call.");
     const none = await call("vm-recorded", { RecordingDuration: "0" }, `b=${box.id}`);
-    expect(none).toContain("We didn't get a message.");
-    expect(none).not.toContain("Your message has been sent");
+    expect(none).toContain("/api/voice/vm-none");
+    const retry = (await call("vm-none", {}, `b=${box.id}`)).replace(/&apos;/g, "'");
+    expect(retry).toContain("We didn't receive a message. To try again, press 3. Otherwise, you may hang up.");
+    expect(retry).not.toContain("Your message has been sent");
     await db.update(schema.voicemailBoxes).set({ greetingText: null }).where(eq(schema.voicemailBoxes.id, box.id));
   });
 

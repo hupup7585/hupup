@@ -45,7 +45,7 @@ beforeAll(async () => {
 describe("main menu: every key goes through", () => {
   it("the menu plays every line and listens for one key (# is not a menu key)", async () => {
     const xml = text(await call("menu", {}, { first: "1" }));
-    for (const k of ["greeting", "main_book", "main_equipment", "main_learn", "main_service", "main_rental_help", "main_6", "main_hours", "main_organizations", "main_9", "main_0", "main_star_again"] as const) expect(xml).toContain(P(k));
+    for (const k of ["main_hi", "main_slogan", "main_any_time", "main_catalog", "main_book", "main_equipment", "main_service_3", "main_learn_4", "main_rental_help", "main_6", "main_hours", "main_9", "main_0"] as const) expect(xml).toContain(P(k));
     expect(gatherTo(xml)).toBe("menu-choice");
     expect(xml).toContain('finishOnKey=""');
   });
@@ -53,12 +53,12 @@ describe("main menu: every key goes through", () => {
   const routes: [string, string][] = [
     ["1", "book"],
     ["2", "instructions"],
-    ["3", "learn"],
-    ["4", "ring?k=4"],
+    ["3", "ring?k=4"],
+    ["4", "learn"],
     ["5", "ring?k=5"],
     ["6", "ring?k=6"],
     ["7", "hours"],
-    ["8", "ring?k=8"],
+    ["8", "catalog"],
     ["9", "voicemail?x=9"],
     ["0", "ring?k=0"],
     ["*", "menu?first=1"],
@@ -130,7 +130,7 @@ describe("key 2: instructions", () => {
   });
 });
 
-describe("key 3: learn about our rentals", () => {
+describe("key 4: learn about our rentals (was key 3)", () => {
   it("same choice of attractions; each description lists the items from Admin and says we deliver", async () => {
     const menu = text(await call("learn"));
     expect(menu).toContain(P("learn_intro"));
@@ -163,7 +163,7 @@ describe("key 3: learn about our rentals", () => {
   it("2 and 3 work when the office is closed too (recorded information, no one needs to answer)", async () => {
     h.open = false;
     expect(redirect(await press("2"))).toBe("instructions");
-    expect(redirect(await press("3"))).toBe("learn");
+    expect(redirect(await press("4"))).toBe("learn");
     h.open = true;
   });
 });

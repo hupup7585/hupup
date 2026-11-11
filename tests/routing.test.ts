@@ -89,10 +89,10 @@ describe("simultaneous: everyone at once, first to press 1 wins", () => {
 describe("the staff member's side", () => {
   it("hears Abraham's announcement with the extension number and its Admin name; 1 connects, 2 or silence passes; never logged as a caller", async () => {
     const w = await call("whisper", {}, "k=4", "CAstaffleg");
-    expect(w).toContain("Call from Hup Up Attractions, extension 4, Customer Service. Press 1 to accept, or press 2 to reject.");
+    expect(w).toContain("Call from Hup Up Attractions, extension 3, Customer Service. Press 1 to accept, or press 2 to reject."); // customer service is key 3 now
     expect(w).not.toContain("caller&apos;s number");
     await saveSetting("ringName4", "Customer Care");
-    expect(await call("whisper", {}, "k=4", "CAstaffleg")).toContain("Call from Hup Up Attractions, extension 4, Customer Care. Press 1 to accept, or press 2 to reject.");
+    expect(await call("whisper", {}, "k=4", "CAstaffleg")).toContain("Call from Hup Up Attractions, extension 3, Customer Care. Press 1 to accept, or press 2 to reject.");
     await saveSetting("ringName4", "");
     expect(await call("whisper", {}, "k=0", "CAstaffleg")).toContain("Call from Hup Up Attractions, extension 0, Operator.");
     expect(w).toMatch(/<Hangup\/><\/Response>$/);
@@ -107,8 +107,8 @@ describe("the staff member's side", () => {
 });
 
 describe("pauses between menu options (Abraham)", () => {
-  it("three-quarters of a second after the greeting and between options (750 ms silent clip)", async () => {
-    const pause = "<Play>https://hupup.example/audio/pause-750ms.wav</Play>";
+  it("half a second (or less) after each greeting line and between options (Abraham, Nov 11: 500 ms silent clip)", async () => {
+    const pause = "<Play>https://hupup.example/audio/pause-500ms.wav</Play>";
     // The greeting now opens the main menu (first pass): a pause after it and between every line, none after the last
     const xml = await call("menu", {}, "first=1");
     const menu = xml.slice(xml.indexOf("<Gather"), xml.indexOf("</Gather>"));
@@ -116,6 +116,13 @@ describe("pauses between menu options (Abraham)", () => {
     expect(lines).toBeGreaterThan(1);
     expect(menu.split(pause).length - 1).toBe(lines - 1);
     expect(menu).not.toContain("<Pause");
+  });
+  it("the half-second clip is exactly 0.5 seconds of silence", async () => {
+    const { readFileSync } = await import("node:fs");
+    const wav = readFileSync("public/audio/pause-500ms.wav");
+    const rate = wav.readUInt32LE(24), bytes = wav.readUInt32LE(40), bits = wav.readUInt16LE(34);
+    expect(bytes / (rate * (bits / 8))).toBe(0.5);
+    expect(wav.subarray(44).every((b) => b === 0)).toBe(true);
   });
   it("the clip is exactly 0.75 seconds of silence", async () => {
     const { readFileSync } = await import("node:fs");
