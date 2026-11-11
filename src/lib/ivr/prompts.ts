@@ -84,6 +84,7 @@ export const PROMPTS = {
   menu_empty: { group: "Welcome & main menu", label: "No rentals set up yet", text: "We're getting our rentals ready right now. Please call back soon!" },
 
   // Errors & retries
+  idle_warning: { group: "Errors & retries", label: "Inside a booking: 9 minutes with no key (Abraham)", text: "Are you still there? Please press any key to continue. Otherwise, this call will end in one minute." },
   no_input: { group: "Errors & retries", label: "Didn't hear anything", text: "Sorry, I didn't catch that. No problem, let's try that again." },
   no_input_final: { group: "Errors & retries", label: "Giving up after no input", text: "It sounds like we got disconnected. Please call us back anytime, we'd love to help. Thanks for calling Hup Up Attractions. Bye for now!" },
   tech_error: { group: "Errors & retries", label: "Technical problem", text: "Oops, something went wrong on our end. Please call back in a few minutes. Sorry about that!" },
@@ -266,7 +267,7 @@ export const PROMPTS = {
   vm_closed: {
     group: "Voicemail",
     label: "Greeting when the office is closed (every box except key 9; same hours as the website and key 7)",
-    text: "Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.",
+    text: "Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you on the next business day. When you are finished, you may hang up or press the pound key.",
   },
   vm_sent: { group: "Voicemail", label: "Message sent (after pressing 1)", text: "Thank you! Your message has been sent. We will get back to you as soon as possible. Goodbye!" },
   voicemail_prompt: { group: "Voicemail", label: "Before the beep (no longer played; replaced by the Greeting)", text: "Please leave your name, phone number, and a short message after the beep. Press pound when you're done." },

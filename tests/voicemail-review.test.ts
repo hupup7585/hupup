@@ -162,22 +162,25 @@ describe("every path", () => {
     const line = plain(await call("vm-none", {}, `b=${b}`));
     expect(line).toContain("We didn't receive a message. To try again, press 3. Otherwise, you may hang up.");
     expect(line).not.toContain(PROMPTS.vm_sent.text);
-    expect(line).toContain("/api/voice/vm-none?b="); // repeats until a key or hang-up
+    expect(line).toContain("/api/voice/no-key?to=vm-none"); // repeats (3 plays and 20 seconds rule)
     expect(plain(await call("vm-none-choice", { Digits: "3" }, `b=${b}`))).toMatch(/<Record [^>]*finishOnKey="#"/);
     expect(plain(await call("vm-none-choice", { Digits: "5" }, `b=${b}`))).toContain("/api/voice/vm-none");
     expect(await call("vm-option", { Digits: "1" })).not.toContain("Your message has been sent");
     expect(PROMPTS.vm_none_retry.text).toBe("We didn't receive a message. To try again, press 3. Otherwise, you may hang up.");
   });
 
-  it("no key or wrong keys: the options repeat until a valid key or hang-up (Abraham); hanging up still saves it", async () => {
+  it("no key: the options repeat; after 3 plays AND 20 seconds the call ends and the message is kept (Abraham, Nov 11)", async () => {
     const b = (await mainBox()).id;
     await call("vm-recorded", rec("RE6", { Digits: "#" }), `b=${b}`);
     await ready("RE6", b);
-    expect(plain(await call("vm-option", { Digits: "7" }))).toContain("/api/voice/vm-options");
-    for (let i = 0; i < 10; i++) expect(plain(await call("vm-options"))).toContain("/api/voice/vm-options"); // silence: again and again
+    expect(plain(await call("vm-option", { Digits: "7" }))).toContain("/api/voice/vm-options"); // wrong key: the options again
+    const t0 = Date.now();
+    expect(plain(await call("vm-options", {}, `np=1&t0=${t0}`))).toContain(`/api/voice/no-key?to=vm-options&np=2&t0=${t0}`);
+    expect(plain(await call("no-key", {}, `to=vm-options&np=3&t0=${t0}`))).toContain("/api/voice/vm-options?np=3"); // under 20 seconds: again
+    const end = plain(await call("no-key", {}, `to=vm-options&np=3&t0=${t0 - 21_000}`));
+    expect(end).toContain("<Hangup/>");
     expect((await row("RE6")).state).toBe("reviewing");
-    expect(h.emails).toHaveLength(0);
-    await handleCallStatus(h.session.callSid, "completed");
+    await handleCallStatus(h.session.callSid, "completed"); // the call ended: the message is kept
     expect((await row("RE6")).state).toBe("submitted");
     expect(h.emails).toHaveLength(1);
   });
@@ -185,7 +188,7 @@ describe("every path", () => {
   it("office closed (after hours, Shabbos, Yom Tov): Abraham's closed greeting in every box except key 9", async () => {
     h.open = false;
     const closed = plain(await call("voicemail", {}, "x=4"));
-    expect(closed).toContain("Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.");
+    expect(closed).toContain("Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you on the next business day. When you are finished, you may hang up or press the pound key.");
     expect(closed).not.toContain("Our team is assisting other customers right now");
     expect(plain(await call("voicemail", {}, "x=0"))).toContain("Our office is closed right now.");
     expect(plain(await call("voicemail", {}, "x=9"))).toContain(PROMPTS.vm9_greeting.text); // key 9 keeps its own greeting

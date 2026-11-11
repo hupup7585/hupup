@@ -46,7 +46,7 @@ describe("main menu: every key goes through", () => {
   it("the menu plays every line and listens for one key (# is not a menu key)", async () => {
     const xml = text(await call("menu", {}, { first: "1" }));
     for (const k of ["main_hi", "main_slogan", "main_any_time", "main_catalog", "main_book", "main_equipment", "main_service_3", "main_learn_4", "main_rental_help", "main_6", "main_hours", "main_9", "main_0"] as const) expect(xml).toContain(P(k));
-    expect(gatherTo(xml)).toBe("menu-choice");
+    expect(gatherTo(xml)).toMatch(/^menu-choice\?t0=\d+$/);
     expect(xml).toContain('finishOnKey=""');
   });
 
@@ -82,10 +82,18 @@ describe("main menu: every key goes through", () => {
     }
   });
 
-  it("no key: the menu replays, three plays in all, then a polite goodbye", async () => {
-    expect(redirect(await call("menu-choice", {}, { n: "0" }))).toBe("menu?first=1&n=1");
-    expect(redirect(await call("menu-choice", {}, { n: "1" }))).toBe("menu?first=1&n=2");
-    expect(await call("menu-choice", {}, { n: "2" })).toContain("<Hangup/>");
+  it("no key (Abraham, Nov 11): the menu replays; the call ends only after 3 plays AND at least 20 seconds", async () => {
+    const t0 = Date.now();
+    expect(redirect(await call("menu-choice", {}, { t0: String(t0) }))).toBe(`no-key?to=menu&q=first%3D1&np=1&t0=${t0}`);
+    expect(redirect(await call("no-key", {}, { to: "menu", q: "first=1", np: "1", t0: String(t0) }))).toBe(`menu?first=1&np=1&t0=${t0}`);
+    // 3 plays done in under 20 seconds: keep going
+    expect(redirect(await call("no-key", {}, { to: "menu", q: "first=1", np: "3", t0: String(t0) }))).toBe(`menu?first=1&np=3&t0=${t0}`);
+    // 3 plays and 20 seconds: goodbye
+    const end = await call("no-key", {}, { to: "menu", q: "first=1", np: "3", t0: String(t0 - 21_000) });
+    expect(end).toContain(P("no_input_final").replace(/'/g, "&apos;").slice(0, 20));
+    expect(end).toContain("<Hangup/>");
+    // 20 seconds but only 2 plays: keep going
+    expect(redirect(await call("no-key", {}, { to: "menu", q: "first=1", np: "2", t0: String(t0 - 60_000) }))).toContain("menu?first=1&np=2");
   });
 });
 
@@ -122,7 +130,7 @@ describe("key 2: instructions", () => {
       expect(xml).toContain(P("not_valid"));
       expect(redirect(xml)).toBe("instructions?again=1");
     }
-    expect(text(await call("attraction-choice", {}, { m: "i" }))).toContain(P("no_input"));
+    expect(redirect(await call("attraction-choice", {}, { m: "i" }))).toMatch(/^no-key\?to=instructions&q=again%3D1&np=1&t0=\d+$/); // information menus: the same 3 plays and 20 seconds rule
     const after = text(await call("attraction-after", { Digits: "#" }, { m: "i", t: "1" }));
     expect(after).toContain(P("not_valid"));
     expect(redirect(after)).toBe("attraction-options?m=i&t=1");

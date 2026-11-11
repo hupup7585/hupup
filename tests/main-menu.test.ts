@@ -16,7 +16,7 @@ vi.mock("@/lib/db", async () => {
 vi.mock("@/lib/ivr/session", () => ({
   ensureSession: async () => h.session,
   getSession: async () => h.session,
-  updateSession: async (_sid: string, patch: Record<string, unknown>) => Object.assign(h.session, patch),
+  updateSession: async (_sid: string, patch: Record<string, unknown> & { data?: Record<string, unknown> }) => Object.assign(h.session, patch, patch.data ? { data: { ...h.session.data, ...patch.data } } : {}), // merges data like the real session
 }));
 vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
 vi.mock("@/lib/business-hours", async (orig) => ({ ...(await orig<typeof import("@/lib/business-hours")>()), officeOpenNow: () => h.open, lateHoursToday: () => null }));
@@ -84,23 +84,26 @@ describe("Abraham's main menu wording (approved Nov 8, 2026)", () => {
     expect(redirect(await press("*"))).toBe("menu?first=1");
     expect(saidIn(await call("menu", {}, "first=1"))).toEqual(FULL);
   });
-  it("waits 4 seconds after the last line; no choice replays the whole menu; after 3 plays, the goodbye line and hang up", async () => {
+  it("waits 4 seconds after the last line; no choice replays the whole menu; ends only after 3 plays AND 20 seconds (Abraham, Nov 11)", async () => {
     const first = await call("menu", {}, "first=1");
     expect(gatherOf(first)).toMatch(/<Gather [^>]*timeout="4"/);
-    expect(redirect(first)).toBe("menu?first=1&n=1"); // 2nd play, from the greeting, no extra line in between
+    const r1 = redirect(first)!;
+    expect(r1).toMatch(/^no-key\?to=menu&q=first%3D1&np=1&t0=\d+$/);
     expect(first.slice(first.indexOf("</Gather>"))).not.toContain("<Say");
-    const second = await call("menu", {}, "first=1&n=1");
+    const t0 = Number(r1.match(/t0=(\d+)/)![1]);
+    // the menu comes back from the greeting, the same t0 carried along
+    expect(redirect(await call("no-key", {}, `to=menu&q=first%3D1&np=1&t0=${t0}`))).toBe(`menu?first=1&np=1&t0=${t0}`);
+    const second = await call("menu", {}, `first=1&np=1&t0=${t0}`);
     expect(saidIn(second)).toEqual(FULL);
-    expect(redirect(second)).toBe("menu?first=1&n=2"); // 3rd play
-    const third = await call("menu", {}, "first=1&n=2");
-    const after = third.slice(third.indexOf("</Gather>"));
-    expect(after).toContain("It sounds like we got disconnected. Please call us back anytime, we'd love to help. Thanks for calling Hup Up Attractions. Bye for now!");
-    expect(after).toContain("<Hangup/>");
-    expect(redirect(third)).toBeUndefined();
-    // the count travels with the keypad, so an empty answer on the 3rd play also ends the call; a key press always works
-    expect(gatherOf(third)).toContain("menu-choice?n=2");
-    expect(await call("menu-choice", {}, "n=2")).toContain("<Hangup/>");
-    expect(redirect(await call("menu-choice", { Digits: "1" }, "n=2"))).toBe("book");
+    expect(redirect(second)).toBe(`no-key?to=menu&q=first%3D1&np=2&t0=${t0}`);
+    // after 3 plays, but under 20 seconds: one more play
+    expect(redirect(await call("no-key", {}, `to=menu&q=first%3D1&np=3&t0=${t0}`))).toBe(`menu?first=1&np=3&t0=${t0}`);
+    // 3 plays and 20 seconds: goodbye
+    const end = await call("no-key", {}, `to=menu&q=first%3D1&np=3&t0=${t0 - 25_000}`);
+    expect(end).toContain("It sounds like we got disconnected. Please call us back anytime, we'd love to help. Thanks for calling Hup Up Attractions. Bye for now!");
+    expect(end).toContain("<Hangup/>");
+    // a key press always works
+    expect(redirect(await call("menu-choice", { Digits: "1" }, `np=2&t0=${t0}`))).toBe("book");
   });
   it("office closed: the approved closed line plays right after the greeting, inside the menu", async () => {
     h.open = false;
@@ -231,7 +234,7 @@ describe("menus are keys only (Abraham): no speech in any menu", () => {
   });
   it("anything a caller says in a menu is ignored (counts as no choice); the old Oops line is gone", async () => {
     const xml = await call("menu-choice", { SpeechResult: "jumping balloons", Confidence: "0.9" });
-    expect(redirect(xml)).toBe("menu?first=1&n=1");
+    expect(redirect(xml)).toMatch(/^no-key\?to=menu&q=first%3D1&np=1&t0=\d+$/);
     expect(xml).not.toContain("Oops");
     const { PROMPTS } = await import("@/lib/ivr/prompts");
     expect(Object.values(PROMPTS).map((p) => p.text)).not.toContain(OLD_OOPS);

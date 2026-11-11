@@ -129,10 +129,22 @@ describe("key 1: booking by item", () => {
     ]);
   });
 
-  it("no key pressed: the options repeat once, then the general voicemail", async () => {
-    expect(redirect(await call("booked", {}, `p=${medium}&d=${TUE}`))).toBe(`booked?p=${medium}&d=${TUE}&n=1`);
-    expect(redirect(await call("booked", {}, `p=${medium}&d=${TUE}&n=1`))).toBe("voicemail");
-    expect(redirect(await call("date", {}, `p=${medium}&n=1`))).toBe("voicemail");
+  it("inside a booking, no key (Abraham, Nov 11): the same step again; 9 minutes the warning; 10 minutes the call ends", async () => {
+    const q = `p=${medium}&d=${TUE}`;
+    const fall = redirect(await call("booked", {}, q))!;
+    expect(fall).toBe(`idle?to=booked&q=${encodeURIComponent(q).replace(/%3D/g, "%3D")}`);
+    const enc = fall.split("q=")[1];
+    h.session.data = { ...h.session.data, lastKeyAt: Date.now() - 60_000 };
+    expect(redirect(await call("idle", {}, `to=booked&q=${enc}`))).toBe(`booked?${q}`); // no 3-play hang-up
+    h.session.data = { ...h.session.data, lastKeyAt: Date.now() - 9 * 60_000 - 5_000 };
+    const warn = (await call("idle", {}, `to=booked&q=${enc}`)).replace(/&apos;/g, "'");
+    expect(warn).toContain("Are you still there? Please press any key to continue. Otherwise, this call will end in one minute.");
+    expect(warn).toMatch(/<Gather [^>]*action="[^"]*idle-key/);
+    expect(redirect(await call("idle-key", { Digits: "5" }, `to=booked&q=${enc}`))).toBe(`booked?${q}`); // any key: carry on
+    h.session.data = { ...h.session.data, lastKeyAt: Date.now() - 10 * 60_000 - 1_000 };
+    const end = await call("idle", {}, `to=booked&q=${enc}`);
+    expect(end).toContain("<Hangup/>");
+    expect(redirect(await call("date", {}, `p=${medium}`))).toMatch(/^idle\?to=date/);
   });
 
   it("day names and day numbers", () => {

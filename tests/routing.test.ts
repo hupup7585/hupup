@@ -13,7 +13,7 @@ vi.mock("@/lib/db", async () => {
 vi.mock("@/lib/ivr/session", () => ({
   ensureSession: async (sid: string) => (h.ensured.push(sid), h.session),
   getSession: async (sid: string) => (sid === "CArt1" ? h.session : null),
-  updateSession: async (_sid: string, patch: Record<string, unknown>) => Object.assign(h.session, patch),
+  updateSession: async (_sid: string, patch: Record<string, unknown> & { data?: Record<string, unknown> }) => Object.assign(h.session, patch, patch.data ? { data: { ...h.session.data, ...patch.data } } : {}), // merges data like the real session
 }));
 vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
 vi.mock("@/lib/business-hours", async (orig) => ({ ...(await orig<typeof import("@/lib/business-hours")>()), officeOpenNow: () => true }));

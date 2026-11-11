@@ -119,12 +119,9 @@ export function spokenDate(iso: string): string {
   return `${wd}, ${mo} ${n}${n % 10 > 3 ? "th" : suf}`;
 }
 
-/** Booking steps (Abraham): no key pressed -> repeat the options once; still nothing -> the general voicemail. */
+/** Booking steps (Abraham, Nov 11): no key pressed -> the same step again; 9 minutes idle the warning, 10 minutes end. */
 function bookNoInput(vr: VR, ctx: Ctx, retryAction: string, retryParams: Record<string, string | number | undefined> = {}) {
-  const n = Number(ctx.query.get("n") || 0) + 1;
-  if (n >= 2) return back(vr, "voicemail");
-  vr.redirect({ method: "POST" }, url(retryAction, { ...retryParams, n }));
-  return vr;
+  return idleNoKey(vr, ctx, retryAction, retryParams);
 }
 
 /** The item is free on that day, and the day is open (not past, not Shabbos/Yom Tov/closed, pickup rules applied). */
@@ -172,33 +169,64 @@ function speech(vr: VR, action: string, hints: string, opts: { dtmf?: boolean; n
   });
 }
 
-/** Handle "no input" loops: retry a few times then politely hang up. */
+/** Inside a booking (Abraham, Nov 11): no key -> "Sorry, I didn't catch that..." and the same step again (idle rule). */
 function noInput(vr: VR, ctx: Ctx, retryAction: string, retryParams: Record<string, string | number | undefined> = {}) {
-  const n = Number(ctx.query.get("n") || 0) + 1;
-  if (n >= MAX_NO_INPUT) {
-    sp(vr, ctx, "no_input_final");
-    vr.hangup();
-    return vr;
-  }
   sp(vr, ctx, "no_input");
-  vr.redirect({ method: "POST" }, url(retryAction, { ...retryParams, n }));
+  return idleNoKey(vr, ctx, retryAction, retryParams);
+}
+
+/*
+ * No key pressed (Abraham, Nov 11, 2026).
+ * Menus (main menu, information menus, voicemail options, the bookings menu before a booking starts): the whole menu
+ * plays again. The call ends only after 3 full plays with no key AND at least 20 seconds since the first play began.
+ * Inside a booking (items, between items, details, cart, payment): no 3-play hang-up. After 9 minutes with no key the
+ * warning plays; after 10 minutes the call ends. Hanging up in voicemail still keeps the message.
+ */
+export const MENU_PLAYS_BEFORE_END = 3;
+export const MENU_MIN_SECONDS = 20;
+export const IDLE_WARN_MS = 9 * 60_000;
+export const IDLE_END_MS = 10 * 60_000;
+
+const encodeTo = (action: string, params: Record<string, string | number | undefined>) => {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") q.set(k, String(v));
+  return { to: action, q: q.toString() || undefined };
+};
+
+/** Menus: the fallthrough after a play with no key. np = plays finished, t0 = when the first play started. */
+function repeatMenu(vr: VR, ctx: Ctx, action: string, params: Record<string, string | number | undefined> = {}) {
+  const np = Number(ctx.query.get("np") || 0) + 1;
+  const t0 = Number(ctx.query.get("t0")) || Date.now();
+  vr.redirect({ method: "POST" }, url("no-key", { ...encodeTo(action, params), np, t0 }));
   return vr;
 }
 
-/** Main menu (Abraham): plays at most this many times with no choice, then the existing goodbye line and hang up. */
-export const MENU_MAX_PLAYS = 3;
+/** Inside a booking: the fallthrough after a step with no key (the idle clock decides). */
+function idleNoKey(vr: VR, ctx: Ctx, action: string, params: Record<string, string | number | undefined> = {}) {
+  vr.redirect({ method: "POST" }, url("idle", encodeTo(action, params)));
+  return vr;
+}
+
+/** Milliseconds since the caller last pressed a key (or said something), or since the call started. */
+function idleMs(ctx: Ctx, now = Date.now()) {
+  const last = Number(ctx.session?.data.lastKeyAt) || (ctx.session?.startedAt ? new Date(ctx.session.startedAt).getTime() : now);
+  return now - last;
+}
+
+/** Back to a step, carrying the menu's no-key count. */
+function toStep(vr: VR, ctx: Ctx, extra: Record<string, string | number | undefined> = {}) {
+  const to = ctx.query.get("to") || "menu";
+  const params = Object.fromEntries(new URLSearchParams(ctx.query.get("q") || ""));
+  vr.redirect({ method: "POST" }, url(to, { ...params, ...extra }));
+  return vr;
+}
+
 /** Main menu (Abraham): seconds to wait for a choice after the last menu line. */
 export const MENU_WAIT_SECONDS = 4;
 
-/** No choice after the main menu: replay the whole menu from the greeting, or after 3 plays say goodbye and hang up. */
+/** No choice after the main menu: the whole menu again, from the greeting (3 plays and 20 seconds rule). */
 function menuNoChoice(vr: VR, ctx: Ctx) {
-  const plays = Number(ctx.query.get("n") || 0) + 1; // how many times the menu has played so far
-  if (plays >= MENU_MAX_PLAYS) {
-    sp(vr, ctx, "no_input_final");
-    vr.hangup();
-    return vr;
-  }
-  return back(vr, "menu", { first: 1, n: plays });
+  return repeatMenu(vr, ctx, "menu", { first: 1 });
 }
 
 function back(vr: VR, action: string, params: Record<string, string | number | undefined> = {}) {
@@ -283,7 +311,7 @@ function attractionMenu(ctx: Ctx, vr: VR, m: "i" | "l") {
   if (!ctx.query.get("again")) sp(g, ctx, m === "i" ? "instr_intro" : "learn_intro");
   sp(g, ctx, "attraction_choice");
   sp(g, ctx, "attraction_menu_back");
-  return noInput(vr, ctx, m === "i" ? "instructions" : "learn", { again: 1 });
+  return repeatMenu(vr, ctx, m === "i" ? "instructions" : "learn", { again: 1 });
 }
 
 /** The Admin category for a type (by name, so a rename in Admin still works; else the one on that booking key). */
@@ -509,7 +537,7 @@ const handlers: Record<string, Handler> = {
       numDigits: 1,
       finishOnKey: "",
       timeout: MENU_WAIT_SECONDS, // Abraham: 4 seconds after the last line, then the menu plays again
-      action: url("menu-choice", { n: ctx.query.get("n") || undefined }),
+      action: url("menu-choice", { np: ctx.query.get("np") || undefined, t0: ctx.query.get("t0") || Date.now() }),
       method: "POST",
     });
     if (ctx.query.get("first") === "1") {
@@ -579,13 +607,49 @@ const handlers: Record<string, Handler> = {
     }
   },
 
+  /** A menu played with no key: again, until 3 plays AND 20 seconds have passed; then goodbye. */
+  "no-key"(ctx, vr) {
+    const np = Number(ctx.query.get("np") || 0);
+    const t0 = Number(ctx.query.get("t0")) || Date.now();
+    if (np >= MENU_PLAYS_BEFORE_END && Date.now() - t0 >= MENU_MIN_SECONDS * 1000) {
+      sp(vr, ctx, "no_input_final");
+      vr.hangup(); // a voicemail waiting for 1, 2 or 3 is kept when the call ends
+      return vr;
+    }
+    return toStep(vr, ctx, { np, t0 });
+  },
+
+  /** Inside a booking with no key: the same step; at 9 minutes the warning, at 10 minutes the call ends. */
+  idle(ctx, vr) {
+    const idle = idleMs(ctx);
+    if (idle >= IDLE_END_MS) {
+      sp(vr, ctx, "no_input_final");
+      vr.hangup();
+      return vr;
+    }
+    if (idle >= IDLE_WARN_MS) {
+      const to = ctx.query.get("to") ?? undefined;
+      const q = ctx.query.get("q") ?? undefined;
+      const g = vr.gather({ input: ["dtmf"], numDigits: 1, finishOnKey: "", timeout: Math.max(5, Math.ceil((IDLE_END_MS - idle) / 1000)), action: url("idle-key", { to, q }), method: "POST" });
+      sp(g, ctx, "idle_warning");
+      vr.redirect({ method: "POST" }, url("idle", { to, q }));
+      return vr;
+    }
+    return toStep(vr, ctx);
+  },
+
+  /** Any key after the warning: back to the same step. */
+  "idle-key"(ctx, vr) {
+    return toStep(vr, ctx);
+  },
+
   /* ---- Key 8 (Abraham, Nov 11, 2026): our catalog by email or text. Proposed wording: Owner's test calls only. ---- */
 
   catalog(ctx, vr) {
     if (!catalogStepsOn(ctx.from)) return back(vr, "ring", { k: "4" }); // until approved: customer service
     const g = keypad(vr, url("catalog-choice"));
     sp(g, ctx, "catalog_choose");
-    vr.redirect({ method: "POST" }, url("catalog")); // repeats until a key or hang-up
+    repeatMenu(vr, ctx, "catalog"); // repeats (3 plays and 20 seconds rule)
     return vr;
   },
 
@@ -657,7 +721,7 @@ const handlers: Record<string, Handler> = {
     const m = ctx.query.get("m") === "l" ? "l" : "i";
     const d = ctx.body.Digits;
     const menu = m === "l" ? "learn" : "instructions";
-    if (!d) return noInput(vr, ctx, menu, { again: 1 });
+    if (!d) return repeatMenu(vr, ctx, menu, { again: 1 });
     if (d === "*") return back(vr, "menu");
     if (["1", "2", "3"].includes(d)) return back(vr, "attraction", { m, t: d });
     sp(vr, ctx, "not_valid"); // # or any other key
@@ -683,7 +747,7 @@ const handlers: Record<string, Handler> = {
     }
     pause(g);
     sp(g, ctx, "attraction_after");
-    return noInput(vr, ctx, "attraction-options", { m, t });
+    return repeatMenu(vr, ctx, "attraction-options", { m, t });
   },
 
   "attraction-options"(ctx, vr) {
@@ -691,14 +755,14 @@ const handlers: Record<string, Handler> = {
     const t = ctx.query.get("t") ?? "1";
     const g = keypad(vr, url("attraction-after", { m, t }));
     sp(g, ctx, "attraction_after");
-    return noInput(vr, ctx, "attraction-options", { m, t });
+    return repeatMenu(vr, ctx, "attraction-options", { m, t });
   },
 
   async "attraction-after"(ctx, vr) {
     const m = ctx.query.get("m") === "l" ? "l" : "i";
     const t = ctx.query.get("t") ?? "1";
     const d = ctx.body.Digits;
-    if (!d) return noInput(vr, ctx, "attraction-options", { m, t });
+    if (!d) return repeatMenu(vr, ctx, "attraction-options", { m, t });
     if (d === "*") return back(vr, "attraction", { m, t }); // hear it again
     if (d === "1") return back(vr, m === "l" ? "learn" : "instructions", { again: 1 }); // another attraction
     if (d === "2") return back(vr, "menu"); // main menu
@@ -727,12 +791,13 @@ const handlers: Record<string, Handler> = {
     sp(g, ctx, "book_corporate");
     halfPause(g);
     sp(g, ctx, "book_back");
-    return bookNoInput(vr, ctx, "book");
+    // Before a booking starts this is a menu (3 plays and 20 seconds); with something held it follows the idle rule
+    return (await callOrders(ctx)).length ? idleNoKey(vr, ctx, "book") : repeatMenu(vr, ctx, "book");
   },
 
   async "book-choice"(ctx, vr) {
     const d = ctx.body.Digits; // keys only (Abraham)
-    if (!d) return bookNoInput(vr, ctx, "book", {});
+    if (!d) return (await callOrders(ctx)).length ? idleNoKey(vr, ctx, "book") : repeatMenu(vr, ctx, "book");
     if (d === "*") return back(vr, "menu"); // star goes back one step
     if (d === "0") return back(vr, "ring", { k: "4" }); // customer service (main menu key 3's line)
     if (d === "9") return back(vr, "ring", { k: "8" }); // schools, corporate events and organizations
@@ -1617,7 +1682,7 @@ const handlers: Record<string, Handler> = {
   "vm-options"(ctx, vr) {
     const g = keypad(vr, url("vm-option"), { numDigits: 1, timeout: 6 });
     sp(g, ctx, "vm_options");
-    vr.redirect({ method: "POST" }, url("vm-options"));
+    repeatMenu(vr, ctx, "vm-options"); // 3 plays and 20 seconds, then the call ends (the message is kept)
     return vr;
   },
 
@@ -1627,7 +1692,7 @@ const handlers: Record<string, Handler> = {
     const x = ctx.query.get("x") ?? undefined;
     const g = keypad(vr, url("vm-none-choice", { b, x }), { numDigits: 1, timeout: 6 });
     sp(g, ctx, "vm_none_retry");
-    vr.redirect({ method: "POST" }, url("vm-none", { b, x }));
+    repeatMenu(vr, ctx, "vm-none", { b, x });
     return vr;
   },
 
@@ -1752,8 +1817,14 @@ export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Prom
   if (!session && ctx.action !== "incoming") await ensureSession(ctx.callSid, ctx.from);
   // Caller journey (Abraham S): this menu or question, with the key pressed or the words said
   await trackStep(ctx.callSid, ctx.action, ctx.body, ctx.query);
+  // Abraham's idle rule inside a booking: remember when the caller last pressed a key (or said something)
+  let current = session;
+  if ((ctx.body.Digits || (ctx.body.SpeechResult || "").trim()) && current) {
+    await updateSession(ctx.callSid, { data: { lastKeyAt: Date.now() } }, current);
+    current = await getSession(ctx.callSid);
+  }
   try {
-    await handler({ ...ctx, session: session ?? (await getSession(ctx.callSid)) }, vr);
+    await handler({ ...ctx, session: current ?? session ?? (await getSession(ctx.callSid)) }, vr);
   } catch (e) {
     console.error("IVR handler error", ctx.action, e);
     const err = new twilio.twiml.VoiceResponse();

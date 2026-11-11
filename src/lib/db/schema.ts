@@ -184,6 +184,8 @@ export type CallData = {
   day?: string;
   /** Key 1 booking: every held order on this call, one per rental day (paid together with one charge) */
   dayOrderIds?: number[];
+  /** When the caller last pressed a key or said something (Abraham's idle rule inside a booking) */
+  lastKeyAt?: number;
   /** Voicemail review menu: the latest recording on this call, its link, box and menu key */
   vmSid?: string;
   vmUrl?: string;
