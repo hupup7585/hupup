@@ -24,21 +24,20 @@ export async function saveRoutingAction(_prev: { ok?: boolean; message?: string 
   if (targets.length > 10) return { ok: false, message: "Up to 10 numbers." };
   const mode = form.get("mode") === "simultaneous" ? "simultaneous" : "sequential";
   const accept = form.get("accept") === "on";
-  const acceptText = String(form.get("acceptText") ?? "").trim().slice(0, 300);
-  if (k === "0" && accept && !/press 1/i.test(acceptText)) return { ok: false, message: 'The accept message must tell the person to "press 1".' };
+  const name = String(form.get("name") ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
   const before = await getSettings();
   const normalized = targets.map((t) => `${t.label} | ${t.phone} | ${t.ringSeconds}`).join("\n");
   await saveSetting(n.targets as keyof Settings, normalized as never, owner.userId);
   await saveSetting(n.mode as keyof Settings, mode as never, owner.userId);
   await saveSetting(n.accept as keyof Settings, accept as never, owner.userId);
-  if (k === "0" && acceptText) await saveSetting("operatorAcceptText", acceptText, owner.userId);
+  await saveSetting(`ringName${k}` as keyof Settings, name as never, owner.userId);
   await db.insert(schema.auditLog).values({
     userId: owner.userId,
     action: "settings.routing_updated",
     entityType: "settings",
     entityId: `ring_key_${k}`,
-    before: { targets: before[n.targets], mode: before[n.mode], accept: before[n.accept] },
-    after: { targets: normalized, mode, accept },
+    before: { targets: before[n.targets], mode: before[n.mode], accept: before[n.accept], name: before[`ringName${k}` as keyof Settings] },
+    after: { targets: normalized, mode, accept, name },
   });
   revalidatePath("/admin", "layout");
   return { ok: true, message: "Saved." };

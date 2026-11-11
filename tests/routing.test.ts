@@ -60,38 +60,41 @@ describe("routing list", () => {
 });
 
 describe("sequential: one after another, each must press 1", () => {
-  it("rings #1 for its own time with the accept prompt, then #2, then #3, then the missed-call line and voicemail", async () => {
+  it("rings #1 for its own time with the staff announcement, then #2, then #3, then that extension's voicemail", async () => {
     const first = await call("ring", {}, "k=0");
     expect(first).toMatch(/<Dial [^>]*timeout="20"[^>]*action="[^"]*operator-done\?i=0&amp;k=0"/);
-    expect(first).toContain(`<Number url="https://hupup.example/api/voice/whisper?from=%2B18455550199" method="POST">+18455550177</Number>`);
+    expect(first).toContain(`<Number url="https://hupup.example/api/voice/whisper?k=0" method="POST">+18455550177</Number>`);
     const second = await call("operator-done", { DialCallStatus: "no-answer" }, "i=0&k=0");
     expect(second).toMatch(/timeout="15"[^>]*operator-done\?i=1&amp;k=0/);
     expect(second).toContain(">+18455550100</Number>");
     const third = await call("operator-done", { DialCallStatus: "busy" }, "i=1&k=0");
     expect(third).toContain(">+18455550111</Number>");
     const end = await call("operator-done", { DialCallStatus: "no-answer" }, "i=2&k=0");
-    expect(end).toContain("Sorry, we missed your call, our team is busy helping others right now. Please leave a message after the tone and someone will get back to you shortly. Thank you and have a wonderful day!");
-    expect(end).toContain("/api/voice/voicemail?after=1"); // straight to the beep
+    expect(end).toContain("/api/voice/voicemail?x=0"); // the greeting, then the tone
     expect(await call("operator-done", { DialCallStatus: "completed" }, "i=1&k=0")).toContain("<Hangup/>");
   });
 });
 
 describe("simultaneous: everyone at once, first to press 1 wins", () => {
-  it("dials all numbers in one Dial with the longest ring time; no answer goes to the missed-call line and voicemail", async () => {
+  it("dials all numbers in one Dial with the longest ring time; no answer goes to voicemail", async () => {
     await saveSetting("operatorMode", "simultaneous");
     const xml = await call("ring", {}, "k=0");
     expect(xml).toMatch(/<Dial [^>]*timeout="20"/);
     expect((xml.match(/<Number /g) || []).length).toBe(3);
     expect(xml).not.toContain("?i=");
-    expect(await call("operator-done", { DialCallStatus: "no-answer" })).toContain("/api/voice/voicemail?after=1");
+    expect(await call("operator-done", { DialCallStatus: "no-answer" })).toContain("/api/voice/voicemail?x=0");
   });
 });
 
 describe("the staff member's side", () => {
-  it("hears the accept prompt with the caller's number; 1 connects, 2 or silence passes; never logged as a caller", async () => {
-    const w = await call("whisper", {}, "from=%2B18455550199", "CAstaffleg");
-    expect(w).toContain("Call from the Hup Up Attractions hotline. To accept, press 1. To pass, press 2.");
-    expect(w).toContain("The caller's number is 8 4 5 5 5 5 0 1 9 9.");
+  it("hears Abraham's announcement with the extension number and its Admin name; 1 connects, 2 or silence passes; never logged as a caller", async () => {
+    const w = await call("whisper", {}, "k=4", "CAstaffleg");
+    expect(w).toContain("Call from Hup Up Attractions, extension 4, Customer Service. Press 1 to accept, or press 2 to reject.");
+    expect(w).not.toContain("caller&apos;s number");
+    await saveSetting("ringName4", "Customer Care");
+    expect(await call("whisper", {}, "k=4", "CAstaffleg")).toContain("Call from Hup Up Attractions, extension 4, Customer Care. Press 1 to accept, or press 2 to reject.");
+    await saveSetting("ringName4", "");
+    expect(await call("whisper", {}, "k=0", "CAstaffleg")).toContain("Call from Hup Up Attractions, extension 0, Operator.");
     expect(w).toMatch(/<Hangup\/><\/Response>$/);
     expect(await call("whisper-accept", { Digits: "1" }, "", "CAstaffleg")).toBe('<?xml version="1.0" encoding="UTF-8"?><Response/>');
     expect(await call("whisper-accept", { Digits: "2" }, "", "CAstaffleg")).toContain("<Hangup/>");

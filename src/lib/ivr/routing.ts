@@ -76,6 +76,29 @@ export const RING_KEY_LABELS: Record<RingKey, string> = {
   "0": "Key 0: Operator",
 };
 
+/** Each extension's name as staff hear it (Admin, Phone settings; empty uses these). */
+export const RING_KEY_DEFAULT_NAMES: Record<RingKey, string> = {
+  "2": "Equipment Instructions and Guidance",
+  "4": "Customer Service",
+  "5": "Questions or Problems During a Rental",
+  "6": "Delivery and Pickup Information",
+  "8": "Schools, Corporate Events and Organizations",
+  "0": "Operator",
+};
+
+export function extensionName(s: Partial<Record<`ringName${RingKey}`, string>>, k: RingKey): string {
+  return (s[`ringName${k}`] || "").replace(/\s+/g, " ").trim() || RING_KEY_DEFAULT_NAMES[k];
+}
+
+/**
+ * What a staff member hears when they answer a forwarded call (Abraham, approved word for word; the extension number
+ * and name come from Admin): "Call from Hup Up Attractions, extension 4, Customer Service. Press 1 to accept, or
+ * press 2 to reject."
+ */
+export function staffAnnouncement(k: RingKey, name: string): string {
+  return `Call from Hup Up Attractions, extension ${k}, ${name}. Press 1 to accept, or press 2 to reject.`;
+}
+
 type RingSettings = Pick<Settings, "operatorTargets" | "operatorMode" | "operatorAcceptPrompt"> &
   Partial<Record<`ringTargets${"2" | "4" | "5" | "6" | "8"}`, string>> &
   Partial<Record<`ringMode${"2" | "4" | "5" | "6" | "8"}`, string>> &

@@ -42,8 +42,8 @@ import {
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
-import { boxById, mainBox, saveRecording, saveTranscription } from "@/lib/voicemail";
-import { RING_KEYS, ringListFor, type RingKey } from "./routing";
+import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState } from "@/lib/voicemail";
+import { RING_KEYS, extensionName, ringListFor, staffAnnouncement, type RingKey } from "./routing";
 import { matchBlock, parseBlockList } from "./caller-filter";
 import { PROMPTS, loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
@@ -387,7 +387,7 @@ function dialTargets(vr: VR, list: ReturnType<typeof ringListFor>, k: RingKey, i
     method: "POST",
   });
   for (const t of ring) {
-    if (list.accept) dial.number({ url: url("whisper", { from: from || undefined }), method: "POST" }, t.phone);
+    if (list.accept) dial.number({ url: url("whisper", { k }), method: "POST" }, t.phone);
     else dial.number(t.phone);
   }
   return vr;
@@ -397,6 +397,34 @@ function dialTargets(vr: VR, list: ReturnType<typeof ringListFor>, k: RingKey, i
 async function chooseDay(ctx: Ctx, date: string) {
   const sameDay = (await callOrders(ctx)).find((o) => o.order.eventDate === date);
   await updateSession(ctx.callSid, { orderId: sameDay?.order.id ?? null, data: { day: date } }, ctx.session);
+}
+
+/** The voicemail box for a menu key: an extension's own box (named after it in Admin), otherwise Main. */
+async function vmBox(x: string | null | undefined) {
+  if (x && (RING_KEYS as readonly string[]).includes(x) && x !== "0") return boxForKey(x, extensionName(await getSettings(), x as RingKey));
+  return mainBox();
+}
+
+/** Abraham: options repeat for wrong or missing keys, then the message is saved and the call ends. */
+export const VM_OPTION_TRIES = 3;
+
+/** The tone, then recording until # or hang-up (Twilio posts the recording back to vm-recorded). */
+function vmRecord(vr: VR, box: { id: number; maxLengthSec: number; transcribe: boolean }, x: string | null | undefined) {
+  vr.record({
+    maxLength: Math.min(Math.max(box.maxLengthSec, 10), 600),
+    playBeep: true,
+    finishOnKey: "#",
+    timeout: 6,
+    action: url("vm-recorded", { b: box.id, x: x ?? undefined, t: box.transcribe ? 1 : 0 }),
+    method: "POST",
+    recordingStatusCallback: url("vm-recording", { b: box.id, t: box.transcribe ? 1 : 0 }),
+    recordingStatusCallbackEvent: ["completed"],
+    recordingStatusCallbackMethod: "POST",
+    transcribe: box.transcribe,
+    ...(box.transcribe ? { transcribeCallback: url("vm-transcription", { b: box.id }) } : {}),
+  });
+  // Reached only if the caller stayed silent and nothing was recorded.
+  return vr;
 }
 
 /* ------------------------------------------------------------------ handlers */
@@ -1368,8 +1396,7 @@ const handlers: Record<string, Handler> = {
     const list = ringListFor(settings, k);
     if (!list.targets.length || !officeOpenNow(new Date(), settings)) {
       await updateSession(ctx.callSid, { data: { missed: "closed" } }, ctx.session); // dashboard: missed call
-      sp(vr, ctx, "operator_unavailable");
-      return back(vr, "voicemail", { after: 1 });
+      return back(vr, "voicemail", { x: k }); // the extension's own box, with the approved greeting
     }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "forwarded" }, ctx.session);
     sp(vr, ctx, "transfer_connecting");
@@ -1411,18 +1438,21 @@ const handlers: Record<string, Handler> = {
     if (list.mode !== "simultaneous" && next > 0 && next < list.targets.length) return dialTargets(vr, list, k, next, ctx.session?.fromNumber ?? ctx.from);
     // Abraham's missed-call line, then straight to the voicemail beep
     await updateSession(ctx.callSid, { data: { missed: "no_answer" } }, ctx.session); // dashboard: missed call
-    sp(vr, ctx, "transfer_failed");
-    return back(vr, "voicemail", { after: 1 });
+    return back(vr, "voicemail", { x: k }); // pressed 2 or no answer on every number: the extension's voicemail
   },
 
-  /** Plays to the staff member who answered (not the caller): press 1 to take the call. */
+  /**
+   * Plays only to the staff member who answered; the caller keeps hearing ringing meanwhile. Abraham's approved
+   * announcement with the extension number and its name from Admin: press 1 to take the call, 2 to pass it on.
+   */
   async whisper(ctx, vr) {
     const settings = await getSettings();
+    const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
+    const text = staffAnnouncement(k, extensionName(settings, k));
     const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, action: url("whisper-accept"), method: "POST" });
-    const caller = ctx.query.get("from");
-    say(g, `${settings.operatorAcceptText}${caller ? ` The caller's number is ${caller.replace(/\D/g, "").slice(-10).split("").join(" ")}.` : ""}`);
-    say(vr, settings.operatorAcceptText);
-    vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 6, action: url("whisper-accept"), method: "POST" });
+    say(g, text);
+    const again = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 6, action: url("whisper-accept"), method: "POST" });
+    say(again, text);
     vr.hangup(); // no answer from the staff member (or their voicemail): this leg ends and routing moves on
     return vr;
   },
@@ -1437,44 +1467,97 @@ const handlers: Record<string, Handler> = {
     return back(vr, "menu");
   },
 
-  /** Leave a message in the Main box: greeting, beep, record. Twilio posts the recording and transcription back. */
+  /**
+   * Voicemail (Abraham, Nov 11, 2026), every box: the approved greeting, the tone, then recording. The caller hangs
+   * up or presses # to finish. Extension keys use their own box (x = the key); key 0, 9 and the rest use Main.
+   */
   async voicemail(ctx, vr) {
-    const box = await mainBox();
+    const x = ctx.query.get("x");
+    const box = await vmBox(x);
     if (!box.enabled) {
       sp(vr, ctx, "operator_unavailable");
       return back(vr, "menu");
     }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail" }, ctx.session);
-    // After the missed-call line the caller has already been told to leave a message: go straight to the beep.
-    if (ctx.query.get("after") !== "1") {
-      if (box.greetingText?.trim()) say(vr, box.greetingText.trim());
-      else sp(vr, ctx, "voicemail_prompt");
+    sp(vr, ctx, "vm_greeting");
+    return vmRecord(vr, box, x);
+  },
+
+  /**
+   * The Record action: the caller pressed #, stayed silent, or hung up. Hung up = sent as is. # = the review menu;
+   * nothing is sent until they press 1 (or hang up). Nothing recorded = no confirmation, ever.
+   */
+  async "vm-recorded"(ctx, vr) {
+    const b = ctx.body;
+    const box = await boxById(Number(ctx.query.get("b")) || null);
+    const x = ctx.query.get("x");
+    const hungUp = b.Digits === "hangup";
+    const has = Boolean(b.RecordingSid && b.RecordingUrl) && Number(b.RecordingDuration || 0) >= 1;
+    if (!has) {
+      if (hungUp) return vr;
+      sp(vr, ctx, "voicemail_none");
+      vr.hangup();
+      return vr;
     }
-    vr.record({
-      maxLength: Math.min(Math.max(box.maxLengthSec, 10), 600),
-      playBeep: true,
-      finishOnKey: "#",
-      timeout: 6,
-      action: url("voicemail-done", { b: box.id }),
-      method: "POST",
-      recordingStatusCallback: url("vm-recording", { b: box.id, t: box.transcribe ? 1 : 0 }),
-      recordingStatusCallbackEvent: ["completed"],
-      recordingStatusCallbackMethod: "POST",
-      transcribe: box.transcribe,
-      ...(box.transcribe ? { transcribeCallback: url("vm-transcription", { b: box.id }) } : {}),
+    // Pressing 3 replaced the earlier take
+    const previous = ctx.session?.data.vmSid;
+    if (previous && previous !== b.RecordingSid) await setRecordingState(previous, "replaced");
+    await recordingFinished({
+      boxId: box.id,
+      callSid: ctx.callSid,
+      from: ctx.session?.fromNumber ?? ctx.from,
+      recordingSid: b.RecordingSid!,
+      recordingUrl: b.RecordingUrl!,
+      durationSec: Number(b.RecordingDuration || 0),
+      transcribe: ctx.query.get("t") === "1",
+      state: hungUp ? "submitted" : "reviewing",
     });
-    // Reached only if nothing was recorded.
-    sp(vr, ctx, "voicemail_none");
-    vr.hangup();
+    await updateSession(ctx.callSid, { data: { vmSid: b.RecordingSid, vmUrl: b.RecordingUrl, vmBox: box.id, vmKey: x ?? undefined, leftMessage: true } }, ctx.session);
+    if (hungUp) return vr;
+    return back(vr, "vm-options");
+  },
+
+  /** "Thank you! To send your message, press 1. To listen to it, press 2. To delete and re-record, press 3." */
+  "vm-options"(ctx, vr) {
+    const n = Number(ctx.query.get("n") || 0);
+    if (n >= VM_OPTION_TRIES) return back(vr, "vm-option", { auto: 1 }); // no key after a few tries: save and end
+    const g = keypad(vr, url("vm-option", { n }), { numDigits: 1, timeout: 6 });
+    sp(g, ctx, "vm_options");
+    vr.redirect({ method: "POST" }, url("vm-options", { n: n + 1 }));
     return vr;
   },
 
-  async "voicemail-done"(ctx, vr) {
-    if (Number(ctx.body.RecordingDuration || 0) < 1) sp(vr, ctx, "voicemail_none");
-    else {
-      await updateSession(ctx.callSid, { data: { leftMessage: true } }, ctx.session); // a voicemail alert replaces the missed-call alert
-      sp(vr, ctx, "voicemail_thanks");
+  async "vm-option"(ctx, vr) {
+    const sid = ctx.session?.data.vmSid;
+    if (!sid) {
+      sp(vr, ctx, "voicemail_none");
+      vr.hangup();
+      return vr;
     }
+    const d = ctx.query.get("auto") ? "1" : ctx.body.Digits;
+    if (d === "1") {
+      const row = await setRecordingState(sid, "submitted");
+      const [kept] = row ? [row] : await db.select().from(schema.voicemails).where(eq(schema.voicemails.recordingSid, sid)).limit(1);
+      if (kept && kept.state === "submitted") sp(vr, ctx, "vm_sent"); // only once the message is really saved
+      else sp(vr, ctx, "voicemail_none");
+      vr.hangup();
+      return vr;
+    }
+    if (d === "2") {
+      const u = ctx.session?.data.vmUrl;
+      if (u) vr.play(`${u}.mp3`);
+      return back(vr, "vm-options");
+    }
+    if (d === "3") {
+      const box = await boxById(ctx.session?.data.vmBox ?? null);
+      return vmRecord(vr, box, ctx.session?.data.vmKey ?? null);
+    }
+    // Wrong key: the options again (counts toward the tries)
+    return back(vr, "vm-options", { n: Number(ctx.query.get("n") || 0) + 1 });
+  },
+
+  /** Older link: the message was saved when the recording finished. */
+  async "voicemail-done"(ctx, vr) {
     vr.hangup();
     return vr;
   },
@@ -1492,6 +1575,7 @@ const handlers: Record<string, Handler> = {
         recordingUrl: b.RecordingUrl,
         durationSec: Number(b.RecordingDuration || 0),
         transcribe: ctx.query.get("t") === "1",
+        callEnded: ctx.session?.status === "completed" || !ctx.session,
       });
     }
     return vr;
@@ -1589,9 +1673,11 @@ export async function handleCallStatus(callSid: string, status: string) {
     .limit(1)
     .catch(() => []); // journey logging must never break the hang-up handling
   const booked = s.outcome === "checked_out";
+  // Voicemail the caller didn't confirm is kept (with a note if they pressed # and hung up). Never lost.
+  const keptMessages = await finalizeCallRecordings(callSid).catch((e) => (console.error("voicemail finalize failed", e), 0));
   // Owner alert (Abraham): missed call = reached voicemail and hung up without a message, or hung up while ringing.
   // Once per call; never when a voicemail was left (that one gets the voicemail alert).
-  if (!s.data?.missedAlerted && !s.data?.leftMessage) {
+  if (!s.data?.missedAlerted && !s.data?.leftMessage && !keptMessages) {
     const how = s.outcome === "voicemail" || last?.step === "voicemail" ? "voicemail_no_message" : last?.step === "ring" ? "hung_up_ringing" : null;
     if (how) {
       await updateSession(callSid, { data: { missedAlerted: true } }, s);

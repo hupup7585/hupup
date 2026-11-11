@@ -135,10 +135,10 @@ describe("every key, office open", () => {
     await saveSetting("ringTargets2", "Equipment help | (845) 555-0123 | 20");
     expect(await call("ring", {}, "k=2")).toContain(">+18455550123</Number>");
   });
-  it("no one answers: Abraham's missed-call line, then the general voicemail beep", async () => {
+  it("no one answers: that extension's own voicemail (the greeting, then the tone)", async () => {
     const xml = await call("operator-done", { DialCallStatus: "no-answer" }, "i=0&k=8");
-    expect(xml).toContain(MISSED);
-    expect(redirect(xml)).toBe("voicemail?after=1");
+    expect(xml).not.toContain(MISSED);
+    expect(redirect(xml)).toBe("voicemail?x=8");
   });
   it("missed calls are marked for the dashboard: no answer, or office closed", async () => {
     h.session.data = {};
@@ -244,16 +244,15 @@ describe("menus are keys only (Abraham): no speech in any menu", () => {
 });
 
 describe("every key, office closed", () => {
-  it("1 books and 2 and 3 play their information 24/7; 4, 5, 6, 7, 8 and 0 play the missed-call line and go to voicemail; 9 is voicemail", async () => {
+  it("1 books and 2 and 3 play their information 24/7; 4, 5, 6, 8 and 0 go to their own voicemail; 9 is voicemail", async () => {
     h.open = false;
     expect(redirect(await press("1"))).toBe("book");
     expect(redirect(await press("2"))).toBe("instructions");
     expect(redirect(await press("3"))).toBe("learn");
     for (const k of ["2", "4", "5", "6", "8", "0"]) {
       const xml = await call("ring", {}, `k=${k}`);
-      expect(xml).toContain(MISSED);
       expect(xml).not.toContain("<Dial");
-      expect(redirect(xml)).toBe("voicemail?after=1");
+      expect(redirect(xml)).toBe(`voicemail?x=${k}`);
     }
     expect(redirect(await press("7"))).toBe("hours");
     expect(redirect(await press("9"))).toBe("voicemail");

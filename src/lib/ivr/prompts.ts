@@ -235,8 +235,20 @@ export const PROMPTS = {
   // Voicemail (Main box)
   menu_voicemail: { group: "Voicemail", label: "Menu option when the office is closed: leave a message", text: "To leave us a message, press 0." },
   voicemail_offer: { group: "Voicemail", label: "Offer after no one answered", text: "To leave a message, press 1. To keep booking, press star." },
-  voicemail_prompt: { group: "Voicemail", label: "Before the beep (unless the box has its own greeting)", text: "Please leave your name, phone number, and a short message after the beep. Press pound when you're done." },
-  voicemail_thanks: { group: "Voicemail", label: "After the message", text: "Thanks! We got your message and will call you back soon. Bye for now!" },
+  // Abraham, Nov 11, 2026, approved word for word, every voicemail box (main and each extension).
+  vm_greeting: {
+    group: "Voicemail",
+    label: "Greeting (every box)",
+    text: "We apologize that we are unable to answer your call. Our team is assisting other customers right now. Please feel free to leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.",
+  },
+  vm_options: {
+    group: "Voicemail",
+    label: "Options after the caller presses #",
+    text: "Thank you!\nTo send your message, press 1.\nTo listen to it, press 2.\nTo delete and re-record, press 3.",
+  },
+  vm_sent: { group: "Voicemail", label: "Message sent (after pressing 1)", text: "Thank you! Your message has been sent. We will get back to you as soon as possible. Goodbye!" },
+  voicemail_prompt: { group: "Voicemail", label: "Before the beep (no longer played; replaced by the Greeting)", text: "Please leave your name, phone number, and a short message after the beep. Press pound when you're done." },
+  voicemail_thanks: { group: "Voicemail", label: "After the message (no longer played; replaced by Message sent)", text: "Thanks! We got your message and will call you back soon. Bye for now!" },
   voicemail_none: { group: "Voicemail", label: "Caller didn't leave a message", text: "We didn't get a message. Please call back anytime. Bye for now!" },
 } satisfies Record<string, PromptDef>;
 

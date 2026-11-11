@@ -42,7 +42,7 @@ export default async function PhoneSettingsPage() {
                 <h3 className="mb-2 font-extrabold">{RING_KEY_LABELS[k]}</h3>
                 <RoutingForm
                   ringKey={k}
-                  initial={{ ...own, acceptText: settings.operatorAcceptText }}
+                  initial={{ ...own, name: settings[`ringName${k}`] }}
                   summary={`${list.usesOperatorList ? "No numbers yet, so it uses the operator list: " : ""}${routeSummary(list.targets, list.mode)}`}
                 />
               </div>

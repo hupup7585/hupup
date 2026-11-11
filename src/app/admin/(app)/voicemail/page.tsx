@@ -4,6 +4,8 @@ import { requireStaff } from "@/lib/auth";
 import { formatPhone } from "@/lib/phone";
 import { TEXT_ALERTS_NOT_ACTIVE, listVoicemails, mainBox, textingActive } from "@/lib/voicemail";
 import { getSettings } from "@/lib/settings";
+import { db, schema } from "@/lib/db";
+import { PROMPTS } from "@/lib/ivr/prompts";
 import { deleteVoicemailAction, saveBoxAction, setHeardAction, setUrgentAction } from "./actions";
 import { dualDateTime } from "@/lib/dual-date";
 
@@ -20,7 +22,7 @@ export default async function VoicemailPage() {
   let box, list;
   try {
     box = await mainBox();
-    list = await listVoicemails(box.id);
+    list = await listVoicemails(); // every box: Main and each extension
   } catch (e) {
     console.error("[voicemail page]", e);
     return (
@@ -31,11 +33,12 @@ export default async function VoicemailPage() {
     );
   }
   const unheard = list.filter((v) => !v.heardAt).length;
+  const boxes = new Map((await db.select({ id: schema.voicemailBoxes.id, name: schema.voicemailBoxes.name, isMain: schema.voicemailBoxes.isMain }).from(schema.voicemailBoxes)).map((b) => [b.id, b]));
   return (
     <div className="mx-auto max-w-4xl">
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Voicemail</h1>
       <p className="mb-5 text-muted">
-        Messages left on the hotline (press 0 when the office is closed or no one answers). {unheard ? <b>{unheard} new.</b> : "No new messages."}
+        Messages left on the hotline, from every box (Main and each extension). {unheard ? <b>{unheard} new.</b> : "No new messages."}
       </p>
 
       {!list.length && <p className="card p-6 text-muted">No messages yet.</p>}
@@ -47,6 +50,7 @@ export default async function VoicemailPage() {
                 {v.urgent && <span className="rounded-full bg-[#FFE6E4] px-2 py-0.5 text-xs font-black text-[#C83A2F]">URGENT</span>}
                 {!v.heardAt && <span className="rounded-full bg-sun/50 px-2 py-0.5 text-xs font-black">NEW</span>}
                 {v.fromNumber ? formatPhone(v.fromNumber) : "Withheld number"}
+                <span className="rounded-full bg-bg px-2 py-0.5 text-xs font-bold" data-voicemail-box>{boxes.get(v.boxId)?.isMain ? "Main voicemail" : boxes.get(v.boxId)?.name ?? "Voicemail"}</span>
                 <span className="font-normal text-muted">· {when(v.createdAt)} · {mmss(v.durationSec)}</span>
               </div>
               <div className="flex flex-wrap gap-2 text-sm">
@@ -61,6 +65,7 @@ export default async function VoicemailPage() {
               </div>
             </div>
             <audio controls preload="none" className="mt-3 w-full" src={`/api/admin/voicemail/${v.id}/audio`} />
+            {v.note && <p className="mt-2 rounded-lg bg-[#FFF8E1] px-3 py-2 text-sm font-semibold text-[#5C4600]" data-voicemail-note>{v.note}</p>}
             <p className="mt-2 whitespace-pre-line text-[15px]">
               {v.transcription || <span className="text-muted">{v.transcriptionStatus === "pending" ? "Transcription on its way..." : "No transcription."}</span>}
             </p>
@@ -86,10 +91,12 @@ export default async function VoicemailPage() {
           <label className="flex items-center gap-2 font-semibold">
             <input type="checkbox" name="enabled" defaultChecked={box.enabled} /> Voicemail on (callers can leave a message)
           </label>
-          <label className="block">
-            <span className="label">Greeting before the beep (leave empty to use the standard one from Hotline prompts)</span>
-            <textarea name="greetingText" defaultValue={box.greetingText ?? ""} rows={3} className="input" placeholder="Please leave your name, phone number, and a short message after the beep." />
-          </label>
+          <div className="block" data-vm-greeting>
+            <span className="label">Greeting (every box, approved by Abraham)</span>
+            <p className="rounded-lg bg-bg p-3 text-sm">&ldquo;{PROMPTS.vm_greeting.text}&rdquo;</p>
+            <p className="mt-1 text-xs text-muted">After the caller presses #: &ldquo;{PROMPTS.vm_options.text.replace(/\n/g, " ")}&rdquo; Pressing 1: &ldquo;{PROMPTS.vm_sent.text}&rdquo; Each extension (2, 4, 5, 6, 8) has its own box with these alert settings copied from here when it is first used.</p>
+            <input type="hidden" name="greetingText" value={box.greetingText ?? ""} />
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex items-center gap-2 font-semibold">
               <input type="checkbox" name="transcribe" defaultChecked={box.transcribe} /> Transcribe messages to text (costs extra on Twilio; please ask before turning it on)

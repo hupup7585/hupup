@@ -184,6 +184,11 @@ export type CallData = {
   day?: string;
   /** Key 1 booking: every held order on this call, one per rental day (paid together with one charge) */
   dayOrderIds?: number[];
+  /** Voicemail review menu: the latest recording on this call, its link, box and menu key */
+  vmSid?: string;
+  vmUrl?: string;
+  vmBox?: number;
+  vmKey?: string;
   /** Promo texts by phone (keys only): the mobile number typed in Step 3, waiting for the caller to confirm */
   promoHeard?: string;
 };
@@ -474,6 +479,8 @@ export const voicemailBoxes = pgTable("voicemail_boxes", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   isMain: boolean("is_main").notNull().default(false),
+  /** The main-menu key this box belongs to (2, 4, 5, 6, 8); null for the Main box and older boxes */
+  extensionKey: text("extension_key").unique(),
   /** Spoken before the beep (text to speech). Empty = the default prompt from the prompts catalog. */
   greetingText: text("greeting_text"),
   /** Off by default: Twilio charges extra per minute for transcription (Abraham approves before turning on). */
@@ -505,6 +512,15 @@ export const voicemails = pgTable(
     heardBy: integer("heard_by").references(() => adminUsers.id),
     notifiedAt: timestamp("notified_at", { withTimezone: true }),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    /**
+     * recording (call still on) | reviewing (caller pressed #, deciding) | submitted | replaced (caller re-recorded).
+     * Only submitted messages show in Admin and send alerts.
+     */
+    state: text("state").notNull().default("submitted"),
+    /** Twilio says the audio file is ready (the recording status callback arrived) */
+    ready: boolean("ready").notNull().default(true),
+    /** Shown in the alert, e.g. the caller hung up without confirming */
+    note: text("note"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("voicemails_box_idx").on(t.boxId, t.createdAt)],

@@ -73,6 +73,13 @@ export const SETTING_DEFAULTS = {
    * rental), 6 (delivery and pickup) and 8 (schools, corporate events and organizations; the list key 2 had before
    * Nov 8, 2026). Same format as operatorTargets. Empty = ring the operator list (key 0).
    */
+  /** Extension names staff hear in the call announcement (empty = the default name for that key). */
+  ringName0: "",
+  ringName2: "",
+  ringName4: "",
+  ringName5: "",
+  ringName6: "",
+  ringName8: "",
   ringTargets2: "",
   ringMode2: "sequential",
   ringAccept2: true,

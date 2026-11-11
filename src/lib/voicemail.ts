@@ -35,8 +35,46 @@ export async function boxById(id: number | null | undefined): Promise<VoicemailB
   return mainBox();
 }
 
-/** Twilio recording status callback. Idempotent on RecordingSid (Twilio retries). */
-export async function saveRecording(input: { boxId: number; callSid: string | null; from: string | null; recordingSid: string; recordingUrl: string; durationSec: number; transcribe: boolean }) {
+/** The voicemail box for a main-menu key (2, 4, 5, 6, 8), made on first use with the Main box's alert recipients. Key 0 and 9 use the Main box. */
+export async function boxForKey(key: string | null | undefined, name?: string): Promise<VoicemailBox> {
+  if (!key || !["2", "4", "5", "6", "8"].includes(key)) return mainBox();
+  const label = `Extension ${key}${name ? `, ${name}` : ""}`;
+  const [found] = await db.select().from(schema.voicemailBoxes).where(eq(schema.voicemailBoxes.extensionKey, key)).limit(1);
+  if (found) {
+    if (name && found.name !== label) {
+      const [renamed] = await db.update(schema.voicemailBoxes).set({ name: label }).where(eq(schema.voicemailBoxes.id, found.id)).returning();
+      return renamed ?? found;
+    }
+    return found;
+  }
+  const main = await mainBox();
+  const [created] = await db
+    .insert(schema.voicemailBoxes)
+    .values({ name: label, extensionKey: key, transcribe: main.transcribe, maxLengthSec: main.maxLengthSec, notifySms: main.notifySms, notifyEmail: main.notifyEmail })
+    .onConflictDoNothing({ target: schema.voicemailBoxes.extensionKey })
+    .returning();
+  if (created) return created;
+  const [again] = await db.select().from(schema.voicemailBoxes).where(eq(schema.voicemailBoxes.extensionKey, key)).limit(1);
+  return again;
+}
+
+/** Note on the alert when the caller pressed # and then hung up without pressing 1 (Abraham, word for word). */
+export const HUNG_UP_UNCONFIRMED_NOTE = "The customer hung up without confirming or deleting this message.";
+
+export type RecordingState = "recording" | "reviewing" | "submitted" | "replaced";
+
+/** Send the alert once the message is submitted, the audio file is ready and any transcription is back. */
+export async function maybeNotify(id: number) {
+  const [v] = await db.select().from(schema.voicemails).where(eq(schema.voicemails.id, id)).limit(1);
+  if (!v || v.state !== "submitted" || !v.ready || v.deletedAt || v.notifiedAt || v.transcriptionStatus === "pending") return { sent: 0 };
+  return notifyVoicemail(id);
+}
+
+/**
+ * The caller finished recording (the Record action: # pressed, silence, or hang-up). Saves the message with the
+ * caller's state; the audio file may not be ready yet (the status callback marks it ready).
+ */
+export async function recordingFinished(input: { boxId: number; callSid: string | null; from: string | null; recordingSid: string; recordingUrl: string; durationSec: number; transcribe: boolean; state: RecordingState }) {
   const [row] = await db
     .insert(schema.voicemails)
     .values({
@@ -47,12 +85,81 @@ export async function saveRecording(input: { boxId: number; callSid: string | nu
       recordingUrl: input.recordingUrl,
       durationSec: input.durationSec,
       transcriptionStatus: input.transcribe ? "pending" : "off",
+      state: input.state,
+      ready: false,
     })
     .onConflictDoNothing({ target: schema.voicemails.recordingSid })
     .returning();
-  // Without transcription there is nothing to wait for: notify now.
-  if (row && !input.transcribe) await notifyVoicemail(row.id);
+  if (row) return row;
+  // The status callback got here first (the file is ready): only move the state forward.
+  const [updated] = await db.update(schema.voicemails).set({ state: input.state }).where(and(eq(schema.voicemails.recordingSid, input.recordingSid), sql`${schema.voicemails.state} in ('recording','reviewing')`)).returning();
+  if (updated) await maybeNotify(updated.id);
+  return updated ?? null;
+}
+
+/** The caller's choice in the review menu: 1 sends it, 3 replaces it with a new recording. */
+export async function setRecordingState(recordingSid: string, state: RecordingState, note?: string | null) {
+  const [row] = await db
+    .update(schema.voicemails)
+    .set({ state, ...(note !== undefined ? { note } : {}) })
+    .where(and(eq(schema.voicemails.recordingSid, recordingSid), sql`${schema.voicemails.state} in ('recording','reviewing')`))
+    .returning();
+  if (row) await maybeNotify(row.id);
   return row ?? null;
+}
+
+/**
+ * The call ended: anything the caller didn't decide is kept as a submitted voicemail, so no message is ever lost.
+ * Pressed # and hung up without pressing 1 gets Abraham's note on the alert. Returns how many messages were kept.
+ */
+export async function finalizeCallRecordings(callSid: string): Promise<number> {
+  const rows = await db.select().from(schema.voicemails).where(eq(schema.voicemails.callSid, callSid));
+  let kept = 0;
+  for (const r of rows) {
+    if (r.state === "replaced") continue;
+    kept++;
+    if (r.state === "recording" || r.state === "reviewing") {
+      await db
+        .update(schema.voicemails)
+        .set({ state: "submitted", note: r.state === "reviewing" ? HUNG_UP_UNCONFIRMED_NOTE : r.note })
+        .where(and(eq(schema.voicemails.id, r.id), sql`${schema.voicemails.state} in ('recording','reviewing')`));
+      await maybeNotify(r.id);
+    }
+  }
+  return kept;
+}
+
+/**
+ * Twilio recording status callback (the audio file is ready). Idempotent on RecordingSid (Twilio retries).
+ * A message the caller is still deciding on waits; one from a call that already ended is kept as submitted.
+ */
+export async function saveRecording(input: { boxId: number; callSid: string | null; from: string | null; recordingSid: string; recordingUrl: string; durationSec: number; transcribe: boolean; callEnded?: boolean }) {
+  const [row] = await db
+    .insert(schema.voicemails)
+    .values({
+      boxId: input.boxId,
+      callSid: input.callSid,
+      fromNumber: input.from,
+      recordingSid: input.recordingSid,
+      recordingUrl: input.recordingUrl,
+      durationSec: input.durationSec,
+      transcriptionStatus: input.transcribe ? "pending" : "off",
+      state: input.callEnded === false ? "recording" : "submitted",
+      ready: true,
+    })
+    .onConflictDoNothing({ target: schema.voicemails.recordingSid })
+    .returning();
+  if (row) {
+    await maybeNotify(row.id);
+    return row;
+  }
+  const [updated] = await db
+    .update(schema.voicemails)
+    .set({ ready: true, recordingUrl: input.recordingUrl, durationSec: input.durationSec })
+    .where(eq(schema.voicemails.recordingSid, input.recordingSid))
+    .returning();
+  if (updated) await maybeNotify(updated.id);
+  return updated ?? null;
 }
 
 /** Twilio transcription callback: store the text, then notify (once). */
@@ -62,7 +169,7 @@ export async function saveTranscription(recordingSid: string, status: string, te
     .set({ transcription: text?.trim() || null, transcriptionStatus: status === "completed" ? "completed" : "failed" })
     .where(eq(schema.voicemails.recordingSid, recordingSid))
     .returning();
-  if (row) await notifyVoicemail(row.id);
+  if (row) await maybeNotify(row.id);
   return row ?? null;
 }
 
@@ -97,7 +204,7 @@ export type VoicemailAlert = { subject: string; email: string; text: string };
 
 /** The words of one voicemail alert (email and text). */
 export function voicemailAlert(
-  v: Pick<Voicemail, "fromNumber" | "durationSec" | "transcription" | "urgent" | "createdAt">,
+  v: Pick<Voicemail, "fromNumber" | "durationSec" | "transcription" | "urgent" | "createdAt"> & { note?: string | null },
   info: { callerName?: string | null; source: string; playLink: string; attached: boolean },
 ): VoicemailAlert {
   const caller = v.fromNumber ? formatPhone(v.fromNumber) : "a withheld number";
@@ -112,6 +219,7 @@ export function voicemailAlert(
     `Key or box: ${info.source}`,
     `Date and time: ${when}`,
     `Length: ${mmss(v.durationSec)}`,
+    ...(v.note ? ["", v.note] : []),
     "",
     info.attached ? "The recording is attached as an MP3 file." : "Recording attached failed, use the link.",
     `Play it here (private link, expires in 14 days): ${info.playLink}`,
@@ -119,7 +227,7 @@ export function voicemailAlert(
     "",
     `All voicemails: ${config.baseUrl()}/admin/voicemail`,
   ].join("\n");
-  const text = `${urgent}${BUSINESS_NAME}: new voicemail from ${who}, ${info.source}, ${when}, ${mmss(v.durationSec)}. Play: ${info.playLink}`;
+  const text = `${urgent}${BUSINESS_NAME}: new voicemail from ${who}, ${info.source}, ${when}, ${mmss(v.durationSec)}.${v.note ? ` ${v.note}` : ""} Play: ${info.playLink}`;
   return { subject, email, text };
 }
 
@@ -160,20 +268,27 @@ export async function notifyVoicemail(id: number): Promise<{ sent: number }> {
 
 /** Daily safety net: alert for messages whose transcription never came back (older than 15 minutes). */
 export async function notifyStragglers() {
+  // Undecided messages from calls whose hang-up never reached us: keep them (never lose a message).
+  const stuck = await db
+    .select({ callSid: schema.voicemails.callSid })
+    .from(schema.voicemails)
+    .where(and(sql`${schema.voicemails.state} in ('recording','reviewing')`, lt(schema.voicemails.createdAt, sql`now() - interval '15 minutes'`)));
+  for (const r of stuck) if (r.callSid) await finalizeCallRecordings(r.callSid);
+  await db.update(schema.voicemails).set({ ready: true }).where(and(eq(schema.voicemails.ready, false), lt(schema.voicemails.createdAt, sql`now() - interval '15 minutes'`)));
   const rows = await db
     .select({ id: schema.voicemails.id })
     .from(schema.voicemails)
-    .where(and(isNull(schema.voicemails.notifiedAt), isNull(schema.voicemails.deletedAt), lt(schema.voicemails.createdAt, sql`now() - interval '15 minutes'`)));
+    .where(and(isNull(schema.voicemails.notifiedAt), isNull(schema.voicemails.deletedAt), eq(schema.voicemails.state, "submitted"), lt(schema.voicemails.createdAt, sql`now() - interval '15 minutes'`)));
   let n = 0;
   for (const r of rows) n += (await notifyVoicemail(r.id)).sent ? 1 : 0;
   return n;
 }
 
-export async function listVoicemails(boxId: number) {
+export async function listVoicemails(boxId?: number) {
   return db
     .select()
     .from(schema.voicemails)
-    .where(and(eq(schema.voicemails.boxId, boxId), isNull(schema.voicemails.deletedAt)))
+    .where(and(boxId ? eq(schema.voicemails.boxId, boxId) : undefined, isNull(schema.voicemails.deletedAt), eq(schema.voicemails.state, "submitted")))
     .orderBy(desc(schema.voicemails.urgent), desc(schema.voicemails.createdAt))
     .limit(500);
 }
@@ -182,7 +297,7 @@ export async function unheardCount() {
   const [r] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(schema.voicemails)
-    .where(and(isNull(schema.voicemails.heardAt), isNull(schema.voicemails.deletedAt)));
+    .where(and(isNull(schema.voicemails.heardAt), isNull(schema.voicemails.deletedAt), eq(schema.voicemails.state, "submitted")));
   return r?.n ?? 0;
 }
 
