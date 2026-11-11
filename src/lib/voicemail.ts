@@ -35,9 +35,9 @@ export async function boxById(id: number | null | undefined): Promise<VoicemailB
   return mainBox();
 }
 
-/** The voicemail box for a main-menu key (2, 4, 5, 6, 8), made on first use with the Main box's alert recipients. Key 0 and 9 use the Main box. */
+/** The voicemail box for a main-menu key (2, 4, 5, 6, 8, and 9 for feedback), made on first use with the Main box's alert recipients. Key 0 uses the Main box. */
 export async function boxForKey(key: string | null | undefined, name?: string): Promise<VoicemailBox> {
-  if (!key || !["2", "4", "5", "6", "8"].includes(key)) return mainBox();
+  if (!key || !["2", "4", "5", "6", "8", "9"].includes(key)) return mainBox();
   const label = `Extension ${key}${name ? `, ${name}` : ""}`;
   const [found] = await db.select().from(schema.voicemailBoxes).where(eq(schema.voicemailBoxes.extensionKey, key)).limit(1);
   if (found) {
@@ -205,19 +205,19 @@ export type VoicemailAlert = { subject: string; email: string; text: string };
 /** The words of one voicemail alert (email and text). */
 export function voicemailAlert(
   v: Pick<Voicemail, "fromNumber" | "durationSec" | "transcription" | "urgent" | "createdAt"> & { note?: string | null },
-  info: { callerName?: string | null; source: string; playLink: string; attached: boolean },
+  info: { callerName?: string | null; box: string; playLink: string; attached: boolean },
 ): VoicemailAlert {
   const caller = v.fromNumber ? formatPhone(v.fromNumber) : "a withheld number";
   const who = info.callerName ? `${info.callerName} ${caller}` : caller;
-  const when = alertDateTime(v.createdAt);
+  const when = alertWhen(v.createdAt);
   const urgent = v.urgent ? "URGENT: " : "";
-  const subject = `${urgent}New voicemail from ${who}, ${when}`;
+  // Abraham: the box first, so it's seen right away.
+  const subject = `${urgent}New voicemail - ${info.box} - ${caller}`;
   const email = [
-    `New voicemail for ${BUSINESS_NAME}.`,
+    `New voicemail on ${info.box}.`,
     "",
     `Caller: ${who}`,
-    `Key or box: ${info.source}`,
-    `Date and time: ${when}`,
+    `Date and time: ${when} (Eastern)`,
     `Length: ${mmss(v.durationSec)}`,
     ...(v.note ? ["", v.note] : []),
     "",
@@ -227,8 +227,25 @@ export function voicemailAlert(
     "",
     `All voicemails: ${config.baseUrl()}/admin/voicemail`,
   ].join("\n");
-  const text = `${urgent}${BUSINESS_NAME}: new voicemail from ${who}, ${info.source}, ${when}, ${mmss(v.durationSec)}.${v.note ? ` ${v.note}` : ""} Play: ${info.playLink}`;
+  const text = `${urgent}${BUSINESS_NAME}: New voicemail on ${info.box}, from ${caller}, ${when}, ${mmss(v.durationSec)} long.${v.note ? ` ${v.note}` : ""} Play: ${info.playLink}`;
   return { subject, email, text };
+}
+
+/** "Nov 10, 2026 at 3:15 PM" in New York time. */
+export function alertWhen(d: Date): string {
+  const tz = process.env.BUSINESS_TIMEZONE || "America/New_York";
+  const date = d.toLocaleDateString("en-US", { timeZone: tz, month: "short", day: "numeric", year: "numeric" });
+  const time = d.toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" });
+  return `${date} at ${time}`;
+}
+
+/** The box as shown in alerts: "Extension 4, Customer Service"; the general box is extension 0 (Operator). */
+export async function boxLabel(box: Pick<VoicemailBox, "isMain" | "extensionKey" | "name">): Promise<string> {
+  const { extensionLabel } = await import("@/lib/ivr/routing");
+  const s = await getSettings();
+  const k = box.extensionKey ?? (box.isMain ? "0" : null);
+  if (k && ["0", "2", "4", "5", "6", "8", "9"].includes(k)) return extensionLabel(s, k as "0");
+  return box.name;
 }
 
 /** Email (with the MP3 attached) and text the box's recipients. Runs once per message (claims notified_at atomically). */
@@ -252,7 +269,8 @@ export async function notifyVoicemail(id: number): Promise<{ sent: number }> {
   } catch (e) {
     console.error("voicemail alert: recording download failed", e);
   }
-  const alert = voicemailAlert(v, { callerName: cust?.name ?? null, source: voicemailSource(box, session?.data), playLink, attached: Boolean(mp3?.length) });
+  void session;
+  const alert = voicemailAlert(v, { callerName: cust?.name ?? null, box: await boxLabel(box), playLink, attached: Boolean(mp3?.length) });
   const stamp = alertDateTime(v.createdAt).replace(/[^0-9A-Za-z]+/g, "-").replace(/-+$/, "");
   const attachments = mp3?.length ? [{ filename: `voicemail-${stamp}-${(v.fromNumber || "unknown").replace(/\D/g, "")}.mp3`, content: mp3.toString("base64") }] : [];
   let sent = 0;

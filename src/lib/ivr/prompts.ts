@@ -238,9 +238,16 @@ export const PROMPTS = {
   // Abraham, Nov 11, 2026, approved word for word, every voicemail box (main and each extension).
   vm_greeting: {
     group: "Voicemail",
-    label: "Greeting (every box)",
+    label: "Greeting (every box except key 9)",
     text: "We apologize that we are unable to answer your call. Our team is assisting other customers right now. Please feel free to leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.",
   },
+  // Key 9 (Abraham, Nov 11, 2026, word for word): feedback and comments only.
+  vm9_greeting: {
+    group: "Voicemail",
+    label: "Key 9 greeting (feedback and comments)",
+    text: "Thank you for your time. We love to hear from you, and your feedback helps us improve our service. Please share your comments after the tone. If you would like a call back, please say your name and phone number. When you are finished, you may hang up or press the pound key.",
+  },
+  vm9_sent: { group: "Voicemail", label: "Key 9 message sent (after pressing 1)", text: "Thank you for your feedback! We truly appreciate it. Goodbye!" },
   vm_options: {
     group: "Voicemail",
     label: "Options after the caller presses #",

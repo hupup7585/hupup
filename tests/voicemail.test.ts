@@ -30,7 +30,7 @@ vi.mock("@/lib/notify", () => ({
 
 import { handleVoice } from "@/lib/ivr/flow";
 import { db, schema } from "@/lib/db";
-import { alertDateTime, fetchRecordingAudio, mainBox, notifyStragglers, voicemailAlert, voicemailSource } from "@/lib/voicemail";
+import { alertWhen, fetchRecordingAudio, mainBox, notifyStragglers, voicemailAlert, voicemailSource } from "@/lib/voicemail";
 import { eq } from "drizzle-orm";
 
 const call = (action: string, body: Record<string, string> = {}, query = "") =>
@@ -93,18 +93,18 @@ describe("hotline voicemail", () => {
 
     await call("vm-transcription", { RecordingSid: "RE111", TranscriptionStatus: "completed", TranscriptionText: "Hi, I need a bounce house for Sunday." });
     await call("vm-transcription", { RecordingSid: "RE111", TranscriptionStatus: "completed", TranscriptionText: "Hi, I need a bounce house for Sunday." });
-    const when = alertDateTime(rows[0].createdAt);
-    expect(when).toMatch(/^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2}, 20\d\d, \d{1,2}:\d\d [AP]M$/);
+    const when = alertWhen(rows[0].createdAt);
+    expect(when).toMatch(/^[A-Z][a-z]{2} \d{1,2}, 20\d\d at \d{1,2}:\d\d [AP]M$/);
     expect(h.sms).toHaveLength(1);
     expect(h.sms[0].to).toBe("+18457777585");
-    expect(h.sms[0].body).toMatch(new RegExp(`^Hup Up Attractions: new voicemail from \\(845\\) 555-0199, Main voicemail, ${when.replace(/[()]/g, "\\$&")}, 0:42\\. Play: https://hupup\\.example/api/voicemail/play/${rows[0].id}\\?exp=\\d+&sig=[0-9a-f]{32}$`));
+    expect(h.sms[0].body).toMatch(new RegExp(`^Hup Up Attractions: New voicemail on Extension 0, Operator, from \\(845\\) 555-0199, ${when}, 0:42 long\\. Play: https://hupup\\.example/api/voicemail/play/${rows[0].id}\\?exp=\\d+&sig=[0-9a-f]{32}$`));
     expect(h.sms[0].opts).toMatchObject({ kind: "system" });
     expect((h.sms[0].opts?.mediaUrls as string[])[0]).toMatch(/\/api\/voicemail\/play\//); // MMS on (Abraham, Nov 10)
     expect(h.emails).toHaveLength(1);
     expect(h.emails[0].to).toBe("owner@example.com");
-    expect(h.emails[0].subject).toBe(`New voicemail from (845) 555-0199, ${when}`);
+    expect(h.emails[0].subject).toBe("New voicemail - Extension 0, Operator - (845) 555-0199");
     expect(h.emails[0].text).toContain("The recording is attached as an MP3 file.");
-    expect(h.emails[0].text).toContain(`Date and time: ${when}`);
+    expect(h.emails[0].text).toContain(`Date and time: ${when} (Eastern)`);
     expect(h.emails[0].text).toContain("Length: 0:42");
     expect(h.emails[0].attachments).toHaveLength(1);
     expect(h.emails[0].attachments![0].filename).toMatch(/\.mp3$/);
@@ -189,10 +189,14 @@ describe("hotline voicemail", () => {
   });
 
   it("urgent alerts start with URGENT; the audio route only ever fetches from Twilio", async () => {
-    const a = voicemailAlert({ fromNumber: null, durationSec: 65, transcription: null, urgent: true, createdAt: new Date("2026-11-09T20:15:00Z") }, { callerName: null, source: "Key 9 (voicemail)", playLink: "L", attached: true });
-    expect(a.text).toBe("URGENT: Hup Up Attractions: new voicemail from a withheld number, Key 9 (voicemail), Mon, Nov 9, 2026, 3:15 PM, 1:05. Play: L");
-    expect(a.subject).toBe("URGENT: New voicemail from a withheld number, Mon, Nov 9, 2026, 3:15 PM");
-    const named = voicemailAlert({ fromNumber: "+18455550199", durationSec: 5, transcription: null, urgent: false, createdAt: new Date("2026-11-09T20:15:00Z") }, { callerName: "Mrs. Klein", source: "Main voicemail", playLink: "L", attached: true });
+    const a = voicemailAlert({ fromNumber: null, durationSec: 65, transcription: null, urgent: true, createdAt: new Date("2026-11-09T20:15:00Z") }, { callerName: null, box: "Extension 9, Feedback and Comments", playLink: "L", attached: true });
+    expect(a.text).toBe("URGENT: Hup Up Attractions: New voicemail on Extension 9, Feedback and Comments, from a withheld number, Nov 9, 2026 at 3:15 PM, 1:05 long. Play: L");
+    expect(a.subject).toBe("URGENT: New voicemail - Extension 9, Feedback and Comments - a withheld number");
+    // Abraham's examples, exactly
+    const ex = voicemailAlert({ fromNumber: "+18455550123", durationSec: 42, transcription: null, urgent: false, createdAt: new Date("2026-11-10T20:15:00Z") }, { callerName: null, box: "Extension 4, Customer Service", playLink: "L", attached: true });
+    expect(ex.subject).toBe("New voicemail - Extension 4, Customer Service - (845) 555-0123");
+    expect(ex.text.startsWith("Hup Up Attractions: New voicemail on Extension 4, Customer Service, from (845) 555-0123, Nov 10, 2026 at 3:15 PM, 0:42 long.")).toBe(true);
+    const named = voicemailAlert({ fromNumber: "+18455550199", durationSec: 5, transcription: null, urgent: false, createdAt: new Date("2026-11-09T20:15:00Z") }, { callerName: "Mrs. Klein", box: "Extension 0, Operator", playLink: "L", attached: true });
     expect(named.email).toContain("Caller: Mrs. Klein (845) 555-0199");
     process.env.TWILIO_ACCOUNT_SID = "AC1";
     process.env.TWILIO_AUTH_TOKEN = "x";

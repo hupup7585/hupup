@@ -86,9 +86,15 @@ export const RING_KEY_DEFAULT_NAMES: Record<RingKey, string> = {
   "0": "Operator",
 };
 
-export function extensionName(s: Partial<Record<`ringName${RingKey}`, string>>, k: RingKey): string {
-  return (s[`ringName${k}`] || "").replace(/\s+/g, " ").trim() || RING_KEY_DEFAULT_NAMES[k];
+/** Key 9 is the feedback and comments voicemail (no one rings). */
+export const FEEDBACK_KEY_DEFAULT_NAME = "Feedback and Comments";
+
+export function extensionName(s: Partial<Record<`ringName${RingKey | "9"}`, string>>, k: RingKey | "9"): string {
+  return (s[`ringName${k}`] || "").replace(/\s+/g, " ").trim() || (k === "9" ? FEEDBACK_KEY_DEFAULT_NAME : RING_KEY_DEFAULT_NAMES[k]);
 }
+
+/** "Extension 4, Customer Service": how a box is shown in alerts (the name always fresh from Admin). */
+export const extensionLabel = (s: Partial<Record<`ringName${RingKey | "9"}`, string>>, k: RingKey | "9") => `Extension ${k}, ${extensionName(s, k)}`;
 
 /**
  * What a staff member hears when they answer a forwarded call (Abraham, approved word for word; the extension number

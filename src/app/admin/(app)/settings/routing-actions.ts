@@ -42,3 +42,14 @@ export async function saveRoutingAction(_prev: { ok?: boolean; message?: string 
   revalidatePath("/admin", "layout");
   return { ok: true, message: "Saved." };
 }
+
+/** Owner only: the name of key 9 (feedback and comments voicemail), shown in voicemail alerts. Audited. */
+export async function saveFeedbackNameAction(_prev: { ok?: boolean; message?: string } | null, form: FormData): Promise<{ ok?: boolean; message?: string }> {
+  const owner = await requireOwner();
+  const name = String(form.get("name") ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
+  const before = (await getSettings()).ringName9;
+  await saveSetting("ringName9", name, owner.userId);
+  await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.extension_name_updated", entityType: "settings", entityId: "ring_key_9", before: { name: before }, after: { name } });
+  revalidatePath("/admin", "layout");
+  return { ok: true, message: "Saved." };
+}

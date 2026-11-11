@@ -401,9 +401,13 @@ async function chooseDay(ctx: Ctx, date: string) {
 
 /** The voicemail box for a menu key: an extension's own box (named after it in Admin), otherwise Main. */
 async function vmBox(x: string | null | undefined) {
-  if (x && (RING_KEYS as readonly string[]).includes(x) && x !== "0") return boxForKey(x, extensionName(await getSettings(), x as RingKey));
+  if (x && ((RING_KEYS as readonly string[]).includes(x) || x === "9") && x !== "0") return boxForKey(x, extensionName(await getSettings(), x as RingKey | "9"));
   return mainBox();
 }
+
+/** Key 9 is feedback and comments (Abraham): its own greeting and confirmation; every other box uses the standard ones. */
+const vmGreeting = (x: string | null | undefined) => (x === "9" ? "vm9_greeting" : "vm_greeting");
+const vmSent = (x: string | null | undefined) => (x === "9" ? "vm9_sent" : "vm_sent");
 
 /** Abraham: options repeat for wrong or missing keys, then the message is saved and the call ends. */
 export const VM_OPTION_TRIES = 3;
@@ -548,7 +552,7 @@ const handlers: Record<string, Handler> = {
       case "7": // hours of operation, read from Admin (never rings the operator)
         return back(vr, "hours");
       case "9":
-        return back(vr, "voicemail");
+        return back(vr, "voicemail", { x: "9" }); // feedback and comments: its own box, greeting and confirmation
       default:
         // Abraham: any key with no action says this, then the main menu plays again
         sp(vr, ctx, "not_valid");
@@ -1479,7 +1483,7 @@ const handlers: Record<string, Handler> = {
       return back(vr, "menu");
     }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail" }, ctx.session);
-    sp(vr, ctx, "vm_greeting");
+    sp(vr, ctx, vmGreeting(x));
     return vmRecord(vr, box, x);
   },
 
@@ -1538,7 +1542,7 @@ const handlers: Record<string, Handler> = {
     if (d === "1") {
       const row = await setRecordingState(sid, "submitted");
       const [kept] = row ? [row] : await db.select().from(schema.voicemails).where(eq(schema.voicemails.recordingSid, sid)).limit(1);
-      if (kept && kept.state === "submitted") sp(vr, ctx, "vm_sent"); // only once the message is really saved
+      if (kept && kept.state === "submitted") sp(vr, ctx, vmSent(ctx.session?.data.vmKey)); // only once the message is really saved
       else sp(vr, ctx, "voicemail_none");
       vr.hangup();
       return vr;

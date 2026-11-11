@@ -80,6 +80,8 @@ export const SETTING_DEFAULTS = {
   ringName5: "",
   ringName6: "",
   ringName8: "",
+  /** Key 9 (feedback and comments voicemail) name in alerts */
+  ringName9: "",
   ringTargets2: "",
   ringMode2: "sequential",
   ringAccept2: true,

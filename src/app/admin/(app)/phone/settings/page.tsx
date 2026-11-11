@@ -2,6 +2,7 @@ import { getSettings } from "@/lib/settings";
 import NotActive from "@/components/NotActive";
 import { config } from "@/lib/config";
 import { requireOwner } from "@/lib/auth";
+import FeedbackNameForm from "../../settings/FeedbackNameForm";
 import RoutingForm from "../../settings/RoutingForm";
 import BlockingForm from "../../settings/BlockingForm";
 import RecordingForm from "../../settings/RecordingForm";
@@ -32,7 +33,7 @@ export default async function PhoneSettingsPage() {
       <NotActive k="recording" />
       <section className="card mb-6 p-5" id="routing">
         <h2 className="mb-1 text-lg font-extrabold">Live employee ring lists (main menu keys 2, 4, 5, 6, 8 and 0)</h2>
-        <p className="mb-4 text-sm text-muted">Key 9 goes straight to the general voicemail, no ringing.</p>
+        <p className="mb-4 text-sm text-muted">Key 9 goes straight to the feedback and comments voicemail, no ringing.</p>
         <div className="grid gap-8">
           {RING_KEYS.map((k) => {
             const list = ringListFor(settings, k);
@@ -48,6 +49,10 @@ export default async function PhoneSettingsPage() {
               </div>
             );
           })}
+          <div>
+            <h3 className="mb-2 font-extrabold">Key 9: Feedback and comments (voicemail only)</h3>
+            <FeedbackNameForm initial={settings.ringName9} />
+          </div>
         </div>
       </section>
       <section className="card mb-6 p-5" id="recording">

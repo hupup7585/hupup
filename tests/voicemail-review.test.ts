@@ -180,3 +180,47 @@ describe("every path", () => {
     expect((await listVoicemails()).map((v) => v.recordingSid)).not.toContain("RE7");
   });
 });
+
+describe("key 9: feedback and comments (Abraham, word for word)", () => {
+  it("own greeting and confirmation; same tone, # and 1, 2, 3 options; its own box", async () => {
+    expect(PROMPTS.vm9_greeting.text).toBe("Thank you for your time. We love to hear from you, and your feedback helps us improve our service. Please share your comments after the tone. If you would like a call back, please say your name and phone number. When you are finished, you may hang up or press the pound key.");
+    expect(PROMPTS.vm9_sent.text).toBe("Thank you for your feedback! We truly appreciate it. Goodbye!");
+    expect(plain(await call("menu-choice", { Digits: "9" }))).toContain("/api/voice/voicemail?x=9");
+    const xml = plain(await call("voicemail", {}, "x=9"));
+    expect(xml).toContain(PROMPTS.vm9_greeting.text);
+    expect(xml).not.toContain(PROMPTS.vm_greeting.text);
+    expect(xml).toMatch(/<Record [^>]*finishOnKey="#"/);
+    const b9 = await boxForKey("9");
+    expect(b9.name).toBe("Extension 9, Feedback and Comments");
+    expect(b9.id).not.toBe((await mainBox()).id);
+    await call("vm-recorded", rec("RE9", { Digits: "#" }), `b=${b9.id}&x=9`);
+    expect(plain(await call("vm-options"))).toContain("To delete and re-record, press 3.");
+    await ready("RE9", b9.id);
+    const done = plain(await call("vm-option", { Digits: "1" }));
+    expect(done).toContain(PROMPTS.vm9_sent.text);
+    expect(done).not.toContain(PROMPTS.vm_sent.text);
+  });
+});
+
+describe("alerts say which box, first (Abraham)", () => {
+  it("subject and text start with the extension number and its Admin name; renaming updates the next alert", async () => {
+    const b4 = await boxForKey("4");
+    await call("vm-recorded", rec("REa4", { Digits: "hangup" }), `b=${b4.id}&x=4`);
+    await ready("REa4", b4.id);
+    expect(h.emails.at(-1)!.subject).toBe("New voicemail - Extension 4, Customer Service - (845) 555-0166");
+    expect(h.emails.at(-1)!.text!.startsWith("New voicemail on Extension 4, Customer Service.")).toBe(true);
+    expect(h.emails.at(-1)!.text).toMatch(/Date and time: [A-Z][a-z]{2} \d{1,2}, 20\d\d at \d{1,2}:\d\d [AP]M \(Eastern\)/);
+    expect(h.emails.at(-1)!.text).toContain("Length: 0:09");
+    await saveSetting("ringName4", "Customer Care");
+    h.session.callSid = "CArename";
+    await call("vm-recorded", rec("REa4b", { Digits: "hangup" }), `b=${b4.id}&x=4`);
+    await ready("REa4b", b4.id);
+    expect(h.emails.at(-1)!.subject).toBe("New voicemail - Extension 4, Customer Care - (845) 555-0166");
+    await saveSetting("ringName4", "");
+    const b9 = await boxForKey("9");
+    h.session.callSid = "CAfeedback";
+    await call("vm-recorded", rec("REa9", { Digits: "hangup" }), `b=${b9.id}&x=9`);
+    await ready("REa9", b9.id);
+    expect(h.emails.at(-1)!.subject).toBe("New voicemail - Extension 9, Feedback and Comments - (845) 555-0166");
+  });
+});

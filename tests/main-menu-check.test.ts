@@ -59,7 +59,7 @@ describe("main menu: every key goes through", () => {
     ["6", "ring?k=6"],
     ["7", "hours"],
     ["8", "ring?k=8"],
-    ["9", "voicemail"],
+    ["9", "voicemail?x=9"],
     ["0", "ring?k=0"],
     ["*", "menu?first=1"],
   ];

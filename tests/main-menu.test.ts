@@ -151,9 +151,9 @@ describe("every key, office open", () => {
     await call("ring", {}, "k=4");
     expect(h.session.data.missed).toBe("closed");
   });
-  it("9 goes straight to the general voicemail, no ringing", async () => {
-    expect(redirect(await press("9"))).toBe("voicemail");
-    const vm = await call("voicemail");
+  it("9 goes straight to the feedback and comments voicemail, no ringing", async () => {
+    expect(redirect(await press("9"))).toBe("voicemail?x=9");
+    const vm = await call("voicemail", {}, "x=9");
     expect(vm).toMatch(/<Record /);
     expect(vm).not.toContain("<Dial");
   });
@@ -255,7 +255,7 @@ describe("every key, office closed", () => {
       expect(redirect(xml)).toBe(`voicemail?x=${k}`);
     }
     expect(redirect(await press("7"))).toBe("hours");
-    expect(redirect(await press("9"))).toBe("voicemail");
+    expect(redirect(await press("9"))).toBe("voicemail?x=9");
   });
 });
 
