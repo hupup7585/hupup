@@ -50,7 +50,7 @@ export default async function Home() {
       "Jumping Balloon (bounce house) rental in Kiryas Joel, plus laser tag, inflatable maze and paddle boat rentals for birthday parties, schools and celebrations across Orange County, NY. Reservations by phone; delivery available for an additional fee.",
     telephone: "+1-845-777-7585",
     email: c.email,
-    url: process.env.PUBLIC_BASE_URL || "https://hupup.vercel.app",
+    url: process.env.PUBLIC_BASE_URL || "https://hupupattractions.com",
     ...(c.logoUrl ? { logo: c.logoUrl } : {}),
     address: { "@type": "PostalAddress", addressLocality: "Kiryas Joel", addressRegion: "NY", addressCountry: "US" },
     areaServed: [

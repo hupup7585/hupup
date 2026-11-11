@@ -6,7 +6,7 @@ import { isLiveSite } from "@/lib/seo";
 const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-poppins", display: "swap" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.PUBLIC_BASE_URL || "https://hupup.vercel.app"),
+  metadataBase: new URL(process.env.PUBLIC_BASE_URL || "https://hupupattractions.com"),
   title: "Bounce House & Party Rentals in Kiryas Joel, NY | Hup Up Attractions",
   description:
     "Hup Up Attractions makes party planning easy with bounce house, laser tag, inflatable maze and paddle boat rentals in Kiryas Joel and Orange County, NY. Call (845) 777-7585.",
