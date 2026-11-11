@@ -756,7 +756,7 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("category-choice", { c }));
     sp(g, ctx, "book_category_list", { category: cat.spokenName || cat.name });
     items.forEach((p, i) => sp(g, ctx, "category_item", { item: p.name, key: i + 1 }));
-    sp(g, ctx, "back_to_menu");
+    sp(g, ctx, "book_back"); // Abraham: star goes back one step (to the bookings menu)
     sp(g, ctx, "cart_key");
     return bookNoInput(vr, ctx, "category", { c });
   },
@@ -765,7 +765,7 @@ const handlers: Record<string, Handler> = {
     const c = Number(ctx.query.get("c"));
     const d = ctx.body.Digits;
     if (!d) return bookNoInput(vr, ctx, "category", { c });
-    if (d === "*") return back(vr, "menu");
+    if (d === "*") return back(vr, "book"); // one step back: the bookings menu
     if (d === "0") return back(vr, "cart");
     const items = await phoneProducts(c);
     const p = items[Number(d) - 1];
@@ -826,6 +826,11 @@ const handlers: Record<string, Handler> = {
     const p = ctx.query.get("p") ?? undefined;
     const digits = ctx.body.Digits;
     if (!digits) return bookNoInput(vr, ctx, "date", { p });
+    if (digits.includes("*")) {
+      // Star goes back one step: the rentals in that item's category (or the bookings menu)
+      const prod = p ? await getProduct(Number(p)) : null;
+      return prod ? back(vr, "category", { c: prod.categoryId }) : back(vr, "book");
+    }
     const today = todayISO();
     const r = parseDateInput({ digits }, today);
     if (!r.ok) {

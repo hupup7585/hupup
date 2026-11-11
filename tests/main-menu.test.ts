@@ -186,6 +186,12 @@ describe("every key, office open", () => {
     // a new category in Admin is read out with the next number
     await db.insert(schema.categories).values({ name: "Laser Tag", spokenName: "laser tag and inflatable mazes", ivrDigit: 4, sortOrder: 4, active: true });
     expect(saidIn(await call("book"))).toContain("For laser tag and inflatable mazes, press 2.");
+    // star goes back one step in every booking menu (Abraham)
+    const [cat] = await db.select().from(schema.categories).limit(1);
+    const [prod] = await db.insert(schema.products).values({ categoryId: cat.id, name: "Castle", priceCents: 1000, quantity: 1, active: true, sortOrder: 1 }).returning();
+    expect(saidIn(await call("category", {}, `c=${cat.id}`))).toContain("To go back, press star.");
+    expect(redirect(await call("category-choice", { Digits: "*" }, `c=${cat.id}`))).toBe("book");
+    expect(redirect(await call("date-heard", { Digits: "*" }, `p=${prod.id}`))).toBe(`category?c=${cat.id}`);
   });
 });
 
