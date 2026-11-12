@@ -99,6 +99,7 @@ export type OrderListRow = {
   total_cents: number | null;
   paid_cents: number;
   payment_result: string | null;
+  refunded_cents: number;
   payment_result_at: string | null;
   card_last4: string | null;
   customer_name: string | null;
@@ -126,7 +127,7 @@ export async function listOrders(f: { q?: string; status?: string; from?: string
   const where = sql.join(conds.map((c) => sql`(${c})`), sql` AND `);
   return rows<OrderListRow>(sql`
     SELECT o.id, o.status, o.channel, o.event_date::text, o.pickup_date::text, o.subtotal_cents, o.total_cents, o.paid_cents,
-           o.payment_result, o.payment_result_at::text, o.card_last4, o.delivery_address, o.created_at::text, o.hold_expires_at::text, o.notes,
+           o.payment_result, o.payment_result_at::text, o.card_last4, o.refunded_cents, o.delivery_address, o.created_at::text, o.hold_expires_at::text, o.notes,
            c.name AS customer_name, c.phone AS customer_phone,
            (SELECT string_agg(oi.qty || ' × ' || p.name, ', ' ORDER BY oi.id) FROM order_items oi
               JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) AS items

@@ -9,6 +9,7 @@ import RecordingForm from "../../settings/RecordingForm";
 import { PROMPTS } from "@/lib/ivr/prompts";
 import { RING_KEYS, RING_KEY_LABELS, isLoopNumber, last4, ringListFor, routeSummary, routeTargets } from "@/lib/ivr/routing";
 import { toE164 } from "@/lib/phone";
+import { phonePayStatus } from "@/lib/phone-pay";
 
 /** Phone System → Phone settings: ring lists (extensions, call routing, ring times), recording, caller blocking, Twilio setup. Owner only. */
 export default async function PhoneSettingsPage() {
@@ -28,6 +29,25 @@ export default async function PhoneSettingsPage() {
             until they get their own list.
           </div>
         ) : null;
+      })()}
+      {(() => {
+        const pay = phonePayStatus();
+        return (
+          <section className="card mb-5 p-5" data-phone-pay-status>
+            <h2 className="text-lg font-extrabold">Phone payments (Stripe)</h2>
+            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+              <dt className="font-semibold">Status</dt>
+              <dd>
+                <b>{pay.mode}</b>
+                {pay.mode === "Owner test" && " (only calls from your own phone pay by keypad; everyone else gets the payment link)"}
+              </dd>
+              <dt className="font-semibold">Stripe</dt>
+              <dd>{pay.stripe}</dd>
+              <dt className="font-semibold">Payment subaccount</dt>
+              <dd>{pay.configured ? "Set up" : <>Not active yet: add {pay.missing.join(", ")} in Vercel</>}</dd>
+            </dl>
+          </section>
+        );
       })()}
       <NotActive k="sms" />
       <NotActive k="recording" />

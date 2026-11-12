@@ -1,5 +1,5 @@
 import twilio from "twilio";
-import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { addDays, longDate, todayISO } from "@/lib/dates";
@@ -1670,6 +1670,10 @@ const handlers: Record<string, Handler> = {
   async "pay-keypad"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     if (!o) return back(vr, "goodbye");
+    // The rentals stay held for the whole payment (a fresh hold now; each try in the payment line renews it)
+    const group = await getPaymentGroup(o);
+    const waiting = group?.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id) ?? [];
+    if (waiting.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES), updatedAt: new Date() }).where(inArray(orders.id, waiting));
     sp(vr, ctx, "pay_start", undefined, { draftOk: true });
     const dial = vr.dial({ action: url("pay-done", { o }), method: "POST", timeLimit: 900, answerOnBridge: true });
     dial.sip({ username: process.env.TWILIO_PAY_SIP_USERNAME, password: process.env.TWILIO_PAY_SIP_PASSWORD }, paySipUri(o, ctx.callSid));

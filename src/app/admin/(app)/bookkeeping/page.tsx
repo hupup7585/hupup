@@ -36,6 +36,7 @@ import { Card, CategorySelect, Field, FileInput, Grid, MethodSelect, Save, Stat,
 
 export const metadata = { title: "Bookkeeping | Hup Up Attractions" };
 import { BOOK_TABS, bookTabLabel } from "@/lib/bookkeeping-tabs";
+import { orderNumber } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +76,7 @@ export default async function BookkeepingPage({ searchParams }: { searchParams: 
       {tab === "expenses" && <Expenses cats={activeCats} />}
       {tab === "bills" && <Bills cats={activeCats} today={today} />}
       {tab === "processor" && <Processor from={from} to={to} pct={settings.solaFeePercent} fixed={settings.solaFeeCents} />}
+      {tab === "stripe" && <StripeFees from={from} to={to} />}
       {tab === "bank" && <Bank cats={activeCats} />}
       {tab === "tax" && <Tax year={Number(sp.year) || Number(today.slice(0, 4))} />}
       {tab === "equipment" && <Equipment year={Number(today.slice(0, 4))} />}
@@ -458,6 +460,44 @@ async function Processor({ from, to, pct, fixed }: { from: string; to: string; p
           empty="No Sola payments in this range."
           rows={v.rows.map((r) => [r.date, r.orderId ? <Link className="text-navy underline" href={`/admin/orders/${r.orderId}`}>Booking number {r.orderId}</Link> : "—", r.ref ?? "—", money(r.grossCents), money(r.feeCents), <b>{money(r.netCents)}</b>])}
         />
+      </Card>
+    </>
+  );
+}
+
+/** Stripe fees and payouts (phone payments), pulled with the read-only Stripe key; each fee is in the books. */
+async function StripeFees({ from, to }: { from: string; to: string }) {
+  const { stripeBooks } = await import("@/lib/stripe-ops");
+  const { lines, payouts } = await stripeBooks(from, to);
+  const pay = lines.filter((l) => l.type === "charge" || l.type === "payment");
+  const fees = lines.reduce((n, l) => n + l.feeCents, 0);
+  const when = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" }) : "—");
+  return (
+    <>
+      <RangeForm tab="stripe" from={from} to={to} />
+      {!process.env.STRIPE_READ_KEY && (
+        <p className="card mb-4 border-l-4 border-sun p-4 text-sm">
+          <b>Not active yet:</b> Stripe fees come in with a read-only Stripe key (STRIPE_READ_KEY in Vercel).
+        </p>
+      )}
+      <Card title="Stripe payments, fees and payouts" note="Phone payments by keypad go through Stripe. Each Stripe fee is entered in the books as a Stripe fees processor fee; each payout is the deposit you see at the bank.">
+        <form action={A.syncStripeAction} className="mb-4">
+          <button className="btn-dark !py-1.5 text-sm" disabled={!process.env.STRIPE_READ_KEY}>Update from Stripe</button>
+        </form>
+        <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <Stat label="Card payments" value={money(pay.reduce((n, l) => n + l.amountCents, 0))} />
+          <Stat label="Stripe fees" value={money(fees)} />
+          <Stat label="Net" value={money(pay.reduce((n, l) => n + l.netCents, 0))} />
+          <Stat label="Paid out to the bank" value={money(payouts.filter((p) => p.status === "paid").reduce((n, p) => n + p.amountCents, 0))} />
+        </div>
+        <Table
+          head={["Date", "Type", "Booking", "Amount", "Stripe fee", "Net"]}
+          empty="No Stripe lines in this range."
+          rows={lines.map((l) => [when(l.happenedAt), l.type.replace(/_/g, " "), l.orderId ? <Link className="text-navy underline" href={`/admin/orders/${l.orderId}`}>Order number {orderNumber(l.orderId)}</Link> : "—", money(l.amountCents), money(l.feeCents), <b>{money(l.netCents)}</b>])}
+        />
+      </Card>
+      <Card title="Payouts to the bank" note="Match each payout to the deposit on the bank statement.">
+        <Table head={["Created", "Arrives", "Amount", "Status"]} empty="No payouts in this range." rows={payouts.map((p) => [when(p.createdAt), when(p.arrivalDate), money(p.amountCents), p.status])} />
       </Card>
     </>
   );

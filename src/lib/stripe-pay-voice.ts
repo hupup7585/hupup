@@ -3,7 +3,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config, BUSINESS_NAME } from "@/lib/config";
-import { getPaymentGroup, markGroupPaid, orderNumber } from "@/lib/orders";
+import { PAYMENT_HOLD_MINUTES, getPaymentGroup, markGroupPaid, minutesFromNow, orderNumber } from "@/lib/orders";
+import { sendPhoneReceipt } from "@/lib/phone-receipt";
 import { ensureGroupPriced } from "@/lib/order-pricing";
 import { loadPromptOverrides, promptText, type PromptKey, type PromptOverrides } from "@/lib/ivr/prompts";
 import { STRIPE_PHONE_PAY_MODE, payConnector, payLast4, verifyPaySip } from "@/lib/phone-pay";
@@ -41,7 +42,10 @@ async function payTwiml(vr: VR, orderId: number, sid: string, tries: number, pro
     vr.hangup();
     return vr;
   }
-  await ensureGroupPriced(group.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id));
+  const waiting = group.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id);
+  await ensureGroupPriced(waiting);
+  // The rentals stay held for the whole payment: every try starts a fresh hold (Abraham, Nov 12, 2026)
+  await db.update(schema.orders).set({ holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES), updatedAt: new Date() }).where(inArray(schema.orders.id, waiting));
   const due = (await getPaymentGroup(orderId))!.due;
   if (due <= 0) {
     vr.hangup();
@@ -107,6 +111,8 @@ export async function handlePayVoice(action: string, query: URLSearchParams, bod
         await db.update(schema.orders).set({ stripePaymentId: code }).where(inArray(schema.orders.id, ids));
         await recordPaymentResult(ids, "approved", last4, code);
         await paymentReceivedNotices(orderId, cents);
+        // Our own receipt from info@ (draft: sent once Abraham approves the wording)
+        await sendPhoneReceipt(group.primary.customer?.email, { orderId, paidAt: new Date(), amountCents: cents, last4, name: group.primary.customer?.name }).catch(() => null);
       }
       vr.say(voice(), line(prompts, "pay_success"));
       vr.hangup(); // back to the hotline call, which carries on

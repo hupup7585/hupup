@@ -127,6 +127,8 @@ export const orders = pgTable(
     cardLast4: text("card_last4"),
     /** Phone keypad payment through Stripe (Twilio Pay in the payment subaccount): Stripe's payment ID */
     stripePaymentId: text("stripe_payment_id"),
+    /** Refunded through Stripe from Admin (or Stripe's dashboard): Refunded / Partly refunded */
+    refundedCents: integer("refunded_cents").notNull().default(0),
     notes: text("notes"),
     holdExpiresAt: timestamp("hold_expires_at", { withTimezone: true }),
     callSid: text("call_sid"),
@@ -1066,4 +1068,57 @@ export const inboxReplies = pgTable("inbox_replies", {
   error: text("error"),
   userId: integer("user_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* Stripe refunds, disputes, fees and payouts (Abraham, Nov 12, 2026). Nothing is ever deleted. */
+export const orderRefunds = pgTable("order_refunds", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull().references(() => orders.id),
+  amountCents: integer("amount_cents").notNull(),
+  stripeRefundId: text("stripe_refund_id").unique(),
+  /** succeeded | pending | failed */
+  status: text("status").notNull(),
+  error: text("error"),
+  /** admin | stripe_dashboard */
+  source: text("source").notNull().default("admin"),
+  userId: integer("user_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const orderDisputes = pgTable("order_disputes", {
+  id: serial("id").primaryKey(),
+  stripeDisputeId: text("stripe_dispute_id").notNull().unique(),
+  orderId: integer("order_id").references(() => orders.id),
+  amountCents: integer("amount_cents").notNull(),
+  reason: text("reason"),
+  status: text("status").notNull(),
+  evidenceDueBy: timestamp("evidence_due_by", { withTimezone: true }),
+  evidenceSentAt: timestamp("evidence_sent_at", { withTimezone: true }),
+  evidenceSentBy: integer("evidence_sent_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const stripeBalanceLines = pgTable("stripe_balance_lines", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  feeCents: integer("fee_cents").notNull().default(0),
+  netCents: integer("net_cents").notNull(),
+  description: text("description"),
+  sourceId: text("source_id"),
+  orderId: integer("order_id"),
+  payoutId: text("payout_id"),
+  happenedAt: timestamp("happened_at", { withTimezone: true }).notNull(),
+  availableOn: timestamp("available_on", { withTimezone: true }),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const stripePayouts = pgTable("stripe_payouts", {
+  id: text("id").primaryKey(),
+  amountCents: integer("amount_cents").notNull(),
+  status: text("status").notNull(),
+  arrivalDate: timestamp("arrival_date", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });

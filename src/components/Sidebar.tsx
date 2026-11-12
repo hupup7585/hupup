@@ -25,6 +25,7 @@ const BOOK_ICONS: Record<string, LucideIcon> = {
   expenses: Receipt,
   bills: FileClock,
   processor: Percent,
+  stripe: Percent,
   bank: Landmark,
   tax: BadgePercent,
   equipment: Wrench,

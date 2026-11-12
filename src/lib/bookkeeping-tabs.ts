@@ -1,7 +1,7 @@
 /** Bookkeeping screens, in the side menu under BOOKKEEPING, sorted into small groups (Abraham, Nov 9, 2026). */
 export const BOOK_GROUPS: { label: string; tabs: [string, string][] }[] = [
   { label: "Money in", tabs: [["overview", "Overview"], ["income", "Income"], ["invoices", "Invoices"]] },
-  { label: "Money out", tabs: [["expenses", "Expenses"], ["bills", "Bills I owe"], ["processor", "Sola fees"]] },
+  { label: "Money out", tabs: [["expenses", "Expenses"], ["bills", "Bills I owe"], ["processor", "Sola fees"], ["stripe", "Stripe fees"]] },
   { label: "Bank and tax", tabs: [["bank", "Bank & card"], ["tax", "Sales tax"]] },
   { label: "Business", tabs: [["equipment", "Equipment"], ["people", "Staff & 1099"], ["mileage", "Mileage"]] },
   { label: "Records", tabs: [["reports", "Reports"], ["ledger", "All entries"], ["gl", "General ledger"], ["settings", "Settings"]] },

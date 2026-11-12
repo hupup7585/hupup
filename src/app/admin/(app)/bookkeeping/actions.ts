@@ -443,3 +443,18 @@ export async function categorizeLineAction(f: FormData) {
     return `Added to the books as entry number ${row.id}.`;
   });
 }
+
+/** Stripe fees and payouts: pull the latest from Stripe (read-only key). */
+export async function syncStripeAction() {
+  return run("stripe", async (userId) => {
+    const { syncStripeBalance, StripeError } = await import("@/lib/stripe-ops");
+    try {
+      const r = await syncStripeBalance();
+      await bookAudit(userId, "stripe_synced", "stripe", null, r);
+      return `Updated from Stripe: ${r.added} new line${r.added === 1 ? "" : "s"}, ${r.payouts} payout${r.payouts === 1 ? "" : "s"}.`;
+    } catch (e) {
+      if (e instanceof StripeError) throw new BooksError(e.message);
+      throw e;
+    }
+  });
+}

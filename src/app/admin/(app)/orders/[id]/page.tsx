@@ -13,6 +13,10 @@ import { STAFF_PROMO_MODE, staffPromoStep2, staffPromoVisible } from "@/lib/staf
 import { staffDisclosure } from "@/lib/sms-terms-v2";
 import { NO_TEXT_CONSENT, hasTransactionalConsent } from "@/lib/sms";
 import DualDate from "@/components/DualDate";
+import StripePanel from "./StripePanel";
+import { disputesFor, refundStatus, refundsFor } from "@/lib/stripe-ops";
+import { inboxWhen } from "@/lib/inbox-format";
+import { db, schema } from "@/lib/db";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -60,9 +64,28 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   {paymentResultLabel(o)}
                 </div>
               )}
+              {refundStatus(o) && <div className="text-sm font-bold text-coral-dark" data-refund-status>{refundStatus(o)}: {formatMoney(o.refundedCents)}</div>}
+              {o.stripePaymentId && <div className="text-xs text-muted">Stripe payment {o.stripePaymentId}</div>}
               {due > 0 && <div className="text-sm font-bold text-coral">Balance due {formatMoney(due)}</div>}
             </div>
           </div>
+          {staff.role === "owner" && o.paymentMethod === "stripe" && (await (async () => {
+            const [refunds, disputes] = await Promise.all([refundsFor(o.id), disputesFor(o.id)]);
+            const users = await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers);
+            const who = (id: number | null) => (id ? (users.find((u) => u.id === id)?.name ?? "Staff") : "Owner");
+            const left = o.paidCents - o.refundedCents;
+            return (
+              <StripePanel
+                orderId={o.id}
+                refundable={formatMoney(left)}
+                refundableCents={left}
+                status={refundStatus(o)}
+                writeReady={Boolean(process.env.STRIPE_WRITE_KEY)}
+                refunds={refunds.map((r) => ({ id: r.id, amount: formatMoney(r.amountCents), when: inboxWhen(r.createdAt), by: r.source === "admin" ? who(r.userId) : "Stripe dashboard", status: r.status, error: r.error }))}
+                disputes={disputes.map((d) => ({ id: d.id, amount: formatMoney(d.amountCents), reason: (d.reason ?? "").replace(/_/g, " "), status: d.status.replace(/_/g, " "), dueBy: d.evidenceDueBy ? inboxWhen(d.evidenceDueBy) : null, sentAt: d.evidenceSentAt ? inboxWhen(d.evidenceSentAt) : null }))}
+              />
+            );
+          })())}
           <div className="card p-5">
             <h2 className="mb-3 font-bold">Customer</h2>
             {customer ? (

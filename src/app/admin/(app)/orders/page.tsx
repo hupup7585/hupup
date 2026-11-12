@@ -58,6 +58,9 @@ export default async function OrdersPage({
                 <td className="td font-bold">{formatMoney(o.total_cents ?? o.subtotal_cents)}</td>
                 <td className={`td ${o.paid_cents >= (o.total_cents ?? o.subtotal_cents) && o.subtotal_cents > 0 ? "text-mint font-bold" : "text-muted"}`}>
                   {formatMoney(o.paid_cents)}
+                  {o.refunded_cents > 0 && (
+                    <div data-refund-status className="text-xs font-bold text-coral-dark">{o.refunded_cents >= o.paid_cents ? "Refunded" : "Partly refunded"} {formatMoney(o.refunded_cents)}</div>
+                  )}
                   {o.payment_result && (
                     <div data-payment-result className={`text-xs ${o.payment_result === "declined" ? "font-bold text-coral-dark" : "text-muted"}`}>
                       {paymentResultLabel({ paymentResult: o.payment_result, paymentResultAt: o.payment_result_at, cardLast4: o.card_last4 })}

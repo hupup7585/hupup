@@ -100,6 +100,12 @@ describe("the payment subaccount: Twilio <Pay> through Stripe", () => {
     expect(xml).toMatch(/input="dtmf"/);
     expect(xml).toContain('<Prompt for="payment-card-number">');
   });
+  it("the rentals stay held for the whole payment: each try starts a fresh hold", async () => {
+    await db.update(schema.orders).set({ holdExpiresAt: new Date(Date.now() + 60_000) }).where(eq(schema.orders.id, orderId));
+    await sub("incoming", sipHeaders(paySipUri(orderId, "CAmain")));
+    const o = await order(orderId);
+    expect(o.holdExpiresAt!.getTime()).toBeGreaterThan(Date.now() + 10 * 60_000);
+  });
   it("refuses requests from another account or without valid signed headers", async () => {
     expect(await handlePayVoice("incoming", new URLSearchParams(), { AccountSid: "ACother", CallSid: "x", ...sipHeaders(paySipUri(orderId, "CAmain")) })).toContain("<Hangup/>");
     expect(await sub("incoming", { "SipHeader_X-Hup-Order": String(orderId) })).toContain("<Hangup/>");

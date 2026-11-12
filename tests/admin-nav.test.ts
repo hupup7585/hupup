@@ -14,7 +14,7 @@ describe("grouped admin menu", () => {
       "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Catalog"],
       Deliveries: ["Deliveries", "Delivery settings"],
       "Phone system": ["Call log", "Voicemail", "Messages", "Campaigns", "Hotline prompts", "Compliance", "Phone settings"],
-      Bookkeeping: ["Overview", "Income", "Invoices", "Expenses", "Bills I owe", "Sola fees", "Bank & card", "Sales tax", "Equipment", "Staff & 1099", "Mileage", "Reports", "All entries", "General ledger", "Settings"],
+      Bookkeeping: ["Overview", "Income", "Invoices", "Expenses", "Bills I owe", "Sola fees", "Stripe fees", "Bank & card", "Sales tax", "Equipment", "Staff & 1099", "Mileage", "Reports", "All entries", "General ledger", "Settings"],
       Staff: ["Staff", "Tasks", "Activity"],
       Settings: ["Business hours & holidays", "General settings", "System status", "Staff screens (preview)"],
     });
@@ -66,7 +66,7 @@ describe("Bookkeeping in the side menu (Abraham, Nov 9, 2026)", () => {
     const { BOOK_GROUPS } = await import("@/lib/bookkeeping-tabs");
     expect(BOOK_GROUPS.map((g) => [g.label, g.tabs.map(([, l]) => l)])).toEqual([
       ["Money in", ["Overview", "Income", "Invoices"]],
-      ["Money out", ["Expenses", "Bills I owe", "Sola fees"]],
+      ["Money out", ["Expenses", "Bills I owe", "Sola fees", "Stripe fees"]],
       ["Bank and tax", ["Bank & card", "Sales tax"]],
       ["Business", ["Equipment", "Staff & 1099", "Mileage"]],
       ["Records", ["Reports", "All entries", "General ledger", "Settings"]],
@@ -78,7 +78,7 @@ describe("Bookkeeping in the side menu (Abraham, Nov 9, 2026)", () => {
     expect(isActive("/admin/bookkeeping", "/admin/bookkeeping?tab=bills", "income")).toBe(false);
     expect(isActive("/admin/bookkeeping", "/admin/bookkeeping?tab=overview", null)).toBe(true);
     // Folders (Abraham): Money in, Money out, Bank and tax, Business, Records, each holding its own pages
-    expect(folders(book.items).map((f) => [f.label, f.items.length])).toEqual([["Money in", 3], ["Money out", 3], ["Bank and tax", 2], ["Business", 3], ["Records", 4]]);
+    expect(folders(book.items).map((f) => [f.label, f.items.length])).toEqual([["Money in", 3], ["Money out", 4], ["Bank and tax", 2], ["Business", 3], ["Records", 4]]);
     const sb = readFileSync("src/components/Sidebar.tsx", "utf8");
     expect(sb).toContain("data-nav-folder={label}");
     expect(sb).toContain('onClick={() => setFolder(folderOpen(label, items) ? "" : label)}'); // only one open; click again closes

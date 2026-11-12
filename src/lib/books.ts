@@ -23,7 +23,7 @@ export const KIND_LABEL: Record<EntryKind, string> = {
   processor_fee: "Processor fee",
   contractor: "Staff or contractor payment",
 };
-export const METHODS = ["cash", "check", "zelle", "card", "sola", "bank", "other"] as const;
+export const METHODS = ["cash", "check", "zelle", "card", "sola", "stripe", "bank", "other"] as const;
 export const isMoneyIn = (k: string) => (MONEY_IN as readonly string[]).includes(k);
 /** + for money in, - for money out */
 export const signed = (kind: string, cents: number) => (isMoneyIn(kind) ? cents : -cents);
@@ -463,4 +463,23 @@ export async function autoMatch(feePercent: string, feeCents: string) {
     }
   }
   return n;
+}
+
+/**
+ * An automatic money-out line (Stripe refund or Stripe fee). Kept once per reference; a locked month moves it to the
+ * next open month (as booking payments do). Never throws into the payment flow.
+ */
+export async function recordAutoMoneyOut(input: { kind: "refund" | "processor_fee"; amountCents: number; category: string; method: string; orderId?: number | null; ref: string; date?: string; notes?: string }) {
+  try {
+    if (input.amountCents <= 0) return;
+    const [dupe] = await db.select({ id: schema.bookEntries.id }).from(schema.bookEntries).where(and(eq(schema.bookEntries.ref, input.ref), eq(schema.bookEntries.kind, input.kind), eq(schema.bookEntries.source, "auto")));
+    if (dupe) return;
+    const date = input.date ?? todayISO();
+    await addEntry(
+      { entryDate: (await isLocked(date)) ? nextOpenDate(date) : date, kind: input.kind, category: input.category, amountCents: input.amountCents, method: input.method, orderId: input.orderId ?? null, ref: input.ref, notes: input.notes ?? null, source: "auto" },
+      null,
+    );
+  } catch (e) {
+    console.error("books: could not record", input.kind, input.ref, e);
+  }
 }
