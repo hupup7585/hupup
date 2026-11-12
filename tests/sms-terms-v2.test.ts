@@ -23,7 +23,12 @@ vi.mock("@/lib/ivr/session", () => ({
   updateSession: async (_s: string, patch: Record<string, unknown> & { data?: Record<string, unknown> }) => Object.assign(h.session, { ...patch, data: { ...h.session.data, ...(patch.data ?? {}) } }),
 }));
 vi.mock("@/lib/phone-promo", async (orig) => ({ ...(await orig<typeof import("@/lib/phone-promo")>()), phonePromoMode: () => "live" as const }));
-vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
+// The promo steps wait for Abraham's OK (they never play until approved); these tests check them as approved.
+vi.mock("@/lib/ivr/prompts", async (orig) => {
+  const m = await orig<typeof import("@/lib/ivr/prompts")>();
+  const approved = Object.fromEntries(Object.keys(m.PROMPTS).filter((k) => k.startsWith("promo_")).map((k) => [k, { text: null, audioUrl: null, approvedAt: new Date() }]));
+  return { ...m, loadPromptOverrides: async () => approved };
+});
 
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";

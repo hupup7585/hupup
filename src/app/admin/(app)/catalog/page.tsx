@@ -4,6 +4,8 @@ import { db, schema } from "@/lib/db";
 import type { Category, Product } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/money";
 import { saveCategoryAction, saveProductAction } from "./actions";
+import { currentCatalog } from "@/lib/catalog-pdf";
+import CatalogPdf from "./CatalogPdf";
 
 function CategoryForm({ c }: { c?: Category }) {
   return (
@@ -56,6 +58,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
     db.select().from(schema.categories).orderBy(asc(schema.categories.sortOrder), asc(schema.categories.id)),
     db.select().from(schema.products).orderBy(asc(schema.products.sortOrder), asc(schema.products.id)),
   ]);
+  const pdf = await currentCatalog();
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="text-2xl font-black sm:text-3xl">Catalog</h1>
@@ -64,6 +67,18 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
       </p>
       {sp.ok && <p className="mb-4 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]">{sp.ok}</p>}
       {sp.error && <p className="mb-4 rounded-xl bg-coral/10 p-3 font-semibold text-coral-dark">{sp.error}</p>}
+      <CatalogPdf
+        current={
+          pdf
+            ? {
+                id: pdf.id,
+                fileName: pdf.fileName,
+                sizeMb: (pdf.sizeBytes / 1024 / 1024).toFixed(1),
+                uploaded: pdf.createdAt.toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }),
+              }
+            : null
+        }
+      />
 
       {cats.map((c) => {
         const items = prods.filter((p) => p.categoryId === c.id);

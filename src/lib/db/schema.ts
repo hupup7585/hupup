@@ -184,6 +184,11 @@ export type CallData = {
   day?: string;
   /** Key 1 booking: every held order on this call, one per rental day (paid together with one charge) */
   dayOrderIds?: number[];
+  /** Key 8 catalog: the number to text, the two parts of the email, and keys typed so far */
+  catPhone?: string;
+  catLocal?: string;
+  catDomain?: string;
+  catKeys?: string;
   /** When the caller last pressed a key or said something (Abraham's idle rule inside a booking) */
   lastKeyAt?: number;
   /** Voicemail review menu: the latest recording on this call, its link, box and menu key */
@@ -389,6 +394,11 @@ export const voicePrompts = pgTable("voice_prompts", {
   key: text("key").primaryKey(),
   text: text("text"),
   audioUrl: text("audio_url"),
+  /** The uploaded recording that plays now (Abraham, Phone Recordings); null = the Google voice. */
+  recordingId: integer("recording_id"),
+  /** Owner's OK for a line marked "Waiting for approval" (until then it never plays). */
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  approvedBy: integer("approved_by"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: integer("updated_by"),
 });
@@ -923,3 +933,60 @@ export const smsCampaignSends = pgTable("sms_campaign_sends", {
   reason: text("reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Abraham's catalog PDF (Phone Menu v3, section 9): one current file, replaced in Admin; old files kept. */
+export const catalogFiles = pgTable("catalog_files", {
+  id: serial("id").primaryKey(),
+  fileName: text("file_name").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  complete: boolean("complete").notNull().default(false),
+  current: boolean("current").notNull().default(false),
+  uploadedBy: integer("uploaded_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const catalogFileChunks = pgTable(
+  "catalog_file_chunks",
+  {
+    fileId: integer("file_id").notNull().references(() => catalogFiles.id),
+    idx: integer("idx").notNull(),
+    data: bytea("data").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.fileId, t.idx] })],
+);
+
+/** Emails to info@ asking for the catalog (subject "Catalog"): who, when, and whether a reply went out. */
+export const catalogEmailRequests = pgTable("catalog_email_requests", {
+  id: serial("id").primaryKey(),
+  sender: text("sender").notNull(),
+  subject: text("subject"),
+  replied: boolean("replied").notNull().default(false),
+  reason: text("reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Phone line recordings (Abraham, Phone Recordings): uploads (MP3/WAV) and Google voice recordings. Never deleted. */
+export const promptRecordings = pgTable("prompt_recordings", {
+  id: serial("id").primaryKey(),
+  promptKey: text("prompt_key").notNull(),
+  /** "upload" | "google" */
+  source: text("source").notNull(),
+  fileName: text("file_name").notNull(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  /** The wording at the time (for Google recordings: the exact text spoken). */
+  wording: text("wording"),
+  complete: boolean("complete").notNull().default(false),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const promptRecordingChunks = pgTable(
+  "prompt_recording_chunks",
+  {
+    recordingId: integer("recording_id").notNull().references(() => promptRecordings.id),
+    idx: integer("idx").notNull(),
+    data: bytea("data").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.recordingId, t.idx] })],
+);

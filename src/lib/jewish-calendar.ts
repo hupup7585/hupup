@@ -237,6 +237,15 @@ export function dayInfo(iso: string, s: CalendarSettings = calendarDefaults()): 
   };
 }
 
+/** Candle lighting on Erev Shabbos / Erev Yom Tov (Monroe, NY 10950 zmanim), or null on other days. */
+export function erevCandleLighting(iso: string, s: CalendarSettings = calendarDefaults()): Date | null {
+  if (!shabbosOrYomTov(addDaysISO(iso, 1)) || shabbosOrYomTov(iso)) return null;
+  return new Date(zmanim(iso, s).sunset().getTime() - (Number(s.candleLightingMinutes) || 18) * 60_000);
+}
+
+/** Today is Shabbos or Yom Tov (nothing rings). */
+export const isShabbosOrYomTov = (iso: string) => shabbosOrYomTov(iso);
+
 /** First day on or after `iso` that is not closed all day. */
 export function nextOpenDay(iso: string, s: CalendarSettings = calendarDefaults()): string {
   let d = iso;

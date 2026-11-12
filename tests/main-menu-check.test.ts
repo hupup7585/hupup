@@ -4,13 +4,14 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
  * Main menu check (Abraham W): every key, every sub-menu, star, replay and invalid-key paths. Simulated calls only
  * (in-memory database; nothing is dialed or texted).
  */
-const h = vi.hoisted(() => ({ open: true }));
+const h = vi.hoisted(() => ({ open: true, overrides: {} as Record<string, unknown> }));
 vi.mock("@/lib/db", async () => {
   const { createMemoryDb } = await import("./helpers/memory-db");
   const m = await createMemoryDb();
   return { db: m.db, schema: m.schema };
 });
-vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
+vi.mock("@/lib/jewish-calendar", async (orig) => ({ ...(await orig<typeof import("@/lib/jewish-calendar")>()), isShabbosOrYomTov: () => false })); // ringing rules: weekday (Phone Menu v3)
+vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => h.overrides }));
 vi.mock("@/lib/business-hours", async (orig) => ({ ...(await orig<typeof import("@/lib/business-hours")>()), officeOpenNow: () => h.open, lateHoursToday: () => null }));
 vi.mock("@/lib/notify", () => ({ sendSms: async () => ({ sent: true }), sendEmail: async () => ({ sent: true }) }));
 
@@ -98,15 +99,23 @@ describe("main menu: every key goes through", () => {
 });
 
 describe("key 2: instructions", () => {
-  it("asks which attraction, with star for the main menu", async () => {
+  it("Abraham's key 2 menu (Phone Menu v3), word for word; star goes back", async () => {
     const xml = text(await call("instructions"));
-    expect(xml).toContain(P("instr_intro"));
-    expect(xml).toContain("For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.");
-    expect(xml).toContain(P("attraction_menu_back"));
+    expect(xml).toContain("For jumping balloon instructions, press 1. For laser tag, press 2. For paddle boats, press 3. To go back, press star.");
     expect(gatherTo(xml)).toBe("attraction-choice?m=i");
+    expect(redirect(await call("attraction-choice", { Digits: "*" }, { m: "i" }))).toBe("menu");
+  });
+  it("scripts waiting for Abraham's OK never play: straight back to the key 2 menu", async () => {
+    h.overrides = {};
+    for (const t of ["1", "2", "3"]) {
+      const xml = text(await call("attraction", {}, { m: "i", t }));
+      expect(xml).not.toContain("Here's how to enjoy");
+      expect(redirect(xml)).toBe("instructions?again=1");
+    }
   });
   for (const [t, key] of [["1", "instr_balloons"], ["2", "instr_laser"], ["3", "instr_paddle"]] as const) {
-    it(`${t} plays the ${key.replace("instr_", "")} instructions, then star again / 1 another / 2 main menu`, async () => {
+    it(`once approved in Admin, ${t} plays the ${key.replace("instr_", "")} instructions, then star again / 1 another / 2 main menu`, async () => {
+      h.overrides = { [key]: { text: null, audioUrl: null, approvedAt: new Date() } };
       expect(redirect(await call("attraction-choice", { Digits: t }, { m: "i" }))).toBe(`attraction?m=i&t=${t}`);
       const xml = text(await call("attraction", {}, { m: "i", t }));
       expect(xml).toContain(P(key));

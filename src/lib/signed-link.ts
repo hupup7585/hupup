@@ -16,3 +16,17 @@ export function verifyVoicemailLink(id: number, exp: string | null, sig: string 
   const got = Buffer.from(sig);
   return want.length === got.length && timingSafeEqual(want, got);
 }
+
+/** Phone line recordings (Abraham, Phone Recordings): a fixed signed link Twilio can play; no expiry, not guessable. */
+const signPrompt = (id: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`prompt-recording:${id}`).digest("hex").slice(0, 32);
+
+export function promptRecordingLink(id: number): string {
+  return `${config.baseUrl()}/api/voice-audio/prompt/${id}?sig=${signPrompt(id)}`;
+}
+
+export function verifyPromptRecordingLink(id: number, sig: string | null): boolean {
+  if (!Number.isInteger(id) || id <= 0 || !sig) return false;
+  const want = Buffer.from(signPrompt(id));
+  const got = Buffer.from(sig);
+  return want.length === got.length && timingSafeEqual(want, got);
+}

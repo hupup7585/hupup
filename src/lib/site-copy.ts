@@ -95,3 +95,6 @@ export function whyLabel(text: string): string {
 
 /** Abraham X: the service area opens Google Maps (new tab). */
 export const SERVICE_AREA_MAP_URL = "https://www.google.com/maps/search/?api=1&query=Kiryas%20Joel%2C%20NY";
+
+/** Under Our Rentals (Abraham, Phone Menu v3, approved word for word). The address is a mailto link with the subject filled in. */
+export const CATALOG_LINE = { before: "Want our catalog? Email ", email: "info@hupupattractions.com", after: " with the subject Catalog, and we'll send it right back." };

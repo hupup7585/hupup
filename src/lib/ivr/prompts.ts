@@ -1,3 +1,4 @@
+import { promptRecordingLink } from "@/lib/signed-link";
 import { db, schema } from "@/lib/db";
 
 /**
@@ -12,6 +13,8 @@ export type PromptDef = {
   vars?: string[];
   /** Always spoken from the text (never an uploaded recording), so the stored consent language is exactly what was heard. */
   textOnly?: boolean;
+  /** Wording not yet approved by Abraham: shows "Waiting for approval" in Admin and never plays on the phone line. */
+  pending?: boolean;
 };
 
 export const PROMPTS = {
@@ -29,7 +32,9 @@ export const PROMPTS = {
   main_rental_help: { group: "Welcome & main menu", label: "Main menu key 5 (Abraham)", text: "For questions or assistance with any issues during your rental, press 5." },
   main_6: { group: "Welcome & main menu", label: "Main menu key 6 (Abraham)", text: "For delivery and pickup information, press 6." },
   main_hours: { group: "Welcome & main menu", label: "Main menu key 7 (Abraham)", text: "To hear our hours of operation, press 7." },
-  main_9: { group: "Welcome & main menu", label: "Main menu key 9 (Abraham)", text: "To leave a message in our general voicemail, press 9." },
+  main_9: { group: "Welcome & main menu", label: "Main menu key 9 (Abraham, Phone Menu v3)", text: "For feedback and comments, press 9." },
+  main_star_again: { group: "Welcome & main menu", label: "Main menu: hear it again (Abraham)", text: "To hear this menu again, press the star key." },
+  main_thanks: { group: "Welcome & main menu", label: "Main menu: closing line (Abraham, Phone Menu v3)", text: "Thank you for choosing Hup Up Attractions." },
   main_0: { group: "Welcome & main menu", label: "Main menu key 0 (Abraham)", text: "To speak with an operator, press 0." },
   // Bookings menu after pressing 1 (Abraham, Nov 11, 2026), approved word for word; categories come from Admin.
   book_note: { group: "Booking by item (key 1)", label: "Bookings menu: first line (Abraham)", text: "Please note, orders can be placed only through our automated system. For information or questions, press 0 for customer service." },
@@ -38,20 +43,24 @@ export const PROMPTS = {
   not_valid: { group: "Welcome & main menu", label: "Any menu: a key that is not a choice (Abraham)", text: "Sorry, that is not a valid selection. Please try again." },
   // Main menu key 2 (Abraham W): instructions for each type of attraction. Editable here like every other prompt.
   attraction_choice: { group: "Key 2: Instructions", label: "Which attraction (keys 2 and 3, Abraham)", text: "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3." },
+  instr_menu: { group: "Key 2: Instructions", label: "Key 2 menu (Abraham, Phone Menu v3)", text: "For jumping balloon instructions, press 1. For laser tag, press 2. For paddle boats, press 3. To go back, press star." },
   attraction_menu_back: { group: "Key 2: Instructions", label: "Which attraction: star for the main menu", text: "To go back to the main menu, press the star key." },
   instr_intro: { group: "Key 2: Instructions", label: "Key 2 opening line", text: "We're happy to help you get the most out of your rental." },
   instr_balloons: {
     group: "Key 2: Instructions",
+    pending: true, // Abraham (Phone Menu v3): his scripts are coming
     label: "Instructions: jumping balloons",
     text: "Here's how to enjoy your jumping balloon safely. Setup: our team sets it up on a flat, open area, away from trees, fences, power lines and anything sharp. Keep the blower running and its cord and air tube clear the whole time it's in use. Safe use: everyone takes off their shoes, glasses and anything in their pockets. No food, drinks, gum, silly string or sharp toys inside. Keep big and small children apart, and don't overcrowd it. No flips, wrestling or climbing on the walls. Supervision: a responsible adult must watch the jumping balloon at all times while it's in use. Please follow the age and rider limits printed on the unit. Weather: if the wind picks up, if it rains, or if you hear thunder, have everyone get out right away and unplug the blower. Getting ready for pickup: make sure everyone is out, unplug the blower, remove any toys or trash, and leave the unit where it is. We'll take care of folding it. Thank you!",
   },
   instr_laser: {
     group: "Key 2: Instructions",
+    pending: true, // Abraham (Phone Menu v3): his scripts are coming
     label: "Instructions: laser tag",
     text: "Here's how to enjoy your laser tag safely. Setup: our team sets up the maze and gets the blasters and vests ready. Keep the blower running and its cord clear, and charge the equipment as our team shows you. Safe use: players walk, never run, inside the maze, and no shoes inside the inflatable. Never point the blasters at anyone's eyes up close, and keep vests fastened. No food or drinks inside. Supervision: a responsible adult must supervise the game at all times. Laser tag is best for children around age six and up, and teens and adults love it too. Weather: if it gets windy, starts to rain, or you hear thunder, stop the game, have everyone get out, and unplug the blower. Bring the blasters and vests inside, out of the rain. Getting ready for pickup: collect every blaster and vest, count them, and put them back in their bins. Make sure the maze is empty and unplugged. We'll take care of the rest. Thank you!",
   },
   instr_paddle: {
     group: "Key 2: Instructions",
+    pending: true, // Abraham (Phone Menu v3): his scripts are coming
     label: "Instructions: paddle boats",
     text: "Here's how to enjoy your paddle boats safely. Setup: our team places the boats in the pool or water area and shows you how they work. Safe use: one rider per boat, unless the boat says otherwise. Riders stay seated, keep their hands and feet inside, and never stand up or bump boats hard. Children who can't swim should wear a life jacket. Supervision: a responsible adult must watch the water at all times while the boats are in use, and stay close enough to reach a child right away. Please follow the age and weight limits on each boat. Weather: if it gets windy, starts to rain, or you hear thunder, have everyone get out of the water right away. Getting ready for pickup: take the boats out of the water if you can, line them up in one place, and remove any toys or trash. We'll take care of the rest. Thank you!",
   },
@@ -134,7 +143,9 @@ export const PROMPTS = {
   // Cart
   added: { group: "Cart", label: "Item added to cart", text: "Woohoo! I added {items} to your cart for {date}. It's saved just for you while we're on the phone.", vars: ["items", "date"] },
   after_add: { group: "Cart", label: "After adding", text: "To keep shopping, press 1. To check out, press 9." },
-  cart_empty: { group: "Cart", label: "Cart is empty", text: "Your cart is empty right now. Let's find something fun!" },
+  cart_empty: { group: "Cart", label: "Cart is empty (Abraham, Phone Menu v3)", text: "Your cart is empty. Let's start shopping!" },
+  bounce_water_note: { group: "Cart", label: "Before a bounce house is added (Abraham, Phone Menu v3)", text: "Please note, our bounce houses are not for water use." },
+  checkout_tax_note: { group: "Cart", label: "Before checkout (Abraham, Phone Menu v3)", text: "Taxes will be calculated after checkout." },
   cart_summary: { group: "Cart", label: "Cart summary", text: "Here's your cart: {items}, for {date}. Your rental total is {total}, plus delivery and sales tax.", vars: ["items", "date", "total"] },
   // Key 1 booking, several days on one call (Abraham, Nov 8, 2026). day_choice and cart_key are Abraham's exact lines.
   day_choice: { group: "Cart", label: "After an item: same day or another day (Abraham)", text: "For the same day, press 1. For another day, press 2." },
@@ -197,13 +208,13 @@ export const PROMPTS = {
     text: "Thank you. We just texted you a confirmation. Reply YES to that text within 24 hours to sign up for promotional texts.",
   },
   // Promo texts by phone, keys only (Abraham, Nov 10, 2026): replaces consent_marketing_v2, which is no longer played.
-  promo_ask: { group: "Promo texts by phone (keys only)", label: "Step 1: after the order", text: "To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1. To skip, press pound." },
-  promo_which: { group: "Promo texts by phone (keys only)", label: "Step 2: which number", text: "To get texts at the number you're calling from, press 1. To use a different phone number, press 2." },
-  promo_enter: { group: "Promo texts by phone (keys only)", label: "Step 3: enter a number", text: "Please enter the 10-digit mobile number, then press pound." },
-  promo_heard: { group: "Promo texts by phone (keys only)", label: "Step 3: read the number back", text: "You entered {number}. To confirm, press 1. To enter it again, press 2.", vars: ["number"] },
-  promo_bad: { group: "Promo texts by phone (keys only)", label: "Step 3: not 10 digits", text: "Sorry, that number didn't work. Please try again." },
-  promo_final: { group: "Promo texts by phone (keys only)", label: "Final line", text: "Thanks! We just sent a text. Reply YES within 24 hours to finish signing up." },
-  promo_disclosure: { group: "Promo texts by phone (keys only)", label: "Disclosure line (right after the Final line)", text: "Message and data rates may apply, and you're signed up only after you reply YES to our confirmation text." },
+  promo_ask: { group: "Promo texts by phone (keys only)", pending: true, label: "Step 1: after the order", text: "To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1. To skip, press pound." },
+  promo_which: { group: "Promo texts by phone (keys only)", pending: true, label: "Step 2: which number", text: "To get texts at the number you're calling from, press 1. To use a different phone number, press 2." },
+  promo_enter: { group: "Promo texts by phone (keys only)", pending: true, label: "Step 3: enter a number", text: "Please enter the 10-digit mobile number, then press pound." },
+  promo_heard: { group: "Promo texts by phone (keys only)", pending: true, label: "Step 3: read the number back", text: "You entered {number}. To confirm, press 1. To enter it again, press 2.", vars: ["number"] },
+  promo_bad: { group: "Promo texts by phone (keys only)", pending: true, label: "Step 3: not 10 digits", text: "Sorry, that number didn't work. Please try again." },
+  promo_final: { group: "Promo texts by phone (keys only)", pending: true, label: "Final line", text: "Thanks! We just sent a text. Reply YES within 24 hours to finish signing up." },
+  promo_disclosure: { group: "Promo texts by phone (keys only)", pending: true, label: "Disclosure line (right after the Final line)", text: "Message and data rates may apply, and you're signed up only after you reply YES to our confirmation text." },
   consent_unclear: { group: "Text message consent", label: "Didn't understand the answer", text: "Sorry, I didn't get that. Please press 1 for yes, or 2 for no." },
   consent_stopped: { group: "Text message consent", label: "Number replied STOP before", text: "This number has opted out of our text messages, so we won't text you. To get our texts again, text the word START to this hotline number." },
   consent_marketing_yes: { group: "Text message consent", label: "Signed up for promotional texts", text: "Thank you, you're signed up for promotional texts. We just texted you a confirmation." },
@@ -245,17 +256,25 @@ export const PROMPTS = {
     text: "We apologize that we are unable to answer your call. Our team is assisting other customers right now. Please feel free to leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.",
   },
   // Key 9 (Abraham, Nov 11, 2026, word for word): feedback and comments only.
-  // Key 8 catalog: PROPOSED wording, heard only on the Owner's test calls until Abraham approves it.
-  catalog_choose: { group: "Catalog (key 8, proposed)", label: "Text or email", text: "We'd love to send you our catalog. To get it by email, press 1. To get it by text, press 2. To go back, press star." },
-  catalog_text_not_yet: { group: "Catalog (key 8, proposed)", label: "Texts not available yet", text: "Sorry, we can't send it by text just yet. Let's send it by email instead." },
-  catalog_ask_email: { group: "Catalog (key 8, proposed)", label: "Ask for the email", text: "Please say your email address, like john at gmail dot com. Or press star to type it on the keypad." },
-  catalog_email_heard: { group: "Catalog (key 8, proposed)", label: "Read back the email", text: "I heard {value}. If that's correct, press 1. To try again, press 2.", vars: ["value"] },
-  catalog_emailed: { group: "Catalog (key 8, proposed)", label: "Catalog emailed", text: "Done! We just emailed you our catalog. Thank you for calling Hup Up Attractions!" },
-  catalog_texted: { group: "Catalog (key 8, proposed)", label: "Catalog texted", text: "Done! We just texted you our catalog. Thank you for calling Hup Up Attractions!" },
+  // Key 8 catalog (Abraham, Phone Menu v3), approved word for word.
+  catalog_menu: { group: "Catalog (key 8)", label: "Text or email", text: "To receive our catalog by text, press 1. To get it by email, press 2. To go back, press star." },
+  catalog_text_which: { group: "Catalog (key 8)", label: "Text: which number", text: "We'll text it to the number you're calling from. To use this number, press 1. To enter a different number, press 2." },
+  catalog_text_enter: { group: "Catalog (key 8)", label: "Text: enter a number", text: "Please enter the 10-digit phone number, then press pound." },
+  catalog_text_heard: { group: "Catalog (key 8)", label: "Text: read the number back", text: "I have {number}. If that's correct, press 1. To try again, press 2.", vars: ["number"] },
+  catalog_texted: { group: "Catalog (key 8)", label: "Text: done", text: "Done! We just texted you our catalog. Thank you for choosing Hup Up Attractions!" },
+  catalog_text_not_yet: { group: "Catalog (key 8)", label: "Text: not available yet", text: "Sorry, we can't send it by text just yet. Let's send it by email instead." },
+  catalog_email_info: { group: "Catalog (key 8)", label: "Email: send us an empty email (plays once the info@ auto-reply is on)", text: "You can also send us an empty email to info at hup up attractions dot com, with the subject Catalog, and we'll send it right back to you." },
+  catalog_email_local: { group: "Catalog (key 8)", label: "Email step 1: the first part", text: "Please enter the first part of your email address, up to the at symbol. To type it, start pressing keys on your keypad now. To say it, wait for the tone, then say it letter by letter. When you're finished, press pound." },
+  catalog_keypad_help: { group: "Catalog (key 8)", label: "Email: keypad directions (when the caller starts typing)", text: "To type, press each key once, twice, or three times for its letter. For example, press 2 once for A, twice for B, or three times for C. To type another letter on the same key, press star once first. To erase the last letter, press star twice. To go back, press star three times. For a dot, press 1 once. For an underscore, press 1 twice. For a dash, press 1 three times. To switch between letters and numbers, press 0. When you're finished, press pound." },
+  catalog_got: { group: "Catalog (key 8)", label: "Email: read back what we got", text: "We got {letters}. To continue, press pound. To start over, press 1. To add more, press 2.", vars: ["letters"] },
+  catalog_ending: { group: "Catalog (key 8)", label: "Email: choose the ending", text: "Now choose the ending. For at gmail dot com, press 1. For at outlook dot com, press 2. For at yahoo dot com, press 3. For at icloud dot com, press 4. For a different ending, press 5." },
+  catalog_domain: { group: "Catalog (key 8)", label: "Email: a different ending", text: "Please give us the ending, after the at symbol. To type it, start pressing keys now. To say it, wait for the tone. When you're finished, press pound." },
+  catalog_final: { group: "Catalog (key 8)", label: "Email: final check", text: "Your email address is {email}. If that's correct, press 1. To start over, press 2.", vars: ["email"] },
+  catalog_emailed: { group: "Catalog (key 8)", label: "Email: done", text: "We just emailed you our catalog! Check your inbox for a variety of attractions and endless fun for your entire family. Thank you for choosing Hup Up Attractions! To hear the main menu, press star. Otherwise, you may hang up." },
   vm9_greeting: {
     group: "Voicemail",
     label: "Key 9 greeting (general voicemail: feedback and comments)",
-    text: "Thank you for your time. We love to hear from you, and your feedback helps us improve our service. Please share your comments after the tone. If you would like a call back, please say your name and phone number. When you are finished, you may hang up or press the pound key.",
+    text: "Thank you for your time. We want to hear from you, your feedback helps us improve our service. Please share your comments after the tone. If you would like a callback, please say your name and phone number. When you're finished, you may hang up or press the pound key.",
   },
   vm9_sent: { group: "Voicemail", label: "Key 9 message sent (after pressing 1)", text: "Thank you for your feedback! We truly appreciate it. Goodbye!" },
   vm_options: {
@@ -263,11 +282,12 @@ export const PROMPTS = {
     label: "Options after the caller presses #",
     text: "Thank you!\nTo send your message, press 1.\nTo listen to it, press 2.\nTo delete and re-record, press 3.",
   },
+  vm_rerecord: { group: "Voicemail", label: "Before the tone when re-recording (press 3)", text: "Please re-record your message. When you're finished, press pound." },
   vm_none_retry: { group: "Voicemail", label: "Nothing was recorded (Abraham)", text: "We didn't receive a message. To try again, press 3. Otherwise, you may hang up." },
   vm_closed: {
     group: "Voicemail",
     label: "Greeting when the office is closed (every box except key 9; same hours as the website and key 7)",
-    text: "Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you on the next business day. When you are finished, you may hang up or press the pound key.",
+    text: "Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.",
   },
   vm_sent: { group: "Voicemail", label: "Message sent (after pressing 1)", text: "Thank you! Your message has been sent. We will get back to you as soon as possible. Goodbye!" },
   voicemail_prompt: { group: "Voicemail", label: "Before the beep (no longer played; replaced by the Greeting)", text: "Please leave your name, phone number, and a short message after the beep. Press pound when you're done." },
@@ -276,14 +296,15 @@ export const PROMPTS = {
 } satisfies Record<string, PromptDef>;
 
 export type PromptKey = keyof typeof PROMPTS;
-export type PromptOverrides = Partial<Record<PromptKey, { text: string | null; audioUrl: string | null }>>;
+export type PromptOverride = { text: string | null; audioUrl: string | null; recordingId?: number | null; approvedAt?: Date | null };
+export type PromptOverrides = Partial<Record<PromptKey, PromptOverride>>;
 
 export async function loadPromptOverrides(): Promise<PromptOverrides> {
   try {
     const rows = await db.select().from(schema.voicePrompts);
     const out: PromptOverrides = {};
     for (const r of rows) {
-      if (r.key in PROMPTS) out[r.key as PromptKey] = { text: r.text, audioUrl: r.audioUrl };
+      if (r.key in PROMPTS) out[r.key as PromptKey] = { text: r.text, audioUrl: r.audioUrl, recordingId: r.recordingId, approvedAt: r.approvedAt };
     }
     return out;
   } catch (e) {
@@ -302,9 +323,21 @@ export function promptText(overrides: PromptOverrides, key: PromptKey, vars?: Re
   return fill(t || PROMPTS[key].text, vars);
 }
 
-/** Recorded audio for a prompt (only used when the prompt has no placeholders). */
-export function promptAudio(overrides: PromptOverrides, key: PromptKey): string | null {
+/** Lines with changing parts (names, emails, dates, totals) and consent lines always stay live Google voice. */
+export function promptRecordable(key: PromptKey): boolean {
   const def = PROMPTS[key] as PromptDef;
-  if (def.vars?.length || def.textOnly) return null;
-  return overrides[key]?.audioUrl || null;
+  return !def.vars?.length && !def.textOnly;
+}
+
+/** Waiting for Abraham's OK: never plays on the phone line until he approves it in Admin. */
+export function promptWaiting(overrides: PromptOverrides, key: PromptKey): boolean {
+  return Boolean((PROMPTS[key] as PromptDef).pending) && !overrides[key]?.approvedAt;
+}
+
+/** Recorded audio for a prompt: Abraham's upload (Phone Recordings) if one is chosen, else none (the live Google voice). */
+export function promptAudio(overrides: PromptOverrides, key: PromptKey): string | null {
+  if (!promptRecordable(key)) return null;
+  const o = overrides[key];
+  if (o?.recordingId) return promptRecordingLink(o.recordingId);
+  return o?.audioUrl || null;
 }

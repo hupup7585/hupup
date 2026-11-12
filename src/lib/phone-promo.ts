@@ -11,7 +11,7 @@ import { toE164 } from "@/lib/phone";
  *                call. Texts still go out only once Twilio A2P is approved (the texting gate blocks them until then).
  */
 export type PhonePromoMode = "off" | "owner_test" | "live";
-export const PHONE_PROMO_MODE: PhonePromoMode = "owner_test";
+export const PHONE_PROMO_MODE: PhonePromoMode = "off"; // Abraham (Phone Menu v3): off until SMS Terms v3 is live and he approves the wording and a test recording
 
 export function phonePromoMode(): PhonePromoMode {
   return PHONE_PROMO_MODE;

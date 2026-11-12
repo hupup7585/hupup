@@ -43,11 +43,13 @@ import {
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { voicemailPlayLink } from "@/lib/signed-link";
-import { catalogStepsOn, catalogText, sendCatalogEmail } from "@/lib/catalog-send";
+import { INFO_CATALOG_AUTOREPLY_ON, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
+import { CATALOG_ENDINGS, decodeCatalogKeys, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
 import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState, textingActive } from "@/lib/voicemail";
-import { RING_KEYS, extensionName, ringListFor, staffAnnouncement, type RingKey } from "./routing";
+import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staffAnnouncement, type RingKey } from "./routing";
+import { erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
 import { matchBlock, parseBlockList } from "./caller-filter";
-import { PROMPTS, loadPromptOverrides, promptAudio, promptText, type PromptKey, type PromptOverrides } from "./prompts";
+import { PROMPTS, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
@@ -87,6 +89,7 @@ function say(target: VR | Gather, text: string) {
 
 /** Speak a catalog prompt: uploaded recording if there is one, otherwise the (editable) text. */
 function sp(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptKey, vars?: Record<string, string | number>) {
+  if (promptWaiting(ctx.prompts, key)) return; // Abraham (Phone Recordings): a line waiting for his OK never plays
   const audio = promptAudio(ctx.prompts, key);
   if (audio) target.play(audio);
   else say(target, promptText(ctx.prompts, key, vars));
@@ -308,16 +311,26 @@ const ATTRACTIONS = {
 
 function attractionMenu(ctx: Ctx, vr: VR, m: "i" | "l") {
   const g = keypad(vr, url("attraction-choice", { m }));
-  if (!ctx.query.get("again")) sp(g, ctx, m === "i" ? "instr_intro" : "learn_intro");
+  if (m === "i") {
+    sp(g, ctx, "instr_menu"); // Abraham, Phone Menu v3, word for word (recorded information, day and night)
+    return repeatMenu(vr, ctx, "instructions", { again: 1 });
+  }
+  if (!ctx.query.get("again")) sp(g, ctx, "learn_intro");
   sp(g, ctx, "attraction_choice");
   sp(g, ctx, "attraction_menu_back");
-  return repeatMenu(vr, ctx, m === "i" ? "instructions" : "learn", { again: 1 });
+  return repeatMenu(vr, ctx, "learn", { again: 1 });
 }
 
 /** The Admin category for a type (by name, so a rename in Admin still works; else the one on that booking key). */
 async function attractionCategory(t: "1" | "2" | "3") {
   const cats = await phoneCategories();
   return cats.find((c) => ATTRACTIONS[t].match.test(c.name)) ?? cats.find((c) => String(c.ivrDigit) === t) ?? null;
+}
+
+/** Is this item in the bounce house (jumping balloons) category? */
+async function isBounceHouse(categoryId: number) {
+  const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, categoryId));
+  return Boolean(cat && ATTRACTIONS["1"].match.test(cat.name));
 }
 
 /** "a, b and c" */
@@ -415,11 +428,12 @@ export function hoursForSpeech(s: Parameters<typeof websiteHoursLines>[0]): stri
 /** Ring one step of a key's list (one after another) or everyone at once. */
 function dialTargets(vr: VR, list: ReturnType<typeof ringListFor>, k: RingKey, i: number, from?: string | null): VR {
   const simultaneous = list.mode === "simultaneous";
-  const ring = simultaneous ? list.targets : [list.targets[i]];
+  // Abraham (Phone Menu v3): the list rings several times over (3 by default); step i goes round the list
+  const ring = simultaneous ? list.targets : [list.targets[i % list.targets.length]];
   const dial = vr.dial({
     callerId: process.env.TWILIO_PHONE_NUMBER || undefined,
     timeout: Math.max(...ring.map((t) => t.ringSeconds)),
-    action: url("operator-done", { i: simultaneous ? undefined : i, k }),
+    action: url("operator-done", { i, k }),
     method: "POST",
   });
   for (const t of ring) {
@@ -470,17 +484,38 @@ function vmRecord(vr: VR, box: { id: number; maxLengthSec: number; transcribe: b
   return vr;
 }
 
-/** Key 8: read the email back, then 1 sends the catalog, 2 tries again. */
-async function catalogReadBack(ctx: Ctx, vr: VR, value: string | null) {
-  if (!value) {
-    sp(vr, ctx, "email_unclear");
+/** Key 8 helpers. */
+const catPart = (ctx: Ctx, part: "local" | "domain") => (part === "domain" ? ctx.session?.data.catDomain : ctx.session?.data.catLocal) ?? "";
+const catalogEmailOf = (ctx: Ctx) => {
+  const l = ctx.session?.data.catLocal ?? "";
+  const d = ctx.session?.data.catDomain ?? "";
+  return validLocal(l) && validDomain(d) ? `${l}@${d}`.toLowerCase() : null;
+};
+/** Texts really go out (Twilio approved), or this isn't the live site. */
+const catalogTextReady = () => textingActive() || process.env.VERCEL_ENV !== "production";
+
+async function catalogSendText(ctx: Ctx, vr: VR, to: string) {
+  const r = await sendMessage({ to, body: catalogText(), kind: "system", event: "catalog_request", callSid: ctx.callSid });
+  await logCatalogRequest(ctx, "text", to, r.sent);
+  if (!r.sent) {
+    sp(vr, ctx, "catalog_text_not_yet");
     return back(vr, "catalog-email");
   }
-  await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
-  const g = keypad(vr, url("catalog-email-confirm"));
-  sp(g, ctx, "catalog_email_heard", { value: FIELDS.email.readBack(value) });
-  vr.redirect({ method: "POST" }, url("catalog-email"));
+  sp(vr, ctx, "catalog_texted");
+  vr.hangup();
   return vr;
+}
+
+/** Every catalog request on the caller's contact (channel, date with year); a failed send alerts Abraham. */
+async function logCatalogRequest(ctx: Ctx, channel: "text" | "email", to: string, sent: boolean) {
+  await track(ctx.callSid, "step", sent ? `Catalog sent by ${channel}` : `Catalog ${channel} failed`, { channel, to, sent });
+  await recordCatalogRequest({ callerPhone: toE164(ctx.from), channel, to, sent, source: "phone" });
+}
+
+/** Does this line ring now (office hours, after-hours switch, key 6 hours, Shabbos and Yom Tov)? */
+async function lineRingsNowFor(k: RingKey, settings: Awaited<ReturnType<typeof getSettings>>, at = new Date()) {
+  const iso = localISO(at);
+  return lineRingsNow(k, at, settings, { officeOpen: officeOpenNow(at, settings), shabbosOrYomTov: isShabbosOrYomTov(iso), candleLighting: erevCandleLighting(iso, settings) });
 }
 
 /* ------------------------------------------------------------------ handlers */
@@ -563,7 +598,7 @@ const handlers: Record<string, Handler> = {
       halfPause(g);
     }
     // Abraham's main menu (Nov 11, 2026), word for word. Any key works at any time, even during the greeting.
-    const lines = ["main_book", "main_equipment", "main_service_3", "main_learn_4", "main_rental_help", "main_6", "main_hours", "main_catalog", "main_9", "main_0"] as const;
+    const lines = ["main_book", "main_equipment", "main_service_3", "main_learn_4", "main_rental_help", "main_6", "main_hours", "main_catalog", "main_9", "main_0", "main_star_again", "main_thanks"] as const;
     lines.forEach((k, i) => {
       sp(g, ctx, k);
       if (i < lines.length - 1) halfPause(g);
@@ -643,66 +678,216 @@ const handlers: Record<string, Handler> = {
     return toStep(vr, ctx);
   },
 
-  /* ---- Key 8 (Abraham, Nov 11, 2026): our catalog by email or text. Proposed wording: Owner's test calls only. ---- */
+  /* ---- Key 8 (Abraham, Phone Menu v3): our catalog by text or email. Never a promo sign-up. ---- */
 
   catalog(ctx, vr) {
-    if (!catalogStepsOn(ctx.from)) return back(vr, "ring", { k: "4" }); // until approved: customer service
     const g = keypad(vr, url("catalog-choice"));
-    sp(g, ctx, "catalog_choose");
-    repeatMenu(vr, ctx, "catalog"); // repeats (3 plays and 20 seconds rule)
-    return vr;
+    sp(g, ctx, "catalog_menu");
+    return repeatMenu(vr, ctx, "catalog");
   },
 
   async "catalog-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "*") return back(vr, "menu");
-    if (d === "1") return back(vr, "catalog-email");
-    if (d === "2") {
-      const to = toE164(ctx.from);
-      if (to && (textingActive() || process.env.VERCEL_ENV !== "production")) {
-        const r = await sendMessage({ to, body: catalogText(), kind: "system", event: "catalog_request", callSid: ctx.callSid });
-        if (r.sent) {
-          await track(ctx.callSid, "step", "Catalog texted", { to });
-          sp(vr, ctx, "catalog_texted");
-          vr.hangup();
-          return vr;
-        }
-      }
+    if (d === "1") {
+      if (catalogTextReady()) return back(vr, "catalog-text");
       sp(vr, ctx, "catalog_text_not_yet");
       return back(vr, "catalog-email");
     }
-    if (d) sp(vr, ctx, "not_valid");
+    if (d === "2") return back(vr, "catalog-email");
+    sp(vr, ctx, "not_valid");
     return back(vr, "catalog");
   },
 
-  "catalog-email"(ctx, vr) {
-    const g = speech(vr, url("catalog-email-heard"), FIELDS.email.hints, { dtmf: true, numDigits: 1, finishOnKey: "" });
-    sp(g, ctx, "catalog_ask_email");
-    return vr;
+  "catalog-text"(ctx, vr) {
+    const g = keypad(vr, url("catalog-text-choice"));
+    sp(g, ctx, "catalog_text_which");
+    return repeatMenu(vr, ctx, "catalog-text");
   },
 
-  async "catalog-email-heard"(ctx, vr) {
-    if (ctx.body.Digits === "*") {
-      const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 15, action: url("catalog-email-typed"), method: "POST" });
-      sp(g, ctx, "type_instructions");
-      sp(g, ctx, "type_email_symbols");
-      return back(vr, "catalog-email");
+  async "catalog-text-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (d === "*") return back(vr, "catalog");
+    if (d === "1") {
+      const to = toE164(ctx.from);
+      return to ? catalogSendText(ctx, vr, to) : back(vr, "catalog-text-enter");
     }
-    const value = normalizeSpokenEmail((ctx.body.SpeechResult || "").trim());
-    return catalogReadBack(ctx, vr, value);
+    if (d === "2") return back(vr, "catalog-text-enter");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "catalog-text");
   },
 
-  async "catalog-email-typed"(ctx, vr) {
-    const raw = decodeMultitap(ctx.body.Digits || "", "email");
-    return catalogReadBack(ctx, vr, raw ? normalizeSpokenEmail(raw) : null);
+  "catalog-text-enter"(ctx, vr) {
+    const g = keypad(vr, url("catalog-text-heard"), { numDigits: 11, timeout: 10, finishOnKey: "#" });
+    sp(g, ctx, "catalog_text_enter");
+    return repeatMenu(vr, ctx, "catalog-text-enter");
   },
 
-  async "catalog-email-confirm"(ctx, vr) {
-    const email = ctx.session?.data.heard;
-    if (ctx.body.Digits !== "1" || !email) return back(vr, "catalog-email");
-    await sendCatalogEmail(email);
-    await track(ctx.callSid, "step", "Catalog emailed", { email });
-    sp(vr, ctx, "catalog_emailed");
+  async "catalog-text-heard"(ctx, vr) {
+    const digits = ctx.body.Digits || "";
+    if (digits.includes("*")) return back(vr, "catalog-text"); // star: one step back
+    const e164 = tenDigitNumber(digits);
+    if (!e164) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "catalog-text-enter");
+    }
+    await updateSession(ctx.callSid, { data: { catPhone: e164 } }, ctx.session);
+    const g = keypad(vr, url("catalog-text-confirm"));
+    sp(g, ctx, "catalog_text_heard", { number: readBack(e164) });
+    return repeatMenu(vr, ctx, "catalog-text-heard-again");
+  },
+
+  "catalog-text-heard-again"(ctx, vr) {
+    const p = ctx.session?.data.catPhone;
+    if (!p) return back(vr, "catalog-text-enter");
+    const g = keypad(vr, url("catalog-text-confirm"));
+    sp(g, ctx, "catalog_text_heard", { number: readBack(p) });
+    return repeatMenu(vr, ctx, "catalog-text-heard-again");
+  },
+
+  async "catalog-text-confirm"(ctx, vr) {
+    const d = ctx.body.Digits;
+    const to = ctx.session?.data.catPhone;
+    if (d === "1" && to) return catalogSendText(ctx, vr, to);
+    if (d === "2") return back(vr, "catalog-text-enter");
+    if (d === "*") return back(vr, "catalog-text");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "catalog-text-heard-again");
+  },
+
+  /** Email: the info@ tip (once that auto-reply is on), then step 1, the first part of the address. */
+  async "catalog-email"(ctx, vr) {
+    if (INFO_CATALOG_AUTOREPLY_ON) sp(vr, ctx, "catalog_email_info");
+    await updateSession(ctx.callSid, { data: { catLocal: "", catDomain: "" } }, ctx.session);
+    return back(vr, "catalog-part", { part: "local" });
+  },
+
+  /**
+   * One part of the address (part = local or domain). A key within 3 seconds switches to keypad typing; no key plays
+   * a tone and listens for spoken letters. add=1 keeps what was already entered.
+   */
+  "catalog-part"(ctx, vr) {
+    const part = ctx.query.get("part") === "domain" ? "domain" : "local";
+    const add = ctx.query.get("add") ?? undefined;
+    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 3, finishOnKey: "", action: url("catalog-key", { part, add }), method: "POST" });
+    sp(g, ctx, part === "domain" ? "catalog_domain" : "catalog_email_local");
+    vr.play(`${config.baseUrl()}/audio/tone.wav`);
+    const s = vr.gather({ input: ["speech", "dtmf"], finishOnKey: "#", timeout: 6, speechTimeout: "auto", language: "en-US", hints: "a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, dot, underscore, dash", action: url("catalog-said", { part, add }), method: "POST" });
+    void s;
+    return repeatMenu(vr, ctx, "catalog-part", { part, add });
+  },
+
+  /** The caller started typing: the directions, then the rest of the keys until pound. */
+  async "catalog-key"(ctx, vr) {
+    const part = ctx.query.get("part") === "domain" ? "domain" : "local";
+    const add = ctx.query.get("add") ?? undefined;
+    const first = ctx.body.Digits || "";
+    if (first === "#") return back(vr, "catalog-got", { part }); // pound early: read back what we have
+    await updateSession(ctx.callSid, { data: { catKeys: first } }, ctx.session);
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 20, action: url("catalog-typed", { part, add }), method: "POST" });
+    sp(g, ctx, "catalog_keypad_help");
+    return back(vr, "catalog-typed", { part, add });
+  },
+
+  async "catalog-typed"(ctx, vr) {
+    const part = ctx.query.get("part") === "domain" ? "domain" : "local";
+    const keep = ctx.query.get("add") === "1" ? catPart(ctx, part) : "";
+    const r = decodeCatalogKeys(`${ctx.session?.data.catKeys ?? ""}${ctx.body.Digits ?? ""}`, keep);
+    await updateSession(ctx.callSid, { data: { catKeys: "", [part === "domain" ? "catDomain" : "catLocal"]: r.text } }, ctx.session);
+    if (r.back) return back(vr, part === "domain" ? "catalog-ending" : "catalog"); // star three times: one step back
+    return back(vr, "catalog-got", { part });
+  },
+
+  async "catalog-said"(ctx, vr) {
+    const part = ctx.query.get("part") === "domain" ? "domain" : "local";
+    const keep = ctx.query.get("add") === "1" ? catPart(ctx, part) : "";
+    const said = spokenLetters(ctx.body.SpeechResult || "");
+    if (!said && !keep) return back(vr, "catalog-part", { part, add: ctx.query.get("add") ?? undefined });
+    await updateSession(ctx.callSid, { data: { [part === "domain" ? "catDomain" : "catLocal"]: keep + said } }, ctx.session);
+    return back(vr, "catalog-got", { part });
+  },
+
+  /** "We got y o s s i. To continue, press pound. To start over, press 1. To add more, press 2." */
+  "catalog-got"(ctx, vr) {
+    const part = ctx.query.get("part") === "domain" ? "domain" : "local";
+    const value = catPart(ctx, part);
+    if (!value) {
+      sp(vr, ctx, "email_unclear");
+      return back(vr, "catalog-part", { part });
+    }
+    const g = keypad(vr, url("catalog-got-choice", { part }));
+    sp(g, ctx, "catalog_got", { letters: spellOut(value) });
+    return repeatMenu(vr, ctx, "catalog-got", { part });
+  },
+
+  async "catalog-got-choice"(ctx, vr) {
+    const part = ctx.query.get("part") === "domain" ? "domain" : "local";
+    const d = ctx.body.Digits;
+    const value = catPart(ctx, part);
+    if (d === "#") {
+      const ok = part === "domain" ? validDomain(value) : validLocal(value);
+      if (!ok) {
+        sp(vr, ctx, "email_unclear");
+        return back(vr, "catalog-part", { part });
+      }
+      return back(vr, part === "domain" ? "catalog-final" : "catalog-ending");
+    }
+    if (d === "1") return back(vr, "catalog-part", { part }); // start over
+    if (d === "2") return back(vr, "catalog-part", { part, add: 1 }); // add more, keeping what was entered
+    if (d === "*") return back(vr, part === "domain" ? "catalog-ending" : "catalog");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "catalog-got", { part });
+  },
+
+  "catalog-ending"(ctx, vr) {
+    const g = keypad(vr, url("catalog-ending-choice"));
+    sp(g, ctx, "catalog_ending");
+    return repeatMenu(vr, ctx, "catalog-ending");
+  },
+
+  async "catalog-ending-choice"(ctx, vr) {
+    const d = ctx.body.Digits ?? "";
+    if (CATALOG_ENDINGS[d]) {
+      await updateSession(ctx.callSid, { data: { catDomain: CATALOG_ENDINGS[d] } }, ctx.session);
+      return back(vr, "catalog-final");
+    }
+    if (d === "5") return back(vr, "catalog-part", { part: "domain" });
+    if (d === "*") return back(vr, "catalog-got", { part: "local" }); // one step back, the first part kept
+    sp(vr, ctx, "not_valid");
+    return back(vr, "catalog-ending");
+  },
+
+  "catalog-final"(ctx, vr) {
+    const email = catalogEmailOf(ctx);
+    if (!email) return back(vr, "catalog-email");
+    const g = keypad(vr, url("catalog-final-choice"));
+    sp(g, ctx, "catalog_final", { email: spokenEmail(email) });
+    return repeatMenu(vr, ctx, "catalog-final");
+  },
+
+  async "catalog-final-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    const email = catalogEmailOf(ctx);
+    if (d === "1" && email) {
+      const r = await sendCatalogEmail(email);
+      await logCatalogRequest(ctx, "email", email, r.sent);
+      if (!r.sent) {
+        sp(vr, ctx, "went_wrong");
+        return back(vr, "menu");
+      }
+      const g = keypad(vr, url("catalog-done"));
+      sp(g, ctx, "catalog_emailed");
+      vr.hangup(); // "Otherwise, you may hang up"
+      return vr;
+    }
+    if (d === "2") return back(vr, "catalog-email"); // start over
+    if (d === "*") return back(vr, "catalog-ending");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "catalog-final");
+  },
+
+  "catalog-done"(ctx, vr) {
+    if (ctx.body.Digits === "*") return back(vr, "menu");
     vr.hangup();
     return vr;
   },
@@ -734,6 +919,8 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("attraction-after", { m, t }));
     const type = ATTRACTIONS[t];
     if (m === "i") {
+      // A script still waiting for Abraham's OK never plays: straight back to the key 2 menu (no new wording)
+      if (promptWaiting(ctx.prompts, type.instr)) return back(vr, "instructions", { again: 1 });
       sp(g, ctx, type.instr);
       await track(ctx.callSid, "category_heard", `Heard the instructions for ${type.label}`, { category: type.label, kind: "instructions" });
     } else {
@@ -820,9 +1007,10 @@ const handlers: Record<string, Handler> = {
     await track(ctx.callSid, "category_heard", `Listened to ${cat.name}`, { category: cat.name, items: items.map((p) => p.name) });
     const g = keypad(vr, url("category-choice", { c }));
     sp(g, ctx, "book_category_list", { category: cat.spokenName || cat.name });
+    sp(g, ctx, "cart_key"); // Abraham (Phone Menu v3): the cart line before the items and again after them
     items.forEach((p, i) => sp(g, ctx, "category_item", { item: p.name, key: i + 1 }));
-    sp(g, ctx, "book_back"); // Abraham: star goes back one step (to the bookings menu)
     sp(g, ctx, "cart_key");
+    sp(g, ctx, "book_back"); // star goes back one step (to the bookings menu)
     return bookNoInput(vr, ctx, "category", { c });
   },
 
@@ -831,7 +1019,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (!d) return bookNoInput(vr, ctx, "category", { c });
     if (d === "*") return back(vr, "book"); // one step back: the bookings menu
-    if (d === "0") return back(vr, "cart");
+    if (d === "0") return back(vr, "cart", { c }); // after the cart, the same item list plays again
     const items = await phoneProducts(c);
     const p = items[Number(d) - 1];
     if (!p) {
@@ -1052,6 +1240,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "qty_invalid");
       return back(vr, "qty", { p: p.id, d: date });
     }
+    if (await isBounceHouse(p.categoryId)) sp(vr, ctx, "bounce_water_note"); // Abraham (Phone Menu v3): before a bounce house is added
     const session = ctx.session ?? (await ensureSession(ctx.callSid, ctx.from));
     // The held order for this day (one per rental day on the call)
     const existing = (await callOrders(ctx)).find((o) => o.order.eventDate === date) ?? null;
@@ -1103,23 +1292,30 @@ const handlers: Record<string, Handler> = {
   /** The whole cart: every day on this call, then one total. */
   async cart(ctx, vr) {
     const days = await callOrders(ctx);
+    const c = ctx.query.get("c") ?? undefined; // the item list the caller came from (Abraham, Phone Menu v3)
     if (!days.length) {
       sp(vr, ctx, "cart_empty");
-      return back(vr, "menu");
+      return c ? back(vr, "category", { c }) : back(vr, "book");
     }
-    const g = keypad(vr, url("cart-choice"));
+    const g = keypad(vr, url("cart-choice", { c }));
     sp(g, ctx, "cart_intro");
     for (const o of days) sp(g, ctx, "cart_day", { date: longDate(o.order.eventDate), items: o.items.map((i) => itemPhrase(i.qty, i.name)).join(", ") });
     sp(g, ctx, "cart_total", { total: spokenMoney(days.reduce((t, o) => t + o.order.subtotalCents, 0)) });
     sp(g, ctx, "cart_options");
+    // From an item list: once the cart has been read, the same item list plays again (Abraham, Phone Menu v3)
+    if (c) return back(vr, "category", { c });
     return noInput(vr, ctx, "cart");
   },
 
   async "cart-choice"(ctx, vr) {
     const d = ctx.body.Digits;
-    if (d === "*") return back(vr, "menu"); // star always returns to the main menu (as in the other sub-menus)
-    if (d === "1") return back(vr, "ask", { f: "name" });
-    if (d === "2") return back(vr, "book"); // keep shopping
+    const c = ctx.query.get("c") ?? undefined;
+    if (d === "*") return c ? back(vr, "category", { c }) : back(vr, "menu"); // star: one step back
+    if (d === "1") {
+      sp(vr, ctx, "checkout_tax_note"); // Abraham (Phone Menu v3): before checkout
+      return back(vr, "ask", { f: "name" });
+    }
+    if (d === "2") return c ? back(vr, "category", { c }) : back(vr, "book"); // keep shopping
     if (d === "3") {
       for (const o of await callOrders(ctx)) await cancelHold(o.order.id);
       await updateSession(ctx.callSid, { orderId: null, outcome: "browsing", data: { dayOrderIds: [], day: undefined } }, ctx.session);
@@ -1128,9 +1324,9 @@ const handlers: Record<string, Handler> = {
     }
     if (d) {
       sp(vr, ctx, "not_valid"); // # or any other key
-      return back(vr, "cart");
+      return back(vr, "cart", { c });
     }
-    return noInput(vr, ctx, "cart");
+    return c ? back(vr, "category", { c }) : noInput(vr, ctx, "cart");
   },
 
   /* ---- checkout: name -> address -> email -> phone -> finalize ---- */
@@ -1554,7 +1750,7 @@ const handlers: Record<string, Handler> = {
     const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
     const settings = await getSettings();
     const list = ringListFor(settings, k);
-    if (!list.targets.length || !officeOpenNow(new Date(), settings)) {
+    if (!list.targets.length || !(await lineRingsNowFor(k, settings))) {
       await updateSession(ctx.callSid, { data: { missed: "closed" } }, ctx.session); // dashboard: missed call
       return back(vr, "voicemail", { x: k }); // the extension's own box, with the approved greeting
     }
@@ -1593,9 +1789,11 @@ const handlers: Record<string, Handler> = {
       return vr;
     }
     const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
-    const list = ringListFor(await getSettings(), k);
+    const settings = await getSettings();
+    const list = ringListFor(settings, k);
     const next = Number(ctx.query.get("i") ?? -1) + 1;
-    if (list.mode !== "simultaneous" && next > 0 && next < list.targets.length) return dialTargets(vr, list, k, next, ctx.session?.fromNumber ?? ctx.from);
+    const steps = (list.mode === "simultaneous" ? 1 : list.targets.length) * ringAttempts(settings, k);
+    if (next > 0 && next < steps && (await lineRingsNowFor(k, settings))) return dialTargets(vr, list, k, next, ctx.session?.fromNumber ?? ctx.from);
     // Abraham's missed-call line, then straight to the voicemail beep
     await updateSession(ctx.callSid, { data: { missed: "no_answer" } }, ctx.session); // dashboard: missed call
     return back(vr, "voicemail", { x: k }); // pressed 2 or no answer on every number: the extension's voicemail
@@ -1608,7 +1806,7 @@ const handlers: Record<string, Handler> = {
   async whisper(ctx, vr) {
     const settings = await getSettings();
     const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
-    const text = staffAnnouncement(k, extensionName(settings, k));
+    const text = staffAnnouncement(k, extensionName(settings, k), settings[`ringAnnounce${k}`]);
     const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, action: url("whisper-accept"), method: "POST" });
     say(g, text);
     const again = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 6, action: url("whisper-accept"), method: "POST" });
@@ -1699,7 +1897,10 @@ const handlers: Record<string, Handler> = {
   async "vm-none-choice"(ctx, vr) {
     const b = ctx.query.get("b") ?? undefined;
     const x = ctx.query.get("x") ?? undefined;
-    if (ctx.body.Digits === "3") return vmRecord(vr, await boxById(Number(b) || null), x);
+    if (ctx.body.Digits === "3") {
+      sp(vr, ctx, "vm_rerecord");
+      return vmRecord(vr, await boxById(Number(b) || null), x);
+    }
     return back(vr, "vm-none", { b, x });
   },
 
@@ -1723,6 +1924,7 @@ const handlers: Record<string, Handler> = {
     }
     if (d === "3") {
       const box = await boxById(ctx.session?.data.vmBox ?? null);
+      sp(vr, ctx, "vm_rerecord");
       return vmRecord(vr, box, ctx.session?.data.vmKey ?? null);
     }
     // Wrong key: the options again

@@ -21,6 +21,7 @@ vi.mock("@/lib/ivr/session", () => ({
   getSession: async () => h.session,
   updateSession: async (_sid: string, patch: Record<string, unknown> & { data?: Record<string, unknown> }) => Object.assign(h.session, patch, patch.data ? { data: { ...h.session.data, ...patch.data } } : {}), // merges data like the real session
 }));
+vi.mock("@/lib/jewish-calendar", async (orig) => ({ ...(await orig<typeof import("@/lib/jewish-calendar")>()), isShabbosOrYomTov: () => false })); // ringing rules: weekday (Phone Menu v3)
 vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
 vi.mock("@/lib/business-hours", async (orig) => ({ ...(await orig<typeof import("@/lib/business-hours")>()), officeOpenNow: () => h.open }));
 vi.mock("@/lib/notify", () => ({
@@ -49,12 +50,13 @@ beforeEach(() => {
 });
 
 describe("hotline voicemail", () => {
-  it("office closed: the menu still offers 9 (voicemail) and 0; 0 goes to voicemail with the approved greeting", async () => {
+  it("office closed: the menu still offers 9 (feedback) and 0; 0 still rings (Phone Menu v3); 3 goes to voicemail with the approved greeting", async () => {
     const menu = await call("menu");
-    expect(menu).toContain("To leave a message in our general voicemail, press 9.");
+    expect(menu).toContain("For feedback and comments, press 9.");
     expect(menu).toContain("To speak with an operator, press 0.");
-    const closed = await call("ring", {}, "k=0");
-    expect(closed).toContain("/api/voice/voicemail?x=0");
+    expect(await call("ring", {}, "k=0")).toContain("<Dial");
+    const closed = await call("ring", {}, "k=4");
+    expect(closed).toContain("/api/voice/voicemail?x=4");
     expect(closed).not.toContain("Sorry, we missed your call"); // the voicemail greeting replaces the missed-call line
   });
 

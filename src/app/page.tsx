@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { websiteHoursLines } from "@/lib/business-hours";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
-import { BUSINESS_NAME_NB, keepName, whyLabel, whyRows, HOW_IT_WORKS_DELIVERY, WEBSITE_HOURS_NOTE, keepTimesTogether, noLonelyWord, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces, SERVICE_AREA_MAP_URL } from "@/lib/site-copy";
+import { BUSINESS_NAME_NB, CATALOG_LINE, keepName, whyLabel, whyRows, HOW_IT_WORKS_DELIVERY, WEBSITE_HOURS_NOTE, keepTimesTogether, noLonelyWord, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces, SERVICE_AREA_MAP_URL } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -145,6 +145,13 @@ export default async function Home() {
                 </article>
               ))}
             </div>
+            <p data-catalog-line className="mt-8 text-lg leading-relaxed text-hu-deep/85">
+              {CATALOG_LINE.before}
+              <a href={`mailto:${CATALOG_LINE.email}?subject=Catalog`} className="font-bold underline decoration-hu-yellow decoration-[3px] underline-offset-4">
+                {CATALOG_LINE.email}
+              </a>
+              {CATALOG_LINE.after}
+            </p>
           </div>
         </section>
 

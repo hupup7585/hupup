@@ -73,14 +73,14 @@ export const RING_KEYS = ["2", "4", "5", "6", "8", "0"] as const;
 export type RingKey = (typeof RING_KEYS)[number];
 
 /** The extension number callers press (and staff hear) for each line, plus key 9's voicemail-only box. */
-export const EXTENSION_NUMBER: Record<RingKey | "9", string> = { "2": "2", "4": "3", "5": "5", "6": "6", "8": "19", "0": "0", "9": "9" };
+export const EXTENSION_NUMBER: Record<RingKey | "9", string> = { "2": "2", "4": "3", "5": "5", "6": "6", "8": "", "0": "0", "9": "9" };
 
 export const RING_KEY_LABELS: Record<RingKey, string> = {
   "2": "Extension 2: Equipment instructions and guidance",
   "4": "Extension 3: Customer service",
   "5": "Extension 5: Questions or problems during a rental",
   "6": "Extension 6: Delivery and pickup information",
-  "8": "Bookings menu 9 (extension 19): Schools, corporate events and organizations",
+  "8": "Bookings menu 9: Schools and Corporate Orders (no extension number)",
   "0": "Extension 0: Operator",
 };
 
@@ -88,28 +88,31 @@ export const RING_KEY_LABELS: Record<RingKey, string> = {
 export const RING_KEY_DEFAULT_NAMES: Record<RingKey, string> = {
   "2": "Equipment Instructions and Guidance",
   "4": "Customer Service",
-  "5": "Questions or Problems During a Rental",
-  "6": "Delivery and Pickup Information",
-  "8": "Schools, Corporate Events and Organizations",
+  "5": "Rental Issues",
+  "6": "Delivery and Pickup",
+  "8": "Schools and Corporate Orders",
   "0": "Operator",
 };
 
 /** Key 9 is the general voicemail (feedback and comments greeting; no one rings). */
-export const FEEDBACK_KEY_DEFAULT_NAME = "General Voicemail";
+export const FEEDBACK_KEY_DEFAULT_NAME = "Feedback and Comments";
 
 export function extensionName(s: Partial<Record<`ringName${RingKey | "9"}`, string>>, k: RingKey | "9"): string {
   return (s[`ringName${k}`] || "").replace(/\s+/g, " ").trim() || (k === "9" ? FEEDBACK_KEY_DEFAULT_NAME : RING_KEY_DEFAULT_NAMES[k]);
 }
 
 /** "Extension 3, Customer Service": how a line or box is shown in alerts (the name always fresh from Admin). */
-export const extensionLabel = (s: Partial<Record<`ringName${RingKey | "9"}`, string>>, k: RingKey | "9") => `Extension ${EXTENSION_NUMBER[k]}, ${extensionName(s, k)}`;
+export const extensionLabel = (s: Partial<Record<`ringName${RingKey | "9"}`, string>>, k: RingKey | "9") =>
+  EXTENSION_NUMBER[k] ? `Extension ${EXTENSION_NUMBER[k]}, ${extensionName(s, k)}` : extensionName(s, k); // schools and corporate: no number
 
 /**
  * What a staff member hears when they answer a forwarded call (Abraham, approved word for word; the extension number
  * and name come from Admin): "Call from Hup Up Attractions, extension 3, Customer Service. Press 1 to accept, or
  * press 2 to reject."
  */
-export function staffAnnouncement(k: RingKey, name: string): string {
+export function staffAnnouncement(k: RingKey, name: string, custom?: string | null): string {
+  if (custom?.trim()) return custom.trim(); // edited in Admin
+  if (!EXTENSION_NUMBER[k]) return `Call from Hup Up Attractions, ${name} extension. Press 1 to accept, or press 2 to reject.`;
   return `Call from Hup Up Attractions, extension ${EXTENSION_NUMBER[k]}, ${name}. Press 1 to accept, or press 2 to reject.`;
 }
 
@@ -125,4 +128,40 @@ export function ringListFor(s: RingSettings, key: RingKey): { targets: RouteTarg
     if (own.length) return { targets: own, mode: s[`ringMode${key}`] || "sequential", accept: s[`ringAccept${key}`] !== false, usesOperatorList: false };
   }
   return { targets: routeTargets(s), mode: s.operatorMode, accept: s.operatorAcceptPrompt, usesOperatorList: key !== "0" };
+}
+
+/* ---------------- When a line rings (Abraham, Phone Menu v3) ---------------- */
+
+/** How many times the list rings before voicemail (each ring = that number's ring seconds). */
+export function ringAttempts(s: Partial<Record<`ringAttempts${RingKey}`, string | number>>, k: RingKey): number {
+  const n = Number(s[`ringAttempts${k}`] ?? 3);
+  return Number.isFinite(n) && n >= 1 && n <= 5 ? Math.round(n) : 3;
+}
+
+/** Minutes since local midnight in New York. */
+function nyMinutes(at: Date) {
+  const [h, m] = new Intl.DateTimeFormat("en-GB", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(at).split(":").map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * Does this line ring right now? During office hours every line rings. Shabbos and Yom Tov (and from candle lighting
+ * on Erev): nothing rings. After hours only lines with the after-hours switch on ring; key 6 only 8:00 AM to 10:30 PM,
+ * and on Friday and Erev Yom Tov only until 4:00 PM or an hour before candle lighting, whichever is earlier.
+ */
+export function lineRingsNow(
+  k: RingKey,
+  at: Date,
+  s: Partial<Record<`ringAfterHours${RingKey}`, boolean>>,
+  cal: { officeOpen: boolean; shabbosOrYomTov: boolean; candleLighting: Date | null },
+): boolean {
+  if (cal.shabbosOrYomTov) return false;
+  if (cal.candleLighting && at >= cal.candleLighting) return false;
+  if (cal.officeOpen) return true;
+  if (!s[`ringAfterHours${k}`]) return false;
+  if (k !== "6") return true;
+  const now = nyMinutes(at);
+  let end = 22 * 60 + 30;
+  if (cal.candleLighting) end = Math.min(16 * 60, nyMinutes(new Date(cal.candleLighting.getTime() - 60 * 60_000)));
+  return now >= 8 * 60 && now < end;
 }

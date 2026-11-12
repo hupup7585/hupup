@@ -37,7 +37,12 @@ vi.mock("@/lib/ivr/session", () => ({
     if (patch.data) h.session.data = { ...h.session.data, ...patch.data };
   },
 }));
-vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
+// The promo steps wait for Abraham's OK (they never play until approved); these tests check them as approved.
+vi.mock("@/lib/ivr/prompts", async (orig) => {
+  const m = await orig<typeof import("@/lib/ivr/prompts")>();
+  const approved = Object.fromEntries(Object.keys(m.PROMPTS).filter((k) => k.startsWith("promo_")).map((k) => [k, { text: null, audioUrl: null, approvedAt: new Date() }]));
+  return { ...m, loadPromptOverrides: async () => approved };
+});
 vi.mock("@/lib/sms-consent", async (orig) => ({
   ...(await orig<typeof import("@/lib/sms-consent")>()),
   consentState: async () => h.state,

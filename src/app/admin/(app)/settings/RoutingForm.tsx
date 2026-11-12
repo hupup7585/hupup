@@ -11,11 +11,12 @@ export default function RoutingForm({
   summary,
 }: {
   ringKey: RingKey;
-  initial: { targets: string; mode: string; accept: boolean; name?: string };
+  initial: { targets: string; mode: string; accept: boolean; name?: string; attempts?: string; afterHours?: boolean; announce?: string };
   summary: string;
 }) {
   const [state, action, pending] = useActionState(saveRoutingAction, null);
   const [name, setName] = useState(initial.name ?? "");
+  const [announce, setAnnounce] = useState(initial.announce ?? "");
   return (
     <form action={action} className="grid gap-4" data-ring-key={ringKey}>
       <input type="hidden" name="ringKey" value={ringKey} />
@@ -23,10 +24,31 @@ export default function RoutingForm({
       <label className="block">
         <span className="label">Extension name (staff hear it when they answer)</span>
         <input name="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className="input" placeholder={RING_KEY_DEFAULT_NAMES[ringKey]} />
+      </label>
+      <label className="block">
+        <span className="label">What staff hear when they answer (leave empty for the standard announcement)</span>
+        <textarea name="announce" value={announce} onChange={(e) => setAnnounce(e.target.value)} rows={2} maxLength={300} className="input" placeholder={staffAnnouncement(ringKey, name.trim() || RING_KEY_DEFAULT_NAMES[ringKey])} />
         <span className="mt-1 block text-sm" data-announcement>
-          Staff hear: &ldquo;{staffAnnouncement(ringKey, name.trim() || RING_KEY_DEFAULT_NAMES[ringKey])}&rdquo;
+          Staff hear: &ldquo;{staffAnnouncement(ringKey, name.trim() || RING_KEY_DEFAULT_NAMES[ringKey], announce)}&rdquo;
         </span>
       </label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block">
+          <span className="label">Times to ring the list before voicemail</span>
+          <select name="attempts" defaultValue={initial.attempts || "3"} className="input">
+            {["1", "2", "3", "4", "5"].map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 font-semibold">
+          <input type="checkbox" name="afterHours" defaultChecked={Boolean(initial.afterHours)} />
+          {ringKey === "6" ? "Ring after hours (8:00 AM to 10:30 PM; Friday and Erev Yom Tov until 4:00 PM or an hour before candle lighting)" : "Ring after hours too"}
+        </label>
+      </div>
+      <p className="text-xs text-muted">Shabbos and Yom Tov: nothing rings; callers go to this line&rsquo;s voicemail.</p>
       <label className="block">
         <span className="label">Numbers to ring, one per line: Name | phone | seconds to ring (5 to 60)</span>
         <textarea name="targets" rows={3} defaultValue={initial.targets} className="input font-mono text-sm" placeholder={"Sara office phone | (845) 555-0123 | 20\nMoshe mobile | (845) 555-0145 | 15"} />

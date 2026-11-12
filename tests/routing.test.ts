@@ -15,6 +15,7 @@ vi.mock("@/lib/ivr/session", () => ({
   getSession: async (sid: string) => (sid === "CArt1" ? h.session : null),
   updateSession: async (_sid: string, patch: Record<string, unknown> & { data?: Record<string, unknown> }) => Object.assign(h.session, patch, patch.data ? { data: { ...h.session.data, ...patch.data } } : {}), // merges data like the real session
 }));
+vi.mock("@/lib/jewish-calendar", async (orig) => ({ ...(await orig<typeof import("@/lib/jewish-calendar")>()), isShabbosOrYomTov: () => false })); // ringing rules: weekday (Phone Menu v3)
 vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
 vi.mock("@/lib/business-hours", async (orig) => ({ ...(await orig<typeof import("@/lib/business-hours")>()), officeOpenNow: () => true }));
 vi.mock("@/lib/notify", () => ({ sendSms: async () => ({ sent: true }), sendEmail: async () => ({ sent: true }) }));
@@ -69,8 +70,15 @@ describe("sequential: one after another, each must press 1", () => {
     expect(second).toContain(">+18455550100</Number>");
     const third = await call("operator-done", { DialCallStatus: "busy" }, "i=1&k=0");
     expect(third).toContain(">+18455550111</Number>");
-    const end = await call("operator-done", { DialCallStatus: "no-answer" }, "i=2&k=0");
+    // Abraham (Phone Menu v3): the whole list rings 3 times (Admin: ring attempts), then the extension's voicemail
+    const round2 = await call("operator-done", { DialCallStatus: "no-answer" }, "i=2&k=0");
+    expect(round2).toMatch(/timeout="20"[^>]*operator-done\?i=3&amp;k=0/);
+    expect(round2).toContain(">+18455550177</Number>");
+    const end = await call("operator-done", { DialCallStatus: "no-answer" }, "i=8&k=0");
     expect(end).toContain("/api/voice/voicemail?x=0"); // the greeting, then the tone
+    await saveSetting("ringAttempts0", "1");
+    expect(await call("operator-done", { DialCallStatus: "no-answer" }, "i=2&k=0")).toContain("/api/voice/voicemail?x=0");
+    await saveSetting("ringAttempts0", "3");
     expect(await call("operator-done", { DialCallStatus: "completed" }, "i=1&k=0")).toContain("<Hangup/>");
   });
 });
@@ -81,8 +89,10 @@ describe("simultaneous: everyone at once, first to press 1 wins", () => {
     const xml = await call("ring", {}, "k=0");
     expect(xml).toMatch(/<Dial [^>]*timeout="20"/);
     expect((xml.match(/<Number /g) || []).length).toBe(3);
-    expect(xml).not.toContain("?i=");
-    expect(await call("operator-done", { DialCallStatus: "no-answer" })).toContain("/api/voice/voicemail?x=0");
+    expect(xml).toContain("operator-done?i=0&amp;k=0");
+    // all at once, 3 times over, then voicemail
+    expect((await call("operator-done", { DialCallStatus: "no-answer" }, "i=0&k=0")).match(/<Number /g)?.length).toBe(3);
+    expect(await call("operator-done", { DialCallStatus: "no-answer" }, "i=2&k=0")).toContain("/api/voice/voicemail?x=0");
   });
 });
 

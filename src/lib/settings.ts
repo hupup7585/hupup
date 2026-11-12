@@ -73,6 +73,30 @@ export const SETTING_DEFAULTS = {
    * rental), 6 (delivery and pickup) and 8 (schools, corporate events and organizations; the list key 2 had before
    * Nov 8, 2026). Same format as operatorTargets. Empty = ring the operator list (key 0).
    */
+  /*
+   * Abraham (Phone Menu v3): each line rings its list this many times (25 seconds a ring, set per number), then
+   * that line's voicemail. After hours: 0 and 5 still ring, 6 rings 8:00 AM to 10:30 PM (Friday and Erev Yom Tov
+   * until 4:00 PM or an hour before candle lighting, whichever is earlier); the rest go to voicemail. Shabbos and
+   * Yom Tov: nothing rings. The announcement staff hear is editable per line (empty = the standard one).
+   */
+  ringAttempts0: "3",
+  ringAttempts2: "3",
+  ringAttempts4: "3",
+  ringAttempts5: "3",
+  ringAttempts6: "3",
+  ringAttempts8: "3",
+  ringAfterHours0: true,
+  ringAfterHours2: false,
+  ringAfterHours4: false,
+  ringAfterHours5: true,
+  ringAfterHours6: true,
+  ringAfterHours8: false,
+  ringAnnounce0: "",
+  ringAnnounce2: "",
+  ringAnnounce4: "",
+  ringAnnounce5: "",
+  ringAnnounce6: "",
+  ringAnnounce8: "",
   /** Extension names staff hear in the call announcement (empty = the default name for that key). */
   ringName0: "",
   ringName2: "",

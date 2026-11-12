@@ -18,6 +18,7 @@ vi.mock("@/lib/ivr/session", () => ({
   getSession: async () => h.session,
   updateSession: async (_sid: string, patch: Record<string, unknown> & { data?: Record<string, unknown> }) => Object.assign(h.session, patch, patch.data ? { data: { ...h.session.data, ...patch.data } } : {}), // merges data like the real session
 }));
+vi.mock("@/lib/jewish-calendar", async (orig) => ({ ...(await orig<typeof import("@/lib/jewish-calendar")>()), isShabbosOrYomTov: () => false })); // ringing rules: weekday (Phone Menu v3)
 vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
 vi.mock("@/lib/business-hours", async (orig) => ({ ...(await orig<typeof import("@/lib/business-hours")>()), officeOpenNow: () => h.open, lateHoursToday: () => null }));
 vi.mock("@/lib/notify", () => ({ sendSms: async () => ({ sent: true }), sendEmail: async () => ({ sent: true }) }));
@@ -52,14 +53,15 @@ const MENU = [
   "For delivery and pickup information, press 6.",
   "To hear our hours of operation, press 7.",
   "To receive our catalog by text or email, press 8.",
-  "To leave a message in our general voicemail, press 9.",
+  "For feedback and comments, press 9.", // Abraham, Phone Menu v3
   "To speak with an operator, press 0.",
 ];
 const HI = "Hi! Thank you for calling Hup Up Attractions!";
 const SLOGAN = "Bringing something special to every occasion!";
 const INTRO = ["If you know your desired extension, you may press it at any time.", "To receive our catalog by text or email, press 8."];
 const GREETING = HI;
-const FULL = [HI, SLOGAN, ...INTRO, ...MENU];
+const OUTRO = ["To hear this menu again, press the star key.", "Thank you for choosing Hup Up Attractions."]; // Abraham, Phone Menu v3
+const FULL = [HI, SLOGAN, ...INTRO, ...MENU, ...OUTRO];
 const gatherOf = (xml: string) => xml.slice(xml.indexOf("<Gather"), xml.indexOf("</Gather>"));
 const saidIn = (xml: string) => [...gatherOf(xml).matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&amp;/g, "&"));
 
@@ -77,7 +79,7 @@ describe("Abraham's main menu wording (approved Nov 8, 2026)", () => {
   it("any valid key works at any time: the whole menu, greeting included, is one Gather", async () => {
     const xml = await call("menu", {}, "first=1");
     expect(xml.indexOf("<Gather")).toBeLessThan(xml.indexOf(GREETING)); // the keypad is listening before the first word
-    expect(xml.indexOf("</Gather>")).toBeGreaterThan(xml.lastIndexOf(MENU[MENU.length - 1]));
+    expect(xml.indexOf("</Gather>")).toBeGreaterThan(xml.lastIndexOf(OUTRO[OUTRO.length - 1]));
     for (const k of ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "*"]) expect(await press(k)).not.toContain("Oops");
   });
   it("star replays the entire main menu, from the greeting", async () => {
@@ -110,7 +112,7 @@ describe("Abraham's main menu wording (approved Nov 8, 2026)", () => {
     const said = saidIn(await call("menu", {}, "first=1"));
     expect(said.slice(0, 2)).toEqual([HI, SLOGAN]);
     expect(said[2]).toBe("Our office is closed right now, but you can book anytime using this automated system.");
-    expect(said.slice(3)).toEqual([...INTRO, ...MENU]);
+    expect(said.slice(3)).toEqual([...INTRO, ...MENU, ...OUTRO]);
   });
 });
 
@@ -144,13 +146,15 @@ describe("every key, office open", () => {
     expect(await call("ring", {}, "k=2")).toContain(">+18455550123</Number>");
   });
   it("no one answers: that extension's own voicemail (the greeting, then the tone)", async () => {
-    const xml = await call("operator-done", { DialCallStatus: "no-answer" }, "i=0&k=8");
+    // Abraham (Phone Menu v3): the list rings 3 times; after the third no-answer, that extension's voicemail
+    expect(await call("operator-done", { DialCallStatus: "no-answer" }, "i=0&k=8")).toContain("operator-done?i=1&amp;k=8");
+    const xml = await call("operator-done", { DialCallStatus: "no-answer" }, "i=2&k=8");
     expect(xml).not.toContain(MISSED);
     expect(redirect(xml)).toBe("voicemail?x=8");
   });
   it("missed calls are marked for the dashboard: no answer, or office closed", async () => {
     h.session.data = {};
-    await call("operator-done", { DialCallStatus: "no-answer" }, "i=0&k=8");
+    await call("operator-done", { DialCallStatus: "no-answer" }, "i=2&k=8");
     expect(h.session.data.missed).toBe("no_answer");
     h.session.data = {};
     await call("operator-done", { DialCallStatus: "completed" }, "i=0&k=8");
@@ -260,22 +264,23 @@ describe("menus are keys only (Abraham): no speech in any menu", () => {
     const { readFileSync } = await import("node:fs");
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(flow).not.toContain("category-speech");
-    expect((flow.match(/= speech\(vr, url\("(\w|-)+"/g) || []).map((m) => m.match(/url\("([\w-]+)"/)![1]).sort()).toEqual(["catalog-email-heard", "heard", "sms-consent-answer"]); // the booking date is keys only (Abraham, Nov 9); key 8 asks for an email
+    expect((flow.match(/= speech\(vr, url\("(\w|-)+"/g) || []).map((m) => m.match(/url\("([\w-]+)"/)![1]).sort()).toEqual(["heard", "sms-consent-answer"]); // the booking date is keys only (Abraham, Nov 9); key 8 has its own say-or-type steps
   });
 });
 
 describe("every key, office closed", () => {
-  it("1 books and 2 and 4 play their information 24/7; 3, 5, 6 and 0 go to their own voicemail; 9 is voicemail", async () => {
+  it("1 books and 2 and 4 play their information 24/7; 3 and corporate go to voicemail; 0 and 5 still ring (Abraham, Phone Menu v3); 9 is voicemail", async () => {
     h.open = false;
     expect(redirect(await press("1"))).toBe("book");
     expect(redirect(await press("2"))).toBe("instructions");
     expect(redirect(await press("4"))).toBe("learn");
     expect(redirect(await press("3"))).toBe("ring?k=4");
-    for (const k of ["2", "4", "5", "6", "8", "0"]) {
+    for (const k of ["2", "4", "8"]) {
       const xml = await call("ring", {}, `k=${k}`);
       expect(xml).not.toContain("<Dial");
       expect(redirect(xml)).toBe(`voicemail?x=${k}`);
     }
+    for (const k of ["0", "5"]) expect(await call("ring", {}, `k=${k}`), k).toContain("<Dial");
     expect(redirect(await press("7"))).toBe("hours");
     expect(redirect(await press("9"))).toBe("voicemail?x=9");
   });

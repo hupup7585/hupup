@@ -28,7 +28,7 @@ vi.mock("@/lib/notify", () => ({
 
 import { db, schema } from "@/lib/db";
 import { handleVoice } from "@/lib/ivr/flow";
-import { CATALOG_PHONE_MODE, catalogEmail } from "@/lib/catalog-send";
+import { catalogEmail } from "@/lib/catalog-send";
 
 const OWNER = "+18457777585";
 const call = (action: string, body: Record<string, string> = {}, query = "", from = OWNER) =>
@@ -48,34 +48,51 @@ beforeEach(() => {
   h.session.data = {};
 });
 
-describe("key 8: catalog", () => {
-  it("not live yet: only the Owner's phone hears the proposed steps; other callers go to customer service", async () => {
-    expect(CATALOG_PHONE_MODE).toBe("owner_test");
-    expect(redirect(await call("catalog", {}, "", "+18455550100"))).toBe("ring?k=4");
-    const xml = plain(await call("catalog"));
-    expect(xml).toContain("We'd love to send you our catalog. To get it by email, press 1. To get it by text, press 2. To go back, press star.");
-    expect(xml).toContain("/api/voice/catalog"); // repeats until a key or hang-up
-  });
-  it("email: say the address, hear it back, 1 sends the catalog from Admin; star goes back", async () => {
+describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
+  it("live for every caller: 1 text, 2 email, star back", async () => {
+    const xml = plain(await call("catalog", {}, "", "+18455550100"));
+    expect(xml).toContain("To receive our catalog by text, press 1. To get it by email, press 2. To go back, press star.");
     expect(redirect(await call("catalog-choice", { Digits: "*" }))).toBe("menu");
-    expect(redirect(await call("catalog-choice", { Digits: "1" }))).toBe("catalog-email");
-    expect(plain(await call("catalog-email"))).toContain("Please say your email address");
-    const heard = plain(await call("catalog-email-heard", { SpeechResult: "yossi at gmail dot com" }));
-    expect(heard).toContain("I heard y o s s i, at gmail dot com. If that's correct, press 1. To try again, press 2.");
-    expect(redirect(await call("catalog-email-confirm", { Digits: "2" }))).toBe("catalog-email");
-    const done = plain(await call("catalog-email-confirm", { Digits: "1" }));
-    expect(done).toContain("Done! We just emailed you our catalog.");
+    expect(redirect(await call("catalog-choice", { Digits: "2" }))).toBe("catalog-email");
+  });
+  it("email by keypad: the first part, the ending, the final check; 1 sends the catalog from Admin, logged on the contact", async () => {
+    expect(redirect(await call("catalog-email"))).toBe("catalog-part?part=local");
+    const part = plain(await call("catalog-part", {}, "part=local"));
+    expect(part).toContain("Please enter the first part of your email address, up to the at symbol.");
+    expect(part).toContain("/audio/tone.wav"); // no key: the tone, then spoken letters
+    expect(part.indexOf("tone.wav")).toBeGreaterThan(part.indexOf("first part"));
+    // 9 9 9 = y, 6 6 6 = o, 7 7 7 7 = s, star, 7 7 7 7 = s, 4 4 4 = i (the first 9 came in the first step)
+    const typing = plain(await call("catalog-key", { Digits: "9" }, "part=local"));
+    expect(typing).toContain("To type, press each key once, twice, or three times for its letter.");
+    expect(redirect(await call("catalog-typed", { Digits: "996667777*7777444" }, "part=local"))).toBe("catalog-got?part=local");
+    expect(plain(await call("catalog-got", {}, "part=local"))).toContain("We got y o s s i. To continue, press pound. To start over, press 1. To add more, press 2.");
+    expect(redirect(await call("catalog-got-choice", { Digits: "#" }, "part=local"))).toBe("catalog-ending");
+    expect(plain(await call("catalog-ending"))).toContain("For at gmail dot com, press 1.");
+    expect(redirect(await call("catalog-ending-choice", { Digits: "1" }))).toBe("catalog-final");
+    expect(plain(await call("catalog-final"))).toContain("Your email address is y o s s i, at gmail dot com. If that's correct, press 1. To start over, press 2.");
+    const done = plain(await call("catalog-final-choice", { Digits: "1" }));
+    expect(done).toContain("We just emailed you our catalog!");
     expect(done).toContain("<Hangup/>");
     expect(h.emails).toHaveLength(1);
     expect(h.emails[0].to).toBe("yossi@gmail.com");
     expect(h.emails[0].subject).toBe("Hup Up Attractions catalog");
     expect(h.emails[0].text).toContain("Royal Castle: A big castle with a slide.");
-    expect(h.emails[0].text).toContain("https://hupup.example/#rentals");
+    const log = await db.select().from(schema.auditLog);
+    expect(log.some((r) => r.action === "catalog.sent")).toBe(true);
+  });
+  it("email by voice: spoken letters; 2 adds more; star goes back one step", async () => {
+    await call("catalog-email");
+    expect(redirect(await call("catalog-said", { SpeechResult: "M O S H E" }, "part=local"))).toBe("catalog-got?part=local");
+    expect(redirect(await call("catalog-got-choice", { Digits: "2" }, "part=local"))).toBe("catalog-part?part=local&add=1");
+    await call("catalog-said", { SpeechResult: "dot k" }, "part=local&add=1");
+    expect(plain(await call("catalog-got", {}, "part=local"))).toContain("We got m o s h e dot k.");
+    expect(redirect(await call("catalog-ending-choice", { Digits: "*" }))).toBe("catalog-got?part=local");
+    expect(redirect(await call("catalog-ending-choice", { Digits: "5" }))).toBe("catalog-part?part=domain");
   });
   it("text: until Twilio approves texting, the phone offers email instead; no promo sign-up ever", async () => {
     const prev = process.env.VERCEL_ENV;
     process.env.VERCEL_ENV = "production"; // live site, texting not approved
-    const xml = plain(await call("catalog-choice", { Digits: "2" }));
+    const xml = plain(await call("catalog-choice", { Digits: "1" }));
     expect(xml).toContain("Sorry, we can't send it by text just yet. Let's send it by email instead.");
     expect(redirect(xml)).toBe("catalog-email");
     expect(h.sms).toHaveLength(0);

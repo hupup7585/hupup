@@ -24,6 +24,7 @@ vi.mock("@/lib/ivr/session", () => ({
     if (data) h.session.data = { ...h.session.data, ...data };
   },
 }));
+vi.mock("@/lib/jewish-calendar", async (orig) => ({ ...(await orig<typeof import("@/lib/jewish-calendar")>()), isShabbosOrYomTov: () => false })); // ringing rules: weekday (Phone Menu v3)
 vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
 vi.mock("@/lib/notify", () => ({
   sendSms: async () => ({ sent: true }),
@@ -188,7 +189,7 @@ describe("every path", () => {
   it("office closed (after hours, Shabbos, Yom Tov): Abraham's closed greeting in every box except key 9", async () => {
     h.open = false;
     const closed = plain(await call("voicemail", {}, "x=4"));
-    expect(closed).toContain("Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you on the next business day. When you are finished, you may hang up or press the pound key.");
+    expect(closed).toContain("Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key."); // Abraham, Phone Menu v3
     expect(closed).not.toContain("Our team is assisting other customers right now");
     expect(plain(await call("voicemail", {}, "x=0"))).toContain("Our office is closed right now.");
     expect(plain(await call("voicemail", {}, "x=9"))).toContain(PROMPTS.vm9_greeting.text); // key 9 keeps its own greeting
@@ -214,7 +215,7 @@ describe("every path", () => {
 
 describe("key 9: feedback and comments (Abraham, word for word)", () => {
   it("own greeting and confirmation; same tone, # and 1, 2, 3 options; its own box", async () => {
-    expect(PROMPTS.vm9_greeting.text).toBe("Thank you for your time. We love to hear from you, and your feedback helps us improve our service. Please share your comments after the tone. If you would like a call back, please say your name and phone number. When you are finished, you may hang up or press the pound key.");
+    expect(PROMPTS.vm9_greeting.text).toBe("Thank you for your time. We want to hear from you, your feedback helps us improve our service. Please share your comments after the tone. If you would like a callback, please say your name and phone number. When you're finished, you may hang up or press the pound key.");
     expect(PROMPTS.vm9_sent.text).toBe("Thank you for your feedback! We truly appreciate it. Goodbye!");
     expect(plain(await call("menu-choice", { Digits: "9" }))).toContain("/api/voice/voicemail?x=9");
     const xml = plain(await call("voicemail", {}, "x=9"));
@@ -222,7 +223,7 @@ describe("key 9: feedback and comments (Abraham, word for word)", () => {
     expect(xml).not.toContain(PROMPTS.vm_greeting.text);
     expect(xml).toMatch(/<Record [^>]*finishOnKey="#"/);
     const b9 = await boxForKey("9");
-    expect(b9.name).toBe("Extension 9, General Voicemail");
+    expect(b9.name).toBe("Extension 9, Feedback and Comments");
     expect(b9.id).not.toBe((await mainBox()).id);
     await call("vm-recorded", rec("RE9", { Digits: "#" }), `b=${b9.id}&x=9`);
     expect(plain(await call("vm-options"))).toContain("To delete and re-record, press 3.");
@@ -252,6 +253,6 @@ describe("alerts say which box, first (Abraham)", () => {
     h.session.callSid = "CAfeedback";
     await call("vm-recorded", rec("REa9", { Digits: "hangup" }), `b=${b9.id}&x=9`);
     await ready("REa9", b9.id);
-    expect(h.emails.at(-1)!.subject).toBe("New voicemail - Extension 9, General Voicemail - (845) 555-0166");
+    expect(h.emails.at(-1)!.subject).toBe("New voicemail - Extension 9, Feedback and Comments - (845) 555-0166");
   });
 });
