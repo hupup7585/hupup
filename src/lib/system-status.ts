@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { NEW_EMAIL_LIVE } from "@/lib/config";
 import { SMS_TERMS_V2_LIVE } from "@/lib/sms-terms-v2";
+import { PAY_ENV_NAMES, phonePayConfigured } from "@/lib/phone-pay";
 
 /**
  * Abraham EE: "Everything should work and run real." This lists every feature that can't run for real yet because of
@@ -41,10 +42,12 @@ export async function blockers(env: Record<string, string | undefined> = process
     },
     {
       key: "keypad-pay",
-      area: "Pay by keypad during the call",
+      area: "Pay by keypad during the call (Stripe)",
       active: false,
-      reason: "Prepared only. Waiting for Sola and Shuttle to confirm the Twilio Pay connection and fees, then Abraham's approval. Keys go in Vercel as SOLA_API_KEY and SOLA_IFIELDS_KEY.",
-      where: "/admin/orders",
+      reason: phonePayConfigured(env)
+        ? "Owner test calls only (Stripe test mode). Goes live for every caller after Abraham approves the pay prompts and a real test payment."
+        : `Needs the payment subaccount in Vercel: ${PAY_ENV_NAMES.filter((k) => !env[k]).join(", ")} (and TWILIO_PAY_CONNECTOR if the Stripe connector isn't named Stripe_Connector).`,
+      where: "/admin/phone/prompts",
     },
     {
       key: "google-voice",

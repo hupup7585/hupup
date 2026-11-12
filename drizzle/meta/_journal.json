@@ -253,6 +253,13 @@
       "when": 1794511356511,
       "tag": "0035_sola_payment_result",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794512486405,
+      "tag": "0036_stripe_phone_pay",
+      "breakpoints": true
     }
   ]
 }

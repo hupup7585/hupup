@@ -1,28 +1,76 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { toE164 } from "@/lib/phone";
+
 /**
- * Pay by keypad during the call (Abraham, Nov 12, 2026, section 14). Prepared only: NOT ACTIVE YET.
+ * Pay by keypad during the call, through Stripe (Abraham, Nov 12, 2026). Sola stays for website payments.
  *
- * Plan (nothing below is built until Abraham approves, and no money is spent):
- *  - Right after the full order read-back, the caller pays by keypad with Twilio <Pay>. The card goes from Twilio
- *    straight to Sola (only if Sola accepts Twilio's Generic Pay Connector itself) or through the Shuttle Pay
- *    Connector, so card numbers never reach our server. We never build an endpoint that receives card numbers.
- *  - Twilio PCI mode and the connector are turned on only after Abraham's yes (PCI mode can't be turned off).
- *  - The payment link by email (text once approved) stays as the backup, e.g. when a card is declined.
- *  - Result saved on the order (orders table, shown on the order page in Admin and in the orders sheet):
- *    payment result (approved / declined), card brand and last 4 digits, Sola reference number, amount, date and time,
- *    and the order's payment status (paid, or still waiting with the link sent).
+ * How it works:
+ *  - After the full order read-back, the main hotline call is passed (Dial to a SIP domain) to a separate Twilio
+ *    subaccount used only for payments, with PCI mode on there and the Stripe Pay Connector installed. The main
+ *    account and its logs stay as they are; PCI mode is never turned on there.
+ *  - In the subaccount, Twilio <Pay> collects card number, expiration, security code and billing ZIP by keypad and
+ *    charges the order total (items + delivery + tax) through Stripe. The card digits stay inside Twilio Pay: our
+ *    server only ever receives Twilio's masked number, and only its last 4 digits are kept.
+ *  - The result posts back to /api/pay-voice: Paid or Declined on the order with date and time, the Stripe payment ID
+ *    and last 4. When the payment leg ends, the main call continues; if the order isn't paid, the Sola payment link
+ *    is emailed instead (texted too once Twilio approves texting).
  *
- * Vercel variable names (Abraham adds the values himself; never in chat): SOLA_API_KEY (the "Website" API key) and
- * SOLA_IFIELDS_KEY (the iFields key). Still open: SOLA_PAYMENTSITE_NAME and SOLA_WEBHOOK_PIN.
+ * Who hears it: STRIPE_PHONE_PAY_MODE. "owner_test" = only calls from the Owner's own phone (ADMIN_PHONE), for
+ * Abraham's Stripe test-mode call; every other caller gets the payment link as before. "live" only after Abraham
+ * approves a real test and the pay prompts. It also needs the subaccount settings below in Vercel.
+ *
+ * Vercel variables the code reads (Abraham/Hark add the values; never in chat):
+ *   TWILIO_PAY_ACCOUNT_SID   the payment subaccount's Account SID
+ *   TWILIO_PAY_AUTH_TOKEN    the payment subaccount's Auth Token (checks that requests really come from it)
+ *   TWILIO_PAY_SIP_DOMAIN    the subaccount's SIP domain, e.g. hupup-pay.sip.twilio.com
+ *   TWILIO_PAY_SIP_USERNAME  a credential on that SIP domain's credential list
+ *   TWILIO_PAY_SIP_PASSWORD  its password
+ *   TWILIO_PAY_CONNECTOR     the Stripe Pay Connector's unique name in the subaccount (default "Stripe_Connector")
+ * The Stripe keys are connected inside Twilio's Stripe Pay Connector; this code doesn't read them.
  */
-export type KeypadPayMode = "off" | "live";
-export const KEYPAD_PAY_MODE: KeypadPayMode = "off";
+export type PhonePayMode = "off" | "owner_test" | "live";
+export const STRIPE_PHONE_PAY_MODE: PhonePayMode = "owner_test";
 
-export const KEYPAD_PAY_NOT_ACTIVE_REASON =
-  "Waiting for Sola and Shuttle to confirm how Twilio Pay reaches Sola and the fees, then Abraham's approval (Twilio PCI mode, the connector).";
+export const PAY_ENV_NAMES = ["TWILIO_PAY_ACCOUNT_SID", "TWILIO_PAY_AUTH_TOKEN", "TWILIO_PAY_SIP_DOMAIN", "TWILIO_PAY_SIP_USERNAME", "TWILIO_PAY_SIP_PASSWORD"] as const;
 
-/** Where the keypad payment step sits: right after the order read-back. Off = the payment link (backup) as today. */
-export function keypadPayOn(mode: KeypadPayMode = KEYPAD_PAY_MODE) {
-  return mode === "live";
+export function phonePayConfigured(env: Record<string, string | undefined> = process.env) {
+  return PAY_ENV_NAMES.every((k) => Boolean(env[k]));
 }
 
-export const ORDER_PAYMENT_FIELDS_PLANNED = ["paymentResult", "cardBrand", "cardLast4", "solaRefNum", "paidAmountCents", "paidAt", "paymentStatus"] as const;
+/** Does this caller get keypad payment right after the read-back? */
+export function keypadPayFor(callerFrom: string | null | undefined, mode: PhonePayMode = STRIPE_PHONE_PAY_MODE, env: Record<string, string | undefined> = process.env): boolean {
+  if (mode === "off" || !phonePayConfigured(env)) return false;
+  if (mode === "live") return true;
+  const caller = toE164(callerFrom);
+  return Boolean(caller && caller === (toE164(env.ADMIN_PHONE) ?? "+18457777585"));
+}
+
+/** Older name kept for the read-back step. */
+export function keypadPayOn() {
+  return STRIPE_PHONE_PAY_MODE === "live" && phonePayConfigured();
+}
+
+export const payConnector = (env: Record<string, string | undefined> = process.env) => env.TWILIO_PAY_CONNECTOR || "Stripe_Connector";
+
+/** The order travels to the subaccount in SIP headers, signed so it can't be changed on the way. */
+const sigFor = (orderId: number, callSid: string) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`phone-pay:${orderId}:${callSid}`).digest("hex").slice(0, 32);
+
+export function paySipUri(orderId: number, callSid: string, env: Record<string, string | undefined> = process.env): string {
+  return `sip:pay@${env.TWILIO_PAY_SIP_DOMAIN}?X-Hup-Order=${orderId}&X-Hup-Call=${encodeURIComponent(callSid)}&X-Hup-Sig=${sigFor(orderId, callSid)}`;
+}
+
+export function verifyPaySip(body: Record<string, string>): { orderId: number; mainCallSid: string } | null {
+  const orderId = Number(body["SipHeader_X-Hup-Order"]);
+  const mainCallSid = body["SipHeader_X-Hup-Call"] ?? "";
+  const sig = body["SipHeader_X-Hup-Sig"] ?? "";
+  if (!Number.isInteger(orderId) || orderId <= 0 || !mainCallSid || !sig) return null;
+  const want = Buffer.from(sigFor(orderId, mainCallSid));
+  const got = Buffer.from(sig);
+  return want.length === got.length && timingSafeEqual(want, got) ? { orderId, mainCallSid } : null;
+}
+
+/** Last 4 digits from Twilio's masked card number (e.g. "xxxx-xxxx-xxxx-1111"); never anything more. */
+export function payLast4(masked: string | null | undefined): string | null {
+  const m = /(\d{4})\D*$/.exec(masked ?? "");
+  return m ? m[1] : null;
+}

@@ -101,8 +101,9 @@ describe("Sola's webhook: Paid or Declined, with date and time and last 4 only",
 });
 
 describe("no card digits on our side", () => {
-  it("no Twilio <Pay>, no PCI mode, no card fields anywhere in the code", async () => {
+  it("no card fields anywhere; Twilio <Pay> only in the payment subaccount's handler (Stripe), never on the main hotline", async () => {
     const { execSync } = await import("node:child_process");
-    expect(execSync("grep -rlE 'vr\\.pay\\(|\\.pay\\(\\{|xCardNum|xCVV|xExp' src || true").toString().trim()).toBe("");
+    expect(execSync("grep -rlE 'xCardNum|xCVV|xExp' src || true").toString().trim()).toBe("");
+    expect(execSync("grep -rlE 'vr\\.pay\\(|\\.pay\\(\\{' src || true").toString().trim()).toBe("src/lib/stripe-pay-voice.ts");
   });
 });

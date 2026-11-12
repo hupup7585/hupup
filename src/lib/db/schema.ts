@@ -125,6 +125,8 @@ export const orders = pgTable(
     paymentResult: text("payment_result"),
     paymentResultAt: timestamp("payment_result_at", { withTimezone: true }),
     cardLast4: text("card_last4"),
+    /** Phone keypad payment through Stripe (Twilio Pay in the payment subaccount): Stripe's payment ID */
+    stripePaymentId: text("stripe_payment_id"),
     notes: text("notes"),
     holdExpiresAt: timestamp("hold_expires_at", { withTimezone: true }),
     callSid: text("call_sid"),

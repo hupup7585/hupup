@@ -249,9 +249,10 @@ describe("Nov 12 decisions: staff reject, caller ID, after hours, keypad pay, CA
     expect(PROMPTS.vm_closed.text).toBe("Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.");
   });
   it("pay by keypad: prepared only, not active", async () => {
-    const { keypadPayOn, KEYPAD_PAY_MODE } = await import("@/lib/phone-pay");
-    expect(KEYPAD_PAY_MODE).toBe("off");
+    const { keypadPayOn, keypadPayFor, STRIPE_PHONE_PAY_MODE } = await import("@/lib/phone-pay");
+    expect(STRIPE_PHONE_PAY_MODE).not.toBe("live"); // customers get the payment link until Abraham approves a real test
     expect(keypadPayOn()).toBe(false);
+    expect(keypadPayFor("+18455550133")).toBe(false);
   });
   it("text CATALOG: any capitals or catalogue; not active until texting is approved; once on, once per number per day, never after STOP", async () => {
     const { isCatalogText, replyToCatalogText, SMS_CATALOG_REPLY_ON } = await import("@/lib/catalog-send");

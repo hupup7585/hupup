@@ -114,7 +114,7 @@ describe("2A. order/service and promotional consent are separate; every send che
     }
     expect(readFileSync("src/app/admin/(app)/orders/actions.ts", "utf8")).toContain("sendOrderText({");
     expect(readFileSync("src/app/admin/(app)/pos/actions.ts", "utf8")).toContain("sendOrderText({");
-    expect(readFileSync("src/app/api/sola/webhook/route.ts", "utf8")).toContain('kind: "transactional", event: "payment_confirmation"');
+    expect(readFileSync("src/lib/payment-result.ts", "utf8")).toContain('kind: "transactional", event: "payment_confirmation"'); // shared by the Sola webhook and Stripe
     expect(readFileSync("src/lib/auth.ts", "utf8")).toContain('kind: "system", event: "login_code", log: false');
   });
 });

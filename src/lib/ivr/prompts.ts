@@ -240,11 +240,19 @@ export const PROMPTS = {
   link_emailed: { group: "Checkout", label: "Payment link emailed (no texts)", text: "No problem, we won't text you. We just emailed you a secure payment link. Your party rentals are saved for {minutes} minutes while you pay.", vars: ["minutes"] },
   link_emailed_consented: {
     group: "Checkout",
-    label: "Payment link emailed (caller agreed to texts, texting not live yet). Draft",
-    pending: true, // new wording: waits for Abraham's OK; until then the caller hears "Couldn't text the link"
+    label: "Payment link emailed (caller agreed to texts, texting not live yet). Approved by Abraham, Nov 12, 2026",
     text: "We just emailed you a secure payment link. Your party rentals are saved for {minutes} minutes while you pay.",
     vars: ["minutes"],
   },
+  // Pay by keypad through Stripe (Abraham, Nov 12, 2026). Drafts wait for his OK; only his own test calls hear them.
+  pay_start: { group: "Pay by keypad", label: "Before the card steps (draft)", pending: true, text: "Let's take care of your payment now. Please have your card ready." },
+  pay_card_number: { group: "Pay by keypad", label: "Card number (draft)", pending: true, text: "Please enter your card number on your keypad, then press pound." },
+  pay_expiration: { group: "Pay by keypad", label: "Expiration date (draft)", pending: true, text: "Please enter the expiration date, two digits for the month and two digits for the year, then press pound." },
+  pay_security_code: { group: "Pay by keypad", label: "Security code (draft)", pending: true, text: "Please enter the security code on the back of your card, then press pound." },
+  pay_postal_code: { group: "Pay by keypad", label: "Billing ZIP code (draft)", pending: true, text: "Please enter the billing ZIP code for your card, then press pound." },
+  pay_processing: { group: "Pay by keypad", label: "While the payment goes through (draft)", pending: true, text: "One moment while we process your payment." },
+  pay_success: { group: "Pay by keypad", label: "Payment approved (Abraham)", text: "Payment received, thank you!" },
+  pay_declined: { group: "Pay by keypad", label: "Card declined: try again or link (draft)", pending: true, text: "Sorry, that card didn't go through. To try again, press 1. To get a secure payment link by email instead, press 2." },
   link_call_back: { group: "Checkout", label: "No texts and no email", text: "No problem, we won't text you. Someone from our team will call you shortly to finish your payment." },
 
   // Talk to a person

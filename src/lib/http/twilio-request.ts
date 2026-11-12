@@ -22,6 +22,7 @@ export function candidateUrls(req: Request): string[] {
 /** Parse a Twilio form POST and verify its X-Twilio-Signature. */
 export async function readTwilioRequest(
   req: Request,
+  authToken: string | undefined = process.env.TWILIO_AUTH_TOKEN,
 ): Promise<{ ok: boolean; body: Record<string, string>; query: URLSearchParams }> {
   const u = new URL(req.url);
   const form = await req.formData();
@@ -29,7 +30,7 @@ export async function readTwilioRequest(
   form.forEach((v, k) => {
     body[k] = String(v);
   });
-  const token = process.env.TWILIO_AUTH_TOKEN;
+  const token = authToken;
   if (!token) {
     // Allowed only for local development / the simulate-call script.
     return { ok: !config.isProd(), body, query: u.searchParams };

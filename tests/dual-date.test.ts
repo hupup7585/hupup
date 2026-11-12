@@ -28,7 +28,7 @@ describe("double dates", () => {
     expect(MESSAGE_DUAL_DATES).toBe(false);
     expect(messageDate("2026-11-08")).toBe("Sunday, November 8");
     expect(messageDate("2026-11-08", true)).toBe("Sunday, Nov 8, 2026 / כ״ח חשון תשפ״ז");
-    for (const f of ["src/lib/ivr/flow.ts", "src/app/admin/(app)/orders/actions.ts", "src/app/admin/(app)/pos/actions.ts", "src/app/api/sola/webhook/route.ts"]) {
+    for (const f of ["src/lib/ivr/flow.ts", "src/app/admin/(app)/orders/actions.ts", "src/app/admin/(app)/pos/actions.ts", "src/lib/payment-result.ts"]) { // payment notices moved from the Sola webhook (shared with Stripe)
       const s = readFileSync(f, "utf8");
       expect(s, f).toContain("messageDate(");
       expect(s, f).not.toMatch(/body: `[^`]*longDate\(|msg = `[^`]*longDate\(|details =\s*`[^`]*longDate\(/);

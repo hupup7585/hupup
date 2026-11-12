@@ -14,6 +14,7 @@ import {
   PHONE_HOLD_MINUTES,
   cancelHold,
   getOrderWithItems,
+  getPaymentGroup,
   minutesFromNow,
   orderNumber,
   reserveItem,
@@ -41,7 +42,10 @@ import {
   wordingVersion,
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
-import { keypadPayOn } from "@/lib/phone-pay";
+import { STRIPE_PHONE_PAY_MODE, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
+
+/** Pay prompts that must all be approved before keypad payment goes live for every caller. */
+const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { voicemailPlayLink } from "@/lib/signed-link";
 import { INFO_CATALOG_AUTOREPLY_ON, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
@@ -89,8 +93,10 @@ function say(target: VR | Gather, text: string) {
 }
 
 /** Speak a catalog prompt: uploaded recording if there is one, otherwise the (editable) text. */
-function sp(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptKey, vars?: Record<string, string | number>) {
-  if (promptWaiting(ctx.prompts, key)) return; // Abraham (Phone Recordings): a line waiting for his OK never plays
+function sp(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptKey, vars?: Record<string, string | number>, opts: { draftOk?: boolean } = {}) {
+  // Abraham (Phone Recordings): a line waiting for his OK never plays. draftOk: steps only the Owner's own test calls
+  // reach (keypad payment in owner_test mode), so he hears the drafts he is reviewing.
+  if (promptWaiting(ctx.prompts, key) && !(opts.draftOk && !keypadPayOn())) return;
   const audio = promptAudio(ctx.prompts, key);
   if (audio) target.play(audio);
   else say(target, promptText(ctx.prompts, key, vars));
@@ -524,6 +530,52 @@ async function logCatalogRequest(ctx: Ctx, channel: "text" | "email", to: string
 async function lineRingsNowFor(k: RingKey, settings: Awaited<ReturnType<typeof getSettings>>, at = new Date()) {
   const iso = localISO(at);
   return lineRingsNow(k, at, settings, { officeOpen: officeOpenNow(at, settings), shabbosOrYomTov: isShabbosOrYomTov(iso), candleLighting: erevCandleLighting(iso, settings) });
+}
+
+/**
+ * The Sola payment link for a phone order (items + delivery + tax): emailed to the caller, and texted with order-text
+ * consent once Twilio approves texting; then the line that says how it was sent.
+ */
+type LinkDay = { order: { id: number; eventDate: string; pickupDate: string; subtotalCents: number; deliveryFeeCents: number; taxCents: number; totalCents: number | null }; items: { qty: number; name: string }[] };
+
+async function sendPayLinkAndSay(ctx: Ctx, vr: VR, orderId: number, who: { phone: string | null; customerId: number | null }, known?: LinkDay[]) {
+  // At checkout the days are already known (and priced); after the payment line they're read again
+  const days: LinkDay[] = known ?? (await getPaymentGroup(orderId))?.orders ?? [];
+  if (!days.length) return;
+  const group = { primary: { order: { id: orderId } } };
+  const data = ctx.session?.data ?? {};
+  const sum = (f: (o: (typeof days)[number]["order"]) => number) => days.reduce((n, d) => n + f(d.order), 0);
+  const totals = {
+    subtotalCents: sum((o) => o.subtotalCents),
+    deliveryFeeCents: sum((o) => o.deliveryFeeCents),
+    taxCents: sum((o) => o.taxCents),
+    totalCents: sum((o) => o.totalCents ?? o.subtotalCents),
+  };
+  const num = orderNumber(group.primary.order.id);
+  const link = payPageLink(group.primary.order.id); // review-and-pay page for the whole reservation, then Sola
+  const dayText = (o: (typeof days)[number]) => `${o.items.map((i) => `${i.qty} x ${i.name}`).join(", ")} for ${messageDate(o.order.eventDate)} (pickup ${messageDate(o.order.pickupDate)})`;
+  const details =
+    `${BUSINESS_NAME} order #${num}: ${days.map(dayText).join("; ")}. ` +
+    `Rentals $${money(totals.subtotalCents)} + delivery $${money(totals.deliveryFeeCents)} + sales tax $${money(totals.taxCents)} = total $${money(totals.totalCents)}. ` +
+    `Pay securely within ${PAYMENT_HOLD_MINUTES} minutes to confirm: ${link}`;
+  // Texts go out only with transactional consent given on this call or recorded before.
+  const consented = data.smsConsent === "yes" || data.smsConsent === "existing";
+  let texted = false;
+  let emailed = false;
+  if (who.phone && consented) {
+    // The STOP line is added by the text system on the first order text (or after 30 days without one)
+    const res = await sendSms(who.phone, details, { kind: "transactional", event: "order_payment_link", customerId: who.customerId, orderId: group.primary.order.id, callSid: ctx.callSid });
+    texted = res.sent;
+  }
+  if (data.email) {
+    const res = await sendEmail(data.email, `${BUSINESS_NAME} order #${num}`, details);
+    emailed = res.sent;
+  }
+  if (texted) sp(vr, ctx, "link_sent", { minutes: PAYMENT_HOLD_MINUTES });
+  else if (emailed && !consented) sp(vr, ctx, "link_emailed", { minutes: PAYMENT_HOLD_MINUTES });
+  else if (emailed && !promptWaiting(ctx.prompts, "link_emailed_consented")) sp(vr, ctx, "link_emailed_consented", { minutes: PAYMENT_HOLD_MINUTES });
+  else if (!consented && !data.email) sp(vr, ctx, "link_call_back");
+  else sp(vr, ctx, "link_failed");
 }
 
 /* ------------------------------------------------------------------ handlers */
@@ -1602,40 +1654,37 @@ const handlers: Record<string, Handler> = {
     const totals = { subtotalCents: sum("subtotalCents"), deliveryFeeCents: sum("deliveryFeeCents"), taxCents: sum("taxCents"), totalCents: sum("totalCents") };
 
     const num = orderNumber(primary.id);
-    const link = payPageLink(primary.id); // review-and-pay page for the whole reservation: Terms box, then Sola
-    const dayText = (o: (typeof days)[number]) => `${o.items.map((i) => `${i.qty} x ${i.name}`).join(", ")} for ${messageDate(o.order.eventDate)} (pickup ${messageDate(o.order.pickupDate)})`;
-    const details =
-      `${BUSINESS_NAME} order #${num}: ${days.map(dayText).join("; ")}. ` +
-      `Rentals $${money(totals.subtotalCents)} + delivery $${money(totals.deliveryFeeCents)} + sales tax $${money(totals.taxCents)} = total $${money(totals.totalCents)}. ` +
-      `Pay securely within ${PAYMENT_HOLD_MINUTES} minutes to confirm: ${link}`;
-    // Texts go out only with transactional consent given on this call or recorded before.
-    const consented = data.smsConsent === "yes" || data.smsConsent === "existing";
-    let texted = false;
-    let emailed = false;
-    // Abraham (Nov 12, 2026): the Sola payment link (items + delivery + tax) is emailed to the caller; it's also
-    // texted with order-text consent once Twilio approves texting (until then the text doesn't go out).
-    if (phone && consented) {
-      // The STOP line is added by the text system on the first order text (or after 30 days without one)
-      const res = await sendSms(phone, details, { kind: "transactional", event: "order_payment_link", customerId, orderId: primary.id, callSid: ctx.callSid });
-      texted = res.sent;
-    }
-    if (data.email) {
-      const res = await sendEmail(data.email, `${BUSINESS_NAME} order #${num}`, details);
-      emailed = res.sent;
-    }
-
     const first = data.name.split(" ")[0];
     sp(vr, ctx, "thanks_order", { name: first, number: spokenDigits(num) });
     sp(vr, ctx, "checkout_total", { total: spokenMoney(totals.totalCents), items: spokenMoney(totals.subtotalCents), delivery: spokenMoney(totals.deliveryFeeCents), tax: spokenMoney(totals.taxCents) });
-    // Section 14: pay by keypad goes here, right after the read-back. Not active yet (src/lib/phone-pay.ts); the
-    // payment link below is the way to pay until Abraham approves it.
-    if (keypadPayOn()) return back(vr, "pay-keypad", { o: primary.id });
-    if (texted) sp(vr, ctx, "link_sent", { minutes: PAYMENT_HOLD_MINUTES });
-    else if (emailed && !consented) sp(vr, ctx, "link_emailed", { minutes: PAYMENT_HOLD_MINUTES });
-    else if (emailed && !promptWaiting(ctx.prompts, "link_emailed_consented")) sp(vr, ctx, "link_emailed_consented", { minutes: PAYMENT_HOLD_MINUTES });
-    else if (!consented && !data.email) sp(vr, ctx, "link_call_back");
-    else sp(vr, ctx, "link_failed");
     await updateSession(ctx.callSid, { data: { placedOrderId: primary.id } }, ctx.session);
+    // Pay by keypad through Stripe, right after the read-back (Abraham, Nov 12, 2026). Only for callers it's on for
+    // (src/lib/phone-pay.ts); everyone else gets the payment link, as before.
+    if (keypadPayFor(ctx.session?.fromNumber ?? ctx.from) && (STRIPE_PHONE_PAY_MODE !== "live" || PAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k))))
+      return back(vr, "pay-keypad", { o: primary.id });
+    await sendPayLinkAndSay(ctx, vr, primary.id, { phone, customerId }, perDay.map(({ o, t }) => ({ order: { ...o.order, deliveryFeeCents: t!.deliveryFeeCents, taxCents: t!.taxCents, totalCents: t!.totalCents }, items: o.items })));
+    return back(vr, "promo-consent");
+  },
+
+  /** Hand the call to the payment subaccount (Twilio Pay + Stripe). The main account never collects card digits. */
+  async "pay-keypad"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    if (!o) return back(vr, "goodbye");
+    sp(vr, ctx, "pay_start", undefined, { draftOk: true });
+    const dial = vr.dial({ action: url("pay-done", { o }), method: "POST", timeLimit: 900, answerOnBridge: true });
+    dial.sip({ username: process.env.TWILIO_PAY_SIP_USERNAME, password: process.env.TWILIO_PAY_SIP_PASSWORD }, paySipUri(o, ctx.callSid));
+    return vr;
+  },
+
+  /** Back from the payment line: paid, then on as usual; not paid (declined, chose the link, hung up), the link. */
+  async "pay-done"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    const group = o ? await getPaymentGroup(o) : null;
+    if (!group) return back(vr, "goodbye");
+    if (group.due > 0) {
+      const c = group.primary.customer;
+      await sendPayLinkAndSay(ctx, vr, o, { phone: c?.phone ?? toE164(ctx.from), customerId: c?.id ?? null });
+    }
     return back(vr, "promo-consent");
   },
 
