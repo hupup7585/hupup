@@ -10,7 +10,7 @@ describe("grouped admin menu", () => {
   it("Owner sees every group in Abraham's order and items", () => {
     expect(titles("owner")).toEqual([null, "Orders & bookings", "Deliveries", "Phone system", "Bookkeeping", "Staff", "Settings"]);
     expect(labels("owner")).toEqual({
-      top: ["Dashboard"],
+      top: ["Dashboard", "Inbox"], // Inbox: info@ (Abraham, Nov 12, 2026; Owner only)
       "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Catalog"],
       Deliveries: ["Deliveries", "Delivery settings"],
       "Phone system": ["Call log", "Voicemail", "Messages", "Campaigns", "Hotline prompts", "Compliance", "Phone settings"],

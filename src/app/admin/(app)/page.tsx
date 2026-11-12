@@ -1,3 +1,4 @@
+import InboxCard from "./InboxCard";
 import { Download, Trophy } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
 import MyTasksCard from "@/components/MyTasksCard";
@@ -71,6 +72,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       </div>
 
       <MyTasksCard staff={staff} />
+      <InboxCard />
       <NotActive k="sms" />
       <NotActive k="payments" />
 

@@ -40,7 +40,7 @@ export function emailEnvelope(to: string, env: Record<string, string | undefined
 
 export type EmailAttachment = { filename: string; content: string /* base64 */ };
 
-export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = []): Promise<SendResult> {
+export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string> } = {}): Promise<SendResult> {
   if (!config.resendConfigured()) {
     if (config.isProd()) return { sent: false, error: "Email (Resend) is not configured" };
     console.log(`[dev EMAIL to ${to}] ${subject}\n${text}${attachments.length ? `\n[attachments: ${attachments.map((a) => a.filename).join(", ")}]` : ""}`);
@@ -55,6 +55,7 @@ export async function sendEmail(to: string, subject: string, text: string, attac
         subject,
         text,
         ...(attachments.length ? { attachments } : {}),
+        ...(opts.headers ? { headers: opts.headers } : {}),
       }),
     });
     if (!res.ok) return { sent: false, error: `Resend ${res.status}: ${await res.text()}` };

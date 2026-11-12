@@ -998,3 +998,72 @@ export const promptRecordingChunks = pgTable(
   },
   (t) => [primaryKey({ columns: [t.recordingId, t.idx] })],
 );
+
+/* info@ Inbox (Abraham, Nov 12, 2026). Nothing here is ever deleted. */
+export const inboxRaw = pgTable("inbox_raw", {
+  uploadId: text("upload_id").primaryKey(),
+  parts: integer("parts").notNull(),
+  emailId: integer("email_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const inboxRawChunks = pgTable(
+  "inbox_raw_chunks",
+  {
+    uploadId: text("upload_id").notNull().references(() => inboxRaw.uploadId),
+    idx: integer("idx").notNull(),
+    data: bytea("data").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.uploadId, t.idx] })],
+);
+
+export const inboxEmails = pgTable("inbox_emails", {
+  id: serial("id").primaryKey(),
+  messageId: text("message_id").unique(),
+  uploadId: text("upload_id"),
+  fromAddress: text("from_address").notNull(),
+  fromName: text("from_name"),
+  toAddress: text("to_address"),
+  subject: text("subject"),
+  textBody: text("text_body"),
+  htmlBody: text("html_body"),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  customerId: integer("customer_id").references(() => customers.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const inboxFiles = pgTable("inbox_files", {
+  id: serial("id").primaryKey(),
+  emailId: integer("email_id").references(() => inboxEmails.id),
+  replyId: integer("reply_id"),
+  fileName: text("file_name").notNull(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  complete: boolean("complete").notNull().default(false),
+  tooBig: boolean("too_big").notNull().default(false),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const inboxFileChunks = pgTable(
+  "inbox_file_chunks",
+  {
+    fileId: integer("file_id").notNull().references(() => inboxFiles.id),
+    idx: integer("idx").notNull(),
+    data: bytea("data").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.fileId, t.idx] })],
+);
+
+export const inboxReplies = pgTable("inbox_replies", {
+  id: serial("id").primaryKey(),
+  emailId: integer("email_id").notNull().references(() => inboxEmails.id),
+  toAddress: text("to_address").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  sent: boolean("sent").notNull().default(false),
+  error: text("error"),
+  userId: integer("user_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

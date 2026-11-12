@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { BOOK_GROUPS, bookTabHref } from "@/lib/bookkeeping-tabs";
 import { Fragment, useEffect, useState } from "react";
-import { Activity, ArrowDownToLine, BadgePercent, BookOpen, Car, ChartColumn, FileClock, FileText, Gauge, IdCard, Landmark, List, Percent, Receipt, Settings2, Wrench, CircleUser, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, ChevronDown, ChevronRight, LayoutDashboard, Megaphone, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PhoneForwarded, PlusCircle, Settings, ShieldCheck, SlidersHorizontal, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
+import { Activity, ArrowDownToLine, BadgePercent, BookOpen, Car, ChartColumn, FileClock, FileText, Gauge, IdCard, Landmark, List, Percent, Receipt, Settings2, Wrench, CircleUser, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, Inbox, ChevronDown, ChevronRight, LayoutDashboard, Megaphone, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PhoneForwarded, PlusCircle, Settings, ShieldCheck, SlidersHorizontal, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
 import type { Role } from "@/lib/db/schema";
 
 const O: Role[] = ["owner"];
@@ -37,7 +37,13 @@ const BOOK_ICONS: Record<string, LucideIcon> = {
 };
 
 export const NAV_GROUPS: Group[] = [
-  { title: null, items: [["/admin", LayoutDashboard, "Dashboard", O]] },
+  {
+    title: null,
+    items: [
+      ["/admin", LayoutDashboard, "Dashboard", O],
+      ["/admin/inbox", Inbox, "Inbox", O], // info@hupupattractions.com (Abraham, Nov 12, 2026; Owner only for now)
+    ],
+  },
   {
     title: "Orders & bookings",
     items: [
@@ -116,7 +122,7 @@ export const isActive = (path: string, href: string, tab: string | null = null) 
 };
 
 /** Staff navigation: navy bar, yellow marker on the current page. Hidden when printing. */
-export default function Sidebar({ logout, role = "owner", name, taskBadge }: { logout: () => Promise<void>; role?: Role; name?: string; taskBadge?: { open: number; overdue: number } }) {
+export default function Sidebar({ logout, role = "owner", name, taskBadge, inboxUnread = 0 }: { logout: () => Promise<void>; role?: Role; name?: string; taskBadge?: { open: number; overdue: number }; inboxUnread?: number }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const tab = useSearchParams()?.get("tab") ?? null;
@@ -158,6 +164,12 @@ export default function Sidebar({ logout, role = "owner", name, taskBadge }: { l
         {on && <span className="absolute inset-y-1.5 left-0 w-1 rounded-full bg-sun" aria-hidden />}
         <Icon className={`h-[18px] w-[18px] shrink-0 ${on ? "text-sun" : "text-sky"}`} strokeWidth={2} aria-hidden />
         {label}
+        {href === "/admin/inbox" && inboxUnread > 0 && (
+          <span data-inbox-badge className="ml-auto rounded-full bg-sun px-2 py-0.5 text-xs font-bold text-navy" title={`${inboxUnread} unread email${inboxUnread === 1 ? "" : "s"}`}>
+            {inboxUnread}
+            <span className="sr-only"> unread emails</span>
+          </span>
+        )}
         {href === "/admin/tasks" && taskBadge && taskBadge.open > 0 && (
           <span
             data-task-badge
