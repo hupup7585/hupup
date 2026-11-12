@@ -269,18 +269,20 @@ describe("menus are keys only (Abraham): no speech in any menu", () => {
 });
 
 describe("every key, office closed", () => {
-  it("1 books and 2 and 4 play their information 24/7; 3 and corporate go to voicemail; 0 and 5 still ring (Abraham, Phone Menu v3); 9 is voicemail", async () => {
+  it("1 books and 2 and 4 play their information 24/7; after hours every extension goes to voicemail (Abraham, Nov 12); 9 is voicemail", async () => {
     h.open = false;
     expect(redirect(await press("1"))).toBe("book");
     expect(redirect(await press("2"))).toBe("instructions");
     expect(redirect(await press("4"))).toBe("learn");
     expect(redirect(await press("3"))).toBe("ring?k=4");
-    for (const k of ["2", "4", "8"]) {
+    for (const k of ["2", "4", "5", "6", "8", "0"]) {
       const xml = await call("ring", {}, `k=${k}`);
       expect(xml).not.toContain("<Dial");
       expect(redirect(xml)).toBe(`voicemail?x=${k}`);
     }
-    for (const k of ["0", "5"]) expect(await call("ring", {}, `k=${k}`), k).toContain("<Dial");
+    await saveSetting("ringAfterHours0", true); // Admin can switch one back on
+    expect(await call("ring", {}, "k=0")).toContain("<Dial");
+    await saveSetting("ringAfterHours0", false);
     expect(redirect(await press("7"))).toBe("hours");
     expect(redirect(await press("9"))).toBe("voicemail?x=9");
   });

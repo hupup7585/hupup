@@ -282,6 +282,12 @@ export const PROMPTS = {
     label: "Options after the caller presses #",
     text: "Thank you!\nTo send your message, press 1.\nTo listen to it, press 2.\nTo delete and re-record, press 3.",
   },
+  vm_after_hours: {
+    group: "Voicemail",
+    label: "After-hours greeting (draft; replaces the closed greeting once approved)",
+    pending: true, // Abraham's draft (section 17): not recorded or played until he approves it
+    text: "Thank you for calling Hup Up Attractions! Our office is closed right now. Please leave your name, phone number, and a short message after the tone, and we'll call you back as soon as we open. To book anytime, visit hupupattractions.com. Have a wonderful day!",
+  },
   vm_rerecord: { group: "Voicemail", label: "Before the tone when re-recording (press 3)", text: "Please re-record your message. When you're finished, press pound." },
   vm_none_retry: { group: "Voicemail", label: "Nothing was recorded (Abraham)", text: "We didn't receive a message. To try again, press 3. Otherwise, you may hang up." },
   vm_closed: {

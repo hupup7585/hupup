@@ -41,6 +41,7 @@ import {
   wordingVersion,
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
+import { keypadPayOn } from "@/lib/phone-pay";
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { voicemailPlayLink } from "@/lib/signed-link";
 import { INFO_CATALOG_AUTOREPLY_ON, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
@@ -425,13 +426,18 @@ export function hoursForSpeech(s: Parameters<typeof websiteHoursLines>[0]): stri
   return websiteHoursLines(s).flatMap((l) => l.split("\n")).map((l) => `${l.replace(/ - /g, " to ").trim()}.`);
 }
 
+/** The caller ID staff see on a forwarded call: the caller's own number, or the hotline when blocked or unknown. */
+export function staffCallerId(from: string | null | undefined, env: Record<string, string | undefined> = process.env): string | undefined {
+  return toE164(from) ?? env.TWILIO_PHONE_NUMBER ?? undefined;
+}
+
 /** Ring one step of a key's list (one after another) or everyone at once. */
 function dialTargets(vr: VR, list: ReturnType<typeof ringListFor>, k: RingKey, i: number, from?: string | null): VR {
   const simultaneous = list.mode === "simultaneous";
   // Abraham (Phone Menu v3): the list rings several times over (3 by default); step i goes round the list
   const ring = simultaneous ? list.targets : [list.targets[i % list.targets.length]];
   const dial = vr.dial({
-    callerId: process.env.TWILIO_PHONE_NUMBER || undefined,
+    callerId: staffCallerId(from), // Abraham: staff phones show the customer's own number (hotline if blocked or unknown)
     timeout: Math.max(...ring.map((t) => t.ringSeconds)),
     action: url("operator-done", { i, k }),
     method: "POST",
@@ -459,9 +465,11 @@ async function vmBox(x: string | null | undefined) {
  * Key 9 (general voicemail) has its own feedback greeting. Every other box: the standard greeting while the office is
  * open, and Abraham's "office is closed" greeting after hours, Shabbos and Yom Tov (same hours as the website and key 7).
  */
-async function vmGreeting(x: string | null | undefined): Promise<PromptKey> {
+async function vmGreeting(x: string | null | undefined, prompts: PromptOverrides): Promise<PromptKey> {
   if (x === "9") return "vm9_greeting";
-  return officeOpenNow(new Date(), await getSettings()) ? "vm_greeting" : "vm_closed";
+  if (officeOpenNow(new Date(), await getSettings())) return "vm_greeting";
+  // Abraham's draft after-hours greeting replaces the closed greeting only once he approves it in Admin
+  return promptWaiting(prompts, "vm_after_hours") ? "vm_closed" : "vm_after_hours";
 }
 const vmSent = (x: string | null | undefined) => (x === "9" ? "vm9_sent" : "vm_sent");
 
@@ -1616,6 +1624,9 @@ const handlers: Record<string, Handler> = {
     const first = data.name.split(" ")[0];
     sp(vr, ctx, "thanks_order", { name: first, number: spokenDigits(num) });
     sp(vr, ctx, "checkout_total", { total: spokenMoney(totals.totalCents), items: spokenMoney(totals.subtotalCents), delivery: spokenMoney(totals.deliveryFeeCents), tax: spokenMoney(totals.taxCents) });
+    // Section 14: pay by keypad goes here, right after the read-back. Not active yet (src/lib/phone-pay.ts); the
+    // payment link below is the way to pay until Abraham approves it.
+    if (keypadPayOn()) return back(vr, "pay-keypad", { o: primary.id });
     if (texted) sp(vr, ctx, "link_sent", { minutes: PAYMENT_HOLD_MINUTES });
     else if (emailed) sp(vr, ctx, "link_emailed", { minutes: PAYMENT_HOLD_MINUTES });
     else if (!consented) sp(vr, ctx, "link_call_back");
@@ -1784,11 +1795,17 @@ const handlers: Record<string, Handler> = {
 
   /** After a ring attempt: a finished conversation ends the call; otherwise try the next number, then voicemail. */
   async "operator-done"(ctx, vr) {
+    const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
+    // Staff pressed 2 (checked first: Twilio may report that leg as completed): that extension's voicemail
+    const rejectedAt = ctx.session?.data.rejectedAt;
+    if (rejectedAt && Date.now() - rejectedAt < 10 * 60_000) {
+      await updateSession(ctx.callSid, { data: { rejectedAt: undefined, missed: "rejected" } }, ctx.session);
+      return back(vr, "voicemail", { x: k });
+    }
     if (ctx.body.DialCallStatus === "completed") {
       vr.hangup();
       return vr;
     }
-    const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
     const settings = await getSettings();
     const list = ringListFor(settings, k);
     const next = Number(ctx.query.get("i") ?? -1) + 1;
@@ -1816,8 +1833,16 @@ const handlers: Record<string, Handler> = {
   },
 
   async "whisper-accept"(ctx, vr) {
-    if (ctx.body.Digits !== "1") vr.hangup(); // 2 or anything else: pass to the next number
-    return vr; // empty response = connect the caller
+    if (ctx.body.Digits === "1") return vr; // empty response = connect the caller
+    // Abraham: press 2 (reject) sends the caller straight to that extension's voicemail. Marked on the caller's call,
+    // so the caller's next step goes to voicemail whatever Twilio reports for this leg.
+    const parent = ctx.body.ParentCallSid;
+    if (ctx.body.Digits === "2" && parent) {
+      const s = await getSession(parent);
+      if (s) await updateSession(parent, { data: { rejectedAt: Date.now() } }, s);
+    }
+    vr.hangup();
+    return vr;
   },
 
   async "voicemail-offer"(ctx, vr) {
@@ -1837,7 +1862,7 @@ const handlers: Record<string, Handler> = {
       return back(vr, "menu");
     }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail" }, ctx.session);
-    sp(vr, ctx, await vmGreeting(x));
+    sp(vr, ctx, await vmGreeting(x, ctx.prompts));
     return vmRecord(vr, box, x);
   },
 

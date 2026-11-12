@@ -216,3 +216,60 @@ describe("Phone Recordings (Abraham)", () => {
     delete process.env.IVR_VOICE;
   });
 });
+
+describe("Nov 12 decisions: staff reject, caller ID, after hours, keypad pay, CATALOG text", () => {
+  it("staff press 2: the caller goes straight to that extension's voicemail", async () => {
+    h.session.data = {};
+    await handleVoice({ action: "whisper-accept", query: new URLSearchParams("k=4"), body: { CallSid: "CAstaff", ParentCallSid: "CAv3", Digits: "2" }, callSid: "CAstaff", from: "+18457990925" });
+    expect(typeof h.session.data.rejectedAt).toBe("number");
+    const xml = await call("operator-done", { DialCallStatus: "completed" }, "i=0&k=4");
+    expect(redirect(xml)).toBe("voicemail?x=4");
+    expect(h.session.data.missed).toBe("rejected");
+    // press 1 connects (empty response)
+    expect(await handleVoice({ action: "whisper-accept", query: new URLSearchParams(), body: { CallSid: "CAstaff2", ParentCallSid: "CAv3", Digits: "1" }, callSid: "CAstaff2", from: "+18457990925" })).toBe('<?xml version="1.0" encoding="UTF-8"?><Response/>');
+  });
+  it("staff phones show the caller's own number; blocked or unknown shows the hotline", async () => {
+    const { staffCallerId } = await import("@/lib/ivr/flow");
+    const env = { TWILIO_PHONE_NUMBER: "+18454157585" };
+    expect(staffCallerId("+18455550133", env)).toBe("+18455550133");
+    expect(staffCallerId("anonymous", env)).toBe("+18454157585");
+    expect(staffCallerId(null, env)).toBe("+18454157585");
+    expect(await call("ring", {}, "k=4")).toContain('callerId="+18455550133"');
+  });
+  it("after hours every extension goes to voicemail by default (Admin can switch one back on)", async () => {
+    const { SETTING_DEFAULTS } = await import("@/lib/settings");
+    const night = new Date("2026-11-17T03:00:00Z");
+    const weekday = { officeOpen: false, shabbosOrYomTov: false, candleLighting: null };
+    for (const k of ["0", "2", "4", "5", "6", "8"] as const) expect(lineRingsNow(k, night, SETTING_DEFAULTS, weekday), k).toBe(false);
+    expect(lineRingsNow("0", night, { ...SETTING_DEFAULTS, ringAfterHours0: true }, weekday)).toBe(true);
+  });
+  it("the draft after-hours greeting waits for approval; the closed greeting plays until then", () => {
+    expect(PROMPTS.vm_after_hours.text).toBe("Thank you for calling Hup Up Attractions! Our office is closed right now. Please leave your name, phone number, and a short message after the tone, and we'll call you back as soon as we open. To book anytime, visit hupupattractions.com. Have a wonderful day!");
+    expect(promptWaiting({}, "vm_after_hours")).toBe(true);
+    expect(PROMPTS.vm_closed.text).toBe("Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.");
+  });
+  it("pay by keypad: prepared only, not active", async () => {
+    const { keypadPayOn, KEYPAD_PAY_MODE } = await import("@/lib/phone-pay");
+    expect(KEYPAD_PAY_MODE).toBe("off");
+    expect(keypadPayOn()).toBe(false);
+  });
+  it("text CATALOG: any capitals or catalogue; not active until texting is approved; once on, once per number per day, never after STOP", async () => {
+    const { isCatalogText, replyToCatalogText, SMS_CATALOG_REPLY_ON } = await import("@/lib/catalog-send");
+    expect(SMS_CATALOG_REPLY_ON).toBe(false);
+    for (const t of ["catalog", "CATALOG", "Catalogue", " catalog. "]) expect(isCatalogText(t), t).toBe(true);
+    for (const t of ["send me a catalog", "cat", ""]) expect(isCatalogText(t), t).toBe(false);
+    const sent: string[] = [];
+    const send = async (to: string, body: string) => {
+      sent.push(body);
+      await db.insert(schema.messages).values({ direction: "out", fromNumber: "+18454157585", toNumber: to, contactPhone: to, body, kind: "transactional", event: "catalog_reply", status: "sent" });
+      return { sent: true };
+    };
+    expect(await replyToCatalogText("+18455550188", { optedOut: false, send })).toEqual({ replied: false, reason: "not_active" });
+    expect(sent).toHaveLength(0);
+    expect((await replyToCatalogText("+18455550188", { optedOut: false, on: true, send })).replied).toBe(true);
+    expect(sent[0]).toBe("Hup Up Attractions: Here is our catalog: hupupattractions.com/#rentals To book, call (845) 777-7585.");
+    expect((await replyToCatalogText("+18455550188", { optedOut: false, on: true, send })).reason).toBe("already_today");
+    expect((await replyToCatalogText("+18455550199", { optedOut: true, on: true, send })).reason).toBe("opted_out");
+    expect((await db.select().from(schema.smsConsents)).filter((r) => r.scope === "marketing" && r.action === "opt_in")).toHaveLength(0);
+  });
+});

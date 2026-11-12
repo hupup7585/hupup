@@ -172,7 +172,7 @@ export type CallData = {
   /** Main-menu keys pressed on this call, in order (call analytics: which departments callers choose) */
   menuKeys?: string[];
   /** A department or operator was asked for and no one took the call: "closed" (office closed / no one on the list) or "no_answer" */
-  missed?: "closed" | "no_answer";
+  missed?: "closed" | "no_answer" | "rejected";
   /** A voicemail was left on this call / the missed-call alert went out (once per call) */
   leftMessage?: boolean;
   missedAlerted?: boolean;
@@ -191,6 +191,8 @@ export type CallData = {
   catKeys?: string;
   /** When the caller last pressed a key or said something (Abraham's idle rule inside a booking) */
   lastKeyAt?: number;
+  /** Staff pressed 2 on the announcement (Abraham): the caller goes to that extension's voicemail. */
+  rejectedAt?: number;
   /** Voicemail review menu: the latest recording on this call, its link, box and menu key */
   vmSid?: string;
   vmUrl?: string;

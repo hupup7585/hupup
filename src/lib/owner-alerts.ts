@@ -23,6 +23,7 @@ export function missedKey(data: { menuKeys?: string[]; missed?: string } | null 
   if (!k) return "before choosing a key";
   if (data?.missed === "closed") return `Key ${k} (office closed)`;
   if (data?.missed === "no_answer") return `Key ${k} (no one answered)`;
+  if (data?.missed === "rejected") return `Key ${k} (staff pressed 2)`;
   return `Key ${k}`;
 }
 

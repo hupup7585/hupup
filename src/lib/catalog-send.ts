@@ -54,7 +54,7 @@ export async function sendCatalogEmail(to: string) {
 export const catalogText = () => `${BUSINESS_NAME}: Here is our catalog: hupupattractions.com/#rentals To book, call ${PUBLIC_PHONE_DISPLAY}.`;
 
 /** Log a catalog request on the contact (by the caller's phone, or the email address), and alert Abraham on failure. */
-export async function recordCatalogRequest(input: { callerPhone: string | null; channel: "text" | "email"; to: string; sent: boolean; source: "phone" | "email" }) {
+export async function recordCatalogRequest(input: { callerPhone: string | null; channel: "text" | "email"; to: string; sent: boolean; source: "phone" | "email" | "text_keyword" }) {
   const phone = input.callerPhone ?? (input.channel === "text" ? toE164(input.to) : null);
   let customerId: number | null = null;
   if (phone) {
@@ -104,4 +104,35 @@ export async function handleCatalogEmail(senderRaw: string, subject: string | nu
   if (!reason) replied = (await send(sender)).sent;
   await db.insert(schema.catalogEmailRequests).values({ sender, subject: subject?.slice(0, 200) ?? null, replied, reason: reason ?? (replied ? null : "send_failed"), createdAt: now });
   return { replied, reason: reason ?? (replied ? null : "send_failed") };
+}
+
+/** Section 18: texting CATALOG to the hotline gets the catalog text back. Not active yet: waits for Twilio texting. */
+export const SMS_CATALOG_REPLY_ON = false;
+
+/** The whole text is "catalog" or "catalogue", any capitals, spaces and punctuation ignored. */
+export function isCatalogText(body: string | null | undefined): boolean {
+  return /^catalog(ue)?$/i.test((body ?? "").replace(/[^a-z]/gi, ""));
+}
+
+/**
+ * Reply to a CATALOG text: once per number per New York day; never to a number that replied STOP; never a promo
+ * sign-up. Logged on the contact. `send` is the app's normal text sender (STOP/HELP rules apply there too).
+ */
+export async function replyToCatalogText(
+  from: string,
+  opts: { optedOut: boolean; on?: boolean; now?: Date; send: (to: string, body: string) => Promise<{ sent: boolean }> },
+) {
+  const on = opts.on ?? SMS_CATALOG_REPLY_ON;
+  const now = opts.now ?? new Date();
+  if (!on) return { replied: false, reason: "not_active" as const };
+  if (opts.optedOut) return { replied: false, reason: "opted_out" as const };
+  const nyDay = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const earlier = await db
+    .select({ at: schema.messages.createdAt })
+    .from(schema.messages)
+    .where(and(eq(schema.messages.toNumber, from), eq(schema.messages.event, "catalog_reply"), gte(schema.messages.createdAt, new Date(now.getTime() - 36 * 3600_000))));
+  if (earlier.some((r) => nyDay(r.at) === nyDay(now))) return { replied: false, reason: "already_today" as const };
+  const r = await opts.send(from, catalogText());
+  await recordCatalogRequest({ callerPhone: from, channel: "text", to: from, sent: r.sent, source: "text_keyword" });
+  return { replied: r.sent, reason: r.sent ? null : ("send_failed" as const) };
 }
