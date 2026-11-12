@@ -119,19 +119,28 @@ export async function makeGoogleRecording(key: string, wording: string, userId: 
   const have = await googleRecordingFor(key, wording);
   if (have) return have;
   if (!googleTtsReady()) return null;
-  const name = googleVoiceName();
+  const data = await synthesize(wording, googleVoiceName(), fetcher);
+  return storeGoogleRecording(key, `${key}-google.mp3`, wording, data, userId);
+}
+
+/** Google Text-to-Speech (the same setup for the pre-recorded lines and the voice samples): MP3 bytes. */
+export async function synthesize(text: string, voiceName: string, fetcher: typeof fetch = fetch): Promise<Buffer> {
   const res = await fetcher(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${encodeURIComponent(process.env.GOOGLE_TTS_API_KEY!)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ input: { text: wording }, voice: { languageCode: name.slice(0, 5), name }, audioConfig: { audioEncoding: "MP3" } }),
+    body: JSON.stringify({ input: { text }, voice: { languageCode: voiceName.slice(0, 5), name: voiceName }, audioConfig: { audioEncoding: "MP3" } }),
   });
   if (!res.ok) throw new Error(`Google voice didn't answer (${res.status}).`);
   const { audioContent } = (await res.json()) as { audioContent?: string };
   const data = Buffer.from(audioContent ?? "", "base64");
   if (!data.length) throw new Error("Google voice sent back no audio.");
+  return data;
+}
+
+export async function storeGoogleRecording(key: string, fileName: string, wording: string, data: Buffer, userId: number | null) {
   const [r] = await db
     .insert(schema.promptRecordings)
-    .values({ promptKey: key, source: "google", fileName: `${key}-google.mp3`, contentType: "audio/mpeg", sizeBytes: data.length, wording, createdBy: userId })
+    .values({ promptKey: key, source: "google", fileName, contentType: "audio/mpeg", sizeBytes: data.length, wording, createdBy: userId })
     .returning();
   for (let i = 0; i * RECORDING_CHUNK_BYTES < data.length; i++) {
     await db.insert(schema.promptRecordingChunks).values({ recordingId: r.id, idx: i, data: data.subarray(i * RECORDING_CHUNK_BYTES, (i + 1) * RECORDING_CHUNK_BYTES) });

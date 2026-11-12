@@ -5,6 +5,8 @@ import { config } from "@/lib/config";
 import { promptRecordingLink } from "@/lib/signed-link";
 import { googleTtsReady, recordingsByKey } from "@/lib/prompt-recordings";
 import PromptEditor, { type RecordingView } from "./PromptEditor";
+import VoiceSamples from "./VoiceSamples";
+import { VOICE_SAMPLE_TEXT, voiceSamples } from "@/lib/voice-samples";
 
 export const metadata = { title: "Hotline prompts · Hup Up Attractions" };
 export const dynamic = "force-dynamic";
@@ -15,6 +17,7 @@ export default async function PromptsPage() {
   const byKey = new Map(rows.map((r) => [r.key, r]));
   const recs = await recordingsByKey();
   const ttsReady = googleTtsReady();
+  const samples = (await voiceSamples()).map((x) => ({ voice: x.voice, fileName: x.fileName, src: x.recording ? promptRecordingLink(x.recording.id) : null }));
   const groups = new Map<string, { key: string; def: PromptDef }[]>();
   for (const [key, def] of Object.entries(PROMPTS) as [string, PromptDef][]) {
     groups.set(def.group, [...(groups.get(def.group) ?? []), { key, def }]);
@@ -51,6 +54,7 @@ export default async function PromptsPage() {
           account and key. Until then the phone line speaks the same Google voice live, and the play button here is off.
         </p>
       )}
+      <VoiceSamples text={VOICE_SAMPLE_TEXT} samples={samples} ttsReady={ttsReady} liveVoice={config.voice().replace(/^Google\./, "")} />
       {[...groups.entries()].map(([group, items]) => (
         <section key={group} className="card mb-5 p-5">
           <h2 className="mb-3 text-lg font-bold">{group}</h2>

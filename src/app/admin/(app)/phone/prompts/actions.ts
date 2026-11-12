@@ -108,3 +108,18 @@ export async function approvePromptAction(key: string): Promise<R> {
   revalidatePath("/admin/phone/prompts");
   return { ok: true, message: "Approved. This line plays on the phone now." };
 }
+
+/** Voice samples (listening only; never changes IVR_VOICE or a live line). */
+export async function makeVoiceSamplesAction(): Promise<R> {
+  const s = await requireOwner();
+  const { makeVoiceSamples } = await import("@/lib/voice-samples");
+  try {
+    const made = await makeVoiceSamples(s.userId);
+    if (made === null) return { ok: false, message: "Not active yet: Google Text-to-Speech needs a Google Cloud billing account and key (GOOGLE_TTS_API_KEY)." };
+    await log(s.userId, "voice_samples.made", "voice-samples", { made });
+    revalidatePath("/admin/phone/prompts");
+    return { ok: true, message: made ? `Made ${made} voice sample${made > 1 ? "s" : ""}.` : "All samples are already made." };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+}
