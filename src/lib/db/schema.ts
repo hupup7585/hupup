@@ -121,6 +121,10 @@ export const orders = pgTable(
     /** sola | cash | check | other */
     paymentMethod: text("payment_method"),
     solaRefNum: text("sola_ref_num"),
+    /** Sola's last answer for this order (Abraham, Nov 12, 2026): "approved" | "declined", when, and the card's last 4 only */
+    paymentResult: text("payment_result"),
+    paymentResultAt: timestamp("payment_result_at", { withTimezone: true }),
+    cardLast4: text("card_last4"),
     notes: text("notes"),
     holdExpiresAt: timestamp("hold_expires_at", { withTimezone: true }),
     callSid: text("call_sid"),

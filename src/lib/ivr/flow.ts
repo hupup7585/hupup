@@ -1612,11 +1612,14 @@ const handlers: Record<string, Handler> = {
     const consented = data.smsConsent === "yes" || data.smsConsent === "existing";
     let texted = false;
     let emailed = false;
+    // Abraham (Nov 12, 2026): the Sola payment link (items + delivery + tax) is emailed to the caller; it's also
+    // texted with order-text consent once Twilio approves texting (until then the text doesn't go out).
     if (phone && consented) {
       // The STOP line is added by the text system on the first order text (or after 30 days without one)
       const res = await sendSms(phone, details, { kind: "transactional", event: "order_payment_link", customerId, orderId: primary.id, callSid: ctx.callSid });
       texted = res.sent;
-    } else if (!consented && data.email) {
+    }
+    if (data.email) {
       const res = await sendEmail(data.email, `${BUSINESS_NAME} order #${num}`, details);
       emailed = res.sent;
     }
@@ -1628,8 +1631,9 @@ const handlers: Record<string, Handler> = {
     // payment link below is the way to pay until Abraham approves it.
     if (keypadPayOn()) return back(vr, "pay-keypad", { o: primary.id });
     if (texted) sp(vr, ctx, "link_sent", { minutes: PAYMENT_HOLD_MINUTES });
-    else if (emailed) sp(vr, ctx, "link_emailed", { minutes: PAYMENT_HOLD_MINUTES });
-    else if (!consented) sp(vr, ctx, "link_call_back");
+    else if (emailed && !consented) sp(vr, ctx, "link_emailed", { minutes: PAYMENT_HOLD_MINUTES });
+    else if (emailed && !promptWaiting(ctx.prompts, "link_emailed_consented")) sp(vr, ctx, "link_emailed_consented", { minutes: PAYMENT_HOLD_MINUTES });
+    else if (!consented && !data.email) sp(vr, ctx, "link_call_back");
     else sp(vr, ctx, "link_failed");
     await updateSession(ctx.callSid, { data: { placedOrderId: primary.id } }, ctx.session);
     return back(vr, "promo-consent");

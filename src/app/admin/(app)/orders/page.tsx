@@ -1,3 +1,4 @@
+import { paymentResultLabel } from "@/lib/payment-result";
 import { Download } from "lucide-react";
 import Link from "next/link";
 import { listOrders } from "@/lib/admin-queries";
@@ -54,8 +55,15 @@ export default async function OrdersPage({
                 <td className="td whitespace-nowrap"><DualDate yi iso={o.event_date} style="short" /><div className="text-xs text-muted">→ <DualDate yi iso={o.pickup_date} style="short" /></div></td>
                 <td className="td">{o.items}</td>
                 <td className="td">{o.channel === "PHONE" ? "Phone" : "In person"}</td>
-                <td className="td font-bold">{formatMoney(o.subtotal_cents)}</td>
-                <td className={`td ${o.paid_cents >= o.subtotal_cents && o.subtotal_cents > 0 ? "text-mint font-bold" : "text-muted"}`}>{formatMoney(o.paid_cents)}</td>
+                <td className="td font-bold">{formatMoney(o.total_cents ?? o.subtotal_cents)}</td>
+                <td className={`td ${o.paid_cents >= (o.total_cents ?? o.subtotal_cents) && o.subtotal_cents > 0 ? "text-mint font-bold" : "text-muted"}`}>
+                  {formatMoney(o.paid_cents)}
+                  {o.payment_result && (
+                    <div data-payment-result className={`text-xs ${o.payment_result === "declined" ? "font-bold text-coral-dark" : "text-muted"}`}>
+                      {paymentResultLabel({ paymentResult: o.payment_result, paymentResultAt: o.payment_result_at, cardLast4: o.card_last4 })}
+                    </div>
+                  )}
+                </td>
                 <td className="td"><StatusBadge status={o.status} /></td>
               </tr>
             ))}

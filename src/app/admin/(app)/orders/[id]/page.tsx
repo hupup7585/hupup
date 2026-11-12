@@ -1,3 +1,4 @@
+import { paymentResultLabel } from "@/lib/payment-result";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderWithItems, orderNumber } from "@/lib/orders";
@@ -54,6 +55,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 <div>Total <b className="ml-3 text-lg">{formatMoney(o.subtotalCents)}</b></div>
               )}
               <div className="text-sm text-muted">Paid {formatMoney(o.paidCents)}{o.paymentMethod ? ` (${o.paymentMethod})` : ""}{o.solaRefNum ? ` · Sola ref ${o.solaRefNum}` : ""}</div>
+              {o.paymentResult && (
+                <div data-payment-result className={`text-sm ${o.paymentResult === "declined" ? "font-bold text-coral-dark" : "text-[#13895C] font-semibold"}`}>
+                  {paymentResultLabel(o)}
+                </div>
+              )}
               {due > 0 && <div className="text-sm font-bold text-coral">Balance due {formatMoney(due)}</div>}
             </div>
           </div>

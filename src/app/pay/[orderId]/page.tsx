@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { paymentLink } from "@/lib/sola";
 import { getPaymentGroup, orderNumber } from "@/lib/orders";
+import { ensureGroupPriced } from "@/lib/order-pricing";
 import { termsActive, verifyPayToken } from "@/lib/rental-terms";
 import PayForm from "./PayForm";
 import { webConsentCopy } from "@/lib/sms-terms-v2";
@@ -18,6 +19,10 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   const { t } = await searchParams;
   const id = Number(orderId);
   if (!Number.isInteger(id) || !verifyPayToken(id, t)) notFound();
+  // Every link charges items + delivery + tax: price any order not priced yet (made in Admin, or older ones)
+  const before = await getPaymentGroup(id);
+  if (!before) notFound();
+  if (!(await ensureGroupPriced(before.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id)))) notFound();
   const group = await getPaymentGroup(id);
   if (!group) notFound();
   const full = group.primary;

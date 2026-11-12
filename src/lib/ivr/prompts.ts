@@ -238,6 +238,13 @@ export const PROMPTS = {
   terms_link_no_text: { group: "Checkout", label: "Can't text the Terms link (no text consent)", text: "We can't text you, because you didn't agree to text messages, but you can read our Terms at hupupattractions.com/terms." },
   terms_required: { group: "Checkout", label: "Terms not accepted", text: "To finish your booking, you need to accept our Terms and Conditions. Please call us back anytime. Goodbye!" },
   link_emailed: { group: "Checkout", label: "Payment link emailed (no texts)", text: "No problem, we won't text you. We just emailed you a secure payment link. Your party rentals are saved for {minutes} minutes while you pay.", vars: ["minutes"] },
+  link_emailed_consented: {
+    group: "Checkout",
+    label: "Payment link emailed (caller agreed to texts, texting not live yet). Draft",
+    pending: true, // new wording: waits for Abraham's OK; until then the caller hears "Couldn't text the link"
+    text: "We just emailed you a secure payment link. Your party rentals are saved for {minutes} minutes while you pay.",
+    vars: ["minutes"],
+  },
   link_call_back: { group: "Checkout", label: "No texts and no email", text: "No problem, we won't text you. Someone from our team will call you shortly to finish your payment." },
 
   // Talk to a person

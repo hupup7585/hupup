@@ -75,3 +75,18 @@ export function isApproved(fields: Record<string, string>): boolean {
   const r = (field(fields, "xResult") || field(fields, "xStatus") || "").toUpperCase();
   return r === "A" || r === "APPROVED";
 }
+
+/** "approved" (A), "declined" (D or E), or null for anything else (e.g. a void or refund notice). */
+export function paymentResultOf(fields: Record<string, string>): "approved" | "declined" | null {
+  const r = (field(fields, "xResult") || "").toUpperCase();
+  const st = (field(fields, "xStatus") || "").toUpperCase();
+  if (r === "A" || st === "APPROVED") return "approved";
+  if (r === "D" || r === "E" || st === "DECLINED" || st === "ERROR") return "declined";
+  return null;
+}
+
+/** The card's last 4 digits only, from Sola's masked number (e.g. "4xxxxxxxxxxx1111" -> "1111"). Nothing else is kept. */
+export function last4Of(fields: Record<string, string>): string | null {
+  const m = /(\d{4})\s*$/.exec(field(fields, "xMaskedCardNumber") || field(fields, "xMaskedCard") || "");
+  return m ? m[1] : null;
+}

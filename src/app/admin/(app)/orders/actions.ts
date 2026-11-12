@@ -1,5 +1,7 @@
 "use server";
 
+import { ensurePriced } from "@/lib/order-pricing";
+
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
@@ -49,6 +51,7 @@ export async function recordPaymentAction(orderId: number, amount: string, metho
 
 export async function sendPayLinkAction(orderId: number): Promise<ActionResult> {
   const session = await requireAdmin();
+  if (!(await ensurePriced(orderId))) return { ok: false, message: "Add a delivery address inside the delivery area first, so the link can include delivery and tax." };
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found" };
   const phone = full.customer?.phone;

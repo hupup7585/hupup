@@ -1,5 +1,7 @@
 "use server";
 
+import { ensurePriced } from "@/lib/order-pricing";
+
 import { headers } from "next/headers";
 import { recordBookingConsents } from "@/lib/booking-consent";
 import { revalidatePath } from "next/cache";
@@ -133,14 +135,18 @@ export async function createBookingAction(input: {
   });
   let message = `Booked order number ${orderNumber(r.orderId)}.`;
   if (consents.stopped) message += " Text consent wasn't saved: this number replied STOP (the customer can text START to get texts again).";
-  if (input.payment === "link" && phone) {
+  // Price the booking (items + delivery + tax) so the link and every total include delivery and tax
+  const priced = await ensurePriced(r.orderId);
+  if (input.payment === "link" && phone && !priced) {
+    message += " Payment link not sent: the delivery address isn't inside the delivery area, so delivery and tax can't be added. Fix the address on the order, then send the link from the order page.";
+  } else if (input.payment === "link" && phone) {
     const full = await getOrderWithItems(r.orderId);
     const link = payPageLink(r.orderId); // review-and-pay page: Terms box, then Sola
     const sent = await sendOrderText({
       phone,
       email: input.email || null,
       subject: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} payment link`,
-      body: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} for ${messageDate(input.date)}: $${(full!.order.subtotalCents / 100).toFixed(2)}. Pay securely within 2 hours to confirm: ${link}`,
+      body: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} for ${messageDate(input.date)}: $${((full!.order.totalCents ?? full!.order.subtotalCents) / 100).toFixed(2)}. Pay securely within 2 hours to confirm: ${link}`,
       orderId: r.orderId,
       customerId: full?.customer?.id ?? null,
       userId: session.userId ?? null,

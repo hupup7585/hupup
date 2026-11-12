@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { config } from "@/lib/config";
 import { getPaymentGroup } from "@/lib/orders";
+import { ensureGroupPriced } from "@/lib/order-pricing";
 import { paymentLink } from "@/lib/sola";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, verifyPayToken } from "@/lib/rental-terms";
 import { TERMS_TEXT } from "@/lib/terms-content";
@@ -16,7 +17,10 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
   if (!verifyPayToken(orderId, token)) return { error: "This payment link is not valid. Please call us." };
   if (!agreed) return { error: "Please check the box to agree to the Terms and Conditions before paying." };
   // One charge for every rental day booked together (payment group)
-  const group = await getPaymentGroup(orderId);
+  const pre = await getPaymentGroup(orderId);
+  if (!pre) return { error: "Order not found." };
+  if (!(await ensureGroupPriced(pre.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id)))) return { error: "This order is not ready for payment yet. Please call us." };
+  const group = await getPaymentGroup(orderId); // priced: items + delivery + tax
   if (!group) return { error: "Order not found." };
   const full = group.primary;
   if (full.order.status !== "PENDING_PAYMENT") return { error: "This order is not waiting for payment. Please call us." };

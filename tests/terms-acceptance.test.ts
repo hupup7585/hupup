@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const h = vi.hoisted(() => ({ recorded: [] as Record<string, unknown>[], redirected: "" as string, order: null as unknown }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-forwarded-for": "1.2.3.4", "user-agent": "UA" }) }));
 vi.mock("next/navigation", () => ({ redirect: (u: string) => ((h.redirected = u), undefined) }));
+vi.mock("@/lib/order-pricing", () => ({ ensurePriced: async () => true, ensureGroupPriced: async () => true })); // orders here are already priced
 vi.mock("@/lib/orders", async (orig) => ({
   ...(await orig<typeof import("@/lib/orders")>()),
   getOrderWithItems: async () => h.order,
