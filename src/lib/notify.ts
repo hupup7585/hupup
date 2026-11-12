@@ -26,6 +26,18 @@ export async function sendOrderText(input: { phone: string; email?: string | nul
   return { texted: false, emailed: false, message: r.error || "SMS failed" };
 }
 
+/**
+ * Sender for every email (Abraham, Nov 12, 2026): "Hup Up Attractions <info@hupupattractions.com>" (EMAIL_FROM in
+ * Vercel; hupupattractions.com is verified in Resend), and replies always go to info@. The catalog auto-reply and
+ * replies from the Admin info@ inbox use this same sender.
+ */
+export const EMAIL_SENDER = `${BUSINESS_NAME} <info@hupupattractions.com>`;
+export const EMAIL_REPLY_TO = "info@hupupattractions.com";
+
+export function emailEnvelope(to: string, env: Record<string, string | undefined> = process.env) {
+  return { from: env.EMAIL_FROM || EMAIL_SENDER, reply_to: EMAIL_REPLY_TO, to };
+}
+
 export type EmailAttachment = { filename: string; content: string /* base64 */ };
 
 export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = []): Promise<SendResult> {
@@ -39,8 +51,7 @@ export async function sendEmail(to: string, subject: string, text: string, attac
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || `${BUSINESS_NAME} <onboarding@resend.dev>`,
-        to,
+        ...emailEnvelope(to),
         subject,
         text,
         ...(attachments.length ? { attachments } : {}),
