@@ -5,28 +5,52 @@ import { eq } from "drizzle-orm";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { PROMPTS, type PromptKey } from "@/lib/ivr/prompts";
+import { PromptError, approveDraft, discardDraft, restoreVersion, saveDraft } from "@/lib/prompt-versions";
 import { approvePrompt, getRecording, makeGoogleRecording, saveRecordingChunk, startRecordingUpload, chooseGoogleVoice, chooseRecording } from "@/lib/prompt-recordings";
 
+/** Edit (Abraham, Nov 13, 2026): saves a new draft "Waiting for approval"; the live wording keeps playing. */
 export async function savePromptAction(key: string, text: string): Promise<{ ok: boolean; message: string }> {
-  await requireOwner();
-  if (!(key in PROMPTS)) return { ok: false, message: "Unknown prompt" };
-  const clean = text.trim();
-  if (/<[^>]+>/.test(clean)) return { ok: false, message: "Plain text only: the hotline voice doesn't support tags or SSML." };
-  if (clean.length > 600) return { ok: false, message: "Please keep prompts under 600 characters." };
-  const def = PROMPTS[key as PromptKey] as { vars?: string[] };
-  const missing = (def.vars ?? []).filter((v) => !clean.includes(`{${v}}`));
-  if (clean && missing.length) return { ok: false, message: `Keep these placeholders in the text: ${missing.map((m) => `{${m}}`).join(", ")}` };
-  if (!clean) {
-    // Back to the default wording; the line's recordings and approval stay (Abraham: never delete recordings)
-    await db.update(schema.voicePrompts).set({ text: null, updatedAt: new Date() }).where(eq(schema.voicePrompts.key, key));
-  } else {
-    await db
-      .insert(schema.voicePrompts)
-      .values({ key, text: clean })
-      .onConflictDoUpdate({ target: schema.voicePrompts.key, set: { text: clean, updatedAt: new Date() } });
+  const s = await requireOwner();
+  try {
+    await saveDraft(key, text, s.userId);
+  } catch (e) {
+    return { ok: false, message: e instanceof PromptError ? e.message : "Something went wrong. Nothing was saved." };
   }
   revalidatePath("/admin/phone/prompts");
-  return { ok: true, message: clean ? "Saved — callers hear this right away." : "Reset to the default wording." };
+  return { ok: true, message: "Saved as a draft, waiting for approval. The live line keeps playing until you approve it." };
+}
+
+export async function approveDraftAction(versionId: number): Promise<{ ok: boolean; message: string }> {
+  const s = await requireOwner();
+  try {
+    const r = await approveDraft(versionId, s.userId);
+    revalidatePath("/admin/phone/prompts");
+    return { ok: true, message: r.recorded ? "Approved and live, with a new Google voice recording." : "Approved and live now (live Google voice)." };
+  } catch (e) {
+    return { ok: false, message: e instanceof PromptError ? e.message : "Something went wrong. Nothing changed." };
+  }
+}
+
+export async function discardDraftAction(versionId: number): Promise<{ ok: boolean; message: string }> {
+  const s = await requireOwner();
+  try {
+    await discardDraft(versionId, s.userId);
+  } catch (e) {
+    return { ok: false, message: e instanceof PromptError ? e.message : "Something went wrong." };
+  }
+  revalidatePath("/admin/phone/prompts");
+  return { ok: true, message: "Draft set aside (kept in the history). The live line is unchanged." };
+}
+
+export async function restoreVersionAction(versionId: number): Promise<{ ok: boolean; message: string }> {
+  const s = await requireOwner();
+  try {
+    await restoreVersion(versionId, s.userId);
+  } catch (e) {
+    return { ok: false, message: e instanceof PromptError ? e.message : "Something went wrong. Nothing changed." };
+  }
+  revalidatePath("/admin/phone/prompts");
+  return { ok: true, message: "That version is live again." };
 }
 
 type R = { ok: boolean; message: string };

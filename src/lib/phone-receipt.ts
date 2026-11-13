@@ -1,4 +1,4 @@
-import { BUSINESS_NAME } from "@/lib/config";
+import { loadPromptOverrides, promptText, type PromptOverrides } from "@/lib/ivr/prompts";
 import { sendEmail } from "@/lib/notify";
 import { orderNumber } from "@/lib/orders";
 import { inboxWhen } from "@/lib/inbox-format";
@@ -9,30 +9,22 @@ import { inboxWhen } from "@/lib/inbox-format";
  */
 export const RECEIPT_APPROVED = true; // Abraham, Nov 13, 2026: approved; replaces the short "payment received" email
 
-export function phoneReceipt(input: { orderId: number; paidAt: Date; amountCents: number; last4: string | null; name?: string | null }) {
+export function phoneReceipt(input: { orderId: number; paidAt: Date; amountCents: number; last4: string | null; name?: string | null }, overrides: PromptOverrides = {}) {
   const num = orderNumber(input.orderId);
   return {
-    subject: `${BUSINESS_NAME} receipt for order #${num}`,
-    text: [
-      `Hi${input.name ? ` ${input.name.split(" ")[0]}` : ""},`,
-      "",
-      "Thank you for your payment! Here is your receipt.",
-      "",
-      `Order number: ${num}`,
-      `Paid on: ${inboxWhen(input.paidAt)}`,
-      `Amount: $${(input.amountCents / 100).toFixed(2)}`,
-      `Card: ending in ${input.last4 ?? "on file"}`,
-      "",
-      "Your rentals are booked. If you have any questions, call us at (845) 777-7585 or reply to this email.",
-      "",
-      BUSINESS_NAME,
-      "hupupattractions.com",
-    ].join("\n"),
+    subject: promptText(overrides, "msg_receipt_subject", { number: num }),
+    text: promptText(overrides, "msg_receipt_body", {
+      greeting: `Hi${input.name ? ` ${input.name.split(" ")[0]}` : ""},`,
+      number: num,
+      paid_on: inboxWhen(input.paidAt),
+      amount: (input.amountCents / 100).toFixed(2),
+      last4: input.last4 ?? "on file",
+    }),
   };
 }
 
 export async function sendPhoneReceipt(to: string | null | undefined, input: Parameters<typeof phoneReceipt>[0], approved = RECEIPT_APPROVED) {
   if (!approved || !to) return { sent: false };
-  const r = phoneReceipt(input);
+  const r = phoneReceipt(input, await loadPromptOverrides());
   return sendEmail(to, r.subject, r.text);
 }

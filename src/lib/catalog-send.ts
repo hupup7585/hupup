@@ -34,16 +34,15 @@ export async function catalogLines() {
 /** The catalog email: subject "Hup Up Attractions catalog", categories and items from Admin, the Rentals link. */
 export async function catalogEmail() {
   const lines = await catalogLines();
+  const { loadPromptOverrides, promptText } = await import("@/lib/ivr/prompts");
+  const p = await loadPromptOverrides(); // wording from Hotline prompts > Texts and emails
   const text = [
-    `Thank you for your interest in ${BUSINESS_NAME}!`,
-    "",
-    "Here is our catalog:",
+    promptText(p, "msg_catalog_email_top"),
     ...lines.flatMap((c) => ["", c.category, ...c.items.map((i) => `- ${i.name}${i.description ? `: ${i.description}` : ""}`)]),
     "",
-    "See our rentals: hupupattractions.com/#rentals",
-    `To book, call ${PUBLIC_PHONE_DISPLAY}.`,
+    promptText(p, "msg_catalog_email_bottom"),
   ].join("\n");
-  return { subject: `${BUSINESS_NAME} catalog`, text };
+  return { subject: promptText(p, "msg_catalog_email_subject"), text };
 }
 
 export async function sendCatalogEmail(to: string) {
@@ -135,7 +134,8 @@ export async function replyToCatalogText(
     .from(schema.messages)
     .where(and(eq(schema.messages.toNumber, from), eq(schema.messages.event, "catalog_reply"), gte(schema.messages.createdAt, new Date(now.getTime() - 36 * 3600_000))));
   if (earlier.some((r) => nyDay(r.at) === nyDay(now))) return { replied: false, reason: "already_today" as const };
-  const r = await opts.send(from, catalogText());
+  const { messageText } = await import("@/lib/ivr/prompts");
+  const r = await opts.send(from, await messageText("msg_catalog_text"));
   await recordCatalogRequest({ callerPhone: from, channel: "text", to: from, sent: r.sent, source: "text_keyword" });
   return { replied: r.sent, reason: r.sent ? null : ("send_failed" as const) };
 }

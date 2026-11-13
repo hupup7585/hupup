@@ -1124,3 +1124,17 @@ export const stripePayouts = pgTable("stripe_payouts", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Every version of a phone line or message (Abraham, Nov 13, 2026): draft -> live -> replaced. Never deleted. */
+export const promptVersions = pgTable("prompt_versions", {
+  id: serial("id").primaryKey(),
+  promptKey: text("prompt_key").notNull(),
+  text: text("text").notNull(),
+  /** draft | live | replaced | discarded */
+  status: text("status").notNull(),
+  note: text("note"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  approvedBy: integer("approved_by"),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+});

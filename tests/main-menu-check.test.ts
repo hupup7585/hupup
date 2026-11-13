@@ -173,7 +173,7 @@ describe("key 4: learn about our rentals (was key 3)", () => {
   });
   it("all key 2 and key 3 lines are editable on the Hotline prompts page", () => {
     for (const k of ["attraction_choice", "attraction_menu_back", "attraction_after", "instr_intro", "instr_balloons", "instr_laser", "instr_paddle", "learn_intro", "learn_balloons", "learn_laser", "learn_paddle", "learn_items", "learn_deliver", "learn_none"] as const) {
-      expect(PROMPTS[k].group).toMatch(/^Key [23]:/);
+      expect(PROMPTS[k].group).toMatch(/^Key [24]:/); // key 3 is customer service now; learn is key 4
       expect((PROMPTS[k] as { textOnly?: boolean }).textOnly).not.toBe(true);
     }
   });

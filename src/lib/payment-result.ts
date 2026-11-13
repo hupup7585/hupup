@@ -36,10 +36,11 @@ export async function paymentReceivedNotices(orderId: number, cents: number, opt
   const before = group.primary;
   const days = group.orders;
   const num = orderNumber(orderId);
+  const { messageText } = await import("@/lib/ivr/prompts");
   const msg =
     days.length > 1
-      ? `${BUSINESS_NAME}: payment received for order #${num}. You're all set for ${days.map((d) => messageDate(d.order.eventDate)).join(" and ")}! We'll deliver and pick up on the days you chose.`
-      : `${BUSINESS_NAME}: payment received for order #${num}. You're all set for ${messageDate(before.order.eventDate)}! We'll deliver that day and pick up ${messageDate(before.order.pickupDate)}.`;
+      ? await messageText("msg_payment_received_days", { number: num, dates: days.map((d) => messageDate(d.order.eventDate)).join(" and ") })
+      : await messageText("msg_payment_received", { number: num, date: messageDate(before.order.eventDate), pickup: messageDate(before.order.pickupDate) });
   // Order/service text only with order-text consent (checked in sendMessage); the email copy goes out as before.
   if (before.customer?.phone) await sendSms(before.customer.phone, msg, { kind: "transactional", event: "payment_confirmation", orderId, customerId: before.customer.id });
   if (before.customer?.email && !opts.skipCustomerEmail) await sendEmail(before.customer.email, `Order #${num} confirmed`, msg);

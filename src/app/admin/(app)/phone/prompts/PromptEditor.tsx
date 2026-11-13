@@ -1,32 +1,54 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { approvePromptAction, googleVoiceAction, makeGoogleRecordingAction, recordingChunkAction, savePromptAction, selectRecordingAction, startRecordingAction } from "./actions";
+import { approveDraftAction, approvePromptAction, discardDraftAction, googleVoiceAction, makeGoogleRecordingAction, recordingChunkAction, restoreVersionAction, savePromptAction, selectRecordingAction, startRecordingAction } from "./actions";
 
 export type RecordingView = { id: number; source: "upload" | "google"; fileName: string; createdAt: string; wording: string | null; src: string };
 
 const CHUNK = 3 * 1024 * 1024;
 
+type Status = "Live" | "Waiting for approval" | "Not active yet" | "Not used";
+type Ver = { id: number; text: string; status: string; when: string; by: string; note: string | null };
+
+const STATUS_STYLE: Record<Status, string> = {
+  Live: "bg-[#13895C]/15 text-[#13895C]",
+  "Waiting for approval": "bg-coral/20 text-coral-dark",
+  "Not active yet": "bg-sun/40 text-navy",
+  "Not used": "bg-line text-muted",
+};
+
+/**
+ * One phone line or message (Abraham, Nov 13, 2026): where it plays, the live wording, status, last change, an Edit
+ * button that saves a draft for approval, the version history with Restore, and the recording controls.
+ */
 export default function PromptEditor(props: {
   promptKey: string;
   label: string;
+  where: string;
   defaultText: string;
+  live: string;
   vars: string[];
-  current: string;
+  message: boolean;
+  status: Status;
+  reason: string | null;
+  codePending: boolean;
+  changed: { when: string; by: string } | null;
+  draft: { id: number; text: string; when: string; by: string } | null;
+  versions: Ver[];
   recordable: boolean;
-  waiting: boolean;
   activeId: number | null;
   uploads: RecordingView[];
   google: RecordingView | null;
   ttsReady: boolean;
 }) {
-  const [text, setText] = useState(props.current || props.defaultText);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(props.draft?.text ?? props.live);
   const [msg, setMsg] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, start] = useTransition();
   const [progress, setProgress] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const customized = Boolean(props.current) && props.current !== props.defaultText;
   const active = props.uploads.find((u) => u.id === props.activeId) ?? null;
+  const run = (fn: () => Promise<{ ok: boolean; message: string }>) => start(async () => setMsg(await fn()));
 
   async function upload(file: File) {
     setMsg(null);
@@ -51,55 +73,116 @@ export default function PromptEditor(props: {
   }
 
   return (
-    <div className="border-b border-line pb-4 last:border-0 last:pb-0">
+    <div className="border-b border-line pb-4 last:border-0 last:pb-0" data-prompt-line={props.promptKey}>
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <span className="font-semibold">{props.label}</span>
-        {props.waiting && <span className="rounded-full bg-coral/20 px-2 py-0.5 text-xs font-bold text-coral-dark">Waiting for approval</span>}
-        {customized && <span className="rounded-full bg-sun/30 px-2 py-0.5 text-xs font-bold">Customized</span>}
-        {props.recordable ? (
+        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${STATUS_STYLE[props.status]}`} data-prompt-status>
+          {props.status}
+        </span>
+        {props.draft && <span className="rounded-full bg-coral/20 px-2 py-0.5 text-xs font-bold text-coral-dark">New wording waiting for approval</span>}
+        {!props.message && props.recordable && (
           <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${active ? "bg-[#13895C]/15 text-[#13895C]" : "bg-sky/15 text-navy"}`}>
-            {active ? "Plays: your recording" : "Plays: Google voice"}
+            {active ? "Plays: your recording" : props.google ? "Plays: Google recording" : "Plays: Google voice"}
           </span>
-        ) : (
-          <span className="rounded-full bg-line px-2 py-0.5 text-xs font-bold text-muted">Changing parts: live Google voice</span>
         )}
-        {props.vars.length > 0 && <span className="text-xs text-muted">Uses {props.vars.map((v) => `{${v}}`).join(" ")}</span>}
+        {!props.message && !props.recordable && <span className="rounded-full bg-line px-2 py-0.5 text-xs font-bold text-muted">Changing parts: live Google voice</span>}
       </div>
-      {props.waiting && <p className="mb-1 text-xs text-coral-dark">This line never plays on the phone until you approve it.</p>}
-      <textarea className="input" rows={2} value={text} onChange={(e) => setText(e.target.value)} />
+      <p className="text-xs text-muted">
+        Where: {props.where}
+        {props.vars.length > 0 && <> · changing parts {props.vars.map((v) => `{${v}}`).join(" ")}</>}
+        {" · "}
+        {props.changed ? <>last changed {props.changed.when} by {props.changed.by}</> : "original wording (never changed)"}
+      </p>
+      {props.reason && <p className="mt-1 text-xs font-semibold text-coral-dark">{props.reason}</p>}
+      {props.status === "Waiting for approval" && props.codePending && !props.draft && (
+        <p className="mt-1 text-xs text-coral-dark">This line never plays on the phone until you approve it.</p>
+      )}
+      <p className={`mt-2 whitespace-pre-wrap rounded-lg border border-line bg-white p-3 ${props.message ? "font-mono text-[13px]" : "text-[15px]"}`} data-prompt-live>
+        {props.live}
+      </p>
+      {props.draft && (
+        <div className="mt-2 rounded-lg border-2 border-coral bg-[#FDF1EF] p-3" data-prompt-draft>
+          <p className="text-xs font-bold text-coral-dark">
+            Draft from {props.draft.when} by {props.draft.by}, waiting for approval. The wording above keeps playing until you approve.
+          </p>
+          <p className={`mt-1 whitespace-pre-wrap ${props.message ? "font-mono text-[13px]" : "text-[15px]"}`}>{props.draft.text}</p>
+          <div className="mt-2 flex gap-2">
+            <button className="btn-dark !py-1.5 text-sm" disabled={pending} onClick={() => run(() => approveDraftAction(props.draft!.id))}>
+              Approve and make live
+            </button>
+            <button className="btn-ghost !py-1.5 text-sm" disabled={pending} onClick={() => run(() => discardDraftAction(props.draft!.id))}>
+              Discard draft
+            </button>
+          </div>
+        </div>
+      )}
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button
-          className="btn-dark !py-1.5 text-sm"
-          disabled={pending}
-          onClick={() => start(async () => setMsg(await savePromptAction(props.promptKey, text === props.defaultText ? "" : text)))}
-        >
-          Save
-        </button>
-        <button
-          className="btn-ghost !py-1.5 text-sm"
-          disabled={pending}
-          onClick={() => {
-            setText(props.defaultText);
-            start(async () => setMsg(await savePromptAction(props.promptKey, "")));
-          }}
-        >
-          Reset to default
-        </button>
-        {props.waiting && (
-          <button className="btn-ghost !py-1.5 text-sm" disabled={pending} onClick={() => start(async () => setMsg(await approvePromptAction(props.promptKey)))}>
+        {!editing && (
+          <button className="btn-ghost !py-1.5 text-sm" disabled={pending} onClick={() => { setText(props.draft?.text ?? props.live); setEditing(true); }}>
+            Edit
+          </button>
+        )}
+        {props.codePending && !props.draft && props.status === "Waiting for approval" && (
+          <button className="btn-ghost !py-1.5 text-sm" disabled={pending} onClick={() => run(() => approvePromptAction(props.promptKey))}>
             Approve this wording
           </button>
         )}
       </div>
-
-      {props.recordable && (
+      {editing && (
+        <div className="mt-2" data-prompt-edit>
+          <textarea className="input" rows={props.message ? 8 : 3} value={text} onChange={(e) => setText(e.target.value)} aria-label={`New wording: ${props.label}`} />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              className="btn-dark !py-1.5 text-sm"
+              disabled={pending}
+              onClick={() =>
+                start(async () => {
+                  const r = await savePromptAction(props.promptKey, text);
+                  setMsg(r);
+                  if (r.ok) setEditing(false);
+                })
+              }
+            >
+              Save as draft
+            </button>
+            <button className="btn-ghost !py-1.5 text-sm" disabled={pending} onClick={() => setText(props.defaultText)}>
+              Start from the original wording
+            </button>
+            <button className="btn-ghost !py-1.5 text-sm" disabled={pending} onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {props.versions.length > 0 && (
+        <details className="mt-2" data-prompt-versions>
+          <summary className="cursor-pointer text-xs font-semibold text-muted">Older versions ({props.versions.filter((v) => v.status !== "live").length}, all kept)</summary>
+          <ul className="mt-2 space-y-2 text-sm">
+            {props.versions.map((v) => (
+              <li key={v.id} className="rounded-lg bg-bg p-2">
+                <p className="text-xs text-muted">
+                  {v.status === "live" ? "Live now" : v.status === "discarded" ? "Draft set aside" : "Earlier version"} · {v.when} · {v.by}
+                  {v.note && v.note !== "Original wording" ? ` · ${v.note.replace(/ of \d{4}-.*$/, "")}` : ""}
+                </p>
+                <p className="whitespace-pre-wrap">{v.text}</p>
+                {v.status !== "live" && (
+                  <button className="btn-ghost mt-1 !py-1 text-xs" disabled={pending} onClick={() => run(() => restoreVersionAction(v.id))}>
+                    Go back to this version
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {props.recordable && !props.message && (
         <div className="mt-3 rounded-xl bg-bg p-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span className="w-32 shrink-0 font-semibold">Google voice</span>
             {props.google ? (
               <audio controls preload="none" src={props.google.src} className="h-8 max-w-full" aria-label={`Google voice: ${props.label}`} />
             ) : props.ttsReady ? (
-              <button className="btn-ghost !py-1 text-sm" disabled={pending} onClick={() => start(async () => setMsg(await makeGoogleRecordingAction(props.promptKey, props.current || props.defaultText)))}>
+              <button className="btn-ghost !py-1 text-sm" disabled={pending} onClick={() => start(async () => setMsg(await makeGoogleRecordingAction(props.promptKey, props.live)))}>
                 Make Google recording
               </button>
             ) : (

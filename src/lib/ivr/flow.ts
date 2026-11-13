@@ -509,7 +509,7 @@ const catalogEmailOf = (ctx: Ctx) => {
 const catalogTextReady = () => textingActive() || process.env.VERCEL_ENV !== "production";
 
 async function catalogSendText(ctx: Ctx, vr: VR, to: string) {
-  const r = await sendMessage({ to, body: catalogText(), kind: "system", event: "catalog_request", callSid: ctx.callSid });
+  const r = await sendMessage({ to, body: promptText(ctx.prompts, "msg_catalog_text"), kind: "system", event: "catalog_request", callSid: ctx.callSid });
   await logCatalogRequest(ctx, "text", to, r.sent);
   if (!r.sent) {
     sp(vr, ctx, "catalog_text_not_yet");
@@ -554,10 +554,16 @@ async function sendPayLinkAndSay(ctx: Ctx, vr: VR, orderId: number, who: { phone
   const num = orderNumber(group.primary.order.id);
   const link = payPageLink(group.primary.order.id); // review-and-pay page for the whole reservation, then Sola
   const dayText = (o: (typeof days)[number]) => `${o.items.map((i) => `${i.qty} x ${i.name}`).join(", ")} for ${messageDate(o.order.eventDate)} (pickup ${messageDate(o.order.pickupDate)})`;
-  const details =
-    `${BUSINESS_NAME} order #${num}: ${days.map(dayText).join("; ")}. ` +
-    `Rentals $${money(totals.subtotalCents)} + delivery $${money(totals.deliveryFeeCents)} + sales tax $${money(totals.taxCents)} = total $${money(totals.totalCents)}. ` +
-    `Pay securely within ${PAYMENT_HOLD_MINUTES} minutes to confirm: ${link}`;
+  const details = promptText(ctx.prompts, "msg_payment_link", {
+    number: num,
+    items: days.map(dayText).join("; "),
+    rentals: money(totals.subtotalCents),
+    delivery: money(totals.deliveryFeeCents),
+    tax: money(totals.taxCents),
+    total: money(totals.totalCents),
+    minutes: PAYMENT_HOLD_MINUTES,
+    link,
+  });
   // Texts go out only with transactional consent given on this call or recorded before.
   const consented = data.smsConsent === "yes" || data.smsConsent === "existing";
   let texted = false;
@@ -568,7 +574,7 @@ async function sendPayLinkAndSay(ctx: Ctx, vr: VR, orderId: number, who: { phone
     texted = res.sent;
   }
   if (data.email) {
-    const res = await sendEmail(data.email, `${BUSINESS_NAME} order #${num}`, details);
+    const res = await sendEmail(data.email, promptText(ctx.prompts, "msg_payment_link_subject", { number: num }), details);
     emailed = res.sent;
   }
   if (texted) sp(vr, ctx, "link_sent", { minutes: PAYMENT_HOLD_MINUTES });
@@ -1495,7 +1501,7 @@ const handlers: Record<string, Handler> = {
       // Text the Terms link (only with order-text consent from this call or before).
       const phone = ctx.session?.data.phone;
       const consented = ctx.session?.data.smsConsent === "yes" || ctx.session?.data.smsConsent === "existing";
-      const r = phone && consented ? await sendSms(phone, `${BUSINESS_NAME} Terms and Conditions: ${config.baseUrl()}/terms`, { kind: "transactional", event: "terms_link", orderId: order.order.id, callSid: ctx.callSid }) : null;
+      const r = phone && consented ? await sendSms(phone, promptText(ctx.prompts, "msg_terms_link", { link: `${config.baseUrl()}/terms` }), { kind: "transactional", event: "terms_link", orderId: order.order.id, callSid: ctx.callSid }) : null;
       sp(vr, ctx, r?.sent ? "terms_link_sent" : "terms_link_no_text");
       return back(vr, "terms", { n: ctx.query.get("n") ?? undefined });
     }
@@ -1880,7 +1886,10 @@ const handlers: Record<string, Handler> = {
   async whisper(ctx, vr) {
     const settings = await getSettings();
     const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
-    const text = staffAnnouncement(k, extensionName(settings, k), settings[`ringAnnounce${k}`]);
+    const text = staffAnnouncement(k, extensionName(settings, k), settings[`ringAnnounce${k}`], {
+      withNumber: promptText(ctx.prompts, "staff_whisper"),
+      noNumber: promptText(ctx.prompts, "staff_whisper_no_number"),
+    });
     const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, action: url("whisper-accept"), method: "POST" });
     say(g, text);
     const again = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 6, action: url("whisper-accept"), method: "POST" });

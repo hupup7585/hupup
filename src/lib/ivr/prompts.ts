@@ -1,4 +1,5 @@
 import { promptRecordingLink } from "@/lib/signed-link";
+import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 
 /**
@@ -15,6 +16,8 @@ export type PromptDef = {
   textOnly?: boolean;
   /** Wording not yet approved by Abraham: shows "Waiting for approval" in Admin and never plays on the phone line. */
   pending?: boolean;
+  /** A text or email the phone system sends (not spoken): longer, can have new lines, no recording. */
+  message?: boolean;
 };
 
 export const PROMPTS = {
@@ -66,25 +69,25 @@ export const PROMPTS = {
   },
   attraction_after: { group: "Key 2: Instructions", label: "After instructions or a description: options (keys 2 and 3)", text: "To hear this again, press the star key. To choose another attraction, press 1. To go back to the main menu, press 2." },
   // Main menu key 3 (Abraham W): a description of each type; the items list comes from Admin, so it always matches the website.
-  learn_intro: { group: "Key 3: Learn about our rentals", label: "Key 3 opening line", text: "We'd love to tell you about our rentals." },
+  learn_intro: { group: "Key 4: Learn about our rentals", label: "Key 3 opening line", text: "We'd love to tell you about our rentals." },
   learn_balloons: {
-    group: "Key 3: Learn about our rentals",
+    group: "Key 4: Learn about our rentals",
     label: "About jumping balloons",
     text: "Our jumping balloons are inflatable bounce houses, and many come with slides or play areas. They're a favorite for birthday parties, family simchas, school events and community celebrations, with options for toddlers and for older kids. Jumping balloons are mostly set up outdoors on grass or a flat, open area. Some smaller units can go indoors in a large room with a high ceiling. Each unit needs open space around it and a nearby power outlet for the blower.",
   },
   learn_laser: {
-    group: "Key 3: Learn about our rentals",
+    group: "Key 4: Learn about our rentals",
     label: "About laser tag",
     text: "Our laser tag comes with blasters and vests, and our inflatable mazes make the game even more exciting. It's a hit with kids around age six and up, teens, and adults, and it's great for parties, schools, camps and group events. Laser tag can be played outdoors, or indoors in a large hall or gym. The maze needs a good amount of open space and a power outlet for the blower.",
   },
   learn_paddle: {
-    group: "Key 3: Learn about our rentals",
+    group: "Key 4: Learn about our rentals",
     label: "About paddle boats",
     text: "Our paddle boats are small, easy-to-steer boats that kids pedal or paddle around the water. They're a fun, special attraction for summer parties, camps and outdoor events. Paddle boats are used outdoors, in a pool or a calm water area with an adult watching. You can rent as many as you need for your space.",
   },
-  learn_items: { group: "Key 3: Learn about our rentals", label: "Our items in this category (from Admin)", text: "Our {category} include: {items}.", vars: ["category", "items"] },
-  learn_deliver: { group: "Key 3: Learn about our rentals", label: "We deliver (key 3)", text: "We deliver, set up, and pick up, so you can relax and enjoy your event. To book, go back to the main menu and press 1." },
-  learn_none: { group: "Key 3: Learn about our rentals", label: "No items in this category right now", text: "We're updating this part of our catalog right now. Please check back with us soon." },
+  learn_items: { group: "Key 4: Learn about our rentals", label: "Our items in this category (from Admin)", text: "Our {category} include: {items}.", vars: ["category", "items"] },
+  learn_deliver: { group: "Key 4: Learn about our rentals", label: "We deliver (key 3)", text: "We deliver, set up, and pick up, so you can relax and enjoy your event. To book, go back to the main menu and press 1." },
+  learn_none: { group: "Key 4: Learn about our rentals", label: "No items in this category right now", text: "We're updating this part of our catalog right now. Please check back with us soon." },
   menu_category: { group: "Welcome & main menu", label: "Menu option for a category", text: "For {category}, press {key}.", vars: ["category", "key"] },
   menu_cart: { group: "Welcome & main menu", label: "Menu option: review cart", text: "Ready to check out? Press 9 to hear your cart." },
   menu_operator: { group: "Welcome & main menu", label: "Menu option: talk to a person", text: "To talk with someone from our team, press 0." },
@@ -178,7 +181,7 @@ export const PROMPTS = {
   phone_bad: { group: "Checkout", label: "Bad phone number", text: "Hmm, that doesn't look like a 10 digit number. Let's try again." },
   phone_heard: { group: "Checkout", label: "Read back phone number", text: "I have {number}. Press 1 if that's right, or 2 to type it again.", vars: ["number"] },
   thanks_order: { group: "Checkout", label: "Order placed", text: "You're all set, {name}! Your order number is {number}.", vars: ["name", "number"] },
-  link_sent: { group: "Checkout", label: "Payment link texted", text: "We just texted you a secure payment link. Your party rentals are saved for {minutes} minutes while you pay, and we'll text you as soon as it's confirmed.", vars: ["minutes"] },
+  link_sent: { group: "Checkout", label: "Payment link texted (Abraham, Nov 13, 2026)", text: "We just texted you a secure payment link. Your party rentals are saved for {minutes} minutes while you pay. After that, they go back into stock, and you'll need to book them again.", vars: ["minutes"] },
   link_failed: { group: "Checkout", label: "Couldn't text the link", text: "We couldn't send the text, so someone from our team will call you back shortly to finish up." },
   goodbye_order_days: { group: "Checkout", label: "Goodbye after ordering several days", text: "We'll deliver and pick up on the days you chose. Thanks so much for choosing Hup Up Attractions. Have an amazing party, bye for now!" },
   goodbye_order: { group: "Checkout", label: "Goodbye after ordering", text: "We'll deliver on {date} and pick up on {pickup}. Thanks so much for choosing Hup Up Attractions. Have an amazing party, bye for now!", vars: ["date", "pickup"] },
@@ -237,7 +240,7 @@ export const PROMPTS = {
   terms_link_sent: { group: "Checkout", label: "Terms link texted", text: "We just texted you the link to our Terms and Conditions." },
   terms_link_no_text: { group: "Checkout", label: "Can't text the Terms link (no text consent)", text: "We can't text you, because you didn't agree to text messages, but you can read our Terms at hupupattractions.com/terms." },
   terms_required: { group: "Checkout", label: "Terms not accepted", text: "To finish your booking, you need to accept our Terms and Conditions. Please call us back anytime. Goodbye!" },
-  link_emailed: { group: "Checkout", label: "Payment link emailed (no texts)", text: "No problem, we won't text you. We just emailed you a secure payment link. Your party rentals are saved for {minutes} minutes while you pay.", vars: ["minutes"] },
+  link_emailed: { group: "Checkout", label: "Payment link emailed (caller said no to texts; Abraham, Nov 13, 2026)", text: "No problem, we won't text you. We just emailed you a secure payment link. Your party rentals are saved for {minutes} minutes while you pay. After that, they go back into stock, and you'll need to book them again.", vars: ["minutes"] },
   link_emailed_consented: {
     group: "Checkout",
     label: "Payment link emailed (caller agreed to texts, texting not live yet). Approved by Abraham, Nov 12, 2026",
@@ -313,10 +316,56 @@ export const PROMPTS = {
   voicemail_prompt: { group: "Voicemail", label: "Before the beep (no longer played; replaced by the Greeting)", text: "Please leave your name, phone number, and a short message after the beep. Press pound when you're done." },
   voicemail_thanks: { group: "Voicemail", label: "After the message (no longer played; replaced by Message sent)", text: "Thanks! We got your message and will call you back soon. Bye for now!" },
   voicemail_none: { group: "Voicemail", label: "Caller didn't leave a message", text: "We didn't get a message. Please call back anytime. Bye for now!" },
+
+  // Spoken answers typed up and read back (Abraham approved the wording Nov 13, 2026; not active until he approves
+  // speech to text and its price)
+  spoken_readback: { group: "Checkout", label: "Read back a spoken answer (speech to text)", text: "We got {text}. If that's correct, press 1. To say it again, press 2.", vars: ["text"] },
+
+  // Staff announcement when a staff phone answers (Abraham). Each extension can still have its own in Phone settings.
+  staff_whisper: { group: "Ringing staff", label: "Staff hear when they answer (extensions with a number)", text: "Call from Hup Up Attractions, extension {number}, {name}. Press 1 to accept, or press 2 to reject.", vars: ["number", "name"] },
+  staff_whisper_no_number: { group: "Ringing staff", label: "Staff hear when they answer (Schools and Corporate, no extension number)", text: "Call from Hup Up Attractions, {name} extension. Press 1 to accept, or press 2 to reject.", vars: ["name"] },
+
+  // Texts and emails the phone system sends (Abraham, Nov 13, 2026: every word on this page)
+  msg_catalog_text: { group: "Texts and emails", message: true, label: "Catalog by text (key 8 and texting CATALOG)", text: "Hup Up Attractions: Here is our catalog: hupupattractions.com/#rentals To book, call (845) 777-7585." },
+  msg_catalog_email_subject: { group: "Texts and emails", message: true, label: "Catalog email: subject (key 8 and info@ Catalog)", text: "Hup Up Attractions catalog" },
+  msg_catalog_email_top: { group: "Texts and emails", message: true, label: "Catalog email: before the list of rentals", text: "Thank you for your interest in Hup Up Attractions!\n\nHere is our catalog:" },
+  msg_catalog_email_bottom: { group: "Texts and emails", message: true, label: "Catalog email: after the list of rentals", text: "See our rentals: hupupattractions.com/#rentals\nTo book, call (845) 777-7585." },
+  msg_payment_link_subject: { group: "Texts and emails", message: true, label: "Payment link email: subject", text: "Hup Up Attractions order #{number}", vars: ["number"] },
+  msg_payment_link: { group: "Texts and emails", message: true, label: "Payment link (text and email) after a phone order", text: "Hup Up Attractions order #{number}: {items}. Rentals ${rentals} + delivery ${delivery} + sales tax ${tax} = total ${total}. Pay securely within {minutes} minutes to confirm: {link}", vars: ["number", "items", "rentals", "delivery", "tax", "total", "minutes", "link"] },
+  msg_receipt_subject: { group: "Texts and emails", message: true, label: "Receipt email after a phone payment: subject", text: "Hup Up Attractions receipt for order #{number}", vars: ["number"] },
+  msg_receipt_body: { group: "Texts and emails", message: true, label: "Receipt email after a phone payment", text: "{greeting}\n\nThank you for your payment! Here is your receipt.\n\nOrder number: {number}\nPaid on: {paid_on}\nAmount: ${amount}\nCard: ending in {last4}\n\nYour rentals are booked. If you have any questions, call us at (845) 777-7585 or reply to this email.\n\nHup Up Attractions\nhupupattractions.com", vars: ["greeting", "number", "paid_on", "amount", "last4"] },
+  msg_payment_received: { group: "Texts and emails", message: true, label: "Payment received (one rental day; text, and email for website payments)", text: "Hup Up Attractions: payment received for order #{number}. You're all set for {date}! We'll deliver that day and pick up {pickup}.", vars: ["number", "date", "pickup"] },
+  msg_payment_received_days: { group: "Texts and emails", message: true, label: "Payment received (several rental days)", text: "Hup Up Attractions: payment received for order #{number}. You're all set for {dates}! We'll deliver and pick up on the days you chose.", vars: ["number", "dates"] },
+  msg_terms_link: { group: "Texts and emails", message: true, label: "Terms and Conditions link by text (during checkout)", text: "Hup Up Attractions Terms and Conditions: {link}", vars: ["link"] },
 } satisfies Record<string, PromptDef>;
 
+/** Old lines no longer played anywhere (kept so nothing is lost; shown as "Not used"). */
+export const RETIRED_PROMPTS = new Set<string>(["instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none"]);
+
+/** The extension (or part of the call) each group of lines belongs to, for the Admin filter. New groups fall into "Other". */
+export const PROMPT_AREAS: Record<string, string> = {
+  "Welcome & main menu": "Main menu",
+  "Errors & retries": "Wrong key, hold and timeouts",
+  "Booking by item (key 1)": "Key 1: Bookings",
+  Browsing: "Key 1: Bookings",
+  "Date & quantity": "Key 1: Bookings",
+  Cart: "Key 1: Bookings",
+  Checkout: "Key 1: Bookings",
+  "Text message consent": "Key 1: Bookings",
+  "Promo texts by phone (keys only)": "Key 1: Bookings",
+  "Pay by keypad": "Key 1: Bookings",
+  "Key 2: Instructions": "Key 2: Instructions",
+  "Key 4: Learn about our rentals": "Key 4: Learn about our rentals",
+  "Talk to a person": "Keys 0, 3, 5, 6 and Schools: ringing staff",
+  "Ringing staff": "Keys 0, 3, 5, 6 and Schools: ringing staff",
+  "Catalog (key 8)": "Key 8: Catalog",
+  Voicemail: "Voicemail (every box) and Key 9",
+  "Texts and emails": "Texts and emails",
+};
+export const promptArea = (group: string) => PROMPT_AREAS[group] ?? "Other";
+
 export type PromptKey = keyof typeof PROMPTS;
-export type PromptOverride = { text: string | null; audioUrl: string | null; recordingId?: number | null; approvedAt?: Date | null };
+export type PromptOverride = { text: string | null; audioUrl: string | null; recordingId?: number | null; approvedAt?: Date | null; googleRecordingId?: number | null };
 export type PromptOverrides = Partial<Record<PromptKey, PromptOverride>>;
 
 export async function loadPromptOverrides(): Promise<PromptOverrides> {
@@ -325,6 +374,20 @@ export async function loadPromptOverrides(): Promise<PromptOverrides> {
     const out: PromptOverrides = {};
     for (const r of rows) {
       if (r.key in PROMPTS) out[r.key as PromptKey] = { text: r.text, audioUrl: r.audioUrl, recordingId: r.recordingId, approvedAt: r.approvedAt };
+    }
+    // Google voice recordings made when a wording was approved: played instead of the live voice, but only while the
+    // wording is still exactly the one recorded (an edit falls back to the live voice until it's recorded again)
+    const google = await db
+      .select({ id: schema.promptRecordings.id, key: schema.promptRecordings.promptKey, wording: schema.promptRecordings.wording })
+      .from(schema.promptRecordings)
+      .where(and(eq(schema.promptRecordings.source, "google"), eq(schema.promptRecordings.complete, true)))
+      .orderBy(desc(schema.promptRecordings.createdAt));
+    for (const g of google) {
+      if (!(g.key in PROMPTS)) continue;
+      const k = g.key as PromptKey;
+      const o = (out[k] ??= { text: null, audioUrl: null });
+      if (o.googleRecordingId) continue;
+      if (g.wording === (o.text?.trim() || PROMPTS[k].text)) o.googleRecordingId = g.id;
     }
     return out;
   } catch (e) {
@@ -354,10 +417,16 @@ export function promptWaiting(overrides: PromptOverrides, key: PromptKey): boole
   return Boolean((PROMPTS[key] as PromptDef).pending) && !overrides[key]?.approvedAt;
 }
 
+/** A text or email wording from Hotline prompts (Admin edits included), filled in. */
+export async function messageText(key: PromptKey, vars?: Record<string, string | number>) {
+  return promptText(await loadPromptOverrides(), key, vars);
+}
+
 /** Recorded audio for a prompt: Abraham's upload (Phone Recordings) if one is chosen, else none (the live Google voice). */
 export function promptAudio(overrides: PromptOverrides, key: PromptKey): string | null {
   if (!promptRecordable(key)) return null;
   const o = overrides[key];
-  if (o?.recordingId) return promptRecordingLink(o.recordingId);
+  if (o?.recordingId) return promptRecordingLink(o.recordingId); // Abraham's upload
+  if (o?.googleRecordingId) return promptRecordingLink(o.googleRecordingId); // the Google voice recording of this wording
   return o?.audioUrl || null;
 }

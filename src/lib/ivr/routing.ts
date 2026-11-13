@@ -110,10 +110,19 @@ export const extensionLabel = (s: Partial<Record<`ringName${RingKey | "9"}`, str
  * and name come from Admin): "Call from Hup Up Attractions, extension 3, Customer Service. Press 1 to accept, or
  * press 2 to reject."
  */
-export function staffAnnouncement(k: RingKey, name: string, custom?: string | null): string {
-  if (custom?.trim()) return custom.trim(); // edited in Admin
-  if (!EXTENSION_NUMBER[k]) return `Call from Hup Up Attractions, ${name} extension. Press 1 to accept, or press 2 to reject.`;
-  return `Call from Hup Up Attractions, extension ${EXTENSION_NUMBER[k]}, ${name}. Press 1 to accept, or press 2 to reject.`;
+export function staffAnnouncement(
+  k: RingKey,
+  name: string,
+  custom?: string | null,
+  // The wording from Hotline prompts (staff_whisper / staff_whisper_no_number), so it can be edited in Admin
+  templates: { withNumber: string; noNumber: string } = {
+    withNumber: "Call from Hup Up Attractions, extension {number}, {name}. Press 1 to accept, or press 2 to reject.",
+    noNumber: "Call from Hup Up Attractions, {name} extension. Press 1 to accept, or press 2 to reject.",
+  },
+): string {
+  if (custom?.trim()) return custom.trim(); // this extension's own announcement (Phone settings)
+  const t = EXTENSION_NUMBER[k] ? templates.withNumber : templates.noNumber;
+  return t.replace(/\{number\}/g, EXTENSION_NUMBER[k]).replace(/\{name\}/g, name);
 }
 
 type RingSettings = Pick<Settings, "operatorTargets" | "operatorMode" | "operatorAcceptPrompt"> &
