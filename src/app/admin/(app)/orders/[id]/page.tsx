@@ -19,6 +19,7 @@ import { LIVE_REFUNDS_APPROVED, refundStatus, refundsFor, refundsSandbox } from 
 import RefundPanel from "./RefundPanel";
 import { inboxWhen } from "@/lib/inbox-format";
 import { db, schema } from "@/lib/db";
+import { spokenAnswersFor } from "@/lib/speech-to-text";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -108,6 +109,25 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               </>
             );
           })())}
+          {await (async () => {
+            const spoken = await spokenAnswersFor(o.callSid);
+            if (!spoken.length) return null;
+            const fieldName: Record<string, string> = { name: "Name", address: "Address", email: "Email" };
+            return (
+              <div className="card p-5" data-spoken-answers>
+                <h2 className="mb-1 font-bold">Spoken answers</h2>
+                <p className="mb-3 text-xs text-muted">What the caller said, typed up by speech to text (preview test only).</p>
+                <ul className="space-y-3">
+                  {spoken.map((a) => (
+                    <li key={a.id} className="text-sm">
+                      <div><b>{fieldName[a.field] ?? a.field}:</b> {a.status === "done" ? a.text || "(nothing understood)" : a.status === "failed" ? "Could not be typed up" : "Still being typed up"}</div>
+                      <audio controls preload="none" className="mt-1 w-full" src={`/api/admin/spoken/${a.id}`} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })()}
           <div className="card p-5">
             <h2 className="mb-3 font-bold">Customer</h2>
             {customer ? (

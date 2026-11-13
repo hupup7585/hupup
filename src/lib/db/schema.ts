@@ -1138,3 +1138,21 @@ export const promptVersions = pgTable("prompt_versions", {
   approvedBy: integer("approved_by"),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
 });
+
+/** Spoken answers recorded and typed up (speech to text), kept on the order and contact (Abraham, Nov 13, 2026). */
+export const spokenAnswers = pgTable("spoken_answers", {
+  id: serial("id").primaryKey(),
+  callSid: text("call_sid").notNull(),
+  /** name | address | email | catalog-local | catalog-domain */
+  field: text("field").notNull(),
+  recordingSid: text("recording_sid"),
+  recordingUrl: text("recording_url"),
+  durationSec: integer("duration_sec"),
+  text: text("text"),
+  /** pending | done | failed */
+  status: text("status").notNull().default("pending"),
+  error: text("error"),
+  orderId: integer("order_id"),
+  customerId: integer("customer_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

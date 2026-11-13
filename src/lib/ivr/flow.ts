@@ -58,6 +58,7 @@ import { PROMPTS, loadPromptOverrides, promptAudio, promptText, promptWaiting, t
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
+import { STT_HOLD_FILE, STT_MAX_WAITS, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
 
 const { categories, products, orders } = schema;
 type VR = InstanceType<typeof twilio.twiml.VoiceResponse>;
@@ -1405,6 +1406,15 @@ const handlers: Record<string, Handler> = {
     const f = ctx.query.get("f") as Field;
     const n = ctx.query.get("n") ?? undefined;
     const spec = FIELDS[f];
+    if (sttActive()) {
+      // Speech to text (preview only until Abraham approves the price): the question, a moment for star (type it) or
+      // pound (skip email), then the answer is recorded and typed up by Google while a soft clip plays.
+      const k = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 1, finishOnKey: "", action: url("heard", { f, n }), method: "POST" });
+      sp(k, ctx, spec.prompt);
+      sp(k, ctx, "type_hint");
+      vr.record({ maxLength: 20, timeout: 3, playBeep: false, finishOnKey: "#*", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
+      return vr;
+    }
     // Say it, or press star to type it on the keypad (Abraham L). finishOnKey "" so star and # arrive as keys.
     const g = speech(vr, url("heard", { f, n }), spec.hints, { dtmf: true, numDigits: 1, finishOnKey: "" });
     sp(g, ctx, spec.prompt);
@@ -1439,13 +1449,56 @@ const handlers: Record<string, Handler> = {
     return noInput(vr, ctx, "type", { f, again: 1 });
   },
 
+  /** Speech to text: the answer was recorded. Type it up in the background; the caller hears the hold clip. */
+  async "stt-recorded"(ctx, vr) {
+    const f = ctx.query.get("f") as Field;
+    const n = ctx.query.get("n") ?? undefined;
+    const digits = ctx.body.Digits || "";
+    const secs = Number(ctx.body.RecordingDuration || 0);
+    if (digits === "*") return back(vr, "type", { f });
+    if (!ctx.body.RecordingUrl || secs < 1) {
+      // Nothing said: pound skips the email (as before); otherwise the usual "didn't catch that" path
+      return back(vr, "heard", { f, n, empty: 1, ...(digits === "#" && f === "email" ? { skip: 1 } : {}) });
+    }
+    const [row] = await db
+      .insert(schema.spokenAnswers)
+      .values({ callSid: ctx.callSid, field: f, recordingSid: ctx.body.RecordingSid || null, recordingUrl: ctx.body.RecordingUrl, durationSec: secs })
+      .returning({ id: schema.spokenAnswers.id });
+    const hints = FIELDS[f].hints.split(",").map((h) => h.trim()).filter(Boolean);
+    runLater(() => transcribeAnswer(row.id, hints));
+    vr.play(`${config.baseUrl()}${STT_HOLD_FILE}`);
+    return back(vr, "stt-check", { f, n, a: row.id, w: 1 });
+  },
+
+  async "stt-check"(ctx, vr) {
+    const f = ctx.query.get("f") as Field;
+    const n = ctx.query.get("n") ?? undefined;
+    const a = Number(ctx.query.get("a"));
+    const w = Number(ctx.query.get("w") || 1);
+    const [row] = Number.isInteger(a) ? await db.select().from(schema.spokenAnswers).where(and(eq(schema.spokenAnswers.id, a), eq(schema.spokenAnswers.callSid, ctx.callSid))).limit(1) : [];
+    if (row && row.status === "pending" && w < STT_MAX_WAITS) {
+      vr.play(`${config.baseUrl()}${STT_HOLD_FILE}`);
+      return back(vr, "stt-check", { f, n, a, w: w + 1 });
+    }
+    return back(vr, "heard", { f, n, a: row?.id });
+  },
+
   async heard(ctx, vr) {
     const f = ctx.query.get("f") as Field;
     const spec = FIELDS[f];
+    if (ctx.query.get("skip")) return back(vr, "phone"); // pound on the recording: skip email
     if (ctx.body.Digits === "*") return back(vr, "type", { f }); // switch to keypad typing
-    if (f === "email" && (ctx.body.Digits === "#" || (ctx.body.Digits === "" && !ctx.body.SpeechResult))) return back(vr, "phone"); // skip email (as before)
-    if (ctx.body.Digits && !ctx.body.SpeechResult) return back(vr, "ask", { f }); // another key: ask again
-    const raw = (ctx.body.SpeechResult || "").trim();
+    // Speech to text: the typed-up answer comes from our own record of this call, not from Twilio's speech result
+    const a = Number(ctx.query.get("a"));
+    const typedUp = Number.isInteger(a) && a > 0
+      ? (await db.select().from(schema.spokenAnswers).where(and(eq(schema.spokenAnswers.id, a), eq(schema.spokenAnswers.callSid, ctx.callSid))).limit(1))[0]
+      : undefined;
+    const viaStt = Boolean(typedUp) || ctx.query.get("empty") === "1";
+    if (!viaStt) {
+      if (f === "email" && (ctx.body.Digits === "#" || (ctx.body.Digits === "" && !ctx.body.SpeechResult))) return back(vr, "phone"); // skip email (as before)
+      if (ctx.body.Digits && !ctx.body.SpeechResult) return back(vr, "ask", { f }); // another key: ask again
+    } else if (ctx.body.Digits === "#" && f === "email") return back(vr, "phone");
+    const raw = (viaStt ? typedUp?.text || "" : ctx.body.SpeechResult || "").trim();
     const value = raw ? spec.normalize(raw) : null;
     if (!value) {
       const n = Number(ctx.query.get("n") || 0) + 1;
@@ -1460,10 +1513,11 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, f === "email" ? "email_unclear" : "field_unclear");
       return back(vr, "ask", { f, n });
     }
-    await track(ctx.callSid, "said", `Said ${f}: ${value}`, { field: f, value, raw });
+    await track(ctx.callSid, "said", `Said ${f}: ${value}`, { field: f, value, raw, ...(viaStt ? { via: "speech to text" } : {}) });
     await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
     const g = keypad(vr, url("confirm", { f }));
-    sp(g, ctx, "heard", { value: spec.readBack(value) });
+    if (viaStt) sp(g, ctx, "spoken_readback", { text: spec.readBack(value) });
+    else sp(g, ctx, "heard", { value: spec.readBack(value) });
     return noInput(vr, ctx, "ask", { f });
   },
 
