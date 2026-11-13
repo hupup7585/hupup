@@ -12,7 +12,7 @@ import { getUsage, bookableQty, pickupDateFor } from "@/lib/availability";
 import { getSettings } from "@/lib/settings";
 import { checkEventDate, dayInfo } from "@/lib/jewish-calendar";
 import { addDays, isValidISO, todayISO } from "@/lib/dates";
-import { createOrderWithItems, getOrderWithItems, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES } from "@/lib/orders";
+import { createOrderWithItems, getOrderWithItems, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES, POS_LINK_HOLD_MINUTES } from "@/lib/orders";
 import { parseMoneyToCents } from "@/lib/money";
 import { toE164 } from "@/lib/phone";
 import { CURRENT_TERMS_VERSION, payPageLink, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
@@ -96,7 +96,7 @@ export async function createBookingAction(input: {
     eventDate: input.date,
     channel: "POS",
     status,
-    holdExpiresAt: input.payment === "link" ? minutesFromNow(60) /* New booking link: unchanged at 60 minutes (its text says "within 2 hours") */ : null,
+    holdExpiresAt: input.payment === "link" ? minutesFromNow(POS_LINK_HOLD_MINUTES) /* New booking link (Abraham, Nov 13, 2026: 25 minutes) */ : null,
     customer: { name: input.name.trim(), phone, email: input.email.trim() || null, address: input.address.trim() || null },
     deliveryTime: input.deliveryTime || null,
     notes: input.notes || null,
@@ -146,13 +146,13 @@ export async function createBookingAction(input: {
       phone,
       email: input.email || null,
       subject: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} payment link`,
-      body: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} for ${messageDate(input.date)}: $${((full!.order.totalCents ?? full!.order.subtotalCents) / 100).toFixed(2)}. Pay securely within 2 hours to confirm: ${link}`,
+      body: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} for ${messageDate(input.date)}: $${((full!.order.totalCents ?? full!.order.subtotalCents) / 100).toFixed(2)}. Pay securely within ${POS_LINK_HOLD_MINUTES} minutes to confirm: ${link}`,
       orderId: r.orderId,
       customerId: full?.customer?.id ?? null,
       userId: session.userId ?? null,
       event: "staff_payment_link",
     });
-    message += sent.texted ? " Payment link texted (held for 2 hours)." : sent.emailed ? " No text consent: payment link emailed (held for 2 hours)." : ` Payment link not texted: ${sent.message}`;
+    message += sent.texted ? ` Payment link texted (held for ${POS_LINK_HOLD_MINUTES} minutes).` : sent.emailed ? ` No text consent: payment link emailed (held for ${POS_LINK_HOLD_MINUTES} minutes).` : ` Payment link not texted: ${sent.message}`;
   }
   revalidatePath("/admin", "layout");
   return { ok: true, message, orderId: r.orderId };

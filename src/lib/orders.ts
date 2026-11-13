@@ -11,6 +11,8 @@ const { orders, orderItems, products, customers } = schema;
 export const PHONE_HOLD_MINUTES = 15;
 /** How long a texted payment link holds stock before it's released. */
 export const PAYMENT_HOLD_MINUTES = 10; // Abraham, Nov 13, 2026: rentals are held 10 minutes while the caller pays
+/** Admin New booking payment link: rentals held 25 minutes (Abraham, Nov 13, 2026; was 60). */
+export const POS_LINK_HOLD_MINUTES = 25;
 
 export function orderNumber(id: number): string {
   return String(1000 + id);
