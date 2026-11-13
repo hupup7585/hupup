@@ -7,7 +7,7 @@ import PayForm from "./PayForm";
 import { webConsentCopy } from "@/lib/sms-terms-v2";
 import { smsNumberDisplay } from "@/lib/sms-number";
 import DualDate from "@/components/DualDate";
-import { LINK_TEXT, holdEnded, holdForCardPage, keepHoldWhileActive, linkOptions, linkRulesActive } from "@/lib/late-payment";
+import { LINK_TEXT, holdEnded, holdForCardPage, keepHoldWhileActive, linkOptions, linkOptionsActive, linkRulesActive } from "@/lib/late-payment";
 import { checkAgainAction, chooseOptionAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   const rules = linkRulesActive();
   if (rules && before.orders.some((d) => holdEnded(d.order))) {
     const count = before.orders.reduce((n, d) => n + d.items.reduce((m, i) => m + i.qty, 0), 0);
-    const options = gone ? await linkOptions(before.orders.map((d) => d.order.id)) : [];
+    const options = gone && linkOptionsActive() ? await linkOptions(before.orders.map((d) => d.order.id)) : [];
     return (
       <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">
         <div className="mx-auto max-w-md rounded-2xl border-2 border-hu-deep bg-white p-6" data-link-expired>

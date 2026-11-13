@@ -31,10 +31,16 @@ async function setup(qty = 1) {
 const get = async (id: number) => (await db.select().from(schema.orders).where(eq(schema.orders.id, id)))[0];
 
 describe("payment link rule", () => {
-  it("preview only until Abraham approves the wording", () => {
-    expect(LINK_WORDING_APPROVED).toBe(false);
-    expect(linkRulesActive({ VERCEL_ENV: "production" })).toBe(false);
+  it("live: Abraham approved every line of the link page (Nov 13, 2026)", () => {
+    expect(LINK_WORDING_APPROVED).toBe(true);
+    expect(linkRulesActive({ VERCEL_ENV: "production" })).toBe(true);
     expect(linkRulesActive({ VERCEL_ENV: "preview" })).toBe(true);
+  });
+  it("the nearest-options list waits for Abraham's OK on its intro line (preview only)", async () => {
+    const { OPTIONS_WORDING_APPROVED, linkOptionsActive } = await import("@/lib/late-payment");
+    expect(OPTIONS_WORDING_APPROVED).toBe(false);
+    expect(linkOptionsActive({ VERCEL_ENV: "production" })).toBe(false);
+    expect(linkOptionsActive({ VERCEL_ENV: "preview" })).toBe(true);
   });
   it("opened at minute 9 and nothing more: ends at minute 13; Agree and pay: 10 minutes for the card", async () => {
     const { mk } = await setup();
@@ -74,8 +80,9 @@ describe("payment link rule", () => {
     expect(Math.round(((await get(pos)).holdExpiresAt!.getTime() - now.getTime()) / MIN)).toBe(25);
   });
   it("friendly draft wording, item or items", () => {
-    expect(LINK_TEXT.expiredBody(1)).toContain("Your item was held");
-    expect(LINK_TEXT.expiredBody(2)).toContain("Your items were held");
+    expect(LINK_TEXT.expiredTitle).toBe("This payment link has expired");
+    expect(LINK_TEXT.expiredBody(1)).toBe("Your item was back into stock so other customers could book. Tap below to check if it's still free for your date.");
+    expect(LINK_TEXT.checkButton).toBe("Check availability again");
     expect(LINK_TEXT.gone(1)).toBe("This item is no longer available for your date."); // Abraham's wording
     expect(LINK_TEXT.gone(2)).toBe("These items are no longer available for your date.");
     expect(LINK_TEXT.goneCall).toBe("Please call us at (845) 777-7585, to choose another option or another day.");

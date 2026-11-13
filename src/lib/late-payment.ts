@@ -17,11 +17,17 @@ import { ensurePriced } from "@/lib/order-pricing";
  *    free, the same order is held again (database lock, so no one else can take it) and the customer pays.
  *
  * Only the link is built (Abraham, Nov 13: "Only the link."). The late-payment backup is a separate plan he reviews.
- * The new customer wording is a draft: this runs on preview only until Abraham approves it (LINK_WORDING_APPROVED).
+ * Every line is Abraham's approved wording (Nov 13, 2026), so it runs on the live site too (LINK_WORDING_APPROVED).
  */
-export const LINK_WORDING_APPROVED = false;
+export const LINK_WORDING_APPROVED = true; // Abraham approved every line of the link page, Nov 13, 2026
 export const IDLE_MINUTES = 4;
 export const CARD_MINUTES = 10;
+
+/** The nearest-options list has one draft line (optionsIntro): preview only until Abraham approves it. */
+export const OPTIONS_WORDING_APPROVED = false;
+export function linkOptionsActive(env: Record<string, string | undefined> = process.env) {
+  return OPTIONS_WORDING_APPROVED || env.VERCEL_ENV !== "production";
+}
 
 export function linkRulesActive(env: Record<string, string | undefined> = process.env) {
   return LINK_WORDING_APPROVED || env.VERCEL_ENV !== "production";
@@ -86,18 +92,21 @@ export async function holdAgain(orderIds: number[], now = new Date()): Promise<n
   });
 }
 
-/** Draft wording (Abraham approves before it goes live). */
+/** The link page wording, approved by Abraham (Nov 13, 2026). */
 export const LINK_TEXT = {
   expiredTitle: "This payment link has expired",
+  // Abraham's wording, Nov 13, 2026 (approved)
   expiredBody: (n: number) =>
-    `No worries! Your ${n === 1 ? "item was" : "items were"} held for a short time and then went back into stock so other customers could book. Tap below and we'll check if ${n === 1 ? "it's" : "they're"} still free for your date.`,
+    n === 1
+      ? "Your item was back into stock so other customers could book. Tap below to check if it's still free for your date."
+      : "Your items were back into stock so other customers could book. Tap below to check if they're still free for your date.",
   checkButton: "Check availability again",
   // Abraham's wording, Nov 13, 2026 (approved): 10 minutes for a phone order, 25 for an Admin link
   heldAgain: (min: number) => `It's still available! We're holding it for you for the next ${min} minutes.`,
   // Abraham's wording, Nov 13, 2026 (approved)
   gone: (n: number) => `${n === 1 ? "This item is" : "These items are"} no longer available for your date.`,
   goneCall: "Please call us at (845) 777-7585, to choose another option or another day.",
-  // Draft: the nearest options (same as the phone line offers)
+  // The nearest options (same as the phone line offers); this one intro line is still a draft
   optionsIntro: "Here are the nearest options that are free right now. Tap one to hold it for you:",
   // Abraham's wording, Nov 13, 2026 (approved)
   cardNote: `After you tap "Agree and pay," you will have ${CARD_MINUTES} minutes to enter your card details on our secure payment page. If your session expires, your rented items will be returned to stock, and you can check again availability to rebook at any time.`,
