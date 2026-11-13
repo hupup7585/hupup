@@ -36,10 +36,11 @@ describe("payment link rule", () => {
     expect(linkRulesActive({ VERCEL_ENV: "production" })).toBe(true);
     expect(linkRulesActive({ VERCEL_ENV: "preview" })).toBe(true);
   });
-  it("the nearest-options list waits for Abraham's OK on its intro line (preview only)", async () => {
-    const { OPTIONS_WORDING_APPROVED, linkOptionsActive } = await import("@/lib/late-payment");
-    expect(OPTIONS_WORDING_APPROVED).toBe(false);
-    expect(linkOptionsActive({ VERCEL_ENV: "production" })).toBe(false);
+  it("the nearest-options list is live: Abraham approved its intro line", async () => {
+    const { OPTIONS_WORDING_APPROVED, linkOptionsActive, LINK_TEXT: T } = await import("@/lib/late-payment");
+    expect(OPTIONS_WORDING_APPROVED).toBe(true);
+    expect(T.optionsIntro).toBe("Here are the nearest options that are free for you right now. Tap one to hold it for you:");
+    expect(linkOptionsActive({ VERCEL_ENV: "production" })).toBe(true);
     expect(linkOptionsActive({ VERCEL_ENV: "preview" })).toBe(true);
   });
   it("opened at minute 9 and nothing more: ends at minute 13; Agree and pay: 10 minutes for the card", async () => {

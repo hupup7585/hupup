@@ -23,8 +23,8 @@ export const LINK_WORDING_APPROVED = true; // Abraham approved every line of the
 export const IDLE_MINUTES = 4;
 export const CARD_MINUTES = 10;
 
-/** The nearest-options list has one draft line (optionsIntro): preview only until Abraham approves it. */
-export const OPTIONS_WORDING_APPROVED = false;
+/** The nearest-options list: its intro line approved by Abraham (Nov 13, 2026), so it runs on the live site too. */
+export const OPTIONS_WORDING_APPROVED = true;
 export function linkOptionsActive(env: Record<string, string | undefined> = process.env) {
   return OPTIONS_WORDING_APPROVED || env.VERCEL_ENV !== "production";
 }
@@ -106,8 +106,8 @@ export const LINK_TEXT = {
   // Abraham's wording, Nov 13, 2026 (approved)
   gone: (n: number) => `${n === 1 ? "This item is" : "These items are"} no longer available for your date.`,
   goneCall: "Please call us at (845) 777-7585, to choose another option or another day.",
-  // The nearest options (same as the phone line offers); this one intro line is still a draft
-  optionsIntro: "Here are the nearest options that are free right now. Tap one to hold it for you:",
+  // The nearest options (same as the phone line offers). Abraham's wording, Nov 13, 2026 (approved)
+  optionsIntro: "Here are the nearest options that are free for you right now. Tap one to hold it for you:",
   // Abraham's wording, Nov 13, 2026 (approved)
   cardNote: `After you tap "Agree and pay," you will have ${CARD_MINUTES} minutes to enter your card details on our secure payment page. If your session expires, your rented items will be returned to stock, and you can check again availability to rebook at any time.`,
 };
