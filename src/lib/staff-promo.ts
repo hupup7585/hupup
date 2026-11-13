@@ -17,7 +17,7 @@ export function staffPromoVisible(role: string, mode: StaffPromoMode = STAFF_PRO
   return role === "owner" || role === "secretary";
 }
 
-export const STAFF_PROMO_STEP1 = "Would you like to get seasonal offers, discounts, and deals from Hup Up Attractions by text, up to 5 a year? It's never required to book.";
+export const STAFF_PROMO_STEP1 = "Would you like to get seasonal offers, discounts, and deals from Hup Up Attractions by text, up to 6 a year? It's never required to book.";
 export const STAFF_PROMO_STEP2 = "Should we text {phone}, or a different number?";
 export const STAFF_PROMO_STEP3 = "Great, we just sent you a text. Reply YES within 24 hours to finish signing up. Message and data rates may apply.";
 

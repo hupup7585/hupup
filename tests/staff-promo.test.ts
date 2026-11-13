@@ -11,7 +11,7 @@ import PromoSignupPanel from "@/app/admin/(app)/orders/[id]/PromoSignupPanel";
 /* Staff promo sign-up (Abraham, Promo Wording C, Nov 10, 2026) */
 describe("staff promo sign-up wording and rules", () => {
   it("uses Abraham's three lines word for word", () => {
-    expect(sp.STAFF_PROMO_STEP1).toBe("Would you like to get seasonal offers, discounts, and deals from Hup Up Attractions by text, up to 5 a year? It's never required to book.");
+    expect(sp.STAFF_PROMO_STEP1).toBe("Would you like to get seasonal offers, discounts, and deals from Hup Up Attractions by text, up to 6 a year? It's never required to book.");
     expect(sp.staffPromoStep2("+18455550100")).toBe("Should we text (845) 555-0100, or a different number?");
     expect(sp.STAFF_PROMO_STEP3).toBe("Great, we just sent you a text. Reply YES within 24 hours to finish signing up. Message and data rates may apply.");
   });

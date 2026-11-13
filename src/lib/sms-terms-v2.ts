@@ -24,7 +24,7 @@ export const WEB_CONSENT_VERSION_V2 = "web-2026-11-10-v3-6yr";
 
 /** SMS v3 website promotional box: it requests the confirmation text; only the YES reply signs the customer up. */
 export const WEB_CONSENT_MARKETING_V2 =
-  "Text me a confirmation to join Hup Up Attractions promotional texts: seasonal offers, discount codes, and rental deals, up to 5 per calendar year. I am signed up only when I reply YES to that confirmation text within 24 hours. Consent is not a condition of purchase. Message and data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help. See our SMS Terms and Privacy Policy.";
+  "Text me a confirmation to join Hup Up Attractions promotional texts: seasonal offers, discount codes, and rental deals, up to 6 per calendar year. I am signed up only when I reply YES to that confirmation text within 24 hours. Consent is not a condition of purchase. Message and data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help. See our SMS Terms and Privacy Policy.";
 
 export const WEB_CONSENT_TRANSACTIONAL_V2 =
   "I agree to receive transactional text messages from Hup Up Attractions, including picture messages such as delivery confirmation photos, regarding my reservations, orders, payments, deliveries, pickups, and customer service, and authorize Hup Up Attractions to share my phone number with service providers only as necessary to deliver these messages. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help.";
@@ -32,19 +32,19 @@ export const WEB_CONSENT_TRANSACTIONAL_V2 =
 /** Confirmation text sent after a phone keypress or a staff-recorded yes. Only a YES reply enrolls the number. */
 /** SMS v3 confirmation text (Abraham, word for word; only the Terms link is filled in, from the live site address). */
 export function promoConfirmRequestSms(base = config.baseUrl()): string {
-  return `Hup Up Attractions: You requested to join our seasonal promotional text program. You may receive up to 5 promotional messages per calendar year, including seasonal offers, discount codes, and rental deals. Message and data rates may apply. Reply YES within 24 hours to confirm. Reply STOP to unsubscribe. Reply HELP for assistance. Terms: ${base}/sms-terms`;
+  return `Hup Up Attractions: You requested to join our seasonal promotional text program. You may receive up to 6 promotional messages per calendar year, including seasonal offers, discount codes, and rental deals. Message and data rates may apply. Reply YES within 24 hours to confirm. Reply STOP to unsubscribe. Reply HELP for assistance. Terms: ${base}/sms-terms`;
 }
 /** @deprecated kept for older records: the text current at build time. */
 export const PROMO_CONFIRM_REQUEST_SMS = promoConfirmRequestSms();
 /** SMS v3: sent after the YES (Abraham, exact). */
 export const PROMO_ENROLLED_SMS =
-  "Hup Up Attractions: You're signed up for seasonal promo texts, up to 5 per year. Msg & data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, HELP for help.";
+  "Hup Up Attractions: You're signed up for seasonal promo texts, up to 6 per year. Msg & data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, HELP for help.";
 export const PROMO_CONFIRM_VERSION = "promo-confirm-2026-11-09-v3";
 /** How long the YES reply counts. */
 export const PROMO_CONFIRM_WINDOW_HOURS = 24;
 
 export const STAFF_DISCLOSURE_MARKETING_V2 =
-  "Would you like promotional text messages from Hup Up Attractions at {phone}: seasonal offers, discount codes, and rental deals, up to 5 per calendar year? If you say yes, we'll text you a confirmation, and you'll be signed up only after you reply YES to that text within 24 hours. Agreeing is never required to book or buy. Message and data rates may apply. You can reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help, at any time. Do you want the confirmation text? Please answer yes or no.";
+  "Would you like promotional text messages from Hup Up Attractions at {phone}: seasonal offers, discount codes, and rental deals, up to 6 per calendar year? If you say yes, we'll text you a confirmation, and you'll be signed up only after you reply YES to that text within 24 hours. Agreeing is never required to book or buy. Message and data rates may apply. You can reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help, at any time. Do you want the confirmation text? Please answer yes or no.";
 
 /** v2 privacy sentence (Abraham's exact words, section 6). */
 export const PRIVACY_V2 =

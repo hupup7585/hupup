@@ -56,7 +56,7 @@ describe("JOIN and YES", () => {
     await text(P, "JOIN");
     expect(sentTo(P)).toEqual([promoConfirmRequestSms()]);
     expect(promoConfirmRequestSms()).toBe(
-      "Hup Up Attractions: You requested to join our seasonal promotional text program. You may receive up to 5 promotional messages per calendar year, including seasonal offers, discount codes, and rental deals. Message and data rates may apply. Reply YES within 24 hours to confirm. Reply STOP to unsubscribe. Reply HELP for assistance. Terms: https://hupup.vercel.app/sms-terms",
+      "Hup Up Attractions: You requested to join our seasonal promotional text program. You may receive up to 6 promotional messages per calendar year, including seasonal offers, discount codes, and rental deals. Message and data rates may apply. Reply YES within 24 hours to confirm. Reply STOP to unsubscribe. Reply HELP for assistance. Terms: https://hupup.vercel.app/sms-terms",
     );
     await text(P, "join");
     expect(sentTo(P)).toHaveLength(1);
@@ -70,7 +70,7 @@ describe("JOIN and YES", () => {
     const [req] = await db.select().from(schema.smsReenrollRequests).where(eq(schema.smsReenrollRequests.phone, P));
     expect(req).toMatchObject({ status: "confirmed", confirmConsentId: rows[0].id }); // confirmation linked to the original request
     expect(sentTo(P).at(-1)).toBe(PROMO_ENROLLED_SMS);
-    expect(PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You're signed up for seasonal promo texts, up to 5 per year. Msg & data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, HELP for help.");
+    expect(PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You're signed up for seasonal promo texts, up to 6 per year. Msg & data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, HELP for help.");
     expect((await customer(P)).marketingOptIn).toBe(true);
   });
   it("a second YES does nothing (no duplicate enrollment)", async () => {
@@ -185,11 +185,11 @@ describe("failed and undelivered texts, permanent records", () => {
   });
 });
 
-describe("the 5 limit, January 1 reset, promo hours, segment length", () => {
-  it("two campaigns at the same time never push a customer past 5", async () => {
+describe("the 6 limit, January 1 reset, promo hours, segment length", () => {
+  it("two campaigns at the same time never push a customer past 6", async () => {
     const P = "+18455551201";
     const [c] = await db.insert(schema.customers).values({ phone: P, marketingOptIn: true, marketingOptInAt: new Date(), timeZone: "America/New_York" }).returning();
-    for (let i = 0; i < 4; i++)
+    for (let i = 0; i < 5; i++)
       await db.insert(schema.messages).values({ direction: "out", toNumber: P, contactPhone: P, body: "old promo", kind: "marketing", status: "delivered", customerId: c.id, createdAt: new Date(`2026-0${i + 1}-10T17:00:00Z`) });
     const NOON = new Date("2026-11-10T17:00:00Z");
     const a = await createCampaign({ name: "A", body: "Deal A for our customers this week." }, 1);
@@ -197,7 +197,7 @@ describe("the 5 limit, January 1 reset, promo hours, segment length", () => {
     await approveCampaign(a.id, 1);
     await approveCampaign(b.id, 1);
     await Promise.all([sendCampaign(a.id, 1, NOON), sendCampaign(b.id, 1, NOON)]);
-    expect(await promosThisYear(P, NOON)).toBe(5);
+    expect(await promosThisYear(P, NOON)).toBe(6);
     expect(await promosThisYear(P, new Date("2027-01-01T12:00:00Z"))).toBe(0); // January 1 reset (New York time)
   });
   it("promos only 8 AM - 9 PM local time; unknown zone: both the area-code zone and Eastern Time", () => {
