@@ -240,6 +240,16 @@ function menuNoChoice(vr: VR, ctx: Ctx) {
   return repeatMenu(vr, ctx, "menu", { first: 1 });
 }
 
+/** A spoken answer typed up on THIS call (never another caller's). */
+async function callSpokenAnswer(ctx: Ctx, id: number) {
+  if (!Number.isInteger(id) || id <= 0) return undefined;
+  const [row] = await db.select().from(schema.spokenAnswers).where(and(eq(schema.spokenAnswers.id, id), eq(schema.spokenAnswers.callSid, ctx.callSid))).limit(1);
+  return row;
+}
+
+/** Spoken letters for the catalog email: hints so Google hears single letters and the symbol words. */
+const CATALOG_LETTER_HINTS = "a b c d e f g h i j k l m n o p q r s t u v w x y z dot underscore dash".split(" ");
+
 function back(vr: VR, action: string, params: Record<string, string | number | undefined> = {}) {
   vr.redirect({ method: "POST" }, url(action, params));
   return vr;
@@ -839,6 +849,11 @@ const handlers: Record<string, Handler> = {
     const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 3, finishOnKey: "", action: url("catalog-key", { part, add }), method: "POST" });
     sp(g, ctx, part === "domain" ? "catalog_domain" : "catalog_email_local");
     vr.play(`${config.baseUrl()}/audio/tone.wav`);
+    if (sttActive()) {
+      // Speech to text (preview only): record the spoken letters, Google types them up while the soft clip plays
+      vr.record({ maxLength: 15, timeout: 3, playBeep: false, finishOnKey: "#", trim: "trim-silence", action: url("catalog-stt-recorded", { part, add }), method: "POST" });
+      return vr;
+    }
     const s = vr.gather({ input: ["speech", "dtmf"], finishOnKey: "#", timeout: 6, speechTimeout: "auto", language: "en-US", hints: "a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, dot, underscore, dash", action: url("catalog-said", { part, add }), method: "POST" });
     void s;
     return repeatMenu(vr, ctx, "catalog-part", { part, add });
@@ -865,10 +880,39 @@ const handlers: Record<string, Handler> = {
     return back(vr, "catalog-got", { part });
   },
 
+  /** Speech to text for the catalog email (preview only): save the recording, type it up in the background. */
+  async "catalog-stt-recorded"(ctx, vr) {
+    const part = ctx.query.get("part") === "domain" ? "domain" : "local";
+    const add = ctx.query.get("add") ?? undefined;
+    const secs = Number(ctx.body.RecordingDuration || 0);
+    if (!ctx.body.RecordingUrl || secs < 1) return back(vr, "catalog-said", { part, add, empty: 1 });
+    const [row] = await db
+      .insert(schema.spokenAnswers)
+      .values({ callSid: ctx.callSid, field: `catalog_${part}`, recordingSid: ctx.body.RecordingSid || null, recordingUrl: ctx.body.RecordingUrl, durationSec: secs })
+      .returning({ id: schema.spokenAnswers.id });
+    runLater(() => transcribeAnswer(row.id, CATALOG_LETTER_HINTS));
+    vr.play(`${config.baseUrl()}${STT_HOLD_FILE}`);
+    return back(vr, "catalog-stt-check", { part, add, a: row.id, w: 1 });
+  },
+
+  async "catalog-stt-check"(ctx, vr) {
+    const part = ctx.query.get("part") === "domain" ? "domain" : "local";
+    const add = ctx.query.get("add") ?? undefined;
+    const a = Number(ctx.query.get("a"));
+    const w = Number(ctx.query.get("w") || 1);
+    const row = await callSpokenAnswer(ctx, a);
+    if (row && row.status === "pending" && w < STT_MAX_WAITS) {
+      vr.play(`${config.baseUrl()}${STT_HOLD_FILE}`);
+      return back(vr, "catalog-stt-check", { part, add, a, w: w + 1 });
+    }
+    return back(vr, "catalog-said", { part, add, a: row?.id });
+  },
+
   async "catalog-said"(ctx, vr) {
     const part = ctx.query.get("part") === "domain" ? "domain" : "local";
     const keep = ctx.query.get("add") === "1" ? catPart(ctx, part) : "";
-    const said = spokenLetters(ctx.body.SpeechResult || "");
+    const typedUp = await callSpokenAnswer(ctx, Number(ctx.query.get("a")));
+    const said = spokenLetters(typedUp ? typedUp.text || "" : ctx.body.SpeechResult || "");
     if (!said && !keep) return back(vr, "catalog-part", { part, add: ctx.query.get("add") ?? undefined });
     await updateSession(ctx.callSid, { data: { [part === "domain" ? "catDomain" : "catLocal"]: keep + said } }, ctx.session);
     return back(vr, "catalog-got", { part });
@@ -1475,7 +1519,7 @@ const handlers: Record<string, Handler> = {
     const n = ctx.query.get("n") ?? undefined;
     const a = Number(ctx.query.get("a"));
     const w = Number(ctx.query.get("w") || 1);
-    const [row] = Number.isInteger(a) ? await db.select().from(schema.spokenAnswers).where(and(eq(schema.spokenAnswers.id, a), eq(schema.spokenAnswers.callSid, ctx.callSid))).limit(1) : [];
+    const row = await callSpokenAnswer(ctx, a);
     if (row && row.status === "pending" && w < STT_MAX_WAITS) {
       vr.play(`${config.baseUrl()}${STT_HOLD_FILE}`);
       return back(vr, "stt-check", { f, n, a, w: w + 1 });
@@ -1489,10 +1533,7 @@ const handlers: Record<string, Handler> = {
     if (ctx.query.get("skip")) return back(vr, "phone"); // pound on the recording: skip email
     if (ctx.body.Digits === "*") return back(vr, "type", { f }); // switch to keypad typing
     // Speech to text: the typed-up answer comes from our own record of this call, not from Twilio's speech result
-    const a = Number(ctx.query.get("a"));
-    const typedUp = Number.isInteger(a) && a > 0
-      ? (await db.select().from(schema.spokenAnswers).where(and(eq(schema.spokenAnswers.id, a), eq(schema.spokenAnswers.callSid, ctx.callSid))).limit(1))[0]
-      : undefined;
+    const typedUp = await callSpokenAnswer(ctx, Number(ctx.query.get("a")));
     const viaStt = Boolean(typedUp) || ctx.query.get("empty") === "1";
     if (!viaStt) {
       if (f === "email" && (ctx.body.Digits === "#" || (ctx.body.Digits === "" && !ctx.body.SpeechResult))) return back(vr, "phone"); // skip email (as before)

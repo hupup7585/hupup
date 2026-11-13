@@ -106,4 +106,16 @@ describe("speech to text: the call", () => {
     expect(redirect(quiet)).toBe("heard?f=name&empty=1");
     expect(redirect(await call("heard", {}, "f=name&empty=1"))).toBe("ask?f=name&n=1");
   });
+  it("key 8 catalog email: spoken letters are recorded and typed up the same way", async () => {
+    const xml = await call("catalog-stt-recorded", { RecordingUrl: "https://api.twilio.com/2010-04-01/Accounts/AC1/Recordings/RE5", RecordingSid: "RE5", RecordingDuration: "3" }, "part=local");
+    expect(xml).toContain("<Play>https://hupup.example/audio/stt-hold.wav</Play>");
+    const a = Number(redirect(xml)!.match(/a=(\d+)/)![1]);
+    expect(redirect(xml)).toBe(`catalog-stt-check?part=local&a=${a}&w=1`);
+    await db.update(schema.spokenAnswers).set({ status: "done", text: "y o s s i" }).where(eq(schema.spokenAnswers.id, a));
+    expect(redirect(await call("catalog-stt-check", {}, `part=local&a=${a}&w=1`))).toBe(`catalog-said?part=local&a=${a}`);
+    expect(redirect(await call("catalog-said", {}, `part=local&a=${a}`))).toBe("catalog-got?part=local");
+    expect(h.session.data.catLocal).toBe("yossi");
+    // nothing said: the same step again
+    expect(redirect(await call("catalog-stt-recorded", { RecordingDuration: "0" }, "part=local"))).toBe("catalog-said?part=local&empty=1");
+  });
 });

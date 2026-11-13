@@ -533,7 +533,10 @@ export const voicemails = pgTable(
     heardAt: timestamp("heard_at", { withTimezone: true }),
     heardBy: integer("heard_by").references(() => adminUsers.id),
     notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    /** Hidden from the list (Delete). The recording is kept (Abraham, Nov 13, 2026). */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    /** Deleted for good by the Owner: the Twilio recording was removed. */
+    purgedAt: timestamp("purged_at", { withTimezone: true }),
     /**
      * recording (call still on) | reviewing (caller pressed #, deciding) | submitted | replaced (caller re-recorded).
      * Only submitted messages show in Admin and send alerts.

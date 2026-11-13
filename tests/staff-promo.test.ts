@@ -15,10 +15,11 @@ describe("staff promo sign-up wording and rules", () => {
     expect(sp.staffPromoStep2("+18455550100")).toBe("Should we text (845) 555-0100, or a different number?");
     expect(sp.STAFF_PROMO_STEP3).toBe("Great, we just sent you a text. Reply YES within 24 hours to finish signing up. Message and data rates may apply.");
   });
-  it("not live yet: only the Owner sees it (preview); never Delivery", () => {
+  it("preview: the Owner and the Secretary see it; never Delivery", () => {
     expect(sp.STAFF_PROMO_MODE).toBe("owner_preview");
     expect(sp.staffPromoVisible("owner")).toBe(true);
-    expect(sp.staffPromoVisible("secretary")).toBe(false);
+    expect(sp.staffPromoVisible("secretary")).toBe(true); // Abraham, Nov 13: the Secretary handles promos
+    expect(sp.staffPromoVisible("delivery")).toBe(false);
     expect(sp.staffPromoVisible("delivery", "live")).toBe(false);
     expect(sp.staffPromoVisible("secretary", "live")).toBe(true);
   });
@@ -26,7 +27,7 @@ describe("staff promo sign-up wording and rules", () => {
     const html = renderToStaticMarkup(createElement(PromoSignupPanel, { orderId: 1, phoneDisplay: "(845) 555-0100", step2: sp.staffPromoStep2("+18455550100"), preview: true }));
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Send confirmation<\/button>/);
     expect(html.replace(/&#x27;/g, "'")).toContain(sp.STAFF_PROMO_STEP1);
-    expect(html).toContain("Preview for Abraham");
+    expect(html).toContain("Preview: the Owner and the Secretary see this");
     expect(html).not.toContain(sp.STAFF_PROMO_STEP3.slice(0, 20)); // Step 3 only after the text went out
   });
   it("the action checks the yes, sends the approved text word for word, and logs staff name, number, date, time and year", () => {

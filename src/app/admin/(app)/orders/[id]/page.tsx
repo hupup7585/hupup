@@ -112,7 +112,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           {await (async () => {
             const spoken = await spokenAnswersFor(o.callSid);
             if (!spoken.length) return null;
-            const fieldName: Record<string, string> = { name: "Name", address: "Address", email: "Email" };
+            const fieldName: Record<string, string> = { name: "Name", address: "Address", email: "Email", catalog_local: "Catalog email (before the @)", catalog_domain: "Catalog email (after the @)" };
             return (
               <div className="card p-5" data-spoken-answers>
                 <h2 className="mb-1 font-bold">Spoken answers</h2>

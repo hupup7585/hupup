@@ -2,11 +2,11 @@ import ConfirmSubmit from "@/components/ConfirmSubmit";
 import { Download, Phone } from "lucide-react";
 import { requireStaff } from "@/lib/auth";
 import { formatPhone } from "@/lib/phone";
-import { TEXT_ALERTS_NOT_ACTIVE, listVoicemails, mainBox, textingActive } from "@/lib/voicemail";
+import { TEXT_ALERTS_NOT_ACTIVE, hiddenVoicemails, listVoicemails, mainBox, textingActive } from "@/lib/voicemail";
 import { getSettings } from "@/lib/settings";
 import { db, schema } from "@/lib/db";
 import { PROMPTS } from "@/lib/ivr/prompts";
-import { deleteVoicemailAction, saveBoxAction, setHeardAction, setUrgentAction } from "./actions";
+import { deleteVoicemailAction, purgeVoicemailAction, restoreVoicemailAction, saveBoxAction, setHeardAction, setUrgentAction } from "./actions";
 import { dualDateTime } from "@/lib/dual-date";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +33,7 @@ export default async function VoicemailPage() {
     );
   }
   const unheard = list.filter((v) => !v.heardAt).length;
+  const hidden = staff.role === "owner" ? await hiddenVoicemails() : [];
   const boxes = new Map((await db.select({ id: schema.voicemailBoxes.id, name: schema.voicemailBoxes.name, isMain: schema.voicemailBoxes.isMain }).from(schema.voicemailBoxes)).map((b) => [b.id, b]));
   return (
     <div className="mx-auto max-w-4xl">
@@ -77,12 +78,34 @@ export default async function VoicemailPage() {
                 <button className="btn-ghost">{v.urgent ? "Not urgent" : "Mark urgent"}</button>
               </form>
               <form action={deleteVoicemailAction.bind(null, v.id)}>
-                <ConfirmSubmit message="Delete this voicemail? The recording will be gone for good." className="btn-ghost text-[#C83A2F]">Delete</ConfirmSubmit>
+                <ConfirmSubmit message="Delete this voicemail? It will be hidden from this list. The recording is kept, and the Owner can show it again." className="btn-ghost text-[#C83A2F]">Delete</ConfirmSubmit>
               </form>
             </div>
           </li>
         ))}
       </ul>
+
+      {staff.role === "owner" && hidden.length > 0 && (
+        <details className="card mt-8 p-5" data-hidden-voicemails>
+          <summary className="cursor-pointer font-black">Deleted messages ({hidden.length})</summary>
+          <p className="mt-2 text-sm text-muted">Hidden from the list, recording kept. Only you can show one again or delete it for good.</p>
+          <ul className="mt-3 space-y-3">
+            {hidden.map((v) => (
+              <li key={v.id} data-hidden-voicemail={v.id} className="rounded-xl bg-bg p-3 text-sm">
+                <div className="font-bold">{v.fromNumber ? formatPhone(v.fromNumber) : "Withheld number"} <span className="font-normal text-muted">· {when(v.createdAt)} · {mmss(v.durationSec)}</span></div>
+                <audio controls preload="none" className="mt-2 w-full" src={`/api/admin/voicemail/${v.id}/audio`} />
+                {v.transcription && <p className="mt-1 whitespace-pre-line">{v.transcription}</p>}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <form action={restoreVoicemailAction.bind(null, v.id)}><button className="btn-ghost">Show again</button></form>
+                  <form action={purgeVoicemailAction.bind(null, v.id)}>
+                    <ConfirmSubmit message="Delete this voicemail for good? The recording will be gone and can't be brought back." className="btn-ghost text-[#C83A2F]">Delete for good</ConfirmSubmit>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {staff.role === "owner" && (
         <form action={saveBoxAction} className="card mt-8 grid gap-4 p-5">

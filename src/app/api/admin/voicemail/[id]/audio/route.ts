@@ -12,7 +12,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (staff.role === "delivery") return new Response("Forbidden", { status: 403 });
   const id = Number((await ctx.params).id);
   const [v] = Number.isInteger(id) ? await db.select().from(schema.voicemails).where(eq(schema.voicemails.id, id)).limit(1) : [];
-  if (!v || v.deletedAt) return new Response("Not found", { status: 404 });
+  // Deleted messages are hidden, not gone: only the Owner can still play them, until deleted for good
+  if (!v || v.purgedAt || (v.deletedAt && staff.role !== "owner")) return new Response("Not found", { status: 404 });
   const audio = await fetchRecordingAudio(v);
   if (!audio?.body) return new Response("Recording unavailable", { status: 502 });
   const download = new URL(req.url).searchParams.has("download");

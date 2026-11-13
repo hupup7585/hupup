@@ -5,15 +5,16 @@ import { formatPhone } from "@/lib/phone";
  * Replaces the long read-aloud promo disclosure. The confirmation text itself stays word for word as approved, and
  * only a YES reply from that number within 24 hours signs it up.
  *
- * "owner_preview": only the Owner sees the new box (marked Preview) so Abraham can review it; Secretaries see no
- *                  promo sign-up at all. "live": Owner and Secretary use it. Abraham switches this after approving.
+ * "owner_preview": the box is marked Preview while Abraham reviews it. The Owner and the Secretary both see it
+ *                  (Abraham, Nov 13, 2026: the Secretary handles promos). "live": the Preview mark goes away.
  */
 export type StaffPromoMode = "owner_preview" | "live";
 export const STAFF_PROMO_MODE: StaffPromoMode = "owner_preview";
 
 export function staffPromoVisible(role: string, mode: StaffPromoMode = STAFF_PROMO_MODE): boolean {
   if (role === "delivery") return false;
-  return mode === "live" ? role === "owner" || role === "secretary" : role === "owner";
+  void mode;
+  return role === "owner" || role === "secretary";
 }
 
 export const STAFF_PROMO_STEP1 = "Would you like to get seasonal offers, discounts, and deals from Hup Up Attractions by text, up to 5 a year? It's never required to book.";

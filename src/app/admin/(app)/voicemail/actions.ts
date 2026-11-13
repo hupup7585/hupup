@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { requireOwner, requireStaff } from "@/lib/auth";
-import { deleteVoicemail } from "@/lib/voicemail";
+import { deleteVoicemail, purgeVoicemail, restoreVoicemail } from "@/lib/voicemail";
 import { toE164 } from "@/lib/phone";
 
 async function audit(userId: number | null, action: string, entityId: number, after: Record<string, unknown> = {}) {
@@ -29,7 +29,23 @@ export async function setUrgentAction(id: number, urgent: boolean) {
 export async function deleteVoicemailAction(id: number) {
   const s = await requireStaff(["owner", "secretary"]);
   await deleteVoicemail(id);
-  await audit(s.userId, "voicemail.deleted", id);
+  await audit(s.userId, "voicemail.hidden", id);
+  revalidatePath("/admin/voicemail");
+}
+
+/** Owner: show a hidden message again. */
+export async function restoreVoicemailAction(id: number) {
+  const s = await requireOwner();
+  await restoreVoicemail(id);
+  await audit(s.userId, "voicemail.restored", id);
+  revalidatePath("/admin/voicemail");
+}
+
+/** Owner only, after the confirm step: remove the recording for good. */
+export async function purgeVoicemailAction(id: number) {
+  const s = await requireOwner();
+  const ok = await purgeVoicemail(id);
+  await audit(s.userId, ok ? "voicemail.deleted_for_good" : "voicemail.delete_for_good_failed", id);
   revalidatePath("/admin/voicemail");
 }
 

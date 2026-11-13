@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { sendEmail, sendSms } from "@/lib/notify";
@@ -331,14 +331,38 @@ export async function fetchRecordingAudio(v: Pick<Voicemail, "recordingUrl">): P
   return res.ok ? res : null;
 }
 
-/** Delete: hide the row now and remove the recording from Twilio (best effort). */
+/** Delete (Owner and Secretary): hide the message from the list. The recording is kept (Abraham, Nov 13, 2026). */
 export async function deleteVoicemail(id: number) {
   const [v] = await db.update(schema.voicemails).set({ deletedAt: new Date() }).where(eq(schema.voicemails.id, id)).returning();
-  if (!v) return false;
+  return Boolean(v);
+}
+
+/** Show a hidden message again (Owner). */
+export async function restoreVoicemail(id: number) {
+  const [v] = await db.update(schema.voicemails).set({ deletedAt: null }).where(and(eq(schema.voicemails.id, id), isNull(schema.voicemails.purgedAt))).returning();
+  return Boolean(v);
+}
+
+/** Delete for good (Owner only, after a confirm step): remove the recording from Twilio. */
+export async function purgeVoicemail(id: number) {
+  const [v] = await db.select().from(schema.voicemails).where(eq(schema.voicemails.id, id)).limit(1);
+  if (!v || v.purgedAt) return false;
   try {
     await getTwilio()?.recordings(v.recordingSid).remove();
   } catch (e) {
     console.error("[voicemail] Twilio recording delete failed:", e);
+    return false;
   }
+  await db.update(schema.voicemails).set({ purgedAt: new Date(), deletedAt: v.deletedAt ?? new Date() }).where(eq(schema.voicemails.id, id));
   return true;
+}
+
+/** Hidden messages the Owner can show again or delete for good. */
+export async function hiddenVoicemails() {
+  return db
+    .select()
+    .from(schema.voicemails)
+    .where(and(isNotNull(schema.voicemails.deletedAt), isNull(schema.voicemails.purgedAt), eq(schema.voicemails.state, "submitted")))
+    .orderBy(desc(schema.voicemails.deletedAt))
+    .limit(500);
 }

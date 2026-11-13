@@ -23,7 +23,7 @@ export default function PromoSignupPanel({ orderId, phoneDisplay, step2, preview
   return (
     <div className="card p-5" data-promo-signup>
       <h2 className="mb-1 font-bold">Promo texts sign-up</h2>
-      {preview && <p data-promo-preview className="mb-3 rounded-lg bg-[#FFF8E1] px-3 py-2 text-sm font-semibold text-[#5C4600]">Preview for Abraham: only the Owner sees this until it&rsquo;s approved.</p>}
+      {preview && <p data-promo-preview className="mb-3 rounded-lg bg-[#FFF8E1] px-3 py-2 text-sm font-semibold text-[#5C4600]">Preview: the Owner and the Secretary see this until it&rsquo;s approved.</p>}
       {stopped && <p className="mb-3 rounded-lg bg-coral/10 p-2 text-sm font-semibold text-coral">This customer replied STOP. No texts can go to this number.</p>}
 
       <div className={step}>Step 1: read to the customer</div>
