@@ -64,20 +64,22 @@ describe("payment link rule", () => {
     const { mk } = await setup(1);
     const phone = await mk(-5, "PHONE", true);
     const now = new Date();
-    expect(await holdAgain([phone], now)).toEqual([phone]);
+    expect(await holdAgain([phone], phone, now)).toEqual({ held: [phone], removed: 0 });
     const o = await get(phone);
     expect(o.status).toBe("PENDING_PAYMENT");
     expect(Math.round((o.holdExpiresAt!.getTime() - now.getTime()) / MIN)).toBe(10);
     // the only unit is now held again by this customer: another expired link for the same unit can't take it
     const other = await mk(-5, "PHONE", true);
-    expect(await holdAgain([other], new Date())).toBeNull();
-    expect(holdEnded(await get(other))).toBe(true);
+    // the other link gets nothing held: its item is taken out and listed for the nearest options
+    expect(await holdAgain([other], other, new Date())).toEqual({ held: [other], removed: 1 });
+    expect((await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, other))).length).toBe(0);
+    expect((await get(other)).linkRemoved).toHaveLength(1);
   });
   it("Admin link gets 25 minutes again", async () => {
     const { mk } = await setup(1);
     const pos = await mk(-1, "POS", true);
     const now = new Date();
-    await holdAgain([pos], now);
+    await holdAgain([pos], pos, now);
     expect(Math.round(((await get(pos)).holdExpiresAt!.getTime() - now.getTime()) / MIN)).toBe(25);
   });
   it("friendly draft wording, item or items", () => {
@@ -88,13 +90,13 @@ describe("payment link rule", () => {
     expect(LINK_TEXT.gone(2)).toBe("These items are no longer available for your date.");
     expect(LINK_TEXT.goneCall).toBe("Please call us at (845) 777-7585, to choose another option or another day.");
     expect(LINK_TEXT.cardNote).toBe('After you tap "Agree and pay," you will have 10 minutes to enter your card details on our secure payment page. If your session expires, your rented items will be returned to stock, and you can check again availability to rebook at any time.');
-    expect(LINK_TEXT.heldAgain(10)).toBe("It's still available! We're holding it for you for the next 10 minutes."); // Abraham's exact wording
+    expect(LINK_TEXT.heldAgain(10)).toBe("It's still available! We are holding it for you for the next 10 minutes."); // Abraham's exact wording
   });
 });
 
-describe("expired link, item gone: the nearest options (Abraham, Nov 13, 2026)", () => {
-  it("offers one size bigger / smaller that day and the same item the day before / after; tapping one holds and re-prices it", async () => {
-    const { linkOptions, chooseLinkOption } = await import("@/lib/late-payment");
+describe("expired link, item gone: the nearest options per item and per day (Abraham, Nov 13, 2026)", () => {
+  it("two items: the free one is held again, the taken one gets its options; choosing one adds it and re-prices", async () => {
+    const { removedWithOptions, chooseLinkOption } = await import("@/lib/late-payment");
     const [c] = await db.insert(schema.categories).values({ name: "Bounce houses opts", sortOrder: 9 }).returning();
     const [small, mid, big] = await db
       .insert(schema.products)
@@ -104,37 +106,65 @@ describe("expired link, item gone: the nearest options (Abraham, Nov 13, 2026)",
         { categoryId: c.id, name: "Big Castle", priceCents: 25000, quantity: 1, sizeOrder: 3 },
       ])
       .returning();
+    const [c2] = await db.insert(schema.categories).values({ name: "Games opts", sortOrder: 10 }).returning();
+    const [laser] = await db.insert(schema.products).values({ categoryId: c2.id, name: "Laser tag set", priceCents: 30000, quantity: 1 }).returning();
     const day = "2026-12-22"; // Tuesday
     // Moshe has the only Castle on the 22nd
     const [moshe] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: day, pickupDate: "2026-12-23" }).returning();
     await db.insert(schema.orderItems).values({ orderId: moshe.id, productId: mid.id, qty: 1, unitPriceCents: 20000 });
-    // Sara's link expired
-    const [sara] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: day, pickupDate: "2026-12-23", holdExpiresAt: new Date(Date.now() - 60_000), subtotalCents: 20000, totalCents: 21625 }).returning();
-    await db.insert(schema.orderItems).values({ orderId: sara.id, productId: mid.id, qty: 1, unitPriceCents: 20000 });
-    expect(await holdAgain([sara.id])).toBeNull(); // gone
-
-    const opts = await linkOptions([sara.id]);
+    // Sara's link (Castle + Laser tag) expired
+    const [sara] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: day, pickupDate: "2026-12-23", holdExpiresAt: new Date(Date.now() - 60_000), subtotalCents: 50000, totalCents: 54063 }).returning();
+    await db.insert(schema.orderItems).values([
+      { orderId: sara.id, productId: mid.id, qty: 1, unitPriceCents: 20000 },
+      { orderId: sara.id, productId: laser.id, qty: 1, unitPriceCents: 30000 },
+    ]);
+    expect(await holdAgain([sara.id], sara.id)).toEqual({ held: [sara.id], removed: 1 });
+    const held = await get(sara.id);
+    expect(held.status).toBe("PENDING_PAYMENT");
+    expect(held.subtotalCents).toBe(30000); // the Laser tag set stays, held again
+    const list = await removedWithOptions(sara.id);
+    expect(list.map((r) => [r.name, r.eventDate])).toEqual([["Castle", day]]);
     // Moshe's Castle is out the 22nd and 23rd, so a booking on the 21st (back on the 22nd) can't fit either:
     // the nearest free days are the 20th and the 24th, the same the phone line offers
-    expect(opts.map((o) => [o.kind, o.name, o.date])).toEqual([
+    expect(list[0].options.map((o) => [o.kind, o.name, o.date])).toEqual([
       ["bigger", "Big Castle", day],
       ["smaller", "Small Castle", day],
       ["before", "Castle", "2026-12-20"],
       ["after", "Castle", "2026-12-24"],
     ]);
     // a made-up choice (not offered) is refused
-    expect(await chooseLinkOption(sara.id, mid.id, day)).toBe(false);
-    // tapping "Big Castle": held again for 10 minutes, item and price changed, re-priced with delivery and tax
-    expect(await chooseLinkOption(sara.id, big.id, day)).toBe(true);
-    const after = await get(sara.id);
-    expect(after.status).toBe("PENDING_PAYMENT");
-    expect(after.holdExpiresAt!.getTime()).toBeGreaterThan(Date.now() + 9 * MIN);
-    expect(after.subtotalCents).toBe(25000);
-    expect(after.totalCents).toBeNull(); // re-priced with delivery and tax from the address (none in this test) before paying
-    const [line] = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, sara.id));
-    expect([line.productId, line.unitPriceCents]).toEqual([big.id, 25000]);
-    // the Big Castle is now held for Sara: no one else can take it
-    expect((await linkOptions([sara.id])).length).toBeGreaterThanOrEqual(0);
+    expect(await chooseLinkOption(sara.id, 0, mid.id, day)).toBe(false);
+    // same day, a size bigger: added to the same order and re-priced
+    expect(await chooseLinkOption(sara.id, 0, big.id, day)).toBe(true);
+    const lines = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, sara.id));
+    expect(lines.map((l) => l.productId).sort()).toEqual([big.id, laser.id].sort());
+    expect((await get(sara.id)).subtotalCents).toBe(55000);
+    expect((await get(sara.id)).linkRemoved).toEqual([]);
     void small;
+  });
+  it("another day: the item joins the same payment as a second rental day", async () => {
+    const { removedWithOptions, chooseLinkOption } = await import("@/lib/late-payment");
+    const { getPaymentGroup } = await import("@/lib/orders");
+    const [c] = await db.insert(schema.categories).values({ name: "Paddle", sortOrder: 11 }).returning();
+    const [boat] = await db.insert(schema.products).values({ categoryId: c.id, name: "Paddle boat", priceCents: 10000, quantity: 1 }).returning();
+    const [ball] = await db.insert(schema.products).values({ categoryId: c.id, name: "Ball pit", priceCents: 8000, quantity: 1 }).returning();
+    const day = "2027-01-05";
+    const [other] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: day, pickupDate: "2027-01-06" }).returning();
+    await db.insert(schema.orderItems).values({ orderId: other.id, productId: boat.id, qty: 1, unitPriceCents: 10000 });
+    const [sara] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "PHONE", eventDate: day, pickupDate: "2027-01-06", subtotalCents: 18000 }).returning();
+    await db.insert(schema.orderItems).values([
+      { orderId: sara.id, productId: boat.id, qty: 1, unitPriceCents: 10000 },
+      { orderId: sara.id, productId: ball.id, qty: 1, unitPriceCents: 8000 },
+    ]);
+    await holdAgain([sara.id], sara.id);
+    const [entry] = await removedWithOptions(sara.id);
+    const later = entry.options.find((o) => o.kind === "after")!;
+    expect(await chooseLinkOption(sara.id, entry.index, boat.id, later.date)).toBe(true);
+    const group = await getPaymentGroup(sara.id);
+    expect(group!.orders.map((d) => [d.order.eventDate, d.items.map((i) => i.productId)])).toEqual([
+      [day, [ball.id]],
+      [later.date, [boat.id]],
+    ]);
+    expect(group!.orders.every((d) => d.order.status === "PENDING_PAYMENT")).toBe(true);
   });
 });

@@ -7,7 +7,7 @@ import PayForm from "./PayForm";
 import { webConsentCopy } from "@/lib/sms-terms-v2";
 import { smsNumberDisplay } from "@/lib/sms-number";
 import DualDate from "@/components/DualDate";
-import { LINK_TEXT, holdEnded, holdForCardPage, keepHoldWhileActive, linkOptions, linkOptionsActive, linkRulesActive } from "@/lib/late-payment";
+import { LINK_TEXT, holdEnded, holdForCardPage, keepHoldWhileActive, linkOptionsActive, linkRulesActive, removedWithOptions } from "@/lib/late-payment";
 import { checkAgainAction, chooseOptionAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +16,9 @@ export const metadata = { title: "Review and pay | Hup Up Attractions", robots: 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
 /** Review-and-pay page (from the payment text). Terms must be accepted with an unchecked box before Sola. */
-export default async function PayPage({ params, searchParams }: { params: Promise<{ orderId: string }>; searchParams: Promise<{ t?: string; held?: string; gone?: string }> }) {
+export default async function PayPage({ params, searchParams }: { params: Promise<{ orderId: string }>; searchParams: Promise<{ t?: string; held?: string }> }) {
   const { orderId } = await params;
-  const { t, held, gone } = await searchParams;
+  const { t, held } = await searchParams;
   const id = Number(orderId);
   if (!Number.isInteger(id) || !verifyPayToken(id, t)) notFound();
   // Every link charges items + delivery + tax: price any order not priced yet (made in Admin, or older ones)
@@ -28,39 +28,14 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   const rules = linkRulesActive();
   if (rules && before.orders.some((d) => holdEnded(d.order))) {
     const count = before.orders.reduce((n, d) => n + d.items.reduce((m, i) => m + i.qty, 0), 0);
-    const options = gone && linkOptionsActive() ? await linkOptions(before.orders.map((d) => d.order.id)) : [];
     return (
       <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">
         <div className="mx-auto max-w-md rounded-2xl border-2 border-hu-deep bg-white p-6" data-link-expired>
-          <h1 className="text-2xl font-extrabold">{gone ? LINK_TEXT.gone(count) : LINK_TEXT.expiredTitle}</h1>
-          {gone ? (
-            <>
-              {options.length > 0 && (
-                <div className="mt-4" data-link-options>
-                  <p>{LINK_TEXT.optionsIntro}</p>
-                  <div className="mt-3 space-y-2">
-                    {options.map((x) => (
-                      <form key={`${x.productId}-${x.date}`} action={chooseOptionAction.bind(null, id, t!, x.productId, x.date)}>
-                        <button className="btn-ghost w-full justify-start py-3 text-left" data-link-option={x.kind}>
-                          <span>
-                            {x.name} on <DualDate iso={x.date} /> ({money(x.priceCents)})
-                          </span>
-                        </button>
-                      </form>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <p className="mt-4" data-link-gone>{LINK_TEXT.goneCall}</p>
-            </>
-          ) : (
-            <>
-              <p className="mt-3">{LINK_TEXT.expiredBody(count)}</p>
-              <form action={checkAgainAction.bind(null, id, t!)} className="mt-5">
-                <button className="btn-dark w-full py-3" data-check-again>{LINK_TEXT.checkButton}</button>
-              </form>
-            </>
-          )}
+          <h1 className="text-2xl font-extrabold">{LINK_TEXT.expiredTitle}</h1>
+          <p className="mt-3">{LINK_TEXT.expiredBody(count)}</p>
+          <form action={checkAgainAction.bind(null, id, t!)} className="mt-5">
+            <button className="btn-dark w-full py-3" data-check-again>{LINK_TEXT.checkButton}</button>
+          </form>
         </div>
       </main>
     );
@@ -72,6 +47,9 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   const full = group.primary;
   const o = full.order;
   const due = group.due; // every rental day booked together, one charge
+  // Items someone else booked (taken out when the customer checked availability again), with their nearest options
+  const removed = rules && linkOptionsActive() ? await removedWithOptions(id) : [];
+  const removedCount = removed.reduce((n, r) => n + r.qty, 0);
   // Live site while the Terms are still a draft: no Terms box, straight to the secure payment page (as before)
   if (!termsActive() && o.status === "PENDING_PAYMENT" && due > 0) {
     if (rules) await holdForCardPage(group.orders.map((d) => d.order.id)); // straight to the card page: 10 minutes there
@@ -111,10 +89,35 @@ export default async function PayPage({ params, searchParams }: { params: Promis
         <ul className="mt-3 text-sm">
           <li className="flex justify-between border-t pt-2 text-base font-bold"><span>Total due</span><span>{money(due)}</span></li>
         </ul>
-        {rules && held && <p data-held-again className="mt-4 rounded-lg bg-[#e5f4e4] px-3 py-2 text-sm font-semibold">{LINK_TEXT.heldAgain(o.channel === "POS" ? 25 : 10)}</p>}
+        {removed.length > 0 && (
+          <section data-link-removed className="mt-5 rounded-xl border-2 border-sun bg-[#FFF8E1] p-4">
+            <h2 className="text-lg font-extrabold">{LINK_TEXT.gone(removedCount)}</h2>
+            {removed.some((r) => r.options.length) && <p className="mt-2 text-sm">{LINK_TEXT.optionsIntro}</p>}
+            {removed.map((r) => (
+              <div key={r.index} className="mt-3" data-link-removed-item>
+                <div className="text-sm font-bold">
+                  {r.qty} × {r.name}, <DualDate iso={r.eventDate} />
+                </div>
+                <div className="mt-2 space-y-2" data-link-options>
+                  {r.options.map((x) => (
+                    <form key={`${x.productId}-${x.date}`} action={chooseOptionAction.bind(null, id, t!, r.index, x.productId, x.date)}>
+                      <button className="btn-ghost w-full justify-start py-3 text-left" data-link-option={x.kind}>
+                        <span>
+                          {x.name} on <DualDate iso={x.date} /> ({money(x.priceCents)})
+                        </span>
+                      </button>
+                    </form>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <p className="mt-3 text-sm" data-link-gone>{LINK_TEXT.goneCall}</p>
+          </section>
+        )}
+        {rules && held && due > 0 && <p data-held-again className="mt-4 rounded-lg bg-[#e5f4e4] px-3 py-2 text-sm font-semibold">{LINK_TEXT.heldAgain(o.channel === "POS" ? 25 : 10)}</p>}
         {rules && o.status === "PENDING_PAYMENT" && due > 0 && <p data-card-note className="mt-3 text-sm">{LINK_TEXT.cardNote}</p>}
         <div className="mt-6">
-          {o.status === "PENDING_PAYMENT" && due > 0 ? <PayForm orderId={id} token={t!} consent={{ transactionalText: webConsentCopy().transactional, marketingText: webConsentCopy().marketing, smsNumber: smsNumberDisplay() }} /> : <p className="font-semibold">This order isn&rsquo;t waiting for payment. Questions? Call (845) 777-7585.</p>}
+          {o.status === "PENDING_PAYMENT" && due > 0 ? <PayForm orderId={id} token={t!} consent={{ transactionalText: webConsentCopy().transactional, marketingText: webConsentCopy().marketing, smsNumber: smsNumberDisplay() }} /> : removed.length ? null : <p className="font-semibold">This order is not waiting for payment. Questions? Call (845) 777-7585.</p>}
         </div>
       </div>
     </main>

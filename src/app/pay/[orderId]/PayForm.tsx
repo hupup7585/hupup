@@ -40,7 +40,7 @@ export default function PayForm({ orderId, token, consent }: { orderId: number; 
       <button className="hu-btn w-full disabled:opacity-50" disabled={!agreed || pending}>
         {pending ? "One moment…" : "Continue to secure payment"}
       </button>
-      <p className="text-sm text-hu-deep/70">You&rsquo;ll pay on our payment provider&rsquo;s secure page.</p>
+      <p className="text-sm text-hu-deep/70">You will pay on our payment provider&rsquo;s secure page.</p>
     </form>
   );
 }

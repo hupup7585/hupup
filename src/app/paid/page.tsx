@@ -15,14 +15,14 @@ export default async function Paid({ searchParams }: { searchParams: Promise<Rec
         <img src="/logo.svg" alt="Hup Up Attractions" className="mx-auto h-14" />
         {declined ? (
           <>
-            <h1 className="mt-5 text-2xl font-black">Payment didn&apos;t go through</h1>
+            <h1 className="mt-5 text-2xl font-black">Payment did not go through</h1>
             <p className="mt-2 text-muted">Please try the link again, or call us at {config.hotlineDisplay}.</p>
           </>
         ) : (
           <>
             <h1 className="mt-5 text-2xl font-black">Thank you!</h1>
             <p className="mt-2 text-muted">
-              {invoice ? `Order ${invoice.replace(/^HU-/, "#")}` : "Your order"} is being confirmed. You&apos;ll receive a
+              {invoice ? `Order ${invoice.replace(/^HU-/, "#")}` : "Your order"} is being confirmed. You will receive a
               text as soon as it&apos;s done.
             </p>
           </>

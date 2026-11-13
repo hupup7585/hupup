@@ -108,6 +108,9 @@ export const orders = pgTable(
     pickupDate: date("pickup_date", { mode: "string" }).notNull(),
     deliveryAddress: text("delivery_address"),
     /** Driver for the delivery and for the pickup (Abraham, Nov 12, 2026); a Delivery login sees only its own stops. */
+    /** Items taken out of an expired payment link because someone else booked them (Abraham, Nov 13, 2026); the
+     *  customer is offered the nearest options for each. Kept on the order the link opens. */
+    linkRemoved: jsonb("link_removed").$type<{ productId: number; qty: number; eventDate: string; name: string }[]>().notNull().default([]),
     deliveryDriverId: integer("delivery_driver_id"),
     pickupDriverId: integer("pickup_driver_id"),
     deliveryTime: text("delivery_time"),

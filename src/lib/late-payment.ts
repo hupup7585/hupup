@@ -65,33 +65,47 @@ export async function holdForCardPage(orderIds: number[], now = new Date()) {
 }
 
 /**
- * "Check availability again": hold the same order again if every item is still free on every day. Runs in one
- * transaction with the products locked, so the phone line, another link or Admin can't take the items at the same
- * moment. Returns the order ids that were held again, or null when something is no longer free.
+ * "Check availability again" (Abraham, Nov 13, 2026): every item that's still free is held again; any item someone
+ * else booked is taken out of the order and listed (linkRemoved) so the customer can pick the nearest option for it.
+ * Runs in one transaction with the products locked, so the phone line, another link or Admin can't take the items at
+ * the same moment. `primaryId` is the order the link opens; the removed items are kept on it.
  */
-export async function holdAgain(orderIds: number[], now = new Date()): Promise<number[] | null> {
+export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now = new Date()): Promise<{ held: number[]; removed: number }> {
   return db.transaction(async (tx) => {
     const rows = await tx.select().from(schema.orders).where(inArray(schema.orders.id, orderIds));
     const ended = rows.filter((o) => holdEnded(o, now));
-    if (!ended.length) return rows.map((o) => o.id); // still held: nothing to do
+    if (!ended.length) return { held: rows.map((o) => o.id), removed: 0 }; // still held: nothing to do
     const items = await tx.select().from(schema.orderItems).where(inArray(schema.orderItems.orderId, ended.map((o) => o.id)));
     const pids = [...new Set(items.map((i) => i.productId))].sort((a, b) => a - b);
     for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+    const removed: { productId: number; qty: number; eventDate: string; name: string }[] = [];
     for (const o of ended) {
       for (const i of items.filter((x) => x.orderId === o.id)) {
         const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, i.productId)).limit(1);
-        if (!p?.active) return null;
-        const free = await checkBookable(p.id, p.quantity, o.eventDate, tx, o.pickupDate);
-        if (free < i.qty) return null;
+        const free = p?.active ? await checkBookable(p.id, p.quantity, o.eventDate, tx, o.pickupDate) : 0;
+        if (free >= i.qty) continue;
+        removed.push({ productId: i.productId, qty: i.qty, eventDate: o.eventDate, name: p?.name ?? "Item" });
+        await tx.delete(schema.orderItems).where(eq(schema.orderItems.id, i.id));
       }
-    }
-    for (const o of ended) {
       await tx
         .update(schema.orders)
-        .set({ status: "PENDING_PAYMENT", holdExpiresAt: inMinutes(o.channel === "POS" ? 25 : 10, now), updatedAt: now })
+        .set({
+          status: "PENDING_PAYMENT",
+          holdExpiresAt: inMinutes(o.channel === "POS" ? 25 : 10, now),
+          subtotalCents: sql`COALESCE((SELECT SUM(qty * unit_price_cents) FROM order_items WHERE order_id = ${o.id}), 0)`,
+          totalCents: null, // re-priced below
+          updatedAt: now,
+        })
         .where(eq(schema.orders.id, o.id));
     }
-    return rows.map((o) => o.id);
+    if (removed.length) {
+      const [primary] = await tx.select().from(schema.orders).where(eq(schema.orders.id, primaryId)).limit(1);
+      await tx.update(schema.orders).set({ linkRemoved: [...(primary?.linkRemoved ?? []), ...removed] }).where(eq(schema.orders.id, primaryId));
+    }
+    return { held: rows.map((o) => o.id), removed: removed.length };
+  }).then(async (r) => {
+    for (const id of orderIds) await ensurePriced(id);
+    return r;
   });
 }
 
@@ -102,10 +116,10 @@ export const LINK_TEXT = {
   expiredBody: (n: number) =>
     n === 1
       ? "Your item was back into stock so other customers could book. Tap below to check if it's still free for your date."
-      : "Your items were back into stock so other customers could book. Tap below to check if they're still free for your date.",
+      : "Your items were back into stock so other customers could book. Tap below to check if they are still free for your date.",
   checkButton: "Check availability again",
   // Abraham's wording, Nov 13, 2026 (approved): 10 minutes for a phone order, 25 for an Admin link
-  heldAgain: (min: number) => `It's still available! We're holding it for you for the next ${min} minutes.`,
+  heldAgain: (min: number) => `It's still available! We are holding it for you for the next ${min} minutes.`,
   // Abraham's wording, Nov 13, 2026 (approved)
   gone: (n: number) => `${n === 1 ? "This item is" : "These items are"} no longer available for your date.`,
   goneCall: "Please call us at (845) 777-7585, to choose another option or another day.",
@@ -117,62 +131,92 @@ export const LINK_TEXT = {
 
 
 export type LinkOption = { kind: "bigger" | "smaller" | "before" | "after"; productId: number; name: string; date: string; priceCents: number };
+export type RemovedWithOptions = { index: number; name: string; qty: number; eventDate: string; options: LinkOption[] };
 
 /**
- * The nearest free options for an expired link whose item is gone, the same ones the phone offers: one size bigger
- * or smaller on the same day, or the same item on the day before / after (else the nearest open days). Only for an
- * order with one item on one day; other orders get the call-us line.
+ * For each item taken out of the link: the nearest free options, the same the phone offers (one size bigger or
+ * smaller the same day, the same item the day before / after, else the nearest open days).
  */
-export async function linkOptions(orderIds: number[]): Promise<LinkOption[]> {
-  if (orderIds.length !== 1) return [];
-  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderIds[0])).limit(1);
-  const items = o ? await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id)) : [];
-  if (!o || items.length !== 1) return [];
-  const [p] = await db.select().from(schema.products).where(eq(schema.products.id, items[0].productId)).limit(1);
-  if (!p) return [];
+export async function removedWithOptions(primaryId: number): Promise<RemovedWithOptions[]> {
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, primaryId)).limit(1);
+  if (!o?.linkRemoved?.length) return [];
   const cal = await getSettings();
-  const [big, small, days] = await Promise.all([nearestSize(p, o.eventDate, 1, cal), nearestSize(p, o.eventDate, -1, cal), nearbyDays(p, o.eventDate, cal)]);
-  const out: LinkOption[] = [];
-  if (big) out.push({ kind: "bigger", productId: big.id, name: big.name, date: o.eventDate, priceCents: big.priceCents });
-  if (small) out.push({ kind: "smaller", productId: small.id, name: small.name, date: o.eventDate, priceCents: small.priceCents });
-  if (days.before) out.push({ kind: "before", productId: p.id, name: p.name, date: days.before, priceCents: p.priceCents });
-  if (days.after) out.push({ kind: "after", productId: p.id, name: p.name, date: days.after, priceCents: p.priceCents });
+  const out: RemovedWithOptions[] = [];
+  for (const [index, r] of o.linkRemoved.entries()) {
+    const [p] = await db.select().from(schema.products).where(eq(schema.products.id, r.productId)).limit(1);
+    const options: LinkOption[] = [];
+    if (p) {
+      const [big, small, days] = await Promise.all([nearestSize(p, r.eventDate, 1, cal), nearestSize(p, r.eventDate, -1, cal), nearbyDays(p, r.eventDate, cal)]);
+      if (big) options.push({ kind: "bigger", productId: big.id, name: big.name, date: r.eventDate, priceCents: big.priceCents });
+      if (small) options.push({ kind: "smaller", productId: small.id, name: small.name, date: r.eventDate, priceCents: small.priceCents });
+      if (days.before) options.push({ kind: "before", productId: p.id, name: p.name, date: days.before, priceCents: p.priceCents });
+      if (days.after) options.push({ kind: "after", productId: p.id, name: p.name, date: days.after, priceCents: p.priceCents });
+    }
+    out.push({ index, name: r.name, qty: r.qty, eventDate: r.eventDate, options });
+  }
   return out;
 }
 
 /**
- * The customer tapped an option: only one the server itself offers is accepted. In one locked transaction the order
- * changes to that item and day, is held again, and is re-priced (items + delivery + tax) before they pay.
+ * The customer tapped an option for one removed item: only an option the server itself offers is accepted. In one
+ * locked transaction the item is added to the order for that day (or that order moves to the new day when it has
+ * nothing else, or a new order joins the same payment), held again, and everything is re-priced before paying.
  */
-export async function chooseLinkOption(orderId: number, productId: number, date: string, now = new Date()): Promise<boolean> {
-  const offered = (await linkOptions([orderId])).find((x) => x.productId === productId && x.date === date);
-  if (!offered) return false;
+export async function chooseLinkOption(primaryId: number, index: number, productId: number, date: string, now = new Date()): Promise<boolean> {
+  const entry = (await removedWithOptions(primaryId)).find((r) => r.index === index);
+  if (!entry?.options.some((x) => x.productId === productId && x.date === date)) return false;
   const cal = await getSettings();
+  const pickup = pickupDateFor(date, cal);
+  const touched = new Set<number>();
   const ok = await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`);
     const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, productId)).limit(1);
-    const [o] = await tx.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
-    if (!p?.active || !o || !holdEnded(o, now)) return false;
-    const pickup = pickupDateFor(date, cal);
-    if ((await checkBookable(p.id, p.quantity, date, tx, pickup)) < 1) return false;
-    const [line] = await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
-    await tx.update(schema.orderItems).set({ productId: p.id, unitPriceCents: p.priceCents }).where(eq(schema.orderItems.id, line.id));
+    const [primary] = await tx.select().from(schema.orders).where(eq(schema.orders.id, primaryId)).limit(1);
+    if (!p?.active || !primary) return false;
+    if ((await checkBookable(p.id, p.quantity, date, tx, pickup)) < entry.qty) return false;
+    const groupIds = primary.paymentGroupId
+      ? (await tx.select({ id: schema.orders.id }).from(schema.orders).where(eq(schema.orders.paymentGroupId, primary.paymentGroupId))).map((r) => r.id)
+      : [primary.id];
+    const group = await tx.select().from(schema.orders).where(inArray(schema.orders.id, groupIds));
+    const counts = async (id: number) => (await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, id))).length;
+    // 1. an order of this payment for that day; 2. the removed item's own order if it has nothing left; 3. a new one
+    let target = group.find((g) => g.eventDate === date && g.status === "PENDING_PAYMENT");
+    if (!target) {
+      const own = group.find((g) => g.eventDate === entry.eventDate);
+      if (own && (await counts(own.id)) === 0) {
+        await tx.update(schema.orders).set({ eventDate: date, pickupDate: pickup }).where(eq(schema.orders.id, own.id));
+        target = { ...own, eventDate: date, pickupDate: pickup };
+      }
+    }
+    if (!target) {
+      const gid = primary.paymentGroupId ?? primary.id;
+      if (!primary.paymentGroupId) await tx.update(schema.orders).set({ paymentGroupId: gid }).where(eq(schema.orders.id, primary.id));
+      const [created] = await tx
+        .insert(schema.orders)
+        .values({ status: "PENDING_PAYMENT", channel: primary.channel, eventDate: date, pickupDate: pickup, customerId: primary.customerId, deliveryAddress: primary.deliveryAddress, paymentGroupId: gid, holdExpiresAt: inMinutes(primary.channel === "POS" ? 25 : 10, now), callSid: primary.callSid })
+        .returning();
+      target = created;
+    }
+    const [same] = await tx.select().from(schema.orderItems).where(and(eq(schema.orderItems.orderId, target.id), eq(schema.orderItems.productId, p.id)));
+    if (same) await tx.update(schema.orderItems).set({ qty: same.qty + entry.qty }).where(eq(schema.orderItems.id, same.id));
+    else await tx.insert(schema.orderItems).values({ orderId: target.id, productId: p.id, qty: entry.qty, unitPriceCents: p.priceCents });
     await tx
       .update(schema.orders)
       .set({
-        eventDate: date,
-        pickupDate: pickup,
         status: "PENDING_PAYMENT",
-        holdExpiresAt: inMinutes(o.channel === "POS" ? 25 : 10, now),
-        subtotalCents: line.qty * p.priceCents,
-        totalCents: null, // re-priced below: items + delivery + tax
+        holdExpiresAt: inMinutes(primary.channel === "POS" ? 25 : 10, now),
+        subtotalCents: sql`COALESCE((SELECT SUM(qty * unit_price_cents) FROM order_items WHERE order_id = ${target.id}), 0)`,
+        totalCents: null,
         updatedAt: now,
-        notes: sql`COALESCE(${schema.orders.notes}, '') || ${`Changed on the payment link to ${p.name} on ${date}. `}`,
+        notes: sql`COALESCE(${schema.orders.notes}, '') || ${`Chose ${p.name} on ${date} on the payment link (instead of ${entry.name} on ${entry.eventDate}). `}`,
       })
-      .where(eq(schema.orders.id, orderId));
+      .where(eq(schema.orders.id, target.id));
+    const left = (primary.linkRemoved ?? []).filter((_, i) => i !== index);
+    await tx.update(schema.orders).set({ linkRemoved: left }).where(eq(schema.orders.id, primaryId));
+    touched.add(target.id);
     return true;
   });
-  if (ok) await ensurePriced(orderId);
+  for (const id of touched) await ensurePriced(id);
   return ok;
 }
 

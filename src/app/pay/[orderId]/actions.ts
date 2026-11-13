@@ -62,17 +62,17 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
   redirect(paymentLink({ orderId: full.order.id, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone: full.customer?.phone }));
 }
 
-/** Expired link: "Check availability again". Holds the same order again if everything is still free. */
+/** Expired link: "Check availability again". Free items are held again; taken ones get their nearest options. */
 export async function checkAgainAction(orderId: number, token: string) {
   if (!linkRulesActive() || !verifyPayToken(orderId, token)) redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}`);
   const group = await getPaymentGroup(orderId);
-  const held = group ? await holdAgain(group.orders.map((d) => d.order.id)) : null;
-  redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}&${held ? "held=1" : "gone=1"}`);
+  if (group) await holdAgain(group.orders.map((d) => d.order.id), orderId);
+  redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}&held=1`);
 }
 
-/** Expired link, item gone: the customer tapped one of the nearest options (checked again on the server). */
-export async function chooseOptionAction(orderId: number, token: string, productId: number, date: string) {
+/** A taken item: the customer tapped one of its nearest options (checked again on the server). */
+export async function chooseOptionAction(orderId: number, token: string, index: number, productId: number, date: string) {
   if (!linkOptionsActive() || !verifyPayToken(orderId, token)) redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}`);
-  const ok = await chooseLinkOption(orderId, productId, date);
-  redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}&${ok ? "held=1" : "gone=1"}`);
+  await chooseLinkOption(orderId, index, productId, date);
+  redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}&held=1`);
 }
