@@ -180,6 +180,38 @@ export async function sendReply(input: { emailId: number; body: string; fileIds:
   return reply;
 }
 
+export const validAddress = (a: string) => /^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]{2,}$/.test(a.trim());
+
+/** A new email written in Admin (Owner), from info@, signed "Hup Up Attractions", attachments up to 10 MB in all. */
+export async function sendNewEmail(input: { to: string; subject: string; body: string; fileIds: number[]; userId: number | null }) {
+  const to = input.to.trim();
+  if (!validAddress(to)) throw new Error("Enter one email address to send to.");
+  const subject = input.subject.trim();
+  if (!subject) throw new Error("Write a subject first.");
+  const body = input.body.trim();
+  if (!body) throw new Error("Write your email first.");
+  const files = [];
+  for (const id of input.fileIds) {
+    const f = await fileBytes(id);
+    if (!f || f.file.emailId || f.file.replyId) throw new Error("An attachment didn't upload. Please attach it again.");
+    files.push(f);
+  }
+  if (files.reduce((n, f) => n + f.data.length, 0) > INBOX_FILE_MAX_BYTES) throw new Error("Attachments can be up to 10 MB in all.");
+  const text = `${body}\n\n${REPLY_SIGNATURE}`;
+  const res = await sendEmail(to, subject, text, files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })));
+  const [sent] = await db
+    .insert(schema.inboxReplies)
+    .values({ emailId: null, toAddress: to, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })
+    .returning();
+  for (const f of files) await db.update(schema.inboxFiles).set({ replyId: sent.id }).where(eq(schema.inboxFiles.id, f.file.id));
+  return sent;
+}
+
+/** New emails written in Admin, newest first. */
+export async function sentNewEmails(limit = 50) {
+  return db.select().from(schema.inboxReplies).where(isNull(schema.inboxReplies.emailId)).orderBy(desc(schema.inboxReplies.createdAt)).limit(limit);
+}
+
 /** Replies go out only from the verified domain. */
 export function repliesActive(env: Record<string, string | undefined> = process.env) {
   return Boolean(env.RESEND_API_KEY) && (env.EMAIL_FROM ?? "").includes("@hupupattractions.com");

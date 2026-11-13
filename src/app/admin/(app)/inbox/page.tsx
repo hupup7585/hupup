@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireOwner } from "@/lib/auth";
-import { inboxUnreadCount, listInbox } from "@/lib/inbox";
+import { inboxUnreadCount, listInbox, sentNewEmails } from "@/lib/inbox";
 import { inboxWhen } from "@/lib/inbox-format";
 
 export const dynamic = "force-dynamic";
@@ -10,10 +10,13 @@ export const metadata = { title: "Inbox · Hup Up Attractions" };
 export default async function InboxPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   await requireOwner();
   const { q } = await searchParams;
-  const [list, unread] = await Promise.all([listInbox(q), inboxUnreadCount()]);
+  const [list, unread, sent] = await Promise.all([listInbox(q), inboxUnreadCount(), sentNewEmails()]);
   return (
     <div className="mx-auto max-w-5xl">
-      <h1 className="text-2xl font-black sm:text-3xl">Inbox</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-black sm:text-3xl">Inbox</h1>
+        <Link href="/admin/inbox/new" className="btn-dark" data-new-email>New email</Link>
+      </div>
       <p className="mb-4 mt-1 text-muted">
         Email to info@hupupattractions.com. {unread} unread. Every email and reply is kept.
       </p>
@@ -39,6 +42,20 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         ))}
         {list.length === 0 && <p className="px-4 py-10 text-center text-muted">{q ? "No emails match." : "No emails yet."}</p>}
       </div>
+      {sent.length > 0 && (
+        <section className="mt-6" data-sent-emails>
+          <h2 className="mb-2 text-lg font-black">Sent emails</h2>
+          <div className="card divide-y divide-line">
+            {sent.map((r) => (
+              <div key={r.id} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-3">
+                <span className="w-56 min-w-0 truncate">To {r.toAddress}</span>
+                <span className="min-w-0 flex-1 truncate">{r.subject}</span>
+                <span className={`text-sm ${r.sent ? "text-muted" : "font-bold text-coral-dark"}`}>{r.sent ? inboxWhen(r.createdAt) : `Not sent: ${r.error}`}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

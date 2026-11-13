@@ -14,7 +14,7 @@ vi.mock("@/lib/notify", async (orig) => ({
 }));
 
 import { db, schema } from "@/lib/db";
-import { fileBytes, getInboxEmail, inboxUnreadCount, listInbox, receiveRawPiece, saveReplyFileChunk, sendReply, setRead, startReplyFile } from "@/lib/inbox";
+import { fileBytes, getInboxEmail, inboxUnreadCount, listInbox, receiveRawPiece, saveReplyFileChunk, sendNewEmail, sendReply, sentNewEmails, setRead, startReplyFile } from "@/lib/inbox";
 import { POST as inbound } from "@/app/api/email/inbound-raw/route";
 
 const pdf = Buffer.from("%PDF-1.4 sample price list").toString("base64");
@@ -111,6 +111,27 @@ describe("Inbox", () => {
   });
   it("attachments over 10 MB are refused for replies", async () => {
     await expect(startReplyFile("big.zip", "application/zip", 11 * 1024 * 1024, null)).rejects.toThrow("10 MB");
+  });
+  it("New email (Abraham, Nov 13, 2026): from info@, signed, with an attachment; listed under Sent emails", async () => {
+    const f = await startReplyFile("catalog.pdf", "application/pdf", 9, null);
+    await saveReplyFileChunk(f.id, 0, Buffer.from("%PDF-1.4x"), true);
+    h.emails.length = 0;
+    const r = await sendNewEmail({ to: "dovid@example.com", subject: "Your rental catalog", body: "Here is our catalog.", fileIds: [f.id], userId: null });
+    expect(r.sent).toBe(true);
+    expect(h.emails[0]).toMatchObject({ to: "dovid@example.com", subject: "Your rental catalog", text: "Here is our catalog.\n\nHup Up Attractions" });
+    expect(h.emails[0].attachments).toHaveLength(1);
+    expect((await sentNewEmails()).map((x) => [x.toAddress, x.subject, x.emailId])).toEqual([["dovid@example.com", "Your rental catalog", null]]);
+    await expect(sendNewEmail({ to: "not an address", subject: "x", body: "y", fileIds: [], userId: null })).rejects.toThrow("Enter one email address");
+    await expect(sendNewEmail({ to: "a@b.com, c@d.com", subject: "x", body: "y", fileIds: [], userId: null })).rejects.toThrow("Enter one email address");
+    await expect(sendNewEmail({ to: "a@b.com", subject: " ", body: "y", fileIds: [], userId: null })).rejects.toThrow("Write a subject first.");
+    // an attachment already used can't be sent again
+    await expect(sendNewEmail({ to: "a@b.com", subject: "x", body: "y", fileIds: [f.id], userId: null })).rejects.toThrow("didn't upload");
+  });
+  it("New email is Owner only", async () => {
+    const { readFileSync } = await import("node:fs");
+    const a = readFileSync("src/app/admin/(app)/inbox/actions.ts", "utf8");
+    expect(a.slice(a.indexOf("export async function sendNewEmailAction")).split("\n}\n")[0]).toContain("await requireOwner()");
+    expect(readFileSync("src/app/admin/(app)/inbox/new/page.tsx", "utf8")).toContain("await requireOwner()");
   });
   it("never deletes: no delete anywhere in the Inbox code", async () => {
     const { readFileSync } = await import("node:fs");

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { repliesActive, saveReplyFileChunk, sendReply, setRead, startReplyFile } from "@/lib/inbox";
+import { repliesActive, saveReplyFileChunk, sendNewEmail, sendReply, setRead, startReplyFile } from "@/lib/inbox";
 
 type R = { ok: boolean; message: string; id?: number };
 
@@ -44,6 +44,20 @@ export async function sendReplyAction(emailId: number, body: string, fileIds: nu
     await db.insert(schema.auditLog).values({ userId: s.userId, action: r.sent ? "inbox.reply_sent" : "inbox.reply_failed", entityType: "inbox_email", entityId: String(emailId), after: { to: r.toAddress, subject: r.subject, files: fileIds.length } });
     revalidatePath(`/admin/inbox/${emailId}`);
     return r.sent ? { ok: true, message: "Reply sent from info@hupupattractions.com." } : { ok: false, message: `Not sent: ${r.error}. The reply is saved below.` };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+}
+
+/** Owner: a new email from info@ (not a reply), with attachments. */
+export async function sendNewEmailAction(to: string, subject: string, body: string, fileIds: number[]): Promise<R> {
+  const s = await requireOwner();
+  if (!repliesActive()) return { ok: false, message: "Not active yet: email goes out from info@ once the sender is set up." };
+  try {
+    const r = await sendNewEmail({ to, subject, body, fileIds, userId: s.userId });
+    await db.insert(schema.auditLog).values({ userId: s.userId, action: r.sent ? "inbox.new_email_sent" : "inbox.new_email_failed", entityType: "inbox_reply", entityId: String(r.id), after: { to: r.toAddress, subject: r.subject, files: fileIds.length } });
+    revalidatePath("/admin/inbox");
+    return r.sent ? { ok: true, message: `Sent to ${r.toAddress} from info@hupupattractions.com.` } : { ok: false, message: `Not sent: ${r.error}. It's saved under Sent emails.` };
   } catch (e) {
     return { ok: false, message: (e as Error).message };
   }

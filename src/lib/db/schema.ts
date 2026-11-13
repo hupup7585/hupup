@@ -1070,7 +1070,8 @@ export const inboxFileChunks = pgTable(
 
 export const inboxReplies = pgTable("inbox_replies", {
   id: serial("id").primaryKey(),
-  emailId: integer("email_id").notNull().references(() => inboxEmails.id),
+  /** The email being answered; null for a new email written in Admin (Abraham, Nov 13, 2026). */
+  emailId: integer("email_id").references(() => inboxEmails.id),
   toAddress: text("to_address").notNull(),
   subject: text("subject").notNull(),
   body: text("body").notNull(),
