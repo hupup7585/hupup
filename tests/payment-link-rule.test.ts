@@ -78,5 +78,6 @@ describe("payment link rule", () => {
     expect(LINK_TEXT.expiredBody(2)).toContain("Your items were held");
     expect(LINK_TEXT.gone(2)).toBe("Sorry, these items are no longer available for your date.");
     expect(LINK_TEXT.cardNote).toContain("10 minutes");
+    expect(LINK_TEXT.heldAgain(10)).toBe("It's still available! We're holding it for you for the next 10 minutes."); // Abraham's exact wording
   });
 });

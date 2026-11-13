@@ -89,7 +89,8 @@ export const LINK_TEXT = {
   expiredBody: (n: number) =>
     `No worries! Your ${n === 1 ? "item was" : "items were"} held for a short time and then went back into stock so other customers could book. Tap below and we'll check if ${n === 1 ? "it's" : "they're"} still free for your date.`,
   checkButton: "Check availability again",
-  heldAgain: (min: number) => `Good news, it's still available! We're holding it for you for the next ${min} minutes. Take your time and pay below whenever you're ready.`,
+  // Abraham's wording, Nov 13, 2026 (approved): 10 minutes for a phone order, 25 for an Admin link
+  heldAgain: (min: number) => `It's still available! We're holding it for you for the next ${min} minutes.`,
   gone: (n: number) => `Sorry, ${n === 1 ? "this item is" : "these items are"} no longer available for your date.`,
   goneCall: "Please call us at (845) 777-7585, and we'll gladly help you choose another option or another day.",
   cardNote: `After you tap "Agree and pay", you'll have ${CARD_MINUTES} minutes to enter your card on our secure payment page. If time runs out, your rentals simply go back into stock, and you can check availability again and book anytime.`,
