@@ -38,14 +38,16 @@ until Abraham approves a real test. Never paste keys or passwords in chat; enter
 ## 5. Stripe (for refunds, fees and disputes)
 1. Stripe Dashboard > Developers > API keys > **Create restricted key** `Hup Up website read`:
    READ only for Balance, Balance transactions, Payouts, Charges, Disputes. Save it in Vercel as `STRIPE_READ_KEY`.
-2. Create restricted key `Hup Up website refunds`: Refunds WRITE, Disputes WRITE, Files WRITE, Charges READ,
-   PaymentIntents READ. Save it in Vercel as `STRIPE_WRITE_KEY`.
-3. Developers > Webhooks > **Add endpoint** `https://hupupattractions.com/api/stripe/webhook`, events:
+2. Create restricted key `Hup Up website refunds`: Refunds WRITE, Charges READ, PaymentIntents READ.
+   Save it in Vercel as `STRIPE_REFUNDS_KEY` (Sandbox key first).
+3. Create restricted key `Hup Up website disputes`: Disputes WRITE, Files WRITE, Charges READ.
+   Save it in Vercel as `STRIPE_DISPUTES_KEY`.
+4. Developers > Webhooks > **Add endpoint** `https://hupupattractions.com/api/stripe/webhook`, events:
    `charge.dispute.created`, `charge.dispute.updated`, `charge.dispute.closed`, `charge.refunded`.
    Save its signing secret in Vercel as `STRIPE_WEBHOOK_SECRET`.
-4. Settings > Business > Customer emails: turn **off** "Successful payments" (our own receipt from info@ replaces it)
+5. Settings > Business > Customer emails: turn **off** "Successful payments" (our own receipt from info@ replaces it)
    and "Refunds" if Abraham prefers our wording there too.
-5. Settings > Public details: statement descriptor `HUP UP ATTRACTIONS`.
+6. Settings > Public details: statement descriptor `HUP UP ATTRACTIONS`.
 Use test-mode keys (`rk_test_...`) while the account is in the sandbox; live keys only after Abraham's yes.
 
 ## 6. Redeploy and test
@@ -53,3 +55,7 @@ Redeploy in Vercel. Admin > Phone System > Phone settings shows **Phone payments
 Payment subaccount: Set up**. Then Abraham calls the hotline from (845) 777-7585, books, and pays with a Stripe test
 card (4242 4242 4242 4242, any future date, any security code, ZIP 10950). The order shows Paid with the Stripe
 payment ID and last 4 (4242).
+
+## 7. Sola refunds (website payments)
+Sola refunds use the Sola "Website" API key: `SOLA_API_KEY` in Vercel. While testing with a Sola sandbox key, also
+add `SOLA_REFUND_MODE` = `sandbox`. Live refunds (Stripe or Sola) stay off until Abraham approves them in the code.

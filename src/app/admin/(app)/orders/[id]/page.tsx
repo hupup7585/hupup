@@ -14,7 +14,9 @@ import { staffDisclosure } from "@/lib/sms-terms-v2";
 import { NO_TEXT_CONSENT, hasTransactionalConsent } from "@/lib/sms";
 import DualDate from "@/components/DualDate";
 import StripePanel from "./StripePanel";
-import { disputesFor, refundStatus, refundsFor } from "@/lib/stripe-ops";
+import { disputesFor } from "@/lib/stripe-ops";
+import { LIVE_REFUNDS_APPROVED, refundStatus, refundsFor, refundsSandbox } from "@/lib/refunds";
+import RefundPanel from "./RefundPanel";
 import { inboxWhen } from "@/lib/inbox-format";
 import { db, schema } from "@/lib/db";
 
@@ -69,21 +71,41 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               {due > 0 && <div className="text-sm font-bold text-coral">Balance due {formatMoney(due)}</div>}
             </div>
           </div>
-          {staff.role === "owner" && o.paymentMethod === "stripe" && (await (async () => {
-            const [refunds, disputes] = await Promise.all([refundsFor(o.id), disputesFor(o.id)]);
+          {staff.role === "owner" && (o.paymentMethod === "stripe" || o.paymentMethod === "sola") && o.paidCents > 0 && (await (async () => {
+            // Refund (Owner only; Secretary and Delivery never see it). Stripe phone or Sola website payments.
+            const [refunds, disputes] = await Promise.all([refundsFor(o.id), o.paymentMethod === "stripe" ? disputesFor(o.id) : Promise.resolve([])]);
             const users = await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers);
-            const who = (id: number | null) => (id ? (users.find((u) => u.id === id)?.name ?? "Staff") : "Owner");
-            const left = o.paidCents - o.refundedCents;
+            const who = (r: { source: string; userId: number | null }) => (r.source === "stripe_dashboard" ? "Stripe dashboard" : r.userId ? (users.find((u) => u.id === r.userId)?.name ?? "Staff") : "Owner");
+            const provider = o.paymentMethod === "stripe" ? "stripe" : "sola";
+            const ready = LIVE_REFUNDS_APPROVED || refundsSandbox(provider);
+            const notReady =
+              provider === "stripe"
+                ? process.env.STRIPE_REFUNDS_KEY
+                  ? "live refunds wait for your OK (sandbox key only for now)."
+                  : "Stripe refunds need STRIPE_REFUNDS_KEY in Vercel (sandbox key first)."
+                : process.env.SOLA_API_KEY
+                  ? "live refunds wait for your OK (Sola sandbox only for now: SOLA_REFUND_MODE=sandbox)."
+                  : "Sola refunds need SOLA_API_KEY in Vercel.";
             return (
-              <StripePanel
-                orderId={o.id}
-                refundable={formatMoney(left)}
-                refundableCents={left}
-                status={refundStatus(o)}
-                writeReady={Boolean(process.env.STRIPE_WRITE_KEY)}
-                refunds={refunds.map((r) => ({ id: r.id, amount: formatMoney(r.amountCents), when: inboxWhen(r.createdAt), by: r.source === "admin" ? who(r.userId) : "Stripe dashboard", status: r.status, error: r.error }))}
-                disputes={disputes.map((d) => ({ id: d.id, amount: formatMoney(d.amountCents), reason: (d.reason ?? "").replace(/_/g, " "), status: d.status.replace(/_/g, " "), dueBy: d.evidenceDueBy ? inboxWhen(d.evidenceDueBy) : null, sentAt: d.evidenceSentAt ? inboxWhen(d.evidenceSentAt) : null }))}
-              />
+              <>
+                <RefundPanel
+                  orderId={o.id}
+                  provider={provider === "stripe" ? "Stripe" : "Sola"}
+                  leftCents={Math.max(0, o.paidCents - o.refundedCents)}
+                  last4={o.cardLast4}
+                  status={refundStatus(o)}
+                  ready={ready}
+                  notReadyReason={ready ? null : notReady}
+                  refunds={refunds.map((r) => ({ id: r.id, when: inboxWhen(r.createdAt), amount: formatMoney(r.amountCents), by: who(r), result: r.status === "failed" ? "Failed" : r.status === "pending" ? "Pending" : "Refunded", refundId: r.stripeRefundId, error: r.error }))}
+                />
+                {disputes.length > 0 && (
+                  <StripePanel
+                    orderId={o.id}
+                    ready={Boolean(process.env.STRIPE_DISPUTES_KEY)}
+                    disputes={disputes.map((d) => ({ id: d.id, amount: formatMoney(d.amountCents), reason: (d.reason ?? "").replace(/_/g, " "), status: d.status.replace(/_/g, " "), dueBy: d.evidenceDueBy ? inboxWhen(d.evidenceDueBy) : null, sentAt: d.evidenceSentAt ? inboxWhen(d.evidenceSentAt) : null }))}
+                  />
+                )}
+              </>
             );
           })())}
           <div className="card p-5">

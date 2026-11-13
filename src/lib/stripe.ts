@@ -7,20 +7,22 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * Vercel variables (Hark adds the values; never in chat):
  *   STRIPE_READ_KEY      restricted key, READ only: Balance, Balance transactions, Payouts, Charges, Disputes
  *                        (Stripe fees and payouts in the books, and the phone payment status in Admin)
- *   STRIPE_WRITE_KEY     restricted key: Refunds WRITE, Disputes WRITE, Files WRITE, Charges READ, PaymentIntents READ
- *                        (Refund from Admin and Send proof for a dispute)
+ *   STRIPE_REFUNDS_KEY   restricted key: Refunds WRITE, Charges READ, PaymentIntents READ (Refund from Admin)
+ *   STRIPE_DISPUTES_KEY  restricted key: Disputes WRITE, Files WRITE, Charges READ (Send proof for a dispute)
  *   STRIPE_WEBHOOK_SECRET  signing secret of the webhook endpoint https://hupupattractions.com/api/stripe/webhook
  * Test-mode keys (rk_test_...) while Stripe is in the sandbox; live keys (rk_live_...) only after Abraham's yes.
  */
-export type StripeKeyUse = "read" | "write";
+export type StripeKeyUse = "read" | "refunds" | "disputes";
+
+export const STRIPE_KEY_NAMES: Record<StripeKeyUse, string> = { read: "STRIPE_READ_KEY", refunds: "STRIPE_REFUNDS_KEY", disputes: "STRIPE_DISPUTES_KEY" };
 
 export function stripeKey(use: StripeKeyUse, env: Record<string, string | undefined> = process.env) {
-  return use === "read" ? env.STRIPE_READ_KEY : env.STRIPE_WRITE_KEY;
+  return env[STRIPE_KEY_NAMES[use]];
 }
 
 /** "test" or "live" from the key (rk_test_ / rk_live_), or null when no key is set yet. */
 export function stripeMode(env: Record<string, string | undefined> = process.env): "test" | "live" | null {
-  const k = env.STRIPE_READ_KEY || env.STRIPE_WRITE_KEY || "";
+  const k = env.STRIPE_READ_KEY || env.STRIPE_REFUNDS_KEY || env.STRIPE_DISPUTES_KEY || "";
   if (/^(rk|sk)_test_/.test(k)) return "test";
   if (/^(rk|sk)_live_/.test(k)) return "live";
   return null;
@@ -52,7 +54,7 @@ export async function stripeApi<T = Record<string, unknown>>(
   opts: { idempotencyKey?: string; fetcher?: typeof fetch } = {},
 ): Promise<T> {
   const key = stripeKey(use);
-  if (!key) throw new StripeError(`Not active yet: ${use === "read" ? "STRIPE_READ_KEY" : "STRIPE_WRITE_KEY"} isn't in Vercel.`);
+  if (!key) throw new StripeError(`Not active yet: ${STRIPE_KEY_NAMES[use]} isn't in Vercel.`);
   const body = formEncode(params).join("&");
   const url = `https://api.stripe.com${path}${method === "GET" && body ? `?${body}` : ""}`;
   const res = await (opts.fetcher ?? fetch)(url, {

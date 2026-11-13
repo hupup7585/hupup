@@ -77,7 +77,7 @@ export function payLast4(masked: string | null | undefined): string | null {
 
 /** For Admin: Off / Owner test / Live, whether the subaccount is set up, and Stripe test or live mode (from the key). */
 export function phonePayStatus(env: Record<string, string | undefined> = process.env, mode: PhonePayMode = STRIPE_PHONE_PAY_MODE) {
-  const k = env.STRIPE_READ_KEY || env.STRIPE_WRITE_KEY || "";
+  const k = env.STRIPE_READ_KEY || env.STRIPE_REFUNDS_KEY || env.STRIPE_DISPUTES_KEY || "";
   const stripe = /^(rk|sk)_test_/.test(k) ? "Stripe test mode" : /^(rk|sk)_live_/.test(k) ? "Stripe live mode" : "Stripe keys not in Vercel yet";
   const missing = PAY_ENV_NAMES.filter((n) => !env[n]);
   return {

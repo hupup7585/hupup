@@ -1081,6 +1081,8 @@ export const orderRefunds = pgTable("order_refunds", {
   error: text("error"),
   /** admin | stripe_dashboard */
   source: text("source").notNull().default("admin"),
+  /** stripe | sola */
+  provider: text("provider").notNull().default("stripe"),
   userId: integer("user_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

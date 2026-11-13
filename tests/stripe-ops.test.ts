@@ -35,7 +35,8 @@ beforeAll(async () => {
   process.env.ADMIN_EMAIL = "hupupattractions@gmail.com";
   process.env.PUBLIC_BASE_URL = "https://hupup.example";
   process.env.STRIPE_READ_KEY = "rk_test_read";
-  process.env.STRIPE_WRITE_KEY = "rk_test_write";
+  process.env.STRIPE_REFUNDS_KEY = "rk_test_refunds";
+  process.env.STRIPE_DISPUTES_KEY = "rk_test_disputes";
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
   const [c] = await db.insert(schema.customers).values({ name: "Test Caller", phone: "+18455550144", email: "caller@example.com" }).returning();
   const [o] = await db
@@ -50,7 +51,7 @@ describe("status in Admin", () => {
     expect(phonePayStatus({ STRIPE_READ_KEY: "rk_test_x" }, "owner_test")).toMatchObject({ mode: "Owner test", configured: false, stripe: "Stripe test mode" });
     expect(phonePayStatus({ STRIPE_READ_KEY: "rk_live_x" }, "live").stripe).toBe("Stripe live mode");
     expect(phonePayStatus({}, "off")).toMatchObject({ mode: "Off", stripe: "Stripe keys not in Vercel yet" });
-    expect(stripeMode({ STRIPE_WRITE_KEY: "rk_test_1" })).toBe("test");
+    expect(stripeMode({ STRIPE_REFUNDS_KEY: "rk_test_1" })).toBe("test");
   });
 });
 
@@ -62,7 +63,7 @@ describe("refunds from Admin", () => {
     expect(calls.at(-1)!.url).toBe("https://api.stripe.com/v1/refunds");
     expect(calls.at(-1)!.body).toContain("charge=ch_test_1");
     expect(calls.at(-1)!.body).toContain("amount=5000");
-    expect(calls.at(-1)!.key).toBe("Bearer rk_test_write");
+    expect(calls.at(-1)!.key).toBe("Bearer rk_test_refunds");
     expect(calls.at(-1)!.idem).toMatch(/^refund-/);
     expect(refundStatus(await order())).toBe("Partly refunded");
     await expect(refundOrder(orderId, 99999, 7, f)).rejects.toThrow("At most $182.47");
@@ -77,13 +78,15 @@ describe("refunds from Admin", () => {
   it("a failed refund is kept and nothing changes on the order", async () => {
     const before = (await order()).refundedCents;
     await db.update(schema.orders).set({ refundedCents: 0 }).where(eq(schema.orders.id, orderId));
-    await expect(refundOrder(orderId, 100, 7, fakeStripe(() => ({ error: { message: "Card closed" } }), 402))).rejects.toThrow("Card closed");
-    expect((await refundsFor(orderId))[0]).toMatchObject({ status: "failed", error: "Card closed" });
+    h.emails.length = 0;
+    await expect(refundOrder(orderId, 100, 7, fakeStripe(() => ({ error: { message: "Card closed" } }), 402))).rejects.toThrow("The card company didn't accept the refund (Card closed).");
+    expect((await refundsFor(orderId))[0]).toMatchObject({ status: "failed", error: "The card company didn't accept the refund (Card closed)." });
+    expect(h.emails.find((e) => e.subject.startsWith("Refund failed on order"))?.to).toBe("hupupattractions@gmail.com");
     await db.update(schema.orders).set({ refundedCents: before }).where(eq(schema.orders.id, orderId));
   });
-  it("Sola or cash orders can't be refunded here", async () => {
-    const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "POS", eventDate: "2026-12-20", pickupDate: "2026-12-21", subtotalCents: 100, paidCents: 100, paymentMethod: "sola" }).returning();
-    await expect(refundOrder(o.id, "full", 7, fakeStripe(() => ({})))).rejects.toThrow("wasn't paid through Stripe");
+  it("cash orders can't be refunded here", async () => {
+    const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "POS", eventDate: "2026-12-20", pickupDate: "2026-12-21", subtotalCents: 100, paidCents: 100, paymentMethod: "cash" }).returning();
+    await expect(refundOrder(o.id, "full", 7, fakeStripe(() => ({})))).rejects.toThrow("no card payment to refund");
   });
 });
 
@@ -126,6 +129,7 @@ describe("disputes", () => {
     expect(ev.uncategorized_text).toContain("DELIVERY PHOTOS");
     const f = fakeStripe(() => ({ id: "dp_1" }));
     await sendDisputeEvidence(d.id, 7, f);
+    expect(calls.at(-1)!.key).toBe("Bearer rk_test_disputes");
     expect(calls.at(-1)!.url).toBe("https://api.stripe.com/v1/disputes/dp_1");
     expect(decodeURIComponent(calls.at(-1)!.body)).toContain("evidence[uncategorized_text]=");
     expect(calls.at(-1)!.body).toContain("submit=true");

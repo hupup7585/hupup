@@ -6,6 +6,8 @@ import { getPaymentGroup, orderNumber } from "@/lib/orders";
 import { recordAutoMoneyOut } from "@/lib/books";
 import { messageDate } from "@/lib/dual-date";
 import { StripeError, stripeApi } from "@/lib/stripe";
+import { applyRefund } from "@/lib/refunds";
+export { refundOrder, refundStatus, refundsFor } from "@/lib/refunds";
 import { inboxWhen } from "@/lib/inbox-format";
 import { PROMPTS, fill } from "@/lib/ivr/prompts";
 
@@ -18,63 +20,6 @@ type Ord = typeof schema.orders.$inferSelect;
 async function orderById(id: number): Promise<Ord | null> {
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, id)).limit(1);
   return o ?? null;
-}
-
-/** Refunded / Partly refunded, for Admin, the orders list and the CSV. */
-export function refundStatus(o: { paidCents: number; refundedCents: number }): "Refunded" | "Partly refunded" | null {
-  if (!o.refundedCents) return null;
-  return o.refundedCents >= o.paidCents ? "Refunded" : "Partly refunded";
-}
-
-/** The Stripe payment behind an order (the first order of a group holds it for every day). */
-async function stripeIdFor(o: Ord): Promise<string | null> {
-  if (o.stripePaymentId) return o.stripePaymentId;
-  if (o.paymentGroupId) return (await orderById(o.paymentGroupId))?.stripePaymentId ?? null;
-  return null;
-}
-
-async function applyRefund(o: Ord, amountCents: number, refundId: string, source: "admin" | "stripe_dashboard", userId: number | null, status = "succeeded") {
-  const [exists] = await db.select().from(schema.orderRefunds).where(eq(schema.orderRefunds.stripeRefundId, refundId)).limit(1);
-  if (exists) return exists;
-  const [row] = await db.insert(schema.orderRefunds).values({ orderId: o.id, amountCents, stripeRefundId: refundId, status, source, userId }).returning();
-  if (status === "succeeded" || status === "pending") {
-    await db.update(schema.orders).set({ refundedCents: sql`${schema.orders.refundedCents} + ${amountCents}`, updatedAt: new Date() }).where(eq(schema.orders.id, o.id));
-    await recordAutoMoneyOut({ kind: "refund", amountCents, category: "Refunds", method: "stripe", orderId: o.id, ref: refundId, notes: `Stripe refund, order #${orderNumber(o.id)}` });
-  }
-  await db.insert(schema.auditLog).values({ userId, action: "payment.refunded", entityType: "order", entityId: String(o.id), after: { amountCents, refundId, source, status } });
-  return row;
-}
-
-/**
- * Refund full or part of a Stripe phone payment (Owner, after a confirm step). Stripe access: STRIPE_WRITE_KEY.
- * Records who, when and how much; the order shows Refunded or Partly refunded.
- */
-export async function refundOrder(orderId: number, amountCents: number | "full", userId: number | null, fetcher?: typeof fetch) {
-  const o = await orderById(orderId);
-  if (!o) throw new Error("Order not found.");
-  const pid = await stripeIdFor(o);
-  if (o.paymentMethod !== "stripe" || !pid) throw new Error("This order wasn't paid through Stripe on the phone.");
-  const left = o.paidCents - o.refundedCents;
-  const amount = amountCents === "full" ? left : amountCents;
-  if (!Number.isInteger(amount) || amount <= 0) throw new Error("Enter an amount to refund.");
-  if (amount > left) throw new Error(`At most ${money(left)} can be refunded on this order.`);
-  try {
-    const re = await stripeApi<{ id: string; status: string }>(
-      "write",
-      "POST",
-      "/v1/refunds",
-      { ...(pid.startsWith("pi_") ? { payment_intent: pid } : { charge: pid }), amount, reason: "requested_by_customer", metadata: { order_number: orderNumber(o.id) } },
-      { idempotencyKey: `refund-${o.id}-${o.refundedCents}-${amount}`, fetcher },
-    );
-    return applyRefund(o, amount, re.id, "admin", userId, re.status === "failed" ? "failed" : re.status);
-  } catch (e) {
-    await db.insert(schema.orderRefunds).values({ orderId: o.id, amountCents: amount, status: "failed", error: (e as Error).message.slice(0, 300), userId });
-    throw e;
-  }
-}
-
-export async function refundsFor(orderId: number) {
-  return db.select().from(schema.orderRefunds).where(eq(schema.orderRefunds.orderId, orderId)).orderBy(desc(schema.orderRefunds.createdAt));
 }
 
 /* ---------------- Stripe fees and payouts (read-only key) ---------------- */
@@ -166,7 +111,7 @@ export async function handleStripeEvent(event: { type: string; data: { object: R
     const c = event.data.object as unknown as Charge;
     const o = await orderForPayment(c.id, c.payment_intent);
     if (!o) return;
-    for (const r of c.refunds?.data ?? []) await applyRefund(o, r.amount, r.id, "stripe_dashboard", null, r.status);
+    for (const r of c.refunds?.data ?? []) await applyRefund(o, { amountCents: r.amount, refundId: r.id, provider: "stripe", source: "stripe_dashboard", userId: null, status: r.status });
   }
 }
 
@@ -218,13 +163,13 @@ export async function disputeEvidence(orderId: number) {
   };
 }
 
-/** One button: send Stripe the proof for this dispute (after a confirm step). STRIPE_WRITE_KEY. */
+/** One button: send Stripe the proof for this dispute (after a confirm step). STRIPE_DISPUTES_KEY. */
 export async function sendDisputeEvidence(disputeRowId: number, userId: number | null, fetcher?: typeof fetch) {
   const [d] = await db.select().from(schema.orderDisputes).where(eq(schema.orderDisputes.id, disputeRowId)).limit(1);
   if (!d || !d.orderId) throw new Error("Dispute not found.");
   if (d.evidenceSentAt) throw new Error("The proof was already sent.");
   const evidence = await disputeEvidence(d.orderId);
-  await stripeApi("write", "POST", `/v1/disputes/${d.stripeDisputeId}`, { evidence, submit: true }, { fetcher });
+  await stripeApi("disputes", "POST", `/v1/disputes/${d.stripeDisputeId}`, { evidence, submit: true }, { fetcher });
   await db.update(schema.orderDisputes).set({ evidenceSentAt: new Date(), evidenceSentBy: userId, updatedAt: new Date() }).where(eq(schema.orderDisputes.id, d.id));
   await db.insert(schema.auditLog).values({ userId, action: "stripe.dispute_evidence_sent", entityType: "order", entityId: String(d.orderId), after: { dispute: d.stripeDisputeId } });
 }
