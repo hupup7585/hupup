@@ -23,13 +23,14 @@ export async function GET(req: Request) {
     to: u.searchParams.get("to") || undefined,
     limit: 10000,
   });
-  const header = ["Order", "Status", "Channel", "Event date", "Pickup date", "Customer", "Phone", "Address", "Items", "Total", "Paid", "Payment", "Payment date and time", "Card last 4", "Refund", "Refunded", "Notes"];
+  const header = ["Order", "Status", "Channel", "Event date", "Pickup date", "Customer", "Phone", "Address", "Items", "Total", "Paid", "Payment", "Payment date and time", "Card last 4", "Payment ID (Stripe or Sola)", "Refund", "Refunded", "Notes"];
   const lines = list.map((o) =>
     [orderNumber(o.id), o.status, o.channel, o.event_date, o.pickup_date, o.customer_name, o.customer_phone, o.delivery_address, o.items,
       ((o.total_cents ?? o.subtotal_cents) / 100).toFixed(2), (o.paid_cents / 100).toFixed(2),
       o.payment_result === "approved" ? "Paid" : o.payment_result === "declined" ? "Declined" : "",
       o.payment_result_at ? new Date(o.payment_result_at).toLocaleString("en-US", { timeZone: "America/New_York", year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "",
       o.card_last4 ?? "",
+      o.stripe_payment_id ?? o.sola_ref_num ?? "",
       o.refunded_cents ? (o.refunded_cents >= o.paid_cents ? "Refunded" : "Partly refunded") : "",
       o.refunded_cents ? (o.refunded_cents / 100).toFixed(2) : "",
       o.notes].map(cell).join(","),

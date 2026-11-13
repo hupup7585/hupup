@@ -1,6 +1,6 @@
 import twilio from "twilio";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { inArray } from "drizzle-orm";
+import { and, inArray, isNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config, BUSINESS_NAME } from "@/lib/config";
 import { PAYMENT_HOLD_MINUTES, getPaymentGroup, markGroupPaid, minutesFromNow, orderNumber } from "@/lib/orders";
@@ -104,11 +104,14 @@ export async function handlePayVoice(action: string, query: URLSearchParams, bod
     const ids = group?.orders.map((d) => d.order.id) ?? [orderId];
     if (result === "success" && body.PaymentConfirmationCode) {
       const code = body.PaymentConfirmationCode;
-      const already = group?.primary.order.stripePaymentId === code;
-      if (!already && group) {
+      // Duplicate protection: claim the payment ID first, in one atomic update. A repeated result (or two arriving at
+      // the same moment) finds it already claimed, so the order is never marked paid twice.
+      const claimed = group
+        ? await db.update(schema.orders).set({ stripePaymentId: code }).where(and(inArray(schema.orders.id, ids), isNull(schema.orders.stripePaymentId))).returning({ id: schema.orders.id })
+        : [];
+      if (claimed.length && group) {
         const cents = group.due;
         await markGroupPaid(orderId, cents, "stripe", null);
-        await db.update(schema.orders).set({ stripePaymentId: code }).where(inArray(schema.orders.id, ids));
         await recordPaymentResult(ids, "approved", last4, code);
         // Abraham: once approved, the receipt replaces the short "payment received" email (not both)
         await paymentReceivedNotices(orderId, cents, { skipCustomerEmail: RECEIPT_APPROVED && Boolean(group.primary.customer?.email) });

@@ -131,6 +131,12 @@ describe("the payment subaccount: Twilio <Pay> through Stripe", () => {
     const back = await mainCall("pay-done", {}, `o=${orderId}`);
     expect(redirect(back)).toBe("promo-consent");
     expect(h.emails.filter((e) => e.text.includes("Pay securely"))).toHaveLength(0);
+    // Duplicate protection: the same result twice at the same moment never pays or emails twice
+    const again = { Result: "success", PaymentConfirmationCode: "ch_3Test123", PaymentCardNumber: "xxxx-xxxx-xxxx-4242", PaymentCardType: "visa" };
+    const q = `o=${orderId}&n=1&t=${_payLegToken(orderId, "CApay")}`;
+    await Promise.all([sub("result", again, q), sub("result", again, q)]);
+    expect((await order(orderId)).paidCents).toBe(23247);
+    expect(h.emails.filter((e) => e.to === "caller@example.com")).toHaveLength(1);
   });
   it("declined: recorded with last 4, then 1 tries again or 2 gets the Sola link by email", async () => {
     const t = _payLegToken(orderId, "CApay");
