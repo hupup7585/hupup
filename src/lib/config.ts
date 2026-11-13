@@ -3,7 +3,7 @@ export const BUSINESS_NAME = "Hup Up Attractions";
 export const OWNER_FIRST_NAME = "Abraham";
 /** The Owner's full name on the staff account (Abraham). */
 export const OWNER_FULL_NAME = "Abraham Schwartz";
-export const DEFAULT_VOICE = "Google.en-US-Chirp3-HD-Fenrir";
+export const DEFAULT_VOICE = "Google.en-US-Chirp3-HD-Puck"; // Abraham, Nov 13, 2026: switch to Puck
 /** Public business number for the website (forwards to the Twilio hotline). */
 export const PUBLIC_PHONE_DISPLAY = "(845) 777-7585";
 export const PUBLIC_PHONE_E164 = "+18457777585";

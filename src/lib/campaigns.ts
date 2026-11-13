@@ -10,7 +10,7 @@ import { pictureUrl, picturesByIds } from "@/lib/promo-pictures";
 /**
  * Seasonal promo campaigns (Abraham, Nov 9, 2026).
  * - The Owner writes the wording and approves it; the Secretary can only send approved campaigns.
- * - Only customers who signed up for promos (and didn't reply STOP or NO PROMO) get them, at most 6 a year.
+ * - Only customers who signed up for promos (and didn't reply STOP or NO PROMO) get them, at most 5 a year.
  * - Every text goes through sendMessage, which rechecks consent, the yearly limit and quiet hours at the moment of sending.
  */
 export type Campaign = typeof schema.smsCampaigns.$inferSelect;

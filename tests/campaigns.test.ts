@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
-/* Promo campaigns and the 6-per-year limit (Abraham, Nov 9, 2026). In-memory database with the real migrations. */
+/* Promo campaigns and the 5-per-year limit (Abraham, Nov 9, 2026). In-memory database with the real migrations. */
 const h = vi.hoisted(() => ({ sent: [] as { to: string; body: string }[] }));
 vi.mock("@/lib/db", async () => {
   const { createMemoryDb } = await import("./helpers/memory-db");
@@ -33,17 +33,17 @@ beforeAll(async () => {
     .returning();
   ids = rows.map((r) => r.id);
   await db.insert(schema.smsConsents).values({ customerId: ids[0], phone: "+18455550301", scope: "marketing", action: "opt_in", source: "web", method: "checkbox", wording: "x" });
-  // Busy customer: already 6 promos this year
-  for (let i = 0; i < 6; i++)
+  // Busy customer: already 5 promos this year
+  for (let i = 0; i < 5; i++)
     await db.insert(schema.messages).values({ direction: "out", toNumber: "+18455550304", contactPhone: "+18455550304", body: "promo", kind: "marketing", status: "delivered", customerId: ids[3], createdAt: new Date(`2026-0${i + 1}-15T17:00:00Z`) });
 });
 
-describe("6 promo texts per customer per year (SMS v3)", () => {
-  it("the 7th promo of the year is refused; blocked or failed ones don't count; a new year starts fresh", async () => {
-    expect(await promosThisYear("+18455550304", NOON)).toBe(6);
+describe("5 promo texts per customer per year (SMS v3)", () => {
+  it("the 6th promo of the year is refused; blocked or failed ones don't count; a new year starts fresh", async () => {
+    expect(await promosThisYear("+18455550304", NOON)).toBe(5);
     const r = await sendMessage({ to: "+18455550304", body: "Another deal", kind: "marketing", now: NOON });
     expect(r).toMatchObject({ sent: false, blocked: "yearly_limit" });
-    expect(await promosThisYear("+18455550304", NOON)).toBe(6);
+    expect(await promosThisYear("+18455550304", NOON)).toBe(5);
     expect(await promosThisYear("+18455550304", new Date("2027-01-02T17:00:00Z"))).toBe(0); // January 1 reset
   });
 });
@@ -55,7 +55,7 @@ describe("campaigns", () => {
       expect.arrayContaining([
         ["Signed up", "Active", 0],
         ["Replied STOP", "Stopped all texts", 0],
-        ["Busy promo year", "At yearly limit", 6],
+        ["Busy promo year", "At yearly limit", 5],
       ]),
     );
     expect(list.find((s) => s.name === "Signed up")!.source).toBe("web");
@@ -78,7 +78,7 @@ describe("campaigns", () => {
     expect(sends.map((s) => [s.status, s.reason])).toEqual([
       ["sent", null],
       ["skipped", "Replied STOP (no texts)"],
-      ["skipped", "Already got 6 promo texts this year"],
+      ["skipped", "Already got 5 promo texts this year"],
     ]);
     expect(done.skippedCount).toBe(2);
     const [msg] = await db.select().from(schema.messages).where(eq(schema.messages.id, sends[0].messageId!));

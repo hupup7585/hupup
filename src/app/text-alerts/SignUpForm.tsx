@@ -82,7 +82,7 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-base">{v3 ? "Up to 6 promo texts a year, never more." : PROMO_BENEFITS_NOTE}</p>
+          <p className="mt-2 text-base">{v3 ? "Up to 5 promo texts a year, never more." : PROMO_BENEFITS_NOTE}</p>
           <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-white p-4">
             <input type="checkbox" name="marketing" className="mt-1 h-6 w-6 shrink-0 accent-hu-deep" />
             <span>

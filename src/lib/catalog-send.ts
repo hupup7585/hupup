@@ -11,8 +11,11 @@ import { logStamp } from "@/lib/phone-promo";
  * a failed send alerts Abraham.
  */
 
-/** The info@ "subject Catalog" auto-reply (section 9) is off until Abraham approves its reply wording. */
-export const INFO_CATALOG_AUTOREPLY_ON = false;
+/**
+ * The info@ "subject Catalog" auto-reply (section 9). Abraham approved the wording on Nov 13, 2026 (the key 8 catalog
+ * email with his PDF). It runs once the Cloudflare Email Worker is connected (INBOUND_EMAIL_SECRET set in Vercel).
+ */
+export const infoCatalogAutoreplyOn = (env: Record<string, string | undefined> = process.env) => Boolean(env.INBOUND_EMAIL_SECRET);
 
 export async function catalogLines() {
   const cats = await db.select().from(schema.categories).where(eq(schema.categories.active, true)).orderBy(asc(schema.categories.ivrDigit), asc(schema.categories.id));
@@ -87,7 +90,7 @@ export function isCatalogSubject(subject: string | null | undefined): boolean {
 
 /**
  * An email to info@ (via the Cloudflare Email Worker, once Abraham OKs the DNS change). Logs every catalog request;
- * replies with the PDF at most once per sender per day (New York day), and only once INFO_CATALOG_AUTOREPLY_ON.
+ * replies with the PDF at most once per sender per day (New York day), and only once infoCatalogAutoreplyOn().
  */
 export async function handleCatalogEmail(senderRaw: string, subject: string | null, now = new Date(), send: (to: string) => Promise<{ sent: boolean }> = sendCatalogEmail) {
   const sender = senderRaw.trim().toLowerCase();
@@ -99,7 +102,7 @@ export async function handleCatalogEmail(senderRaw: string, subject: string | nu
     .from(schema.catalogEmailRequests)
     .where(and(eq(schema.catalogEmailRequests.sender, sender), eq(schema.catalogEmailRequests.replied, true), gte(schema.catalogEmailRequests.createdAt, new Date(now.getTime() - 36 * 3600_000))));
   const today = earlier.some((r) => nyDay(r.createdAt) === nyDay(now));
-  const reason = !INFO_CATALOG_AUTOREPLY_ON ? "autoreply_off" : today ? "already_today" : null;
+  const reason = !infoCatalogAutoreplyOn() ? "autoreply_off" : today ? "already_today" : null;
   let replied = false;
   if (!reason) replied = (await send(sender)).sent;
   await db.insert(schema.catalogEmailRequests).values({ sender, subject: subject?.slice(0, 200) ?? null, replied, reason: reason ?? (replied ? null : "send_failed"), createdAt: now });

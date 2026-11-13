@@ -194,7 +194,8 @@ describe("Phone Recordings (Abraham)", () => {
     expect(promptWaiting({}, "instr_balloons")).toBe(true);
     expect(promptWaiting({ instr_balloons: { text: null, audioUrl: null, approvedAt: new Date() } }, "instr_balloons")).toBe(false);
     expect(promptWaiting({}, "main_thanks")).toBe(false);
-    for (const k of ["promo_ask", "promo_which", "promo_final", "promo_disclosure"] as const) expect(promptWaiting({}, k), k).toBe(true);
+    // Approved Nov 13, 2026 (the promo steps themselves stay off: PHONE_PROMO_MODE)
+    for (const k of ["promo_ask", "promo_which", "promo_final", "promo_disclosure", "pay_start", "pay_declined", "vm_after_hours"] as const) expect(promptWaiting({}, k), k).toBe(false);
   });
   it("Google voice recording: Not active yet without a Google Text-to-Speech key; with one, saved in the hotline voice and reused", async () => {
     delete process.env.GOOGLE_TTS_API_KEY;
@@ -243,9 +244,11 @@ describe("Nov 12 decisions: staff reject, caller ID, after hours, keypad pay, CA
     for (const k of ["0", "2", "4", "5", "6", "8"] as const) expect(lineRingsNow(k, night, SETTING_DEFAULTS, weekday), k).toBe(false);
     expect(lineRingsNow("0", night, { ...SETTING_DEFAULTS, ringAfterHours0: true }, weekday)).toBe(true);
   });
-  it("the draft after-hours greeting waits for approval; the closed greeting plays until then", () => {
-    expect(PROMPTS.vm_after_hours.text).toBe("Thank you for calling Hup Up Attractions! Our office is closed right now. Please leave your name, phone number, and a short message after the tone, and we'll call you back as soon as we open. To book anytime, visit hupupattractions.com. Have a wonderful day!");
-    expect(promptWaiting({}, "vm_after_hours")).toBe(true);
+  it("the approved after-hours greeting; the closed greeting text is kept", () => {
+    // Approved Nov 13, 2026 with Abraham's change ("To see our rentals anytime"; there is no online booking)
+    expect(PROMPTS.vm_after_hours.text).toBe("Thank you for calling Hup Up Attractions! Our office is closed right now. Please leave your name, phone number, and a short message after the tone, and we'll call you back as soon as we open. To see our rentals anytime, visit hupupattractions.com. Have a wonderful day!");
+    expect(promptWaiting({}, "vm_after_hours")).toBe(false);
+    expect(PROMPTS.pay_security_code.text).toBe("Please enter the security code on your card, then press pound.");
     expect(PROMPTS.vm_closed.text).toBe("Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.");
   });
   it("pay by keypad: prepared only, not active", async () => {

@@ -4,7 +4,7 @@ import { inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config, BUSINESS_NAME } from "@/lib/config";
 import { PAYMENT_HOLD_MINUTES, getPaymentGroup, markGroupPaid, minutesFromNow, orderNumber } from "@/lib/orders";
-import { sendPhoneReceipt } from "@/lib/phone-receipt";
+import { RECEIPT_APPROVED, sendPhoneReceipt } from "@/lib/phone-receipt";
 import { ensureGroupPriced } from "@/lib/order-pricing";
 import { loadPromptOverrides, promptText, type PromptKey, type PromptOverrides } from "@/lib/ivr/prompts";
 import { STRIPE_PHONE_PAY_MODE, payConnector, payLast4, verifyPaySip } from "@/lib/phone-pay";
@@ -110,7 +110,8 @@ export async function handlePayVoice(action: string, query: URLSearchParams, bod
         await markGroupPaid(orderId, cents, "stripe", null);
         await db.update(schema.orders).set({ stripePaymentId: code }).where(inArray(schema.orders.id, ids));
         await recordPaymentResult(ids, "approved", last4, code);
-        await paymentReceivedNotices(orderId, cents);
+        // Abraham: once approved, the receipt replaces the short "payment received" email (not both)
+        await paymentReceivedNotices(orderId, cents, { skipCustomerEmail: RECEIPT_APPROVED && Boolean(group.primary.customer?.email) });
         // Our own receipt from info@ (draft: sent once Abraham approves the wording)
         await sendPhoneReceipt(group.primary.customer?.email, { orderId, paidAt: new Date(), amountCents: cents, last4, name: group.primary.customer?.name }).catch(() => null);
       }

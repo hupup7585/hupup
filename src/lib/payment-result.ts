@@ -30,7 +30,7 @@ export function paymentResultLabel(o: { paymentResult: string | null; paymentRes
 }
 
 /** After a payment (Sola on the website, Stripe on the phone): the customer's confirmation, the owner's alerts. */
-export async function paymentReceivedNotices(orderId: number, cents: number) {
+export async function paymentReceivedNotices(orderId: number, cents: number, opts: { skipCustomerEmail?: boolean } = {}) {
   const group = await getPaymentGroup(orderId);
   if (!group) return;
   const before = group.primary;
@@ -42,7 +42,7 @@ export async function paymentReceivedNotices(orderId: number, cents: number) {
       : `${BUSINESS_NAME}: payment received for order #${num}. You're all set for ${messageDate(before.order.eventDate)}! We'll deliver that day and pick up ${messageDate(before.order.pickupDate)}.`;
   // Order/service text only with order-text consent (checked in sendMessage); the email copy goes out as before.
   if (before.customer?.phone) await sendSms(before.customer.phone, msg, { kind: "transactional", event: "payment_confirmation", orderId, customerId: before.customer.id });
-  if (before.customer?.email) await sendEmail(before.customer.email, `Order #${num} confirmed`, msg);
+  if (before.customer?.email && !opts.skipCustomerEmail) await sendEmail(before.customer.email, `Order #${num} confirmed`, msg);
   if (process.env.ADMIN_PHONE) {
     await sendSms(process.env.ADMIN_PHONE, `New paid order #${num}: $${(cents / 100).toFixed(2)} for ${messageDate(before.order.eventDate)}${days.length > 1 ? ` and ${days.length - 1} more day${days.length > 2 ? "s" : ""}` : ""}.`, { kind: "system", event: "owner_alert" });
   }

@@ -11,7 +11,7 @@ export const WEB_CONSENT_VERSION = "web-2026-11-05";
 export const PROMO_OPENING = "Hup Up Attractions: Reply STOP to opt out.";
 
 /** Abraham (SMS v3, Nov 9, 2026): strict maximum of promotional texts per customer per calendar year, all campaigns combined. */
-export const PROMOS_PER_YEAR = 6;
+export const PROMOS_PER_YEAR = 5; // Abraham, Nov 13, 2026: 5 promo texts per calendar year, everywhere
 
 /**
  * SMS Terms v2 promo format (Abraham, Nov 9, 2026): starts with the business name, ends with the NO PROMO and STOP

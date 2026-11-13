@@ -4,11 +4,10 @@ import { orderNumber } from "@/lib/orders";
 import { inboxWhen } from "@/lib/inbox-format";
 
 /**
- * Our own receipt after a phone payment is Paid (Abraham, Nov 12, 2026), from info@. DRAFT: not sent until Abraham
- * approves the wording (RECEIPT_APPROVED). Stripe's own automatic receipts are turned off in Stripe's settings, so
+ * Our own receipt after a phone payment is Paid (Abraham, Nov 12, 2026), from info@. Approved Nov 13, 2026. Stripe's own automatic receipts are turned off in Stripe's settings, so
  * customers get just this one.
  */
-export const RECEIPT_APPROVED = false;
+export const RECEIPT_APPROVED = true; // Abraham, Nov 13, 2026: approved; replaces the short "payment received" email
 
 export function phoneReceipt(input: { orderId: number; paidAt: Date; amountCents: number; last4: string | null; name?: string | null }) {
   const num = orderNumber(input.orderId);

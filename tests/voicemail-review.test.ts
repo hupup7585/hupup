@@ -186,10 +186,10 @@ describe("every path", () => {
     expect(h.emails).toHaveLength(1);
   });
 
-  it("office closed (after hours, Shabbos, Yom Tov): Abraham's closed greeting in every box except key 9", async () => {
+  it("office closed (after hours, Shabbos, Yom Tov): Abraham's after-hours greeting in every box except key 9", async () => {
     h.open = false;
     const closed = plain(await call("voicemail", {}, "x=4"));
-    expect(closed).toContain("Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key."); // Abraham, Phone Menu v3
+    expect(closed).toContain("Thank you for calling Hup Up Attractions! Our office is closed right now. Please leave your name, phone number, and a short message after the tone, and we'll call you back as soon as we open. To see our rentals anytime, visit hupupattractions.com. Have a wonderful day!"); // approved Nov 13, 2026
     expect(closed).not.toContain("Our team is assisting other customers right now");
     expect(plain(await call("voicemail", {}, "x=0"))).toContain("Our office is closed right now.");
     expect(plain(await call("voicemail", {}, "x=9"))).toContain(PROMPTS.vm9_greeting.text); // key 9 keeps its own greeting

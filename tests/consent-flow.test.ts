@@ -214,7 +214,7 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
   const plain = (x: string) => x.replace(/&apos;/g, "'");
   it("Step 1 after the order: exact wording, keys only (no speech), pound or nothing skips", async () => {
     const xml = plain(await call("promo-consent"));
-    expect(xml).toContain("To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1. To skip, press pound.");
+    expect(xml).toContain("To get seasonal offers, discounts, and deals by text, up to 5 a year, press 1. To skip, press pound.");
     expect(xml).toContain('input="dtmf"');
     expect(xml).not.toContain("speech");
     expect(xml).not.toContain("say yes");

@@ -48,7 +48,7 @@ import { STRIPE_PHONE_PAY_MODE, keypadPayFor, keypadPayOn, paySipUri } from "@/l
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { voicemailPlayLink } from "@/lib/signed-link";
-import { INFO_CATALOG_AUTOREPLY_ON, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
+import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
 import { CATALOG_ENDINGS, decodeCatalogKeys, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
 import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState, textingActive } from "@/lib/voicemail";
 import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staffAnnouncement, type RingKey } from "./routing";
@@ -817,7 +817,7 @@ const handlers: Record<string, Handler> = {
 
   /** Email: the info@ tip (once that auto-reply is on), then step 1, the first part of the address. */
   async "catalog-email"(ctx, vr) {
-    if (INFO_CATALOG_AUTOREPLY_ON) sp(vr, ctx, "catalog_email_info");
+    if (infoCatalogAutoreplyOn()) sp(vr, ctx, "catalog_email_info");
     await updateSession(ctx.callSid, { data: { catLocal: "", catDomain: "" } }, ctx.session);
     return back(vr, "catalog-part", { part: "local" });
   },

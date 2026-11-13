@@ -96,7 +96,7 @@ export async function createBookingAction(input: {
     eventDate: input.date,
     channel: "POS",
     status,
-    holdExpiresAt: input.payment === "link" ? minutesFromNow(PAYMENT_HOLD_MINUTES * 4) : null,
+    holdExpiresAt: input.payment === "link" ? minutesFromNow(60) /* New booking link: unchanged at 60 minutes (its text says "within 2 hours") */ : null,
     customer: { name: input.name.trim(), phone, email: input.email.trim() || null, address: input.address.trim() || null },
     deliveryTime: input.deliveryTime || null,
     notes: input.notes || null,

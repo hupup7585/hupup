@@ -28,8 +28,8 @@ describe("totals: items + delivery + Orange County tax on the whole order", () =
     expect(computeTotals(25000, "area", s)).toMatchObject({ deliveryFeeCents: 1500, taxCents: 2153, totalCents: 28653 });
     expect(computeTotals(25000, "outside", s)).toBeNull();
   });
-  it("cart hold and payment window are 15 minutes", () => {
+  it("cart hold is 15 minutes; the payment window is 10 minutes (Abraham, Nov 13, 2026)", () => {
     expect(PHONE_HOLD_MINUTES).toBe(15);
-    expect(PAYMENT_HOLD_MINUTES).toBe(15);
+    expect(PAYMENT_HOLD_MINUTES).toBe(10);
   });
 });

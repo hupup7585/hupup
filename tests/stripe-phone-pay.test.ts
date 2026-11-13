@@ -104,7 +104,7 @@ describe("the payment subaccount: Twilio <Pay> through Stripe", () => {
     await db.update(schema.orders).set({ holdExpiresAt: new Date(Date.now() + 60_000) }).where(eq(schema.orders.id, orderId));
     await sub("incoming", sipHeaders(paySipUri(orderId, "CAmain")));
     const o = await order(orderId);
-    expect(o.holdExpiresAt!.getTime()).toBeGreaterThan(Date.now() + 10 * 60_000);
+    expect(o.holdExpiresAt!.getTime()).toBeGreaterThan(Date.now() + 9 * 60_000); // 10 minutes (Abraham)
   });
   it("refuses requests from another account or without valid signed headers", async () => {
     expect(await handlePayVoice("incoming", new URLSearchParams(), { AccountSid: "ACother", CallSid: "x", ...sipHeaders(paySipUri(orderId, "CAmain")) })).toContain("<Hangup/>");
@@ -123,6 +123,10 @@ describe("the payment subaccount: Twilio <Pay> through Stripe", () => {
     expect(o.paymentResult).toBe("approved");
     expect(o.cardLast4).toBe("4242");
     expect(JSON.stringify(o)).not.toContain("xxxx-xxxx");
+    // The approved receipt replaces the short "payment received" email (Abraham, Nov 13, 2026)
+    const toCaller = h.emails.filter((e) => e.to === "caller@example.com");
+    expect(toCaller.map((e) => e.subject)).toEqual([`Hup Up Attractions receipt for order #${1000 + orderId}`]);
+    expect(toCaller[0].text).toContain("Card: ending in 4242");
     // the hotline carries on without a payment link
     const back = await mainCall("pay-done", {}, `o=${orderId}`);
     expect(redirect(back)).toBe("promo-consent");

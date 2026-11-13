@@ -10,7 +10,7 @@ const { orders, orderItems, products, customers } = schema;
 /** How long a phone cart holds stock if the call-ended webhook never arrives. */
 export const PHONE_HOLD_MINUTES = 15;
 /** How long a texted payment link holds stock before it's released. */
-export const PAYMENT_HOLD_MINUTES = 15;
+export const PAYMENT_HOLD_MINUTES = 10; // Abraham, Nov 13, 2026: rentals are held 10 minutes while the caller pays
 
 export function orderNumber(id: number): string {
   return String(1000 + id);

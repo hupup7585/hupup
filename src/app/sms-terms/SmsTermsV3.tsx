@@ -13,7 +13,7 @@ export default function SmsTermsV3() {
         <p>{`Texts about your reservations, orders, payments, deliveries, pickups, and questions, including verification codes. You may agree on our website, on our phone line, or with our team. These may include picture messages (MMS), such as a photo confirming your delivery. Message frequency varies.`}</p>
 
         <h2>Promotional Texts</h2>
-        <p>{`Seasonal offers, discount codes, and rental deals, limited to 6 per customer per calendar year. Each promotional text begins with "Hup Up Attractions:" and ends with "Reply NOPROMO to stop promos, STOP to stop all texts." Promotional texts are sent only between 8:00 AM and 9:00 PM your local time. If your time zone is unknown, we send only when both your area code's time zone and Eastern Time are within those hours.`}</p>
+        <p>{`Seasonal offers, discount codes, and rental deals, limited to 5 per customer per calendar year. Each promotional text begins with "Hup Up Attractions:" and ends with "Reply NOPROMO to stop promos, STOP to stop all texts." Promotional texts are sent only between 8:00 AM and 9:00 PM your local time. If your time zone is unknown, we send only when both your area code's time zone and Eastern Time are within those hours.`}</p>
 
         <h2>How to Join Promotional Texts</h2>
         <p>{`You may request our confirmation text by checking the promotional box on our website, pressing a key on our phone line, asking our team, or texting JOIN to (845) 415-7585. You are enrolled only when you reply YES to that confirmation text within 24 hours. Your YES reply is your express written consent. Texting JOIN alone does not enroll you.`}</p>
