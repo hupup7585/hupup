@@ -22,6 +22,8 @@ import { db, schema } from "@/lib/db";
 import { spokenAnswersFor } from "@/lib/speech-to-text";
 import { activeDrivers, overlapsFor } from "@/lib/drivers";
 import { assignDriversAction } from "./driver-actions";
+import { confirmAttentionAction } from "./attention-actions";
+import { attentionItemsFree } from "@/lib/late-payment";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -39,6 +41,20 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         <StatusBadge status={o.status} />
         <span className="text-sm text-muted">{o.channel === "PHONE" ? "Booked by phone" : "Booked in person"} · <DualDate yi at={o.createdAt} /></span>
       </div>
+      {o.status === "NEEDS_ATTENTION" && (await (async () => {
+        const free = await attentionItemsFree(o.id);
+        return (
+          <div data-needs-attention className="mb-5 rounded-xl border-2 border-[#C83A2F] bg-[#FFE6E4] p-4 text-sm text-[#5C1A14]">
+            <b>Needs staff attention.</b> This customer paid after the hold ended, and another customer had booked the items. The customer was emailed to call customer service, extension 3.
+            <div className="mt-2">{free ? "The items are free again now." : "The items are still taken on those days: offer another date or item, or a refund."}</div>
+            {staff.role !== "delivery" && free && (
+              <form action={confirmAttentionAction.bind(null, o.id)} className="mt-3">
+                <button className="btn-dark">Confirm order</button>
+              </form>
+            )}
+          </div>
+        );
+      })())}
       <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-5">
           <div className="card p-5">

@@ -35,6 +35,8 @@ export async function paymentReceivedNotices(orderId: number, cents: number, opt
   if (!group) return;
   const before = group.primary;
   const days = group.orders;
+  // A late payment whose items were taken: no "you're all set" message (Abraham, Nov 13, 2026)
+  if (days.some((d) => d.order.status === "NEEDS_ATTENTION")) return;
   const num = orderNumber(orderId);
   const { messageText } = await import("@/lib/ivr/prompts");
   const msg =

@@ -87,6 +87,8 @@ export const ORDER_STATUSES = [
   "DELIVERED",
   "PICKED_UP",
   "CANCELLED",
+  /** Paid after its hold ended and the items were taken by someone else (Abraham, Nov 13, 2026): never confirmed by itself. */
+  "NEEDS_ATTENTION",
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 

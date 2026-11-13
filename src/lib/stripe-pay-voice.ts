@@ -116,7 +116,10 @@ export async function handlePayVoice(action: string, query: URLSearchParams, bod
         // Abraham: once approved, the receipt replaces the short "payment received" email (not both)
         await paymentReceivedNotices(orderId, cents, { skipCustomerEmail: RECEIPT_APPROVED && Boolean(group.primary.customer?.email) });
         // Our own receipt from info@ (draft: sent once Abraham approves the wording)
-        await sendPhoneReceipt(group.primary.customer?.email, { orderId, paidAt: new Date(), amountCents: cents, last4, name: group.primary.customer?.name }).catch(() => null);
+        // A late payment whose items were taken gets the "please call us" email instead of a receipt
+        const after = await getPaymentGroup(orderId);
+        if (!after?.orders.some((d) => d.order.status === "NEEDS_ATTENTION"))
+          await sendPhoneReceipt(group.primary.customer?.email, { orderId, paidAt: new Date(), amountCents: cents, last4, name: group.primary.customer?.name }).catch(() => null);
       }
       vr.say(voice(), line(prompts, "pay_success"));
       vr.hangup(); // back to the hotline call, which carries on

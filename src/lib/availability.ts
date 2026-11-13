@@ -11,12 +11,12 @@ import { calendarDefaults, nextOpenDay, type CalendarSettings } from "@/lib/jewi
  * Shabbos and Sunday. A booking for day D needs a free unit on every day from D through its pickup day.
  *
  * Orders that occupy inventory:
- *  - CONFIRMED, DELIVERED                       always
+ *  - CONFIRMED, DELIVERED, NEEDS_ATTENTION      always (a late payment keeps its claim while staff sort it out)
  *  - HOLD, PENDING_PAYMENT                      while hold_expires_at is in the future (or null)
  * PICKED_UP and CANCELLED free the unit.
  */
 export const ACTIVE_ORDER_SQL = sql`(
-  o.status IN ('CONFIRMED','DELIVERED')
+  o.status IN ('CONFIRMED','DELIVERED','NEEDS_ATTENTION')
   OR (o.status IN ('HOLD','PENDING_PAYMENT') AND (o.hold_expires_at IS NULL OR o.hold_expires_at > now()))
 )`;
 

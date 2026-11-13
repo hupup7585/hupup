@@ -260,8 +260,16 @@ export async function markPaid(orderId: number, cents: number, method: string, r
   if (!o) return null;
   if (ref && o.solaRefNum === ref) return o; // duplicate webhook
   const paid = o.paidCents + cents;
+  // Late payment (Abraham, Nov 13, 2026): the hold had already ended. Still free: confirm. Taken: never confirm.
+  const { handleLatePayment, holdEnded, itemsStillFree } = await import("@/lib/late-payment");
+  const late = holdEnded(o);
+  const stillFree = late ? await itemsStillFree(orderId) : true;
   const status: OrderStatus =
-    o.status === "PENDING_PAYMENT" || o.status === "HOLD" || o.status === "CANCELLED" ? "CONFIRMED" : o.status;
+    late && !stillFree
+      ? "NEEDS_ATTENTION"
+      : o.status === "PENDING_PAYMENT" || o.status === "HOLD" || o.status === "CANCELLED"
+        ? "CONFIRMED"
+        : o.status;
   const [updated] = await db
     .update(orders)
     .set({
@@ -272,12 +280,13 @@ export async function markPaid(orderId: number, cents: number, method: string, r
       holdExpiresAt: null,
       updatedAt: new Date(),
       notes:
-        o.status === "CANCELLED"
-          ? sql`COALESCE(${orders.notes}, '') || 'Payment arrived after hold expired - re-confirmed, check availability. '`
+        late
+          ? sql`COALESCE(${orders.notes}, '') || ${stillFree ? "Payment arrived after the hold ended; the items were still free, confirmed. " : "Payment arrived after the hold ended; the items were taken, needs staff attention. "}`
           : o.notes,
     })
     .where(eq(orders.id, orderId))
     .returning();
+  if (late) await handleLatePayment(orderId, cents, method, stillFree);
   // Bookkeeping (Abraham T): every paid booking is recorded as income automatically (rental, delivery, tax, tip).
   const { recordBookingPayment } = await import("@/lib/books");
   await recordBookingPayment(orderId, cents, method, ref);

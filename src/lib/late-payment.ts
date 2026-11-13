@@ -1,9 +1,12 @@
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { checkBookable, pickupDateFor } from "@/lib/availability";
+import { checkBookable, getUsage, pickupDateFor, usedOn } from "@/lib/availability";
+import { addDays } from "@/lib/dates";
 import { nearbyDays, nearestSize } from "@/lib/alternatives";
 import { getSettings } from "@/lib/settings";
 import { ensurePriced } from "@/lib/order-pricing";
+import { config } from "@/lib/config";
+import { sendEmail } from "@/lib/notify";
 
 /*
  * Payment links and late payments (Abraham, Nov 13, 2026).
@@ -171,4 +174,82 @@ export async function chooseLinkOption(orderId: number, productId: number, date:
   });
   if (ok) await ensurePriced(orderId);
   return ok;
+}
+
+/*
+ * Late payment backup (Abraham, Nov 13, 2026: "build it as planned"). Money that arrives after the hold ended:
+ *  - items still free: the order confirms by itself, and the Owner gets an email;
+ *  - items taken by someone else: "Needs staff attention", never confirmed by itself; the Owner gets an email,
+ *    and the customer gets Abraham's email below.
+ */
+export const LATE_EMAIL_APPROVED = true; // Abraham approved the wording, Nov 13, 2026
+export const LATE_EMAIL = {
+  subject: (num: string) => `Hup Up Attractions order #${num}: please call us`,
+  // Abraham's wording, Nov 13, 2026 (approved), every word spelled out per his rule
+  body: (num: string) =>
+    `Thank you, we received your payment for order #${num}. Your hold ended just before it went through, so our team needs to check your booking. Please call customer service at (845) 777-7585, extension 3, and we will take care of it. If it is not available anymore, we will give you another option to book.\n\nHup Up Attractions`,
+};
+
+/** Are this order's items free on every day it needs (an ended hold isn't counted, so its own row is left out)? */
+export async function itemsStillFree(orderId: number): Promise<boolean> {
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
+  if (!o) return false;
+  const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
+  for (const i of items) {
+    const [p] = await db.select().from(schema.products).where(eq(schema.products.id, i.productId)).limit(1);
+    if (!p || (await checkBookable(p.id, p.quantity, o.eventDate, db, o.pickupDate)) < i.qty) return false;
+  }
+  return true;
+}
+
+/** After a late payment was recorded: the Owner's email, and the customer's when the items were taken. */
+export async function handleLatePayment(orderId: number, cents: number, method: string, stillFree: boolean, env: Record<string, string | undefined> = process.env) {
+  const { orderNumber, getOrderWithItems } = await import("@/lib/orders");
+  const num = orderNumber(orderId);
+  const to = config.adminEmail();
+  if (to)
+    await sendEmail(
+      to,
+      stillFree ? `Hup Up Attractions: late payment on order #${num} (confirmed)` : `Hup Up Attractions: late payment on order #${num} needs staff attention`,
+      `A payment of $${(cents / 100).toFixed(2)} (${method}) arrived after the hold on order #${num} had ended.\n\n` +
+        (stillFree
+          ? "The items were still free on those days, so the order was confirmed by itself. Nothing else to do."
+          : "Some items are no longer free on those days (another customer booked them). The order is not confirmed and is marked Needs staff attention. Please call the customer about another date or item, or a refund.") +
+        `\n\n${config.baseUrl()}/admin/orders/${orderId}`,
+    ).catch((e) => console.error("[late payment] owner email failed:", e));
+  if (!stillFree && (LATE_EMAIL_APPROVED || env.VERCEL_ENV !== "production")) {
+    const full = await getOrderWithItems(orderId);
+    if (full?.customer?.email) await sendEmail(full.customer.email, LATE_EMAIL.subject(num), LATE_EMAIL.body(num)).catch(() => null);
+  }
+}
+
+/**
+ * For a "Needs staff attention" order (its own claim counts while it waits): are its items free again, meaning no
+ * day is booked past the stock with this order included?
+ */
+export async function attentionItemsFree(orderId: number, exec: Pick<typeof db, "execute" | "select"> = db): Promise<boolean> {
+  const [o] = await exec.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
+  if (!o) return false;
+  const items = await exec.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
+  const last = o.pickupDate && o.pickupDate > o.eventDate ? o.pickupDate : o.eventDate;
+  const usage = await getUsage(o.eventDate, last, items.map((i) => i.productId), exec);
+  for (const i of items) {
+    const [p] = await exec.select().from(schema.products).where(eq(schema.products.id, i.productId)).limit(1);
+    if (!p) return false;
+    for (let d = o.eventDate; d <= last; d = addDays(d, 1)) if (usedOn(usage, i.productId, d) > p.quantity) return false;
+  }
+  return true;
+}
+
+/** Staff confirm a "Needs staff attention" order once its items are free again (checked here, with the stock locked). */
+export async function confirmAttentionOrder(orderId: number): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const [o] = await tx.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
+    if (!o || o.status !== "NEEDS_ATTENTION") return false;
+    const items = await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
+    for (const id of [...new Set(items.map((i) => i.productId))].sort((a, b) => a - b)) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+    if (!(await attentionItemsFree(orderId, tx))) return false;
+    await tx.update(schema.orders).set({ status: "CONFIRMED", updatedAt: new Date() }).where(eq(schema.orders.id, orderId));
+    return true;
+  });
 }

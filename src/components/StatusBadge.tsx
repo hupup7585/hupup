@@ -8,6 +8,7 @@ const MAP: Record<OrderStatus, [string, string]> = {
   DELIVERED: ["Delivered", "badge-done"],
   PICKED_UP: ["Picked up", "badge-done"],
   CANCELLED: ["Cancelled", "badge-muted line-through"],
+  NEEDS_ATTENTION: ["Needs staff attention", "badge-pending"],
 };
 
 export function StatusBadge({ status }: { status: OrderStatus }) {
