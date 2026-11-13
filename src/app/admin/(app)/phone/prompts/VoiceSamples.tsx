@@ -42,7 +42,7 @@ export default function VoiceSamples(props: { text: string; samples: Sample[]; t
         ) : (
           <p className="mt-3 text-sm">
             <b>Not active yet:</b> the samples are made with Google Text-to-Speech, which needs a Google Cloud billing account and key
-            (GOOGLE_TTS_API_KEY in Vercel). About 1,100 characters in all, inside Google&apos;s free monthly allowance.
+            (GOOGLE_TTS_API_KEY in Vercel). All 16 Chirp 3 HD male voices, about 2,500 characters in all, inside Google&apos;s free monthly allowance.
           </p>
         ))}
       {msg?.message && <p className={`mt-2 text-sm font-semibold ${msg.ok ? "text-[#13895C]" : "text-coral-dark"}`}>{msg.message}</p>}

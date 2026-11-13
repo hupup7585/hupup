@@ -20,6 +20,8 @@ import RefundPanel from "./RefundPanel";
 import { inboxWhen } from "@/lib/inbox-format";
 import { db, schema } from "@/lib/db";
 import { spokenAnswersFor } from "@/lib/speech-to-text";
+import { activeDrivers, overlapsFor } from "@/lib/drivers";
+import { assignDriversAction } from "./driver-actions";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -107,6 +109,35 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   />
                 )}
               </>
+            );
+          })())}
+          {staff.role !== "delivery" && o.status !== "CANCELLED" && (await (async () => {
+            const drivers = await activeDrivers();
+            const warn = [...(await overlapsFor(o, "delivery")).map((w) => `Delivery driver also has: ${w}`), ...(await overlapsFor(o, "pickup")).map((w) => `Pickup driver also has: ${w}`)];
+            const pick = (name: "delivery" | "pickup", current: number | null) => (
+              <label className="block">
+                <span className="label">{name === "delivery" ? "Delivery driver" : "Pickup driver"}</span>
+                <select name={name} defaultValue={current ?? ""} className="input">
+                  <option value="">Not assigned</option>
+                  {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </label>
+            );
+            return (
+              <form action={assignDriversAction.bind(null, o.id)} className="card p-5" data-drivers>
+                <h2 className="mb-3 font-bold">Drivers</h2>
+                {!drivers.length && <p className="mb-2 text-sm text-muted">No active Delivery logins yet. Add one in Staff.</p>}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {pick("delivery", o.deliveryDriverId)}
+                  {pick("pickup", o.pickupDriverId)}
+                </div>
+                {warn.length > 0 && (
+                  <ul className="mt-3 rounded-lg bg-[#FFF8E1] px-3 py-2 text-sm font-semibold text-[#5C4600]" data-driver-overlap>
+                    {warn.map((w) => <li key={w}>Overlap: {w}</li>)}
+                  </ul>
+                )}
+                <button className="btn-dark mt-3">Save drivers</button>
+              </form>
             );
           })())}
           {await (async () => {

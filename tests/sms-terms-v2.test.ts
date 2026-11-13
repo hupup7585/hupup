@@ -150,7 +150,7 @@ describe("Abraham U checks", () => {
     expect(a).toContain("const t = DELIVERY_TEMPLATES[key]");
     expect(a).toContain("body: t.body");
     expect(a).toContain("phone: full.customer.phone");
-    expect(a).toContain('staff.role === "delivery" && !isCurrentStop(full.order)');
+    expect(a).toContain('staff.role === "delivery" && (!isCurrentStop(full.order) || !hasAnyStop(full.order, staff.userId))');
   });
 
   it("HELP uses the same email as the live SMS Terms and Privacy Policy", async () => {

@@ -105,6 +105,9 @@ export const orders = pgTable(
     /** Pickup day = eventDate + 1. */
     pickupDate: date("pickup_date", { mode: "string" }).notNull(),
     deliveryAddress: text("delivery_address"),
+    /** Driver for the delivery and for the pickup (Abraham, Nov 12, 2026); a Delivery login sees only its own stops. */
+    deliveryDriverId: integer("delivery_driver_id"),
+    pickupDriverId: integer("pickup_driver_id"),
     deliveryTime: text("delivery_time"),
     subtotalCents: integer("subtotal_cents").notNull().default(0),
     /** Delivery zone at checkout: kj ($10) | area ($15). Set when the order is priced. */

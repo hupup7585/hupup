@@ -15,6 +15,7 @@ import { logoutAction } from "../login/actions";
 import StopActions from "./StopActions";
 import DualDate from "@/components/DualDate";
 import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
+import { driverOf, isMyStop } from "@/lib/drivers";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Deliveries · Hup Up Attractions", robots: { index: false } };
@@ -39,6 +40,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
         .innerJoin(schema.products, eq(schema.products.id, schema.orderItems.productId))
         .where(inArray(schema.orderItems.orderId, ids))
     : [];
+  const driverNames = new Map((await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers).where(eq(schema.adminUsers.role, "delivery"))).map((d) => [d.id, d.name]));
   const custIds = rows.map((r) => r.customerId).filter((x): x is number => Boolean(x));
   const customers = custIds.length ? await db.select().from(schema.customers).where(inArray(schema.customers.id, custIds)) : [];
   const stops = rows
@@ -48,6 +50,8 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
       if (o.pickupDate === day) out.push({ o, stop: "pickup" as const, done: o.status === "PICKED_UP" });
       return out;
     })
+    // A Delivery login sees only the stops assigned to it (checked here on the server, not in the browser)
+    .filter(({ o, stop }) => staff.role !== "delivery" || isMyStop(o, stop, staff.userId))
     .sort((a, b) => (a.o.deliveryTime || "99").localeCompare(b.o.deliveryTime || "99"));
 
   // Navigation (free Google Maps / Waze links): stops in the order shown, then back to stock
@@ -99,7 +103,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
           }
         />
         <MyTasksCard staff={staff} />
-        {!stops.length && <p className="card p-6 text-muted">No deliveries or pickups on this day.</p>}
+        {!stops.length && <p className="card p-6 text-muted">{staff.role === "delivery" ? "No deliveries or pickups assigned to you on this day." : "No deliveries or pickups on this day."}</p>}
         {stops.length > 0 && (
           <section data-route-card className="no-print card mb-5 p-4" aria-label="Today's route">
             <h2 className="flex items-center gap-2 text-lg font-extrabold">
@@ -148,6 +152,11 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
                     </div>
                     <Badge tone={tone}>{done ? (stop === "delivery" ? "Delivered" : "Picked up") : stop === "delivery" ? "Scheduled" : "To pick up"}</Badge>
                   </div>
+                  {staff.role !== "delivery" && (
+                    <div className="mt-1 text-sm" data-stop-driver>
+                      Driver: {driverOf(o, stop) ? <b>{driverNames.get(driverOf(o, stop)!) ?? "Unknown"}</b> : <b className="text-[#b3261e]">Not assigned</b>}
+                    </div>
+                  )}
                   <div className="mt-2 text-lg font-bold">{c?.name || "Customer"}</div>
                   <div className="mt-0.5 flex items-start gap-1.5 text-sm">
                     <MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />

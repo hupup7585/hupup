@@ -4,20 +4,30 @@ import { googleTtsReady, storeGoogleRecording, synthesize } from "@/lib/prompt-r
 
 /**
  * Voice samples for Abraham to pick the hotline voice (Nov 12, 2026). Listening only: nothing here changes IVR_VOICE
- * or any live phone line. Made with the same Google Text-to-Speech setup as the pre-recorded lines. Seven samples of
- * about 160 characters each (about 1,100 characters in all), inside Google's free monthly allowance.
+ * or any live phone line. Made with the same Google Text-to-Speech setup as the pre-recorded lines. All 16 Google
+ * Chirp 3 HD male voices (Abraham, Nov 12, 2026), about 160 characters each (about 2,500 characters in all), far
+ * inside Google's free monthly allowance of 1 million characters for Chirp 3 HD.
  */
 export const VOICE_SAMPLE_TEXT =
   "Hi! Thank you for calling Hup Up Attractions! Bringing something special to every occasion! If you know your desired extension, you may press it at any time.";
 
 export const VOICE_SAMPLE_VOICES = [
-  "en-US-Chirp3-HD-Sadachbia",
-  "en-US-Chirp3-HD-Zubenelgenubi",
-  "en-US-Chirp3-HD-Umbriel",
-  "en-US-Chirp3-HD-Algieba",
-  "en-US-Chirp3-HD-Puck",
-  "en-US-Chirp3-HD-Fenrir",
   "en-US-Chirp3-HD-Achird",
+  "en-US-Chirp3-HD-Algenib",
+  "en-US-Chirp3-HD-Algieba",
+  "en-US-Chirp3-HD-Alnilam",
+  "en-US-Chirp3-HD-Charon",
+  "en-US-Chirp3-HD-Enceladus",
+  "en-US-Chirp3-HD-Fenrir",
+  "en-US-Chirp3-HD-Iapetus",
+  "en-US-Chirp3-HD-Orus",
+  "en-US-Chirp3-HD-Puck",
+  "en-US-Chirp3-HD-Rasalgethi",
+  "en-US-Chirp3-HD-Sadachbia",
+  "en-US-Chirp3-HD-Sadaltager",
+  "en-US-Chirp3-HD-Schedar",
+  "en-US-Chirp3-HD-Umbriel",
+  "en-US-Chirp3-HD-Zubenelgenubi",
 ] as const;
 
 const KEY_PREFIX = "voice-sample:";
