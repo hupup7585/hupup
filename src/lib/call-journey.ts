@@ -23,11 +23,15 @@ export type JourneyKind =
   | "typed"
   | "said"
   | "booking_finished"
+  | "vm_access"
   | "hung_up";
 
 /** What each hotline step means, for the timeline. Steps not listed show their own name. */
 export const STEP_LABELS: Record<string, string> = {
   incoming: "Call started",
+  "vma-pin": "Staff voicemail access: PIN asked",
+  "vma-box": "Staff voicemail access: choose a box",
+  "vma-play": "Staff voicemail access: message played",
   "record-start": "Recording notice played",
   menu: "Main menu",
   "menu-choice": "Main menu: key pressed",

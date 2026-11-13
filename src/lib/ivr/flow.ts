@@ -1,5 +1,5 @@
 import twilio from "twilio";
-import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { addDays, longDate, todayISO } from "@/lib/dates";
@@ -58,6 +58,7 @@ import { PROMPTS, loadPromptOverrides, promptAudio, promptText, promptWaiting, t
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
+import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_PIN_TRIES, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinSet } from "@/lib/vm-access";
 import { STT_HOLD_FILE, STT_MAX_WAITS, googleReadback, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
 
 const { categories, products, orders } = schema;
@@ -512,6 +513,28 @@ function vmRecord(vr: VR, box: { id: number; maxLengthSec: number; transcribe: b
   });
   // Reached only if the caller stayed silent and nothing was recorded.
   return vr;
+}
+
+/** Staff voicemail access: signed in with the PIN on THIS call. */
+const vmaSignedIn = (ctx: Ctx) => vmAccessActive() && ctx.session?.data.vmaOk === 1;
+
+/** A box's messages for staff by phone: sent (not hidden), newest first. */
+async function vmaMessages(boxId: number) {
+  if (!Number.isInteger(boxId)) return [];
+  return db
+    .select()
+    .from(schema.voicemails)
+    .where(and(eq(schema.voicemails.boxId, boxId), eq(schema.voicemails.state, "submitted"), isNull(schema.voicemails.deletedAt)))
+    .orderBy(desc(schema.voicemails.createdAt))
+    .limit(100);
+}
+
+function vmaWhen(d: Date) {
+  const tz = process.env.BUSINESS_TIMEZONE || "America/New_York";
+  return {
+    date: d.toLocaleDateString("en-US", { timeZone: tz, weekday: "long", month: "long", day: "numeric" }),
+    time: d.toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }),
+  };
 }
 
 /** Key 8 helpers. */
@@ -2037,8 +2060,163 @@ const handlers: Record<string, Handler> = {
       return back(vr, "menu");
     }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail" }, ctx.session);
+    if (vmAccessActive()) {
+      // Staff access (preview only): 7 then 4 while the greeting plays. Never announced; any other key just records.
+      const g = vr.gather({ input: ["dtmf"], numDigits: 2, timeout: 1, finishOnKey: "", action: url("vm-greeting-key", { x: x ?? undefined }), method: "POST" });
+      sp(g, ctx, await vmGreeting(x, ctx.prompts));
+      return vmRecord(vr, box, x);
+    }
     sp(vr, ctx, await vmGreeting(x, ctx.prompts));
     return vmRecord(vr, box, x);
+  },
+
+  /** A key during the greeting: 7 4 = staff access; anything else goes straight to the tone (as if the greeting ended). */
+  async "vm-greeting-key"(ctx, vr) {
+    const x = ctx.query.get("x");
+    if (ctx.body.Digits === VM_ACCESS_KEYS && vmAccessActive()) return back(vr, "vma-pin");
+    return vmRecord(vr, await vmBox(x), x);
+  },
+
+  /* ---- Staff voicemail access by phone (Abraham, Nov 13, 2026; preview only; every line a draft) ---- */
+
+  async "vma-pin"(ctx, vr) {
+    if (!vmAccessActive()) return back(vr, "menu");
+    const from = ctx.session?.fromNumber ?? ctx.from;
+    if (await vmLockedUntil()) {
+      await logVmAccess(ctx.callSid, from, "refused_locked");
+      sp(vr, ctx, "vma_locked", undefined, { draftOk: true });
+      vr.hangup();
+      return vr;
+    }
+    if (!(await vmPinSet())) {
+      await logVmAccess(ctx.callSid, from, "no_pin");
+      sp(vr, ctx, "vma_locked", undefined, { draftOk: true });
+      vr.hangup();
+      return vr;
+    }
+    const t = Number(ctx.query.get("t") || 0);
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-pin-check", { t }), method: "POST" });
+    sp(g, ctx, "vma_pin", undefined, { draftOk: true });
+    vr.hangup(); // no PIN entered
+    return vr;
+  },
+
+  async "vma-pin-check"(ctx, vr) {
+    if (!vmAccessActive()) return back(vr, "menu");
+    const from = ctx.session?.fromNumber ?? ctx.from;
+    if (await vmLockedUntil()) {
+      await logVmAccess(ctx.callSid, from, "refused_locked");
+      sp(vr, ctx, "vma_locked", undefined, { draftOk: true });
+      vr.hangup();
+      return vr;
+    }
+    if (await checkVmPin(ctx.body.Digits || "")) {
+      await logVmAccess(ctx.callSid, from, "ok");
+      await updateSession(ctx.callSid, { data: { vmaOk: 1 } }, ctx.session);
+      return back(vr, "vma-box");
+    }
+    await logVmAccess(ctx.callSid, from, "wrong_pin");
+    const t = Number(ctx.query.get("t") || 0) + 1;
+    if (t >= VM_PIN_TRIES) {
+      await lockVmAccess(ctx.callSid, from);
+      sp(vr, ctx, "vma_locked", undefined, { draftOk: true });
+      vr.hangup();
+      return vr;
+    }
+    sp(vr, ctx, "vma_wrong", undefined, { draftOk: true });
+    return back(vr, "vma-pin", { t });
+  },
+
+  async "vma-box"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const n = Number(ctx.query.get("n") || 0);
+    if (n >= 3) {
+      vr.hangup();
+      return vr;
+    }
+    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, finishOnKey: "", action: url("vma-box-choice"), method: "POST" });
+    sp(g, ctx, "vma_box", undefined, { draftOk: true });
+    return back(vr, "vma-box", { n: n + 1 });
+  },
+
+  async "vma-box-choice"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const key = BOX_BY_NUMBER[ctx.body.Digits ?? ""];
+    if (!key) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "vma-box");
+    }
+    const box = await vmBox(key);
+    const list = await vmaMessages(box.id);
+    if (!list.length) {
+      sp(vr, ctx, "vma_none", undefined, { draftOk: true });
+      return back(vr, "vma-box");
+    }
+    sp(vr, ctx, "vma_count", { count: list.length }, { draftOk: true });
+    return back(vr, "vma-play", { b: box.id, i: 0 });
+  },
+
+  async "vma-play"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const b = Number(ctx.query.get("b"));
+    const i = Math.max(0, Number(ctx.query.get("i") || 0));
+    const list = await vmaMessages(b);
+    const v = list[i];
+    if (!v) {
+      const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, finishOnKey: "", action: url("vma-box"), method: "POST" });
+      sp(g, ctx, "vma_end", undefined, { draftOk: true });
+      vr.hangup();
+      return vr;
+    }
+    const when = vmaWhen(v.createdAt);
+    sp(vr, ctx, "vma_message", { n: i + 1, number: v.fromNumber ? readBack(v.fromNumber) : "a withheld number", date: when.date, time: when.time }, { draftOk: true });
+    vr.play(voicemailPlayLink(v.id, 1));
+    return back(vr, "vma-options", { b, i, v: v.id });
+  },
+
+  "vma-options"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const p = { b: ctx.query.get("b") ?? undefined, i: ctx.query.get("i") ?? undefined, v: ctx.query.get("v") ?? undefined };
+    const n = Number(ctx.query.get("n") || 0);
+    if (n >= 3) {
+      vr.hangup();
+      return vr;
+    }
+    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, finishOnKey: "", action: url("vma-choice", p), method: "POST" });
+    sp(g, ctx, "vma_options", undefined, { draftOk: true });
+    return back(vr, "vma-options", { ...p, n: n + 1 });
+  },
+
+  async "vma-choice"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const b = Number(ctx.query.get("b"));
+    const i = Number(ctx.query.get("i") || 0);
+    const id = Number(ctx.query.get("v"));
+    const d = ctx.body.Digits;
+    if (d === "1") return back(vr, "vma-play", { b, i });
+    if (d === "2") return back(vr, "vma-play", { b, i: i + 1 });
+    if (d === "*") return back(vr, "vma-box");
+    const [v] = Number.isInteger(id) ? await db.select().from(schema.voicemails).where(and(eq(schema.voicemails.id, id), eq(schema.voicemails.boxId, b))).limit(1) : [];
+    if (d === "3" && v) {
+      await db.update(schema.voicemails).set({ heardAt: new Date() }).where(eq(schema.voicemails.id, v.id));
+      await track(ctx.callSid, "vm_access", `Voicemail marked as heard by phone (message ${v.id})`, { voicemailId: v.id });
+      sp(vr, ctx, "vma_heard", undefined, { draftOk: true });
+      return back(vr, "vma-options", { b, i, v: v.id });
+    }
+    if (d === "4" && v) {
+      const to = callbackNumber(v.fromNumber);
+      if (!to) {
+        sp(vr, ctx, "vma_no_number", undefined, { draftOk: true });
+        return back(vr, "vma-options", { b, i, v: v.id });
+      }
+      await track(ctx.callSid, "vm_access", `Called back ${to} from voicemail by phone (message ${v.id})`, { voicemailId: v.id, to });
+      sp(vr, ctx, "vma_calling", undefined, { draftOk: true });
+      // Shows (845) 777-7585; after the call, back to this message's options
+      vr.dial({ callerId: CALLBACK_CALLER_ID, action: url("vma-options", { b, i, v: v.id }), method: "POST", timeout: 30 }, to);
+      return vr;
+    }
+    sp(vr, ctx, "not_valid");
+    return back(vr, "vma-options", { b, i, v: ctx.query.get("v") ?? undefined });
   },
 
   /**

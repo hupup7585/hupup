@@ -6,8 +6,9 @@ import { TEXT_ALERTS_NOT_ACTIVE, hiddenVoicemails, listVoicemails, mainBox, text
 import { getSettings } from "@/lib/settings";
 import { db, schema } from "@/lib/db";
 import { PROMPTS } from "@/lib/ivr/prompts";
-import { deleteVoicemailAction, purgeVoicemailAction, restoreVoicemailAction, saveBoxAction, setHeardAction, setUrgentAction } from "./actions";
+import { setVmPinAction, deleteVoicemailAction, purgeVoicemailAction, restoreVoicemailAction, saveBoxAction, setHeardAction, setUrgentAction } from "./actions";
 import { dualDateTime } from "@/lib/dual-date";
+import { VM_ACCESS_LIVE_APPROVED, VM_LOCK_MINUTES, recentVmAccess, vmLockedUntil, vmPinSet } from "@/lib/vm-access";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,8 @@ export default async function VoicemailPage() {
   }
   const unheard = list.filter((v) => !v.heardAt).length;
   const hidden = staff.role === "owner" ? await hiddenVoicemails() : [];
+  const access = staff.role === "owner" ? { pinSet: await vmPinSet(), lockedUntil: await vmLockedUntil(), log: await recentVmAccess(30) } : null;
+  const ACCESS_RESULT: Record<string, string> = { ok: "Signed in", wrong_pin: "Wrong PIN", locked: `Locked for ${VM_LOCK_MINUTES} minutes (you were emailed)`, refused_locked: "Refused: locked", no_pin: "Refused: no PIN set" };
   const boxes = new Map((await db.select({ id: schema.voicemailBoxes.id, name: schema.voicemailBoxes.name, isMain: schema.voicemailBoxes.isMain }).from(schema.voicemailBoxes)).map((b) => [b.id, b]));
   return (
     <div className="mx-auto max-w-4xl">
@@ -105,6 +108,35 @@ export default async function VoicemailPage() {
             ))}
           </ul>
         </details>
+      )}
+
+      {access && (
+        <section className="card mt-8 p-5" data-vm-access>
+          <h2 className="text-lg font-black">Voicemail by phone (staff)</h2>
+          <p className="mt-1 text-sm text-muted">
+            While any voicemail greeting plays, pressing 7 then 4 asks for this PIN. Callers are never told about it. 3 wrong tries end the call and lock access for {VM_LOCK_MINUTES} minutes, and you get an email.
+            {!VM_ACCESS_LIVE_APPROVED && <b> Preview only until you approve it.</b>}
+          </p>
+          <p className="mt-2 text-sm font-semibold">{access.pinSet ? "A PIN is set." : "No PIN set yet: access by phone is refused until you set one."}{access.lockedUntil ? ` Locked until ${when(access.lockedUntil)}.` : ""}</p>
+          <form action={setVmPinAction} className="mt-3 flex flex-wrap items-end gap-3">
+            <label className="block"><span className="label">{access.pinSet ? "New PIN" : "PIN"} (4 to 8 digits)</span><input name="pin" type="password" inputMode="numeric" pattern="[0-9]{4,8}" required className="input w-40" autoComplete="new-password" /></label>
+            <label className="block"><span className="label">Same PIN again</span><input name="pinAgain" type="password" inputMode="numeric" pattern="[0-9]{4,8}" required className="input w-40" autoComplete="new-password" /></label>
+            <button className="btn-dark">{access.pinSet ? "Change PIN" : "Set PIN"}</button>
+          </form>
+          <h3 className="mt-5 font-bold">Sign-ins by phone</h3>
+          {access.log.length ? (
+            <table className="mt-2 w-full text-sm" data-vm-access-log>
+              <thead><tr><th className="th">When</th><th className="th">Calling from</th><th className="th">Result</th></tr></thead>
+              <tbody>
+                {access.log.map((r) => (
+                  <tr key={r.id}><td className="td">{when(r.createdAt)}</td><td className="td">{r.fromNumber ? formatPhone(r.fromNumber) : "Withheld"}</td><td className={`td ${r.result === "ok" ? "" : "font-bold text-[#C83A2F]"}`}>{ACCESS_RESULT[r.result] ?? r.result}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="mt-1 text-sm text-muted">No sign-ins yet.</p>
+          )}
+        </section>
       )}
 
       {staff.role === "owner" && (

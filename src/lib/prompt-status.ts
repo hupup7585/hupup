@@ -13,6 +13,7 @@ const TEXTING = "Waits for Twilio to approve texting.";
 export function notActiveReason(key: string, env: Record<string, string | undefined> = process.env): string | null {
   if (key.startsWith("promo_") || key === "consent_marketing_v2") return PHONE_PROMO_MODE === "off" ? "Phone promo steps are off until SMS Terms v3 is live and you approve a test recording." : null;
   if (key.startsWith("pay_")) return STRIPE_PHONE_PAY_MODE !== "live" ? "Keypad payment plays only on your own test calls until you approve a real test." : null;
+  if (key.startsWith("vma_")) return "Staff voicemail access by phone runs on preview only until you approve it and the call-back price.";
   if (key === "spoken_readback") return "Waits for your OK on speech to text and its price.";
   if (key === "recording_notice") return "Call recording is off.";
   if (key.startsWith("catalog_text") || key === "catalog_texted") return TEXTING;

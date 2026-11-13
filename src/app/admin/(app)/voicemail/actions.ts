@@ -7,6 +7,7 @@ import { db, schema } from "@/lib/db";
 import { requireOwner, requireStaff } from "@/lib/auth";
 import { deleteVoicemail, purgeVoicemail, restoreVoicemail } from "@/lib/voicemail";
 import { toE164 } from "@/lib/phone";
+import { setVmPin, validPin } from "@/lib/vm-access";
 
 async function audit(userId: number | null, action: string, entityId: number, after: Record<string, unknown> = {}) {
   await db.insert(schema.auditLog).values({ userId, action, entityType: "voicemail", entityId: String(entityId), after });
@@ -69,5 +70,19 @@ export async function saveBoxAction(form: FormData) {
   await saveSetting("missedCallAlerts", form.get("missedCallAlerts") === "on", s.userId);
   await saveSetting("incomingTextEmail", form.get("incomingTextEmail") === "on", s.userId);
   await db.insert(schema.auditLog).values({ userId: s.userId, action: "voicemail_box.updated", entityType: "voicemail_box", entityId: String(id), after });
+  revalidatePath("/admin/voicemail");
+}
+
+/** Owner: set or change the voicemail PIN for staff access by phone (stored hashed only). */
+export async function setVmPinAction(form: FormData) {
+  const s = await requireOwner();
+  const pin = String(form.get("pin") || "").trim();
+  const again = String(form.get("pinAgain") || "").trim();
+  if (!validPin(pin) || pin !== again) {
+    revalidatePath("/admin/voicemail");
+    return;
+  }
+  await setVmPin(pin, s.userId);
+  await audit(s.userId, "voicemail.pin_changed", 0); // the PIN itself is never logged
   revalidatePath("/admin/voicemail");
 }

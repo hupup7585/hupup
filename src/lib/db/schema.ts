@@ -197,6 +197,8 @@ export type CallData = {
   catLocal?: string;
   /** The catalog email letters came from speech to text (read back in the Google voice). */
   catStt?: number;
+  /** Staff voicemail access: signed in with the voicemail PIN on this call. */
+  vmaOk?: number;
   catDomain?: string;
   catKeys?: string;
   /** When the caller last pressed a key or said something (Abraham's idle rule inside a booking) */
@@ -1161,3 +1163,16 @@ export const spokenAnswers = pgTable("spoken_answers", {
   customerId: integer("customer_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Staff voicemail access by phone (Abraham, Nov 13, 2026): every PIN sign-in and lockout. result: ok | wrong_pin | locked | refused_locked | no_pin */
+export const vmAccessLog = pgTable(
+  "vm_access_log",
+  {
+    id: serial("id").primaryKey(),
+    callSid: text("call_sid"),
+    fromNumber: text("from_number"),
+    result: text("result").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("vm_access_log_created_idx").on(t.createdAt)],
+);

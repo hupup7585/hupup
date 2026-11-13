@@ -273,6 +273,19 @@ export const PROMPTS = {
     label: "Greeting while the office is open (every box except key 9)",
     text: "We apologize that we are unable to answer your call. Our team is assisting other customers right now. Please feel free to leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.",
   },
+  // Staff voicemail access by phone (Abraham, Nov 13, 2026): drafts, hidden (7 then 4 during a greeting), preview only.
+  vma_pin: { group: "Voicemail", label: "Staff access: ask for the voicemail PIN", text: "Please enter your voicemail PIN, then press pound.", pending: true },
+  vma_wrong: { group: "Voicemail", label: "Staff access: wrong PIN", text: "Sorry, that PIN isn't right. Please try again.", pending: true },
+  vma_locked: { group: "Voicemail", label: "Staff access: locked", text: "Voicemail access is locked for now. Please try again later. Goodbye.", pending: true },
+  vma_box: { group: "Voicemail", label: "Staff access: choose a box", text: "Please enter the extension number of the voicemail box, or press 0 for the main box.", pending: true },
+  vma_count: { group: "Voicemail", label: "Staff access: how many messages", text: "You have {count} messages, newest first.", vars: ["count"], pending: true },
+  vma_none: { group: "Voicemail", label: "Staff access: empty box", text: "There are no messages in this box.", pending: true },
+  vma_message: { group: "Voicemail", label: "Staff access: before each message", text: "Message {n}, from {number}, on {date} at {time}.", vars: ["n", "number", "date", "time"], pending: true },
+  vma_options: { group: "Voicemail", label: "Staff access: after each message", text: "To replay this message, press 1. For the next message, press 2. To mark it as heard, press 3. To call this person back, press 4. To choose another box, press star.", pending: true },
+  vma_heard: { group: "Voicemail", label: "Staff access: marked as heard", text: "Marked as heard.", pending: true },
+  vma_end: { group: "Voicemail", label: "Staff access: no more messages", text: "That was the last message. To choose another box, press star, or hang up.", pending: true },
+  vma_calling: { group: "Voicemail", label: "Staff access: calling back", text: "Calling them back now.", pending: true },
+  vma_no_number: { group: "Voicemail", label: "Staff access: no number to call", text: "Sorry, there's no number we can call back for this message.", pending: true },
   // Key 9 (Abraham, Nov 11, 2026, word for word): feedback and comments only.
   // Key 8 catalog (Abraham, Phone Menu v3), approved word for word.
   catalog_menu: { group: "Catalog (key 8)", label: "Text or email", text: "To receive our catalog by text, press 1. To get it by email, press 2. To go back, press star." },
