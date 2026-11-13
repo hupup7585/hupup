@@ -24,7 +24,7 @@ describe("every line is on the page", () => {
     expect(lineStatus("main_hi", o).status).toBe("Live");
     expect(lineStatus("instr_balloons", o).status).toBe("Waiting for approval");
     expect(lineStatus("promo_ask", o).status).toBe("Not active yet");
-    expect(lineStatus("spoken_readback", o).status).toBe("Not active yet");
+    expect(lineStatus("spoken_readback", o).status).toBe("Waiting for approval"); // Abraham, Nov 13: still a draft
     expect(lineStatus("voicemail_thanks", o).status).toBe("Not used");
     expect(RETIRED_PROMPTS.size).toBe(24);
   });

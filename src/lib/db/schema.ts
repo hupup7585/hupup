@@ -195,6 +195,8 @@ export type CallData = {
   /** Key 8 catalog: the number to text, the two parts of the email, and keys typed so far */
   catPhone?: string;
   catLocal?: string;
+  /** The catalog email letters came from speech to text (read back in the Google voice). */
+  catStt?: number;
   catDomain?: string;
   catKeys?: string;
   /** When the caller last pressed a key or said something (Abraham's idle rule inside a booking) */

@@ -1,11 +1,13 @@
 import { eq } from "drizzle-orm";
 import { after } from "next/server";
 import { db, schema } from "@/lib/db";
+import { googleRecordingFor, googleTtsReady, googleVoiceName, storeGoogleRecording, synthesize } from "@/lib/prompt-recordings";
+import { promptRecordingLink } from "@/lib/signed-link";
 
 /**
  * Spoken answers: record what the caller says, type it up with Google Speech-to-Text, read it back (Abraham, Nov 13,
  * 2026). PREVIEW ONLY: on the live line callers keep today's spoken answers until Abraham approves the price per call
- * (STT_LIVE_APPROVED). Uses the V1 API (Abraham, Nov 13: V1 with data logging on, $0.016 a minute, first 60 minutes a
+ * (STT_LIVE_APPROVED). Uses the V1 API, standard model (Abraham, Nov 13: V1 standard with data logging on, $0.016 a minute, first 60 minutes a
  * month free; data logging is switched on in the Google Cloud console). Needs a Google key with the Cloud Speech-to-Text API allowed: GOOGLE_STT_API_KEY, or the same
  * GOOGLE_TTS_API_KEY if both APIs are ticked on it.
  */
@@ -16,7 +18,8 @@ export function sttKey(env: Record<string, string | undefined> = process.env) {
 }
 
 export function sttActive(env: Record<string, string | undefined> = process.env) {
-  if (!sttKey(env)) return false;
+  // Typing up needs a Speech-to-Text key; the read-back is made with GOOGLE_TTS_API_KEY (never Twilio's Say)
+  if (!sttKey(env) || !env.GOOGLE_TTS_API_KEY) return false;
   return STT_LIVE_APPROVED || env.VERCEL_ENV !== "production";
 }
 
@@ -28,7 +31,7 @@ export async function recognize(audio: Buffer, hints: string[], fetcher: typeof 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      config: { languageCode: "en-US", model: "phone_call", useEnhanced: true, speechContexts: hints.length ? [{ phrases: hints.slice(0, 500) }] : undefined },
+      config: { languageCode: "en-US", model: "phone_call", useEnhanced: false, speechContexts: hints.length ? [{ phrases: hints.slice(0, 500) }] : undefined },
       audio: { content: audio.toString("base64") },
     }),
   });
@@ -85,3 +88,47 @@ export function runLater(fn: () => Promise<unknown>) {
 export const STT_HOLD_FILE = "/audio/stt-hold.wav";
 /** How many hold clips (about 4 seconds each) before we give up and ask again. */
 export const STT_MAX_WAITS = 4;
+
+/*
+ * Read-back in the Google voice (Abraham, Nov 13, 2026): never Twilio's Say for the read-back. The line is split
+ * around its changing part: the fixed words ("We got", "If that's correct, press 1...") are made once with Google
+ * Text-to-Speech and reused on every call; only the caller's own words are made fresh. Played with <Play>.
+ */
+const FIXED_KEY = "stt_readback_fixed";
+const WORDS_KEY = "stt_readback_words";
+
+/** "We got {text}. If that's correct..." -> ["We got", "{text}", "If that's correct..."] (empty parts dropped). */
+export function splitLine(template: string): string[] {
+  return template
+    .split(/(\{\w+\})/)
+    .map((p) => (/^\{\w+\}$/.test(p) ? p : p.replace(/^[\s.,;:!?]+/, "").trim()))
+    .filter(Boolean);
+}
+
+async function googleAudio(key: string, wording: string, voice: string, fetcher: typeof fetch) {
+  // The voice is part of what is stored, so changing the hotline voice makes fresh audio
+  const stored = `${voice}|${wording}`;
+  const have = await googleRecordingFor(key, stored);
+  if (have) return have.id;
+  const data = await synthesize(wording, voice, fetcher);
+  return (await storeGoogleRecording(key, `${key}.mp3`, stored, data, null)).id;
+}
+
+/** Links to play, in order, for a line with one changing part filled in. Null when Google voice can't make it. */
+export async function googleReadback(template: string, vars: Record<string, string>, fetcher: typeof fetch = fetch): Promise<string[] | null> {
+  if (!googleTtsReady()) return null;
+  const voice = googleVoiceName();
+  try {
+    const links: string[] = [];
+    for (const part of splitLine(template)) {
+      const v = part.match(/^\{(\w+)\}$/);
+      const words = v ? vars[v[1]] : part;
+      if (!words) continue;
+      links.push(promptRecordingLink(await googleAudio(v ? WORDS_KEY : FIXED_KEY, v ? `${words}.` : part, voice, fetcher)));
+    }
+    return links;
+  } catch (e) {
+    console.error("[speech to text] Google voice read-back failed:", (e as Error).message);
+    return null;
+  }
+}

@@ -319,7 +319,13 @@ export const PROMPTS = {
 
   // Spoken answers typed up and read back (Abraham approved the wording Nov 13, 2026; not active until he approves
   // speech to text and its price)
-  spoken_readback: { group: "Checkout", label: "Read back a spoken answer (speech to text)", text: "We got {text}. If that's correct, press 1. To say it again, press 2.", vars: ["text"] },
+  spoken_readback: {
+    group: "Checkout",
+    label: "Read back a spoken answer (speech to text, Google voice)",
+    text: "We got {text}. If that's correct, press 1. To say it again, press 2.",
+    vars: ["text"],
+    pending: true, // Abraham, Nov 13, 2026: still a draft; plays only in the preview test of speech to text
+  },
 
   // Staff announcement when a staff phone answers (Abraham). Each extension can still have its own in Phone settings.
   staff_whisper: { group: "Ringing staff", label: "Staff hear when they answer (extensions with a number)", text: "Call from Hup Up Attractions, extension {number}, {name}. Press 1 to accept, or press 2 to reject.", vars: ["number", "name"] },

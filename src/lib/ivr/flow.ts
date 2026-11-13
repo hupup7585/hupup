@@ -58,7 +58,7 @@ import { PROMPTS, loadPromptOverrides, promptAudio, promptText, promptWaiting, t
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
-import { STT_HOLD_FILE, STT_MAX_WAITS, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
+import { STT_HOLD_FILE, STT_MAX_WAITS, googleReadback, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
 
 const { categories, products, orders } = schema;
 type VR = InstanceType<typeof twilio.twiml.VoiceResponse>;
@@ -238,6 +238,11 @@ export const MENU_WAIT_SECONDS = 4;
 /** No choice after the main menu: the whole menu again, from the greeting (3 plays and 20 seconds rule). */
 function menuNoChoice(vr: VR, ctx: Ctx) {
   return repeatMenu(vr, ctx, "menu", { first: 1 });
+}
+
+/** A line's wording with its changing parts still in braces (Admin edits included). */
+function lineTemplate(ctx: Ctx, key: PromptKey) {
+  return ctx.prompts[key]?.text?.trim() || PROMPTS[key].text;
 }
 
 /** A spoken answer typed up on THIS call (never another caller's). */
@@ -875,7 +880,7 @@ const handlers: Record<string, Handler> = {
     const part = ctx.query.get("part") === "domain" ? "domain" : "local";
     const keep = ctx.query.get("add") === "1" ? catPart(ctx, part) : "";
     const r = decodeCatalogKeys(`${ctx.session?.data.catKeys ?? ""}${ctx.body.Digits ?? ""}`, keep);
-    await updateSession(ctx.callSid, { data: { catKeys: "", [part === "domain" ? "catDomain" : "catLocal"]: r.text } }, ctx.session);
+    await updateSession(ctx.callSid, { data: { catKeys: "", [part === "domain" ? "catDomain" : "catLocal"]: r.text, catStt: undefined } }, ctx.session);
     if (r.back) return back(vr, part === "domain" ? "catalog-ending" : "catalog"); // star three times: one step back
     return back(vr, "catalog-got", { part });
   },
@@ -914,12 +919,12 @@ const handlers: Record<string, Handler> = {
     const typedUp = await callSpokenAnswer(ctx, Number(ctx.query.get("a")));
     const said = spokenLetters(typedUp ? typedUp.text || "" : ctx.body.SpeechResult || "");
     if (!said && !keep) return back(vr, "catalog-part", { part, add: ctx.query.get("add") ?? undefined });
-    await updateSession(ctx.callSid, { data: { [part === "domain" ? "catDomain" : "catLocal"]: keep + said } }, ctx.session);
+    await updateSession(ctx.callSid, { data: { [part === "domain" ? "catDomain" : "catLocal"]: keep + said, catStt: typedUp ? 1 : undefined } }, ctx.session);
     return back(vr, "catalog-got", { part });
   },
 
   /** "We got y o s s i. To continue, press pound. To start over, press 1. To add more, press 2." */
-  "catalog-got"(ctx, vr) {
+  async "catalog-got"(ctx, vr) {
     const part = ctx.query.get("part") === "domain" ? "domain" : "local";
     const value = catPart(ctx, part);
     if (!value) {
@@ -927,7 +932,9 @@ const handlers: Record<string, Handler> = {
       return back(vr, "catalog-part", { part });
     }
     const g = keypad(vr, url("catalog-got-choice", { part }));
-    sp(g, ctx, "catalog_got", { letters: spellOut(value) });
+    const links = ctx.session?.data.catStt ? await googleReadback(lineTemplate(ctx, "catalog_got"), { letters: spellOut(value) }) : null;
+    if (links) for (const l of links) g.play(l); // speech to text: read back in the Google voice, not Twilio's Say
+    else sp(g, ctx, "catalog_got", { letters: spellOut(value) });
     return repeatMenu(vr, ctx, "catalog-got", { part });
   },
 
@@ -1556,9 +1563,16 @@ const handlers: Record<string, Handler> = {
     }
     await track(ctx.callSid, "said", `Said ${f}: ${value}`, { field: f, value, raw, ...(viaStt ? { via: "speech to text" } : {}) });
     await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
+    if (viaStt) {
+      // Read back in the Google voice (never Twilio's Say); the draft wording plays on preview for Abraham's test
+      const links = await googleReadback(lineTemplate(ctx, "spoken_readback"), { text: spec.readBack(value) });
+      if (!links) return back(vr, "type", { f }); // Google voice not available: type it on the keypad instead
+      const g = keypad(vr, url("confirm", { f }));
+      for (const l of links) g.play(l);
+      return noInput(vr, ctx, "ask", { f });
+    }
     const g = keypad(vr, url("confirm", { f }));
-    if (viaStt) sp(g, ctx, "spoken_readback", { text: spec.readBack(value) });
-    else sp(g, ctx, "heard", { value: spec.readBack(value) });
+    sp(g, ctx, "heard", { value: spec.readBack(value) });
     return noInput(vr, ctx, "ask", { f });
   },
 

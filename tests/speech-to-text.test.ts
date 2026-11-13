@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   session: { callSid: "CAstt", fromNumber: "+18455550177", orderId: null, data: {} as Record<string, unknown>, status: "in_progress", outcome: "carted" },
   later: [] as (() => Promise<unknown>)[],
+  tts: [] as string[],
 }));
 vi.mock("@/lib/db", async () => {
   const { createMemoryDb } = await import("./helpers/memory-db");
@@ -23,7 +24,7 @@ vi.mock("@/lib/speech-to-text", async (orig) => ({ ...(await orig<typeof import(
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { handleVoice } from "@/lib/ivr/flow";
-import { STT_LIVE_APPROVED, STT_MAX_WAITS, recognize, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
+import { STT_LIVE_APPROVED, STT_MAX_WAITS, googleReadback, recognize, splitLine, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
 
 const call = (action: string, body: Record<string, string> = {}, query = "") =>
   handleVoice({ action, query: new URLSearchParams(query), body: { CallSid: "CAstt", ...body }, callSid: "CAstt", from: "+18455550177" });
@@ -33,9 +34,10 @@ const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].ma
 describe("speech to text: where it runs", () => {
   it("is not approved for the live line; preview only, and only with a Google key", () => {
     expect(STT_LIVE_APPROVED).toBe(false);
-    expect(sttActive({ VERCEL_ENV: "production", GOOGLE_STT_API_KEY: "k" })).toBe(false);
-    expect(sttActive({ VERCEL_ENV: "preview", GOOGLE_STT_API_KEY: "k" })).toBe(true);
-    expect(sttActive({ VERCEL_ENV: "preview", GOOGLE_TTS_API_KEY: "k" })).toBe(true);
+    expect(sttActive({ VERCEL_ENV: "production", GOOGLE_STT_API_KEY: "k", GOOGLE_TTS_API_KEY: "k" })).toBe(false);
+    expect(sttActive({ VERCEL_ENV: "preview", GOOGLE_STT_API_KEY: "k", GOOGLE_TTS_API_KEY: "k" })).toBe(true);
+    expect(sttActive({ VERCEL_ENV: "preview", GOOGLE_TTS_API_KEY: "k" })).toBe(true); // one key with both APIs ticked
+    expect(sttActive({ VERCEL_ENV: "preview", GOOGLE_STT_API_KEY: "k" })).toBe(false); // the read-back needs the Google voice key
     expect(sttActive({ VERCEL_ENV: "preview" })).toBe(false);
   });
 });
@@ -52,7 +54,7 @@ describe("speech to text: Google request", () => {
     }) as unknown as typeof fetch;
     expect(await recognize(Buffer.from("wav"), ["Friedman"], fake)).toBe("Yossi Friedman");
     expect(sent!.url).toMatch(/^https:\/\/speech\.googleapis\.com\/v1\/speech:recognize\?key=/);
-    expect(sent!.body.config).toMatchObject({ languageCode: "en-US", model: "phone_call", useEnhanced: true, speechContexts: [{ phrases: ["Friedman"] }] });
+    expect(sent!.body.config).toMatchObject({ languageCode: "en-US", model: "phone_call", useEnhanced: false, speechContexts: [{ phrases: ["Friedman"] }] });
     expect(sent!.body.audio.content).toBe(Buffer.from("wav").toString("base64"));
   });
   it("only ever fetches recordings from api.twilio.com, and saves the text", async () => {
@@ -71,8 +73,28 @@ describe("speech to text: Google request", () => {
   });
 });
 
+describe("speech to text: Google voice read-back", () => {
+  it("splits a line around its changing part", () => {
+    expect(splitLine("We got {text}. If that's correct, press 1. To say it again, press 2.")).toEqual(["We got", "{text}", "If that's correct, press 1. To say it again, press 2."]);
+    expect(splitLine("We got {letters}. To continue, press pound.")).toEqual(["We got", "{letters}", "To continue, press pound."]);
+  });
+  it("no Google voice key: no read-back audio (the call never falls back to Twilio's Say)", async () => {
+    const saved = process.env.GOOGLE_TTS_API_KEY;
+    delete process.env.GOOGLE_TTS_API_KEY;
+    expect(await googleReadback("We got {text}.", { text: "x" })).toBeNull();
+    process.env.GOOGLE_TTS_API_KEY = saved;
+  });
+});
+
 describe("speech to text: the call", () => {
   beforeEach(() => {
+    process.env.GOOGLE_TTS_API_KEY = "tts-key";
+    h.tts = [];
+    vi.stubGlobal("fetch", async (u: string, init: RequestInit) => {
+      if (!String(u).startsWith("https://texttospeech.googleapis.com/")) throw new Error(`unexpected fetch ${u}`);
+      h.tts.push(JSON.parse(String(init.body)).input.text);
+      return new Response(JSON.stringify({ audioContent: Buffer.from("mp3").toString("base64") }));
+    });
     process.env.PUBLIC_BASE_URL = "https://hupup.example";
     h.session.data = {};
     h.later = [];
@@ -90,8 +112,16 @@ describe("speech to text: the call", () => {
     await db.update(schema.spokenAnswers).set({ status: "done", text: "yossi friedman" }).where(eq(schema.spokenAnswers.id, a));
     expect(redirect(await call("stt-check", {}, `f=name&a=${a}&w=1`))).toBe(`heard?f=name&a=${a}`);
     const back = await call("heard", {}, `f=name&a=${a}`);
-    expect(said(back)).toContain("We got Yossi Friedman. If that's correct, press 1. To say it again, press 2.");
+    // Google voice audio, never Twilio's Say: "We got" + the caller's words + "If that's correct..."
+    expect(said(back).join(" ")).not.toContain("We got");
+    expect([...back.matchAll(/<Play>[^<]*\/api\/voice-audio\/prompt\/\d+/g)]).toHaveLength(3);
+    expect(h.tts).toEqual(["We got", "Yossi Friedman.", "If that's correct, press 1. To say it again, press 2."]);
     expect(h.session.data.heard).toBe("Yossi Friedman");
+    // the fixed words are made once and reused; only the caller's words are new
+    h.tts = [];
+    await db.update(schema.spokenAnswers).set({ text: "sara klein" }).where(eq(schema.spokenAnswers.id, a));
+    await call("heard", {}, `f=name&a=${a}`);
+    expect(h.tts).toEqual(["Sara Klein."]);
   });
   it("another call's answer is never read back", async () => {
     const [row] = await db.insert(schema.spokenAnswers).values({ callSid: "CAother", field: "name", recordingUrl: "https://api.twilio.com/x", status: "done", text: "Someone Else" }).returning();
@@ -115,6 +145,10 @@ describe("speech to text: the call", () => {
     expect(redirect(await call("catalog-stt-check", {}, `part=local&a=${a}&w=1`))).toBe(`catalog-said?part=local&a=${a}`);
     expect(redirect(await call("catalog-said", {}, `part=local&a=${a}`))).toBe("catalog-got?part=local");
     expect(h.session.data.catLocal).toBe("yossi");
+    const got = await call("catalog-got", {}, "part=local");
+    expect(said(got).join(" ")).not.toContain("We got"); // read back in the Google voice
+    expect(h.tts).toContain("y o s s i."); // "We got" was already made once and is reused
+    expect([...got.matchAll(/<Play>[^<]*\/api\/voice-audio\/prompt\/\d+/g)]).toHaveLength(3);
     // nothing said: the same step again
     expect(redirect(await call("catalog-stt-recorded", { RecordingDuration: "0" }, "part=local"))).toBe("catalog-said?part=local&empty=1");
   });
