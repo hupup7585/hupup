@@ -70,7 +70,7 @@ describe("JOIN and YES", () => {
     const [req] = await db.select().from(schema.smsReenrollRequests).where(eq(schema.smsReenrollRequests.phone, P));
     expect(req).toMatchObject({ status: "confirmed", confirmConsentId: rows[0].id }); // confirmation linked to the original request
     expect(sentTo(P).at(-1)).toBe(PROMO_ENROLLED_SMS);
-    expect(PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You're signed up for seasonal promo texts, up to 6 per year. Msg & data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, HELP for help.");
+    expect(PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You are signed up for seasonal promo texts, up to 6 per year. Msg & data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, HELP for help.");
     expect((await customer(P)).marketingOptIn).toBe(true);
   });
   it("a second YES does nothing (no duplicate enrollment)", async () => {

@@ -117,7 +117,7 @@ describe("key 1: date first, several days, one charge", () => {
     const after = await db.select().from(schema.orders).where(inArray(schema.orders.id, pending.map((o) => o.id)));
     expect(after.every((o) => o.status === "CONFIRMED")).toBe(true);
     expect(after.reduce((n, o) => n + o.paidCents, 0)).toBe(sum);
-    expect(h.sms.some((m) => m.body.includes("You're all set for Tuesday, December 1 and Tuesday, December 8!"))).toBe(true);
+    expect(h.sms.some((m) => m.body.includes("You are all set for Tuesday, December 1 and Tuesday, December 8!"))).toBe(true);
   });
 
   it("hanging up releases every held day on the call", async () => {
