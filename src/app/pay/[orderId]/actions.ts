@@ -10,6 +10,7 @@ import { CURRENT_TERMS_VERSION, recordTermsAcceptance, verifyPayToken } from "@/
 import { TERMS_TEXT } from "@/lib/terms-content";
 import { PAY_AGREE_LABEL } from "./label";
 import { recordBookingConsents } from "@/lib/booking-consent";
+import { LINK_TEXT, holdAgain, holdEnded, holdForCardPage, linkRulesActive } from "@/lib/late-payment";
 
 
 /** Customer checked the (unchecked-by-default) box: record the acceptance, then continue to Sola. */
@@ -23,6 +24,8 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
   const group = await getPaymentGroup(orderId); // priced: items + delivery + tax
   if (!group) return { error: "Order not found." };
   const full = group.primary;
+  // The link rule (preview until Abraham approves the wording): an ended hold can't be paid
+  if (linkRulesActive() && group.orders.some((d) => holdEnded(d.order))) return { error: LINK_TEXT.expiredTitle + "." };
   if (full.order.status !== "PENDING_PAYMENT") return { error: "This order is not waiting for payment. Please call us." };
   const due = group.due;
   if (due <= 0) return { error: "Nothing left to pay." };
@@ -54,5 +57,15 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
     userAgent: h.get("user-agent")?.slice(0, 500) ?? null,
     pageUrl: `${config.baseUrl()}/pay/${orderId}`,
   });
+  // 10 minutes to finish on the secure card page (Sola can't tell us about typing there)
+  if (linkRulesActive()) await holdForCardPage(group.orders.map((d) => d.order.id));
   redirect(paymentLink({ orderId: full.order.id, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone: full.customer?.phone }));
+}
+
+/** Expired link: "Check availability again". Holds the same order again if everything is still free. */
+export async function checkAgainAction(orderId: number, token: string) {
+  if (!linkRulesActive() || !verifyPayToken(orderId, token)) redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}`);
+  const group = await getPaymentGroup(orderId);
+  const held = group ? await holdAgain(group.orders.map((d) => d.order.id)) : null;
+  redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}&${held ? "held=1" : "gone=1"}`);
 }

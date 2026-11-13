@@ -7,6 +7,8 @@ import PayForm from "./PayForm";
 import { webConsentCopy } from "@/lib/sms-terms-v2";
 import { smsNumberDisplay } from "@/lib/sms-number";
 import DualDate from "@/components/DualDate";
+import { LINK_TEXT, holdEnded, holdForCardPage, keepHoldWhileActive, linkRulesActive } from "@/lib/late-payment";
+import { checkAgainAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Review and pay | Hup Up Attractions", robots: { index: false } };
@@ -14,14 +16,37 @@ export const metadata = { title: "Review and pay | Hup Up Attractions", robots: 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
 /** Review-and-pay page (from the payment text). Terms must be accepted with an unchecked box before Sola. */
-export default async function PayPage({ params, searchParams }: { params: Promise<{ orderId: string }>; searchParams: Promise<{ t?: string }> }) {
+export default async function PayPage({ params, searchParams }: { params: Promise<{ orderId: string }>; searchParams: Promise<{ t?: string; held?: string; gone?: string }> }) {
   const { orderId } = await params;
-  const { t } = await searchParams;
+  const { t, held, gone } = await searchParams;
   const id = Number(orderId);
   if (!Number.isInteger(id) || !verifyPayToken(id, t)) notFound();
   // Every link charges items + delivery + tax: price any order not priced yet (made in Admin, or older ones)
   const before = await getPaymentGroup(id);
   if (!before) notFound();
+  // The link rule (Abraham, Nov 13, 2026; preview until he approves the wording)
+  const rules = linkRulesActive();
+  if (rules && before.orders.some((d) => holdEnded(d.order))) {
+    const count = before.orders.reduce((n, d) => n + d.items.reduce((m, i) => m + i.qty, 0), 0);
+    return (
+      <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">
+        <div className="mx-auto max-w-md rounded-2xl border-2 border-hu-deep bg-white p-6" data-link-expired>
+          <h1 className="text-2xl font-extrabold">{gone ? LINK_TEXT.gone(count) : LINK_TEXT.expiredTitle}</h1>
+          {gone ? (
+            <p className="mt-3" data-link-gone>{LINK_TEXT.goneCall}</p>
+          ) : (
+            <>
+              <p className="mt-3">{LINK_TEXT.expiredBody(count)}</p>
+              <form action={checkAgainAction.bind(null, id, t!)} className="mt-5">
+                <button className="btn-dark w-full py-3" data-check-again>{LINK_TEXT.checkButton}</button>
+              </form>
+            </>
+          )}
+        </div>
+      </main>
+    );
+  }
+  if (rules) await keepHoldWhileActive(before.orders.map((d) => d.order.id)); // opening the page is activity
   if (!(await ensureGroupPriced(before.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id)))) notFound();
   const group = await getPaymentGroup(id);
   if (!group) notFound();
@@ -30,6 +55,7 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   const due = group.due; // every rental day booked together, one charge
   // Live site while the Terms are still a draft: no Terms box, straight to the secure payment page (as before)
   if (!termsActive() && o.status === "PENDING_PAYMENT" && due > 0) {
+    if (rules) await holdForCardPage(group.orders.map((d) => d.order.id)); // straight to the card page: 10 minutes there
     redirect(paymentLink({ orderId: o.id, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone: full.customer?.phone }));
   }
   return (
@@ -66,6 +92,8 @@ export default async function PayPage({ params, searchParams }: { params: Promis
         <ul className="mt-3 text-sm">
           <li className="flex justify-between border-t pt-2 text-base font-bold"><span>Total due</span><span>{money(due)}</span></li>
         </ul>
+        {rules && held && <p data-held-again className="mt-4 rounded-lg bg-[#e5f4e4] px-3 py-2 text-sm font-semibold">{LINK_TEXT.heldAgain(o.channel === "POS" ? 25 : 10)}</p>}
+        {rules && o.status === "PENDING_PAYMENT" && due > 0 && <p data-card-note className="mt-3 text-sm">{LINK_TEXT.cardNote}</p>}
         <div className="mt-6">
           {o.status === "PENDING_PAYMENT" && due > 0 ? <PayForm orderId={id} token={t!} consent={{ transactionalText: webConsentCopy().transactional, marketingText: webConsentCopy().marketing, smsNumber: smsNumberDisplay() }} /> : <p className="font-semibold">This order isn&rsquo;t waiting for payment. Questions? Call (845) 777-7585.</p>}
         </div>
