@@ -1,6 +1,9 @@
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { checkBookable } from "@/lib/availability";
+import { checkBookable, pickupDateFor } from "@/lib/availability";
+import { nearbyDays, nearestSize } from "@/lib/alternatives";
+import { getSettings } from "@/lib/settings";
+import { ensurePriced } from "@/lib/order-pricing";
 
 /*
  * Payment links and late payments (Abraham, Nov 13, 2026).
@@ -91,8 +94,72 @@ export const LINK_TEXT = {
   checkButton: "Check availability again",
   // Abraham's wording, Nov 13, 2026 (approved): 10 minutes for a phone order, 25 for an Admin link
   heldAgain: (min: number) => `It's still available! We're holding it for you for the next ${min} minutes.`,
-  gone: (n: number) => `Sorry, ${n === 1 ? "this item is" : "these items are"} no longer available for your date.`,
-  goneCall: "Please call us at (845) 777-7585, and we'll gladly help you choose another option or another day.",
-  cardNote: `After you tap "Agree and pay", you'll have ${CARD_MINUTES} minutes to enter your card on our secure payment page. If time runs out, your rentals simply go back into stock, and you can check availability again and book anytime.`,
+  // Abraham's wording, Nov 13, 2026 (approved)
+  gone: (n: number) => `${n === 1 ? "This item is" : "These items are"} no longer available for your date.`,
+  goneCall: "Please call us at (845) 777-7585, to choose another option or another day.",
+  // Draft: the nearest options (same as the phone line offers)
+  optionsIntro: "Here are the nearest options that are free right now. Tap one to hold it for you:",
+  // Abraham's wording, Nov 13, 2026 (approved)
+  cardNote: `After you tap "Agree and pay," you will have ${CARD_MINUTES} minutes to enter your card details on our secure payment page. If your session expires, your rented items will be returned to stock, and you can check again availability to rebook at any time.`,
 };
 
+
+export type LinkOption = { kind: "bigger" | "smaller" | "before" | "after"; productId: number; name: string; date: string; priceCents: number };
+
+/**
+ * The nearest free options for an expired link whose item is gone, the same ones the phone offers: one size bigger
+ * or smaller on the same day, or the same item on the day before / after (else the nearest open days). Only for an
+ * order with one item on one day; other orders get the call-us line.
+ */
+export async function linkOptions(orderIds: number[]): Promise<LinkOption[]> {
+  if (orderIds.length !== 1) return [];
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderIds[0])).limit(1);
+  const items = o ? await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id)) : [];
+  if (!o || items.length !== 1) return [];
+  const [p] = await db.select().from(schema.products).where(eq(schema.products.id, items[0].productId)).limit(1);
+  if (!p) return [];
+  const cal = await getSettings();
+  const [big, small, days] = await Promise.all([nearestSize(p, o.eventDate, 1, cal), nearestSize(p, o.eventDate, -1, cal), nearbyDays(p, o.eventDate, cal)]);
+  const out: LinkOption[] = [];
+  if (big) out.push({ kind: "bigger", productId: big.id, name: big.name, date: o.eventDate, priceCents: big.priceCents });
+  if (small) out.push({ kind: "smaller", productId: small.id, name: small.name, date: o.eventDate, priceCents: small.priceCents });
+  if (days.before) out.push({ kind: "before", productId: p.id, name: p.name, date: days.before, priceCents: p.priceCents });
+  if (days.after) out.push({ kind: "after", productId: p.id, name: p.name, date: days.after, priceCents: p.priceCents });
+  return out;
+}
+
+/**
+ * The customer tapped an option: only one the server itself offers is accepted. In one locked transaction the order
+ * changes to that item and day, is held again, and is re-priced (items + delivery + tax) before they pay.
+ */
+export async function chooseLinkOption(orderId: number, productId: number, date: string, now = new Date()): Promise<boolean> {
+  const offered = (await linkOptions([orderId])).find((x) => x.productId === productId && x.date === date);
+  if (!offered) return false;
+  const cal = await getSettings();
+  const ok = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`);
+    const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, productId)).limit(1);
+    const [o] = await tx.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
+    if (!p?.active || !o || !holdEnded(o, now)) return false;
+    const pickup = pickupDateFor(date, cal);
+    if ((await checkBookable(p.id, p.quantity, date, tx, pickup)) < 1) return false;
+    const [line] = await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
+    await tx.update(schema.orderItems).set({ productId: p.id, unitPriceCents: p.priceCents }).where(eq(schema.orderItems.id, line.id));
+    await tx
+      .update(schema.orders)
+      .set({
+        eventDate: date,
+        pickupDate: pickup,
+        status: "PENDING_PAYMENT",
+        holdExpiresAt: inMinutes(o.channel === "POS" ? 25 : 10, now),
+        subtotalCents: line.qty * p.priceCents,
+        totalCents: null, // re-priced below: items + delivery + tax
+        updatedAt: now,
+        notes: sql`COALESCE(${schema.orders.notes}, '') || ${`Changed on the payment link to ${p.name} on ${date}. `}`,
+      })
+      .where(eq(schema.orders.id, orderId));
+    return true;
+  });
+  if (ok) await ensurePriced(orderId);
+  return ok;
+}

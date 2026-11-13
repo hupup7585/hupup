@@ -10,7 +10,7 @@ import { CURRENT_TERMS_VERSION, recordTermsAcceptance, verifyPayToken } from "@/
 import { TERMS_TEXT } from "@/lib/terms-content";
 import { PAY_AGREE_LABEL } from "./label";
 import { recordBookingConsents } from "@/lib/booking-consent";
-import { LINK_TEXT, holdAgain, holdEnded, holdForCardPage, linkRulesActive } from "@/lib/late-payment";
+import { LINK_TEXT, chooseLinkOption, holdAgain, holdEnded, holdForCardPage, linkRulesActive } from "@/lib/late-payment";
 
 
 /** Customer checked the (unchecked-by-default) box: record the acceptance, then continue to Sola. */
@@ -68,4 +68,11 @@ export async function checkAgainAction(orderId: number, token: string) {
   const group = await getPaymentGroup(orderId);
   const held = group ? await holdAgain(group.orders.map((d) => d.order.id)) : null;
   redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}&${held ? "held=1" : "gone=1"}`);
+}
+
+/** Expired link, item gone: the customer tapped one of the nearest options (checked again on the server). */
+export async function chooseOptionAction(orderId: number, token: string, productId: number, date: string) {
+  if (!linkRulesActive() || !verifyPayToken(orderId, token)) redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}`);
+  const ok = await chooseLinkOption(orderId, productId, date);
+  redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}&${ok ? "held=1" : "gone=1"}`);
 }

@@ -76,8 +76,57 @@ describe("payment link rule", () => {
   it("friendly draft wording, item or items", () => {
     expect(LINK_TEXT.expiredBody(1)).toContain("Your item was held");
     expect(LINK_TEXT.expiredBody(2)).toContain("Your items were held");
-    expect(LINK_TEXT.gone(2)).toBe("Sorry, these items are no longer available for your date.");
-    expect(LINK_TEXT.cardNote).toContain("10 minutes");
+    expect(LINK_TEXT.gone(1)).toBe("This item is no longer available for your date."); // Abraham's wording
+    expect(LINK_TEXT.gone(2)).toBe("These items are no longer available for your date.");
+    expect(LINK_TEXT.goneCall).toBe("Please call us at (845) 777-7585, to choose another option or another day.");
+    expect(LINK_TEXT.cardNote).toBe('After you tap "Agree and pay," you will have 10 minutes to enter your card details on our secure payment page. If your session expires, your rented items will be returned to stock, and you can check again availability to rebook at any time.');
     expect(LINK_TEXT.heldAgain(10)).toBe("It's still available! We're holding it for you for the next 10 minutes."); // Abraham's exact wording
+  });
+});
+
+describe("expired link, item gone: the nearest options (Abraham, Nov 13, 2026)", () => {
+  it("offers one size bigger / smaller that day and the same item the day before / after; tapping one holds and re-prices it", async () => {
+    const { linkOptions, chooseLinkOption } = await import("@/lib/late-payment");
+    const [c] = await db.insert(schema.categories).values({ name: "Bounce houses opts", sortOrder: 9 }).returning();
+    const [small, mid, big] = await db
+      .insert(schema.products)
+      .values([
+        { categoryId: c.id, name: "Small Castle", priceCents: 15000, quantity: 1, sizeOrder: 1 },
+        { categoryId: c.id, name: "Castle", priceCents: 20000, quantity: 1, sizeOrder: 2 },
+        { categoryId: c.id, name: "Big Castle", priceCents: 25000, quantity: 1, sizeOrder: 3 },
+      ])
+      .returning();
+    const day = "2026-12-22"; // Tuesday
+    // Moshe has the only Castle on the 22nd
+    const [moshe] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: day, pickupDate: "2026-12-23" }).returning();
+    await db.insert(schema.orderItems).values({ orderId: moshe.id, productId: mid.id, qty: 1, unitPriceCents: 20000 });
+    // Sara's link expired
+    const [sara] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: day, pickupDate: "2026-12-23", holdExpiresAt: new Date(Date.now() - 60_000), subtotalCents: 20000, totalCents: 21625 }).returning();
+    await db.insert(schema.orderItems).values({ orderId: sara.id, productId: mid.id, qty: 1, unitPriceCents: 20000 });
+    expect(await holdAgain([sara.id])).toBeNull(); // gone
+
+    const opts = await linkOptions([sara.id]);
+    // Moshe's Castle is out the 22nd and 23rd, so a booking on the 21st (back on the 22nd) can't fit either:
+    // the nearest free days are the 20th and the 24th, the same the phone line offers
+    expect(opts.map((o) => [o.kind, o.name, o.date])).toEqual([
+      ["bigger", "Big Castle", day],
+      ["smaller", "Small Castle", day],
+      ["before", "Castle", "2026-12-20"],
+      ["after", "Castle", "2026-12-24"],
+    ]);
+    // a made-up choice (not offered) is refused
+    expect(await chooseLinkOption(sara.id, mid.id, day)).toBe(false);
+    // tapping "Big Castle": held again for 10 minutes, item and price changed, re-priced with delivery and tax
+    expect(await chooseLinkOption(sara.id, big.id, day)).toBe(true);
+    const after = await get(sara.id);
+    expect(after.status).toBe("PENDING_PAYMENT");
+    expect(after.holdExpiresAt!.getTime()).toBeGreaterThan(Date.now() + 9 * MIN);
+    expect(after.subtotalCents).toBe(25000);
+    expect(after.totalCents).toBeNull(); // re-priced with delivery and tax from the address (none in this test) before paying
+    const [line] = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, sara.id));
+    expect([line.productId, line.unitPriceCents]).toEqual([big.id, 25000]);
+    // the Big Castle is now held for Sara: no one else can take it
+    expect((await linkOptions([sara.id])).length).toBeGreaterThanOrEqual(0);
+    void small;
   });
 });

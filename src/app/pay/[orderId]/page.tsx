@@ -7,8 +7,8 @@ import PayForm from "./PayForm";
 import { webConsentCopy } from "@/lib/sms-terms-v2";
 import { smsNumberDisplay } from "@/lib/sms-number";
 import DualDate from "@/components/DualDate";
-import { LINK_TEXT, holdEnded, holdForCardPage, keepHoldWhileActive, linkRulesActive } from "@/lib/late-payment";
-import { checkAgainAction } from "./actions";
+import { LINK_TEXT, holdEnded, holdForCardPage, keepHoldWhileActive, linkOptions, linkRulesActive } from "@/lib/late-payment";
+import { checkAgainAction, chooseOptionAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Review and pay | Hup Up Attractions", robots: { index: false } };
@@ -28,12 +28,31 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   const rules = linkRulesActive();
   if (rules && before.orders.some((d) => holdEnded(d.order))) {
     const count = before.orders.reduce((n, d) => n + d.items.reduce((m, i) => m + i.qty, 0), 0);
+    const options = gone ? await linkOptions(before.orders.map((d) => d.order.id)) : [];
     return (
       <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">
         <div className="mx-auto max-w-md rounded-2xl border-2 border-hu-deep bg-white p-6" data-link-expired>
           <h1 className="text-2xl font-extrabold">{gone ? LINK_TEXT.gone(count) : LINK_TEXT.expiredTitle}</h1>
           {gone ? (
-            <p className="mt-3" data-link-gone>{LINK_TEXT.goneCall}</p>
+            <>
+              {options.length > 0 && (
+                <div className="mt-4" data-link-options>
+                  <p>{LINK_TEXT.optionsIntro}</p>
+                  <div className="mt-3 space-y-2">
+                    {options.map((x) => (
+                      <form key={`${x.productId}-${x.date}`} action={chooseOptionAction.bind(null, id, t!, x.productId, x.date)}>
+                        <button className="btn-ghost w-full justify-start py-3 text-left" data-link-option={x.kind}>
+                          <span>
+                            {x.name} on <DualDate iso={x.date} /> ({money(x.priceCents)})
+                          </span>
+                        </button>
+                      </form>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="mt-4" data-link-gone>{LINK_TEXT.goneCall}</p>
+            </>
           ) : (
             <>
               <p className="mt-3">{LINK_TEXT.expiredBody(count)}</p>

@@ -58,6 +58,7 @@ import { PROMPTS, loadPromptOverrides, promptAudio, promptText, promptWaiting, t
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
+import { categoryProducts, itemFreeOn, nearestFreeDay, nearestSize } from "@/lib/alternatives";
 import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_PIN_TRIES, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinSet } from "@/lib/vm-access";
 import { STT_HOLD_FILE, STT_MAX_WAITS, googleReadback, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
 
@@ -137,32 +138,6 @@ function bookNoInput(vr: VR, ctx: Ctx, retryAction: string, retryParams: Record<
 }
 
 /** The item is free on that day, and the day is open (not past, not Shabbos/Yom Tov/closed, pickup rules applied). */
-async function itemFreeOn(p: { id: number; quantity: number }, date: string, cal: Awaited<ReturnType<typeof getSettings>>): Promise<boolean> {
-  if (date < todayISO()) return false;
-  if (!checkEventDate(date, cal).ok) return false;
-  return (await checkBookable(p.id, p.quantity, date)) > 0;
-}
-
-/** Next size up (+1) or down (-1) in the same category that's free that day; null if none. */
-async function nearestSize(p: { id: number; categoryId: number; sizeOrder: number | null }, date: string, dir: 1 | -1, cal: Awaited<ReturnType<typeof getSettings>>) {
-  if (p.sizeOrder == null) return null;
-  const sizes = (await phoneProducts(p.categoryId))
-    .filter((x) => x.id !== p.id && x.sizeOrder != null && (dir > 0 ? x.sizeOrder! > p.sizeOrder! : x.sizeOrder! < p.sizeOrder!))
-    .sort((a, b) => dir * (a.sizeOrder! - b.sizeOrder!));
-  for (const x of sizes) if (await itemFreeOn(x, date, cal)) return x;
-  return null;
-}
-
-/** Nearest open day with the item free, searching back (-1) or forward (+1) from a date (skipping closed days). */
-async function nearestFreeDay(p: { id: number; quantity: number }, date: string, dir: 1 | -1, cal: Awaited<ReturnType<typeof getSettings>>, start = 2, limit = dir > 0 ? 90 : 60) {
-  for (let i = start; i <= limit; i++) {
-    const d = addDays(date, dir * i);
-    if (dir < 0 && d < todayISO()) return null;
-    if (await itemFreeOn(p, d, cal)) return d;
-  }
-  return null;
-}
-
 /** Speech (plus optional keypad) gather tuned for phone audio. */
 function speech(vr: VR, action: string, hints: string, opts: { dtmf?: boolean; numDigits?: number; finishOnKey?: string } = {}) {
   return vr.gather({
@@ -270,12 +245,7 @@ async function phoneCategories() {
 }
 
 async function phoneProducts(categoryId: number) {
-  const rows = await db
-    .select()
-    .from(products)
-    .where(and(eq(products.categoryId, categoryId), eq(products.active, true)))
-    .orderBy(asc(products.sortOrder), asc(products.id));
-  return rows.slice(0, 9); // keypad 1-9
+  return (await categoryProducts(categoryId)).slice(0, 9); // keypad 1-9
 }
 
 async function getProduct(id: number) {
