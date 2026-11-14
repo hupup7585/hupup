@@ -75,7 +75,7 @@ describe("speech to text: Google request", () => {
 
 describe("speech to text: Google voice read-back", () => {
   it("splits a line around its changing part", () => {
-    expect(splitLine("We got {text}. If that's correct, press 1. To say it again, press 2.")).toEqual(["We got", "{text}", "If that's correct, press 1. To say it again, press 2."]);
+    expect(splitLine("We got {text}. If that is correct, press 1. To say it again, press 2.")).toEqual(["We got", "{text}", "If that is correct, press 1. To say it again, press 2."]);
     expect(splitLine("We got {letters}. To continue, press pound.")).toEqual(["We got", "{letters}", "To continue, press pound."]);
   });
   it("no Google voice key: no read-back audio (the call never falls back to Twilio's Say)", async () => {
@@ -112,10 +112,10 @@ describe("speech to text: the call", () => {
     await db.update(schema.spokenAnswers).set({ status: "done", text: "yossi friedman" }).where(eq(schema.spokenAnswers.id, a));
     expect(redirect(await call("stt-check", {}, `f=name&a=${a}&w=1`))).toBe(`heard?f=name&a=${a}`);
     const back = await call("heard", {}, `f=name&a=${a}`);
-    // Google voice audio, never Twilio's Say: "We got" + the caller's words + "If that's correct..."
+    // Google voice audio, never Twilio's Say: "We got" + the caller's words + "If that is correct..."
     expect(said(back).join(" ")).not.toContain("We got");
     expect([...back.matchAll(/<Play>[^<]*\/api\/voice-audio\/prompt\/\d+/g)]).toHaveLength(3);
-    expect(h.tts).toEqual(["We got", "Yossi Friedman.", "If that's correct, press 1. To say it again, press 2."]);
+    expect(h.tts).toEqual(["We got", "Yossi Friedman.", "If that is correct, press 1. To say it again, press 2."]);
     expect(h.session.data.heard).toBe("Yossi Friedman");
     // the fixed words are made once and reused; only the caller's words are new
     h.tts = [];
@@ -128,7 +128,7 @@ describe("speech to text: the call", () => {
     const xml = await call("heard", {}, `f=name&a=${row.id}`);
     expect(said(xml).join(" ")).not.toContain("Someone Else");
   });
-  it("star types it on the keypad; pound with nothing said skips the email; silence is 'didn't catch that'", async () => {
+  it("star types it on the keypad; pound with nothing said skips the email; silence is 'did not catch that'", async () => {
     expect(redirect(await call("stt-recorded", { Digits: "*", RecordingDuration: "0" }, "f=name"))).toBe("type?f=name");
     const skip = await call("stt-recorded", { Digits: "#", RecordingDuration: "0" }, "f=email");
     expect(redirect(await call("heard", {}, redirect(skip)!.split("?")[1]))).toBe("phone");

@@ -65,7 +65,7 @@ describe("key 1: booking by item", () => {
     expect(said(date)).toEqual(["Please enter your event date: two digits for the month, then two digits for the day. For example, for March 5th, press 0, 3, 0, 5."]);
     expect(date).not.toContain('input="dtmf speech"');
     expect(redirect(await call("date-heard", { Digits: "1201" }, `p=${medium}`))).toBe(`date-ask?p=${medium}&d=${TUE}`);
-    expect(said(await call("date-ask", {}, `p=${medium}&d=${TUE}`))).toEqual(["You entered Tuesday, December 1st. If that's correct, press 1. To enter a different date, press 2."]);
+    expect(said(await call("date-ask", {}, `p=${medium}&d=${TUE}`))).toEqual(["You entered Tuesday, December 1st. If that is correct, press 1. To enter a different date, press 2."]);
     expect(redirect(await call("date-confirm", { Digits: "2" }, `p=${medium}&d=${TUE}`))).toBe(`date?p=${medium}`);
     expect(redirect(await call("date-confirm", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`qty?p=${medium}&d=${TUE}`);
   });
@@ -80,7 +80,7 @@ describe("key 1: booking by item", () => {
     expect(redirect(await call("qty", {}, `p=${medium}&d=${TUE}`))).toBe(`booked?p=${medium}&d=${TUE}`);
     const both = await call("booked", {}, `p=${medium}&d=${TUE}`);
     expect(said(both)).toEqual([
-      "I'm sorry, the Medium Castle is already booked on Tuesday, December 1st.",
+      "I am sorry, the Medium Castle is already booked on Tuesday, December 1st.",
       "Here are the closest options for that day.",
       "For the next size up, the Large Castle, press 1.",
       "For the next size down, the Small Castle, press 2.",
@@ -122,7 +122,7 @@ describe("key 1: booking by item", () => {
     await book(small, "2026-12-11");
     const xml = await call("altdates", {}, `p=${small}&d=2026-12-10`);
     expect(said(xml)).toEqual([
-      "The Small Castle isn't available the day before or after.",
+      "The Small Castle is not available the day before or after.",
       "The nearest date before your date is Monday, December 7th. To choose it, press 1.",
       "The nearest date after your date is Sunday, December 13th. To choose it, press 2.",
       "To try a different date, press 3.",

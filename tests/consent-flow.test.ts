@@ -236,7 +236,7 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
   });
   it("Step 2: press 1 texts the approved confirmation to the caller's number, then the Final and Disclosure lines", async () => {
     expect(await call("promo-consent-answer", { Digits: "1" })).toContain("/api/voice/promo-which");
-    expect(plain(await call("promo-which"))).toContain("To get texts at the number you're calling from, press 1. To use a different phone number, press 2.");
+    expect(plain(await call("promo-which"))).toContain("To get texts at the number you are calling from, press 1. To use a different phone number, press 2.");
     const xml = plain(await call("promo-which-answer", { Digits: "1" }));
     expect(h.promoRequests).toHaveLength(1);
     expect(h.promoRequests[0].to).toBe("+18455550100");
@@ -249,7 +249,7 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
     const { promoConfirmRequestSms } = await import("@/lib/sms-terms-v2");
     expect(m.body).toBe(promoConfirmRequestSms()); // word for word as approved
     const fin = xml.indexOf("Thanks! We just sent a text. Reply YES within 24 hours to finish signing up.");
-    const dis = xml.indexOf("Message and data rates may apply, and you're signed up only after you reply YES to our confirmation text.");
+    const dis = xml.indexOf("Message and data rates may apply, and you are signed up only after you reply YES to our confirmation text.");
     expect(fin).toBeGreaterThan(-1);
     expect(dis).toBeGreaterThan(fin);
     expect(xml).toContain("/api/voice/goodbye");
@@ -272,7 +272,7 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
     await call("promo-heard", { Digits: "8455551234" });
     expect(await call("promo-confirm", { Digits: "2" })).toContain("/api/voice/promo-enter");
     const bad = plain(await call("promo-heard", { Digits: "84555" }));
-    expect(bad).toContain("Sorry, that number didn't work. Please try again.");
+    expect(bad).toContain("Sorry, that number did not work. Please try again.");
     expect(bad).toContain("/api/voice/promo-enter?t=1");
     const second = await handleVoice({ action: "promo-heard", query: new URLSearchParams("t=1"), body: { Digits: "123" }, callSid: "CA1", from: "+18455550100" });
     expect(second).toContain("/api/voice/goodbye");

@@ -49,17 +49,17 @@ describe("Chanukah late hours (Abraham)", () => {
 
 describe("hotline 'open late' lines (Abraham approved, exact)", () => {
   it("has the exact wording", () => {
-    expect(PROMPTS.late_cholhamoed.text).toBe("Happy Chol Hamoed! We're open late today, and you can book anytime using this automated system.");
-    expect(PROMPTS.late_chanukah.text).toBe("Happy Chanukah! We're open late today, and you can book anytime using this automated system.");
+    expect(PROMPTS.late_cholhamoed.text).toBe("Happy Chol Hamoed! We are open late today, and you can book anytime using this automated system.");
+    expect(PROMPTS.late_chanukah.text).toBe("Happy Chanukah! We are open late today, and you can book anytime using this automated system.");
   });
   it("Chanukah weekday while open: says the Chanukah line, no closing time", async () => {
     const xml = await greet("2026-12-07T20:00:00Z"); // Mon 3:00 PM
-    expect(xml).toContain("Happy Chanukah! We're open late today, and you can book anytime using this automated system.");
+    expect(xml).toContain("Happy Chanukah! We are open late today, and you can book anytime using this automated system.");
     expect(xml).not.toMatch(/10:30|until/);
   });
   it("Chol Hamoed while open: says the Chol Hamoed line", async () => {
     const xml = await greet("2027-04-25T18:00:00Z"); // Sun Apr 25, 2027 (Pesach IV), 2:00 PM EDT
-    expect(xml).toContain("Happy Chol Hamoed! We're open late today, and you can book anytime using this automated system.");
+    expect(xml).toContain("Happy Chol Hamoed! We are open late today, and you can book anytime using this automated system.");
     expect(xml).not.toContain("Happy Chanukah");
   });
   it("not on ordinary days or when closed", async () => {

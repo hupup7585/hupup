@@ -102,7 +102,7 @@ describe("Abraham's main menu wording (approved Nov 8, 2026)", () => {
     expect(redirect(await call("no-key", {}, `to=menu&q=first%3D1&np=3&t0=${t0}`))).toBe(`menu?first=1&np=3&t0=${t0}`);
     // 3 plays and 20 seconds: goodbye
     const end = await call("no-key", {}, `to=menu&q=first%3D1&np=3&t0=${t0 - 25_000}`);
-    expect(end).toContain("It sounds like we got disconnected. Please call us back anytime, we'd love to help. Thanks for calling Hup Up Attractions. Bye for now!");
+    expect(end).toContain("It sounds like we got disconnected. Please call us back anytime, we would love to help. Thanks for calling Hup Up Attractions. Bye for now!");
     expect(end).toContain("<Hangup/>");
     // a key press always works
     expect(redirect(await call("menu-choice", { Digits: "1" }, `np=2&t0=${t0}`))).toBe("book");
@@ -225,7 +225,7 @@ describe("# is never a menu key; star returns (Abraham, spec item 5)", () => {
 });
 
 describe("menus are keys only (Abraham): no speech in any menu", () => {
-  const OLD_OOPS = "Oops, that's not one of the choices. No problem, let's try again.";
+  const OLD_OOPS = "Oops, that is not one of the choices. No problem, let us try again.";
   const NOT_VALID = "Sorry, that is not a valid selection. Please try again.";
   it("the main menu and the key 1 rental list listen for keys only, and # comes in as a key", async () => {
     h.session.data = { day: "2026-12-01" };

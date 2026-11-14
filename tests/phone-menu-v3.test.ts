@@ -87,7 +87,7 @@ describe("section 2 and 3: ringing staff, after hours", () => {
 
 describe("section 4: voicemail re-record line", () => {
   it("is Abraham's wording, played before the tone", () => {
-    expect(PROMPTS.vm_rerecord.text).toBe("Please re-record your message. When you're finished, press pound.");
+    expect(PROMPTS.vm_rerecord.text).toBe("Please re-record your message. When you are finished, press pound.");
   });
 });
 
@@ -105,7 +105,7 @@ describe("section 8: bookings reminders", () => {
     const xml = await call("category-choice", { Digits: "0" }, `c=${balloons}`);
     expect(redirect(xml)).toBe(`cart?c=${balloons}`);
     const empty = await call("cart", {}, `c=${balloons}`);
-    expect(said(empty)).toContain("Your cart is empty. Let's start shopping!");
+    expect(said(empty)).toContain("Your cart is empty. Let us start shopping!");
     expect(redirect(empty)).toBe(`category?c=${balloons}`);
   });
   it("before a bounce house is added: the water note; after the cart is read, the same item list; before checkout: the tax note", async () => {
@@ -178,14 +178,14 @@ describe("Phone Recordings (Abraham)", () => {
     h.overrides = {};
     expect(said(await call("menu", {}, "first=1"))).toContain("Thank you for choosing Hup Up Attractions.");
   });
-  it("rejects files that aren't MP3 or WAV, and lines with changing parts (they stay live Google voice)", async () => {
+  it("rejects files that are not MP3 or WAV, and lines with changing parts (they stay live Google voice)", async () => {
     await expect(startRecordingUpload("main_thanks", "x.pdf", 10, null)).rejects.toThrow("MP3 or WAV");
     const bad = await startRecordingUpload("main_thanks", "fake.mp3", 8, null);
     await expect(saveRecordingChunk(bad.id, 0, Buffer.from("%PDF-1.7"), true, null)).rejects.toThrow("isn't an MP3 or WAV");
     await expect(startRecordingUpload("added", "a.mp3", 10, null)).rejects.toThrow("changing parts");
     expect(promptAudio({ added: { text: null, audioUrl: null, recordingId: 5 } }, "added")).toBeNull();
   });
-  it("signed links: Twilio can play them, guessing doesn't work", () => {
+  it("signed links: Twilio can play them, guessing does not work", () => {
     const link = new URL(promptRecordingLink(12));
     expect(verifyPromptRecordingLink(12, link.searchParams.get("sig"))).toBe(true);
     expect(verifyPromptRecordingLink(13, link.searchParams.get("sig"))).toBe(false);
@@ -246,7 +246,7 @@ describe("Nov 12 decisions: staff reject, caller ID, after hours, keypad pay, CA
   });
   it("the approved after-hours greeting; the closed greeting text is kept", () => {
     // Approved Nov 13, 2026 with Abraham's change ("To see our rentals anytime"; there is no online booking)
-    expect(PROMPTS.vm_after_hours.text).toBe("Thank you for calling Hup Up Attractions! Our office is closed right now. Please leave your name, phone number, and a short message after the tone, and we'll call you back as soon as we open. To see our rentals anytime, visit hupupattractions.com. Have a wonderful day!");
+    expect(PROMPTS.vm_after_hours.text).toBe("Thank you for calling Hup Up Attractions! Our office is closed right now. Please leave your name, phone number, and a short message after the tone, and we will call you back as soon as we open. To see our rentals anytime, visit hupupattractions.com. Have a wonderful day!");
     expect(promptWaiting({}, "vm_after_hours")).toBe(false);
     expect(PROMPTS.pay_security_code.text).toBe("Please enter the security code on your card, then press pound.");
     expect(PROMPTS.vm_closed.text).toBe("Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.");

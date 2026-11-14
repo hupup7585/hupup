@@ -161,13 +161,13 @@ describe("every path", () => {
     const none = plain(await call("vm-recorded", { RecordingDuration: "0" }, `b=${b}`));
     expect(none).toContain(`/api/voice/vm-none?b=${b}`);
     const line = plain(await call("vm-none", {}, `b=${b}`));
-    expect(line).toContain("We didn't receive a message. To try again, press 3. Otherwise, you may hang up.");
+    expect(line).toContain("We did not receive a message. To try again, press 3. Otherwise, you may hang up.");
     expect(line).not.toContain(PROMPTS.vm_sent.text);
     expect(line).toContain("/api/voice/no-key?to=vm-none"); // repeats (3 plays and 20 seconds rule)
     expect(plain(await call("vm-none-choice", { Digits: "3" }, `b=${b}`))).toMatch(/<Record [^>]*finishOnKey="#"/);
     expect(plain(await call("vm-none-choice", { Digits: "5" }, `b=${b}`))).toContain("/api/voice/vm-none");
     expect(await call("vm-option", { Digits: "1" })).not.toContain("Your message has been sent");
-    expect(PROMPTS.vm_none_retry.text).toBe("We didn't receive a message. To try again, press 3. Otherwise, you may hang up.");
+    expect(PROMPTS.vm_none_retry.text).toBe("We did not receive a message. To try again, press 3. Otherwise, you may hang up.");
   });
 
   it("no key: the options repeat; after 3 plays AND 20 seconds the call ends and the message is kept (Abraham, Nov 11)", async () => {
@@ -189,7 +189,7 @@ describe("every path", () => {
   it("office closed (after hours, Shabbos, Yom Tov): Abraham's after-hours greeting in every box except key 9", async () => {
     h.open = false;
     const closed = plain(await call("voicemail", {}, "x=4"));
-    expect(closed).toContain("Thank you for calling Hup Up Attractions! Our office is closed right now. Please leave your name, phone number, and a short message after the tone, and we'll call you back as soon as we open. To see our rentals anytime, visit hupupattractions.com. Have a wonderful day!"); // approved Nov 13, 2026
+    expect(closed).toContain("Thank you for calling Hup Up Attractions! Our office is closed right now. Please leave your name, phone number, and a short message after the tone, and we will call you back as soon as we open. To see our rentals anytime, visit hupupattractions.com. Have a wonderful day!"); // approved Nov 13, 2026
     expect(closed).not.toContain("Our team is assisting other customers right now");
     expect(plain(await call("voicemail", {}, "x=0"))).toContain("Our office is closed right now.");
     expect(plain(await call("voicemail", {}, "x=9"))).toContain(PROMPTS.vm9_greeting.text); // key 9 keeps its own greeting
@@ -215,7 +215,7 @@ describe("every path", () => {
 
 describe("key 9: feedback and comments (Abraham, word for word)", () => {
   it("own greeting and confirmation; same tone, # and 1, 2, 3 options; its own box", async () => {
-    expect(PROMPTS.vm9_greeting.text).toBe("Thank you for your time. We want to hear from you, your feedback helps us improve our service. Please share your comments after the tone. If you would like a callback, please say your name and phone number. When you're finished, you may hang up or press the pound key.");
+    expect(PROMPTS.vm9_greeting.text).toBe("Thank you for your time. We want to hear from you, your feedback helps us improve our service. Please share your comments after the tone. If you would like a callback, please say your name and phone number. When you are finished, you may hang up or press the pound key.");
     expect(PROMPTS.vm9_sent.text).toBe("Thank you for your feedback! We truly appreciate it. Goodbye!");
     expect(plain(await call("menu-choice", { Digits: "9" }))).toContain("/api/voice/voicemail?x=9");
     const xml = plain(await call("voicemail", {}, "x=9"));

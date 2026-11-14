@@ -69,7 +69,7 @@ describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
     expect(redirect(await call("catalog-got-choice", { Digits: "#" }, "part=local"))).toBe("catalog-ending");
     expect(plain(await call("catalog-ending"))).toContain("For at gmail dot com, press 1.");
     expect(redirect(await call("catalog-ending-choice", { Digits: "1" }))).toBe("catalog-final");
-    expect(plain(await call("catalog-final"))).toContain("Your email address is y o s s i at gmail dot com. If that's correct, press 1. To start over, press 2.");
+    expect(plain(await call("catalog-final"))).toContain("Your email address is y o s s i at gmail dot com. If that is correct, press 1. To start over, press 2.");
     const done = plain(await call("catalog-final-choice", { Digits: "1" }));
     expect(done).toContain("We just emailed you our catalog!");
     expect(done).toContain("<Hangup/>");
@@ -93,7 +93,7 @@ describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
     const prev = process.env.VERCEL_ENV;
     process.env.VERCEL_ENV = "production"; // live site, texting not approved
     const xml = plain(await call("catalog-choice", { Digits: "1" }));
-    expect(xml).toContain("Sorry, we can't send it by text just yet. Let's send it by email instead.");
+    expect(xml).toContain("Sorry, we cannot send it by text just yet. Let us send it by email instead.");
     expect(redirect(xml)).toBe("catalog-email");
     expect(h.sms).toHaveLength(0);
     process.env.VERCEL_ENV = prev;

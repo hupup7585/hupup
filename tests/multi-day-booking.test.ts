@@ -85,7 +85,7 @@ describe("key 1: date first, several days, one charge", () => {
 
   it("the cart reads every day, then one rental total", async () => {
     const lines = said(await call("cart"));
-    expect(lines[0]).toBe("Here's your cart.");
+    expect(lines[0]).toBe("Here is your cart.");
     expect(lines).toContain("For Tuesday, December 1: 2 Castle.");
     expect(lines).toContain("For Tuesday, December 8: 2 Castle.");
     expect(lines).toContain("Your rental total is 800 dollars, plus delivery and sales tax.");

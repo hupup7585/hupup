@@ -34,7 +34,7 @@ import { saveRecordingAction } from "@/app/admin/(app)/settings/recording-action
 const call = (action: string, body: Record<string, string> = {}) =>
   handleVoice({ action, query: new URLSearchParams(), body: { CallSid: "CArec", ...body }, callSid: "CArec", from: "+18455550155" });
 const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/Redirect>/)?.[1].replace("https://hupup.example/api/voice/", "").replace(/&amp;/g, "&");
-const NOTICE = "This call may be recorded for quality and training. Please don&apos;t share card numbers or security codes on this call.";
+const NOTICE = "This call may be recorded for quality and training. Please do not share card numbers or security codes on this call.";
 
 beforeEach(() => {
   process.env.PUBLIC_BASE_URL = "https://hupup.example";
@@ -63,7 +63,7 @@ describe("call recording", () => {
     await saveSetting("callRecording", false);
   });
 
-  it("Owner switch: can't be turned on without approving the notice; Secretary can't change it; logged", async () => {
+  it("Owner switch: cannot be turned on without approving the notice; Secretary cannot change it; logged", async () => {
     const on = new FormData();
     on.set("callRecording", "on");
     expect((await saveRecordingAction(null, on)).ok).toBe(false);

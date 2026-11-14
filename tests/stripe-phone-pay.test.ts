@@ -141,7 +141,7 @@ describe("the payment subaccount: Twilio <Pay> through Stripe", () => {
   it("declined: recorded with last 4, then 1 tries again or 2 gets the Sola link by email", async () => {
     const t = _payLegToken(orderId, "CApay");
     const xml = await sub("result", { Result: "payment-connector-error", PaymentError: "card_declined", PaymentCardNumber: "xxxx-xxxx-xxxx-0002" }, `o=${orderId}&n=1&t=${t}`);
-    expect(xml).toContain("Sorry, that card didn't go through. To try again, press 1. To get a secure payment link by email instead, press 2.");
+    expect(xml).toContain("Sorry, that card did not go through. To try again, press 1. To get a secure payment link by email instead, press 2.");
     const o = await order(orderId);
     expect([o.paymentResult, o.cardLast4, o.status]).toEqual(["declined", "0002", "PENDING_PAYMENT"]);
     expect(await sub("retry", { Digits: "1" }, `o=${orderId}&n=1&t=${t}`)).toContain("<Pay ");

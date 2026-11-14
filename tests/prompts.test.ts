@@ -18,7 +18,7 @@ describe("hotline prompts", () => {
     }
   });
   it("retries are friendly", () => {
-    expect(PROMPTS.no_input.text).toContain("No problem, let's try that again");
+    expect(PROMPTS.no_input.text).toContain("No problem, let us try that again");
   });
   it("admin overrides replace the default; empty override falls back", () => {
     expect(promptText({ main_hi: { text: "Hello from Hup Up Attractions!", audioUrl: null } }, "main_hi")).toBe("Hello from Hup Up Attractions!");

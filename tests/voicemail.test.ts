@@ -115,7 +115,7 @@ describe("hotline voicemail", () => {
     fetchSpy.mockRestore();
   });
 
-  it("before texting is approved: email only; if the recording can't be downloaded the email says so and keeps the link", async () => {
+  it("before texting is approved: email only; if the recording cannot be downloaded the email says so and keeps the link", async () => {
     const box = await mainBox();
     h.session.status = "completed";
     delete process.env.TWILIO_MESSAGING_SERVICE_SID;
@@ -159,7 +159,7 @@ describe("hotline voicemail", () => {
     const none = await call("vm-recorded", { RecordingDuration: "0" }, `b=${box.id}`);
     expect(none).toContain("/api/voice/vm-none");
     const retry = (await call("vm-none", {}, `b=${box.id}`)).replace(/&apos;/g, "'");
-    expect(retry).toContain("We didn't receive a message. To try again, press 3. Otherwise, you may hang up.");
+    expect(retry).toContain("We did not receive a message. To try again, press 3. Otherwise, you may hang up.");
     expect(retry).not.toContain("Your message has been sent");
     await db.update(schema.voicemailBoxes).set({ greetingText: null }).where(eq(schema.voicemailBoxes.id, box.id));
   });
