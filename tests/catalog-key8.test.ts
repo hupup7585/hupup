@@ -69,7 +69,7 @@ describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
     expect(redirect(await call("catalog-got-choice", { Digits: "#" }, "part=local"))).toBe("catalog-ending");
     expect(plain(await call("catalog-ending"))).toContain("For at gmail dot com, press 1.");
     expect(redirect(await call("catalog-ending-choice", { Digits: "1" }))).toBe("catalog-final");
-    expect(plain(await call("catalog-final"))).toContain("Your email address is y o s s i, at gmail dot com. If that's correct, press 1. To start over, press 2.");
+    expect(plain(await call("catalog-final"))).toContain("Your email address is y o s s i at gmail dot com. If that's correct, press 1. To start over, press 2.");
     const done = plain(await call("catalog-final-choice", { Digits: "1" }));
     expect(done).toContain("We just emailed you our catalog!");
     expect(done).toContain("<Hangup/>");
@@ -104,5 +104,14 @@ describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
     const { text } = await catalogEmail();
     expect(text).toContain("Jumping Balloons");
     expect(text).toContain("To book, call (845) 777-7585.");
+  });
+});
+
+describe("key 8 email read-back (Abraham, Nov 14, 2026)", () => {
+  it("says the whole address in one smooth run: no comma, 'dot' only for a real dot, 'at' for @", async () => {
+    const { spokenEmail } = await import("@/lib/ivr/catalog-keys");
+    expect(spokenEmail("yossi@gmail.com")).toBe("y o s s i at gmail dot com");
+    expect(spokenEmail("k.weiss@kj.mail.net")).toBe("k dot w e i s s at kj dot mail dot net");
+    expect(spokenEmail("yossi@gmail.com")).not.toMatch(/[,.]/);
   });
 });

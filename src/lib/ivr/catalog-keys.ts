@@ -64,8 +64,11 @@ export const CATALOG_ENDINGS: Record<string, string> = { "1": "gmail.com", "2": 
 export const validLocal = (s: string) => /^[a-z0-9][a-z0-9._-]{0,63}$/i.test(s);
 export const validDomain = (s: string) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(s) && s.length <= 253;
 
-/** "yossi at gmail dot com" */
+/**
+ * "y o s s i at gmail dot com", said in one smooth run (Abraham, Nov 14, 2026): no comma or pause between the parts,
+ * "dot" only where the address really has one, "at" for @.
+ */
 export function spokenEmail(email: string): string {
   const [user, domain] = email.split("@");
-  return `${spellOut(user)}, at ${domain.replace(/\./g, " dot ")}`;
+  return `${spellOut(user)} at ${domain.split(".").filter(Boolean).join(" dot ")}`.replace(/\s+/g, " ").trim();
 }
