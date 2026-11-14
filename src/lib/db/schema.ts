@@ -8,6 +8,7 @@ import {
   date,
   jsonb,
   index,
+  uniqueIndex,
   primaryKey,
   real,
   customType,
@@ -1185,3 +1186,49 @@ export const vmAccessLog = pgTable(
   },
   (t) => [index("vm_access_log_created_idx").on(t.createdAt)],
 );
+
+/* Owner-only API Keys page (Abraham, Nov 14, 2026): values encrypted, shown as last 4 only; the log is append-only. */
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: serial("id").primaryKey(),
+    /** The Vercel variable name, e.g. STRIPE_READ_KEY */
+    name: text("name").notNull(),
+    service: text("service").notNull(),
+    purpose: text("purpose"),
+    /** test | live */
+    mode: text("mode").notNull().default("test"),
+    valueEnc: text("value_enc").notNull(),
+    last4: text("last4").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedBy: integer("updated_by"),
+    vercelSyncedAt: timestamp("vercel_synced_at", { withTimezone: true }),
+    vercelError: text("vercel_error"),
+  },
+  (t) => [uniqueIndex("api_keys_name_idx").on(t.name)],
+);
+
+export const apiKeysLog = pgTable(
+  "api_keys_log",
+  {
+    id: serial("id").primaryKey(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    userId: integer("user_id"),
+    /** open | unlock_code_sent | unlocked | failed_password | failed_code | locked_out | add | replace | delete | page_password_set */
+    action: text("action").notNull(),
+    keyName: text("key_name"),
+    ok: boolean("ok").notNull().default(true),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+  },
+  (t) => [index("api_keys_log_at_idx").on(t.at)],
+);
+
+export const apiKeysUnlocks = pgTable("api_keys_unlocks", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
