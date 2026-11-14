@@ -119,7 +119,7 @@ describe("written promotional consent (phone keypress only sends a confirmation 
   it("staff can't enroll promotions in v2: a yes only sends the confirmation text", () => {
     const a = readFileSync("src/app/admin/(app)/orders/consent-actions.ts", "utf8");
     expect(a).toContain("requestPromoConfirmation");
-    expect(v2.staffDisclosure({ VERCEL_ENV: "preview" }).marketing).toContain("you'll be signed up only after you reply YES to that text");
+    expect(v2.staffDisclosure({ VERCEL_ENV: "preview" }).marketing).toContain("you will be signed up only after you reply YES to that text");
   });
 });
 

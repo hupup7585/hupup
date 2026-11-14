@@ -44,7 +44,7 @@ export const PROMO_CONFIRM_VERSION = "promo-confirm-2026-11-09-v3";
 export const PROMO_CONFIRM_WINDOW_HOURS = 24;
 
 export const STAFF_DISCLOSURE_MARKETING_V2 =
-  "Would you like promotional text messages from Hup Up Attractions at {phone}: seasonal offers, discount codes, and rental deals, up to 6 per calendar year? If you say yes, we'll text you a confirmation, and you'll be signed up only after you reply YES to that text within 24 hours. Agreeing is never required to book or buy. Message and data rates may apply. You can reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help, at any time. Do you want the confirmation text? Please answer yes or no.";
+  "Would you like promotional text messages from Hup Up Attractions at {phone}: seasonal offers, discount codes, and rental deals, up to 6 per calendar year? If you say yes, we will text you a confirmation, and you will be signed up only after you reply YES to that text within 24 hours. Agreeing is never required to book or buy. Message and data rates may apply. You can reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help, at any time. Do you want the confirmation text? Please answer yes or no.";
 
 /** v2 privacy sentence (Abraham's exact words, section 6). */
 export const PRIVACY_V2 =
