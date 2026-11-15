@@ -195,9 +195,26 @@ async function deliveryMapCheck() {
   }
 }
 
+/** Twilio's own error alerts for the hotline in the last 6 hours (codes and messages only; no caller numbers). */
+async function twilioAlerts(env: NodeJS.ProcessEnv) {
+  const sid = env.TWILIO_ACCOUNT_SID;
+  const token = env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) return log("Twilio alerts: hotline account settings are not in Vercel.");
+  const since = new Date(Date.now() - 6 * 3600_000).toISOString();
+  const r = await fetch(`https://monitor.twilio.com/v1/Alerts?PageSize=20&StartDate=${encodeURIComponent(since)}`, { headers: { authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}` }, signal: T(15000) });
+  const j = (await r.json().catch(() => ({}))) as { alerts?: { error_code: string; date_created: string; alert_text?: string; request_url?: string }[] };
+  const alerts = j.alerts ?? [];
+  log(`Twilio alerts (last 6 hours): ${alerts.length}${r.ok ? "" : ` (Twilio answered ${r.status})`}.`);
+  for (const a of alerts.slice(0, 12)) {
+    const text = decodeURIComponent((a.alert_text ?? "").replace(/\+/g, " ")).replace(/(From|To|Caller|Called)=[^&]*/g, "$1=hidden").slice(0, 220);
+    log(`Twilio alert ${a.error_code} at ${a.date_created} on ${(a.request_url ?? "").replace(/\?.*$/, "")}: ${text}`);
+  }
+}
+
 async function main() {
   if (process.env.VERCEL_ENV !== "production") return log("Not a live build: payment line check and Cloudflare setup skipped.");
   for (const [name, step] of [
+    ["Twilio alerts", twilioAlerts],
     ["Payment line check", twilioPayCheck],
     ["Cloudflare setup", cloudflareSetup],
     ["Delivery map", deliveryMapCheck],
