@@ -12,7 +12,8 @@ import { sendEmail } from "@/lib/notify";
  *    units are never bookable. Items without units keep their typed-in quantity, as before.
  *  - Once a booking is confirmed, a unit is assigned for every rental day. The database refuses a second booking of
  *    the same unit on the same day (unique index), so a double booking can't be saved even by two requests at once.
- *  - Every status change is kept with the staff member and the reason. Taking a unit out of service is Owner only.
+ *  - Every status change is kept with the staff member and the reason. Owner and Secretary may change a status;
+ *    taking a unit out of service needs a reason. Adding units is Owner only.
  */
 export const UNIT_STATUS_LABEL: Record<UnitStatus, string> = {
   available: "Available",
@@ -48,7 +49,8 @@ export async function addUnit(
 ) {
   if (who.role !== "owner") throw new Error("Only the Owner can add equipment units.");
   const code = input.code.trim().toUpperCase();
-  if (!/^[A-Z0-9][A-Z0-9-]{1,30}$/.test(code)) throw new Error("Give the unit a short ID, like CASTLE-01.");
+  // Abraham keeps his own equipment numbers: letters, digits, spaces, dots, dashes and slashes
+  if (!/^[A-Z0-9][A-Z0-9 ./-]{0,39}$/.test(code)) throw new Error("Give the unit an ID of up to 40 letters and numbers.");
   const [u] = await db
     .insert(schema.equipmentUnits)
     .values({
@@ -75,7 +77,8 @@ export async function addUnit(
  * needs a reason. Any confirmed bookings that now have no unit are reported to the Owner.
  */
 export async function setUnitStatus(unitId: number, status: UnitStatus, reason: string, who: Who) {
-  if (status !== "available" && who.role !== "owner") throw new Error("Only the Owner can take a unit out of service.");
+  // Abraham, Nov 15, 2026: Owner and Secretary may take a unit out of service and put it back
+  if (who.role !== "owner" && who.role !== "secretary") throw new Error("Only the Owner or the Secretary can change a unit.");
   if (status !== "available" && !reason.trim()) throw new Error("Please give a reason.");
   const [u] = await db.select().from(schema.equipmentUnits).where(eq(schema.equipmentUnits.id, unitId)).limit(1);
   if (!u) throw new Error("Unit not found.");
@@ -107,7 +110,7 @@ export async function setUnitStatus(unitId: number, status: UnitStatus, reason: 
   return { conflicts };
 }
 
-/** Owner email (draft wording for Abraham's OK). */
+/** Owner email (wording approved by Abraham, Nov 15, 2026). */
 async function alertConflict(lead: string, conflicts: string[]) {
   const to = config.adminEmail();
   if (!to) return;

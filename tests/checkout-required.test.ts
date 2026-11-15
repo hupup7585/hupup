@@ -77,7 +77,7 @@ describe("payment can never be skipped (Abraham, Nov 15, 2026)", () => {
     expect(redirect(await call("heard", { Digits: "#" }, "f=email"))).toBe("ask?f=email"); // can't skip
     expect(redirect(await call("heard", { SpeechResult: "" }, "f=email&n=2"))).not.toBe("phone");
     h.session.data = { emailRequired: 1, heard: "sara@example.com" };
-    expect(redirect(await call("confirm", { Digits: "1" }, "f=email"))).toBe("finalize");
+    expect(redirect(await call("confirm", { Digits: "#" }, "f=email"))).toBe("finalize");
     expect(h.session.data.email).toBe("sara@example.com");
     expect(h.session.data.emailRequired).toBeUndefined();
   });

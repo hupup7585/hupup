@@ -81,7 +81,7 @@ describe("typing in the call", () => {
     expect(t).toMatch(/<Gather [^>]*finishOnKey="#"/);
     expect(said(t)[0]).toMatch(/^To type, press each key until you reach the letter: press 2 once for A, twice for B, three times for C/);
     const back = await call("typed", { Digits: encode("yossi friedman") }, "f=name");
-    expect(said(back)).toContain("You typed: Yossi Friedman. If that is right, press 1. To try again, press 2.");
+    expect(said(back)).toContain("You typed: Yossi Friedman. If that is right, press pound to continue. To try again, press 1.");
     expect(h.session.data.heard).toBe("Yossi Friedman");
     expect(said(await call("type", {}, "f=email"))).toContain("For a dot, press 1 once. For the at sign, press 1 twice.");
   });

@@ -263,8 +263,8 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
     expect(ask).toContain("Please enter the 10-digit mobile number, then press pound.");
     expect(ask).toContain('finishOnKey="#"');
     const heard = await call("promo-heard", { Digits: "8455551234" });
-    expect(heard).toContain("You entered 8 4 5, 5 5 5, 1 2 3 4. To confirm, press 1. To enter it again, press 2.");
-    const xml = await call("promo-confirm", { Digits: "1" });
+    expect(heard).toContain("You entered 8 4 5, 5 5 5, 1 2 3 4. If that is right, press pound to continue. To enter it again, press 1.");
+    const xml = await call("promo-confirm", { Digits: "#" });
     expect(h.promoRequests[0].to).toBe("+18455551234");
     expect(h.promoRequests[0].how).toContain("number chosen: entered number +18455551234");
     expect(h.messages.find((x) => x.event === "promo_confirm_request")!.to).toBe("+18455551234");
@@ -272,7 +272,7 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
   });
   it("Step 3: press 2 enters it again; not 10 digits says sorry, and after 2 tries skips", async () => {
     await call("promo-heard", { Digits: "8455551234" });
-    expect(await call("promo-confirm", { Digits: "2" })).toContain("/api/voice/promo-enter");
+    expect(await call("promo-confirm", { Digits: "1" })).toContain("/api/voice/promo-enter");
     const bad = plain(await call("promo-heard", { Digits: "84555" }));
     expect(bad).toContain("Sorry, that number did not work. Please try again.");
     expect(bad).toContain("/api/voice/promo-enter?t=1");
@@ -341,13 +341,13 @@ describe("time zone question (after a promotional yes)", () => {
 describe("checkout pricing, delivery area and terms (Abram's final decisions)", () => {
   it("an address outside the delivery area stops checkout and asks again", async () => {
     h.session.data.heard = "5 Main Street, Albany";
-    const xml = await call("confirm", { Digits: "1" }, "f=address");
+    const xml = await call("confirm", { Digits: "#" }, "f=address");
     expect(xml).toContain("we only deliver in Kiryas Joel and nearby Orange County towns");
     expect(xml).toContain("/api/voice/ask?f=address");
   });
   it("an in-area address continues", async () => {
     h.session.data.heard = "5 Main Street, Monroe";
-    const xml = await call("confirm", { Digits: "1" }, "f=address");
+    const xml = await call("confirm", { Digits: "#" }, "f=address");
     expect(xml).not.toContain("we only deliver");
   });
   it("finalize asks for the terms first, with the exact notice", async () => {

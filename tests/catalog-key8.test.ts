@@ -69,8 +69,8 @@ describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
     expect(redirect(await call("catalog-got-choice", { Digits: "#" }, "part=local"))).toBe("catalog-ending");
     expect(plain(await call("catalog-ending"))).toContain("For at gmail dot com, press 1.");
     expect(redirect(await call("catalog-ending-choice", { Digits: "1" }))).toBe("catalog-final");
-    expect(plain(await call("catalog-final"))).toContain("Your email address is y o s s i at gmail dot com. If that is correct, press 1. To start over, press 2.");
-    const done = plain(await call("catalog-final-choice", { Digits: "1" }));
+    expect(plain(await call("catalog-final"))).toContain("Your email address is y o s s i at gmail dot com. If that is correct, press pound to continue. To start over, press 1.");
+    const done = plain(await call("catalog-final-choice", { Digits: "#" }));
     expect(done).toContain("We just emailed you our catalog!");
     expect(done).toContain("<Hangup/>");
     expect(h.emails).toHaveLength(1);

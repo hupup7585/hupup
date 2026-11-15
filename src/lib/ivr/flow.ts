@@ -865,8 +865,9 @@ const handlers: Record<string, Handler> = {
   async "catalog-text-confirm"(ctx, vr) {
     const d = ctx.body.Digits;
     const to = ctx.session?.data.catPhone;
-    if (d === "1" && to) return catalogSendText(ctx, vr, to);
-    if (d === "2") return back(vr, "catalog-text-enter");
+    // Abraham, Nov 15, 2026: pound continues, 1 does it again
+    if (d === "#" && to) return catalogSendText(ctx, vr, to);
+    if (d === "1") return back(vr, "catalog-text-enter");
     if (d === "*") return back(vr, "catalog-text");
     sp(vr, ctx, "not_valid");
     return back(vr, "catalog-text-heard-again");
@@ -1021,7 +1022,7 @@ const handlers: Record<string, Handler> = {
   async "catalog-final-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     const email = catalogEmailOf(ctx);
-    if (d === "1" && email) {
+    if (d === "#" && email) {
       const r = await sendCatalogEmail(email);
       await logCatalogRequest(ctx, "email", email, r.sent);
       if (!r.sent) {
@@ -1033,7 +1034,7 @@ const handlers: Record<string, Handler> = {
       vr.hangup(); // "Otherwise, you may hang up"
       return vr;
     }
-    if (d === "2") return back(vr, "catalog-email"); // start over
+    if (d === "1") return back(vr, "catalog-email"); // start over
     if (d === "*") return back(vr, "catalog-ending");
     sp(vr, ctx, "not_valid");
     return back(vr, "catalog-final");
@@ -1345,7 +1346,7 @@ const handlers: Record<string, Handler> = {
     return back(vr, "date-ask", { p, d: r.date });
   },
 
-  /** "You entered Tuesday, March 5th. If that's correct, press 1. To enter a different date, press 2." */
+  /** "You entered Tuesday, March 5th. If that is correct, press pound to continue. To enter a different date, press 1." */
   async "date-ask"(ctx, vr) {
     const p = ctx.query.get("p") ?? undefined;
     const date = ctx.query.get("d")!;
@@ -1358,8 +1359,8 @@ const handlers: Record<string, Handler> = {
     const p = ctx.query.get("p") ?? undefined;
     const date = ctx.query.get("d")!;
     const d = ctx.body.Digits;
-    if (d === "2") return back(vr, "date", { p });
-    if (d !== "1") {
+    if (d === "1") return back(vr, "date", { p }); // a different date
+    if (d !== "#") {
       if (d) sp(vr, ctx, "not_valid");
       return back(vr, "date-ask", { p, d: date });
     }
@@ -1729,8 +1730,8 @@ const handlers: Record<string, Handler> = {
   async confirm(ctx, vr) {
     const f = ctx.query.get("f") as Field;
     const d = ctx.body.Digits;
-    // Spoken answers (speech to text) confirm with pound; typed and older spoken answers with 1
-    const yes = ctx.query.get("k") === "pound" ? d === "#" : d === "1";
+    // Abraham, Nov 15, 2026: every read-back confirms with pound; 1 (or any other key) asks again
+    const yes = d === "#";
     if (!yes) return back(vr, "ask", { f });
     const heard = ctx.session?.data.heard;
     if (!heard) return back(vr, "ask", { f });
@@ -1832,7 +1833,7 @@ const handlers: Record<string, Handler> = {
   },
 
   async "phone-confirm"(ctx, vr) {
-    if (ctx.body.Digits !== "1" || !ctx.session?.data.heard) return back(vr, "phone-enter");
+    if (ctx.body.Digits !== "#" || !ctx.session?.data.heard) return back(vr, "phone-enter");
     await updateSession(ctx.callSid, { data: { phone: ctx.session.data.heard, heard: undefined } }, ctx.session);
     return back(vr, "sms-consent");
   },
@@ -2036,11 +2037,11 @@ const handlers: Record<string, Handler> = {
 
   async "promo-confirm"(ctx, vr) {
     const heard = ctx.session?.data.promoHeard;
-    if (ctx.body.Digits === "1" && heard) {
+    if (ctx.body.Digits === "#" && heard) {
       await updateSession(ctx.callSid, { data: { promoHeard: undefined } }, ctx.session);
       return promoSend(ctx, vr, heard, "entered");
     }
-    if (ctx.body.Digits === "2") return back(vr, "promo-enter");
+    if (ctx.body.Digits === "1") return back(vr, "promo-enter");
     return back(vr, "goodbye");
   },
 

@@ -79,16 +79,16 @@ describe("equipment units", () => {
     expect(h.emails.at(-1)!.subject).toBe("Hup Up Attractions: equipment conflict");
   });
 
-  it("out of service: Owner only with a reason; history kept; bookings move to another unit or are flagged", async () => {
+  it("out of service: Owner or Secretary with a reason; history kept; bookings move to another unit or are flagged", async () => {
     const [one, two] = (await u.listUnits(productId)).map((r) => r.unit);
-    await expect(u.setUnitStatus(one.id, "damaged", "Torn seam", secretary)).rejects.toThrow("Only the Owner");
+    await expect(u.setUnitStatus(one.id, "damaged", "Torn seam", { userId: null, role: "delivery" })).rejects.toThrow("Only the Owner or the Secretary");
     await expect(u.setUnitStatus(one.id, "damaged", " ", owner)).rejects.toThrow("Please give a reason.");
     const o = await order("2099-09-01");
     await setOrderStatus(o, "CONFIRMED");
     const [booked] = await db.select().from(schema.unitBookings).where(eq(schema.unitBookings.orderId, o));
     const target = booked.unitId === one.id ? one : two;
     const other = target.id === one.id ? two : one;
-    const r1 = await u.setUnitStatus(target.id, "maintenance", "Blower check", owner);
+    const r1 = await u.setUnitStatus(target.id, "maintenance", "Blower check", secretary);
     // the earlier 2-unit booking on Aug 1 has no spare unit, so only that day is flagged
     expect(r1.conflicts.every((c) => c.endsWith("2099-08-01"))).toBe(true);
     expect(r1.conflicts.some((c) => c.endsWith("2099-09-01"))).toBe(false);

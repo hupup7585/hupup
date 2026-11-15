@@ -52,7 +52,7 @@ export default async function UnitsPage({ searchParams }: { searchParams: Promis
                     <form action={unitStatusAction} className="mt-2 grid gap-2">
                       <input type="hidden" name="unitId" value={u.id} />
                       <select name="status" className="input" defaultValue={u.status}>
-                        {UNIT_STATUSES.filter((s) => owner || s === "available").map((s) => <option key={s} value={s}>{UNIT_STATUS_LABEL[s]}</option>)}
+                        {UNIT_STATUSES.map((s) => <option key={s} value={s}>{UNIT_STATUS_LABEL[s]}</option>)}
                       </select>
                       <input name="reason" className="input" placeholder="Reason (needed to take it out of service)" />
                       <button className="btn-ghost">Save</button>

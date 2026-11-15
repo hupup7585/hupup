@@ -46,7 +46,7 @@ describe("caller journey", () => {
     await call("menu", {}, { first: "1" });
     await call("menu-choice", { Digits: "1" });
     await call("date-heard", { Digits: day.slice(5, 7) + day.slice(8, 10) });
-    await call("date-confirm", { Digits: "1" }, { d: day });
+    await call("date-confirm", { Digits: "#" }, { d: day });
     await call("category", {}, { c: String(catId) });
     await call("product", {}, { p: String(productId) });
     await call("product-choice", { Digits: "1" }, { p: String(productId) });

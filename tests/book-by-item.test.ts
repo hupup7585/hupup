@@ -65,9 +65,9 @@ describe("key 1: booking by item", () => {
     expect(said(date)).toEqual(["Please enter your event date: two digits for the month, then two digits for the day. For example, for March 5th, press 0, 3, 0, 5."]);
     expect(date).not.toContain('input="dtmf speech"');
     expect(redirect(await call("date-heard", { Digits: "1201" }, `p=${medium}`))).toBe(`date-ask?p=${medium}&d=${TUE}`);
-    expect(said(await call("date-ask", {}, `p=${medium}&d=${TUE}`))).toEqual(["You entered Tuesday, December 1st. If that is correct, press 1. To enter a different date, press 2."]);
-    expect(redirect(await call("date-confirm", { Digits: "2" }, `p=${medium}&d=${TUE}`))).toBe(`date?p=${medium}`);
-    expect(redirect(await call("date-confirm", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`qty?p=${medium}&d=${TUE}`);
+    expect(said(await call("date-ask", {}, `p=${medium}&d=${TUE}`))).toEqual(["You entered Tuesday, December 1st. If that is correct, press pound to continue. To enter a different date, press 1."]);
+    expect(redirect(await call("date-confirm", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`date?p=${medium}`);
+    expect(redirect(await call("date-confirm", { Digits: "#" }, `p=${medium}&d=${TUE}`))).toBe(`qty?p=${medium}&d=${TUE}`);
   });
 
   it("available: straight on to the current booking steps", async () => {
