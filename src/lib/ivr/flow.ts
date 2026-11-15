@@ -56,7 +56,7 @@ import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogE
 import { CATALOG_ENDINGS, decodeCatalogKeys, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
 import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState, textingActive } from "@/lib/voicemail";
 import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staffAnnouncement, type RingKey } from "./routing";
-import { erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
+import { bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
 import { matchBlock, parseBlockList } from "./caller-filter";
 import { PROMPTS, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
@@ -1123,6 +1123,13 @@ const handlers: Record<string, Handler> = {
    */
   /** Key 1 (Abraham, Nov 9, 2026): choose a category, then the item, then the date. */
   async book(ctx, vr) {
+    // Abraham, Nov 14, 2026: no booking on Shabbos or Yom Tov (candle lighting until Rabbeinu Tam), automatically
+    const lock = bookingLock(new Date(), await getSettings());
+    if (lock.locked) {
+      await track(ctx.callSid, "step", `Booking closed (${lock.reason})`, { key: "1" });
+      sp(vr, ctx, lock.reason === "Yom Tov" ? "booking_closed_yomtov" : "booking_closed_shabbos");
+      return back(vr, "menu");
+    }
     // Abraham, Nov 15, 2026: a caller back from the same number is offered last call's unfinished cart (once)
     if (resumeActive(ctx) && !ctx.session?.data.resumeAsked && !(await callOrders(ctx)).length && (await unfinishedCart(ctx)).length) return back(vr, "resume");
     const cats = await phoneCategories();

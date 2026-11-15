@@ -1,3 +1,4 @@
+import { paymentsClosedLine } from "@/lib/payments-closed";
 import { notFound, redirect } from "next/navigation";
 import { paymentLink } from "@/lib/sola";
 import { getPaymentGroup, orderNumber } from "@/lib/orders";
@@ -24,6 +25,16 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   // Every link charges items + delivery + tax: price any order not priced yet (made in Admin, or older ones)
   const before = await getPaymentGroup(id);
   if (!before) notFound();
+  // Abraham, Nov 14, 2026: payments are closed on Shabbos and Yom Tov (candle lighting until Rabbeinu Tam)
+  const closedLine = before.due > 0 ? await paymentsClosedLine() : null;
+  if (closedLine)
+    return (
+      <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">
+        <div className="mx-auto max-w-md rounded-2xl border-2 border-hu-deep bg-white p-6 text-center" data-payments-closed>
+          <h1 className="text-2xl font-extrabold">{closedLine}</h1>
+        </div>
+      </main>
+    );
   // The link rule (Abraham, Nov 13, 2026; preview until he approves the wording)
   const rules = linkRulesActive();
   if (rules && before.orders.some((d) => holdEnded(d.order))) {

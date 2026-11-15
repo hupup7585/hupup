@@ -239,6 +239,9 @@ export const PROMPTS = {
   tz_saved: { group: "Text message consent", label: "Time zone saved", text: "Got it, thank you." },
   late_cholhamoed: { group: "Welcome & main menu", label: "Chol Hamoed, while open (Abraham approved)", text: "Happy Chol Hamoed! We are open late today, and you can book anytime using this automated system." },
   late_chanukah: { group: "Welcome & main menu", label: "Chanukah, while open (Abraham approved)", text: "Happy Chanukah! We are open late today, and you can book anytime using this automated system." },
+  // No booking on Shabbos or Yom Tov (Abraham, Nov 14, 2026): drafts for his OK; silent until approved (key 1 just returns to the menu)
+  booking_closed_shabbos: { group: "Welcome & main menu", label: "Key 1 on Shabbos", text: "Booking is closed on Shabbos. Please call us again after Shabbos.", pending: true },
+  booking_closed_yomtov: { group: "Welcome & main menu", label: "Key 1 on Yom Tov", text: "Booking is closed on Yom Tov. Please call us again after Yom Tov.", pending: true },
   office_closed: { group: "Welcome & main menu", label: "Office closed (booking still available)", text: "Our office is closed right now, but you can book anytime using this automated system." },
   date_closed: { group: "Date & quantity", label: "Chosen date is a closed day", text: "Sorry, we are closed on {date} for {reason}. Let us pick another date.", vars: ["date", "reason"] },
   address_outside_area: { group: "Checkout", label: "Address outside the delivery area", text: "Sorry, we only deliver in Kiryas Joel and nearby Orange County towns. Please say a delivery address in our area." },

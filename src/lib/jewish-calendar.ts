@@ -285,3 +285,32 @@ export function checkEventDate(iso: string, s: CalendarSettings = calendarDefaul
   }
   return { ok: true, message: null, pickupWarning: null, suggestedPickup: null, day };
 }
+
+/**
+ * Booking lock (Abraham, Nov 14, 2026): no booking on Shabbos or Yom Tov. It closes at candle lighting on Erev (15
+ * minutes before shkia in Monroe) and opens again after Shabbos or the last Yom Tov day at the reopen time from
+ * Admin (Rabbeinu Tam, 72 minutes after sunset). Working days (Chol Hamoed, Chanukah, Purim, Tisha B'Av, Lag BaOmer)
+ * are never locked by this. Nobody has to switch it on or off.
+ */
+export function bookingLock(at: Date = new Date(), s: CalendarSettings = calendarDefaults()): { locked: boolean; reason: "Shabbos" | "Yom Tov" | null; opensAt: Date | null } {
+  const iso = localISO(at);
+  const reasonFor = (d: string): "Shabbos" | "Yom Tov" => (kinds(d).kinds.has("yomtov") ? "Yom Tov" : "Shabbos");
+  const reopenFrom = (d: string): Date | null => {
+    // the last Shabbos or Yom Tov day of the run opens at night; earlier days stay locked all night
+    let last = d;
+    while (shabbosOrYomTov(addDaysISO(last, 1))) last = addDaysISO(last, 1);
+    const z = zmanim(last, s);
+    return /^\d+$/.test(String(s.reopenAfter).trim()) ? new Date(z.sunset().getTime() + Number(s.reopenAfter) * 60_000) : z.tzeit(8.5);
+  };
+  if (shabbosOrYomTov(iso)) {
+    const opensAt = reopenFrom(iso);
+    if (opensAt && at >= opensAt) return { locked: false, reason: null, opensAt: null };
+    return { locked: true, reason: reasonFor(iso), opensAt };
+  }
+  const candles = erevCandleLighting(iso, s);
+  if (candles && at >= candles) {
+    const next = addDaysISO(iso, 1);
+    return { locked: true, reason: reasonFor(next), opensAt: reopenFrom(next) };
+  }
+  return { locked: false, reason: null, opensAt: null };
+}

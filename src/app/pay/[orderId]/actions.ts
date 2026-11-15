@@ -15,6 +15,11 @@ import { LINK_TEXT, chooseLinkOption, linkOptionsActive, holdAgain, holdEnded, h
 
 /** Customer checked the (unchecked-by-default) box: record the acceptance, then continue to Sola. */
 export async function agreeAndPayAction(orderId: number, token: string, agreed: boolean, sms: { transactional: boolean; marketing: boolean } = { transactional: false, marketing: false }): Promise<{ error: string } | void> {
+  {
+    const { paymentsClosedLine } = await import("@/lib/payments-closed");
+    const closed = await paymentsClosedLine();
+    if (closed) return { error: closed };
+  }
   if (!verifyPayToken(orderId, token)) return { error: "This payment link is not valid. Please call us." };
   if (!agreed) return { error: "Please check the box to agree to the Terms and Conditions before paying." };
   // One charge for every rental day booked together (payment group)

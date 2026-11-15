@@ -73,6 +73,13 @@ export async function createBookingAction(input: {
   smsTransactional?: boolean;
   smsMarketing?: boolean;
 }): Promise<PosResult> {
+  {
+    // Abraham, Nov 14, 2026: no booking on Shabbos or Yom Tov (candle lighting until Rabbeinu Tam)
+    const { bookingLock } = await import("@/lib/jewish-calendar");
+    const { getSettings } = await import("@/lib/settings");
+    const lock = bookingLock(new Date(), await getSettings());
+    if (lock.locked) return { ok: false, message: `Booking is closed on ${lock.reason}. It opens again after ${lock.reason}.` } as PosResult;
+  }
   const session = await requireAdmin();
   if (!isValidISO(input.date)) return { ok: false, message: "Pick an event date." };
   if (input.date < todayISO()) return { ok: false, message: "That date is in the past." };
