@@ -1127,7 +1127,13 @@ const handlers: Record<string, Handler> = {
     const lock = bookingLock(new Date(), await getSettings());
     if (lock.locked) {
       await track(ctx.callSid, "step", `Booking closed (${lock.reason})`, { key: "1" });
-      sp(vr, ctx, lock.reason === "Yom Tov" ? "booking_closed_yomtov" : "booking_closed_shabbos");
+      // "on Saturday at 5:51 PM": the day and time booking opens again (Abraham, Nov 14, 2026)
+      const opens = lock.opensAt ?? new Date();
+      const when = {
+        day: opens.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/New_York" }),
+        time: opens.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }),
+      };
+      sp(vr, ctx, lock.reason === "Yom Tov" ? "booking_closed_yomtov" : "booking_closed_shabbos", when);
       return back(vr, "menu");
     }
     // Abraham, Nov 15, 2026: a caller back from the same number is offered last call's unfinished cart (once)
