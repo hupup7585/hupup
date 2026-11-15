@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { KeyRound, MessageSquareText } from "lucide-react";
 import { passwordAction, sendCodeAction, sendEmailCodeAction, verifyCodeAction } from "./actions";
 
-/** Staff sign-in: phone number, then a texted code (everyone) or a password (Owner and Secretary). */
+/** Staff sign-in: one Username field (username, phone number or email), then a code by email or text, or a password. */
 export default function LoginForm({ smsActive = true, emailActive = true }: { smsActive?: boolean; emailActive?: boolean }) {
   const [phone, setPhone] = useState("");
   const [mode, setMode] = useState<"code" | "password">("password");
@@ -40,8 +40,8 @@ export default function LoginForm({ smsActive = true, emailActive = true }: { sm
       <div data-signin-accent className="h-1.5 bg-sun" aria-hidden />
       <div className="space-y-5 px-8 py-8">
         <label className="block">
-          <span className="label">Your mobile number</span>
-          <input className="input" inputMode="tel" autoComplete="tel-national" placeholder="(845) 555-0123" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={sent} />
+          <span className="label">Username</span>
+          <input className="input" autoComplete="username" autoCapitalize="none" spellCheck={false} value={phone} onChange={(e) => setPhone(e.target.value)} disabled={sent} data-username />
         </label>
 
         {!sent && (
@@ -62,13 +62,13 @@ export default function LoginForm({ smsActive = true, emailActive = true }: { sm
         {mode === "code" && !sent && (
           <div className="space-y-3" data-code-ways>
             <p className="text-sm font-bold text-navy">Send the code how?</p>
-            <button type="button" data-email-code className="btn-dark w-full py-3" onClick={() => send("email")} disabled={!emailActive || pending || phone.replace(/\D/g, "").length < 10}>
+            <button type="button" data-email-code className="btn-dark w-full py-3" onClick={() => send("email")} disabled={!emailActive || pending || phone.trim().length < 3}>
               {pending && via === "email" ? "Sending…" : "By email"}
             </button>
             {!emailActive && (
               <p data-not-active="email-login" className="rounded-lg bg-[#FFF8E1] p-3 text-sm text-[#5C4600]"><b>Not active yet:</b> email codes need the email sender set up. Use your password instead.</p>
             )}
-            <button type="button" data-sms-code className="btn-ghost w-full py-3" onClick={() => send("sms")} disabled={!smsActive || pending || phone.replace(/\D/g, "").length < 10}>
+            <button type="button" data-sms-code className="btn-ghost w-full py-3" onClick={() => send("sms")} disabled={!smsActive || pending || phone.trim().length < 3}>
               {pending && via === "sms" ? "Sending…" : "By text (SMS)"}
             </button>
             {!smsActive && (
@@ -121,7 +121,7 @@ export default function LoginForm({ smsActive = true, emailActive = true }: { sm
               <span className="label">Password</span>
               <input type="password" autoComplete="current-password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} />
             </label>
-            <button className="btn-dark w-full py-3" disabled={pending || !password || phone.replace(/\D/g, "").length < 10}>
+            <button className="btn-dark w-full py-3" disabled={pending || !password || phone.trim().length < 3}>
               {pending ? "Checking…" : "Sign in"}
             </button>
             <p className="text-xs text-muted">No password yet? Choose &ldquo;Send me a code&rdquo;, sign in, then set one under My account (or ask the Owner to set it on the Staff page). Delivery staff sign in by text code only.</p>

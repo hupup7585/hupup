@@ -53,6 +53,6 @@ describe("staff sign-in design (Abraham)", () => {
   });
   it("wording (Abraham's sign-in choices)", () => {
     // Abraham (Nov 9): front page offers "Sign in with password" or "Send me a code", then "By email" or "By text (SMS)"
-    for (const w of ["Staff sign-in", "Your mobile number", "Sign in with password", "Send me a code", "By email", "By text (SMS)", "6-digit code", "Keep me signed in on this device for 30 days"]) expect(form).toContain(w);
+    for (const w of ["Staff sign-in", "Username", "Sign in with password", "Send me a code", "By email", "By text (SMS)", "6-digit code", "Keep me signed in on this device for 30 days"]) expect(form).toContain(w);
   });
 });

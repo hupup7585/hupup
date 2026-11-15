@@ -298,6 +298,8 @@ export const adminUsers = pgTable("admin_users", {
   name: text("name").notNull(),
   phone: text("phone").notNull().unique(),
   email: text("email"),
+  /** Optional sign-in name (Abraham, Nov 14, 2026): staff sign in with their username, phone number or email. */
+  username: text("username"),
   role: text("role").$type<Role>().notNull(),
   active: boolean("active").notNull().default(true),
   passwordHash: text("password_hash"),

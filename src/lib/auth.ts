@@ -55,6 +55,32 @@ export async function staffForPhone(rawPhone: string): Promise<StaffUser | null>
   return null;
 }
 
+/**
+ * Sign-in with one "Username" field (Abraham, Nov 14, 2026): staff type their username, phone number or email, and
+ * this finds the phone number on their account (the code and password checks still work by that number). Anything
+ * that matches no account is passed on as typed, so the same safe "if that ... has an account" answers apply.
+ */
+export async function loginPhoneFor(identifier: string): Promise<string> {
+  const v = identifier.trim();
+  if (!v) return "";
+  if (v.includes("@")) {
+    const addr = v.toLowerCase();
+    const [u] = await db.select({ phone: adminUsers.phone }).from(adminUsers).where(sql`lower(${adminUsers.email}) = ${addr}`).limit(1);
+    if (u) return u.phone;
+    const ownerAddr = (config.adminEmail() || "").toLowerCase();
+    if (ownerAddr && ownerAddr === addr) return toE164(config.adminPhone()) ?? v;
+    return v;
+  }
+  if (/^[\d\s()+.-]+$/.test(v) && v.replace(/\D/g, "").length >= 10) return toE164(v) ?? v;
+  const name = v.toLowerCase();
+  const [u] = await db.select({ phone: adminUsers.phone }).from(adminUsers).where(sql`lower(${adminUsers.username}) = ${name}`).limit(1);
+  if (u) return u.phone;
+  const [row] = await db.select().from(schema.appSettings).where(eq(schema.appSettings.key, "ownerUsername")).limit(1);
+  const owner = typeof row?.value === "string" ? row.value.trim().toLowerCase() : "";
+  if (owner && owner === name) return toE164(config.adminPhone()) ?? v;
+  return v;
+}
+
 async function audit(action: string, userId: number | null, after: Record<string, unknown>) {
   const h = await headers();
   await db.insert(schema.auditLog).values({
@@ -67,7 +93,7 @@ async function audit(action: string, userId: number | null, after: Record<string
   });
 }
 
-const GENERIC = "If that number belongs to a staff account, a code is on its way.";
+const GENERIC = "If that username belongs to a staff account, a code is on its way.";
 /** Abraham: the Owner can also get the sign-in code by email; it always goes to this address. */
 export const OWNER_CODE_EMAIL = "hupupattractions@gmail.com";
 
@@ -79,7 +105,7 @@ async function staffEmail(staff: StaffUser): Promise<string | null> {
   }
   return staff.role === "owner" ? OWNER_CODE_EMAIL : null;
 }
-const GENERIC_EMAIL = "If that number has a staff account with a saved email, a code is on its way to that email.";
+const GENERIC_EMAIL = "If that username has a staff account with a saved email, a code is on its way to that email. Check the email on your staff account, and your spam folder.";
 /**
  * Text codes only work once Twilio approves our texting registration (A2P 10DLC); until then carriers drop the texts.
  * On the live site we say so plainly instead of pretending a code is on its way. (Test and preview builds keep the

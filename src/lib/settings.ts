@@ -32,9 +32,9 @@ export const SETTING_DEFAULTS = {
   /** Erev Yom Tov closes at: "chatzos" or "candles" (pending Abraham; default chatzos) */
   erevYomTovClose: "chatzos",
   /** Minutes before sunset for candle lighting (used only when a "candles" close is chosen) */
-  candleLightingMinutes: "18",
+  candleLightingMinutes: "15", // Abraham, Nov 14, 2026: Monroe lights 15 minutes before the first shkia
   /** Reopen after Shabbos / Yom Tov: minutes after sunset, or "tzeis" for nightfall at 8.5 degrees */
-  reopenAfter: "tzeis",
+  reopenAfter: "72", // Abraham, Nov 14, 2026: reopen at Rabbeinu Tam, 72 minutes after sunset
   closeCholHamoed: "no",
   closeChanukah: "no",
   closePurim: "yes",
@@ -167,7 +167,13 @@ export async function getSettings(): Promise<Settings> {
   const out = { ...SETTING_DEFAULTS } as Settings;
   try {
     const rows = await db.select().from(schema.appSettings);
-    for (const r of rows) if (r.key in out) (out as Record<string, unknown>)[r.key] = r.value;
+    for (const r of rows) {
+      if (!(r.key in out)) continue;
+      // The database hands back a saved "72" as the number 72; keep every value the same type as its default
+      const def = (SETTING_DEFAULTS as Record<string, unknown>)[r.key];
+      const v = typeof def === "string" && r.value !== null && typeof r.value !== "string" ? String(r.value) : r.value;
+      (out as Record<string, unknown>)[r.key] = v;
+    }
   } catch (e) {
     console.error("settings load failed, using defaults", e);
   }

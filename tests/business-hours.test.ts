@@ -18,10 +18,11 @@ describe("office hours (Abraham 2026-11-06, Eastern time)", () => {
     expect(officeOpenNow(at("2026-11-13T17:00:00Z"), S)).toBe(false); // 12:00 PM, after chatzos (~11:41)
   });
   it("Shabbos closed; Motzei Shabbos opens 2 hours after Shabbos ends, until 11:00 PM in winter", () => {
-    // Nov 14, 2026: Shabbos ends (tzeis 8.5 deg) about 5:22 PM, so the office opens about 7:22 PM
+    // Nov 14, 2026: Shabbos ends at Rabbeinu Tam (sunset + 72 minutes) about 5:51 PM, so the office opens about 7:51 PM
     expect(officeOpenNow(at("2026-11-14T17:00:00Z"), S)).toBe(false); // Shabbos noon
     expect(officeOpenNow(at("2026-11-14T23:30:00Z"), S)).toBe(false); // 6:30 PM: Shabbos over, but < 2 hours
-    expect(officeOpenNow(at("2026-11-15T00:30:00Z"), S)).toBe(true); // 7:30 PM
+    expect(officeOpenNow(at("2026-11-15T00:30:00Z"), S)).toBe(false); // 7:30 PM: not yet
+    expect(officeOpenNow(at("2026-11-15T01:00:00Z"), S)).toBe(true); // 8:00 PM
     expect(officeOpenNow(at("2026-11-15T03:59:00Z"), S)).toBe(true); // 10:59 PM
     expect(officeOpenNow(at("2026-11-15T04:00:00Z"), S)).toBe(false); // 11:00 PM
   });

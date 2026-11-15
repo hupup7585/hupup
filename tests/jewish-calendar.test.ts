@@ -82,7 +82,8 @@ describe("Erev Shabbos and Erev Yom Tov close at chatzos (Kiryas Joel zmanim)", 
     expect(i.closesAtLabel).toMatch(/closes at candle lighting \(4:2\d PM\)/);
   });
   it("reopens at tzeis after Shabbos / the last Yom Tov day, not between consecutive closed days", () => {
-    expect(etTime(dayInfo("2026-11-07").reopensAt!)).toBe("17:27");
+    expect(etTime(dayInfo("2026-11-07", { ...S, reopenAfter: "tzeis" }).reopensAt!)).toBe("17:27"); // tzeis still possible
+    expect(etTime(dayInfo("2026-11-07").reopensAt!)).toBe("17:56"); // default (Abraham, Nov 14, 2026): Rabbeinu Tam, 72 minutes
     expect(dayInfo("2026-09-12").reopensAt).toBeNull(); // RH 1 -> RH 2
     expect(dayInfo("2026-09-13").reopensAt).not.toBeNull();
     expect(etTime(dayInfo("2026-11-07", { ...S, reopenAfter: "72" }).reopensAt!)).toBe("17:56"); // sunset 4:44 PM + 72 minutes
