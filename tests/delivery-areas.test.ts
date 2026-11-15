@@ -71,6 +71,14 @@ describe("delivery price map", () => {
     expect(merged.find((a) => a.mapName === "Local")).toMatchObject({ name: "Kiryas Joel", priceCents: 1200 });
   });
 
+  it("the saved map reads back as the map (it once read back empty, so the town rule was used by mistake)", async () => {
+    const { getSettings, saveSetting } = await import("@/lib/settings");
+    await saveSetting("deliveryAreas", JSON.stringify(areas), null);
+    const back = (await getSettings()).deliveryAreas;
+    expect(JSON.parse(back)).toHaveLength(4);
+    expect(await deliveryQuote("4 Ruach Way, Monroe", await getSettings(), census(-73.99, 41.51))).toEqual({ ok: true, zone: "Ruach Hchaim", feeCents: 2000 });
+  });
+
   it("before the map is loaded, the town-name rule still works", async () => {
     expect(await deliveryQuote("5 Main St, Chester NY", { ...SETTING_DEFAULTS, deliveryAreas: "" })).toEqual({ ok: true, zone: "area", feeCents: 1500 });
   });

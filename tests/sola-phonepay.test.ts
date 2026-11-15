@@ -110,7 +110,13 @@ describe("card payment plan (Abraham, Nov 15, 2026): the caller never controls t
     expect(classifyTry([t("E", 80000)], want, new Set(["E"])).kind).toBe("none"); // already used
     const both = classifyTry([t("F", 100), t("G", 80000, null, 1)], want, new Set());
     expect(both.kind).toBe("paid");
-    expect(both.wrong.map((x) => x.refNum)).toEqual(["F"]); // the wrong one is still voided
+    expect(both.wrong.map((x) => x.refNum)).toEqual(["F"]);
+  });
+  it("two charges of exactly the order total (two callers at once, or a Sola portal charge): nothing is paid", async () => {
+    const { classifyTry } = await import("@/lib/sola-phonepay");
+    const two = classifyTry([t("H", 80000), t("I", 80000, null, 1)], want, new Set());
+    expect(two.kind).toBe("ambiguous");
+    expect(two.paid).toBeNull();
   });
   it("void goes to Sola's gateway with the reference only", async () => {
     const { solaVoid } = await import("@/lib/sola-phonepay");

@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
@@ -280,13 +280,16 @@ export const PHONEPAY_MAX_TRIES = 6;
  * - none for the order total but some for other amounts: "wrong_amount" (they are voided)
  * - none: "none"
  */
-export function classifyTry(txns: SolaTxn[], want: { amountCents: number; from: Date; to: Date }, used: Set<string>): { kind: "paid" | "wrong_amount" | "none"; paid: SolaTxn | null; wrong: SolaTxn[] } {
+export function classifyTry(txns: SolaTxn[], want: { amountCents: number; from: Date; to: Date }, used: Set<string>): { kind: "paid" | "ambiguous" | "wrong_amount" | "none"; paid: SolaTxn | null; matches: SolaTxn[]; wrong: SolaTxn[] } {
   const mine = txns
     .filter((t) => t.approved && t.refNum && !used.has(t.refNum) && !(t.invoice ?? "").replace(/\D/g, "") && t.at >= new Date(want.from.getTime() - 60_000) && t.at <= new Date(want.to.getTime() + 120_000))
     .sort((a, b) => a.at.getTime() - b.at.getTime());
-  const paid = mine.find((t) => t.amountCents === want.amountCents) ?? null;
-  const wrong = mine.filter((t) => t !== paid);
-  return { kind: paid ? "paid" : wrong.length ? "wrong_amount" : "none", paid, wrong };
+  // Safer check (Abraham, Nov 15, 2026): the exact order total, and only one such charge
+  const matches = mine.filter((t) => t.amountCents === want.amountCents);
+  const wrong = mine.filter((t) => t.amountCents !== want.amountCents);
+  if (matches.length > 1) return { kind: "ambiguous", paid: null, matches, wrong };
+  if (matches.length === 1) return { kind: "paid", paid: matches[0], matches, wrong };
+  return { kind: wrong.length ? "wrong_amount" : "none", paid: null, matches, wrong };
 }
 
 /** Void a Sola charge (Sola gateway, cc:void). Only used for a PhonePay charge that is not the order total. */
@@ -356,9 +359,28 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
     const { sendEmail } = await import("@/lib/notify");
     await sendEmail(to, subject, `${text}\n\n${config.baseUrl()}/admin/orders/${orderId}`).catch(() => null);
   };
-  // Charges that are not the order total: voided right away, never counted as payment
+  // Two or more charges of exactly the order total (two callers paying at once, or a charge keyed in the Sola portal):
+  // nothing is marked paid and nothing is voided; the Owner checks Sola (Abraham, Nov 15, 2026)
+  if (c?.kind === "ambiguous") {
+    await db.update(schema.phonepayAttempts).set({ result: "check_failed" }).where(eq(schema.phonepayAttempts.id, attemptId));
+    await finishAttempt(attemptId, { matched: false, note: "More than one charge fits: check Sola" });
+    await mail(`Hup Up Attractions: please check a phone payment, order #${num}`, `A caller paid order #${num} ($${(dueCents / 100).toFixed(2)}) by phone, but Sola shows more than one charge of that amount with no invoice number at the same time:\n\n${c.matches.map((t) => `$${(t.amountCents / 100).toFixed(2)}, Sola reference ${t.refNum}, card ending ${t.last4 ?? "?"}`).join("\n")}\n\nNothing was marked paid and nothing was voided. Please check Sola, then mark the right order paid.`);
+    return { result: "check_failed" };
+  }
+  // A charge that is not the order total: voided automatically only when it is the only one in this try's window and
+  // no other caller was paying by phone at the same time; otherwise left alone and the Owner is emailed
+  const others = await db
+    .select({ id: schema.phonepayAttempts.id, callSid: schema.phonepayAttempts.callSid, endedAt: schema.phonepayAttempts.endedAt })
+    .from(schema.phonepayAttempts)
+    .where(gte(schema.phonepayAttempts.startedAt, new Date(from.getTime() - 15 * 60_000)));
+  const someoneElse = others.some((o) => o.callSid !== attempt?.callSid && (!o.endedAt || o.endedAt >= from));
+  const safeToVoid = (c?.wrong.length ?? 0) === 1 && !someoneElse;
   const voids: string[] = [];
   for (const t of c?.wrong ?? []) {
+    if (!safeToVoid) {
+      voids.push(`$${(t.amountCents / 100).toFixed(2)} (Sola reference ${t.refNum}): NOT voided, because ${someoneElse ? "another caller was paying by phone at the same time" : "more than one such charge was found"}. Please check it in Sola`);
+      continue;
+    }
     const v = await solaVoid(t.refNum, deps.fetcher);
     voids.push(`$${(t.amountCents / 100).toFixed(2)} (Sola reference ${t.refNum}): ${v.ok ? "voided" : `could NOT be voided (${v.error}), please void or refund it in Sola`}`);
   }

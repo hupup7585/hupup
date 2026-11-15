@@ -197,7 +197,8 @@ export async function getSettings(): Promise<Settings> {
       if (!(r.key in out)) continue;
       // The database hands back a saved "72" as the number 72; keep every value the same type as its default
       const def = (SETTING_DEFAULTS as Record<string, unknown>)[r.key];
-      const v = typeof def === "string" && r.value !== null && typeof r.value !== "string" ? String(r.value) : r.value;
+      // (a saved list, like the delivery map areas, comes back as a list: kept as its JSON text)
+      const v = typeof def === "string" && r.value !== null && typeof r.value !== "string" ? (typeof r.value === "object" ? JSON.stringify(r.value) : String(r.value)) : r.value;
       (out as Record<string, unknown>)[r.key] = v;
     }
   } catch (e) {
