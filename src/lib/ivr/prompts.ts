@@ -261,12 +261,13 @@ export const PROMPTS = {
   },
   // Pay by keypad through Stripe (Abraham, Nov 12, 2026). Wording approved Nov 13, 2026; still owner test only.
   // Sola PhonePay (Abraham, Nov 14, 2026): drafts until he approves them; they play only on his own test calls until then
-  phonepay_choice: { group: "Pay by card (Sola PhonePay)", label: "Pay now or get a link", text: "Press 1 to pay now by card. Press 2 to get a secure payment link instead.", pending: true },
-  // Abraham's approved wording (Nov 14, 2026); stays "Waiting" until he approves the recorded audio
-  phonepay_intro: { group: "Pay by card (Sola PhonePay)", label: "PhonePay connect", text: "Thank you. Please hold for a moment while we connect you to our secure payment line.", pending: true },
-  phonepay_back: { group: "Pay by card (Sola PhonePay)", label: "Back from the payment line", text: "Thank you, let us finish your order.", pending: true },
-  phonepay_paid: { group: "Pay by card (Sola PhonePay)", label: "Payment found", text: "Your payment was received. You are all set!", pending: true },
-  phonepay_not_found: { group: "Pay by card (Sola PhonePay)", label: "Payment not found", text: "We could not confirm your payment yet. We will send you a secure payment link, and our team will call you back if needed.", pending: true },
+  phonepay_choice: { group: "Pay by card (Sola PhonePay)", label: "Pay now or get a link", text: "Press 1 to pay now by card. Press 2 to get a secure payment link instead." }, // approved Nov 14
+  // Abraham approved the wording (Nov 14, 2026). No recording is made until he picks the voice and approves the audio;
+  // until then the lines play in the live voice and PhonePay stays on his own test calls only.
+  phonepay_intro: { group: "Pay by card (Sola PhonePay)", label: "PhonePay connect", text: "Thank you. Please hold for a moment while we connect you to our secure payment line." }, // approved Nov 14
+  phonepay_back: { group: "Pay by card (Sola PhonePay)", label: "Back from the payment line", text: "Thank you. Let us finish your order." }, // approved Nov 14 ("Let's", spelled out by the standing rule)
+  phonepay_paid: { group: "Pay by card (Sola PhonePay)", label: "Payment found", text: "Your payment was received. You are all set!" }, // approved Nov 14 ("You're", spelled out)
+  phonepay_not_found: { group: "Pay by card (Sola PhonePay)", label: "Payment not found", text: "We could not confirm your payment yet. We will send you a secure payment link, and our team will call you back if needed." }, // approved Nov 14 (spelled out)
   pay_start: { group: "Pay by keypad", label: "Before the card steps", text: "Let us take care of your payment now. Please have your card ready." },
   pay_card_number: { group: "Pay by keypad", label: "Card number", text: "Please enter your card number on your keypad, then press pound." },
   pay_expiration: { group: "Pay by keypad", label: "Expiration date", text: "Please enter the expiration date, two digits for the month and two digits for the year, then press pound." },
@@ -296,9 +297,15 @@ export const PROMPTS = {
   vma_pin: { group: "Voicemail", label: "Staff access: ask for the password (Abraham, word for word)", text: "Please enter your password." },
   vma_wrong: { group: "Voicemail", label: "Staff access: wrong PIN", text: "Sorry, that PIN is not right. Please try again.", pending: true },
   vma_locked: { group: "Voicemail", label: "Staff access: locked", text: "Voicemail access is locked for now. Please try again later. Goodbye.", pending: true },
-  vma_box: { group: "Voicemail", label: "Staff access: choose a box or call out", text: "Please enter the number of the voicemail box. For the main box, press 1. To call a customer, press 0. To change your password, press star.", pending: true },
+  vma_box: { group: "Voicemail", label: "Staff access: choose a box or call out", text: "Please enter the number of the voicemail box. For the main box, press 1. To call a customer, press 0. To charge a custom amount, press 7. To change your password, press star.", pending: true },
   vma_out_enter: { group: "Voicemail", label: "Staff access: call out, enter the number (Abraham, word for word)", text: "Please enter the phone number." },
   vma_out_bad: { group: "Voicemail", label: "Staff access: call out, not a valid number (Abraham)", text: "It is not a valid phone number. Please try again." },
+  // Owner custom charge (Abraham, Nov 14, 2026): owner voicemail menu, key 7; drafts until he approves the text and audio
+  vma_charge_amount: { group: "Voicemail", label: "Owner custom charge: enter the amount", text: "Enter the amount in dollars and cents, then press pound. For example, for 125 dollars, press 1 2 5 0 0, then pound.", pending: true },
+  vma_charge_readback: { group: "Voicemail", label: "Owner custom charge: read the amount back", text: "You entered {dollars} dollars and {cents} cents. Press 1 to confirm, or 2 to enter it again.", vars: ["dollars", "cents"], pending: true },
+  vma_charge_note: { group: "Voicemail", label: "Owner custom charge: optional order number", text: "To add an order number, enter it now and press pound. To skip, just press pound.", pending: true },
+  vma_charge_bad: { group: "Voicemail", label: "Owner custom charge: amount not allowed", text: "That amount is not allowed. Please try again.", pending: true },
+  vma_charge_back: { group: "Voicemail", label: "Owner custom charge: back in the menu", text: "You are back in the owner menu.", pending: true },
   vma_count: { group: "Voicemail", label: "Staff access: how many messages", text: "You have {count} messages, newest first.", vars: ["count"], pending: true },
   vma_none: { group: "Voicemail", label: "Staff access: empty box", text: "There are no messages in this box.", pending: true },
   vma_message: { group: "Voicemail", label: "Staff access: before each message", text: "Message {n}, from {number}, on {date} at {time}.", vars: ["n", "number", "date", "time"], pending: true },

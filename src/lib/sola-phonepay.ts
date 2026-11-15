@@ -65,28 +65,46 @@ export function digitsTemplateError(template: string): string | null {
 }
 
 /** The order travels to the subaccount in SIP headers, signed so it can't be changed on the way. */
-const sig = (orderId: number, callSid: string, cents: number) =>
-  createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`sola-phonepay:${orderId}:${callSid}:${cents}`).digest("hex").slice(0, 32);
+export type PayKind = "order" | "custom";
+const sig = (orderId: number, callSid: string, cents: number, kind: PayKind) =>
+  createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`sola-phonepay:${kind}:${orderId}:${callSid}:${cents}`).digest("hex").slice(0, 32);
 
-export function phonePaySipUri(orderId: number, callSid: string, cents: number, env: Record<string, string | undefined> = process.env): string {
-  return `sip:phonepay@${env.TWILIO_PAY_SIP_DOMAIN}?X-Hup-Mode=phonepay&X-Hup-Order=${orderId}&X-Hup-Call=${encodeURIComponent(callSid)}&X-Hup-Cents=${cents}&X-Hup-Sig=${sig(orderId, callSid, cents)}`;
+/** orderId 0 = an Owner custom charge with no order number. */
+export function phonePaySipUri(orderId: number, callSid: string, cents: number, env: Record<string, string | undefined> = process.env, kind: PayKind = "order"): string {
+  return `sip:phonepay@${env.TWILIO_PAY_SIP_DOMAIN}?X-Hup-Mode=phonepay&X-Hup-Kind=${kind}&X-Hup-Order=${orderId}&X-Hup-Call=${encodeURIComponent(callSid)}&X-Hup-Cents=${cents}&X-Hup-Sig=${sig(orderId, callSid, cents, kind)}`;
 }
 
-export function verifyPhonePaySip(body: Record<string, string>): { orderId: number; mainCallSid: string; cents: number } | null {
+export function verifyPhonePaySip(body: Record<string, string>): { orderId: number; mainCallSid: string; cents: number; kind: PayKind } | null {
   if (body["SipHeader_X-Hup-Mode"] !== "phonepay") return null;
+  const kind: PayKind = body["SipHeader_X-Hup-Kind"] === "custom" ? "custom" : "order";
   const orderId = Number(body["SipHeader_X-Hup-Order"]);
   const cents = Number(body["SipHeader_X-Hup-Cents"]);
   const mainCallSid = body["SipHeader_X-Hup-Call"] ?? "";
   const got = Buffer.from(body["SipHeader_X-Hup-Sig"] ?? "");
-  if (!Number.isInteger(orderId) || orderId <= 0 || !Number.isInteger(cents) || cents <= 0 || !mainCallSid) return null;
-  const want = Buffer.from(sig(orderId, mainCallSid, cents));
-  return want.length === got.length && timingSafeEqual(want, got) ? { orderId, mainCallSid, cents } : null;
+  if (!Number.isInteger(orderId) || orderId < (kind === "custom" ? 0 : 1) || !Number.isInteger(cents) || cents <= 0 || !mainCallSid) return null;
+  const want = Buffer.from(sig(orderId, mainCallSid, cents, kind));
+  return want.length === got.length && timingSafeEqual(want, got) ? { orderId, mainCallSid, cents, kind } : null;
+}
+
+/* ---- Owner custom charge (owner voicemail menu, key 7; Abraham, Nov 14, 2026) ---- */
+
+/** Typed as dollars and cents with no point: 12500 = $125.00. Allowed: $1.00 up to the cap from Admin. */
+export function parseCustomAmount(digits: string | null | undefined, capCents: number): number | null {
+  const d = (digits ?? "").trim();
+  if (!/^\d{3,7}$/.test(d)) return null;
+  const cents = Number(d);
+  return cents >= 100 && cents <= capCents ? cents : null;
+}
+
+/** For the read-back: "125 dollars and 0 cents". */
+export function amountParts(cents: number) {
+  return { dollars: Math.floor(cents / 100), cents: cents % 100 };
 }
 
 /* ---- Attempts (Admin shows the last 20; never any card data) ---- */
 
-export async function startAttempt(orderId: number, callSid: string, amountCents: number) {
-  const [row] = await db.insert(schema.phonepayAttempts).values({ orderId, callSid, amountCents }).returning();
+export async function startAttempt(orderId: number | null, callSid: string, amountCents: number, kind: PayKind = "order") {
+  const [row] = await db.insert(schema.phonepayAttempts).values({ orderId: orderId || null, callSid, amountCents, kind }).returning();
   return row;
 }
 
@@ -103,7 +121,7 @@ export async function recentAttempts(limit = 20) {
 
 export async function openAttemptFor(callSid: string, orderId: number) {
   const [row] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.callSid, callSid)).orderBy(desc(schema.phonepayAttempts.id)).limit(1);
-  return row && row.orderId === orderId && !row.endedAt ? row : null;
+  return row && (row.orderId ?? 0) === orderId && !row.endedAt ? row : null;
 }
 
 /* ---- Finding the payment in Sola ---- */
@@ -173,9 +191,10 @@ export const phonePayAdminUrl = () => `${config.baseUrl()}/admin/phone/phonepay`
 
 /** PhonePay payments are Sola payments: refunds, the books and reports treat them like any Sola payment. */
 export const PHONEPAY_METHOD = "sola_phonepay";
-export const isSolaMethod = (m: string | null | undefined) => m === "sola" || m === PHONEPAY_METHOD;
+export const isSolaMethod = (m: string | null | undefined) => m === "sola" || m === PHONEPAY_METHOD || m === "sola_phonepay_custom";
+export const PHONEPAY_CUSTOM_METHOD = "sola_phonepay_custom";
 export const paymentSourceLabel = (m: string | null | undefined) =>
-  m === PHONEPAY_METHOD ? "Phone (Sola PhonePay)" : m === "sola" ? "Sola payment link" : m === "stripe" ? "Phone (Stripe keypad)" : m ? m.charAt(0).toUpperCase() + m.slice(1) : "";
+  m === PHONEPAY_CUSTOM_METHOD ? "Phone, custom charge (owner)" : m === PHONEPAY_METHOD ? "Phone (Sola PhonePay)" : m === "sola" ? "Sola payment link" : m === "stripe" ? "Phone (Stripe keypad)" : m ? m.charAt(0).toUpperCase() + m.slice(1) : "";
 
 /**
  * After the caller is back from PhonePay: look for the payment in Sola (Sola may take a few seconds to list it, so it
@@ -238,4 +257,41 @@ export function phonePayDialTwiml(vr: DialHost, phone: string, digits: string, a
   const dial = vr.dial({ timeout: 30, timeLimit: 900, record: "do-not-record", ...(action ? { action, method: "POST" } : {}) });
   dial.number({ sendDigits: digits }, toE164(phone) ?? phone);
   return vr;
+}
+
+
+/**
+ * Owner custom charge, after PhonePay hangs up: find the payment in Sola the same way. With an order number that is a
+ * real order, a found payment is recorded on that order ("Phone, custom charge (owner)"). Without one, it is only
+ * logged on the attempt. No card data, ever.
+ */
+export async function matchCustomCharge(attemptId: number, cents: number, orderId: number | null, deps: { fetcher?: typeof fetch; waitMs?: number; now?: () => Date } = {}): Promise<{ found: boolean; reason: string }> {
+  const { orderNumber, markGroupPaid } = await import("@/lib/orders");
+  const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
+  const from = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
+  const num = orderId ? orderNumber(orderId) : "";
+  let reason = "not_found";
+  let found: SolaTxn | null = null;
+  for (let i = 0; i < 3 && !found; i++) {
+    if (i) await new Promise((r) => setTimeout(r, deps.waitMs ?? 3000));
+    try {
+      const now = deps.now?.() ?? new Date();
+      const r = pickMatch(await solaApprovedBetween(new Date(from.getTime() - 60_000), now, deps.fetcher), { amountCents: cents, orderNumber: num || "none", from, to: now }, await usedSolaRefs());
+      reason = r.reason;
+      found = r.match;
+    } catch (e) {
+      reason = `lookup_failed: ${(e as Error).message}`.slice(0, 200);
+    }
+  }
+  if (!found) {
+    await finishAttempt(attemptId, { matched: false, note: reason });
+    return { found: false, reason };
+  }
+  await finishAttempt(attemptId, { matched: true, solaRef: found.refNum, last4: found.last4, cardType: found.cardType, note: orderId ? "Paid" : "Paid, no order number" });
+  if (orderId) {
+    await markGroupPaid(orderId, found.amountCents, PHONEPAY_CUSTOM_METHOD, found.refNum);
+    const { recordPaymentResult } = await import("@/lib/payment-result");
+    await recordPaymentResult([orderId], "approved", found.last4, found.refNum, found.at);
+  }
+  return { found: true, reason: "found" };
 }

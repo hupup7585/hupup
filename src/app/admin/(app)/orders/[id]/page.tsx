@@ -92,7 +92,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               {due > 0 && <div className="text-sm font-bold text-coral">Balance due {formatMoney(due)}</div>}
             </div>
           </div>
-          {staff.role === "owner" && (o.paymentMethod === "stripe" || o.paymentMethod === "sola" || o.paymentMethod === "sola_phonepay") && o.paidCents > 0 && (await (async () => {
+          {staff.role === "owner" && (o.paymentMethod === "stripe" || o.paymentMethod === "sola" || o.paymentMethod === "sola_phonepay" || o.paymentMethod === "sola_phonepay_custom") && o.paidCents > 0 && (await (async () => {
             // Refund (Owner only; Secretary and Delivery never see it). Stripe phone or Sola website payments.
             const [refunds, disputes] = await Promise.all([refundsFor(o.id), o.paymentMethod === "stripe" ? disputesFor(o.id) : Promise.resolve([])]);
             const users = await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers);

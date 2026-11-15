@@ -1378,7 +1378,10 @@ export const phonepayAttempts = pgTable(
   "phonepay_attempts",
   {
     id: serial("id").primaryKey(),
-    orderId: integer("order_id").notNull().references(() => orders.id),
+    /** Empty for an Owner custom charge without an order number */
+    orderId: integer("order_id").references(() => orders.id),
+    /** "order" (a caller paying an order) or "custom" (Owner custom charge from the owner voicemail menu) */
+    kind: text("kind").notNull().default("order"),
     callSid: text("call_sid").notNull(),
     amountCents: integer("amount_cents").notNull(),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),

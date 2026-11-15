@@ -35,7 +35,7 @@ export async function paymentRef(o: Ord): Promise<{ provider: Provider; ref: str
   const lead = !o.stripePaymentId && !o.solaRefNum && o.paymentGroupId ? await orderById(o.paymentGroupId) : null;
   const src = lead ?? o;
   if (o.paymentMethod === "stripe" && src.stripePaymentId) return { provider: "stripe", ref: src.stripePaymentId };
-  if ((o.paymentMethod === "sola" || o.paymentMethod === "sola_phonepay") && src.solaRefNum) return { provider: "sola", ref: src.solaRefNum };
+  if ((o.paymentMethod === "sola" || o.paymentMethod === "sola_phonepay" || o.paymentMethod === "sola_phonepay_custom") && src.solaRefNum) return { provider: "sola", ref: src.solaRefNum };
   return null;
 }
 

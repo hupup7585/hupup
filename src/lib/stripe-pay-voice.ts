@@ -88,14 +88,15 @@ export async function handlePayVoice(action: string, query: URLSearchParams, bod
     const s = await getSettings();
     const pin = process.env.SOLA_PHONEPAY_PIN ?? "";
     if (action === "phonepay-backup") {
-      const o = Number(query.get("o"));
+      const o = Number(query.get("o") || 0);
       const cents = Number(query.get("c"));
+      const custom = query.get("k") === "custom";
       const answered = body.DialCallStatus === "completed" || body.DialCallStatus === "answered";
-      if (answered || !o || !cents || !tokOk(o, sid, query.get("t")) || !pin) {
+      if (answered || (!o && !custom) || !cents || !tokOk(o, sid, query.get("t")) || !pin) {
         vr.hangup();
         return vr.toString();
       }
-      phonePayDialTwiml(vr, s.solaPhonePayBackup, buildSendDigits(s.solaPhonePayDigits, { pin, amountCents: cents, orderNumber: orderNumber(o) }), null);
+      phonePayDialTwiml(vr, s.solaPhonePayBackup, buildSendDigits(custom ? s.solaPhonePayCustomDigits : s.solaPhonePayDigits, { pin, amountCents: cents, orderNumber: o ? orderNumber(o) : "" }), null);
       vr.hangup();
       return vr.toString();
     }
@@ -104,8 +105,9 @@ export async function handlePayVoice(action: string, query: URLSearchParams, bod
       vr.hangup();
       return vr.toString();
     }
-    const digits = buildSendDigits(s.solaPhonePayDigits, { pin, amountCents: v.cents, orderNumber: orderNumber(v.orderId) });
-    phonePayDialTwiml(vr, s.solaPhonePayNumber, digits, payUrl("phonepay-backup", { o: v.orderId, c: v.cents, t: tok(v.orderId, sid) }));
+    const custom = v.kind === "custom";
+    const digits = buildSendDigits(custom ? s.solaPhonePayCustomDigits : s.solaPhonePayDigits, { pin, amountCents: v.cents, orderNumber: v.orderId ? orderNumber(v.orderId) : "" });
+    phonePayDialTwiml(vr, s.solaPhonePayNumber, digits, payUrl("phonepay-backup", { o: v.orderId, c: v.cents, k: v.kind, t: tok(v.orderId, sid) }));
     return vr.toString();
   }
   if (stripePhonePayMode() === "off" || (process.env.TWILIO_PAY_ACCOUNT_SID && body.AccountSid !== process.env.TWILIO_PAY_ACCOUNT_SID)) {

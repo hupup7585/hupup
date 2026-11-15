@@ -44,7 +44,7 @@ import {
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { stripePhonePayMode, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
-import { matchPhonePay, phonePayOffered, phonePaySipUri, startAttempt } from "@/lib/sola-phonepay";
+import { amountParts, matchCustomCharge, matchPhonePay, parseCustomAmount, phonePayOffered, phonePaySipUri, startAttempt } from "@/lib/sola-phonepay";
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
@@ -2356,6 +2356,7 @@ const handlers: Record<string, Handler> = {
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
     if (ctx.body.Digits === "0") return back(vr, "vma-out"); // call a customer out
     if (ctx.body.Digits === "*") return back(vr, "vma-newpin"); // change the password (Abraham, Nov 15, 2026)
+    if (ctx.body.Digits === "7") return back(vr, "vma-charge"); // Owner custom charge through Sola PhonePay (Nov 14, 2026)
     const key = BOX_BY_NUMBER[ctx.body.Digits ?? ""];
     if (!key) {
       sp(vr, ctx, "not_valid");
@@ -2468,6 +2469,83 @@ const handlers: Record<string, Handler> = {
     await vmPinChangedByPhone(ctx.callSid, ctx.session?.fromNumber ?? ctx.from, pin);
     await track(ctx.callSid, "vm_access", "Voicemail password changed by phone", {});
     sp(vr, ctx, "vma_newpin_saved", undefined, { draftOk: true });
+    return back(vr, "vma-box");
+  },
+
+  /* ---- Owner custom charge through Sola PhonePay (Abraham, Nov 14, 2026); only after the voicemail password ---- */
+
+  async "vma-charge"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const settings = await getSettings();
+    if (!phonePayOffered(ctx.session?.fromNumber ?? ctx.from, { ...settings, solaPhonePayOwnerOnly: false })) {
+      sp(vr, ctx, "not_valid"); // PhonePay is switched off (or not set up): this key does nothing
+      return back(vr, "vma-box");
+    }
+    const t = Number(ctx.query.get("t") || 0);
+    if (t >= 3) {
+      sp(vr, ctx, "vma_charge_back", undefined, { draftOk: true });
+      return back(vr, "vma-box");
+    }
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 12, action: url("vma-charge-amount", { t }), method: "POST" });
+    sp(g, ctx, "vma_charge_amount", undefined, { draftOk: true });
+    return back(vr, "vma-charge", { t: t + 1 });
+  },
+
+  async "vma-charge-amount"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const t = Number(ctx.query.get("t") || 0);
+    const cents = parseCustomAmount(ctx.body.Digits, Number((await getSettings()).solaPhonePayCustomCapCents) || 500000);
+    if (!cents) {
+      sp(vr, ctx, "vma_charge_bad", undefined, { draftOk: true });
+      return back(vr, "vma-charge", { t: t + 1 });
+    }
+    const g = keypad(vr, url("vma-charge-confirm", { c: cents, t }), { numDigits: 1, timeout: 8 });
+    sp(g, ctx, "vma_charge_readback", amountParts(cents), { draftOk: true });
+    return back(vr, "vma-charge", { t: t + 1 });
+  },
+
+  "vma-charge-confirm"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const c = Number(ctx.query.get("c"));
+    const t = Number(ctx.query.get("t") || 0);
+    if (ctx.body.Digits !== "1") return back(vr, "vma-charge", { t: ctx.body.Digits === "2" ? t : t + 1 });
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-charge-go", { c }), method: "POST", actionOnEmptyResult: true });
+    sp(g, ctx, "vma_charge_note", undefined, { draftOk: true });
+    return back(vr, "vma-charge-go", { c });
+  },
+
+  async "vma-charge-go"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const c = Number(ctx.query.get("c"));
+    if (!c) return back(vr, "vma-box");
+    // An order number is attached only if it is a real order
+    const typed = (ctx.body.Digits || "").replace(/\D/g, "");
+    const id = typed ? Number(typed) - 1000 : 0;
+    const [order] = id > 0 ? await db.select({ id: orders.id }).from(orders).where(eq(orders.id, id)).limit(1) : [];
+    if (ctx.session?.data.recording) {
+      try {
+        await pauseRecording(ctx.callSid);
+      } catch {
+        sp(vr, ctx, "vma_charge_back", undefined, { draftOk: true });
+        return back(vr, "vma-box");
+      }
+    }
+    const attempt = await startAttempt(order?.id ?? null, ctx.callSid, c, "custom");
+    await track(ctx.callSid, "vm_access", `Owner custom charge started: $${(c / 100).toFixed(2)}${order ? ` for order #${orderNumber(order.id)}` : ""}`, { attempt: attempt.id });
+    sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true });
+    const dial = vr.dial({ action: url("vma-charge-done", { a: attempt.id, c, o: order?.id ?? 0 }), method: "POST", timeLimit: 900, answerOnBridge: true });
+    dial.sip({ username: process.env.TWILIO_PAY_SIP_USERNAME, password: process.env.TWILIO_PAY_SIP_PASSWORD }, phonePaySipUri(order?.id ?? 0, ctx.callSid, c, process.env, "custom"));
+    return vr;
+  },
+
+  async "vma-charge-done"(ctx, vr) {
+    if (ctx.session?.data.recording) await resumeRecording(ctx.callSid).catch(() => null);
+    const a = Number(ctx.query.get("a"));
+    const c = Number(ctx.query.get("c"));
+    const o = Number(ctx.query.get("o")) || null;
+    if (a && c) await matchCustomCharge(a, c, o);
+    sp(vr, ctx, "vma_charge_back", undefined, { draftOk: true });
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
     return back(vr, "vma-box");
   },
 

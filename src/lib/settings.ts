@@ -31,6 +31,10 @@ export const SETTING_DEFAULTS = {
   solaPhonePayBackup: "+18444227356",
   /** Digits sent to PhonePay: w = half a second; {pin} {amount} {dollars} {order}. Set from Abraham's test call. */
   solaPhonePayDigits: "wwwwwwwwww{pin}#",
+  /** Owner custom charge (owner voicemail menu, key 7): its own digits (leave {amount} out if PhonePay should let the
+   * Owner type the amount) and the highest amount allowed, in cents ($5,000.00). */
+  solaPhonePayCustomDigits: "wwwwwwwwww{pin}#",
+  solaPhonePayCustomCapCents: "500000",
   calendarEnabled: "yes",
   calendarLatitude: "41.3407",
   calendarLongitude: "-74.1679",

@@ -20,19 +20,27 @@ export async function savePhonePayAction(form: FormData) {
   if (!number || !backup) return back("Enter both PhonePay numbers, for example (833) 434-3354.");
   const err = digitsTemplateError(digits);
   if (err) return back(err);
+  const customDigits = String(form.get("customDigits") ?? "").replace(/\s+/g, "");
+  const customErr = digitsTemplateError(customDigits);
+  if (customErr) return back(`Custom charge: ${customErr}`);
+  const capDollars = Number(String(form.get("customCap") ?? "").replace(/[$,\s]/g, ""));
+  if (!Number.isFinite(capDollars) || capDollars < 1 || capDollars > 99999) return back("The highest custom amount must be between $1.00 and $99,999.00.");
+  const customCap = String(Math.round(capDollars * 100));
   const before = await getSettings();
   await saveSetting("solaPhonePayOn", on, owner.userId);
   await saveSetting("solaPhonePayOwnerOnly", ownerOnly, owner.userId);
   await saveSetting("solaPhonePayNumber", number, owner.userId);
   await saveSetting("solaPhonePayBackup", backup, owner.userId);
   await saveSetting("solaPhonePayDigits", digits, owner.userId);
+  await saveSetting("solaPhonePayCustomDigits", customDigits, owner.userId);
+  await saveSetting("solaPhonePayCustomCapCents", customCap, owner.userId);
   await db.insert(schema.auditLog).values({
     userId: owner.userId,
     action: "settings.phonepay_updated",
     entityType: "settings",
     entityId: "sola_phonepay",
     before: { on: before.solaPhonePayOn, ownerOnly: before.solaPhonePayOwnerOnly, number: before.solaPhonePayNumber, backup: before.solaPhonePayBackup, digits: before.solaPhonePayDigits },
-    after: { on, ownerOnly, number, backup, digits },
+    after: { on, ownerOnly, number, backup, digits, customDigits, customCap },
   });
   revalidatePath("/admin/phone/phonepay");
   return back("Saved.");

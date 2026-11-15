@@ -148,7 +148,7 @@ describe("after the PIN", () => {
     h.session.data = { vmaOk: 1 };
     const none = await call("vma-box-choice", { Digits: "3" });
     expect(said(none)).toContain("There are no messages in this box.");
-    expect(redirect(await call("vma-box-choice", { Digits: "7" }))).toBe("vma-box");
+    expect(redirect(await call("vma-box-choice", { Digits: "4" }))).toBe("vma-box"); // 4 has no box (7 is the Owner custom charge)
   });
   it("star changes the password: new password twice, saved hashed, the Owner is emailed; a mismatch asks again", async () => {
     h.session.data = { vmaOk: 1 };

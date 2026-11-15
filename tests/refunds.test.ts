@@ -82,7 +82,7 @@ describe("Admin", () => {
     expect(refundQuestion(2500, "1234")).toBe("Refund $25.00 to card ending 1234? This cannot be undone.");
   });
   it("Owner only: the Refund box is shown only to the Owner; refunds need the Owner on the server too", () => {
-    expect(readFileSync("src/app/admin/(app)/orders/[id]/page.tsx", "utf8")).toContain('staff.role === "owner" && (o.paymentMethod === "stripe" || o.paymentMethod === "sola" || o.paymentMethod === "sola_phonepay")');
+    expect(readFileSync("src/app/admin/(app)/orders/[id]/page.tsx", "utf8")).toContain('staff.role === "owner" && (o.paymentMethod === "stripe" || o.paymentMethod === "sola" || o.paymentMethod === "sola_phonepay" || o.paymentMethod === "sola_phonepay_custom")');
     expect(readFileSync("src/app/admin/(app)/orders/[id]/stripe-actions.ts", "utf8")).toMatch(/export async function refundAction[\s\S]*?await requireOwner\(\)/);
     expect(readFileSync("src/app/admin/(app)/orders/[id]/RefundPanel.tsx", "utf8")).toContain("? This cannot be undone.");
   });

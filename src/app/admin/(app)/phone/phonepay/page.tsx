@@ -64,6 +64,11 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
             Sent automatically after PhonePay answers. <code>w</code> waits half a second. <code>{"{pin}"}</code> is our merchant PIN (kept secret in Vercel), <code>{"{amount}"}</code> the total in cents with no point (230.00 is 23000), <code>{"{dollars}"}</code> whole dollars, <code>{"{order}"}</code> the order number. Example: <code>{"wwwwwwwwww{pin}#ww{amount}#"}</code> waits 5 seconds, enters the PIN and pound, waits 1 second, then the amount and pound. Set this to match PhonePay&rsquo;s prompts from your test call.
           </span>
         </label>
+        <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2" data-phonepay-custom>
+          <p className="text-sm sm:col-span-2"><b>Owner custom charge</b> (owner voicemail menu, key 7): charge any amount by phone, after your voicemail password.</p>
+          <label className="block"><span className="label">Highest amount allowed, in dollars</span><input name="customCap" inputMode="decimal" defaultValue={(Number(s.solaPhonePayCustomCapCents) / 100).toFixed(2)} className="input" placeholder="5000.00" /></label>
+          <label className="block"><span className="label">Digits sent to PhonePay for a custom charge</span><input name="customDigits" defaultValue={s.solaPhonePayCustomDigits} className="input font-mono" /><span className="mt-1 block text-xs text-muted">Same rules as above. Leave {"{amount}"} out if PhonePay should let you type the amount yourself.</span></label>
+        </div>
         <button className="btn-dark w-fit">Save</button>
       </form>
 
@@ -78,7 +83,10 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
               {attempts.map((a) => (
                 <tr key={a.id}>
                   <td className="td">{dualDateTime(a.startedAt)}</td>
-                  <td className="td"><a className="underline" href={`/admin/orders/${a.orderId}`}>Order number {orderNumber(a.orderId)}</a></td>
+                  <td className="td">
+                    {a.orderId ? <a className="underline" href={`/admin/orders/${a.orderId}`}>Order number {orderNumber(a.orderId)}</a> : "No order number"}
+                    {a.kind === "custom" && <span className="block text-xs text-muted">Custom charge (owner)</span>}
+                  </td>
                   <td className="td">{formatMoney(a.amountCents)}</td>
                   <td className={`td font-semibold ${a.matched ? "text-[#13895C]" : a.matched === false ? "text-[#C83A2F]" : "text-muted"}`}>{a.matched ? "Yes" : a.matched === false ? `No (${NOTE[a.note ?? ""] ?? a.note ?? ""})` : "In progress"}</td>
                   <td className="td">{a.cardType ?? ""}{a.last4 ? ` ending ${a.last4}` : ""}</td>
