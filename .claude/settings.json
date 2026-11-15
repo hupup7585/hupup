@@ -2,6 +2,7 @@
   "permissions": {
     "allow": [
       "mcp__Vercel",
+      "mcp__vercel",
       "mcp__Vercel__list_deployments",
       "mcp__Vercel__get_deployment",
       "mcp__Vercel__list_deployment_events",
@@ -19,7 +20,7 @@
       "Bash(npx vercel:*)",
       "WebFetch"
     ],
-    "deny": [
+    "ask": [
       "mcp__Vercel__buy_domain",
       "mcp__Vercel__create_or_transfer_domain",
       "mcp__Vercel__get_purchase_quote",
@@ -48,7 +49,10 @@
       "Bash(npx vercel remove:*)",
       "Bash(npx vercel rm:*)",
       "Bash(npx vercel projects rm:*)",
-      "Bash(npx vercel domains buy:*)"
+      "Bash(npx vercel project rm:*)",
+      "Bash(npx vercel domains buy:*)",
+      "Bash(npx vercel domains rm:*)",
+      "Bash(npx vercel env rm:*)"
     ]
   }
 }
