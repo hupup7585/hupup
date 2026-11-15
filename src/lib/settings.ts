@@ -25,6 +25,8 @@ export const SETTING_DEFAULTS = {
   zoneAreaPlaces: "Monroe\nBlooming Grove\nWoodbury\nHighland Mills\nChester\nHarriman\nMiddletown\nWashingtonville",
   /* Jewish calendar (Abraham, 2026-11-06). Diaspora; zmanim for Monroe / Kiryas Joel. Booleans as "yes"/"no". */
   /* Sola PhonePay (Abraham, Nov 14, 2026): card by phone through Sola's free PhonePay line. Off; Owner test first. */
+  /** The Owner's sign-in username (Abraham, Nov 14, 2026); staff usernames live on their accounts */
+  ownerUsername: "",
   solaPhonePayOn: false,
   solaPhonePayOwnerOnly: true,
   solaPhonePayNumber: "+18334343354",

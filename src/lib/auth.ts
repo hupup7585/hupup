@@ -93,7 +93,7 @@ async function audit(action: string, userId: number | null, after: Record<string
   });
 }
 
-const GENERIC = "If that username belongs to a staff account, a code is on its way.";
+const GENERIC = "If that username has a staff account that can use this, the code is on its way.";
 /** Abraham: the Owner can also get the sign-in code by email; it always goes to this address. */
 export const OWNER_CODE_EMAIL = "hupupattractions@gmail.com";
 
@@ -105,7 +105,7 @@ async function staffEmail(staff: StaffUser): Promise<string | null> {
   }
   return staff.role === "owner" ? OWNER_CODE_EMAIL : null;
 }
-const GENERIC_EMAIL = "If that username has a staff account with a saved email, a code is on its way to that email. Check the email on your staff account, and your spam folder.";
+const GENERIC_EMAIL = "If that username has a staff account that can use this, the code is on its way. Check the email on your staff account, and your spam folder.";
 /**
  * Text codes only work once Twilio approves our texting registration (A2P 10DLC); until then carriers drop the texts.
  * On the live site we say so plainly instead of pretending a code is on its way. (Test and preview builds keep the

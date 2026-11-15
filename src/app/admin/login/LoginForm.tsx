@@ -1,13 +1,25 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { KeyRound, MessageSquareText } from "lucide-react";
+import { KeyRound, Mail, MessageSquareText } from "lucide-react";
 import { passwordAction, sendCodeAction, sendEmailCodeAction, verifyCodeAction } from "./actions";
 
 /** Staff sign-in: one Username field (username, phone number or email), then a code by email or text, or a password. */
-export default function LoginForm({ smsActive = true, emailActive = true }: { smsActive?: boolean; emailActive?: boolean }) {
+export type SignInWay = "password" | "email" | "sms";
+/** Remembered on this device only (never per account on this page, so the page tells a stranger nothing). */
+export const SIGNIN_WAY_COOKIE = "hup_signin_way";
+
+export default function LoginForm({ smsActive = true, emailActive = true, initialWay = "password" }: { smsActive?: boolean; emailActive?: boolean; initialWay?: SignInWay }) {
   const [phone, setPhone] = useState("");
-  const [mode, setMode] = useState<"code" | "password">("password");
+  const [way, setWay] = useState<SignInWay>(initialWay);
+  const mode: "code" | "password" = way === "password" ? "password" : "code";
+  const remember = (w: SignInWay) => {
+    try {
+      document.cookie = `${SIGNIN_WAY_COOKIE}=${w}; path=/admin; max-age=31536000; samesite=lax`;
+    } catch {
+      /* no cookies: nothing to remember */
+    }
+  };
   const [sent, setSent] = useState(false);
   const [via, setVia] = useState<"sms" | "email">("sms");
   const [code, setCode] = useState("");
@@ -45,14 +57,15 @@ export default function LoginForm({ smsActive = true, emailActive = true }: { sm
         </label>
 
         {!sent && (
-          <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="How do you want to sign in?" data-signin-choice>
+          <div className="grid grid-cols-3 gap-2" role="tablist" aria-label="How do you want to sign in?" data-signin-choice>
             {(
               [
-                ["password", "Sign in with password", KeyRound],
-                ["code", "Send me a code", MessageSquareText],
+                ["password", "Password", KeyRound],
+                ["email", "Code by email", Mail],
+                ["sms", "Code by text", MessageSquareText],
               ] as const
-            ).map(([m, label, Icon]) => (
-              <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => (setMode(m), setError(null))} className={`flex items-center justify-center gap-1.5 rounded-xl border-2 px-2 py-3 text-sm font-bold ${mode === m ? "border-navy bg-navy text-white" : "border-line bg-white text-navy hover:border-navy"}`}>
+            ).map(([w, label, Icon]) => (
+              <button key={w} type="button" role="tab" aria-selected={way === w} data-way={w} onClick={() => (setWay(w), setError(null))} className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 px-2 py-3 text-sm font-bold sm:flex-row sm:gap-1.5 ${way === w ? "border-navy bg-navy text-white" : "border-line bg-white text-navy hover:border-navy"}`}>
                 <Icon className="h-4 w-4 shrink-0" aria-hidden /> {label}
               </button>
             ))}
@@ -61,20 +74,23 @@ export default function LoginForm({ smsActive = true, emailActive = true }: { sm
 
         {mode === "code" && !sent && (
           <div className="space-y-3" data-code-ways>
-            <p className="text-sm font-bold text-navy">Send the code how?</p>
-            <button type="button" data-email-code className="btn-dark w-full py-3" onClick={() => send("email")} disabled={!emailActive || pending || phone.trim().length < 3}>
-              {pending && via === "email" ? "Sending…" : "By email"}
-            </button>
-            {!emailActive && (
+            {way === "email" && (
+              <button type="button" data-email-code className="btn-dark w-full py-3" onClick={() => (remember("email"), send("email"))} disabled={!emailActive || pending || phone.trim().length < 3}>
+                {pending && via === "email" ? "Sending…" : "Send me a code by email"}
+              </button>
+            )}
+            {way === "email" && !emailActive && (
               <p data-not-active="email-login" className="rounded-lg bg-[#FFF8E1] p-3 text-sm text-[#5C4600]"><b>Not active yet:</b> email codes need the email sender set up. Use your password instead.</p>
             )}
-            <button type="button" data-sms-code className="btn-ghost w-full py-3" onClick={() => send("sms")} disabled={!smsActive || pending || phone.trim().length < 3}>
-              {pending && via === "sms" ? "Sending…" : "By text (SMS)"}
-            </button>
-            {!smsActive && (
+            {way === "sms" && (
+              <button type="button" data-sms-code className="btn-dark w-full py-3" onClick={() => (remember("sms"), send("sms"))} disabled={!smsActive || pending || phone.trim().length < 3}>
+                {pending && via === "sms" ? "Sending…" : "Send me a code by text"}
+              </button>
+            )}
+            {way === "sms" && !smsActive && (
               <p data-not-active="sms-login" className="rounded-lg bg-[#FFF8E1] p-3 text-sm text-[#5C4600]"><b>Not active yet:</b> text codes start once Twilio approves our texting registration (A2P). Use &ldquo;By email&rdquo; or your password instead. Delivery staff sign in by text code only, so Delivery sign-in starts when text codes do.</p>
             )}
-            <p className="text-xs text-muted">The code goes to the email or mobile number saved on your staff account. Delivery staff: text code only.</p>
+            <p className="text-xs text-muted">The code goes to the {way === "email" ? "email" : "mobile number"} saved on your staff account. It works for 10 minutes. Delivery staff: code by text only.</p>
           </div>
         )}
 
@@ -111,6 +127,7 @@ export default function LoginForm({ smsActive = true, emailActive = true }: { sm
               e.preventDefault();
               start(async () => {
                 setError(null);
+                remember("password");
                 const r = await passwordAction(phone, password, trust);
                 if (r && !r.ok) setError(r.error ?? "Could not sign in.");
               });

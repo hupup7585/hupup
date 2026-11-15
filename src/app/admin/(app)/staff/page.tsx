@@ -3,14 +3,15 @@ import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { formatPhone } from "@/lib/phone";
 import { Badge, PageHeader, Section } from "@/components/staff/ui";
-import { AddStaffForm, StaffRowActions } from "./StaffForms";
+import { AddStaffForm, OwnerUsernameForm, StaffRowActions } from "./StaffForms";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 /** Owner only: staff accounts. Owner and Secretary may use a password or a texted code; Delivery a texted code only. */
 /** SMS v3 (Abraham): who can do what. The server enforces the same rules on every screen and action. */
 const ROLE_TABLE: [string, string, string, string][] = [
-  ["Promo campaigns", "Write, approve, cancel and send", "Send approved campaigns to eligible customers only (5-a-year limit); see campaign history and results", "No access"],
+  ["Promo campaigns", "Write, approve, cancel and send", "Send approved campaigns to eligible customers only (6-a-year limit); see campaign history and results", "No access"],
   ["Text consent records and text history", "Full access", "View on customer records", "No access"],
   ["Texting customers", "Approved templates and replies", "Approved templates (booking confirmations, payment links)", "Approved delivery templates only, to customers who agreed to order texts, with an optional proof photo; never promos"],
   ["Bookings, calendar, customers", "Full access", "Full access", "Only their own delivery and pickup stops"],
@@ -20,10 +21,13 @@ const ROLE_TABLE: [string, string, string, string][] = [
 
 export default async function StaffPage() {
   await requireOwner();
-  const users = await db.select().from(schema.adminUsers).orderBy(asc(schema.adminUsers.name));
+  const [users, settings] = await Promise.all([db.select().from(schema.adminUsers).orderBy(asc(schema.adminUsers.name)), getSettings()]);
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader title="Staff" subtitle="Accounts are deactivated, never deleted. Deactivating signs the person out everywhere." />
+      <Section title="Your sign-in username">
+        <OwnerUsernameForm initial={settings.ownerUsername} />
+      </Section>
       <Section title="Add a staff member">
         <AddStaffForm />
       </Section>
@@ -34,7 +38,7 @@ export default async function StaffPage() {
             <li key={u.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
               <div>
                 <div className="font-bold">{u.name}</div>
-                <div className="text-sm text-muted">{formatPhone(u.phone)}{u.email ? ` · ${u.email}` : ""}</div>
+                <div className="text-sm text-muted">{u.username ? `Username ${u.username} · ` : ""}{formatPhone(u.phone)}{u.email ? ` · ${u.email}` : ""}</div>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   <Badge tone={u.role === "owner" ? "done" : u.role === "secretary" ? "scheduled" : "pending"}>{u.role}</Badge>
                   {!u.active && <Badge tone="muted">Deactivated</Badge>}
@@ -42,7 +46,7 @@ export default async function StaffPage() {
                   {u.lockedUntil && u.lockedUntil > new Date() && <Badge tone="alert">Locked</Badge>}
                 </div>
               </div>
-              <StaffRowActions userId={u.id} role={u.role} active={u.active} />
+              <StaffRowActions userId={u.id} role={u.role} active={u.active} username={u.username} />
             </li>
           ))}
         </ul>

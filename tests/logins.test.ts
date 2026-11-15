@@ -82,10 +82,9 @@ describe("staff sign-in on the live site", () => {
   it("the sign-in page says plainly what works today", () => {
     const form = readFileSync("src/app/admin/login/LoginForm.tsx", "utf8");
     expect(form).toContain('data-not-active="sms-login"');
-    expect(form).toContain('["password", "Sign in with password", KeyRound]');
-    expect(form).toContain('["code", "Send me a code", MessageSquareText]');
-    expect(form).toContain('"By email"');
-    expect(form).toContain('"By text (SMS)"');
+    expect(form).toContain('["password", "Password", KeyRound]');
+    expect(form).toContain('["email", "Code by email", Mail]');
+    expect(form).toContain('["sms", "Code by text", MessageSquareText]');
     expect(form).toContain('data-not-active="email-login"');
     expect(readFileSync("src/app/admin/login/page.tsx", "utf8")).toContain("smsActive={smsLoginActive()}");
   });
