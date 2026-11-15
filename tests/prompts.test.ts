@@ -44,12 +44,12 @@ describe("hotline prompts", () => {
 });
 
 describe("hotline voice", () => {
-  it("defaults to Google Chirp3-HD Achird when IVR_VOICE is not set (Abraham, Nov 15, 2026)", async () => {
+  it("defaults to Google Chirp3-HD Puck when IVR_VOICE is not set (back to Puck, Nov 15, 2026)", async () => {
     const saved = process.env.IVR_VOICE;
     delete process.env.IVR_VOICE;
     const { config, DEFAULT_VOICE } = await import("@/lib/config");
-    expect(DEFAULT_VOICE).toBe("Google.en-US-Chirp3-HD-Achird");
-    expect(config.voice()).toBe("Google.en-US-Chirp3-HD-Achird");
+    expect(DEFAULT_VOICE).toBe("Google.en-US-Chirp3-HD-Puck");
+    expect(config.voice()).toBe("Google.en-US-Chirp3-HD-Puck");
     process.env.IVR_VOICE = saved;
   });
 });
