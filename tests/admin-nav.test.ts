@@ -10,7 +10,7 @@ describe("grouped admin menu", () => {
   it("Owner sees every group in Abraham's order and items", () => {
     expect(titles("owner")).toEqual([null, "Orders & bookings", "Deliveries", "Phone system", "Bookkeeping", "Staff", "Settings"]);
     expect(labels("owner")).toEqual({
-      top: ["Dashboard", "Inbox"], // Inbox: info@ (Abraham, Nov 12, 2026; Owner only)
+      top: ["Dashboard", "Inbox", "Search"], // Inbox: info@ (Abraham, Nov 12, 2026; Owner only)
       "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Catalog", "Equipment units"],
       Deliveries: ["Deliveries", "Delivery settings"],
       "Phone system": ["Call log", "Voicemail", "Messages", "Campaigns", "Hotline prompts", "Compliance", "Phone settings"],
@@ -22,6 +22,7 @@ describe("grouped admin menu", () => {
 
   it("role rules: Secretary and Delivery see only their items; empty groups are hidden", () => {
     expect(labels("secretary")).toEqual({
+      top: ["Search"],
       "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Equipment units"],
       Deliveries: ["Deliveries"],
       "Phone system": ["Call log", "Voicemail", "Messages", "Campaigns", "Compliance"],

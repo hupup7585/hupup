@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { BOOK_GROUPS, bookTabHref } from "@/lib/bookkeeping-tabs";
 import { Fragment, useEffect, useState } from "react";
-import { Activity, Boxes, ArrowDownToLine, BadgePercent, BookOpen, Car, ChartColumn, FileClock, FileText, Gauge, IdCard, Landmark, List, Percent, Receipt, Settings2, Wrench, CircleUser, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, Inbox, KeyRound, ChevronDown, ChevronRight, LayoutDashboard, Megaphone, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PhoneForwarded, PlusCircle, Settings, ShieldCheck, SlidersHorizontal, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
+import { Activity, Boxes, Search, ArrowDownToLine, BadgePercent, BookOpen, Car, ChartColumn, FileClock, FileText, Gauge, IdCard, Landmark, List, Percent, Receipt, Settings2, Wrench, CircleUser, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, Inbox, KeyRound, ChevronDown, ChevronRight, LayoutDashboard, Megaphone, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PhoneForwarded, PlusCircle, Settings, ShieldCheck, SlidersHorizontal, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
 import type { Role } from "@/lib/db/schema";
 
 const O: Role[] = ["owner"];
@@ -43,6 +43,7 @@ export const NAV_GROUPS: Group[] = [
     items: [
       ["/admin", LayoutDashboard, "Dashboard", O],
       ["/admin/inbox", Inbox, "Inbox", O], // info@hupupattractions.com (Abraham, Nov 12, 2026; Owner only for now)
+      ["/admin/search", Search, "Search", OS], // search everything (Abraham, Nov 15, 2026)
     ],
   },
   {

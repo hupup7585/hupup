@@ -1,4 +1,5 @@
 import InboxCard from "./InboxCard";
+import SearchBar from "@/components/SearchBar";
 import { Download, Trophy } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
 import MyTasksCard from "@/components/MyTasksCard";
@@ -58,12 +59,13 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const pos = split.find((s) => s.channel === "POS");
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="mx-auto max-w-7xl" data-dashboard>
+      <SearchBar />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <StaffGreeting staff={staff} />
         <div className="flex flex-wrap gap-2">
           {(Object.keys(RANGES) as Range[]).map((r) => (
-            <Link key={r} href={`/admin?range=${r}`} className={`btn-ghost ${r === range ? "!border-navy" : ""}`}>
+            <Link key={r} href={`/admin?range=${r}`} className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${r === range ? "border-transparent bg-[#D3E7F8] text-navy" : "border-line bg-white hover:bg-bg"}`} data-range-chip aria-current={r === range ? "page" : undefined}>
               {RANGES[r]}
             </Link>
           ))}
