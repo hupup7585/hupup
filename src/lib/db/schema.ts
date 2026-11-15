@@ -216,6 +216,8 @@ export type CallData = {
   catStt?: number;
   /** Staff voicemail access: signed in with the voicemail PIN on this call. */
   vmaOk?: number;
+  /** Hashed new voicemail password typed once, waiting for the second entry (cleared right after). */
+  vmaNewPin?: string;
   catDomain?: string;
   catKeys?: string;
   /** When the caller last pressed a key or said something (Abraham's idle rule inside a booking) */

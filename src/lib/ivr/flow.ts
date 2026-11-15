@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import twilio from "twilio";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -59,7 +60,7 @@ import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
 import { categoryProducts, itemFreeOn, nearestFreeDay, nearestSize } from "@/lib/alternatives";
-import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_ACCESS_KEY_GAP, VM_PIN_TRIES, callOutNumber, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinSet } from "@/lib/vm-access";
+import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_ACCESS_KEY_GAP, VM_PIN_TRIES, callOutNumber, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinChangedByPhone, vmPinSet, validPin } from "@/lib/vm-access";
 import { STT_HOLD_FILE, STT_MAX_WAITS, googleReadback, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
 
 const { categories, products, orders, orderItems } = schema;
@@ -2284,6 +2285,7 @@ const handlers: Record<string, Handler> = {
   async "vma-box-choice"(ctx, vr) {
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
     if (ctx.body.Digits === "0") return back(vr, "vma-out"); // call a customer out
+    if (ctx.body.Digits === "*") return back(vr, "vma-newpin"); // change the password (Abraham, Nov 15, 2026)
     const key = BOX_BY_NUMBER[ctx.body.Digits ?? ""];
     if (!key) {
       sp(vr, ctx, "not_valid");
@@ -2360,6 +2362,43 @@ const handlers: Record<string, Handler> = {
     }
     sp(vr, ctx, "not_valid");
     return back(vr, "vma-options", { b, i, v: ctx.query.get("v") ?? undefined });
+  },
+
+  /** Change the password by phone (Abraham, Nov 15, 2026): new password twice, then the Owner is emailed. */
+  "vma-newpin"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-newpin-again"), method: "POST" });
+    sp(g, ctx, "vma_newpin", undefined, { draftOk: true });
+    return back(vr, "vma-box");
+  },
+
+  async "vma-newpin-again"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const pin = ctx.body.Digits || "";
+    if (!validPin(pin)) {
+      sp(vr, ctx, "vma_newpin_bad", undefined, { draftOk: true });
+      return back(vr, "vma-newpin");
+    }
+    // only a scrambled (hashed) copy is kept between the two entries
+    await updateSession(ctx.callSid, { data: { vmaNewPin: await bcrypt.hash(pin, 8) } }, ctx.session);
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-newpin-save"), method: "POST" });
+    sp(g, ctx, "vma_newpin_again", undefined, { draftOk: true });
+    return back(vr, "vma-box");
+  },
+
+  async "vma-newpin-save"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const first = ctx.session?.data.vmaNewPin;
+    const pin = ctx.body.Digits || "";
+    await updateSession(ctx.callSid, { data: { vmaNewPin: undefined } }, ctx.session);
+    if (!first || !validPin(pin) || !(await bcrypt.compare(pin, first))) {
+      sp(vr, ctx, "vma_newpin_bad", undefined, { draftOk: true });
+      return back(vr, "vma-newpin");
+    }
+    await vmPinChangedByPhone(ctx.callSid, ctx.session?.fromNumber ?? ctx.from, pin);
+    await track(ctx.callSid, "vm_access", "Voicemail password changed by phone", {});
+    sp(vr, ctx, "vma_newpin_saved", undefined, { draftOk: true });
+    return back(vr, "vma-box");
   },
 
   /** Call a customer out (Abraham, Nov 15, 2026): the number, then pound; the customer sees (845) 777-7585. */

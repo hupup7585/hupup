@@ -150,6 +150,22 @@ describe("after the PIN", () => {
     expect(said(none)).toContain("There are no messages in this box.");
     expect(redirect(await call("vma-box-choice", { Digits: "7" }))).toBe("vma-box");
   });
+  it("star changes the password: new password twice, saved hashed, the Owner is emailed; a mismatch asks again", async () => {
+    h.session.data = { vmaOk: 1 };
+    await setVmPin("4821", null);
+    expect(redirect(await call("vma-box-choice", { Digits: "*" }))).toBe("vma-newpin");
+    expect(said(await call("vma-newpin"))).toContain("Please enter your new password, 4 to 8 digits, then press pound.");
+    expect(redirect(await call("vma-newpin-again", { Digits: "12" }))).toBe("vma-newpin"); // too short
+    await call("vma-newpin-again", { Digits: "5566" });
+    expect(String(h.session.data.vmaNewPin)).not.toContain("5566");
+    expect(redirect(await call("vma-newpin-save", { Digits: "5567" }))).toBe("vma-newpin"); // mismatch
+    await call("vma-newpin-again", { Digits: "5566" });
+    const saved = await call("vma-newpin-save", { Digits: "5566" });
+    expect(said(saved)).toContain("Your password was changed.");
+    expect(redirect(await call("vma-pin-check", { Digits: "5566" }))).toBe("vma-box");
+    expect(h.emails.at(-1)).toMatchObject({ subject: "Hup Up Attractions: voicemail password changed" });
+    expect(h.emails.at(-1)!.body).not.toContain("5566");
+  });
   it("0 calls a customer out from (845) 777-7585: enter the number, pound; not valid asks again", async () => {
     h.session.data = { vmaOk: 1 };
     expect(redirect(await call("vma-box-choice", { Digits: "0" }))).toBe("vma-out");

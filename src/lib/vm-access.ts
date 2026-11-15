@@ -54,7 +54,7 @@ export async function checkVmPin(pin: string) {
   return Boolean(h && pin && (await bcrypt.compare(pin, h)));
 }
 
-export async function logVmAccess(callSid: string | null, from: string | null, result: "ok" | "wrong_pin" | "locked" | "refused_locked" | "no_pin") {
+export async function logVmAccess(callSid: string | null, from: string | null, result: "ok" | "wrong_pin" | "locked" | "refused_locked" | "no_pin" | "pin_changed") {
   await db.insert(schema.vmAccessLog).values({ callSid, fromNumber: from, result });
 }
 
@@ -81,6 +81,20 @@ export async function lockVmAccess(callSid: string | null, from: string | null, 
     "Hup Up Attractions: voicemail access locked",
     `Someone entered a wrong voicemail PIN ${VM_PIN_TRIES} times on the hotline.\n\nCalling from: ${from ? formatPhone(from) : "withheld number"}\nTime: ${when}\n\nVoicemail access by phone is locked for ${VM_LOCK_MINUTES} minutes. Every sign-in is listed in Admin > Voicemail.`,
   ).catch((e) => console.error("[vm access] lockout email failed:", e));
+}
+
+/** Password changed by phone: the Owner is emailed (the password itself is never sent or logged). */
+export async function vmPinChangedByPhone(callSid: string | null, from: string | null, pin: string, now = new Date()) {
+  await setVmPin(pin, null);
+  await logVmAccess(callSid, from, "pin_changed");
+  const to = config.adminEmail();
+  if (!to) return;
+  const when = now.toLocaleString("en-US", { timeZone: process.env.BUSINESS_TIMEZONE || "America/New_York", dateStyle: "medium", timeStyle: "short" });
+  await sendEmail(
+    to,
+    "Hup Up Attractions: voicemail password changed",
+    `The voicemail password was changed by phone.\n\nCalling from: ${from ? formatPhone(from) : "withheld number"}\nTime: ${when}\n\nIf this was not you, set a new password in Admin > Voicemail.`,
+  ).catch((e) => console.error("[vm access] password change email failed:", e));
 }
 
 export async function recentVmAccess(limit = 50) {

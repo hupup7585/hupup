@@ -289,7 +289,7 @@ export const PROMPTS = {
   vma_pin: { group: "Voicemail", label: "Staff access: ask for the password (Abraham, word for word)", text: "Please enter your password." },
   vma_wrong: { group: "Voicemail", label: "Staff access: wrong PIN", text: "Sorry, that PIN is not right. Please try again.", pending: true },
   vma_locked: { group: "Voicemail", label: "Staff access: locked", text: "Voicemail access is locked for now. Please try again later. Goodbye.", pending: true },
-  vma_box: { group: "Voicemail", label: "Staff access: choose a box or call out", text: "Please enter the number of the voicemail box. For the main box, press 1. To call a customer, press 0.", pending: true },
+  vma_box: { group: "Voicemail", label: "Staff access: choose a box or call out", text: "Please enter the number of the voicemail box. For the main box, press 1. To call a customer, press 0. To change your password, press star.", pending: true },
   vma_out_enter: { group: "Voicemail", label: "Staff access: call out, enter the number (Abraham, word for word)", text: "Please enter the phone number." },
   vma_out_bad: { group: "Voicemail", label: "Staff access: call out, not a valid number (Abraham)", text: "It is not a valid phone number. Please try again." },
   vma_count: { group: "Voicemail", label: "Staff access: how many messages", text: "You have {count} messages, newest first.", vars: ["count"], pending: true },
@@ -299,6 +299,10 @@ export const PROMPTS = {
   vma_heard: { group: "Voicemail", label: "Staff access: marked as heard", text: "Marked as heard.", pending: true },
   vma_end: { group: "Voicemail", label: "Staff access: no more messages", text: "That was the last message. To choose another box, press star, or hang up.", pending: true },
   vma_calling: { group: "Voicemail", label: "Staff access: calling back", text: "Calling them back now.", pending: true },
+  vma_newpin: { group: "Voicemail", label: "Staff access: change the password, step 1", text: "Please enter your new password, 4 to 8 digits, then press pound.", pending: true },
+  vma_newpin_again: { group: "Voicemail", label: "Staff access: change the password, step 2", text: "Please enter the new password again, then press pound.", pending: true },
+  vma_newpin_saved: { group: "Voicemail", label: "Staff access: password changed", text: "Your password was changed.", pending: true },
+  vma_newpin_bad: { group: "Voicemail", label: "Staff access: new password not accepted", text: "The passwords did not match, or it was not 4 to 8 digits. Please try again.", pending: true },
   vma_no_number: { group: "Voicemail", label: "Staff access: no number to call", text: "Sorry, there is no number we can call back for this message.", pending: true },
   // Key 9 (Abraham, Nov 11, 2026, word for word): feedback and comments only.
   // Key 8 catalog (Abraham, Phone Menu v3), approved word for word.
