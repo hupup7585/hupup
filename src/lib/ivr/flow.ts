@@ -216,27 +216,32 @@ function menuNoChoice(vr: VR, ctx: Ctx) {
   return repeatMenu(vr, ctx, "menu", { first: 1 });
 }
 
-/** How long an unfinished phone cart is offered again to the same number (Abraham, Nov 15, 2026). */
-export const RESUME_HOURS = 24;
+type ResumeLine = NonNullable<CallSession["data"]["resumeLines"]>[number];
+
+const RESUME_PROMPTS = ["resume_offer", "resume_free_one", "resume_free", "resume_taken", "resume_done", "resume_added"] as const;
 
 /** Unfinished-cart offer: once Abraham approves its two lines; on preview it runs for his test. */
 function resumeActive(ctx: Ctx, env: Record<string, string | undefined> = process.env) {
-  return env.VERCEL_ENV !== "production" || (!promptWaiting(ctx.prompts, "resume_offer") && !promptWaiting(ctx.prompts, "resume_added"));
+  return env.VERCEL_ENV !== "production" || RESUME_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k));
 }
 
 /**
  * The cart from this number's most recent earlier call that ended without an order (the hold was released when they
- * hung up), from the last 24 hours, rental days still ahead.
+ * hung up). Offered until its booking day has passed (Abraham, Nov 15, 2026), and not once the caller has booked on
+ * a later call.
  */
 async function unfinishedCart(ctx: Ctx): Promise<{ productId: number; name: string; qty: number; date: string }[]> {
   const from = toE164(ctx.session?.fromNumber ?? ctx.from);
   if (!from) return [];
-  const since = new Date(Date.now() - RESUME_HOURS * 3_600_000);
+  const today = todayISO();
   const res = await db.execute(sql`
     SELECT cs.call_sid FROM call_sessions cs
-    WHERE cs.from_number = ${from} AND cs.call_sid <> ${ctx.callSid} AND cs.started_at > ${since}
-      AND EXISTS (SELECT 1 FROM orders o WHERE o.call_sid = cs.call_sid AND o.status = 'CANCELLED' AND o.paid_cents = 0)
+    WHERE cs.from_number = ${from} AND cs.call_sid <> ${ctx.callSid}
+      AND EXISTS (SELECT 1 FROM orders o WHERE o.call_sid = cs.call_sid AND o.status = 'CANCELLED' AND o.paid_cents = 0 AND o.event_date >= ${today}::date)
       AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.call_sid = cs.call_sid AND o.status <> 'CANCELLED')
+      AND NOT EXISTS (
+        SELECT 1 FROM call_sessions later JOIN orders o2 ON o2.call_sid = later.call_sid
+        WHERE later.from_number = ${from} AND later.started_at > cs.started_at AND o2.status <> 'CANCELLED')
     ORDER BY cs.started_at DESC LIMIT 1`);
   const last = (res.rows[0] as { call_sid: string } | undefined)?.call_sid;
   if (!last) return [];
@@ -1144,28 +1149,80 @@ const handlers: Record<string, Handler> = {
     return idleNoKey(vr, ctx, "book");
   },
 
+  /**
+   * Press 1: check every item again (Abraham, Nov 15, 2026). Free items are held for the caller (so no one else can
+   * take them) but NOT put in the cart; the caller adds each one by key. Taken items get the nearest options.
+   */
   async "resume-choice"(ctx, vr) {
-    const d = ctx.body.Digits;
-    if (d !== "1") return back(vr, "book"); // 2 (or anything else): a new order
-    const lines = await unfinishedCart(ctx);
-    const session = ctx.session ?? (await ensureSession(ctx.callSid, ctx.from));
-    const gone: { p: number; d: string }[] = [];
-    let ids = [...(session.data?.dayOrderIds ?? [])];
-    const added: string[] = [];
-    for (const l of lines) {
-      if (l.date < todayISO()) continue;
-      const existing = (await callOrders({ ...ctx, session: { ...session, data: { ...session.data, dayOrderIds: ids } } })).find((o) => o.order.eventDate === l.date) ?? null;
-      const r = await reserveItem({ orderId: existing?.order.id ?? null, productId: l.productId, qty: l.qty, eventDate: l.date, channel: "PHONE", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid });
-      if (r.ok) {
-        ids = [...new Set([...ids, r.orderId])];
-        added.push(`${itemPhrase(l.qty, l.name)} for ${longDate(l.date)}`);
-        await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted", data: { day: l.date, dayOrderIds: ids } }, session);
-      } else gone.push({ p: l.productId, d: l.date });
+    if (ctx.body.Digits !== "1") return back(vr, "book"); // 2 (or anything else): a new order
+    const lines: ResumeLine[] = [];
+    for (const l of (await unfinishedCart(ctx)).filter((x) => x.date >= todayISO())) {
+      // each item its own hold, outside the cart, until the caller adds it
+      const r = await reserveItem({ orderId: null, productId: l.productId, qty: l.qty, eventDate: l.date, channel: "PHONE", status: "HOLD", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid });
+      lines.push({ p: l.productId, name: l.name, qty: l.qty, d: l.date, holdId: r.ok ? r.orderId : null, state: r.ok ? "free" : "taken" });
     }
-    await track(ctx.callSid, "step", `Unfinished cart from the last call: ${added.length} back in the cart, ${gone.length} no longer free`, { added, gone });
-    await updateSession(ctx.callSid, { data: { resumeGone: gone } }, ctx.session);
-    if (added.length) sp(vr, ctx, "resume_added", { items: added.join(", and ") }, { draftOk: true });
-    return back(vr, "cart"); // the cart plays the nearest options for each taken item first, then the whole cart
+    await track(ctx.callSid, "step", `Unfinished cart checked again: ${lines.filter((l) => l.state === "free").length} free, ${lines.filter((l) => l.state === "taken").length} no longer free`, { lines });
+    await updateSession(ctx.callSid, { data: { resumeLines: lines } }, ctx.session);
+    return back(vr, "resume-items");
+  },
+
+  /** One item: "...free for {date}, as you chose. To add it to your cart and check out, press 1." Several: 1, 2, 3... */
+  async "resume-items"(ctx, vr) {
+    const lines = ctx.session?.data.resumeLines ?? [];
+    const open = lines.filter((l) => l.state !== "added" && l.state !== "done");
+    if (!open.length) return back(vr, "cart");
+    const g = keypad(vr, url("resume-pick"));
+    if (lines.length === 1 && open[0].state === "free") {
+      sp(g, ctx, "resume_free_one", { item: open[0].name, date: longDate(open[0].d) }, { draftOk: true });
+    } else {
+      lines.forEach((l, i) => {
+        if (l.state === "free") sp(g, ctx, "resume_free", { item: l.name, date: longDate(l.d), key: i + 1 }, { draftOk: true });
+        else if (l.state === "taken") sp(g, ctx, "resume_taken", { item: l.name, date: longDate(l.d), key: i + 1 }, { draftOk: true });
+      });
+      sp(g, ctx, "resume_done", undefined, { draftOk: true });
+    }
+    return idleNoKey(vr, ctx, "resume-items");
+  },
+
+  async "resume-pick"(ctx, vr) {
+    const lines = [...(ctx.session?.data.resumeLines ?? [])];
+    const d = ctx.body.Digits ?? "";
+    const single = lines.length === 1;
+    if (d === "#" || (single && d === "2")) {
+      // done: release what was not added, then the cart (or a new order when nothing was added)
+      for (const l of lines) if (l.state === "free" && l.holdId) await cancelHold(l.holdId);
+      await updateSession(ctx.callSid, { data: { resumeLines: lines.map((l) => (l.state === "added" ? l : { ...l, state: "done" as const })) } }, ctx.session);
+      return back(vr, (await callOrders(ctx)).length ? "cart" : "book");
+    }
+    const i = Number(d) - 1;
+    const l = lines[i];
+    if (!l || l.state === "added" || l.state === "done") {
+      if (d) sp(vr, ctx, "not_valid");
+      return back(vr, "resume-items");
+    }
+    if (l.state === "taken") {
+      lines[i] = { ...l, state: "done" };
+      await updateSession(ctx.callSid, { data: { resumeLines: lines } }, ctx.session);
+      return back(vr, "booked", { p: l.p, d: l.d }); // the nearest options: a size up or down, or another day
+    }
+    // free: move its hold into the cart (the day's cart order if there is one)
+    const session = ctx.session ?? (await ensureSession(ctx.callSid, ctx.from));
+    const day = (await callOrders(ctx)).find((o) => o.order.eventDate === l.d);
+    let cartOrder = l.holdId!;
+    if (day) {
+      await db.update(orderItems).set({ orderId: day.order.id }).where(eq(orderItems.orderId, l.holdId!));
+      await cancelHold(l.holdId!);
+      await db.execute(sql`UPDATE orders SET subtotal_cents = COALESCE((SELECT SUM(qty * unit_price_cents) FROM order_items WHERE order_id = ${day.order.id}), 0) WHERE id = ${day.order.id}`);
+      cartOrder = day.order.id;
+    }
+    await db.update(orders).set({ holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES) }).where(eq(orders.id, cartOrder));
+    lines[i] = { ...l, state: "added" };
+    const ids = [...new Set([...(session.data?.dayOrderIds ?? []), cartOrder])];
+    await updateSession(ctx.callSid, { orderId: cartOrder, outcome: "carted", data: { day: l.d, dayOrderIds: ids, resumeLines: lines } }, session);
+    await track(ctx.callSid, "item_added", `Added ${itemPhrase(l.qty, l.name)} for ${longDate(l.d)} from the last call`, { item: l.name, productId: l.p, qty: l.qty, date: l.d, orderId: cartOrder });
+    sp(vr, ctx, "resume_added", { item: l.name }, { draftOk: true });
+    // one item: straight to the cart and checkout; several: the list again for the rest
+    return back(vr, single ? "cart" : "resume-items");
   },
 
   async "book-choice"(ctx, vr) {
@@ -1477,12 +1534,6 @@ const handlers: Record<string, Handler> = {
 
   /** The whole cart: every day on this call, then one total. */
   async cart(ctx, vr) {
-    const queue = ctx.session?.data.resumeGone ?? [];
-    if (queue.length) {
-      const [next, ...rest] = queue;
-      await updateSession(ctx.callSid, { data: { resumeGone: rest } }, ctx.session);
-      return back(vr, "booked", { p: next.p, d: next.d }); // its nearest options: a size up or down, or another day
-    }
     const days = await callOrders(ctx);
     const c = ctx.query.get("c") ?? undefined; // the item list the caller came from (Abraham, Phone Menu v3)
     if (!days.length) {
@@ -2512,6 +2563,8 @@ export async function handleCallStatus(callSid: string, status: string) {
   if (!s) return;
   // Every day's held order on this call (cancelHold only affects orders still in HOLD)
   for (const id of new Set([...(s.data?.dayOrderIds ?? []), ...(s.orderId ? [s.orderId] : [])])) await cancelHold(id);
+  // Items from the last call that were held while the caller decided (not added to the cart)
+  for (const l of s.data?.resumeLines ?? []) if (l.state === "free" && l.holdId) await cancelHold(l.holdId);
   // Where the caller hung up (the last menu or question they reached) and whether a booking was finished
   const [last] = await db
     .select({ step: schema.callEvents.step, label: schema.callEvents.label })

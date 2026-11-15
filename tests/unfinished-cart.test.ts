@@ -42,7 +42,7 @@ beforeEach(async () => {
     castle = a.id;
     laser = b.id;
     // Last call, from the same number: Castle and Laser tag on Dec 22, hung up before checkout (hold released)
-    await db.insert(schema.callSessions).values({ callSid: "CAold", fromNumber: "+18455550277", startedAt: new Date(Date.now() - 3_600_000) });
+    await db.insert(schema.callSessions).values({ callSid: "CAold", fromNumber: "+18455550277", startedAt: new Date(Date.now() - 3 * 86_400_000) }); // 3 days ago: still offered (until the booking day passes)
     const [o] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "PHONE", eventDate: "2026-12-22", pickupDate: "2026-12-23", callSid: "CAold" }).returning();
     await db.insert(schema.orderItems).values([
       { orderId: o.id, productId: castle, qty: 1, unitPriceCents: 20000 },
@@ -55,22 +55,53 @@ beforeEach(async () => {
 });
 
 describe("unfinished phone order", () => {
-  it("key 1: offered once; press 1 puts free items back and gives the taken one its nearest options", async () => {
+  it("key 1: offered once; press 1 checks again: free items are held but NOT in the cart until the caller adds each by key; taken ones get options", async () => {
+    const { callOrdersFor } = { callOrdersFor: null };
+    void callOrdersFor;
     expect(redirect(await call("book"))).toBe("resume");
     const offer = await call("resume");
-    expect(said(offer).join(" ")).toContain("Welcome back! On your last call you had one Castle and one Laser tag set for Tuesday, December 22 in your cart. To check if it is still available and continue, press 1. To start a new order, press 2.");
-    const back = await call("resume-choice", { Digits: "1" });
-    expect(said(back).join(" ")).toContain("back in your cart: one Laser tag set");
-    expect(redirect(back)).toBe("cart");
-    // the cart first plays the Castle's nearest options (the same as when an item is booked)
-    expect(redirect(await call("cart"))).toBe(`booked?p=${castle}&d=2026-12-22`);
+    expect(said(offer).join(" ")).toContain("Welcome back! On your last call you had one Castle and one Laser tag set for Tuesday, December 22 in your cart. To check if they are still available, press 1. To start a new order, press 2.");
+    expect(redirect(await call("resume-choice", { Digits: "1" }))).toBe("resume-items");
+    // nothing in the cart yet
+    expect(h.session.data.dayOrderIds ?? []).toEqual([]);
+    const lines = h.session.data.resumeLines as { state: string; holdId: number | null }[];
+    expect(lines.map((l) => l.state)).toEqual(["taken", "free"]); // Castle taken, Laser tag free (and held)
+    const held = (await db.select().from(schema.orders)).find((o) => o.id === lines[1].holdId)!;
+    expect(held.status).toBe("HOLD");
+    const items = said(await call("resume-items")).join(" ");
+    expect(items).toContain("The Castle is no longer available for Tuesday, December 22. For the nearest options, press 1.");
+    expect(items).toContain("The Laser tag set is free for Tuesday, December 22, as you chose. To add it to your cart, press 2.");
+    expect(items).toContain("When you are done, press pound to go to your cart.");
+    // 2 adds the Laser tag set
+    const added = await call("resume-pick", { Digits: "2" });
+    expect(said(added).join(" ")).toContain("The Laser tag set is now in your cart.");
+    expect((h.session.data.dayOrderIds as number[]).length).toBe(1);
+    expect(redirect(added)).toBe("resume-items");
+    // 1 for the Castle: its nearest options
+    expect(redirect(await call("resume-pick", { Digits: "1" }))).toBe(`booked?p=${castle}&d=2026-12-22`);
     // asked once only
     expect(redirect(await call("book"))).not.toBe("resume");
     void laser;
   });
+  it("one item: free for the day, as chosen; 1 adds it and goes to the cart for checkout", async () => {
+    const [hold] = await db.insert(schema.orders).values({ status: "HOLD", channel: "PHONE", eventDate: "2026-12-29", pickupDate: "2026-12-30", holdExpiresAt: new Date(Date.now() + 600_000), callSid: "CAnew" }).returning();
+    await db.insert(schema.orderItems).values({ orderId: hold.id, productId: laser, qty: 1, unitPriceCents: 30000 });
+    h.session.data = { resumeAsked: 1, resumeLines: [{ p: laser, name: "Laser tag set", qty: 1, d: "2026-12-29", holdId: hold.id, state: "free" }] };
+    expect(said(await call("resume-items")).join(" ")).toContain("Good news! The Laser tag set is free for Tuesday, December 29, as you chose. To add it to your cart and check out, press 1. To start a new order, press 2.");
+    const r = await call("resume-pick", { Digits: "1" });
+    expect(redirect(r)).toBe("cart");
+    expect(h.session.data.dayOrderIds).toEqual([hold.id]);
+  });
   it("press 2 starts a new order", async () => {
     h.session.data = { resumeAsked: undefined };
     expect(redirect(await call("resume-choice", { Digits: "2" }))).toBe("book");
+  });
+  it("not offered once the caller booked on a later call, or after the booking day", async () => {
+    h.session.data = {};
+    await db.insert(schema.callSessions).values({ callSid: "CAlater", fromNumber: "+18455550277", startedAt: new Date(Date.now() - 86_400_000) });
+    const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: "2026-12-30", pickupDate: "2026-12-31", callSid: "CAlater" }).returning();
+    await db.insert(schema.orderItems).values({ orderId: o.id, productId: laser, qty: 1, unitPriceCents: 30000 });
+    expect(redirect(await call("book"))).not.toBe("resume");
   });
   it("live line: waits until Abraham approves its two lines", async () => {
     process.env.VERCEL_ENV = "production";

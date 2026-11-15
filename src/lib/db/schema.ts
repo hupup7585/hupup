@@ -179,7 +179,8 @@ export type CallData = {
   emailRequired?: number;
   /** Unfinished cart from the last call: offered once, and the taken items still waiting for their options */
   resumeAsked?: number;
-  resumeGone?: { p: number; d: string }[];
+  /** Each item from the last call, checked again: held for the caller (not in the cart) until added by key */
+  resumeLines?: { p: number; name: string; qty: number; d: string; holdId: number | null; state: "free" | "taken" | "added" | "done" }[];
   /** Optional directions for the driver, said after the address (Abraham, Nov 15, 2026) */
   directions?: string;
   email?: string;
