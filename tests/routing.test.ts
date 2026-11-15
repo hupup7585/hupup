@@ -152,3 +152,13 @@ describe("Phone settings ring list form", () => {
     expect(f).toContain("data-ring-example");
   });
 });
+
+describe("key 6 ring list (Abraham, approved)", () => {
+  it("the migration adds (845) 213-5239 to key 6 without removing other numbers", async () => {
+    const { readFileSync } = await import("node:fs");
+    const sql = readFileSync("drizzle/0053_key6_ring.sql", "utf8");
+    expect(sql).toContain("ringTargets6");
+    expect(sql).toContain("+18452135239|25");
+    expect(sql).toContain("ELSE to_jsonb((app_settings.\"value\" #>> '{}') || E'\\nDelivery and Pickup|+18452135239|25')");
+  });
+});
