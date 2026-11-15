@@ -1,5 +1,5 @@
 import twilio from "twilio";
-import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { addDays, longDate, todayISO } from "@/lib/dates";
@@ -214,6 +214,11 @@ export const MENU_WAIT_SECONDS = 4;
 /** No choice after the main menu: the whole menu again, from the greeting (3 plays and 20 seconds rule). */
 function menuNoChoice(vr: VR, ctx: Ctx) {
   return repeatMenu(vr, ctx, "menu", { first: 1 });
+}
+
+/** The directions step plays once Abraham approves its two lines; on preview it runs for his test. */
+function directionsActive(ctx: Ctx, env: Record<string, string | undefined> = process.env) {
+  return env.VERCEL_ENV !== "production" || (!promptWaiting(ctx.prompts, "ask_directions") && !promptWaiting(ctx.prompts, "directions_saved"));
 }
 
 /** A line's wording with its changing parts still in braces (Admin edits included). */
@@ -1549,7 +1554,8 @@ const handlers: Record<string, Handler> = {
       }
       if (n >= MAX_NO_INPUT) {
         sp(vr, ctx, "field_trouble");
-        return back(vr, config.forwardPhone() ? "operator" : "phone");
+        // Abraham, Nov 15, 2026: name and address can never be skipped. A person takes it, or the caller types it.
+        return config.forwardPhone() ? back(vr, "operator") : back(vr, "type", { f });
       }
       sp(vr, ctx, f === "email" ? "email_unclear" : "field_unclear");
       return back(vr, "ask", { f, n });
@@ -1568,6 +1574,27 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("confirm", { f }));
     sp(g, ctx, "heard", { value: spec.readBack(value) });
     return noInput(vr, ctx, "ask", { f });
+  },
+
+  /**
+   * Directions for the driver (Abraham, Nov 15, 2026): optional, after the address. Pound (or nothing said) skips.
+   * The wording is a draft: the step runs on preview only until Abraham approves the two lines.
+   */
+  directions(ctx, vr) {
+    if (!directionsActive(ctx)) return back(vr, "ask", { f: "email" });
+    const g = vr.gather({ input: ["speech", "dtmf"], finishOnKey: "#", numDigits: 1, timeout: 6, speechTimeout: "auto", language: "en-US", speechModel: "phone_call", enhanced: true, action: url("directions-heard"), method: "POST", actionOnEmptyResult: true });
+    sp(g, ctx, "ask_directions", undefined, { draftOk: true });
+    return back(vr, "ask", { f: "email" }); // nothing said: skip
+  },
+
+  async "directions-heard"(ctx, vr) {
+    const said = (ctx.body.SpeechResult || "").trim();
+    if (said && ctx.body.Digits !== "#") {
+      await updateSession(ctx.callSid, { data: { directions: said.slice(0, 500) } }, ctx.session);
+      await track(ctx.callSid, "said", `Delivery directions: ${said.slice(0, 200)}`, { field: "directions", value: said });
+      sp(vr, ctx, "directions_saved", undefined, { draftOk: true });
+    }
+    return back(vr, "ask", { f: "email" });
   },
 
   async confirm(ctx, vr) {
@@ -1747,6 +1774,7 @@ const handlers: Record<string, Handler> = {
         .set({
           customerId,
           deliveryAddress: data.address,
+          ...(data.directions ? { notes: sql`COALESCE(${orders.notes}, '') || ${`Delivery directions (from the caller): ${data.directions}. `}` } : {}),
           status: "PENDING_PAYMENT",
           holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES),
           deliveryZone: t!.zone,
@@ -2333,7 +2361,7 @@ const FIELDS: Record<
     hints: "Kiryas Joel, Monroe, Palm Tree, Forest Road, Garfield Road, Bakertown Road, Mountain Road, Acres Road, Schunnemunk, Quickway Road, Seven Springs Road, Harriman, Chester, Blooming Grove",
     normalize: (s) => normalizeSpokenAddress(s) || null,
     readBack: (v) => v,
-    next: "ask?f=email",
+    next: "directions", // Abraham, Nov 15, 2026: then any directions for the driver (pound skips)
   },
   email: {
     prompt: "ask_email",

@@ -163,6 +163,9 @@ export const PROMPTS = {
   // Checkout
   ask_name: { group: "Checkout", label: "Ask for name", text: "Awesome, let us get you booked! Please say your first and last name." },
   ask_address: { group: "Checkout", label: "Ask for address", text: "Thanks! Now please say the delivery address, with the house number, street, and town." },
+  // Abraham, Nov 15, 2026: optional directions for the driver after the address (drafts for his OK)
+  ask_directions: { group: "Checkout", label: "Ask for delivery directions (optional)", text: "Is there anything our delivery team should know, like a gate code, where to park, or where to set up? Please say it now. To skip, press pound.", pending: true },
+  directions_saved: { group: "Checkout", label: "Delivery directions saved", text: "Thank you, we saved that for our delivery team.", pending: true },
   ask_email: { group: "Checkout", label: "Ask for email", text: "Almost done! Please say your email address for your receipt, like john at gmail dot com. Or press pound to skip." },
   // Call recording notice (Abraham O): PROPOSED wording, not approved yet; plays only if the Owner turns recording on.
   recording_notice: { group: "Welcome & main menu", label: "Call recording notice (proposed, plays only when recording is on)", text: "This call may be recorded for quality and training. Please do not share card numbers or security codes on this call." },

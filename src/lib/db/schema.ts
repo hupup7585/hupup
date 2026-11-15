@@ -175,6 +175,8 @@ export type CallData = {
   /** Checkout answers */
   name?: string;
   address?: string;
+  /** Optional directions for the driver, said after the address (Abraham, Nov 15, 2026) */
+  directions?: string;
   email?: string;
   phone?: string;
   /** Value heard but not yet confirmed */
