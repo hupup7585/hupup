@@ -1,0 +1,4382 @@
+[
+{
+"street": "Ace Farms",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 16,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Ace Farms",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 18,
+"to": 98,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Ace Farms",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 83,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Ace Farms",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 85,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Apple Hill",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 66,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Apple Hill",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 68,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Apple Hill",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 67,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Apple Hill",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 69,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Arlin Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 200,
+"to": 222,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Arlin Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 224,
+"to": 308,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Arlin Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 310,
+"to": 374,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Arlin Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 376,
+"to": 698,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Arlin Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 201,
+"to": 223,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Arlin Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 225,
+"to": 699,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Arrao Pl",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 2,
+"to": 10,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Arrao Pl",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 12,
+"to": 36,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Arrao Pl",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 38,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Ashmore Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 6,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Ashmore Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 8,
+"to": 98,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Ashmore Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 5,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Ashmore Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 7,
+"to": 99,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Baile Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 98,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Baile Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 41,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Baile Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 43,
+"to": 63,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Baile Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 65,
+"to": 99,
+"cents": 1500,
+"area": "Blooming Grove"
+},
+{
+"street": "Bakertown Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 418,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Bakertown Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 420,
+"to": 498,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Bakertown Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 153,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Brentwood Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 4,
+"to": 18,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Brentwood Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 20,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Briarwood Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 84,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Briarwood Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 86,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Briarwood Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 85,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Briarwood Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 87,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Bride Hill Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 2,
+"to": 30,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Bride Hill Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 32,
+"to": 54,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Bride Hill Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 56,
+"to": 98,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Bride Hill Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 1,
+"to": 45,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Bride Hill Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 47,
+"to": 69,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Bride Hill Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 71,
+"to": 99,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Bridge St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 8,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Bridge St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 10,
+"to": 64,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Bridge St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 66,
+"to": 98,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Bridge St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 7,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Bridge St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 9,
+"to": 63,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Bridge St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 65,
+"to": 99,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Buena Vista Ter",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 14,
+"to": 78,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Buena Vista Ter",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 80,
+"to": 98,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Buena Vista Ter",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 7,
+"to": 77,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Buena Vista Ter",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 79,
+"to": 99,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Bull Mill Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 470,
+"to": 514,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Bull Mill Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 516,
+"to": 698,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Bull Mill Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 471,
+"to": 515,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Bull Mill Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 517,
+"to": 699,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Bull Mine Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 2,
+"to": 126,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Bull Mine Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 128,
+"to": 198,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Bull Mine Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 1,
+"to": 127,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Bull Mine Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 129,
+"to": 199,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Camelback Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 2,
+"to": 30,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Camelback Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 32,
+"to": 98,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Camelback Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 1,
+"to": 29,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Camelback Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 31,
+"to": 99,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Clove Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 542,
+"to": 578,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Clove Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 580,
+"to": 598,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Clove Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 507,
+"to": 581,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Clove Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 583,
+"to": 599,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Co Rd 105",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 302,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Co Rd 105",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 304,
+"to": 328,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Co Rd 105",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 330,
+"to": 352,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Co Rd 105",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 354,
+"to": 398,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Co Rd 105",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 400,
+"to": 498,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Co Rd 105",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 499,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Co Rd 105",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 400,
+"to": 598,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Co Rd 105",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 600,
+"to": 698,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Co Rd 105",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 401,
+"to": 499,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Co Rd 105",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 501,
+"to": 599,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Co Rd 5",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 4,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Co Rd 5",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 6,
+"to": 10,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Co Rd 5",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 12,
+"to": 68,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Co Rd 5",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 3,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Co Rd 5",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 5,
+"to": 9,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Co Rd 5",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 11,
+"to": 99,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Co Rte 105",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 200,
+"to": 352,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Co Rte 105",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 354,
+"to": 398,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Co Rte 105",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 201,
+"to": 499,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Continental Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 102,
+"to": 116,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Continental Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 118,
+"to": 144,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Continental Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 146,
+"to": 508,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Continental Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 101,
+"to": 105,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Continental Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 107,
+"to": 173,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Continental Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 175,
+"to": 599,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Country Woods Dr",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 2,
+"to": 52,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Country Woods Dr",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 54,
+"to": 98,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Country Woods Dr",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 1,
+"to": 51,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Country Woods Dr",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 53,
+"to": 99,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Craigville Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 900,
+"to": 962,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Craigville Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 964,
+"to": 1298,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Craigville Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 909,
+"to": 953,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Craigville Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 955,
+"to": 1299,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Cranberry Dr",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 24,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Cranberry Dr",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 26,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Cranberry Dr",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 95,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Cranberry Dr",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 97,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Cromwell Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 54,
+"to": 102,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Cromwell Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 104,
+"to": 362,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Cromwell Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 364,
+"to": 398,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Cromwell Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 59,
+"to": 103,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Cromwell Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 105,
+"to": 399,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Dunderberg Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 2,
+"to": 10,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Dunderberg Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 12,
+"to": 398,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Dunderberg Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 1,
+"to": 3,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Dunderberg Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 5,
+"to": 399,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Dunderberg Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 300,
+"to": 398,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Dunderberg Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 401,
+"to": 411,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Dunderberg Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 413,
+"to": 599,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Durland Dr",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 2,
+"to": 46,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Durland Dr",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 48,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Durland Dr",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 1,
+"to": 99,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Edgewood Dr",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 2,
+"to": 6,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Edgewood Dr",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 8,
+"to": 126,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Edgewood Dr",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 128,
+"to": 178,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Edgewood Dr",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 180,
+"to": 198,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Edgewood Dr",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 1,
+"to": 5,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Edgewood Dr",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 7,
+"to": 161,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Edgewood Dr",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 163,
+"to": 189,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Edgewood Dr",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 191,
+"to": 199,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Edison Ave",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 52,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Edison Ave",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 54,
+"to": 58,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Edison Ave",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 60,
+"to": 98,
+"cents": 1500,
+"area": "Country Hollow"
+},
+{
+"street": "Edison Ave",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 61,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Edison Ave",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 63,
+"to": 67,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Edison Ave",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 69,
+"to": 99,
+"cents": 1500,
+"area": "Country Hollow"
+},
+{
+"street": "Emily Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 4,
+"cents": 1500,
+"area": "Blooming Grove"
+},
+{
+"street": "Emily Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 6,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Forest Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 198,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Forest Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 199,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Fort Worth Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 74,
+"cents": 1500,
+"area": "Blooming Grove"
+},
+{
+"street": "Fort Worth Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 76,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Fort Worth Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 71,
+"cents": 1500,
+"area": "Blooming Grove"
+},
+{
+"street": "Fort Worth Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 73,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Gilbert St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 88,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Gilbert St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 90,
+"to": 96,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Gilbert St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 98,
+"to": 198,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Gilbert St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 95,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Gilbert St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 97,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Gladstone Ct",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 50,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Gladstone Ct",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 52,
+"to": 98,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Gladstone Ct",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 3,
+"to": 53,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Gladstone Ct",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 55,
+"to": 99,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Gregory Ln",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 2,
+"to": 18,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Gregory Ln",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 20,
+"to": 98,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Gregory Ln",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 1,
+"to": 17,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Gregory Ln",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 19,
+"to": 99,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Greycourt Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 2,
+"to": 192,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Greycourt Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 194,
+"to": 276,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Greycourt Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 1,
+"to": 191,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Greycourt Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 193,
+"to": 275,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Hilltop Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 100,
+"to": 100,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Hilltop Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 102,
+"to": 198,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Hilltop Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 101,
+"to": 199,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Hoffman Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 40,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Hoffman Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 42,
+"to": 72,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Hoffman Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 74,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Hoffman Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 39,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Hoffman Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 41,
+"to": 73,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Hoffman Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 75,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Ivy Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 196,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Ivy Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 198,
+"to": 198,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Ivy Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 197,
+"cents": 1500,
+"area": "Ruach Hchaim"
+},
+{
+"street": "Ivy Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 199,
+"to": 199,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Knight St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 8,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Knight St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 10,
+"to": 90,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Knight St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 92,
+"to": 98,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Knight St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 1,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Knight St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 3,
+"to": 19,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Knight St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 21,
+"to": 99,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Lakes Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 4,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Lakes Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 6,
+"to": 10,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Lakes Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 12,
+"to": 198,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Lakes Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 200,
+"to": 398,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Lakes Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 3,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Lakes Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 5,
+"to": 9,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Lakes Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 11,
+"to": 199,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Lakes Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 201,
+"to": 299,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Lakes St",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 98,
+"cents": 1500,
+"area": "Country Hollow"
+},
+{
+"street": "Lakes St",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 91,
+"cents": 1500,
+"area": "Country Hollow"
+},
+{
+"street": "Lakes St",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 93,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Linden Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 6,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Linden Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 8,
+"to": 198,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Linden Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 5,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Linden Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 7,
+"to": 199,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Maple Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 2,
+"to": 6,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Maple Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 8,
+"to": 98,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Maple Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 1,
+"to": 13,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Maple Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 15,
+"to": 99,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Midland Ave",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 2,
+"to": 74,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Midland Ave",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 76,
+"to": 98,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Midland Ave",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 1,
+"to": 73,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Midland Ave",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 75,
+"to": 99,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Mill St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 200,
+"to": 218,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Mill St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 220,
+"to": 272,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Mill St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 274,
+"to": 298,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Mill St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 201,
+"to": 267,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Mill St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 269,
+"to": 299,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Mine Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 18,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Mine Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 20,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Mine Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 13,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Mine Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 15,
+"to": 27,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Mine Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 29,
+"to": 81,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Mine Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 83,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Mountain Park Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 10,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Mountain Park Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 12,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Mountain Park Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 9,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Mountain Park Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 11,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Museum Village Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 100,
+"to": 398,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Museum Village Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 101,
+"to": 259,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Museum Village Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 261,
+"to": 265,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Museum Village Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 267,
+"to": 399,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "N Trestle Tree Ln",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 2,
+"to": 20,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "N Trestle Tree Ln",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 22,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "N Trestle Tree Ln",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 1,
+"to": 19,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "N Trestle Tree Ln",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 21,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Nininger Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 1,
+"to": 97,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Nininger Rd",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 99,
+"to": 109,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Nininger Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 70,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Nininger Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 72,
+"to": 296,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Nininger Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 298,
+"to": 298,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Nininger Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 111,
+"to": 397,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Nininger Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 399,
+"to": 399,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Oakland Ave",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 2,
+"to": 98,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Oakland Ave",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 1,
+"to": 11,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Oakland Ave",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 13,
+"to": 99,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Oakland Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 20,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Oakland Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 22,
+"to": 130,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Oakland Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 132,
+"to": 190,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Oakland Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 192,
+"to": 398,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Oakland Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 209,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Oakland Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 211,
+"to": 265,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Oakland Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 267,
+"to": 295,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Oakland Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 297,
+"to": 399,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Old Mansion Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 2,
+"to": 6,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Old Mansion Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 8,
+"to": 36,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Old Mansion Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 38,
+"to": 198,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Old Mansion Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 1,
+"to": 5,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Old Mansion Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 7,
+"to": 37,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Old Mansion Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 39,
+"to": 199,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Old Quaker Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 62,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Old Quaker Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 64,
+"to": 68,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Old Quaker Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 70,
+"to": 198,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Old Quaker Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 99,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Orange Tpke",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 1200,
+"to": 1356,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Orange Tpke",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 1358,
+"to": 1498,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Orange Tpke",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1313,
+"to": 1391,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Orange Tpke",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1393,
+"to": 1499,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Orchard Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 272,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Orchard Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 274,
+"to": 318,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Orchard Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 320,
+"to": 398,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Orchard Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 201,
+"to": 257,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Orchard Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 259,
+"to": 317,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Orchard Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 319,
+"to": 399,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Orchard St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 156,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Orchard St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 158,
+"to": 160,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Orchard St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 162,
+"to": 198,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Orchard St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 157,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Orchard St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 159,
+"to": 161,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Orchard St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 163,
+"to": 199,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Orchard Ter",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 10,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Orchard Ter",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 12,
+"to": 96,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Orchard Ter",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 98,
+"to": 1098,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Orchard Ter",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 199,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Owen Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 11,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Owen Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 13,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Owens Dr",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 2,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Owens Dr",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 4,
+"to": 98,
+"cents": 1500,
+"area": "Country Hollow"
+},
+{
+"street": "Owens Dr",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 1,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Owens Dr",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 3,
+"to": 99,
+"cents": 1500,
+"area": "Country Hollow"
+},
+{
+"street": "Oxford Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 172,
+"to": 200,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Oxford Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 202,
+"to": 398,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Oxford Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 167,
+"to": 209,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Oxford Rd",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 211,
+"to": 399,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Paisley Ct",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 8,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Paisley Ct",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 10,
+"to": 98,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Paisley Ct",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 7,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Paisley Ct",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 9,
+"to": 99,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Palamar Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 10,
+"cents": 1500,
+"area": "Blooming Grove"
+},
+{
+"street": "Palamar Dr",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 12,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Phoenix Hill Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 90,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Phoenix Hill Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 92,
+"to": 98,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Phoenix Hill Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 91,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Phoenix Hill Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 93,
+"to": 99,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Pine Tree Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 74,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Pine Tree Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 76,
+"to": 298,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Pine Tree Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 45,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Pine Tree Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 47,
+"to": 299,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Prospect Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 178,
+"to": 212,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Prospect Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 214,
+"to": 234,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Prospect Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 236,
+"to": 258,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Prospect Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 260,
+"to": 314,
+"cents": 1500,
+"area": "Blooming Grove"
+},
+{
+"street": "Prospect Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 316,
+"to": 318,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Prospect Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 320,
+"to": 324,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Prospect Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 179,
+"to": 211,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Prospect Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 213,
+"to": 225,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Prospect Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 227,
+"to": 253,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Prospect Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 255,
+"to": 299,
+"cents": 1500,
+"area": "Blooming Grove"
+},
+{
+"street": "Prospect St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 10,
+"to": 34,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Prospect St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 36,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Prospect St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 11,
+"to": 35,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Prospect St",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 37,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Quaker Hill",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 198,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Quaker Hill",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 69,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Quaker Hill",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 71,
+"to": 89,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Quaker Hill",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 91,
+"to": 199,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Reed Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 100,
+"to": 122,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Reed Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 124,
+"to": 198,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Reed Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 99,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Ridge Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 4,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Ridge Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 6,
+"to": 310,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Ridge Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 312,
+"to": 328,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Ridge Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 330,
+"to": 392,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Ridge Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 394,
+"to": 404,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Ridge Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 406,
+"to": 598,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Ridge Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 299,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Ridge Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 301,
+"to": 315,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Ridge Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 317,
+"to": 393,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Ridge Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 395,
+"to": 399,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Ridge Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 401,
+"to": 599,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Roselawn Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 30,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Roselawn Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 32,
+"to": 298,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Roselawn Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 43,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Roselawn Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 45,
+"to": 299,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Round Lake Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 18,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Round Lake Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 20,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Round Lake Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 19,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Round Lake Ave",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 21,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Round Lake Ter",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 300,
+"to": 304,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Round Lake Ter",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 306,
+"to": 398,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Round Lake Ter",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 301,
+"to": 305,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Round Lake Ter",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 307,
+"to": 399,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Rye Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 98,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Rye Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 100,
+"to": 158,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Rye Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 99,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Rye Hill Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 101,
+"to": 139,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Schunnemunk Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 136,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Schunnemunk Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 138,
+"to": 160,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Schunnemunk Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 162,
+"to": 398,
+"cents": 1500,
+"area": "Country Hollow"
+},
+{
+"street": "Schunnemunk Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 400,
+"to": 498,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Schunnemunk Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 107,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Schunnemunk Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 109,
+"to": 149,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Schunnemunk Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 151,
+"to": 359,
+"cents": 1500,
+"area": "Country Hollow"
+},
+{
+"street": "Schunnemunk Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 361,
+"to": 399,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Schunnemunk Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 401,
+"to": 499,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Schunnemunk Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 298,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Schunnemunk Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 149,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Schunnemunk Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 151,
+"to": 199,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Serpi Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 2,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Serpi Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 4,
+"to": 98,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Serpi Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 1,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Serpi Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 3,
+"to": 99,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Seven Springs Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 70,
+"cents": 1500,
+"area": "Country Hollow"
+},
+{
+"street": "Seven Springs Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 72,
+"to": 74,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Seven Springs Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 76,
+"to": 240,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Seven Springs Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 99,
+"cents": 1500,
+"area": "Country Hollow"
+},
+{
+"street": "Seven Springs Rd",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 101,
+"to": 241,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Shetland Cir",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 80,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Shetland Cir",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 82,
+"to": 98,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Shetland Cir",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 81,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Shetland Cir",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 83,
+"to": 99,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Shuit Pl",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 2,
+"to": 20,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Shuit Pl",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 22,
+"to": 98,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Shuit Pl",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 1,
+"to": 19,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Shuit Pl",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 21,
+"to": 99,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Southfield Falls",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 62,
+"to": 66,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Southfield Falls",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 68,
+"to": 72,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Southfield Falls",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 74,
+"to": 98,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Southfield Falls",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 79,
+"to": 99,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Southfield Falls",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 76,
+"to": 84,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Southfield Falls",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 57,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Southfield Falls",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 59,
+"to": 71,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Southfield Falls",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 73,
+"to": 77,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Stage Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 698,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Stage Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 449,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Stage Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 451,
+"to": 481,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Stage Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 483,
+"to": 699,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "State Rte 17",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 1000,
+"to": 1012,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "State Rte 17",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 1014,
+"to": 1098,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "State Rte 17M",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 1170,
+"to": 1192,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "State Rte 17M",
+"zip": "10918",
+"town": "Chester",
+"side": "Even",
+"from": 1194,
+"to": 1298,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "State Rte 17M",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 1125,
+"to": 1309,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "State Rte 17M",
+"zip": "10918",
+"town": "Chester",
+"side": "Odd",
+"from": 1311,
+"to": 1399,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "State Rte 17M",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 248,
+"to": 356,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "State Rte 17M",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 358,
+"to": 1040,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "State Rte 17M",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 1042,
+"to": 1058,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "State Rte 17M",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 1060,
+"to": 1168,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "State Rte 17M",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 247,
+"to": 387,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "State Rte 17M",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 389,
+"to": 1063,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "State Rte 17M",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1065,
+"to": 1079,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "State Rte 17M",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1081,
+"to": 1123,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "State Rte 208",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 502,
+"to": 788,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "State Rte 208",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 790,
+"to": 792,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "State Rte 208",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 794,
+"to": 1044,
+"cents": 1500,
+"area": "Blooming Grove"
+},
+{
+"street": "State Rte 208",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 1046,
+"to": 1058,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "State Rte 208",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 1060,
+"to": 1252,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "State Rte 208",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 1254,
+"to": 1278,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "State Rte 208",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 781,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "State Rte 208",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 783,
+"to": 787,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "State Rte 208",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 789,
+"to": 1123,
+"cents": 1500,
+"area": "Blooming Grove"
+},
+{
+"street": "State Rte 208",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1125,
+"to": 1129,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "State Rte 208",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1131,
+"to": 1249,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "State Rte 208",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1251,
+"to": 1285,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Strauss Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 66,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Strauss Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 68,
+"to": 98,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Strauss Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 1,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Strauss Ln",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 3,
+"to": 99,
+"cents": 1500,
+"area": "Chester"
+},
+{
+"street": "Summit Ave",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 2,
+"to": 8,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Summit Ave",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Even",
+"from": 10,
+"to": 298,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Summit Ave",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 1,
+"to": 7,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Summit Ave",
+"zip": "10917",
+"town": "Central Valley",
+"side": "Odd",
+"from": 9,
+"to": 299,
+"cents": 1500,
+"area": "Woodbury Junction"
+},
+{
+"street": "Swezey Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 4,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Swezey Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 6,
+"to": 28,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Swezey Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 30,
+"to": 98,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Swezey Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 3,
+"cents": 1500,
+"area": "High St Area"
+},
+{
+"street": "Swezey Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 5,
+"to": 27,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Swezey Pl",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 29,
+"to": 99,
+"cents": 1500,
+"area": "Local Town"
+},
+{
+"street": "Townsend Ave",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 2,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Townsend Ave",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 4,
+"to": 98,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Townsend Ave",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 99,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Waverly Ct",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 2,
+"to": 16,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Waverly Ct",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Even",
+"from": 18,
+"to": 98,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Waverly Ct",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 1,
+"to": 15,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Waverly Ct",
+"zip": "10930",
+"town": "Highland Mills",
+"side": "Odd",
+"from": 17,
+"to": 99,
+"cents": 1500,
+"area": "Highland Lake Estate"
+},
+{
+"street": "Woodland Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 44,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Woodland Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 46,
+"to": 198,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Woodland Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 53,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Woodland Rd",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 55,
+"to": 199,
+"cents": 1500,
+"area": "Winchester"
+},
+{
+"street": "Zlotchev Way",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 2,
+"to": 84,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Zlotchev Way",
+"zip": "10950",
+"town": "Monroe",
+"side": "Even",
+"from": 86,
+"to": 98,
+"cents": 2000,
+"area": "Outside"
+},
+{
+"street": "Zlotchev Way",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 1,
+"to": 85,
+"cents": 1000,
+"area": "Kiryas Joel"
+},
+{
+"street": "Zlotchev Way",
+"zip": "10950",
+"town": "Monroe",
+"side": "Odd",
+"from": 87,
+"to": 99,
+"cents": 2000,
+"area": "Outside"
+}
+]

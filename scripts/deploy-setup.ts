@@ -155,28 +155,40 @@ async function deliveryMapCheck() {
     log(`Delivery map test: ${a.name} (rule price $${(want / 100).toFixed(2)}): "${address}" -> ${q.ok ? `${q.zone}, $${(q.feeCents / 100).toFixed(2)}` : `no price (${q.reason})`} ${pass ? "PASS" : "CHECK"}`);
     await new Promise((x) => setTimeout(x, 1100)); // OpenStreetMap asks for at most 1 lookup a second
   }
-  // Two houses on the same street with different prices (the house decides): house numbers along roads that cross
-  // the KJ line, each placed on the map by the US Census address service
-  const roads = ["Forest Road", "Mountain Road", "Bakertown Road", "Acres Road", "Seven Springs Mountain Road", "Schunnemunk Road", "Larkin Drive", "Dinev Road"];
-  const numbers = [1, 10, 25, 40, 60, 80, 100, 130, 160, 200, 250, 300, 400, 500, 600];
-  let found = false;
-  for (const road of roads) {
-    const seen: { address: string; fee: number; zone: string }[] = [];
-    for (const n of numbers) {
-      const address = `${n} ${road}, Monroe, NY 10950`;
-      const q = await deliveryQuote(address, s);
-      if (!q.ok) continue;
-      const other = seen.find((x) => x.fee !== q.feeCents);
-      if (other) {
-        log(`Delivery map test, same street: "${other.address}" -> ${other.zone}, $${(other.fee / 100).toFixed(2)}; "${address}" -> ${q.zone}, $${(q.feeCents / 100).toFixed(2)} PASS`);
-        found = true;
-        break;
-      }
-      seen.push({ address, fee: q.feeCents, zone: q.zone });
+  // Check against Hark's sheet of streets that cross a zone line (only to check; it never sets a price). One house in
+  // the middle of every few rows is priced the way a booking is, and compared with the sheet.
+  const { readFileSync } = await import("node:fs");
+  type Row = { street: string; zip: string; town: string; side: string; from: number; to: number; cents: number; area: string };
+  const sheet = JSON.parse(readFileSync("scripts/data/delivery-price-check.json", "utf8")) as Row[];
+  const sample = sheet.filter((_, k) => k % 8 === 0);
+  const houseIn = (r: Row) => {
+    let n = Math.round((r.from + r.to) / 2);
+    if ((n % 2 === 0) !== (r.side.toLowerCase() === "even")) n += 1;
+    return n > r.to ? r.from : n;
+  };
+  let agree = 0;
+  const differ: string[] = [];
+  const priced = new Map<string, { address: string; cents: number; zone: string }[]>();
+  for (const r of sample) {
+    const address = `${houseIn(r)} ${r.street}, ${r.town}, NY ${r.zip}`;
+    const q = await deliveryQuote(address, s);
+    if (!q.ok) {
+      differ.push(`"${address}": sheet $${r.cents / 100} (${r.area}), ours not found`);
+      continue;
     }
-    if (found) break;
+    if (q.feeCents === r.cents) agree++;
+    else differ.push(`"${address}": sheet $${r.cents / 100} (${r.area}), ours $${q.feeCents / 100} (${q.zone})`);
+    priced.set(r.street, [...(priced.get(r.street) ?? []), { address, cents: q.feeCents, zone: q.zone }]);
   }
-  if (!found) log("Delivery map test, same street: none of the test roads had two houses in different zones.");
+  log(`Delivery map check against Hark's sheet: ${agree} of ${sample.length} houses agree.`);
+  for (const d of differ.slice(0, 15)) log(`Delivery map check, differs: ${d}`);
+  // Two houses on the same street with different prices
+  const pair = [...priced.values()].find((list) => new Set(list.map((x) => x.cents)).size > 1);
+  if (pair) {
+    const a = pair[0];
+    const b = pair.find((x) => x.cents !== a.cents)!;
+    log(`Delivery map test, same street: "${a.address}" -> ${a.zone}, $${(a.cents / 100).toFixed(2)}; "${b.address}" -> ${b.zone}, $${(b.cents / 100).toFixed(2)} PASS`);
+  } else log("Delivery map test, same street: no pair in this sample.");
   for (const out of ["25 Main Street, Goshen, NY 10924"]) {
     const q = await deliveryQuote(out, s);
     log(`Delivery map test: outside every colored area "${out}" -> ${q.ok ? `$${(q.feeCents / 100).toFixed(2)} ${q.feeCents === 2000 ? "PASS" : "CHECK"}` : `no price (${q.reason}) CHECK`}`);
