@@ -42,8 +42,15 @@ export const NAV_GROUPS: Group[] = [
     title: null,
     items: [
       ["/admin", LayoutDashboard, "Dashboard", O],
-      ["/admin/inbox", Inbox, "Inbox", O], // info@hupupattractions.com (Abraham, Nov 12, 2026; Owner only for now)
-      ["/admin/search", Search, "Search", OS], // search everything (Abraham, Nov 15, 2026)
+      ["/admin/search", Search, "Search", OS], // search everything, right under Dashboard (Abraham, Nov 14, 2026)
+    ],
+  },
+  {
+    // Abraham, Nov 14, 2026: Inbox is its own group; open it to choose Email or SMS
+    title: "Inbox",
+    items: [
+      ["/admin/inbox", Inbox, "Email", O], // info@hupupattractions.com (Owner only for now)
+      ["/admin/messages", MessageSquare, "SMS", OS],
     ],
   },
   {
@@ -69,7 +76,6 @@ export const NAV_GROUPS: Group[] = [
     items: [
       ["/admin/calls", PhoneCall, "Call log", OS],
       ["/admin/voicemail", Voicemail, "Voicemail", OS],
-      ["/admin/messages", MessageSquare, "Messages", OS],
       ["/admin/campaigns", Megaphone, "Campaigns", OS],
       ["/admin/phone/prompts", Mic, "Hotline prompts", O],
       ["/admin/compliance", ShieldCheck, "Compliance", OS],

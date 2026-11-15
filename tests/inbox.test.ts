@@ -109,8 +109,8 @@ describe("Inbox", () => {
     expect(after.replies).toHaveLength(1);
     expect(after.replyFiles.map((x) => x.fileName)).toEqual(["price.pdf"]);
   });
-  it("attachments over 10 MB are refused for replies", async () => {
-    await expect(startReplyFile("big.zip", "application/zip", 11 * 1024 * 1024, null)).rejects.toThrow("10 MB");
+  it("attachments over 18 MB in all are refused for replies", async () => {
+    await expect(startReplyFile("big.zip", "application/zip", 19 * 1024 * 1024, null)).rejects.toThrow("18 MB");
   });
   it("New email (Abraham, Nov 13, 2026): from info@, signed, with an attachment; listed under Sent emails", async () => {
     const f = await startReplyFile("catalog.pdf", "application/pdf", 9, null);
@@ -136,5 +136,16 @@ describe("Inbox", () => {
   it("never deletes: no delete anywhere in the Inbox code", async () => {
     const { readFileSync } = await import("node:fs");
     for (const f of ["src/lib/inbox.ts", "src/app/admin/(app)/inbox/actions.ts"]) expect(readFileSync(f, "utf8")).not.toMatch(/\.delete\(/);
+  });
+});
+
+describe("attachment limit (Abraham, Nov 14, 2026: reach the free limit)", () => {
+  it("18 MB in all per email, and new attachments stop before the free database fills up", async () => {
+    const { INBOX_FILE_MAX_BYTES, ATTACHMENT_STORAGE_STOP_BYTES, databaseBytes } = await import("@/lib/inbox");
+    expect(INBOX_FILE_MAX_BYTES).toBe(18 * 1024 * 1024);
+    expect(ATTACHMENT_STORAGE_STOP_BYTES).toBeLessThan(1024 * 1024 * 1024);
+    expect(await databaseBytes()).toBeGreaterThanOrEqual(0);
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/app/admin/(app)/inbox/[id]/ReplyForm.tsx", "utf8")).toContain("const MAX = 18 * 1024 * 1024;");
   });
 });

@@ -8,10 +8,30 @@ import { handleCatalogEmail } from "@/lib/catalog-send";
 /**
  * info@hupupattractions.com Inbox (Abraham, Nov 12, 2026). Owner only. Every email and every reply is kept; nothing
  * is ever deleted. Mail arrives from a Cloudflare Email Worker that forwards to Gmail first and then sends the full
- * original email here in pieces (Vercel takes at most 4.5 MB per request). Attachments up to 10 MB are kept and can
+ * original email here in pieces (Vercel takes at most 4.5 MB per request). Attachments up to 18 MB are kept and can
  * be opened; bigger ones are listed (the Gmail copy has them).
  */
-export const INBOX_FILE_MAX_BYTES = 10 * 1024 * 1024;
+/**
+ * Attachments: up to 18 MB in all per email (Abraham, Nov 14, 2026: "reach the free limit"). Resend takes up to 40 MB
+ * free, but Gmail and most inboxes refuse emails over 25 MB, and attachments grow by about a third when sent, so 18 MB
+ * is the most that reaches everyone. A received attachment up to 18 MB is kept; bigger ones stay in the Gmail copy.
+ */
+export const INBOX_FILE_MAX_BYTES = 18 * 1024 * 1024;
+export const INBOX_FILE_MAX_LABEL = "18 MB";
+/**
+ * Attachments are saved in the database, and Neon's free plan holds 1 GB in all. New attachments are refused once the
+ * database passes 800 MB, so bookings, calls and payments always have room.
+ */
+export const ATTACHMENT_STORAGE_STOP_BYTES = 800 * 1024 * 1024;
+
+export async function databaseBytes(): Promise<number> {
+  try {
+    const r = await db.execute(sql`SELECT pg_database_size(current_database())::bigint AS n`);
+    return Number((r.rows[0] as { n: string | number }).n);
+  } catch {
+    return 0;
+  }
+}
 export const INBOX_CHUNK_BYTES = 3 * 1024 * 1024;
 const RAW_MAX_BYTES = 30 * 1024 * 1024;
 
@@ -48,7 +68,7 @@ async function storeFile(input: { emailId?: number | null; fileName: string; con
   return f;
 }
 
-/** Read the email, keep it (and its attachments up to 10 MB), link the contact, tell Abraham, check for Catalog. */
+/** Read the email, keep it (and its attachments up to 18 MB), link the contact, tell Abraham, check for Catalog. */
 export async function fileEmail(bytes: Buffer, uploadId: string | null = null, now = new Date()): Promise<InboxEmail> {
   const mail = await PostalMime.parse(bytes);
   const messageId = mail.messageId?.trim() || null;
@@ -136,7 +156,9 @@ export async function fileBytes(id: number) {
 
 /** Reply attachments are uploaded first (in pieces), then attached when the reply is sent. */
 export async function startReplyFile(fileName: string, contentType: string, size: number, userId: number | null) {
-  if (size <= 0 || size > INBOX_FILE_MAX_BYTES) throw new Error("Attachments can be up to 10 MB.");
+  if (size <= 0 || size > INBOX_FILE_MAX_BYTES) throw new Error(`Attachments can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
+  if ((await databaseBytes()) + size > ATTACHMENT_STORAGE_STOP_BYTES)
+    throw new Error("The storage for attachments is nearly full. Send the file as a link instead, or ask Claude to move files to R2.");
   const [f] = await db.insert(schema.inboxFiles).values({ fileName: fileName.slice(0, 200), contentType: contentType || "application/octet-stream", sizeBytes: size, createdBy: userId }).returning();
   return f;
 }
@@ -169,7 +191,7 @@ export async function sendReply(input: { emailId: number; body: string; fileIds:
     if (!f || f.file.emailId || f.file.replyId) throw new Error("An attachment didn't upload. Please attach it again.");
     files.push(f);
   }
-  if (files.reduce((n, f) => n + f.data.length, 0) > INBOX_FILE_MAX_BYTES) throw new Error("Attachments can be up to 10 MB in all.");
+  if (files.reduce((n, f) => n + f.data.length, 0) > INBOX_FILE_MAX_BYTES) throw new Error(`Attachments can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
   const e = found.email;
   const subject = /^re:/i.test(e.subject ?? "") ? e.subject! : `Re: ${e.subject ?? ""}`.trim();
   const text = `${body}\n\n${REPLY_SIGNATURE}`;
@@ -186,7 +208,7 @@ export async function sendReply(input: { emailId: number; body: string; fileIds:
 
 export const validAddress = (a: string) => /^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]{2,}$/.test(a.trim());
 
-/** A new email written in Admin (Owner), from info@, signed "Hup Up Attractions", attachments up to 10 MB in all. */
+/** A new email written in Admin (Owner), from info@, signed "Hup Up Attractions", attachments up to 18 MB in all. */
 export async function sendNewEmail(input: { to: string; subject: string; body: string; fileIds: number[]; userId: number | null; forwardOf?: number | null }) {
   const to = input.to.trim();
   if (!validAddress(to)) throw new Error("Enter one email address to send to.");
@@ -209,7 +231,9 @@ export async function sendNewEmail(input: { to: string; subject: string; body: s
       if (fb) forwarded.push({ filename: fb.file.fileName, content: fb.data.toString("base64") });
     }
   }
-  if (files.reduce((n, f) => n + f.data.length, 0) > INBOX_FILE_MAX_BYTES) throw new Error("Attachments can be up to 10 MB in all.");
+  if (files.reduce((n, f) => n + f.data.length, 0) > INBOX_FILE_MAX_BYTES) throw new Error(`Attachments can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
+  if (files.reduce((n, f) => n + f.data.length, 0) + forwarded.reduce((n, f) => n + Buffer.byteLength(f.content, "base64"), 0) > INBOX_FILE_MAX_BYTES)
+    throw new Error(`Attachments, with the forwarded ones, can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
   const text = `${body}\n\n${REPLY_SIGNATURE}`;
   const res = await sendEmail(to, subject, text, [...files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), ...forwarded]);
   const [sent] = await db

@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { discardDraftAction, replyFileChunkAction, saveDraftAction, sendNewEmailAction, sendReplyAction, startReplyFileAction } from "../actions";
 
 const CHUNK = 3 * 1024 * 1024;
-const MAX = 10 * 1024 * 1024;
+const MAX = 18 * 1024 * 1024; // same as INBOX_FILE_MAX_BYTES (18 MB in all per email)
 
 /**
- * Reply from Hup Up Attractions <info@hupupattractions.com>, signed "Hup Up Attractions". Attachments up to 10 MB.
+ * Reply from Hup Up Attractions <info@hupupattractions.com>, signed "Hup Up Attractions". Attachments up to 18 MB in all.
  * Without an emailId it is a new email (Abraham, Nov 13, 2026): To and Subject are typed in.
  */
 export default function ReplyForm(props: { emailId?: number; to?: string; active: boolean; draftId?: number; initialTo?: string; initialSubject?: string; initialBody?: string; forwardOf?: number; forwardFiles?: string[] }) {
@@ -44,7 +44,7 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
 
   async function send() {
     setMsg(null);
-    if (total > MAX) return setMsg({ ok: false, message: "Attachments can be up to 10 MB in all." });
+    if (total > MAX) return setMsg({ ok: false, message: "Attachments can be up to 18 MB in all." });
     const ids: number[] = [];
     for (const f of files) {
       const opened = await startReplyFileAction(f.name, f.type, f.size);
@@ -107,7 +107,7 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
           </span>
         ))}
         {props.forwardFiles?.map((n) => <span key={n} className="rounded-full bg-[#D3E7F8] px-2 py-0.5 text-xs" data-forward-file>{n} (from the original)</span>)}
-        <span className={`text-xs ${total > MAX ? "font-bold text-coral-dark" : "text-muted"}`}>{files.length ? `${(total / 1024 / 1024).toFixed(1)} MB of 10 MB` : "Up to 10 MB"}</span>
+        <span className={`text-xs ${total > MAX ? "font-bold text-coral-dark" : "text-muted"}`}>{files.length ? `${(total / 1024 / 1024).toFixed(1)} MB of 18 MB` : "Up to 18 MB in all"}</span>
       </div>
       <div className="mt-3 flex items-center gap-3">
         <button className="btn-dark" disabled={!props.active || pending || !body.trim() || (isNew && (!to.trim() || !subject.trim()))} onClick={() => start(send)}>

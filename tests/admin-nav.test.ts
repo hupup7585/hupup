@@ -8,12 +8,13 @@ const labels = (role: "owner" | "secretary" | "delivery") => Object.fromEntries(
 
 describe("grouped admin menu", () => {
   it("Owner sees every group in Abraham's order and items", () => {
-    expect(titles("owner")).toEqual([null, "Orders & bookings", "Deliveries", "Phone system", "Bookkeeping", "Staff", "Settings"]);
+    expect(titles("owner")).toEqual([null, "Inbox", "Orders & bookings", "Deliveries", "Phone system", "Bookkeeping", "Staff", "Settings"]);
     expect(labels("owner")).toEqual({
-      top: ["Dashboard", "Inbox", "Search"], // Inbox: info@ (Abraham, Nov 12, 2026; Owner only)
+      top: ["Dashboard", "Search"],
+      Inbox: ["Email", "SMS"], // Inbox: info@ (Abraham, Nov 12, 2026; Owner only)
       "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Catalog", "Equipment units"],
       Deliveries: ["Deliveries", "Delivery settings"],
-      "Phone system": ["Call log", "Voicemail", "Messages", "Campaigns", "Hotline prompts", "Compliance", "Phone settings"],
+      "Phone system": ["Call log", "Voicemail", "Campaigns", "Hotline prompts", "Compliance", "Phone settings"],
       Bookkeeping: ["Overview", "Income", "Invoices", "Expenses", "Bills I owe", "Sola fees", "Stripe fees", "Bank & card", "Sales tax", "Equipment", "Staff & 1099", "Mileage", "Reports", "All entries", "General ledger", "Settings"],
       Staff: ["Staff", "Tasks", "Activity"],
       Settings: ["Business hours & holidays", "General settings", "System status", "API keys", "Staff screens (preview)"],
@@ -23,9 +24,10 @@ describe("grouped admin menu", () => {
   it("role rules: Secretary and Delivery see only their items; empty groups are hidden", () => {
     expect(labels("secretary")).toEqual({
       top: ["Search"],
+      Inbox: ["SMS"],
       "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Equipment units"],
       Deliveries: ["Deliveries"],
-      "Phone system": ["Call log", "Voicemail", "Messages", "Campaigns", "Compliance"],
+      "Phone system": ["Call log", "Voicemail", "Campaigns", "Compliance"],
       Staff: ["Tasks"],
     });
     expect(labels("delivery")).toEqual({ Deliveries: ["Deliveries"], Staff: ["Tasks"] });
