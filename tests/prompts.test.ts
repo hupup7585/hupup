@@ -66,3 +66,16 @@ describe("delivery is an additional fee on the phone", () => {
     expect(PROMPTS.main_hi.text + PROMPTS.main_slogan.text).not.toMatch(/bounce/i);
   });
 });
+
+describe("voice safety (Abraham, Nov 15, 2026)", () => {
+  it("a voice Twilio rejects (Achird) falls back to Puck, so the line never hangs up", async () => {
+    const { safeVoice, config } = await import("@/lib/config");
+    expect(safeVoice("Google.en-US-Chirp3-HD-Achird")).toBe("Google.en-US-Chirp3-HD-Puck");
+    expect(safeVoice("")).toBe("Google.en-US-Chirp3-HD-Puck");
+    expect(safeVoice("Google.en-US-Chirp3-HD-Fenrir")).toBe("Google.en-US-Chirp3-HD-Fenrir");
+    const saved = process.env.IVR_VOICE;
+    process.env.IVR_VOICE = "Google.en-US-Chirp3-HD-Achird";
+    expect(config.voice()).toBe("Google.en-US-Chirp3-HD-Puck");
+    process.env.IVR_VOICE = saved;
+  });
+});
