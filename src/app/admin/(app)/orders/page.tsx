@@ -67,7 +67,14 @@ export default async function OrdersPage({
                     </div>
                   )}
                 </td>
-                <td className="td"><StatusBadge status={o.status} /></td>
+                <td className="td">
+                  <StatusBadge status={o.status} />
+                  {o.hold_expires_at && (o.status === "HOLD" || o.status === "PENDING_PAYMENT") && (
+                    <div data-hold-end className="mt-1 text-xs font-semibold text-navy">
+                      Hold ends {new Date(o.hold_expires_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })}
+                    </div>
+                  )}
+                </td>
               </tr>
             ))}
             {list.length === 0 && (

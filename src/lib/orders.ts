@@ -229,22 +229,25 @@ export async function getOrderWithItems(orderId: number) {
   return { order: o, items, customer };
 }
 
-export async function setOrderStatus(orderId: number, status: OrderStatus, extra: Partial<typeof orders.$inferInsert> = {}) {
+export async function setOrderStatus(orderId: number, status: OrderStatus, extra: Partial<typeof orders.$inferInsert> = {}, why?: { reason: string; userId?: number | null }) {
   await db
     .update(orders)
     .set({ status, updatedAt: new Date(), ...extra })
     .where(eq(orders.id, orderId));
+  if (why) await (await import("@/lib/status-history")).explainStatus(orderId, status, why.reason, why.userId ?? null);
   // Equipment units (Abraham, Nov 15, 2026): a confirmed booking gets its units; a cancelled one gives them back
   if (status === "CONFIRMED") await (await import("@/lib/units")).assignUnits(orderId);
   if (status === "CANCELLED") await (await import("@/lib/units")).releaseUnits(orderId);
 }
 
 /** Empty a held cart (keeps the order row as CANCELLED for the call log). */
-export async function cancelHold(orderId: number) {
-  await db
+export async function cancelHold(orderId: number, reason = "Cart emptied (the caller hung up or left the cart)") {
+  const res = await db
     .update(orders)
     .set({ status: "CANCELLED", holdExpiresAt: null, updatedAt: new Date(), notes: sql`COALESCE(${orders.notes}, '') || 'Hold released. '` })
-    .where(and(eq(orders.id, orderId), eq(orders.status, "HOLD")));
+    .where(and(eq(orders.id, orderId), eq(orders.status, "HOLD")))
+    .returning({ id: orders.id });
+  if (res.length) await (await import("@/lib/status-history")).explainStatus(orderId, "CANCELLED", reason);
 }
 
 /** Release every hold/payment-pending order whose time ran out. Returns count. */
@@ -254,6 +257,10 @@ export async function releaseExpired(): Promise<number> {
     .set({ status: "CANCELLED", updatedAt: new Date(), notes: sql`COALESCE(${orders.notes}, '') || 'Expired hold released. '` })
     .where(and(inArray(orders.status, ["HOLD", "PENDING_PAYMENT"]), lt(orders.holdExpiresAt, new Date())))
     .returning({ id: orders.id });
+  if (res.length) {
+    const { explainStatus } = await import("@/lib/status-history");
+    for (const r of res) await explainStatus(r.id, "CANCELLED", "Hold ended: the time ran out before payment");
+  }
   return res.length;
 }
 
@@ -290,6 +297,10 @@ export async function markPaid(orderId: number, cents: number, method: string, r
     .where(eq(orders.id, orderId))
     .returning();
   if (late) await handleLatePayment(orderId, cents, method, stillFree);
+  if (status !== o.status) {
+    const paidText = `Paid $${(cents / 100).toFixed(2)} by ${method}`;
+    await (await import("@/lib/status-history")).explainStatus(orderId, status, late ? (stillFree ? `${paidText} after the hold ended; the items were still free` : `${paidText} after the hold ended; the items were taken by another booking`) : paidText);
+  }
   if (updated?.status === "CONFIRMED") await (await import("@/lib/units")).assignUnits(orderId);
   // Bookkeeping (Abraham T): every paid booking is recorded as income automatically (rental, delivery, tax, tip).
   const { recordBookingPayment } = await import("@/lib/books");

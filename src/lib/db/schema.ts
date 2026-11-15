@@ -1309,3 +1309,21 @@ export const unitBookings = pgTable(
   },
   (t) => [uniqueIndex("unit_bookings_unit_day_idx").on(t.unitId, t.day), index("unit_bookings_order_idx").on(t.orderId)],
 );
+
+/**
+ * Booking status history (Abraham, Nov 15, 2026): a database trigger saves every status change of an order (from,
+ * to, time), so none can be missed. The app adds who made it and why when it knows.
+ */
+export const orderStatusHistory = pgTable(
+  "order_status_history",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    userId: integer("user_id"),
+    reason: text("reason"),
+  },
+  (t) => [index("order_status_history_order_idx").on(t.orderId, t.at)],
+);

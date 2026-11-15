@@ -26,6 +26,7 @@ export default function OrderActions(props: {
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [amount, setAmount] = useState(props.due > 0 ? (props.due / 100).toFixed(2) : "");
   const [method, setMethod] = useState("cash");
+  const [reason, setReason] = useState("");
   const run = (fn: () => Promise<ActionResult>) => start(async () => setMsg(await fn()));
 
   return (
@@ -33,8 +34,11 @@ export default function OrderActions(props: {
       <div className="card p-5">
         <h2 className="mb-3 font-bold">Update status</h2>
         {props.holdExpiresAt && (props.status === "PENDING_PAYMENT" || props.status === "HOLD") && (
-          <p className="mb-3 text-sm text-muted">Held until {new Date(props.holdExpiresAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })} : released automatically if unpaid. Mark Confirmed to keep it regardless.</p>
+          <p className="mb-3 text-sm font-semibold text-navy" data-hold-end>
+            Hold ends at {new Date(props.holdExpiresAt).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })}. If it is not paid by then, the items are released by themselves. Mark Confirmed to keep it anyway.
+          </p>
         )}
+        <input className="input mb-2" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for the change (needed to cancel)" aria-label="Reason for the change" data-status-reason />
         <div className="grid grid-cols-2 gap-2">
           {NEXT.filter((n) => n.status !== props.status).map((n) => (
             <button
@@ -42,8 +46,13 @@ export default function OrderActions(props: {
               className={n.cls}
               disabled={pending}
               onClick={() => {
+                if (n.status === "CANCELLED" && !reason.trim()) return setMsg({ ok: false, message: "Please write the reason for cancelling." });
                 if (n.status === "CANCELLED" && !confirm("Cancel this order and free the items?")) return;
-                run(() => updateStatusAction(props.orderId, n.status));
+                run(async () => {
+                  const r = await updateStatusAction(props.orderId, n.status, reason);
+                  if (r.ok) setReason("");
+                  return r;
+                });
               }}
             >
               {n.label}

@@ -19,9 +19,11 @@ export type ActionResult = { ok: boolean; message: string };
 
 const OCCUPYING: OrderStatus[] = ["HOLD", "PENDING_PAYMENT", "CONFIRMED", "DELIVERED"];
 
-export async function updateStatusAction(orderId: number, status: OrderStatus): Promise<ActionResult> {
-  await requireAdmin();
+export async function updateStatusAction(orderId: number, status: OrderStatus, reason = ""): Promise<ActionResult> {
+  const staff = await requireAdmin();
   if (!ORDER_STATUSES.includes(status)) return { ok: false, message: "Unknown status" };
+  const why = reason.trim().slice(0, 300);
+  if (status === "CANCELLED" && !why) return { ok: false, message: "Please write the reason for cancelling." };
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found" };
   const wasOccupying =
@@ -35,7 +37,8 @@ export async function updateStatusAction(orderId: number, status: OrderStatus): 
       if (free < it.qty) return { ok: false, message: `${it.name} is no longer available for ${dualDate(full.order.eventDate)} (${free} free).` };
     }
   }
-  await setOrderStatus(orderId, status, status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {});
+  await setOrderStatus(orderId, status, status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}, { reason: why || "Changed by staff in Admin", userId: staff.userId });
+  await db.insert(schema.auditLog).values({ userId: staff.userId, action: "order.status", entityType: "order", entityId: String(orderId), before: { status: full.order.status }, after: { status, reason: why || null } });
   revalidatePath("/admin", "layout");
   return { ok: true, message: "Status updated" };
 }

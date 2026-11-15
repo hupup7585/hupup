@@ -9,6 +9,7 @@ import { confirmAttentionOrder } from "@/lib/late-payment";
 export async function confirmAttentionAction(orderId: number) {
   const s = await requireStaff(["owner", "secretary"]);
   const ok = await confirmAttentionOrder(orderId);
+  if (ok) await (await import("@/lib/status-history")).explainStatus(orderId, "CONFIRMED", "Confirmed by staff after checking the items are free again", s.userId);
   await db.insert(schema.auditLog).values({ userId: s.userId, action: ok ? "order.attention_confirmed" : "order.attention_still_taken", entityType: "order", entityId: String(orderId) });
   revalidatePath(`/admin/orders/${orderId}`);
 }

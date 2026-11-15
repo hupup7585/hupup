@@ -24,6 +24,7 @@ import { activeDrivers, overlapsFor } from "@/lib/drivers";
 import { assignDriversAction } from "./driver-actions";
 import { confirmAttentionAction } from "./attention-actions";
 import { attentionItemsFree } from "@/lib/late-payment";
+import { STATUS_LABEL, statusHistory } from "@/lib/status-history";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -172,6 +173,29 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     </li>
                   ))}
                 </ul>
+              </div>
+            );
+          })()}
+          {await (async () => {
+            const hist = await statusHistory(o.id);
+            if (!hist.length) return null;
+            return (
+              <div className="card p-5" data-status-history>
+                <h2 className="mb-3 font-bold">Status history</h2>
+                <ol className="space-y-2 text-sm">
+                  {hist.map(({ h, who }) => (
+                    <li key={h.id}>
+                      <div>
+                        <b>{STATUS_LABEL[h.toStatus] ?? h.toStatus}</b>
+                        {h.fromStatus ? <span className="text-muted"> (was {STATUS_LABEL[h.fromStatus] ?? h.fromStatus})</span> : null}
+                      </div>
+                      <div className="text-muted">
+                        <DualDate at={h.at} /> · {who ?? (h.userId ? "Staff" : "System")}
+                        {h.reason ? ` · ${h.reason}` : ""}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
               </div>
             );
           })()}
