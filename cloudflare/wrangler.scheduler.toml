@@ -1,0 +1,14 @@
+# Hup Up Attractions free scheduler (Cloudflare Workers free plan). Deploy:
+#   npx wrangler deploy --config cloudflare/wrangler.scheduler.toml
+#   npx wrangler secret put CRON_SECRET --config cloudflare/wrangler.scheduler.toml
+# Needs a Cloudflare API token limited to Workers. No R2, no DNS, no routes on the domain.
+name = "hupup-scheduler"
+main = "scheduler-worker.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+SITE_URL = "https://hupupattractions.com"
