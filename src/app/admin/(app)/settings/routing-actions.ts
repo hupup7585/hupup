@@ -29,6 +29,14 @@ export async function saveRoutingAction(_prev: { ok?: boolean; message?: string 
   if (announce && !/press 1/i.test(announce)) return { ok: false, message: 'The announcement must tell staff to "press 1" to accept.' };
   const attempts = String(Math.min(5, Math.max(1, Number(form.get("attempts")) || 3)));
   const afterHours = form.get("afterHours") === "on";
+  const time = (v: FormDataEntryValue | null) => {
+    const t = String(v ?? "").trim();
+    return /^\d{1,2}:\d{2}$/.test(t) ? t : "";
+  };
+  const afterFrom = time(form.get("afterFrom"));
+  const afterTo = time(form.get("afterTo"));
+  const erevTo = time(form.get("erevTo"));
+  const erevBefore = String(Math.min(240, Math.max(0, Math.round(Number(form.get("erevBefore")) || 0))));
   const before = await getSettings();
   const normalized = targets.map((t) => `${t.label} | ${t.phone} | ${t.ringSeconds}`).join("\n");
   await saveSetting(n.targets as keyof Settings, normalized as never, owner.userId);
@@ -38,13 +46,17 @@ export async function saveRoutingAction(_prev: { ok?: boolean; message?: string 
   await saveSetting(`ringAnnounce${k}` as keyof Settings, announce as never, owner.userId);
   await saveSetting(`ringAttempts${k}` as keyof Settings, attempts as never, owner.userId);
   await saveSetting(`ringAfterHours${k}` as keyof Settings, afterHours as never, owner.userId);
+  await saveSetting(`ringAfterFrom${k}` as keyof Settings, afterFrom as never, owner.userId);
+  await saveSetting(`ringAfterTo${k}` as keyof Settings, afterTo as never, owner.userId);
+  await saveSetting(`ringErevTo${k}` as keyof Settings, erevTo as never, owner.userId);
+  await saveSetting(`ringErevBefore${k}` as keyof Settings, erevBefore as never, owner.userId);
   await db.insert(schema.auditLog).values({
     userId: owner.userId,
     action: "settings.routing_updated",
     entityType: "settings",
     entityId: `ring_key_${k}`,
     before: { targets: before[n.targets], mode: before[n.mode], accept: before[n.accept], name: before[`ringName${k}` as keyof Settings] },
-    after: { targets: normalized, mode, accept, name, announce, attempts, afterHours },
+    after: { targets: normalized, mode, accept, name, announce, attempts, afterHours, afterFrom, afterTo, erevTo, erevBefore },
   });
   revalidatePath("/admin", "layout");
   return { ok: true, message: "Saved." };

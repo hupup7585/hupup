@@ -2133,13 +2133,12 @@ const handlers: Record<string, Handler> = {
   /** After a ring attempt: a finished conversation ends the call; otherwise try the next number, then voicemail. */
   async "operator-done"(ctx, vr) {
     const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
-    // Staff pressed 2 (checked first: Twilio may report that leg as completed): that extension's voicemail
+    // Abraham, Nov 14, 2026, every line: staff pressed 2 = pass the call on to the next number or round, exactly like
+    // no answer; voicemail only after the last round. Checked first: Twilio may report that leg as completed.
     const rejectedAt = ctx.session?.data.rejectedAt;
-    if (rejectedAt && Date.now() - rejectedAt < 10 * 60_000) {
-      await updateSession(ctx.callSid, { data: { rejectedAt: undefined, missed: "rejected" } }, ctx.session);
-      return back(vr, "voicemail", { x: k });
-    }
-    if (ctx.body.DialCallStatus === "completed") {
+    const rejected = Boolean(rejectedAt && Date.now() - rejectedAt < 10 * 60_000);
+    if (rejected) await updateSession(ctx.callSid, { data: { rejectedAt: undefined } }, ctx.session);
+    if (!rejected && ctx.body.DialCallStatus === "completed") {
       vr.hangup();
       return vr;
     }
@@ -2149,8 +2148,8 @@ const handlers: Record<string, Handler> = {
     const steps = (list.mode === "simultaneous" ? 1 : list.targets.length) * ringAttempts(settings, k);
     if (next > 0 && next < steps && (await lineRingsNowFor(k, settings))) return dialTargets(vr, list, k, next, ctx.session?.fromNumber ?? ctx.from);
     // Abraham's missed-call line, then straight to the voicemail beep
-    await updateSession(ctx.callSid, { data: { missed: "no_answer" } }, ctx.session); // dashboard: missed call
-    return back(vr, "voicemail", { x: k }); // pressed 2 or no answer on every number: the extension's voicemail
+    await updateSession(ctx.callSid, { data: { missed: rejected ? "rejected" : "no_answer" } }, ctx.session); // dashboard: missed call
+    return back(vr, "voicemail", { x: k }); // passed (2) or no answer on every number and round: the extension's voicemail
   },
 
   /**
@@ -2174,8 +2173,8 @@ const handlers: Record<string, Handler> = {
 
   async "whisper-accept"(ctx, vr) {
     if (ctx.body.Digits === "1") return vr; // empty response = connect the caller
-    // Abraham: press 2 (reject) sends the caller straight to that extension's voicemail. Marked on the caller's call,
-    // so the caller's next step goes to voicemail whatever Twilio reports for this leg.
+    // Abraham (Nov 14, 2026): press 2 passes the call on to the next number or round (voicemail only after the last
+    // round). Marked on the caller's call, so the next step moves on whatever Twilio reports for this leg.
     const parent = ctx.body.ParentCallSid;
     if (ctx.body.Digits === "2" && parent) {
       const s = await getSession(parent);

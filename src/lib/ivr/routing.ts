@@ -154,23 +154,58 @@ function nyMinutes(at: Date) {
 }
 
 /**
- * Does this line ring right now? During office hours every line rings. Shabbos and Yom Tov (and from candle lighting
- * on Erev): nothing rings. After hours only lines with the after-hours switch on ring; key 6 only 8:00 AM to 10:30 PM,
- * and on Friday and Erev Yom Tov only until 4:00 PM or an hour before candle lighting, whichever is earlier.
+ * After-hours ringing window per line (Abraham, Nov 14, 2026: every hour editable in Admin > Phone settings). Empty
+ * "from"/"to" = the whole time the office is closed. On Friday and Erev Yom Tov the line stops at "Erev until" or the
+ * set minutes before candle lighting, whichever is earlier (empty "Erev until" = only the candle lighting rule).
+ * Defaults keep what was approved: key 6 8:00 AM to 10:30 PM, Erev until 4:00 PM or 60 minutes before candles.
  */
-export function lineRingsNow(
-  k: RingKey,
-  at: Date,
-  s: Partial<Record<`ringAfterHours${RingKey}`, boolean>>,
-  cal: { officeOpen: boolean; shabbosOrYomTov: boolean; candleLighting: Date | null },
-): boolean {
+export const AFTER_HOURS_DEFAULTS: Record<RingKey, { from: string; to: string; erevTo: string; erevBefore: string }> = {
+  "0": { from: "", to: "", erevTo: "", erevBefore: "0" },
+  "2": { from: "", to: "", erevTo: "", erevBefore: "0" },
+  "4": { from: "", to: "", erevTo: "", erevBefore: "0" },
+  "5": { from: "", to: "", erevTo: "", erevBefore: "0" },
+  "6": { from: "08:00", to: "22:30", erevTo: "16:00", erevBefore: "60" },
+  "8": { from: "", to: "", erevTo: "", erevBefore: "0" },
+};
+type AfterHoursSettings = Partial<Record<`ringAfterHours${RingKey}`, boolean>> &
+  Partial<Record<`ringAfterFrom${RingKey}` | `ringAfterTo${RingKey}` | `ringErevTo${RingKey}` | `ringErevBefore${RingKey}`, string>>;
+
+const hhmm = (v: string | undefined): number | null => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec((v ?? "").trim());
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+
+export function afterHoursWindow(k: RingKey, s: AfterHoursSettings) {
+  const d = AFTER_HOURS_DEFAULTS[k];
+  const pick = (key: string, def: string) => {
+    const v = (s as Record<string, string | undefined>)[key];
+    return v === undefined ? def : v;
+  };
+  return {
+    from: pick(`ringAfterFrom${k}`, d.from),
+    to: pick(`ringAfterTo${k}`, d.to),
+    erevTo: pick(`ringErevTo${k}`, d.erevTo),
+    erevBefore: pick(`ringErevBefore${k}`, d.erevBefore),
+  };
+}
+
+/**
+ * Does this line ring right now? During office hours every line rings. Shabbos and Yom Tov (and from candle lighting
+ * on Erev): nothing rings. After hours only lines with the after-hours switch on ring, inside their window (above).
+ */
+export function lineRingsNow(k: RingKey, at: Date, s: AfterHoursSettings, cal: { officeOpen: boolean; shabbosOrYomTov: boolean; candleLighting: Date | null }): boolean {
   if (cal.shabbosOrYomTov) return false;
   if (cal.candleLighting && at >= cal.candleLighting) return false;
   if (cal.officeOpen) return true;
   if (!s[`ringAfterHours${k}`]) return false;
-  if (k !== "6") return true;
+  const w = afterHoursWindow(k, s);
   const now = nyMinutes(at);
-  let end = 22 * 60 + 30;
-  if (cal.candleLighting) end = Math.min(16 * 60, nyMinutes(new Date(cal.candleLighting.getTime() - 60 * 60_000)));
-  return now >= 8 * 60 && now < end;
+  const from = hhmm(w.from) ?? 0;
+  let end = hhmm(w.to) ?? 24 * 60;
+  if (cal.candleLighting) {
+    const erevTo = hhmm(w.erevTo);
+    const beforeCandles = nyMinutes(new Date(cal.candleLighting.getTime() - (Number(w.erevBefore) || 0) * 60_000));
+    end = Math.min(end, erevTo ?? 24 * 60, beforeCandles);
+  }
+  return now >= from && now < end;
 }

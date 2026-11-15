@@ -11,7 +11,7 @@ export default function RoutingForm({
   summary,
 }: {
   ringKey: RingKey;
-  initial: { targets: string; mode: string; accept: boolean; name?: string; attempts?: string; afterHours?: boolean; announce?: string };
+  initial: { targets: string; mode: string; accept: boolean; name?: string; attempts?: string; afterHours?: boolean; announce?: string; afterFrom?: string; afterTo?: string; erevTo?: string; erevBefore?: string };
   summary: string;
 }) {
   const [state, action, pending] = useActionState(saveRoutingAction, null);
@@ -45,9 +45,31 @@ export default function RoutingForm({
         </label>
         <label className="flex items-center gap-2 font-semibold">
           <input type="checkbox" name="afterHours" defaultChecked={Boolean(initial.afterHours)} />
-          {ringKey === "6" ? "Ring after hours (8:00 AM to 10:30 PM; Friday and Erev Yom Tov until 4:00 PM or an hour before candle lighting)" : "Ring after hours too"}
+          Ring after the office closes too
         </label>
       </div>
+      <fieldset className="grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-4" data-after-hours-window>
+        <legend className="px-1 text-sm font-semibold">After-hours ringing times (only when the box above is ticked)</legend>
+        <label className="block">
+          <span className="label">From</span>
+          <input type="time" name="afterFrom" defaultValue={initial.afterFrom ?? ""} className="input" />
+        </label>
+        <label className="block">
+          <span className="label">Until</span>
+          <input type="time" name="afterTo" defaultValue={initial.afterTo ?? ""} className="input" />
+        </label>
+        <label className="block">
+          <span className="label">Friday and Erev Yom Tov until</span>
+          <input type="time" name="erevTo" defaultValue={initial.erevTo ?? ""} className="input" />
+        </label>
+        <label className="block">
+          <span className="label">Stop this many minutes before candle lighting</span>
+          <input type="number" name="erevBefore" min={0} max={240} defaultValue={initial.erevBefore ?? "0"} className="input" />
+        </label>
+        <p className="text-xs text-muted sm:col-span-4">
+          Leave From and Until empty to ring the whole time the office is closed. On Friday and Erev Yom Tov the line stops at the earlier of the two Erev times. Example for delivery and pickup: from 8:00 AM until 10:30 PM; Friday until 4:00 PM or 60 minutes before candle lighting.
+        </p>
+      </fieldset>
       <p className="text-xs text-muted">Shabbos and Yom Tov: nothing rings; callers go to this line&rsquo;s voicemail.</p>
       <label className="block">
         <span className="label">Numbers to ring, one per line: Name | phone | seconds to ring (5 to 60)</span>

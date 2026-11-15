@@ -275,6 +275,7 @@ describe("every key, office closed", () => {
     expect(redirect(await press("2"))).toBe("instructions");
     expect(redirect(await press("4"))).toBe("learn");
     expect(redirect(await press("3"))).toBe("ring?k=4");
+    await saveSetting("ringAfterHours6", false); // key 6 is switched on live (Nov 14); here: the rule with every switch off
     for (const k of ["2", "4", "5", "6", "8", "0"]) {
       const xml = await call("ring", {}, `k=${k}`);
       expect(xml).not.toContain("<Dial");
@@ -283,6 +284,7 @@ describe("every key, office closed", () => {
     await saveSetting("ringAfterHours0", true); // Admin can switch one back on
     expect(await call("ring", {}, "k=0")).toContain("<Dial");
     await saveSetting("ringAfterHours0", false);
+    await saveSetting("ringAfterHours6", true);
     expect(redirect(await press("7"))).toBe("hours");
     expect(redirect(await press("9"))).toBe("voicemail?x=9");
   });

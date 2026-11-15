@@ -92,6 +92,13 @@ export const SETTING_DEFAULTS = {
   ringAfterHours5: false,
   ringAfterHours6: false,
   ringAfterHours8: false,
+  /* After-hours window per line, editable in Phone settings (Abraham, Nov 14, 2026). Key 6 keeps the approved hours. */
+  ringAfterFrom0: "", ringAfterTo0: "", ringErevTo0: "", ringErevBefore0: "0",
+  ringAfterFrom2: "", ringAfterTo2: "", ringErevTo2: "", ringErevBefore2: "0",
+  ringAfterFrom4: "", ringAfterTo4: "", ringErevTo4: "", ringErevBefore4: "0",
+  ringAfterFrom5: "", ringAfterTo5: "", ringErevTo5: "", ringErevBefore5: "0",
+  ringAfterFrom6: "08:00", ringAfterTo6: "22:30", ringErevTo6: "16:00", ringErevBefore6: "60",
+  ringAfterFrom8: "", ringAfterTo8: "", ringErevTo8: "", ringErevBefore8: "0",
   ringAnnounce0: "",
   ringAnnounce2: "",
   ringAnnounce4: "",

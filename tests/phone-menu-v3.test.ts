@@ -219,12 +219,23 @@ describe("Phone Recordings (Abraham)", () => {
 });
 
 describe("Nov 12 decisions: staff reject, caller ID, after hours, keypad pay, CATALOG text", () => {
-  it("staff press 2: the caller goes straight to that extension's voicemail", async () => {
+  it("staff press 2 (Abraham, Nov 14, every line): the call moves on to the next number or round; voicemail only after the last round", async () => {
+    const { saveSetting } = await import("@/lib/settings");
+    await saveSetting("ringTargets4", "Office | +18457990925 | 25");
+    await saveSetting("ringAttempts4", "3");
+    await saveSetting("ringAfterHours4", true);
+    const pass = async () => {
+      await handleVoice({ action: "whisper-accept", query: new URLSearchParams("k=4"), body: { CallSid: "CAstaff", ParentCallSid: "CAv3", Digits: "2" }, callSid: "CAstaff", from: "+18457990925" });
+      expect(typeof h.session.data.rejectedAt).toBe("number");
+    };
     h.session.data = {};
-    await handleVoice({ action: "whisper-accept", query: new URLSearchParams("k=4"), body: { CallSid: "CAstaff", ParentCallSid: "CAv3", Digits: "2" }, callSid: "CAstaff", from: "+18457990925" });
-    expect(typeof h.session.data.rejectedAt).toBe("number");
-    const xml = await call("operator-done", { DialCallStatus: "completed" }, "i=0&k=4");
-    expect(redirect(xml)).toBe("voicemail?x=4");
+    await pass();
+    const next = await call("operator-done", { DialCallStatus: "completed" }, "i=0&k=4");
+    expect(next).toContain("<Dial"); // round 2, not voicemail
+    expect(h.session.data.rejectedAt).toBeUndefined();
+    await pass();
+    const last = await call("operator-done", { DialCallStatus: "completed" }, "i=2&k=4");
+    expect(redirect(last)).toBe("voicemail?x=4"); // after the third round
     expect(h.session.data.missed).toBe("rejected");
     // press 1 connects (empty response)
     expect(await handleVoice({ action: "whisper-accept", query: new URLSearchParams(), body: { CallSid: "CAstaff2", ParentCallSid: "CAv3", Digits: "1" }, callSid: "CAstaff2", from: "+18457990925" })).toBe('<?xml version="1.0" encoding="UTF-8"?><Response/>');
@@ -275,5 +286,25 @@ describe("Nov 12 decisions: staff reject, caller ID, after hours, keypad pay, CA
     expect((await replyToCatalogText("+18455550188", { optedOut: false, on: true, send })).reason).toBe("already_today");
     expect((await replyToCatalogText("+18455550199", { optedOut: true, on: true, send })).reason).toBe("opted_out");
     expect((await db.select().from(schema.smsConsents)).filter((r) => r.scope === "marketing" && r.action === "opt_in")).toHaveLength(0);
+  });
+});
+
+describe("after-hours ringing times in Admin (Abraham, Nov 14, 2026)", () => {
+  const at = (iso: string) => new Date(iso);
+  const weekday = { officeOpen: false, shabbosOrYomTov: false, candleLighting: null };
+  it("every line's window is a setting; changing key 6 to 9:00 PM stops it then; empty = all night; Erev uses the earlier stop", () => {
+    const base = { ringAfterHours6: true, ringAfterHours5: true };
+    expect(lineRingsNow("6", at("2026-11-18T02:30:00Z"), { ...base, ringAfterTo6: "21:00" }, weekday)).toBe(false); // 9:30 PM
+    expect(lineRingsNow("6", at("2026-11-18T01:30:00Z"), { ...base, ringAfterTo6: "21:00" }, weekday)).toBe(true); // 8:30 PM
+    expect(lineRingsNow("5", at("2026-11-17T08:00:00Z"), base, weekday)).toBe(true); // 3:00 AM, no window on 5
+    expect(lineRingsNow("5", at("2026-11-17T08:00:00Z"), { ...base, ringAfterFrom5: "08:00", ringAfterTo5: "23:00" }, weekday)).toBe(false);
+    const fri = { ...weekday, candleLighting: at("2026-11-20T21:13:00Z") }; // candles 4:13 PM
+    expect(lineRingsNow("6", at("2026-11-20T17:30:00Z"), { ...base, ringErevTo6: "12:00" }, fri)).toBe(false); // 12:30 PM, Erev until noon
+    expect(lineRingsNow("6", at("2026-11-20T16:30:00Z"), { ...base, ringErevTo6: "12:00" }, fri)).toBe(true); // 11:30 AM
+  });
+  it("key 6 rings after hours (switch on in the live database); the form shows the times", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("drizzle/0054_key6_after_hours.sql", "utf8")).toContain("'ringAfterHours6', 'true'::jsonb");
+    expect(readFileSync("src/app/admin/(app)/settings/RoutingForm.tsx", "utf8")).toContain("data-after-hours-window");
   });
 });
