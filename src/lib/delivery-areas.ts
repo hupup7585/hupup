@@ -6,34 +6,21 @@ import { eq } from "drizzle-orm";
  * downloads its shapes (KML) during each live build and when the Owner presses "Reload the map" in Admin. The Owner
  * can rename each area and change its price; a reload keeps those edits. An address is placed on the map with the
  * free US Census address service (OpenStreetMap as a backup); no key and no cost. The house decides the price, never
- * the street, and nobody changes it by hand. Outside every zone = we don\u2019t deliver there; not found = the
- * address is asked for again.
+ * the street, and nobody changes it by hand (prices: RULE_CENTS). Not found = the address is asked for again.
  */
 export const DELIVERY_MAP_KML = "https://www.google.com/maps/d/kml?mid=1Wuj9Q746oXbWSeTPs0nO7yVpJ0En6N8&forcekml=1";
 
 export type Ring = [number, number][]; // [longitude, latitude]
 export type DeliveryArea = { id: string; mapName: string; name: string; priceCents: number | null; polygons: Ring[] };
 
-/** Abraham's prices (Nov 15, 2026), used for an area the first time it comes from the map. Chester is $15. */
-const ABRAHAM_PRICES: [RegExp, number][] = [
-  [/ruach/i, 2000],
-  [/local town|woodbury junction|winchester|high st|highland lake|country hollow|blooming grove|chester/i, 1500],
-  [/^\s*\$?\s*\d*\s*local\s*$|^local\b/i, 1000],
-];
-
 const text = (s: string) => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
-const priceIn = (s: string): number | null => {
-  const m = /\$\s*(\d+(?:\.\d{1,2})?)/.exec(s);
-  return m ? Math.round(Number(m[1]) * 100) : null;
-};
 
-/** Areas from the map file: every placemark with a shape. A price in its name, notes or layer name is read too. */
+/** Areas from the map file: every placemark with a shape (names only; prices follow the rule). */
 export function parseKml(kml: string): DeliveryArea[] {
   const out: DeliveryArea[] = [];
   const folders = [...kml.matchAll(/<Folder>([\s\S]*?)<\/Folder>/g)].map((m) => m[1]);
   const chunks = folders.length ? folders : [kml];
   for (const chunk of chunks) {
-    const layer = text(/<name>([\s\S]*?)<\/name>/.exec(chunk.replace(/<Placemark>[\s\S]*?<\/Placemark>/g, ""))?.[1] ?? "");
     for (const pm of chunk.matchAll(/<Placemark>([\s\S]*?)<\/Placemark>/g)) {
       const body = pm[1];
       const polys = [...body.matchAll(/<outerBoundaryIs>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/g)].map((c) =>
@@ -46,10 +33,10 @@ export function parseKml(kml: string): DeliveryArea[] {
       );
       if (!polys.length || polys.every((r) => r.length < 3)) continue;
       const mapName = text(/<name>([\s\S]*?)<\/name>/.exec(body)?.[1] ?? "Area");
-      const desc = text(/<description>([\s\S]*?)<\/description>/.exec(body)?.[1] ?? "");
       const plain = mapName.replace(/\$\s*\d+(?:\.\d{1,2})?/g, "").replace(/^[\s:,-]+|[\s:,-]+$/g, "") || mapName;
-      const abraham = ABRAHAM_PRICES.find(([re]) => re.test(plain))?.[1] ?? null;
-      out.push({ id: `${mapName}#${out.filter((a) => a.mapName === mapName).length}`, mapName, name: plain, priceCents: abraham ?? priceIn(mapName) ?? priceIn(desc) ?? priceIn(layer), polygons: polys.filter((r) => r.length >= 3) });
+      // The price comes from Abraham's rule (RULE_CENTS), never from the map's labels; shown here for Admin only
+      const area = { id: `${mapName}#${out.filter((a) => a.mapName === mapName).length}`, mapName, name: plain, priceCents: 0, polygons: polys.filter((r) => r.length >= 3) };
+      out.push({ ...area, priceCents: /^\s*local\s*$/i.test(plain) ? 1000 : 1500 });
     }
   }
   return out;
@@ -82,14 +69,29 @@ function metersToEdge([x, y]: [number, number], ring: Ring): number {
 /** A house this close to a zone line counts as on the line. */
 export const ON_LINE_METERS = 10;
 
+/** Is this the KJ line (the map's "Local" shape)? */
+export const isLocalArea = (a: DeliveryArea) => /^\s*local\s*$/i.test(a.mapName.replace(/\$\s*\d+(\.\d+)?/g, "").replace(/[^a-z\s]/gi, " "));
+
 /**
- * The zone a house is in (Abraham, Nov 15, 2026: the house decides, not the street). On a zone line (or where two
- * zones overlap), the lower price wins.
+ * Delivery prices (Abraham, Nov 15, 2026), one rule, from the house's spot only (never the map's price labels):
+ * inside the KJ line (Local) $10; inside any other colored area $15 (Chester and Ruach Hchaim too); outside every
+ * colored area $20. A house on a zone line (within ON_LINE_METERS) gets the lower price.
  */
+export const RULE_CENTS = { local: 1000, area: 1500, outside: 2000 } as const;
+
+/** The zones a house is in or on the line of. */
+export function areasAt(lng: number, lat: number, areas: DeliveryArea[]): DeliveryArea[] {
+  return areas.filter((a) => a.polygons.some((r) => inRing([lng, lat], r) || metersToEdge([lng, lat], r) <= ON_LINE_METERS));
+}
+
+/** The zone that sets the price: the KJ line wins when the house is in it or on its line. */
 export function areaAt(lng: number, lat: number, areas: DeliveryArea[]): DeliveryArea | null {
-  const hits = areas.filter((a) => a.polygons.some((r) => inRing([lng, lat], r) || metersToEdge([lng, lat], r) <= ON_LINE_METERS));
-  if (!hits.length) return null;
-  return hits.slice().sort((p, q) => (p.priceCents ?? Infinity) - (q.priceCents ?? Infinity))[0];
+  const hits = areasAt(lng, lat, areas);
+  return hits.find(isLocalArea) ?? hits[0] ?? null;
+}
+
+export function priceFor(a: DeliveryArea | null): number {
+  return !a ? RULE_CENTS.outside : isLocalArea(a) ? RULE_CENTS.local : RULE_CENTS.area;
 }
 
 /** A point inside an area (for the build's one-address-per-area test). */
@@ -152,11 +154,11 @@ export function savedAreas(json: string | null | undefined): DeliveryArea[] {
   }
 }
 
-/** New shapes from the map, keeping the Owner's own names and prices for areas already there. */
+/** New shapes from the map, keeping the Owner's own names for areas already there (prices always follow the rule). */
 export function mergeAreas(fromMap: DeliveryArea[], old: DeliveryArea[]): DeliveryArea[] {
   return fromMap.map((a) => {
     const before = old.find((o) => o.id === a.id);
-    return before ? { ...a, name: before.name, priceCents: before.priceCents } : a;
+    return before ? { ...a, name: before.name } : a;
   });
 }
 
@@ -220,7 +222,7 @@ export type DeliveryQuote = { ok: true; zone: string; feeCents: number } | { ok:
 /**
  * The delivery fee for an address: the price of the map area it is in. Before the map is loaded, the older town-name
  * rule is used. No price is ever guessed: outside every area, a place the map service can't find, or an area with
- * no price = the booking does not go on (outside: we don't deliver there; not found: the address is asked again).
+ * not found = the address is asked for again.
  */
 export async function deliveryQuote(address: string | null | undefined, s: { deliveryAreas: string; zoneKjPlaces: string; zoneAreaPlaces: string; deliveryFeeKjCents: string; deliveryFeeAreaCents: string; localStreets?: string }, fetcher: typeof fetch = fetch): Promise<DeliveryQuote> {
   if (!address?.trim()) return { ok: false, reason: "no_address" };
@@ -234,14 +236,12 @@ export async function deliveryQuote(address: string | null | undefined, s: { del
   const at = await geocode(address, fetcher);
   if (!at) return { ok: false, reason: "not_found" };
   const a = areaAt(at.lng, at.lat, areas);
-  if (!a) return { ok: false, reason: "outside" };
-  if (a.priceCents === null) return { ok: false, reason: "no_price", area: a.name };
-  return { ok: true, zone: a.name, feeCents: a.priceCents };
+  return { ok: true, zone: a ? a.name : "Outside the colored areas", feeCents: priceFor(a) };
 }
 
 export const QUOTE_WHY: Record<string, string> = {
   no_address: "there is no delivery address",
   not_found: "the address could not be found on the map: check the spelling of the house number, street, town and ZIP",
-  outside: "we don't deliver there (the house is outside every zone on the price map)",
+  outside: "the house is outside the delivery area",
   no_price: "its area has no price yet",
 };

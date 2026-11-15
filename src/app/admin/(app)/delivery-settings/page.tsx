@@ -3,7 +3,7 @@ import { requireOwner } from "@/lib/auth";
 import StockAddressForm from "../settings/StockAddressForm";
 import { DeliveryPricingForm } from "../settings/PricingForms";
 import { DELIVERY_TEMPLATES } from "@/lib/delivery-templates";
-import { savedAreas } from "@/lib/delivery-areas";
+import { priceFor, savedAreas } from "@/lib/delivery-areas";
 import { checkAddressAction, reloadMapAction, saveAreasAction } from "./area-actions";
 
 /** Deliveries → Delivery settings: delivery area, fees, stock address and the approved delivery texts. Owner only. */
@@ -20,7 +20,7 @@ export default async function DeliverySettingsPage({ searchParams }: { searchPar
       <section className="card mb-6 p-5" id="areas" data-delivery-areas>
         <h2 className="mb-1 text-lg font-extrabold">Delivery prices by map area</h2>
         <p className="mb-3 text-sm text-muted">
-          The delivery price is decided by the house, not the street: the zone on your Google map (&ldquo;Price list&rdquo;) that the house sits in. On a zone line, the lower price. Outside every zone, we don&rsquo;t deliver there. The phone line, New booking and the payment total all use it, and nobody can change the price on an order by hand. To change a shape, edit it on the Google map, then press Reload the map; your names and prices here are kept.
+          The delivery price is decided by the house, not the street: the zone on your Google map (&ldquo;Price list&rdquo;) that the house sits in. Inside the KJ line $10, inside any other colored area $15, outside every colored area $20; on a zone line, the lower price. The phone line, New booking and the payment total all use it, and nobody can change the price on an order by hand. To change a shape, edit it on the Google map, then press Reload the map; your names and prices here are kept.
         </p>
         {areas.length === 0 ? (
           <p className="mb-3 text-sm">The map is not loaded yet, so the town lists below are used. Press Reload the map.</p>
@@ -29,11 +29,12 @@ export default async function DeliverySettingsPage({ searchParams }: { searchPar
             {areas.map((a) => (
               <div key={a.id} className="grid grid-cols-[1fr_7rem] items-end gap-2">
                 <label className="block"><span className="label">Area name {a.mapName !== a.name && <span className="text-xs text-muted">(on the map: {a.mapName})</span>}</span><input name={`name:${a.id}`} defaultValue={a.name} className="input" /></label>
-                <label className="block"><span className="label">Price</span><input name={`price:${a.id}`} inputMode="decimal" defaultValue={a.priceCents === null ? "" : (a.priceCents / 100).toFixed(2)} placeholder="no price" className="input" /></label>
+                <div><span className="label">Price</span><div className="py-2 font-bold">${(priceFor(a) / 100).toFixed(2)}</div></div>
               </div>
             ))}
-            <span className="text-xs text-muted">Where two zones overlap, or a house is on a zone line, the lower price is used.</span>
-            <button className="btn-dark w-fit">Save names and prices</button>
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-[#F5F7FA] p-2 text-sm"><span>Outside every colored area</span><b>$20.00</b></div>
+            <span className="text-xs text-muted">The rule: inside the KJ line (Local) $10, inside any other colored area $15, outside every colored area $20. A house on a zone line gets the lower price. The map&rsquo;s own price labels are not used.</span>
+            <button className="btn-dark w-fit">Save names</button>
           </form>
         )}
         <div className="flex flex-wrap items-end gap-2 border-t border-line pt-3">

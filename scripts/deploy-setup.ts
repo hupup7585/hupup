@@ -126,7 +126,7 @@ async function liveSettingsReport() {
  * way a booking is. The results go in the build log.
  */
 async function deliveryMapCheck() {
-  const { reloadDeliveryMap, pointInside, deliveryQuote } = await import("../src/lib/delivery-areas");
+  const { reloadDeliveryMap, pointInside, deliveryQuote, priceFor } = await import("../src/lib/delivery-areas");
   const { getSettings } = await import("../src/lib/settings");
   const r = await reloadDeliveryMap();
   log(`Delivery map: ${r.message}`);
@@ -150,8 +150,9 @@ async function deliveryMapCheck() {
       continue;
     }
     const q = await deliveryQuote(address, s);
-    const pass = q.ok && q.zone === a.name && q.feeCents === a.priceCents;
-    log(`Delivery map test: ${a.name} (map price $${a.priceCents === null ? "none" : (a.priceCents / 100).toFixed(2)}): "${address}" -> ${q.ok ? `${q.zone}, $${(q.feeCents / 100).toFixed(2)}` : `no price (${q.reason})`} ${pass ? "PASS" : "CHECK"}`);
+    const want = priceFor(a);
+    const pass = q.ok && q.feeCents === want;
+    log(`Delivery map test: ${a.name} (rule price $${(want / 100).toFixed(2)}): "${address}" -> ${q.ok ? `${q.zone}, $${(q.feeCents / 100).toFixed(2)}` : `no price (${q.reason})`} ${pass ? "PASS" : "CHECK"}`);
     await new Promise((x) => setTimeout(x, 1100)); // OpenStreetMap asks for at most 1 lookup a second
   }
   // Two houses on the same street with different prices (the house decides): look across each zone line
@@ -193,9 +194,9 @@ async function deliveryMapCheck() {
     if (found || tries >= 30) break;
   }
   if (!found) log(`Delivery map test, same street: no street with houses on both sides of a zone line found in ${tries} tries.`);
-  for (const out of ["1 Main Street, Albany, NY 12207"]) {
+  for (const out of ["25 Main Street, Goshen, NY 10924"]) {
     const q = await deliveryQuote(out, s);
-    log(`Delivery map test: outside every area "${out}" -> ${q.ok ? `$${(q.feeCents / 100).toFixed(2)} (WRONG)` : `no price, we don\u2019t deliver there (${q.reason}) PASS`}`);
+    log(`Delivery map test: outside every colored area "${out}" -> ${q.ok ? `$${(q.feeCents / 100).toFixed(2)} ${q.feeCents === 2000 ? "PASS" : "CHECK"}` : `no price (${q.reason}) CHECK`}`);
   }
 }
 
