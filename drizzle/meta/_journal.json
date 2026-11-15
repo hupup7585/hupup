@@ -428,6 +428,13 @@
       "when": 1794771782133,
       "tag": "0060_phonepay_test_line",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1794772407608,
+      "tag": "0061_delivery_photos",
+      "breakpoints": true
     }
   ]
 }

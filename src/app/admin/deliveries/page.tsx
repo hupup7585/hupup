@@ -42,6 +42,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
         .where(inArray(schema.orderItems.orderId, ids))
     : [];
   const stages = await stagesFor(ids);
+  const photos = ids.length ? await db.select({ id: schema.deliveryPhotos.id, orderId: schema.deliveryPhotos.orderId, stop: schema.deliveryPhotos.stop }).from(schema.deliveryPhotos).where(inArray(schema.deliveryPhotos.orderId, ids)) : [];
   const driverNames = new Map((await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers).where(eq(schema.adminUsers.role, "delivery"))).map((d) => [d.id, d.name]));
   const custIds = rows.map((r) => r.customerId).filter((x): x is number => Boolean(x));
   const customers = custIds.length ? await db.select().from(schema.customers).where(inArray(schema.customers.id, custIds)) : [];
@@ -176,6 +177,18 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
                   </div>
                   <div className="mt-0.5 text-sm text-muted">{its.map((i) => `${i.qty} × ${i.name}`).join(", ")}</div>
                   {o.notes && <div className="mt-1 text-sm">Note: {o.notes}</div>}
+                  {photos.some((p) => p.orderId === o.id && p.stop === stop) && (
+                    <div className="mt-2 flex flex-wrap gap-2" data-stop-photos>
+                      {photos
+                        .filter((p) => p.orderId === o.id && p.stop === stop)
+                        .map((p) => (
+                          <a key={p.id} href={`/api/admin/photos/${p.id}`} target="_blank" rel="noreferrer">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={`/api/admin/photos/${p.id}`} alt={`${stop === "delivery" ? "Delivery" : "Pickup"} photo for order ${o.id}`} className="h-20 w-20 rounded-lg border border-line object-cover" loading="lazy" />
+                          </a>
+                        ))}
+                    </div>
+                  )}
                   <StopActions orderId={o.id} phone={c?.phone ?? null} stop={stop} done={done} stage={stages.get(`${o.id}-${stop}`)?.stage} />
                   {(() => {
                     const leg = nextLeg(route, route.findIndex((r) => r.key === `${o.id}-${stop}`), stockAddress);

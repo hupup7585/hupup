@@ -1394,3 +1394,20 @@ export const phonepayAttempts = pgTable(
   },
   (t) => [index("phonepay_attempts_started_idx").on(t.startedAt)],
 );
+
+/** Delivery and pickup photos (Abraham, Nov 15, 2026): the files live in Cloudflare R2 (free tier); only the key here. */
+export const deliveryPhotos = pgTable(
+  "delivery_photos",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id").notNull(),
+    stop: text("stop").notNull(), // delivery | pickup
+    storageKey: text("storage_key").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    takenBy: integer("taken_by"),
+    takenByName: text("taken_by_name"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("delivery_photos_order_idx").on(t.orderId)],
+);

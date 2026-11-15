@@ -94,8 +94,8 @@ export async function blockers(env: Record<string, string | undefined> = process
     {
       key: "photos",
       area: "Delivery photos (Cloudflare R2)",
-      active: Boolean(env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_BUCKET),
-      reason: "Needs a free Cloudflare R2 bucket and its API keys (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET) in Vercel.",
+      active: Boolean((env.CLOUDFLARE_R2_WORKERS_TOKEN || env.CLOUDFLARE_API_TOKEN) && env.CLOUDFLARE_ACCOUNT_ID),
+      reason: "Needs the Cloudflare token (CLOUDFLARE_R2_WORKERS_TOKEN) and CLOUDFLARE_ACCOUNT_ID in Vercel.",
       where: "/admin/deliveries",
     },
     {

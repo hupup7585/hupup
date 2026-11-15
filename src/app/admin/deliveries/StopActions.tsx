@@ -3,7 +3,18 @@
 import { useState, useTransition } from "react";
 import { AlertTriangle, Camera, CheckCircle2, MessageSquareText, Phone, Truck } from "lucide-react";
 import { DELIVERY_TEMPLATES, type TemplateKey } from "@/lib/delivery-templates";
-import { markDoneAction, sendTemplateAction, stageAction } from "./actions";
+import { markDoneAction, sendTemplateAction, stageAction, uploadPhotoAction } from "./actions";
+
+/** Shrink a phone photo to at most 1600 pixels on the long side, as a JPEG (keeps uploads small and inside the free tier). */
+async function shrink(file: File): Promise<Blob> {
+  const img = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * scale);
+  c.height = Math.round(img.height * scale);
+  c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+  return new Promise((ok, no) => c.toBlob((b) => (b ? ok(b) : no(new Error("Could not read that photo."))), "image/jpeg", 0.82));
+}
 
 export default function StopActions({ orderId, phone, stop, done, stage }: { orderId: number; phone: string | null; stop: "delivery" | "pickup"; done: boolean; stage?: string }) {
   const [problem, setProblem] = useState<string | null>(null);
@@ -32,9 +43,31 @@ export default function StopActions({ orderId, phone, stop, done, stage }: { ord
             <MessageSquareText className="h-4 w-4" aria-hidden /> Send template text
           </button>
         </div>
-        <button type="button" className="btn-ghost" disabled title="Photo storage is waiting for Abraham's approval">
+        <label className={`btn-ghost cursor-pointer ${pending ? "pointer-events-none opacity-60" : ""}`} data-add-photo>
           <Camera className="h-4 w-4" aria-hidden /> Add photo
-        </button>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (!f) return;
+              start(async () => {
+                try {
+                  const form = new FormData();
+                  form.set("orderId", String(orderId));
+                  form.set("stop", stop);
+                  form.set("photo", await shrink(f), "photo.jpg");
+                  setMsg(await uploadPhotoAction(form));
+                } catch (err) {
+                  setMsg({ ok: false, message: (err as Error).message });
+                }
+              });
+            }}
+          />
+        </label>
       </div>
       {!done && stage !== "out_for_delivery" && stage !== "out_for_pickup" && (
         <button type="button" className="btn-ghost w-full" data-stage-out disabled={pending} onClick={() => start(async () => setMsg(await stageAction(orderId, stop, stop === "delivery" ? "out_for_delivery" : "out_for_pickup")))}>
