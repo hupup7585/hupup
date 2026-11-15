@@ -202,11 +202,12 @@ describe("finalize sends texts only with consent", () => {
     expect(h.emails).toEqual([{ to: "yossi@example.com" }]);
     expect(xml).toContain("We just emailed you a secure payment link");
   });
-  it("without consent or email: no text, staff will call", async () => {
+  it("without consent or email: no text; the email becomes required so the payment link can be sent (Abraham, Nov 15)", async () => {
     h.session.data.smsConsent = "no";
     const xml = await call("finalize");
     expect(h.sms).toHaveLength(0);
-    expect(xml).toContain("Someone from our team will call you shortly");
+    expect(xml).toContain("/api/voice/ask?f=email");
+    expect(h.session.data.emailRequired).toBe(1);
   });
 });
 

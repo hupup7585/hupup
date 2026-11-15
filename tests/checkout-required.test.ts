@@ -66,3 +66,23 @@ describe("driver directions (optional)", () => {
     expect(redirect(await call("directions"))).toBe("ask?f=email");
   });
 });
+
+describe("payment can never be skipped (Abraham, Nov 15, 2026)", () => {
+  it("no texts and no email: the email becomes required, pound can't skip it, then back to the order", async () => {
+    h.session.data = { emailRequired: 1 };
+    const ask = await call("ask", {}, "f=email");
+    void ask; // the cart check runs first in a real call; the wording is checked below
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    expect(PROMPTS.ask_email_required.text).toBe("To send your secure payment link, we need your email address. Please say your email address, like john at gmail dot com.");
+    expect(redirect(await call("heard", { Digits: "#" }, "f=email"))).toBe("ask?f=email"); // can't skip
+    expect(redirect(await call("heard", { SpeechResult: "" }, "f=email&n=2"))).not.toBe("phone");
+    h.session.data = { emailRequired: 1, heard: "sara@example.com" };
+    expect(redirect(await call("confirm", { Digits: "1" }, "f=email"))).toBe("finalize");
+    expect(h.session.data.email).toBe("sara@example.com");
+    expect(h.session.data.emailRequired).toBeUndefined();
+  });
+  it("otherwise the email stays optional, as before", async () => {
+    h.session.data = {};
+    expect(redirect(await call("heard", { Digits: "#" }, "f=email"))).toBe("phone");
+  });
+});

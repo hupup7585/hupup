@@ -1455,18 +1455,19 @@ const handlers: Record<string, Handler> = {
     const f = ctx.query.get("f") as Field;
     const n = ctx.query.get("n") ?? undefined;
     const spec = FIELDS[f];
+    const prompt: PromptKey = f === "email" && ctx.session?.data.emailRequired ? "ask_email_required" : spec.prompt;
     if (sttActive()) {
       // Speech to text (preview only until Abraham approves the price): the question, a moment for star (type it) or
       // pound (skip email), then the answer is recorded and typed up by Google while a soft clip plays.
       const k = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 1, finishOnKey: "", action: url("heard", { f, n }), method: "POST" });
-      sp(k, ctx, spec.prompt);
+      sp(k, ctx, prompt);
       sp(k, ctx, "type_hint");
       vr.record({ maxLength: 20, timeout: 3, playBeep: false, finishOnKey: "#*", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
       return vr;
     }
     // Say it, or press star to type it on the keypad (Abraham L). finishOnKey "" so star and # arrive as keys.
     const g = speech(vr, url("heard", { f, n }), spec.hints, { dtmf: true, numDigits: 1, finishOnKey: "" });
-    sp(g, ctx, spec.prompt);
+    sp(g, ctx, prompt);
     sp(g, ctx, "type_hint");
     return vr;
   },
@@ -1535,20 +1536,21 @@ const handlers: Record<string, Handler> = {
   async heard(ctx, vr) {
     const f = ctx.query.get("f") as Field;
     const spec = FIELDS[f];
-    if (ctx.query.get("skip")) return back(vr, "phone"); // pound on the recording: skip email
+    const required = f === "email" && Boolean(ctx.session?.data.emailRequired);
+    if (ctx.query.get("skip")) return required ? back(vr, "ask", { f }) : back(vr, "phone"); // pound on the recording: skip email
     if (ctx.body.Digits === "*") return back(vr, "type", { f }); // switch to keypad typing
     // Speech to text: the typed-up answer comes from our own record of this call, not from Twilio's speech result
     const typedUp = await callSpokenAnswer(ctx, Number(ctx.query.get("a")));
     const viaStt = Boolean(typedUp) || ctx.query.get("empty") === "1";
     if (!viaStt) {
-      if (f === "email" && (ctx.body.Digits === "#" || (ctx.body.Digits === "" && !ctx.body.SpeechResult))) return back(vr, "phone"); // skip email (as before)
+      if (f === "email" && (ctx.body.Digits === "#" || (ctx.body.Digits === "" && !ctx.body.SpeechResult))) return required ? back(vr, "ask", { f }) : back(vr, "phone"); // skip email (as before), unless it is required
       if (ctx.body.Digits && !ctx.body.SpeechResult) return back(vr, "ask", { f }); // another key: ask again
-    } else if (ctx.body.Digits === "#" && f === "email") return back(vr, "phone");
+    } else if (ctx.body.Digits === "#" && f === "email") return required ? back(vr, "ask", { f }) : back(vr, "phone");
     const raw = (viaStt ? typedUp?.text || "" : ctx.body.SpeechResult || "").trim();
     const value = raw ? spec.normalize(raw) : null;
     if (!value) {
       const n = Number(ctx.query.get("n") || 0) + 1;
-      if (f === "email" && n >= 2) {
+      if (f === "email" && n >= 2 && !required) {
         sp(vr, ctx, "email_skip");
         return back(vr, "phone");
       }
@@ -1611,8 +1613,9 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "address_outside_area");
       return back(vr, "ask", { f: "address" });
     }
-    await updateSession(ctx.callSid, { data: { [f]: heard, heard: undefined } }, ctx.session);
-    return back(vr, FIELDS[f].next);
+    const wasRequired = f === "email" && Boolean(ctx.session?.data.emailRequired);
+    await updateSession(ctx.callSid, { data: { [f]: heard, heard: undefined, ...(wasRequired ? { emailRequired: undefined } : {}) } }, ctx.session);
+    return back(vr, wasRequired ? "finalize" : FIELDS[f].next);
   },
 
   /* ---- Terms: "By pressing #, you agree to our Terms and Conditions..." (logged with time, phone, order, version) ---- */
@@ -1752,6 +1755,14 @@ const handlers: Record<string, Handler> = {
     }
     if (!data.name || !data.address) return back(vr, "ask", { f: !data.name ? "name" : "address" });
     if (termsActive() && !data.termsAccepted) return back(vr, "terms"); // off on live until the final Terms are in
+    // Payment can never be skipped (Abraham, Nov 15, 2026): no texts and no email means no way to send the payment
+    // link, so the email becomes required (keypad payment needs neither).
+    const canText = data.smsConsent === "yes" || data.smsConsent === "existing";
+    const keypadPay = keypadPayFor(ctx.session?.fromNumber ?? ctx.from) && (STRIPE_PHONE_PAY_MODE !== "live" || PAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k)));
+    if (!canText && !data.email && !keypadPay) {
+      await updateSession(ctx.callSid, { data: { emailRequired: 1 } }, ctx.session);
+      return back(vr, "ask", { f: "email" });
+    }
     const settings = await getSettings();
     const zone = deliveryZone(data.address, settings);
     // Each rental day is its own delivery: its own delivery fee and tax. One charge pays for all of them.

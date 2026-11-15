@@ -175,6 +175,8 @@ export type CallData = {
   /** Checkout answers */
   name?: string;
   address?: string;
+  /** No texts and no email: the email is required for the payment link (Abraham, Nov 15, 2026) */
+  emailRequired?: number;
   /** Optional directions for the driver, said after the address (Abraham, Nov 15, 2026) */
   directions?: string;
   email?: string;
