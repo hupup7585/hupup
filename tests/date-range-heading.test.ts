@@ -12,7 +12,7 @@ describe("date range heading", () => {
     expect(rangeHeading("2026-11-08", "2026-11-14")).toEqual({
       week: { en: "Week of Parshas Toldos", he: "פרשת תולדות" },
       from: { en: "Sunday, November 8, 2026", he: "זונטאג, כ״ח חשון" },
-      to: { en: "Shabbos, November 14, 2026", he: "שבת קודש, ד׳ כסלו" },
+      to: { en: "Shabbes, November 14, 2026", he: "שבת קודש, ד׳ כסלו" },
     });
   });
 
@@ -24,7 +24,7 @@ describe("date range heading", () => {
     expect(PARSHIYOS_EN).toHaveLength(PARSHIYOS.length);
     expect(parshaEnglish("פרשת ויקהל-פקודי")).toBe("Parshas Vayakhel-Pekudei");
     expect(parshaEnglish("חול המועד פסח")).toBe("Chol Hamoed Pesach");
-    expect(englishFullDate("2026-11-14")).toBe("Shabbos, November 14, 2026");
+    expect(englishFullDate("2026-11-14")).toBe("Shabbes, November 14, 2026");
     expect(yiddishFullDate("2026-11-13")).toBe("פרייטאג, ג׳ כסלו");
   });
 
@@ -33,7 +33,7 @@ describe("date range heading", () => {
     expect(html).toContain("<h1");
     expect(html.match(/פרשת תולדות/g)).toHaveLength(1);
     expect(html).toContain("From:</span> <span>Sunday, November 8, 2026</span>");
-    expect(html).toContain("To:</span> <span>Shabbos, November 14, 2026</span>");
+    expect(html).toContain("To:</span> <span>Shabbes, November 14, 2026</span>");
     expect(html).not.toContain(" / ");
     const yi = html.match(/<span dir="rtl" lang="yi" data-yi="true" class="([^"]+)">/g)!;
     expect(yi).toHaveLength(3);

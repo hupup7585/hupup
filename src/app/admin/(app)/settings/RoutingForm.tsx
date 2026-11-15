@@ -70,7 +70,7 @@ export default function RoutingForm({
           Leave From and Until empty to ring the whole time the office is closed. On Friday and Erev Yom Tov the line rings until the Erev time, or until the minutes before candle lighting when that is later (summer). Example for delivery and pickup: from 8:00 AM until 10:30 PM; Friday until 4:00 PM, or 60 minutes before candle lighting when that is later.
         </p>
       </fieldset>
-      <p className="text-xs text-muted">Shabbos and Yom Tov: nothing rings; callers go to this line&rsquo;s voicemail.</p>
+      <p className="text-xs text-muted">Shabbes and Yom Tov: nothing rings; callers go to this line&rsquo;s voicemail.</p>
       <label className="block">
         <span className="label">Numbers to ring, one per line: Name | phone | seconds to ring (5 to 60)</span>
         <textarea name="targets" rows={3} defaultValue={initial.targets} className="input font-mono text-sm" placeholder={"Sara office phone | (845) 555-0123 | 20\nMoshe mobile | (845) 555-0145 | 15"} />

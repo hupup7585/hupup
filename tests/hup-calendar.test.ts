@@ -61,13 +61,13 @@ describe("calendar rules hold for every year from 5787 to 6000", () => {
       expect([0, 3, 5]).not.toContain(weekday(newYear(y))); // Lo ADU Rosh: never Sunday, Wednesday, Friday
       expect([0, 5]).not.toContain(weekday(toFixed({ year: y, month: TISHREI, day: 10 }))); // Yom Kippur never Friday/Sunday
       expect([1, 3, 5]).not.toContain(weekday(toFixed({ year: y, month: NISAN, day: 15 }))); // Pesach never Mon/Wed/Fri
-      expect([1, 3, 6]).not.toContain(weekday(toFixed({ year: y, month: isLeapYear(y) ? ADAR2 : ADAR, day: 14 }))); // Purim never Mon/Wed/Shabbos
+      expect([1, 3, 6]).not.toContain(weekday(toFixed({ year: y, month: isLeapYear(y) ? ADAR2 : ADAR, day: 14 }))); // Purim never Mon/Wed/Shabbes
     }
   });
   it("every day converts to Hebrew and back exactly", () => {
     for (let rd = fixedFromISO("2026-11-01"); rd <= newYear(6001); rd++) expect(toFixed(fromFixed(rd))).toBe(rd);
   });
-  it("fasts that fall on Shabbos move (Tisha B'Av to Sunday, Esther to Thursday)", () => {
+  it("fasts that fall on Shabbes move (Tisha B'Av to Sunday, Esther to Thursday)", () => {
     let found = 0;
     for (let y = 5787; y <= 6000; y++) {
       const av9 = toFixed({ year: y, month: 5, day: 9 });
@@ -88,7 +88,7 @@ describe("calendar rules hold for every year from 5787 to 6000", () => {
 });
 
 describe("sun times for Kiryas Joel (in-house NOAA equations)", () => {
-  it("chatzos on Erev Shabbos, November 13, 2026 is 11:40 AM; Shabbos ends at 5:21 PM", () => {
+  it("chatzos on Erev Shabbes, November 13, 2026 is 11:40 AM; Shabbes ends at 5:21 PM", () => {
     expect(eastern(zmanim("2026-11-13", KJ).chatzos())).toBe("11:40 AM");
     expect(eastern(zmanim("2026-11-14", KJ).tzeis(8.5))).toBe("5:21 PM");
   });
@@ -105,7 +105,7 @@ describe("names and the public website", () => {
     const sukkos = dayInfo("2026-09-26"); // Sukkos I, 5787
     expect(sukkos.reasonEn).toBe("Sukkos");
     expect(sukkos.reasonYi).toBe("סוכות");
-    expect(dayInfo("2026-11-14").reasonEn).toBe("Shabbos");
+    expect(dayInfo("2026-11-14").reasonEn).toBe("Shabbes");
     expect(dayInfo("2026-11-14").reasonYi).toBe("שבת");
     expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toContain("chk.day.reasonEn");
   });

@@ -9,7 +9,7 @@ import { getUsage, freeOnDay, bookableQty } from "@/lib/availability";
 import { runsForDay } from "@/lib/admin-queries";
 import { addDays, dayOfMonth, daysBetween, isValidISO, todayISO, weekdayShort } from "@/lib/dates";
 
-/** The Sunday that starts this date's week (weeks run Sunday to Shabbos). */
+/** The Sunday that starts this date's week (weeks run Sunday to Shabbes). */
 const sundayOf = (iso: string) => addDays(iso, -new Date(`${iso}T12:00:00Z`).getUTCDay());
 import { formatPhone } from "@/lib/phone";
 import { orderNumber } from "@/lib/orders";
@@ -28,7 +28,7 @@ export default async function CalendarPage({
   const today = todayISO();
   const span = sp.span === "14" ? 14 : sp.span === "28" ? 28 : 7;
   const dayParam = sp.day && isValidISO(sp.day) ? sp.day : null;
-  const start = sp.start && isValidISO(sp.start) ? sp.start : sundayOf(dayParam ?? today); // Sunday-Shabbos weeks (Abraham)
+  const start = sp.start && isValidISO(sp.start) ? sp.start : sundayOf(dayParam ?? today); // Sunday-Shabbes weeks (Abraham)
   const end = addDays(start, span - 1);
   const days = daysBetween(start, end);
   const selected = dayParam ?? (days.includes(today) ? today : start);

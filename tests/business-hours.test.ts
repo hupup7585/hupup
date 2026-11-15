@@ -17,16 +17,16 @@ describe("office hours (Abraham 2026-11-06, Eastern time)", () => {
     expect(officeOpenNow(at("2026-11-13T16:00:00Z"), S)).toBe(true); // 11:00 AM
     expect(officeOpenNow(at("2026-11-13T17:00:00Z"), S)).toBe(false); // 12:00 PM, after chatzos (~11:41)
   });
-  it("Shabbos closed; Motzei Shabbos opens 2 hours after Shabbos ends, until 11:00 PM in winter", () => {
-    // Nov 14, 2026: Shabbos ends at Rabbeinu Tam (sunset + 72 minutes) about 5:51 PM, so the office opens about 7:51 PM
-    expect(officeOpenNow(at("2026-11-14T17:00:00Z"), S)).toBe(false); // Shabbos noon
-    expect(officeOpenNow(at("2026-11-14T23:30:00Z"), S)).toBe(false); // 6:30 PM: Shabbos over, but < 2 hours
+  it("Shabbes closed; Motzei Shabbes opens 2 hours after Shabbes ends, until 11:00 PM in winter", () => {
+    // Nov 14, 2026: Shabbes ends at Rabbeinu Tam (sunset + 72 minutes) about 5:51 PM, so the office opens about 7:51 PM
+    expect(officeOpenNow(at("2026-11-14T17:00:00Z"), S)).toBe(false); // Shabbes noon
+    expect(officeOpenNow(at("2026-11-14T23:30:00Z"), S)).toBe(false); // 6:30 PM: Shabbes over, but < 2 hours
     expect(officeOpenNow(at("2026-11-15T00:30:00Z"), S)).toBe(false); // 7:30 PM: not yet
     expect(officeOpenNow(at("2026-11-15T01:00:00Z"), S)).toBe(true); // 8:00 PM
     expect(officeOpenNow(at("2026-11-15T03:59:00Z"), S)).toBe(true); // 10:59 PM
     expect(officeOpenNow(at("2026-11-15T04:00:00Z"), S)).toBe(false); // 11:00 PM
   });
-  it("summer (daylight saving): Motzei Shabbos runs until 12:00 AM midnight", () => {
+  it("summer (daylight saving): Motzei Shabbes runs until 12:00 AM midnight", () => {
     expect(officeOpenNow(at("2027-06-20T03:59:00Z"), S)).toBe(true); // Sat Jun 19, 11:59 PM EDT
     expect(officeOpenNow(at("2027-06-20T04:00:00Z"), S)).toBe(false); // Sun 12:00 AM
     expect(officeOpenNow(at("2027-06-20T04:15:00Z"), S)).toBe(false); // 12:15 AM
@@ -49,7 +49,7 @@ describe("office hours (Abraham 2026-11-06, Eastern time)", () => {
     expect(l[0]).toBe("Monday to Thursday: 10:30 AM to 7:00 PM");
     expect(l).toContain("Sunday: 11:30 AM to 7:00 PM");
     expect(l).toContain("Chol Hamoed: 10:30 AM to 10:30 PM");
-    expect(l).toContain("Saturday night (Motzei Shabbos): from 2 hours after Shabbos ends until 11:00 PM in winter, 12:00 AM in summer");
+    expect(l).toContain("Saturday night (Motzei Shabbes): from 2 hours after Shabbes ends until 11:00 PM in winter, 12:00 AM in summer");
     expect(S.hoursWebsiteNote).toBe("Please note that you can book at any time using our automated phone system.");
   });
   it("the hotline never hangs up for closed hours: booking stays 24/7, live person only in hours", () => {
@@ -68,9 +68,9 @@ describe("phone line holiday schedule (Abraham, phone system and admin only)", (
     for (let i = 0; i < days; i++, d = addDaysISO(d, 1)) if (dayInfo(d).names.some((n) => re.test(n))) return d;
     throw new Error(`no day matching ${re}`);
   };
-  it("closed on Shabbos, Yom Tov, Purim and Tisha B'Av; open on Chanukah and Lag Ba'Omer", async () => {
+  it("closed on Shabbes, Yom Tov, Purim and Tisha B'Av; open on Chanukah and Lag Ba'Omer", async () => {
     const { dayInfo } = await import("@/lib/jewish-calendar");
-    expect(dayInfo("2026-11-14").closed).toBe(true); // Shabbos
+    expect(dayInfo("2026-11-14").closed).toBe(true); // Shabbes
     expect(dayInfo(await findDay(/^Pesach I$/)).closed).toBe(true); // Yom Tov
     expect(dayInfo(await findDay(/^Purim$/)).closed).toBe(true);
     expect(dayInfo(await findDay(/^Tish['’]a B['’]Av$/)).closed).toBe(true);
@@ -78,12 +78,12 @@ describe("phone line holiday schedule (Abraham, phone system and admin only)", (
     expect(dayInfo(chanukahWeekday).closed).toBe(false);
     expect(dayInfo(await findDay(/^Lag BaOmer$/)).closed).toBe(false);
   });
-  it("closes by chatzos on Erev Shabbos and Erev Yom Tov; Chol Hamoed open until 10:30 PM", async () => {
+  it("closes by chatzos on Erev Shabbes and Erev Yom Tov; Chol Hamoed open until 10:30 PM", async () => {
     const { dayInfo } = await import("@/lib/jewish-calendar");
-    expect(dayInfo("2026-11-13").closesAtLabel).toMatch(/^Erev Shabbos: closes at chatzos/);
+    expect(dayInfo("2026-11-13").closesAtLabel).toMatch(/^Erev Shabbes: closes at chatzos/);
     expect(dayInfo(await findDay(/^Erev Pesach$/)).closesAtLabel).toMatch(/^Erev Yom Tov: closes at chatzos/);
     expect(S.hoursCholHamoed).toBe("10:30-22:30");
-    const chm = await findDay(/^Pesach IV \(CH['’]['’]M\)$/); // Sun Apr 25, 2027 (Pesach III that year is Shabbos)
+    const chm = await findDay(/^Pesach IV \(CH['’]['’]M\)$/); // Sun Apr 25, 2027 (Pesach III that year is Shabbes)
     expect(chm).toBe("2027-04-25");
     expect(dayInfo(chm).closed).toBe(false);
     expect(officeOpenNow(at("2027-04-26T02:00:00Z"), S)).toBe(true); // 10:00 PM EDT

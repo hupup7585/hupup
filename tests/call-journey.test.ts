@@ -29,7 +29,7 @@ beforeAll(async () => {
   productId = p.id;
 });
 
-/** A weekday at least 3 days out that isn't Friday/Shabbos, as MMDD. */
+/** A weekday at least 3 days out that isn't Friday/Shabbes, as MMDD. */
 function workday() {
   for (let i = 3; i < 20; i++) {
     const d = addDays(todayISO(), i);

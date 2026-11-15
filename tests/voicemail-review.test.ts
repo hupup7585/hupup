@@ -186,7 +186,7 @@ describe("every path", () => {
     expect(h.emails).toHaveLength(1);
   });
 
-  it("office closed (after hours, Shabbos, Yom Tov): Abraham's after-hours greeting in every box except key 9", async () => {
+  it("office closed (after hours, Shabbes, Yom Tov): Abraham's after-hours greeting in every box except key 9", async () => {
     h.open = false;
     const closed = plain(await call("voicemail", {}, "x=4"));
     expect(closed).toContain("Thank you for calling Hup Up Attractions! Our office is closed right now. Please leave your name, phone number, and a short message after the tone, and we will call you back as soon as we open. To see our rentals anytime, visit hupupattractions.com. Have a wonderful day!"); // approved Nov 13, 2026

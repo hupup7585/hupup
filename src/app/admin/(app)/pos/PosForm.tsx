@@ -73,7 +73,7 @@ export default function PosForm(props: {
     <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
       <div className="card min-w-0 p-5">
         <label className="label">Event (delivery) date — pickup is the next open day</label>
-        {/* Coming days with Hebrew dates; closed days (Shabbos, Yom Tov, other closed days) can't be chosen. */}
+        {/* Coming days with Hebrew dates; closed days (Shabbes, Yom Tov, other closed days) can't be chosen. */}
         <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1" data-pos-calendar>
           {days.map((d) => (
             <button

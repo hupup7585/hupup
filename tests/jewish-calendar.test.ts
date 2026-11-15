@@ -28,7 +28,7 @@ describe("5787 defaults (Abraham's answers)", () => {
     expect(dayInfo(START).hebrew).toBe("1st of Tishrei, 5787");
     expect(dayInfo(END).hebrew).toBe("29th of Elul, 5787");
   });
-  it("every Shabbos is closed", () => {
+  it("every Shabbes is closed", () => {
     const sats = allDays.filter((d) => dow(d) === 6);
     expect(sats.length).toBeGreaterThanOrEqual(55);
     for (const d of sats) expect(dayInfo(d).closed, d).toBe(true);
@@ -37,11 +37,11 @@ describe("5787 defaults (Abraham's answers)", () => {
     for (const d of YOM_TOV) expect(dayInfo(d).closed, d).toBe(true);
     expect(dayInfo("2026-09-26").reason).toBe("Sukkos I");
   });
-  it("Chol Hamoed and Hoshana Rabbah are open (except Shabbos)", () => {
+  it("Chol Hamoed and Hoshana Rabbah are open (except Shabbes)", () => {
     for (const d of ["2026-09-28", "2026-09-29", "2026-09-30", "2026-10-01", "2026-10-02", "2027-04-25", "2027-04-26", "2027-04-27"]) expect(dayInfo(d).closed, d).toBe(false);
-    expect(dayInfo("2027-04-24").closed).toBe(true); // Shabbos Chol Hamoed
+    expect(dayInfo("2027-04-24").closed).toBe(true); // Shabbes Chol Hamoed
   });
-  it("Chanukah is open (except Shabbos)", () => {
+  it("Chanukah is open (except Shabbes)", () => {
     for (const d of ["2026-12-06", "2026-12-07", "2026-12-08", "2026-12-09", "2026-12-10", "2026-12-11"]) expect(dayInfo(d).closed, d).toBe(false);
     expect(dayInfo("2026-12-05").closed).toBe(true);
   });
@@ -53,14 +53,14 @@ describe("5787 defaults (Abraham's answers)", () => {
   it("minor fasts and Lag Ba'Omer are open", () => {
     for (const d of ["2026-09-14", "2026-12-20", "2027-03-22", "2027-07-22", "2027-05-25"]) expect(dayInfo(d).closed, d).toBe(false);
   });
-  it("closed days in 5787: Shabbos + Yom Tov + Purim + Tisha B'Av, nothing else", () => {
+  it("closed days in 5787: Shabbes + Yom Tov + Purim + Tisha B'Av, nothing else", () => {
     const closed = allDays.filter((d) => dayInfo(d).closed);
     const expected = new Set([...allDays.filter((d) => dow(d) === 6), ...YOM_TOV, "2027-03-23", "2027-08-12"]);
     expect(new Set(closed)).toEqual(expected);
   });
 });
 
-describe("Erev Shabbos and Erev Yom Tov close at chatzos (Kiryas Joel zmanim)", () => {
+describe("Erev Shabbes and Erev Yom Tov close at chatzos (Kiryas Joel zmanim)", () => {
   it("every open Friday closes at chatzos, between 11:30 and 13:10 Eastern (later in daylight saving time)", () => {
     for (const d of allDays.filter((x) => dow(x) === 5 && !dayInfo(x).closed)) {
       const i = dayInfo(d);
@@ -81,7 +81,7 @@ describe("Erev Shabbos and Erev Yom Tov close at chatzos (Kiryas Joel zmanim)", 
     const i = dayInfo("2026-11-06", { ...S, erevShabbosClose: "candles", candleLightingMinutes: "18" });
     expect(i.closesAtLabel).toMatch(/closes at candle lighting \(4:2\d PM\)/);
   });
-  it("reopens at tzeis after Shabbos / the last Yom Tov day, not between consecutive closed days", () => {
+  it("reopens at tzeis after Shabbes / the last Yom Tov day, not between consecutive closed days", () => {
     expect(etTime(dayInfo("2026-11-07", { ...S, reopenAfter: "tzeis" }).reopensAt!)).toBe("17:27"); // tzeis still possible
     expect(etTime(dayInfo("2026-11-07").reopensAt!)).toBe("17:56"); // default (Abraham, Nov 14, 2026): Rabbeinu Tam, 72 minutes
     expect(dayInfo("2026-09-12").reopensAt).toBeNull(); // RH 1 -> RH 2
@@ -91,17 +91,17 @@ describe("Erev Shabbos and Erev Yom Tov close at chatzos (Kiryas Joel zmanim)", 
 });
 
 describe("open right now (hotline)", () => {
-  it("Friday before chatzos open, after chatzos closed, Motzei Shabbos open after tzeis", () => {
+  it("Friday before chatzos open, after chatzos closed, Motzei Shabbes open after tzeis", () => {
     expect(openNow(new Date("2026-11-06T15:00:00Z")).open).toBe(true); // 10:00 AM Friday
-    expect(openNow(new Date("2026-11-06T17:00:00Z"))).toMatchObject({ open: false, reason: "Shabbos" });
-    expect(openNow(new Date("2026-11-07T20:00:00Z")).open).toBe(false); // Shabbos afternoon
+    expect(openNow(new Date("2026-11-06T17:00:00Z"))).toMatchObject({ open: false, reason: "Shabbes" });
+    expect(openNow(new Date("2026-11-07T20:00:00Z")).open).toBe(false); // Shabbes afternoon
     expect(openNow(new Date("2026-11-07T23:00:00Z")).open).toBe(true); // after tzeis
   });
 });
 
 describe("booking rules", () => {
   it("closed event days are refused", () => {
-    expect(checkEventDate("2026-11-07")).toMatchObject({ ok: false, message: "We're closed on that day (Shabbos)." });
+    expect(checkEventDate("2026-11-07")).toMatchObject({ ok: false, message: "We're closed on that day (Shabbes)." });
     expect(checkEventDate("2027-03-23").ok).toBe(false);
   });
   it("a Friday event: pickup moves to Sunday, flagged with the suggestion", () => {
@@ -110,7 +110,7 @@ describe("booking rules", () => {
     expect(c.suggestedPickup).toBe("2026-11-08");
     expect(pickupDateFor("2026-11-06")).toBe("2026-11-08");
   });
-  it("before a three-day Yom Tov + Shabbos, pickup is the first open day after", () => {
+  it("before a three-day Yom Tov + Shabbes, pickup is the first open day after", () => {
     expect(nextOpenDay("2026-09-12")).toBe("2026-09-14");
     expect(pickupDateFor("2026-10-02")).toBe("2026-10-05"); // Hoshana Rabbah -> after Shemini Atzeres/Simchas Torah
   });

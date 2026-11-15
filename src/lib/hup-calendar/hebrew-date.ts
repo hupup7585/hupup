@@ -101,7 +101,7 @@ export function isoFromFixed(rd: number): string {
   return new Date((rd - 719163) * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** 0 = Sunday ... 6 = Shabbos. */
+/** 0 = Sunday ... 6 = Shabbes. */
 export const weekday = (rd: number) => ((rd % 7) + 7) % 7;
 
 export const hebrewFromISO = (iso: string) => fromFixed(fixedFromISO(iso));

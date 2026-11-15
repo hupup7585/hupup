@@ -2,7 +2,7 @@
  * Clean date-range headings for staff screens (Abraham):
  *   Week of Parshas Toldos  (פרשת תולדות)
  *   From: Sunday, November 8, 2026  ·  זונטאג, כ״ח חשון
- *   To: Shabbos, November 14, 2026  ·  שבת קודש, ד׳ כסלו
+ *   To: Shabbes, November 14, 2026  ·  שבת קודש, ד׳ כסלו
  * English first; the Yiddish/Hebrew part is kept separate (rendered right-to-left in its own span).
  */
 import { PARSHIYOS, parshaForDate, shabbosIso } from "@/lib/hup-calendar/parsha";
@@ -38,10 +38,10 @@ export function parshaEnglish(he: string): string {
   return `Parshas ${en.join("-")}`;
 }
 
-const DAY_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Shabbos"];
+const DAY_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Shabbes"];
 const weekday = (iso: string) => new Date(`${iso}T12:00:00Z`).getUTCDay();
 
-/** "Sunday, November 8, 2026" (Saturday is "Shabbos"). */
+/** "Sunday, November 8, 2026" (Saturday is "Shabbes"). */
 export function englishFullDate(iso: string): string {
   const d = new Date(`${iso}T12:00:00Z`);
   const md = d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric", year: "numeric" });

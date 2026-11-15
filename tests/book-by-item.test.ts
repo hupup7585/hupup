@@ -114,8 +114,8 @@ describe("key 1: booking by item", () => {
     expect(redirect(await call("altdate-choice", { Digits: "3" }, action(xml)!.split("?")[1]))).toBe(`date?p=${medium}`);
   });
 
-  it("neither day open: the nearest open dates before and after (Shabbos skipped)", async () => {
-    // Small Castle: Thursday Dec 10 asked; booked Wed 9 and Fri 11; Shabbos 12 closed -> nearest after is Sunday 13;
+  it("neither day open: the nearest open dates before and after (Shabbes skipped)", async () => {
+    // Small Castle: Thursday Dec 10 asked; booked Wed 9 and Fri 11; Shabbes 12 closed -> nearest after is Sunday 13;
     // before: Tuesday 8 would be picked up Wednesday morning while it's out on the 9th, so Monday 7
     await book(small, "2026-12-10");
     await book(small, "2026-12-09");

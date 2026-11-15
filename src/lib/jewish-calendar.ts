@@ -10,10 +10,10 @@ import { SETTING_DEFAULTS } from "@/lib/settings";
  * Hup Up's own calendar (src/lib/hup-calendar, written in-house, no outside library). Diaspora (two-day Yom Tov).
  * Zmanim for Monroe / Kiryas Joel, NY.
  *
- * Closed all day: every Shabbos and Yom Tov (Rosh Hashanah, Yom Kippur, Sukkos 1-2, Shemini Atzeres, Simchas
+ * Closed all day: every Shabbes and Yom Tov (Rosh Hashanah, Yom Kippur, Sukkos 1-2, Shemini Atzeres, Simchas
  * Torah, Pesach 1-2 and 7-8, Shavuos 1-2). Open: Chol Hamoed, Chanukah. Admin toggles (defaults): Purim closed,
- * Tisha B'Av closed, minor fasts open, Lag Ba'Omer open. Erev Shabbos and Erev Yom Tov close at chatzos (or at
- * candle lighting if set). Reopen after Shabbos / Yom Tov at tzeis (8.5 degrees) or N minutes after sunset.
+ * Tisha B'Av closed, minor fasts open, Lag Ba'Omer open. Erev Shabbes and Erev Yom Tov close at chatzos (or at
+ * candle lighting if set). Reopen after Shabbes / Yom Tov at tzeis (8.5 degrees) or N minutes after sunset.
  * Owner overrides by date win over everything.
  */
 
@@ -86,8 +86,8 @@ export function kinds(iso: string): { kinds: Set<Kind>; names: string[]; namesEn
   const namesYi: string[] = [];
   if (weekday(iso) === 6) {
     k.add("shabbos");
-    names.push("Shabbos");
-    namesEn.push("Shabbos");
+    names.push("Shabbes");
+    namesEn.push("Shabbes");
     namesYi.push("שבת");
   }
   for (const e of events(iso)) {
@@ -160,19 +160,19 @@ export type DayInfo = {
   /** Closed for the whole day (no deliveries, pickups or bookings for that day). */
   closed: boolean;
   reason: string | null;
-  /** Erev Shabbos / Erev Yom Tov: open in the morning, closes at this time. */
+  /** Erev Shabbes / Erev Yom Tov: open in the morning, closes at this time. */
   closesAt: Date | null;
   closesAtLabel: string | null;
-  /** On a Shabbos/Yom Tov day followed by an open day: reopens this evening (after tzeis). */
+  /** On a Shabbes/Yom Tov day followed by an open day: reopens this evening (after tzeis). */
   reopensAt: Date | null;
 };
 
 function reasonFor(k: Set<Kind>, names: string[], alt: string[] = names): string {
   if (k.has("yomtov")) {
-    const i = names.findIndex((n) => !/^Erev|Shabbos/.test(n));
+    const i = names.findIndex((n) => !/^Erev|Shabbes/.test(n));
     return i >= 0 ? alt[i] : alt === names ? "Yom Tov" : "יום טוב";
   }
-  if (k.has("shabbos")) return alt[names.indexOf("Shabbos")] ?? "Shabbos";
+  if (k.has("shabbos")) return alt[names.indexOf("Shabbes")] ?? "Shabbes";
   return alt[0] ?? "Closed";
 }
 
@@ -215,7 +215,7 @@ export function dayInfo(iso: string, s: CalendarSettings = calendarDefaults()): 
     const isShabbos = weekday(tomorrow) === 6 && !kinds(tomorrow).kinds.has("yomtov");
     const mode = isShabbos ? s.erevShabbosClose : s.erevYomTovClose;
     closesAt = mode === "candles" ? new Date(z.sunset().getTime() - (Number(s.candleLightingMinutes) || 18) * 60_000) : z.chatzot();
-    closesAtLabel = `${isShabbos ? "Erev Shabbos" : "Erev Yom Tov"}: closes at ${mode === "candles" ? "candle lighting" : "chatzos"} (${fmt(closesAt)})`;
+    closesAtLabel = `${isShabbos ? "Erev Shabbes" : "Erev Yom Tov"}: closes at ${mode === "candles" ? "candle lighting" : "chatzos"} (${fmt(closesAt)})`;
   }
   if (today.closed && shabbosOrYomTov(iso) && !fullClosed(tomorrow, s).closed) {
     reopensAt = /^\d+$/.test(s.reopenAfter.trim()) ? new Date(z.sunset().getTime() + Number(s.reopenAfter) * 60_000) : z.tzeit(8.5);
@@ -237,13 +237,13 @@ export function dayInfo(iso: string, s: CalendarSettings = calendarDefaults()): 
   };
 }
 
-/** Candle lighting on Erev Shabbos / Erev Yom Tov (Monroe, NY 10950 zmanim), or null on other days. */
+/** Candle lighting on Erev Shabbes / Erev Yom Tov (Monroe, NY 10950 zmanim), or null on other days. */
 export function erevCandleLighting(iso: string, s: CalendarSettings = calendarDefaults()): Date | null {
   if (!shabbosOrYomTov(addDaysISO(iso, 1)) || shabbosOrYomTov(iso)) return null;
   return new Date(zmanim(iso, s).sunset().getTime() - (Number(s.candleLightingMinutes) || 18) * 60_000);
 }
 
-/** Today is Shabbos or Yom Tov (nothing rings). */
+/** Today is Shabbes or Yom Tov (nothing rings). */
 export const isShabbosOrYomTov = (iso: string) => shabbosOrYomTov(iso);
 
 /** First day on or after `iso` that is not closed all day. */
@@ -287,16 +287,16 @@ export function checkEventDate(iso: string, s: CalendarSettings = calendarDefaul
 }
 
 /**
- * Booking lock (Abraham, Nov 14, 2026): no booking on Shabbos or Yom Tov. It closes at candle lighting on Erev (15
- * minutes before shkia in Monroe) and opens again after Shabbos or the last Yom Tov day at the reopen time from
+ * Booking lock (Abraham, Nov 14, 2026): no booking on Shabbes or Yom Tov. It closes at candle lighting on Erev (15
+ * minutes before shkia in Monroe) and opens again after Shabbes or the last Yom Tov day at the reopen time from
  * Admin (Rabbeinu Tam, 72 minutes after sunset). Working days (Chol Hamoed, Chanukah, Purim, Tisha B'Av, Lag BaOmer)
  * are never locked by this. Nobody has to switch it on or off.
  */
-export function bookingLock(at: Date = new Date(), s: CalendarSettings = calendarDefaults()): { locked: boolean; reason: "Shabbos" | "Yom Tov" | null; opensAt: Date | null } {
+export function bookingLock(at: Date = new Date(), s: CalendarSettings = calendarDefaults()): { locked: boolean; reason: "Shabbes" | "Yom Tov" | null; opensAt: Date | null } {
   const iso = localISO(at);
-  const reasonFor = (d: string): "Shabbos" | "Yom Tov" => (kinds(d).kinds.has("yomtov") ? "Yom Tov" : "Shabbos");
+  const reasonFor = (d: string): "Shabbes" | "Yom Tov" => (kinds(d).kinds.has("yomtov") ? "Yom Tov" : "Shabbes");
   const reopenFrom = (d: string): Date | null => {
-    // the last Shabbos or Yom Tov day of the run opens at night; earlier days stay locked all night
+    // the last Shabbes or Yom Tov day of the run opens at night; earlier days stay locked all night
     let last = d;
     while (shabbosOrYomTov(addDaysISO(last, 1))) last = addDaysISO(last, 1);
     const z = zmanim(last, s);

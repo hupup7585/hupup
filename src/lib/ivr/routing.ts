@@ -190,7 +190,7 @@ export function afterHoursWindow(k: RingKey, s: AfterHoursSettings) {
 }
 
 /**
- * Does this line ring right now? During office hours every line rings. Shabbos and Yom Tov (and from candle lighting
+ * Does this line ring right now? During office hours every line rings. Shabbes and Yom Tov (and from candle lighting
  * on Erev): nothing rings. After hours only lines with the after-hours switch on ring, inside their window (above).
  */
 export function lineRingsNow(k: RingKey, at: Date, s: AfterHoursSettings, cal: { officeOpen: boolean; shabbosOrYomTov: boolean; candleLighting: Date | null }): boolean {

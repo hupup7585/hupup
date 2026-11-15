@@ -40,13 +40,13 @@ export const SETTING_DEFAULTS = {
   calendarEnabled: "yes",
   calendarLatitude: "41.3407",
   calendarLongitude: "-74.1679",
-  /** Erev Shabbos closes at: "chatzos" (halachic midday) or "candles" (candle lighting) */
+  /** Erev Shabbes closes at: "chatzos" (halachic midday) or "candles" (candle lighting) */
   erevShabbosClose: "chatzos",
   /** Erev Yom Tov closes at: "chatzos" or "candles" (pending Abraham; default chatzos) */
   erevYomTovClose: "chatzos",
   /** Minutes before sunset for candle lighting (used only when a "candles" close is chosen) */
   candleLightingMinutes: "15", // Abraham, Nov 14, 2026: Monroe lights 15 minutes before the first shkia
-  /** Reopen after Shabbos / Yom Tov: minutes after sunset, or "tzeis" for nightfall at 8.5 degrees */
+  /** Reopen after Shabbes / Yom Tov: minutes after sunset, or "tzeis" for nightfall at 8.5 degrees */
   reopenAfter: "72", // Abraham, Nov 14, 2026: reopen at Rabbeinu Tam, 72 minutes after sunset
   closeCholHamoed: "no",
   closeChanukah: "no",
@@ -59,14 +59,14 @@ export const SETTING_DEFAULTS = {
   /* Office hours (walk-ins and live calls), Eastern time, "HH:MM-HH:MM" (24-hour). The automated phone system
      books 24/7 regardless. Items marked "to confirm" are Abraham's pending answers. */
   hoursMonThu: "10:30-19:00",
-  /** Friday opening; closing follows the Erev Shabbos rule (chatzos) until Abraham confirms. */
+  /** Friday opening; closing follows the Erev Shabbes rule (chatzos) until Abraham confirms. */
   hoursFridayOpen: "10:30",
   hoursSunday: "11:30-19:00",
-  /** Motzei Shabbos opening: "tzeis+120" = 2 hours after Shabbos ends (Abraham), "tzeis", or HH:MM. */
+  /** Motzei Shabbes opening: "tzeis+120" = 2 hours after Shabbes ends (Abraham), "tzeis", or HH:MM. */
   hoursMotzeiOpen: "tzeis+120",
   hoursMotzeiCloseWinter: "23:00",
   hoursMotzeiCloseSummer: "00:00",
-  /** Which Motzei Shabbos closing applies: "dst" = summer while daylight saving time is in effect (to confirm). */
+  /** Which Motzei Shabbes closing applies: "dst" = summer while daylight saving time is in effect (to confirm). */
   hoursMotzeiSeason: "dst",
   /** Chol Hamoed hours (opening to confirm). */
   hoursCholHamoed: "10:30-22:30",
@@ -89,7 +89,7 @@ export const SETTING_DEFAULTS = {
   /*
    * Abraham (Phone Menu v3): each line rings its list this many times (25 seconds a ring, set per number), then
    * that line's voicemail. After hours: 0 and 5 still ring, 6 rings 8:00 AM to 10:30 PM (Friday and Erev Yom Tov
-   * until 4:00 PM or an hour before candle lighting, whichever is earlier); the rest go to voicemail. Shabbos and
+   * until 4:00 PM or an hour before candle lighting, whichever is earlier); the rest go to voicemail. Shabbes and
    * Yom Tov: nothing rings. The announcement staff hear is editable per line (empty = the standard one).
    */
   ringAttempts0: "3",
@@ -98,7 +98,7 @@ export const SETTING_DEFAULTS = {
   ringAttempts5: "3",
   ringAttempts6: "3",
   ringAttempts8: "3",
-  /* Abraham (section 17): after hours, Shabbos and Yom Tov every extension goes to voicemail; switch per line in Admin */
+  /* Abraham (section 17): after hours, Shabbes and Yom Tov every extension goes to voicemail; switch per line in Admin */
   ringAfterHours0: false,
   ringAfterHours2: false,
   ringAfterHours4: false,

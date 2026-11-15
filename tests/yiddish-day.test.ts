@@ -20,7 +20,7 @@ const ny = (local: string) => {
 };
 
 describe("parsha matches hebcal (diaspora)", () => {
-  it("every Shabbos for 140 years (5760-5899): doubles, Yom Tov weeks, Nasso before Shavuos, Vayeilech in Tishrei", () => {
+  it("every Shabbes for 140 years (5760-5899): doubles, Yom Tov weeks, Nasso before Shavuos, Vayeilech in Tishrei", () => {
     const bad: string[] = [];
     let n = 0;
     for (let y = 5760; y < 5900; y++) {
@@ -60,21 +60,21 @@ describe("Abraham's spellings and examples", () => {
   it("day names (Z)", () => {
     expect(DAY_YI).toEqual(["זונטאג", "מאנטאג", "דינסטאג", "מיטוואך", "דאנערשטאג", "פרייטאג", "שבת קודש"]);
   });
-  it("plain days: the week is named for the coming Shabbos; Saturday stays שבת קודש in a day cell", () => {
-    expect(yiddishDay("2026-11-01")).toBe("זונטאג, פרשת חיי שרה"); // Shabbos Nov 7 = Chayei Sara
+  it("plain days: the week is named for the coming Shabbes; Saturday stays שבת קודש in a day cell", () => {
+    expect(yiddishDay("2026-11-01")).toBe("זונטאג, פרשת חיי שרה"); // Shabbes Nov 7 = Chayei Sara
     expect(yiddishDay("2026-11-07")).toBe("שבת קודש, פרשת חיי שרה");
     expect(yiddishDay("2026-11-08")).toBe("זונטאג, פרשת תולדות");
-    expect(yiddishDay("2026-09-27")).toBe("זונטאג, שמיני עצרת"); // Yom Tov week: Shabbos Oct 3, 2026 is Shemini Atzeres
+    expect(yiddishDay("2026-09-27")).toBe("זונטאג, שמיני עצרת"); // Yom Tov week: Shabbes Oct 3, 2026 is Shemini Atzeres
     expect(yiddishDay("2026-10-04")).toBe("זונטאג, פרשת בראשית");
-    expect(yiddishDay("2026-07-06")).toBe("מאנטאג, פרשת מטות-מסעי"); // a double parsha (Shabbos Jul 11, 2026)
+    expect(yiddishDay("2026-07-06")).toBe("מאנטאג, פרשת מטות-מסעי"); // a double parsha (Shabbes Jul 11, 2026)
   });
-  it("Motzei Shabbos (AA): after Shabbos ends in Monroe, next week's parsha", () => {
+  it("Motzei Shabbes (AA): after Shabbes ends in Monroe, next week's parsha", () => {
     const ends = shabbosEnds("2026-11-07");
     expect(ends.getUTCHours()).toBe(22); // about 5:15 PM EST
     expect(yiddishMoment(new Date(ends.getTime() - 60_000))).toBe("שבת קודש, פרשת חיי שרה");
     expect(yiddishMoment(new Date(ends.getTime() + 60_000))).toBe("מוצאי שבת קודש, פרשת תולדות");
   });
-  it("call log (BB): the day turns at 6 AM; night and morning labels; Motzei Shabbos before 6 AM Sunday", () => {
+  it("call log (BB): the day turns at 6 AM; night and morning labels; Motzei Shabbes before 6 AM Sunday", () => {
     expect(yiddishCallDay(ny("2026-11-12T03:00"))).toMatchObject({ label: "מיטוואך ביינאכט", part: "night" }); // Thursday 3 AM
     expect(yiddishCallDay(ny("2026-11-12T06:30"))).toMatchObject({ label: "דאנערשטאג אינדערפרי", part: "morning" });
     expect(yiddishCallDay(ny("2026-11-12T14:00"))).toMatchObject({ label: "דאנערשטאג", part: null });

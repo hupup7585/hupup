@@ -13,31 +13,31 @@ import { bookableQty, checkBookable, getUsage, pickupDateFor } from "@/lib/avail
 import { PROMPTS } from "@/lib/ivr/prompts";
 
 const FRI = "2026-11-13";
-const SHABBOS = "2026-11-14";
+const SHABBES = "2026-11-14";
 const SUN = "2026-11-15";
 
 describe("whole rental days", () => {
-  it("Friday delivery is picked up Sunday (no pickup on Shabbos)", () => {
+  it("Friday delivery is picked up Sunday (no pickup on Shabbes)", () => {
     expect(pickupDateFor(FRI)).toBe(SUN);
     expect(pickupDateFor("2026-11-16")).toBe("2026-11-17"); // Monday -> Tuesday
   });
 
-  it("a Friday booking holds the unit Friday, Shabbos and Sunday, on the phone, website and staff booking alike", async () => {
+  it("a Friday booking holds the unit Friday, Shabbes and Sunday, on the phone, website and staff booking alike", async () => {
     const [cat] = await db.insert(schema.categories).values({ name: "Paddle Boats", sortOrder: 1, active: true }).returning();
     const [p] = await db.insert(schema.products).values({ categoryId: cat.id, name: "Paddle Boat", priceCents: 4500, quantity: 1, active: true, sortOrder: 1 }).returning();
     const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: FRI, pickupDate: SUN }).returning();
     await db.insert(schema.orderItems).values({ orderId: o.id, productId: p.id, qty: 1, unitPriceCents: 4500 });
     const usage = await getUsage("2026-11-12", "2026-11-17", [p.id]);
     const days = [...(usage.get(p.id)?.keys() ?? [])].sort();
-    expect(days).toEqual([FRI, SHABBOS, SUN]);
+    expect(days).toEqual([FRI, SHABBES, SUN]);
     expect(await checkBookable(p.id, 1, SUN)).toBe(0); // Sunday: still out until the pickup
     expect(await checkBookable(p.id, 1, "2026-11-12")).toBe(0); // Thursday: its pickup day (Friday) overlaps
     expect(await checkBookable(p.id, 1, "2026-11-16")).toBe(1); // Monday: free again
   });
 
   it("a booking needs the unit free on every day from delivery through pickup", () => {
-    const usage = new Map([[1, new Map([[SHABBOS, { event: 0, pickup: 1, held: 0 }]])]]);
-    expect(bookableQty(1, usage, 1, FRI, SUN)).toBe(0); // only Shabbos is taken, and that still blocks it
+    const usage = new Map([[1, new Map([[SHABBES, { event: 0, pickup: 1, held: 0 }]])]]);
+    expect(bookableQty(1, usage, 1, FRI, SUN)).toBe(0); // only Shabbes is taken, and that still blocks it
   });
 
   it("no delivery times: staff screens show the fixed windows; callers hear the window and the 9 AM pickup", () => {

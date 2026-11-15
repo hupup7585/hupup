@@ -42,7 +42,7 @@ async function call(callSid, from, answers, { stopAfterGathers = Infinity } = {}
   return { said, error: "too many steps" };
 }
 
-// Ordinary open weekdays (not Shabbos, Yom Tov, Purim or Tisha B'Av, with an open next day), so the test isn't
+// Ordinary open weekdays (not Shabbes, Yom Tov, Purim or Tisha B'Av, with an open next day), so the test isn't
 // tripped by the Jewish-calendar rules. Each run picks at random so earlier runs don't hold the stock.
 const OPEN_DAYS = ["2027-01-12", "2027-01-13", "2027-01-19", "2027-01-20", "2027-01-26", "2027-01-27", "2027-02-02", "2027-02-03", "2027-02-09", "2027-02-10", "2027-02-16", "2027-02-17", "2027-02-23", "2027-02-24", "2027-03-02", "2027-03-03", "2027-03-09", "2027-03-10", "2027-05-04", "2027-05-05", "2027-05-11", "2027-05-12", "2027-06-01", "2027-06-02", "2027-07-06", "2027-07-07"];
 const openDay = () => {

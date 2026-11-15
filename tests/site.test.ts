@@ -486,22 +486,22 @@ describe("website Hours (Abraham's simple list)", () => {
       "Sunday: 11:30 AM - 7:00 PM",
       "Monday - Thursday: 10:30 AM - 7:00 PM",
       "Friday: 10:30 AM - Chatzos",
-      "Shabbos: Closed",
-      "Motzei Shabbos: Winter: 2 hours after Shabbos - 11:00 PM\nSummer: 2 hours after Shabbos - 12:00 AM",
+      "Shabbes: Closed",
+      "Motzei Shabbes: Winter: 2 hours after Shabbes - 11:00 PM\nSummer: 2 hours after Shabbes - 12:00 AM",
     ]);
     // A change in Admin Settings shows on the website too (the two can never differ)
     expect(websiteHoursLines({ ...hoursDefaults(), hoursMonThu: "10:00-20:00", hoursSunday: "12:00-18:30", hoursFridayOpen: "9:30", hoursMotzeiOpen: "tzeis+90", hoursMotzeiCloseWinter: "23:30", hoursMotzeiCloseSummer: "01:00" })).toEqual([
       "Sunday: 12:00 PM - 6:30 PM",
       "Monday - Thursday: 10:00 AM - 8:00 PM",
       "Friday: 9:30 AM - Chatzos",
-      "Shabbos: Closed",
-      "Motzei Shabbos: Winter: 90 minutes after Shabbos - 11:30 PM\nSummer: 90 minutes after Shabbos - 1:00 AM",
+      "Shabbes: Closed",
+      "Motzei Shabbes: Winter: 90 minutes after Shabbes - 11:30 PM\nSummer: 90 minutes after Shabbes - 1:00 AM",
     ]);
     expect(WEBSITE_HOURS_NOTE).toBe("Book by phone anytime, 24/7.");
-    // The card splits each line at the first ": " (day label, then hours), so Motzei Shabbos shows Abraham's two lines
+    // The card splits each line at the first ": " (day label, then hours), so Motzei Shabbes shows Abraham's two lines
     const motzei = WEBSITE_HOURS[4];
-    expect(motzei.slice(0, motzei.indexOf(": "))).toBe("Motzei Shabbos");
-    expect(motzei.slice(motzei.indexOf(": ") + 2).split("\n")).toEqual(["Winter: 2 hours after Shabbos - 11:00 PM", "Summer: 2 hours after Shabbos - 12:00 AM"]);
+    expect(motzei.slice(0, motzei.indexOf(": "))).toBe("Motzei Shabbes");
+    expect(motzei.slice(motzei.indexOf(": ") + 2).split("\n")).toEqual(["Winter: 2 hours after Shabbes - 11:00 PM", "Summer: 2 hours after Shabbes - 12:00 AM"]);
     const page = readFileSync("src/app/page.tsx", "utf8");
     const hours = page.slice(page.indexOf('id="hours"'), page.indexOf('id="contact"'));
     expect(hours).toContain("websiteHoursLines(settings).map(");
@@ -509,7 +509,7 @@ describe("website Hours (Abraham's simple list)", () => {
     expect(readFileSync("src/app/admin/(app)/settings/calendar-actions.ts", "utf8")).toContain('revalidatePath("/", "layout")');
     // phones: a time and its range never split across lines; the words stay exactly the same
     const { keepTimesTogether } = await import("@/lib/site-copy");
-    expect(keepTimesTogether("Winter: 2 hours after Shabbos - 11:00 PM")).toBe("Winter: 2 hours after Shabbos\u00A0-\u00A011:00\u00A0PM");
+    expect(keepTimesTogether("Winter: 2 hours after Shabbes - 11:00 PM")).toBe("Winter: 2 hours after Shabbes\u00A0-\u00A011:00\u00A0PM");
     for (const l of WEBSITE_HOURS) expect(keepTimesTogether(l).replace(/\u00A0/g, " ")).toBe(l);
     expect(hours).toContain("keepTimesTogether(line.slice(i + 2))");
     expect(hours).toContain("{WEBSITE_HOURS_NOTE}");

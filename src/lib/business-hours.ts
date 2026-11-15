@@ -6,7 +6,7 @@ import { holidaysOn } from "@/lib/hup-calendar/holidays";
 
 /**
  * Office hours (walk-ins and live calls), Abraham 2026-11-06. Eastern time. Uses the Jewish calendar for closed
- * days, Erev Shabbos/Yom Tov early close and Motzei Shabbos. The automated phone system books 24/7 regardless.
+ * days, Erev Shabbes/Yom Tov early close and Motzei Shabbes. The automated phone system books 24/7 regardless.
  */
 
 export type HoursSettings = CalendarSettings &
@@ -61,7 +61,7 @@ export function officeOpenNow(at: Date = new Date(), s: HoursSettings = hoursDef
   const now = localMinutes(at);
   const today = dayInfo(iso, s);
 
-  // After midnight on Sunday: the end of a Motzei Shabbos set to close after 12:00 AM (the default summer close is midnight).
+  // After midnight on Sunday: the end of a Motzei Shabbes set to close after 12:00 AM (the default summer close is midnight).
   const yesterday = dayInfo(addDaysISO(iso, -1), s);
   const close = motzeiCloseMinutes(at, s);
   if (yesterday.reopensAt && close < 6 * 60 && now < close) return true;
@@ -75,7 +75,7 @@ export function officeOpenNow(at: Date = new Date(), s: HoursSettings = hoursDef
 
   if (today.closed) {
     if (!today.reopensAt || at < today.reopensAt) return false;
-    // Motzei Shabbos / Motzei Yom Tov: opens N minutes after Shabbos ends ("tzeis+120"), at tzeis, or at a set time.
+    // Motzei Shabbes / Motzei Yom Tov: opens N minutes after Shabbes ends ("tzeis+120"), at tzeis, or at a set time.
     const after = s.hoursMotzeiOpen.trim().match(/^tzeis(?:\+(\d+))?$/);
     if (after) {
       if (at.getTime() < today.reopensAt.getTime() + Number(after[1] ?? 0) * 60_000) return false;
@@ -94,13 +94,13 @@ export function officeOpenNow(at: Date = new Date(), s: HoursSettings = hoursDef
   else if (dow(iso) === 5) window = [mins(s.hoursFridayOpen) ?? 630, 24 * 60];
   else window = range(s.hoursMonThu);
   if (!window || now < window[0] || now >= window[1]) return false;
-  if (today.closesAt && at >= today.closesAt) return false; // Erev Shabbos / Erev Yom Tov
+  if (today.closesAt && at >= today.closesAt) return false; // Erev Shabbes / Erev Yom Tov
   return true;
 }
 
 /**
  * For the hotline's "open late today" line: Chol Hamoed or Chanukah when that day's late hours apply and the office
- * is open right now. Never on a day that closes early (Erev Shabbos / Erev Yom Tov).
+ * is open right now. Never on a day that closes early (Erev Shabbes / Erev Yom Tov).
  */
 export function lateHoursToday(at: Date = new Date(), s: HoursSettings = hoursDefaults()): "cholHamoed" | "chanukah" | null {
   const iso = localISO(at);
@@ -142,22 +142,22 @@ export function defaultDayText(iso: string, s: HoursSettings = hoursDefaults()):
 export function hoursLines(s: HoursSettings = hoursDefaults()): string[] {
   const after = s.hoursMotzeiOpen.trim().match(/^tzeis(?:\+(\d+))?$/);
   const n = after ? Number(after[1] ?? 0) : 0;
-  const motzeiOpen = after ? (n ? `from ${n % 60 === 0 ? `${n / 60} hour${n === 60 ? "" : "s"}` : `${n} minutes`} after Shabbos ends` : "when Shabbos ends") : `from ${ampm(s.hoursMotzeiOpen)}`;
+  const motzeiOpen = after ? (n ? `from ${n % 60 === 0 ? `${n / 60} hour${n === 60 ? "" : "s"}` : `${n} minutes`} after Shabbes ends` : "when Shabbes ends") : `from ${ampm(s.hoursMotzeiOpen)}`;
   return [
     `Monday to Thursday: ${span(s.hoursMonThu)}`,
     `Friday: from ${ampm(s.hoursFridayOpen)} until midday (chatzos)`,
-    "Saturday (Shabbos): Closed",
-    `Saturday night (Motzei Shabbos): ${motzeiOpen} until ${ampm(s.hoursMotzeiCloseWinter)} in winter, ${ampm(s.hoursMotzeiCloseSummer)} in summer`,
+    "Saturday (Shabbes): Closed",
+    `Saturday night (Motzei Shabbes): ${motzeiOpen} until ${ampm(s.hoursMotzeiCloseWinter)} in winter, ${ampm(s.hoursMotzeiCloseSummer)} in summer`,
     `Sunday: ${span(s.hoursSunday)}`,
     `Chol Hamoed: ${span(s.hoursCholHamoed)}`,
     `Chanukah: ${span(s.hoursChanukah)}`,
-    "Closed on Shabbos and Yom Tov.",
+    "Closed on Shabbes and Yom Tov.",
   ];
 }
 
 /**
  * The website "Our Hours" card (Abraham): built from the same Admin Settings hours the phone line uses, so the two
- * can never differ. Same layout as Abraham's list: "Day: hours", with Motzei Shabbos on two lines.
+ * can never differ. Same layout as Abraham's list: "Day: hours", with Motzei Shabbes on two lines.
  */
 export function websiteHoursLines(s: HoursSettings = hoursDefaults()): string[] {
   const dash = (r: string) => {
@@ -168,19 +168,19 @@ export function websiteHoursLines(s: HoursSettings = hoursDefaults()): string[] 
   const n = after ? Number(after[1] ?? 0) : 0;
   const motzeiOpen = after
     ? n === 0
-      ? "When Shabbos ends"
-      : `${n % 60 === 0 ? `${n / 60} hour${n === 60 ? "" : "s"}` : `${n} minutes`} after Shabbos`
+      ? "When Shabbes ends"
+      : `${n % 60 === 0 ? `${n / 60} hour${n === 60 ? "" : "s"}` : `${n} minutes`} after Shabbes`
     : ampm(s.hoursMotzeiOpen);
   return [
     `Sunday: ${dash(s.hoursSunday)}`,
     `Monday - Thursday: ${dash(s.hoursMonThu)}`,
     `Friday: ${ampm(s.hoursFridayOpen)} - Chatzos`,
-    "Shabbos: Closed",
-    `Motzei Shabbos: Winter: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseWinter)}\nSummer: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseSummer)}`,
+    "Shabbes: Closed",
+    `Motzei Shabbes: Winter: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseWinter)}\nSummer: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseSummer)}`,
   ];
 }
 
-/** Today's office hours as one line, e.g. "Today: 10:30 AM to 7:00 PM" or "Closed today (Shabbos). Open tonight from 7:22 PM to 11:00 PM." */
+/** Today's office hours as one line, e.g. "Today: 10:30 AM to 7:00 PM" or "Closed today (Shabbes). Open tonight from 7:22 PM to 11:00 PM." */
 export function todayHours(at: Date = new Date(), s: HoursSettings = hoursDefaults()): string {
   const iso = localISO(at);
   const info = dayInfo(iso, s);
@@ -195,7 +195,7 @@ export function todayHours(at: Date = new Date(), s: HoursSettings = hoursDefaul
   }
   if (isCholHamoed(iso)) return `Today (Chol Hamoed): ${span(s.hoursCholHamoed)}`;
   if (dow(iso) === 0) return `Today: ${span(s.hoursSunday)}`;
-  if (info.closesAt) return `Today: ${ampm(s.hoursFridayOpen)} to ${t(info.closesAt)} (${dow(iso) === 5 ? "Erev Shabbos" : "Erev Yom Tov"})`;
+  if (info.closesAt) return `Today: ${ampm(s.hoursFridayOpen)} to ${t(info.closesAt)} (${dow(iso) === 5 ? "Erev Shabbes" : "Erev Yom Tov"})`;
   if (dow(iso) === 5) return `Today: from ${ampm(s.hoursFridayOpen)}`;
   return `Today: ${span(s.hoursMonThu)}`;
 }

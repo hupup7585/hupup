@@ -1,12 +1,12 @@
 /**
  * Weekly parsha, diaspora schedule (Abraham Y/Z/AA), written in-house like the rest of this calendar and checked
- * against hebcal in the tests. Each week (Sunday through Shabbos) is named for the parsha read that Shabbos; when
- * that Shabbos is Yom Tov or Chol Hamoed, the week is named for the Yom Tov.
+ * against hebcal in the tests. Each week (Sunday through Shabbes) is named for the parsha read that Shabbes; when
+ * that Shabbes is Yom Tov or Chol Hamoed, the week is named for the Yom Tov.
  *
- * How the readings fall: from Bereshis (first Shabbos after Simchas Torah) the parshiyos are read in order, one per
- * Shabbos that isn't Yom Tov, with a few pairs read together when there aren't enough Shabbosim. Fixed points:
- * Bamidbar is the last Shabbos before Shavuos, Devarim the Shabbos on or before Tisha B'Av, and Nitzavim the last
- * Shabbos before Rosh Hashanah (with Vayeilech when there's no room for it in Tishrei).
+ * How the readings fall: from Bereshis (first Shabbes after Simchas Torah) the parshiyos are read in order, one per
+ * Shabbes that isn't Yom Tov, with a few pairs read together when there aren't enough Shabbesim. Fixed points:
+ * Bamidbar is the last Shabbes before Shavuos, Devarim the Shabbes on or before Tisha B'Av, and Nitzavim the last
+ * Shabbes before Rosh Hashanah (with Vayeilech when there's no room for it in Tishrei).
  */
 import { AV, NISAN, SIVAN, TISHREI, fixedFromISO, fromFixed, isLeapYear, isoFromFixed, newYear, toFixed, weekday } from "./hebrew-date";
 
@@ -21,14 +21,14 @@ export const PARSHIYOS = [
 /** Pairs that can be read together, by the first parsha's index. */
 const VAYAKHEL = 21, TAZRIA = 26, ACHAREI = 28, BEHAR = 31, CHUKAS = 38, MATOS = 41, NITZAVIM = 50;
 const BAMIDBAR = 33, DEVARIM = 43, VAYEILECH = 51, HAAZINU = 52;
-/** Which pairs are combined first when Shabbosim are short (segment Bereshis..Bamidbar, then Nasso..Devarim). */
+/** Which pairs are combined first when Shabbesim are short (segment Bereshis..Bamidbar, then Nasso..Devarim). */
 const DOUBLE_ORDER_1 = [TAZRIA, ACHAREI, BEHAR, VAYAKHEL];
 const DOUBLE_ORDER_2 = [MATOS, CHUKAS];
 
-/** A Shabbos reading: parsha indexes (one, or two read together), or a Yom Tov name. */
+/** A Shabbes reading: parsha indexes (one, or two read together), or a Yom Tov name. */
 export type Reading = { parsha: number[] } | { yomTov: string };
 
-/** Yom Tov / Chol Hamoed on a Shabbos (diaspora), in Hebrew letters; null if it's an ordinary Shabbos. */
+/** Yom Tov / Chol Hamoed on a Shabbes (diaspora), in Hebrew letters; null if it's an ordinary Shabbes. */
 export function shabbosYomTov(month: number, day: number): string | null {
   if (month === TISHREI) {
     if (day === 1 || day === 2) return "ראש השנה";
@@ -51,8 +51,8 @@ const firstShabbosOnOrAfter = (rd: number) => rd + ((6 - weekday(rd) + 7) % 7);
 const cache = new Map<number, Map<number, Reading>>();
 
 /**
- * Every Shabbos of the reading cycle that starts on Bereshis in Hebrew year y, through the last Shabbos before
- * Rosh Hashanah y+1, plus the Tishrei Shabbosim of y+1 (Vayeilech / Haazinu).
+ * Every Shabbes of the reading cycle that starts on Bereshis in Hebrew year y, through the last Shabbes before
+ * Rosh Hashanah y+1, plus the Tishrei Shabbesim of y+1 (Vayeilech / Haazinu).
  */
 function cycle(y: number): Map<number, Reading> {
   const hit = cache.get(y);
@@ -62,7 +62,7 @@ function cycle(y: number): Map<number, Reading> {
   const shavuos = toFixed({ year: y, month: SIVAN, day: 6 });
   const tishaBav = toFixed({ year: y, month: AV, day: 9 });
   const bereshis = firstShabbosOnOrAfter(toFixed({ year: y, month: TISHREI, day: 24 }));
-  // Shabbosim that get a parsha, from Bereshis to the last Shabbos before next Rosh Hashanah
+  // Shabbesim that get a parsha, from Bereshis to the last Shabbes before next Rosh Hashanah
   const slots: number[] = [];
   for (let d = bereshis; d < nextRh; d += 7) {
     const h = fromFixed(d);
@@ -72,7 +72,7 @@ function cycle(y: number): Map<number, Reading> {
   }
   const bamidbarSlot = slots.filter((d) => d < shavuos).length - 1;
   const devarimSlot = slots.filter((d) => d <= tishaBav).length - 1;
-  // Tishrei of the next year: Shabbosim between Rosh Hashanah and Sukkos that aren't Yom Tov
+  // Tishrei of the next year: Shabbesim between Rosh Hashanah and Sukkos that aren't Yom Tov
   const tishreiSlots: number[] = [];
   for (let d = firstShabbosOnOrAfter(nextRh); d < toFixed({ year: y + 1, month: TISHREI, day: 15 }); d += 7) {
     const h = fromFixed(d);
@@ -96,7 +96,7 @@ function cycle(y: number): Map<number, Reading> {
     }
     return p;
   };
-  // Bamidbar is read by the Shabbos before Shavuos (Nasso too, when there's an extra Shabbos)
+  // Bamidbar is read by the Shabbes before Shavuos (Nasso too, when there's an extra Shabbes)
   const afterSeg1 = assign(0, bamidbarSlot, 0, BAMIDBAR, DOUBLE_ORDER_1);
   assign(bamidbarSlot + 1, devarimSlot, afterSeg1, DEVARIM, DOUBLE_ORDER_2);
   assign(devarimSlot + 1, slots.length - 1, DEVARIM + 1, vayeilechInTishrei ? NITZAVIM : VAYEILECH, vayeilechInTishrei ? [] : [NITZAVIM]);
@@ -107,12 +107,12 @@ function cycle(y: number): Map<number, Reading> {
   return out;
 }
 
-/** The reading for the Shabbos on R.D. `rd` (must be a Shabbos). */
+/** The reading for the Shabbes on R.D. `rd` (must be a Shabbes). */
 export function readingOn(rd: number): Reading {
   const h = fromFixed(rd);
   const yt = shabbosYomTov(h.month, h.day);
   if (yt) return { yomTov: yt };
-  // Shabbosim before Bereshis belong to the previous year's cycle (Vayeilech / Haazinu)
+  // Shabbesim before Bereshis belong to the previous year's cycle (Vayeilech / Haazinu)
   const bereshis = firstShabbosOnOrAfter(toFixed({ year: h.year, month: TISHREI, day: 24 }));
   const r = (rd >= bereshis ? cycle(h.year) : cycle(h.year - 1)).get(rd);
   return r ?? { yomTov: "" };
@@ -124,14 +124,14 @@ export function readingLabel(r: Reading): string {
   return `פרשת ${r.parsha.map((p) => PARSHIYOS[p]).join("-")}`;
 }
 
-/** The Shabbos that ends the week of this date (the date itself if it's Shabbos). */
+/** The Shabbes that ends the week of this date (the date itself if it's Shabbes). */
 export const weekShabbos = (iso: string) => firstShabbosOnOrAfter(fixedFromISO(iso));
 
-/** Parsha label for the week containing this civil date (Sunday-Shabbos). */
+/** Parsha label for the week containing this civil date (Sunday-Shabbes). */
 export function parshaForDate(iso: string): string {
   return readingLabel(readingOn(weekShabbos(iso)));
 }
 
-/** Used by tests: ISO of the Shabbos after a date. */
+/** Used by tests: ISO of the Shabbes after a date. */
 export const shabbosIso = (iso: string) => isoFromFixed(weekShabbos(iso));
 export { isLeapYear };

@@ -25,7 +25,7 @@ function Yi({
  *   Availability
  *   Week of Parshas Toldos  (פרשת תולדות)
  *   From: Sunday, November 8, 2026  ·  זונטאג, כ״ח חשון
- *   To: Shabbos, November 14, 2026  ·  שבת קודש, ד׳ כסלו
+ *   To: Shabbes, November 14, 2026  ·  שבת קודש, ד׳ כסלו
  */
 export default function DateRangeHeading({
   title,

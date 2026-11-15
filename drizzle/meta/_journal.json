@@ -414,6 +414,13 @@
       "when": 1794757786896,
       "tag": "0058_phonepay_custom",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1794761044905,
+      "tag": "0059_shabbes_spelling",
+      "breakpoints": true
     }
   ]
 }

@@ -22,8 +22,8 @@ const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
 
 /** Proposed English / Yiddish names for the days that matter to the business. */
 export const PROPOSED_NAMES = {
-  shabbos: { en: "Shabbos", yi: "שבת" },
-  erevShabbos: { en: "Erev Shabbos", yi: "ערב שבת" },
+  shabbos: { en: "Shabbes", yi: "שבת" },
+  erevShabbos: { en: "Erev Shabbes", yi: "ערב שבת" },
   erevYomTov: { en: "Erev Yom Tov", yi: "ערב יום טוב" },
   chatzos: { en: "Chatzos", yi: "חצות" },
   roshHashanah: { en: "Rosh Hashanah", yi: "ראש השנה" },

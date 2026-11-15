@@ -71,7 +71,7 @@ describe("section 2 and 3: ringing staff, after hours", () => {
     expect(lineRingsNow("6", at("2027-06-25T22:58:00Z"), S, summerFri)).toBe(true); // 6:58 PM
     expect(lineRingsNow("6", at("2027-06-25T22:59:00Z"), S, summerFri)).toBe(false); // 6:59 PM
   });
-  it("Shabbos and Yom Tov: nothing rings; Admin can turn after-hours ringing off per line", () => {
+  it("Shabbes and Yom Tov: nothing rings; Admin can turn after-hours ringing off per line", () => {
     const shabbos = { ...weekday, officeOpen: true, shabbosOrYomTov: true };
     for (const k of ["0", "5", "6", "4"] as const) expect(lineRingsNow(k, at("2026-11-21T17:00:00Z"), S, shabbos)).toBe(false);
     expect(lineRingsNow("0", at("2026-11-17T03:00:00Z"), { ...S, ringAfterHours0: false }, weekday)).toBe(false);

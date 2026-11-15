@@ -23,7 +23,7 @@ export const DELIVERY_FEE_NOTE = "Delivery available. Call for pricing.";
 export const WEBSITE_HOURS_NOTE = "Book by phone anytime, 24/7.";
 
 /**
- * Display only (the words never change): keep "11:00 PM" and "Shabbos - 11:00 PM" from breaking across lines on
+ * Display only (the words never change): keep "11:00 PM" and "Shabbes - 11:00 PM" from breaking across lines on
  * phones, by joining a time to its AM/PM and a " - " to the words on both sides with non-breaking spaces.
  */
 export function keepTimesTogether(text: string): string {

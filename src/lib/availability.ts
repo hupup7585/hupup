@@ -7,8 +7,8 @@ import { calendarDefaults, nextOpenDay, type CalendarSettings } from "@/lib/jewi
 /**
  * Inventory rule (Abraham, Nov 8, 2026): bookings are whole rental days. A rented unit is OUT from its delivery day
  * (delivered 9:00 AM to 12:00 PM) through its pickup day (out the door by 9:00 AM), and on every day in between.
- * There is no pickup on Shabbos or Yom Tov, so a Friday booking is picked up Sunday and holds the unit Friday,
- * Shabbos and Sunday. A booking for day D needs a free unit on every day from D through its pickup day.
+ * There is no pickup on Shabbes or Yom Tov, so a Friday booking is picked up Sunday and holds the unit Friday,
+ * Shabbes and Sunday. A booking for day D needs a free unit on every day from D through its pickup day.
  *
  * Orders that occupy inventory:
  *  - CONFIRMED, DELIVERED, NEEDS_ATTENTION      always (a late payment keeps its claim while staff sort it out)
@@ -51,7 +51,7 @@ export async function getUsage(
            SUM(CASE WHEN o.status = 'HOLD' THEN oi.qty ELSE 0 END)::int AS held
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
-    -- every day from delivery through pickup (a Friday booking holds Friday, Shabbos and Sunday)
+    -- every day from delivery through pickup (a Friday booking holds Friday, Shabbes and Sunday)
     CROSS JOIN LATERAL (
       SELECT g::date AS day, CASE WHEN g::date = o.event_date THEN 'event' ELSE 'pickup' END AS kind
       FROM generate_series(o.event_date::timestamp, greatest(o.pickup_date, o.event_date)::timestamp, interval '1 day') AS g
@@ -85,7 +85,7 @@ export function freeOnDay(quantity: number, usage: UsageMap, productId: number, 
 }
 
 /**
- * Pickup day for an event: the next day, or, when that day is Shabbos / Yom Tov / another closed day, the next open
+ * Pickup day for an event: the next day, or, when that day is Shabbes / Yom Tov / another closed day, the next open
  * day (Jewish calendar settings). The unit stays out until then, so it can't be double-booked in between.
  */
 export function pickupDateFor(eventDate: string, cal: CalendarSettings = calendarDefaults()): string {

@@ -3,11 +3,11 @@
  * line, the public website, texts or emails.
  *
  *  Plain day:   "זונטאג, פרשת חיי שרה"   (Saturday: "שבת קודש, פרשת ...")
- *  A moment:    after Shabbos ends in Monroe (tzeis, 8.5 degrees, as hebcal's havdalah) Saturday shows
+ *  A moment:    after Shabbes ends in Monroe (tzeis, 8.5 degrees, as hebcal's havdalah) Saturday shows
  *               "מוצאי שבת קודש, פרשת <next week>".
  *  Call log:    the day changes at 6:00 AM New York time. Before 6 AM = the previous day's night ("ביינאכט"),
  *               6 AM to noon = "אינדערפרי", then the plain day name. Saturday night / before 6 AM Sunday after
- *               Shabbos ends = "מוצאי שבת קודש".
+ *               Shabbes ends = "מוצאי שבת קודש".
  */
 import { zmanim } from "@/lib/hup-calendar/zmanim";
 import { parshaForDate } from "@/lib/hup-calendar/parsha";
@@ -32,7 +32,7 @@ function nyParts(at: Date) {
   return { iso: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) };
 }
 
-/** When Shabbos ends on this Saturday (tzeis 8.5 degrees in Monroe). */
+/** When Shabbes ends on this Saturday (tzeis 8.5 degrees in Monroe). */
 export function shabbosEnds(saturdayIso: string): Date {
   return zmanim(saturdayIso, MONROE).tzeis(8.5);
 }
@@ -42,7 +42,7 @@ export function yiddishDay(iso: string): string {
   return `${DAY_YI[weekdayOf(iso)]}, ${parshaForDate(iso)}`;
 }
 
-/** Right now / a moment: like yiddishDay, but Saturday after Shabbos ends is Motzei Shabbos with next week's parsha. */
+/** Right now / a moment: like yiddishDay, but Saturday after Shabbes ends is Motzei Shabbes with next week's parsha. */
 export function yiddishMoment(at: Date): string {
   const { iso } = nyParts(at);
   if (weekdayOf(iso) === 6 && at.getTime() >= shabbosEnds(iso).getTime()) return `${MOTZEI_SHABBOS}, ${parshaForDate(addDay(iso, 1))}`;
@@ -56,7 +56,7 @@ export function yiddishCallDay(at: Date): CallDay {
   const { iso, hour } = nyParts(at);
   if (hour < DAY_START_HOUR) {
     const prev = addDay(iso, -1);
-    // Saturday night after Shabbos (and before 6 AM Sunday): Motzei Shabbos, next week's parsha
+    // Saturday night after Shabbes (and before 6 AM Sunday): Motzei Shabbes, next week's parsha
     if (weekdayOf(prev) === 6 && at.getTime() >= shabbosEnds(prev).getTime()) return { day: MOTZEI_SHABBOS, part: "night", label: MOTZEI_SHABBOS, parsha: parshaForDate(iso) };
     return { day: DAY_YI[weekdayOf(prev)], part: "night", label: `${DAY_YI[weekdayOf(prev)]} ${NIGHT}`, parsha: parshaForDate(prev) };
   }

@@ -25,13 +25,13 @@ export default function CalendarSettingsForm({ initial }: { initial: Record<stri
         start(async () => setMsg(await saveCalendarSettingsAction(v)));
       }}
     >
-      <p className="text-sm text-muted">Always closed: every Shabbos and every Yom Tov day (two-day Yom Tov). Zmanim for Monroe / Kiryas Joel.</p>
+      <p className="text-sm text-muted">Always closed: every Shabbes and every Yom Tov day (two-day Yom Tov). Zmanim for Monroe / Kiryas Joel.</p>
       <label className="flex items-center gap-2 font-semibold">
         <input type="checkbox" checked={v.calendarEnabled === "yes"} onChange={(e) => set("calendarEnabled", e.target.checked ? "yes" : "no")} /> Use the Jewish calendar for open and closed days
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="label">Erev Shabbos closes at</span>
+          <span className="label">Erev Shabbes closes at</span>
           <select className="input" value={v.erevShabbosClose} onChange={(e) => set("erevShabbosClose", e.target.value)}>
             <option value="chatzos">Chatzos (halachic midday)</option>
             <option value="candles">Candle lighting</option>
@@ -49,7 +49,7 @@ export default function CalendarSettingsForm({ initial }: { initial: Record<stri
           <input className="input" inputMode="numeric" value={v.candleLightingMinutes} onChange={(e) => set("candleLightingMinutes", e.target.value)} />
         </label>
         <label className="block">
-          <span className="label">Reopen after Shabbos / Yom Tov</span>
+          <span className="label">Reopen after Shabbes / Yom Tov</span>
           <input className="input" value={v.reopenAfter} onChange={(e) => set("reopenAfter", e.target.value)} />
           <span className="mt-1 block text-xs text-muted">&ldquo;tzeis&rdquo; (nightfall, 8.5°) or a number of minutes after shkiah, e.g. 72.</span>
         </label>
@@ -69,13 +69,13 @@ export default function CalendarSettingsForm({ initial }: { initial: Record<stri
         {(
           [
             ["hoursMonThu", "Monday to Thursday", "10:30-19:00"],
-            ["hoursFridayOpen", "Friday opens (closes at the Erev Shabbos time)", "10:30"],
+            ["hoursFridayOpen", "Friday opens (closes at the Erev Shabbes time)", "10:30"],
             ["hoursSunday", "Sunday", "11:30-19:00"],
             ["hoursCholHamoed", "Chol Hamoed", "10:30-22:30"],
             ["hoursChanukah", "Chanukkah (Friday of Chanukkah still closes at chatzos)", "10:30-22:30"],
-            ["hoursMotzeiOpen", "Motzei Shabbos opens (\"tzeis+120\" = 2 hours after Shabbos ends)", "tzeis+120"],
-            ["hoursMotzeiCloseWinter", "Motzei Shabbos closes (winter)", "23:00"],
-            ["hoursMotzeiCloseSummer", "Motzei Shabbos closes (summer, 00:00 = midnight)", "00:00"],
+            ["hoursMotzeiOpen", "Motzei Shabbes opens (\"tzeis+120\" = 2 hours after Shabbes ends)", "tzeis+120"],
+            ["hoursMotzeiCloseWinter", "Motzei Shabbes closes (winter)", "23:00"],
+            ["hoursMotzeiCloseSummer", "Motzei Shabbes closes (summer, 00:00 = midnight)", "00:00"],
           ] as const
         ).map(([k, label, ph]) => (
           <label key={k} className="block">
@@ -84,7 +84,7 @@ export default function CalendarSettingsForm({ initial }: { initial: Record<stri
           </label>
         ))}
         <label className="block">
-          <span className="label">Motzei Shabbos summer hours apply</span>
+          <span className="label">Motzei Shabbes summer hours apply</span>
           <select className="input" value={v.hoursMotzeiSeason} onChange={(e) => set("hoursMotzeiSeason", e.target.value)}>
             <option value="dst">While daylight saving time is in effect</option>
             <option value="summer">Always (summer hours)</option>

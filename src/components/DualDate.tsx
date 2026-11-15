@@ -27,7 +27,7 @@ export default function DualDate({ iso, at, style = "long", stack = false, yi = 
 
 /**
  * Staff screens only (Abraham Y/Z/AA): the Yiddish day and the week's parsha, e.g. "זונטאג, פרשת חיי שרה".
- * A moment (`at`) after Shabbos ends shows "מוצאי שבת קודש" with next week's parsha; a plain day keeps "שבת קודש".
+ * A moment (`at`) after Shabbes ends shows "מוצאי שבת קודש" with next week's parsha; a plain day keeps "שבת קודש".
  */
 export function YiddishDay({ iso, at, className = "" }: { iso?: string; at?: Date | string; className?: string }) {
   const text = at !== undefined ? yiddishMoment(new Date(at)) : yiddishDay(iso!);

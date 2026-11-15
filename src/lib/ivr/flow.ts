@@ -142,7 +142,7 @@ function bookNoInput(vr: VR, ctx: Ctx, retryAction: string, retryParams: Record<
   return idleNoKey(vr, ctx, retryAction, retryParams);
 }
 
-/** The item is free on that day, and the day is open (not past, not Shabbos/Yom Tov/closed, pickup rules applied). */
+/** The item is free on that day, and the day is open (not past, not Shabbes/Yom Tov/closed, pickup rules applied). */
 /** Speech (plus optional keypad) gather tuned for phone audio. */
 function speech(vr: VR, action: string, hints: string, opts: { dtmf?: boolean; numDigits?: number; finishOnKey?: string } = {}) {
   return vr.gather({
@@ -503,7 +503,7 @@ async function vmBox(x: string | null | undefined) {
 
 /**
  * Key 9 (general voicemail) has its own feedback greeting. Every other box: the standard greeting while the office is
- * open, and Abraham's "office is closed" greeting after hours, Shabbos and Yom Tov (same hours as the website and key 7).
+ * open, and Abraham's "office is closed" greeting after hours, Shabbes and Yom Tov (same hours as the website and key 7).
  */
 async function vmGreeting(x: string | null | undefined, prompts: PromptOverrides): Promise<PromptKey> {
   if (x === "9") return "vm9_greeting";
@@ -582,7 +582,7 @@ async function logCatalogRequest(ctx: Ctx, channel: "text" | "email", to: string
   await recordCatalogRequest({ callerPhone: toE164(ctx.from), channel, to, sent, source: "phone" });
 }
 
-/** Does this line ring now (office hours, after-hours switch, key 6 hours, Shabbos and Yom Tov)? */
+/** Does this line ring now (office hours, after-hours switch, key 6 hours, Shabbes and Yom Tov)? */
 async function lineRingsNowFor(k: RingKey, settings: Awaited<ReturnType<typeof getSettings>>, at = new Date()) {
   const iso = localISO(at);
   return lineRingsNow(k, at, settings, { officeOpen: officeOpenNow(at, settings), shabbosOrYomTov: isShabbosOrYomTov(iso), candleLighting: erevCandleLighting(iso, settings) });
@@ -654,7 +654,7 @@ const handlers: Record<string, Handler> = {
       return vr;
     }
     await ensureSession(ctx.callSid, ctx.from);
-    // Shabbos and Yom Tov (Abraham, Nov 14, 2026, choice A): the whole hotline is closed. A closed greeting with the
+    // Shabbes and Yom Tov (Abraham, Nov 14, 2026, choice A): the whole hotline is closed. A closed greeting with the
     // day and time we open again, then the tone; every message goes to the general voicemail (key 9's box), without
     // that box's own greeting. Draft wording: on preview now, on the live line once Abraham approves it.
     const lock = bookingLock(calendarNow(), await getSettings());
@@ -1138,7 +1138,7 @@ const handlers: Record<string, Handler> = {
    */
   /** Key 1 (Abraham, Nov 9, 2026): choose a category, then the item, then the date. */
   async book(ctx, vr) {
-    // Abraham, Nov 14, 2026: no booking on Shabbos or Yom Tov (candle lighting until Rabbeinu Tam), automatically
+    // Abraham, Nov 14, 2026: no booking on Shabbes or Yom Tov (candle lighting until Rabbeinu Tam), automatically
     const lock = bookingLock(calendarNow(), await getSettings());
     if (lock.locked) {
       await track(ctx.callSid, "step", `Booking closed (${lock.reason})`, { key: "1" });

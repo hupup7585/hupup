@@ -74,7 +74,7 @@ export async function createBookingAction(input: {
   smsMarketing?: boolean;
 }): Promise<PosResult> {
   {
-    // Abraham, Nov 14, 2026: no booking on Shabbos or Yom Tov (candle lighting until Rabbeinu Tam)
+    // Abraham, Nov 14, 2026: no booking on Shabbes or Yom Tov (candle lighting until Rabbeinu Tam)
     const { bookingLock } = await import("@/lib/jewish-calendar");
     const { getSettings } = await import("@/lib/settings");
     const lock = bookingLock((await import("@/lib/clock")).calendarNow(), await getSettings());

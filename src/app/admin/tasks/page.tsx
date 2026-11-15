@@ -145,7 +145,7 @@ async function MonthView({ staff, m, names }: { staff: Awaited<ReturnType<typeof
       </div>
       <div className="overflow-x-auto">
         <div className="grid min-w-[760px] grid-cols-7 gap-1 text-xs">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Shabbos"].map((d) => <div key={d} className="px-1 py-1 font-bold text-muted">{d}</div>)}
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Shabbes"].map((d) => <div key={d} className="px-1 py-1 font-bold text-muted">{d}</div>)}
           {cells.map((iso, i) => (
             <div key={i} className={`min-h-[96px] rounded-lg border p-1 ${iso === today ? "border-navy" : "border-line"} ${iso ? "bg-white" : "bg-transparent"}`}>
               {iso && (

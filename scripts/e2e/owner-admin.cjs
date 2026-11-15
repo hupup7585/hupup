@@ -37,7 +37,7 @@ const broken = async (page) => /Application error|Unhandled Runtime Error|Intern
 
   // New booking at the POS for a customer without text consent: the link must not be texted.
   await page.goto(BASE + "/admin/pos");
-  // An ordinary open weekday (calendar rules refuse Shabbos / Yom Tov); random so earlier runs don't hold the stock.
+  // An ordinary open weekday (calendar rules refuse Shabbes / Yom Tov); random so earlier runs don't hold the stock.
   const OPEN = ["2027-01-12", "2027-01-19", "2027-01-26", "2027-02-02", "2027-02-09", "2027-02-16", "2027-02-23", "2027-03-02", "2027-05-04", "2027-05-11", "2027-06-01", "2027-07-06", "2027-08-03", "2027-08-24"];
   const d = OPEN[Math.floor(Math.random() * OPEN.length)];
   await page.waitForSelector("[data-pos-calendar] button", { timeout: 60000 }); // page hydrated

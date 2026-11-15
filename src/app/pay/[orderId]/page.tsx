@@ -25,7 +25,7 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   // Every link charges items + delivery + tax: price any order not priced yet (made in Admin, or older ones)
   const before = await getPaymentGroup(id);
   if (!before) notFound();
-  // Abraham, Nov 14, 2026: payments are closed on Shabbos and Yom Tov (candle lighting until Rabbeinu Tam)
+  // Abraham, Nov 14, 2026: payments are closed on Shabbes and Yom Tov (candle lighting until Rabbeinu Tam)
   const closedLine = before.due > 0 ? await paymentsClosedLine() : null;
   if (closedLine)
     return (
