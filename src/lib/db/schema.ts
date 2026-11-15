@@ -1058,7 +1058,34 @@ export const inboxEmails = pgTable("inbox_emails", {
   receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
   readAt: timestamp("read_at", { withTimezone: true }),
   customerId: integer("customer_id").references(() => customers.id),
+  /** Gmail-style Inbox (Abraham, Nov 15, 2026): star, archive, trash (hidden only, never deleted) and labels. */
+  starred: boolean("starred").notNull().default(false),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  trashedAt: timestamp("trashed_at", { withTimezone: true }),
+  labels: text("labels").array().notNull().default(sql`'{}'::text[]`),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const inboxLabels = pgTable("inbox_labels", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  color: text("color").notNull().default("#2585D8"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Drafts save by themselves while writing; sending or discarding keeps the row (nothing is deleted). */
+export const inboxDrafts = pgTable("inbox_drafts", {
+  id: serial("id").primaryKey(),
+  replyToEmailId: integer("reply_to_email_id").references(() => inboxEmails.id),
+  forwardOfEmailId: integer("forward_of_email_id").references(() => inboxEmails.id),
+  toAddress: text("to_address").notNull().default(""),
+  subject: text("subject").notNull().default(""),
+  body: text("body").notNull().default(""),
+  userId: integer("user_id"),
+  sentReplyId: integer("sent_reply_id"),
+  discardedAt: timestamp("discarded_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const inboxFiles = pgTable("inbox_files", {

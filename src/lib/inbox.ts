@@ -1,5 +1,5 @@
 import PostalMime from "postal-mime";
-import { asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { sendEmail, EMAIL_REPLY_TO } from "@/lib/notify";
@@ -94,7 +94,11 @@ export async function fileEmail(bytes: Buffer, uploadId: string | null = null, n
 
 export async function inboxUnreadCount(): Promise<number> {
   try {
-    const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.inboxEmails).where(isNull(schema.inboxEmails.readAt));
+    // Like Gmail: unread emails in the Inbox folder (not archived, not in Trash)
+    const [r] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(schema.inboxEmails)
+      .where(and(isNull(schema.inboxEmails.readAt), isNull(schema.inboxEmails.archivedAt), isNull(schema.inboxEmails.trashedAt)));
     return r?.n ?? 0;
   } catch {
     return 0;
@@ -183,7 +187,7 @@ export async function sendReply(input: { emailId: number; body: string; fileIds:
 export const validAddress = (a: string) => /^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]{2,}$/.test(a.trim());
 
 /** A new email written in Admin (Owner), from info@, signed "Hup Up Attractions", attachments up to 10 MB in all. */
-export async function sendNewEmail(input: { to: string; subject: string; body: string; fileIds: number[]; userId: number | null }) {
+export async function sendNewEmail(input: { to: string; subject: string; body: string; fileIds: number[]; userId: number | null; forwardOf?: number | null }) {
   const to = input.to.trim();
   if (!validAddress(to)) throw new Error("Enter one email address to send to.");
   const subject = input.subject.trim();
@@ -196,9 +200,18 @@ export async function sendNewEmail(input: { to: string; subject: string; body: s
     if (!f || f.file.emailId || f.file.replyId) throw new Error("An attachment didn't upload. Please attach it again.");
     files.push(f);
   }
+  // Forward (Gmail-style Inbox): the original email's attachments go along
+  const forwarded: { filename: string; content: string }[] = [];
+  if (input.forwardOf) {
+    const orig = await db.select().from(schema.inboxFiles).where(and(eq(schema.inboxFiles.emailId, input.forwardOf), eq(schema.inboxFiles.complete, true), eq(schema.inboxFiles.tooBig, false)));
+    for (const o of orig) {
+      const fb = await fileBytes(o.id);
+      if (fb) forwarded.push({ filename: fb.file.fileName, content: fb.data.toString("base64") });
+    }
+  }
   if (files.reduce((n, f) => n + f.data.length, 0) > INBOX_FILE_MAX_BYTES) throw new Error("Attachments can be up to 10 MB in all.");
   const text = `${body}\n\n${REPLY_SIGNATURE}`;
-  const res = await sendEmail(to, subject, text, files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })));
+  const res = await sendEmail(to, subject, text, [...files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), ...forwarded]);
   const [sent] = await db
     .insert(schema.inboxReplies)
     .values({ emailId: null, toAddress: to, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })

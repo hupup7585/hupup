@@ -3,8 +3,12 @@ import { notFound } from "next/navigation";
 import { requireOwner } from "@/lib/auth";
 import { getInboxEmail, repliesActive, setRead } from "@/lib/inbox";
 import { inboxWhen, sizeLabel } from "@/lib/inbox-format";
-import ReadToggle from "./ReadToggle";
 import ReplyForm from "./ReplyForm";
+import MailShell from "../MailShell";
+import StarButton from "./StarButton";
+import { bulkAction } from "../actions";
+import { listDrafts, listLabels } from "@/lib/inbox-folders";
+import { Archive, Forward, Inbox, Mail, Reply, Trash2, Undo2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Email · Inbox · Hup Up Attractions" };
@@ -16,12 +20,45 @@ export default async function InboxEmailPage({ params }: { params: Promise<{ id:
   if (!found) notFound();
   const { email, files, replies, replyFiles, contact } = found;
   if (!email.readAt) await setRead(email.id, true); // opening it marks it read
+  const labels = await listLabels();
+  const replyDraft = (await listDrafts()).find((d) => d.replyToEmailId === email.id);
+  const folder = email.trashedAt ? "trash" : email.archivedAt ? "archive" : "inbox";
+  const back = folder === "inbox" ? "/admin/inbox" : `/admin/inbox?f=${folder}`;
+  const act = (action: string, icon: React.ReactNode, text: string, to = back) => (
+    <form action={bulkAction}>
+      <input type="hidden" name="id" value={email.id} />
+      <input type="hidden" name="back" value={to} />
+      <button name="action" value={action} className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm hover:bg-bg">{icon} {text}</button>
+    </form>
+  );
+  const ic = "h-4 w-4";
   return (
-    <div className="mx-auto max-w-4xl">
-      <Link href="/admin/inbox" className="text-sm font-bold text-navy">
-        ← Inbox
-      </Link>
-      <div className="card mt-3 p-5" data-inbox-email>
+    <MailShell folder={folder}>
+      <div className="card mb-3 flex flex-wrap items-center gap-1 px-2 py-1.5" data-email-toolbar>
+        <Link href={back} className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-bold text-navy hover:bg-bg">← Back</Link>
+        {folder === "trash"
+          ? act("restore", <Undo2 className={ic} aria-hidden />, "Restore", `/admin/inbox/${email.id}`)
+          : (
+            <>
+              {folder === "archive" ? act("inbox", <Inbox className={ic} aria-hidden />, "Move to Inbox", `/admin/inbox/${email.id}`) : act("archive", <Archive className={ic} aria-hidden />, "Archive")}
+              {act("trash", <Trash2 className={ic} aria-hidden />, "Trash")}
+            </>
+          )}
+        {act("unread", <Mail className={ic} aria-hidden />, "Mark as unread")}
+        <StarButton id={email.id} starred={email.starred} />
+        {labels.length > 0 && (
+          <form action={bulkAction} className="inline-flex items-center gap-1">
+            <input type="hidden" name="id" value={email.id} />
+            <input type="hidden" name="back" value={`/admin/inbox/${email.id}`} />
+            <select name="label" className="input !w-36 !py-1 text-sm" aria-label="Label">{labels.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}</select>
+            <button name="action" value="label" className="rounded-full px-2 py-1.5 text-sm hover:bg-bg">Add label</button>
+            <button name="action" value="unlabel" className="rounded-full px-2 py-1.5 text-sm hover:bg-bg">Remove</button>
+          </form>
+        )}
+        <a href="#reply" className="ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm hover:bg-bg"><Reply className={ic} aria-hidden /> Reply</a>
+        <Link href={`/admin/inbox/new?forward=${email.id}`} className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm hover:bg-bg" data-forward><Forward className={ic} aria-hidden /> Forward</Link>
+      </div>
+      <div className="card p-5" data-inbox-email>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-xl font-black sm:text-2xl">{email.subject || "(no subject)"}</h1>
@@ -39,7 +76,11 @@ export default async function InboxEmailPage({ params }: { params: Promise<{ id:
             </p>
             <p className="text-sm text-muted">{inboxWhen(email.receivedAt)}</p>
           </div>
-          <ReadToggle id={email.id} />
+          {email.labels.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {email.labels.map((n) => <span key={n} className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-white" style={{ background: labels.find((l) => l.name === n)?.color ?? "#2585D8" }}>{n}</span>)}
+            </div>
+          )}
         </div>
         <div className="mt-4 border-t border-line pt-4">
           {email.textBody?.trim() ? (
@@ -87,7 +128,9 @@ export default async function InboxEmailPage({ params }: { params: Promise<{ id:
           ))}
         </div>
       ))}
-      <ReplyForm emailId={email.id} to={email.fromAddress} active={repliesActive()} />
-    </div>
+      <div id="reply">
+        <ReplyForm emailId={email.id} to={email.fromAddress} active={repliesActive()} draftId={replyDraft?.id} initialBody={replyDraft?.body} />
+      </div>
+    </MailShell>
   );
 }
