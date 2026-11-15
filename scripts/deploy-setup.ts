@@ -1,0 +1,120 @@
+import "dotenv/config";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+/**
+ * Runs during each Vercel build, after the database steps (Abraham, Nov 15, 2026). Never fails the build and never
+ * prints a secret: only names, yes/no answers, HTTP status codes and Cloudflare's or Twilio's own error text.
+ *
+ * 1. Payment line check (live builds): the "Hup Up Payments" Twilio subaccount's SIP domain must send its calls to
+ *    /api/pay-voice/incoming on our site, and its credential list must hold our SIP username. A wrong voice URL is
+ *    corrected; everything else is reported in the build log.
+ * 2. Cloudflare (live builds): the free scheduler Worker (cloudflare/scheduler-worker.js) is put on Cloudflare with a
+ *    5-minute schedule, and the delivery photos bucket is created in R2 if it is missing. Workers and R2 only, within
+ *    the free tier; no DNS and no routes on the domain. Uses CLOUDFLARE_R2_WORKERS_TOKEN and CLOUDFLARE_ACCOUNT_ID.
+ */
+const log = (m: string) => console.log(`[setup] ${m}`);
+const T = (ms: number) => AbortSignal.timeout(ms);
+export const R2_PHOTOS_BUCKET = "hupup-delivery-photos";
+export const SCHEDULER_NAME = "hupup-scheduler";
+
+async function twilioPayCheck(env: NodeJS.ProcessEnv) {
+  const sid = env.TWILIO_PAY_ACCOUNT_SID;
+  const token = env.TWILIO_PAY_AUTH_TOKEN;
+  const domainName = (env.TWILIO_PAY_SIP_DOMAIN || "").toLowerCase();
+  if (!sid || !token || !domainName) return log("Payment line: subaccount settings are not all in Vercel yet.");
+  const auth = `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`;
+  const base = `https://api.twilio.com/2010-04-01/Accounts/${sid}`;
+  const get = async (path: string) => {
+    const r = await fetch(`${base}${path}`, { headers: { authorization: auth }, signal: T(15000) });
+    return { status: r.status, json: (await r.json().catch(() => ({}))) as Record<string, unknown> };
+  };
+  const d = await get("/SIP/Domains.json?PageSize=50");
+  if (d.status !== 200) return log(`Payment line: Twilio answered ${d.status} when listing SIP domains (check the subaccount SID and token).`);
+  const domains = (d.json.domains as { sid: string; domain_name: string; voice_url: string | null; voice_method: string | null }[]) ?? [];
+  const dom = domains.find((x) => x.domain_name.toLowerCase() === domainName);
+  if (!dom) return log(`Payment line: no SIP domain named ${domainName} in the subaccount (found ${domains.length}).`);
+  const want = `${(env.PUBLIC_BASE_URL || "https://hupupattractions.com").replace(/\/$/, "")}/api/pay-voice/incoming`;
+  if (dom.voice_url !== want || (dom.voice_method || "").toUpperCase() !== "POST") {
+    const r = await fetch(`${base}/SIP/Domains/${dom.sid}.json`, {
+      method: "POST",
+      headers: { authorization: auth, "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ VoiceUrl: want, VoiceMethod: "POST" }),
+      signal: T(15000),
+    });
+    log(`Payment line: SIP domain voice URL was ${dom.voice_url || "empty"}; set to ${want}: ${r.status === 200 ? "done" : `Twilio answered ${r.status}`}.`);
+  } else log("Payment line: SIP domain voice URL is correct.");
+  const maps = await get(`/SIP/Domains/${dom.sid}/Auth/Calls/CredentialListMappings.json`);
+  const lists = (maps.json.contents as { sid: string }[]) ?? [];
+  if (!lists.length) return log("Payment line: the SIP domain has no credential list for calls, so the hotline cannot sign in to it.");
+  let found = false;
+  for (const l of lists) {
+    const c = await get(`/SIP/CredentialLists/${l.sid}/Credentials.json`);
+    if (((c.json.credentials as { username: string }[]) ?? []).some((x) => x.username === env.TWILIO_PAY_SIP_USERNAME)) found = true;
+  }
+  log(`Payment line: our SIP username is ${found ? "" : "NOT "}in the domain's credential list.`);
+}
+
+async function cloudflareSetup(env: NodeJS.ProcessEnv) {
+  const token = env.CLOUDFLARE_R2_WORKERS_TOKEN || env.CLOUDFLARE_API_TOKEN;
+  const account = env.CLOUDFLARE_ACCOUNT_ID;
+  if (!token || !account) return log("Cloudflare: token or account ID is not in Vercel yet.");
+  const cf = async (method: string, path: string, body?: BodyInit, type?: string) => {
+    const r = await fetch(`https://api.cloudflare.com/client/v4${path}`, { method, headers: { authorization: `Bearer ${token}`, ...(type ? { "content-type": type } : {}) }, body, signal: T(20000) });
+    const j = (await r.json().catch(() => ({}))) as { success?: boolean; errors?: { message?: string }[]; result?: unknown };
+    return { status: r.status, ok: r.ok && j.success !== false, errors: (j.errors ?? []).map((e) => e.message).join("; "), result: j.result };
+  };
+  const v = await cf("GET", `/accounts/${account}/tokens/verify`);
+  const v2 = v.ok ? v : await cf("GET", "/user/tokens/verify");
+  log(`Cloudflare: token check ${v2.ok ? "passed" : `failed (${v2.status} ${v2.errors})`}.`);
+
+  // Scheduler Worker, every 5 minutes (free plan; no routes, no DNS)
+  if (!env.CRON_SECRET) log("Cloudflare: CRON_SECRET is missing, so the scheduler is not uploaded.");
+  else {
+    const code = readFileSync(join(process.cwd(), "cloudflare/scheduler-worker.js"), "utf8");
+    const form = new FormData();
+    form.append(
+      "metadata",
+      JSON.stringify({
+        main_module: "scheduler-worker.js",
+        compatibility_date: "2026-11-01",
+        bindings: [
+          { type: "plain_text", name: "SITE_URL", text: env.PUBLIC_BASE_URL || "https://hupupattractions.com" },
+          { type: "secret_text", name: "CRON_SECRET", text: env.CRON_SECRET },
+        ],
+      }),
+    );
+    form.append("scheduler-worker.js", new Blob([code], { type: "application/javascript+module" }), "scheduler-worker.js");
+    const up = await cf("PUT", `/accounts/${account}/workers/scripts/${SCHEDULER_NAME}`, form);
+    log(`Cloudflare: scheduler Worker upload ${up.ok ? "done" : `failed (${up.status} ${up.errors})`} (code ${createHash("sha256").update(code).digest("hex").slice(0, 8)}).`);
+    if (up.ok) {
+      const sch = await cf("PUT", `/accounts/${account}/workers/scripts/${SCHEDULER_NAME}/schedules`, JSON.stringify([{ cron: "*/5 * * * *" }]), "application/json");
+      log(`Cloudflare: every-5-minutes schedule ${sch.ok ? "set" : `failed (${sch.status} ${sch.errors})`}.`);
+    }
+  }
+
+  // Delivery photos bucket (R2 free tier: 10 GB stored a month)
+  const b = await cf("GET", `/accounts/${account}/r2/buckets/${R2_PHOTOS_BUCKET}`);
+  if (b.ok) log(`Cloudflare: R2 bucket ${R2_PHOTOS_BUCKET} is there.`);
+  else {
+    const c = await cf("POST", `/accounts/${account}/r2/buckets`, JSON.stringify({ name: R2_PHOTOS_BUCKET }), "application/json");
+    log(`Cloudflare: R2 bucket ${R2_PHOTOS_BUCKET} ${c.ok ? "created" : `could not be created (${c.status} ${c.errors})`}.`);
+  }
+}
+
+async function main() {
+  if (process.env.VERCEL_ENV !== "production") return log("Not a live build: payment line check and Cloudflare setup skipped.");
+  for (const [name, step] of [
+    ["Payment line check", twilioPayCheck],
+    ["Cloudflare setup", cloudflareSetup],
+  ] as const) {
+    try {
+      await step(process.env);
+    } catch (e) {
+      log(`${name}: stopped (${(e as Error).name}: ${(e as Error).message.slice(0, 160)}). The build carries on.`);
+    }
+  }
+}
+
+main().catch(() => undefined);

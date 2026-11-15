@@ -26,6 +26,9 @@ export async function savePhonePayAction(form: FormData) {
   const capDollars = Number(String(form.get("customCap") ?? "").replace(/[$,\s]/g, ""));
   if (!Number.isFinite(capDollars) || capDollars < 1 || capDollars > 99999) return back("The highest custom amount must be between $1.00 and $99,999.00.");
   const customCap = String(Math.round(capDollars * 100));
+  const testLines = String(form.get("testNumbers") ?? "").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
+  const testNumbers = testLines.map((x) => toE164(x));
+  if (testNumbers.some((x) => !x)) return back("Each payment test number must be a 10-digit phone number, one per line.");
   const before = await getSettings();
   await saveSetting("solaPhonePayOn", on, owner.userId);
   await saveSetting("solaPhonePayOwnerOnly", ownerOnly, owner.userId);
@@ -34,13 +37,14 @@ export async function savePhonePayAction(form: FormData) {
   await saveSetting("solaPhonePayDigits", digits, owner.userId);
   await saveSetting("solaPhonePayCustomDigits", customDigits, owner.userId);
   await saveSetting("solaPhonePayCustomCapCents", customCap, owner.userId);
+  await saveSetting("paymentTestNumbers", testNumbers.join("\n"), owner.userId);
   await db.insert(schema.auditLog).values({
     userId: owner.userId,
     action: "settings.phonepay_updated",
     entityType: "settings",
     entityId: "sola_phonepay",
     before: { on: before.solaPhonePayOn, ownerOnly: before.solaPhonePayOwnerOnly, number: before.solaPhonePayNumber, backup: before.solaPhonePayBackup, digits: before.solaPhonePayDigits },
-    after: { on, ownerOnly, number, backup, digits, customDigits, customCap },
+    after: { on, ownerOnly, number, backup, digits, customDigits, customCap, testNumbers },
   });
   revalidatePath("/admin/phone/phonepay");
   return back("Saved.");

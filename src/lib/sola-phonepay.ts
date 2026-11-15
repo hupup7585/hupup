@@ -19,7 +19,7 @@ import { toE164 } from "@/lib/phone";
 export const PHONEPAY_NUMBER_DEFAULT = "+18334343354";
 export const PHONEPAY_BACKUP_DEFAULT = "+18444227356";
 /** Default digits: wait 5 seconds, the PIN, pound. Abraham sets the real sequence after his test call. */
-export const PHONEPAY_DIGITS_DEFAULT = "wwwwwwwwww{pin}#";
+export const PHONEPAY_DIGITS_DEFAULT = "wwwwwwwwww{pin}#wwwwwwwwwwwwwwwwwwwwwwww{amount}#wwwwwwwwww1";
 
 export type PhonePaySettings = {
   solaPhonePayOn: boolean;
@@ -27,13 +27,24 @@ export type PhonePaySettings = {
   solaPhonePayNumber: string;
   solaPhonePayBackup: string;
   solaPhonePayDigits: string;
+  paymentTestNumbers?: string;
 };
+
+/** The payment test list: the Owner's phone plus each number in Admin (one per line). */
+export function paymentTestList(s: Partial<PhonePaySettings>, env: Record<string, string | undefined> = process.env): string[] {
+  const list = String(s.paymentTestNumbers ?? "").split(/[\n,;]+/).map((x) => toE164(x.trim())).filter((x): x is string => Boolean(x));
+  const owner = toE164(env.ADMIN_PHONE) ?? "+18457777585";
+  return [...new Set([owner, ...list])];
+}
 
 /** Is PhonePay offered to this caller right now? Off by default; Owner-test only by default. */
 export function phonePayOffered(caller: string | null | undefined, s: Partial<PhonePaySettings>, env: Record<string, string | undefined> = process.env): boolean {
   if (!s.solaPhonePayOn) return false;
   if (!env.SOLA_PHONEPAY_PIN || !env.TWILIO_PAY_SIP_DOMAIN || !env.TWILIO_PAY_SIP_USERNAME || !env.TWILIO_PAY_SIP_PASSWORD) return false;
-  if (s.solaPhonePayOwnerOnly !== false) return Boolean(toE164(caller) && toE164(caller) === (toE164(env.ADMIN_PHONE) ?? "+18457777585"));
+  if (s.solaPhonePayOwnerOnly !== false) {
+    const c = toE164(caller);
+    return Boolean(c && paymentTestList(s, env).includes(c));
+  }
   return true;
 }
 
@@ -50,7 +61,7 @@ export function buildSendDigits(template: string, v: { pin: string; amountCents:
     .replace(/\{dollars\}/gi, String(Math.floor(v.amountCents / 100)))
     .replace(/\{order\}/gi, v.orderNumber.replace(/\D/g, ""));
   if (!/^[0-9*#wW]*$/.test(out)) throw new Error("The PhonePay digits may hold only numbers, star, pound, w (half a second wait) and {pin}, {amount}, {dollars}, {order}.");
-  if (out.length > 64) throw new Error("The PhonePay digits are too long (64 at most).");
+  if (out.length > 120) throw new Error("The PhonePay digits are too long (120 at most).");
   return out;
 }
 

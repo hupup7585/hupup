@@ -51,7 +51,12 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
         </label>
         <label className="flex items-start gap-2">
           <input type="checkbox" name="ownerOnly" defaultChecked={s.solaPhonePayOwnerOnly} className="mt-1" />
-          <span><b>Only my own test calls</b> from (845) 777-7585. <span className="text-sm text-muted">Untick this to offer it to every caller, after your test payment and once the 5 phone lines are approved.</span></span>
+          <span><b>Only test calls</b> from the numbers below. <span className="text-sm text-muted">Untick this to offer it to every caller, after your test payment and once the 5 phone lines are approved.</span></span>
+        </label>
+        <label className="block" data-payment-test-numbers>
+          <span className="label">Payment test numbers</span>
+          <textarea name="testNumbers" rows={3} defaultValue={s.paymentTestNumbers.split(/[\n,;]+/).filter(Boolean).map((n) => formatPhone(n)).join("\n")} className="input font-mono" />
+          <span className="mt-1 block text-xs text-muted">One phone number per line. While &ldquo;Only test calls&rdquo; is ticked, only calls from these numbers (and always (845) 777-7585) are offered pay by card.</span>
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block"><span className="label">PhonePay number</span><input name="number" defaultValue={formatPhone(s.solaPhonePayNumber)} className="input" placeholder="(833) 434-3354" /></label>
@@ -61,7 +66,7 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
           <span className="label">Digits sent to PhonePay</span>
           <input name="digits" defaultValue={s.solaPhonePayDigits} className="input font-mono" />
           <span className="mt-1 block text-xs text-muted">
-            Sent automatically after PhonePay answers. <code>w</code> waits half a second. <code>{"{pin}"}</code> is our merchant PIN (kept secret in Vercel), <code>{"{amount}"}</code> the total in cents with no point (230.00 is 23000), <code>{"{dollars}"}</code> whole dollars, <code>{"{order}"}</code> the order number. Example: <code>{"wwwwwwwwww{pin}#ww{amount}#"}</code> waits 5 seconds, enters the PIN and pound, waits 1 second, then the amount and pound. Set this to match PhonePay&rsquo;s prompts from your test call.
+            Sent automatically after PhonePay answers. <code>w</code> waits half a second. <code>{"{pin}"}</code> is our merchant PIN (kept secret in Vercel), <code>{"{amount}"}</code> the total in cents with no point (230.00 is 23000), <code>{"{dollars}"}</code> whole dollars, <code>{"{order}"}</code> the order number. The default matches your test call of November 15: it waits 5 seconds for the greeting, enters the PIN and pound, waits 12 seconds for the amount question, enters the amount and pound, waits 5 seconds, then presses 1 to confirm. After that it sends nothing more, and the caller types the card.
           </span>
         </label>
         <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2" data-phonepay-custom>

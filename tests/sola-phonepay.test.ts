@@ -75,3 +75,22 @@ describe("Owner custom charge (owner voicemail menu, key 7)", () => {
     expect(verifyPhonePaySip({ ...body, "SipHeader_X-Hup-Kind": "order" })).toBeNull(); // a customer hand-over needs a real order
   });
 });
+
+describe("PhonePay hand-off matches Abraham's Nov 15 test call", () => {
+  it("default digits: wait for the greeting, PIN and pound, wait, amount in cents and pound, wait, 1 to confirm; nothing after", async () => {
+    const { PHONEPAY_DIGITS_DEFAULT } = await import("@/lib/sola-phonepay");
+    const d = buildSendDigits(PHONEPAY_DIGITS_DEFAULT, { pin: "4321", amountCents: 80000, orderNumber: "1438" });
+    expect(d).toBe("wwwwwwwwww4321#wwwwwwwwwwwwwwwwwwwwwwww80000#wwwwwwwwww1");
+    expect(d.endsWith("1")).toBe(true); // the caller types the card after this
+  });
+  it("test list: the Owner's phone and (845) 799-0925 are offered pay by card while it is test-only; others are not", async () => {
+    const { paymentTestList } = await import("@/lib/sola-phonepay");
+    const { SETTING_DEFAULTS } = await import("@/lib/settings");
+    const s = { solaPhonePayOn: true, solaPhonePayOwnerOnly: true, paymentTestNumbers: SETTING_DEFAULTS.paymentTestNumbers };
+    expect(paymentTestList(s, env)).toEqual(["+18457777585", "+18457990925"]);
+    expect(phonePayOffered("+18457990925", s, env)).toBe(true);
+    expect(phonePayOffered("(845) 777-7585", s, env)).toBe(true);
+    expect(phonePayOffered("+18455550100", s, env)).toBe(false);
+    expect(phonePayOffered("+18457990925", { ...s, solaPhonePayOn: false }, env)).toBe(false);
+  });
+});

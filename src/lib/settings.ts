@@ -31,12 +31,17 @@ export const SETTING_DEFAULTS = {
   solaPhonePayOwnerOnly: true,
   solaPhonePayNumber: "+18334343354",
   solaPhonePayBackup: "+18444227356",
-  /** Digits sent to PhonePay: w = half a second; {pin} {amount} {dollars} {order}. Set from Abraham's test call. */
-  solaPhonePayDigits: "wwwwwwwwww{pin}#",
+  /** Digits sent to PhonePay: w = half a second; {pin} {amount} {dollars} {order}. Matches Abraham's Nov 15 test call:
+   * wait for the greeting, PIN and pound; wait for the amount question, amount in cents and pound; wait, then 1 to
+   * confirm. Nothing after that: the caller types the card. */
+  solaPhonePayDigits: "wwwwwwwwww{pin}#wwwwwwwwwwwwwwwwwwwwwwww{amount}#wwwwwwwwww1",
   /** Owner custom charge (owner voicemail menu, key 7): its own digits (leave {amount} out if PhonePay should let the
    * Owner type the amount) and the highest amount allowed, in cents ($5,000.00). */
   solaPhonePayCustomDigits: "wwwwwwwwww{pin}#",
   solaPhonePayCustomCapCents: "500000",
+  /** Payment test list (Abraham, Nov 15, 2026): while PhonePay is "test numbers only", only these callers are offered
+   * pay by card. One phone number per line. */
+  paymentTestNumbers: "+18457777585\n+18457990925",
   calendarEnabled: "yes",
   calendarLatitude: "41.3407",
   calendarLongitude: "-74.1679",
