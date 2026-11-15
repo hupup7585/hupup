@@ -40,7 +40,10 @@ export async function startRecordingUpload(key: string, fileName: string, sizeBy
   return r;
 }
 
-/** One piece; the last piece checks the file and makes it the recording that plays on that line right away. */
+/**
+ * One piece; the last piece checks the file. An upload waits on its line until the Owner listens and presses "Use this
+ * one" (Abraham, Nov 15, 2026: he hears and approves each of Hark's recordings before it goes on the line).
+ */
 export async function saveRecordingChunk(id: number, idx: number, data: Buffer, last: boolean, userId: number | null) {
   if (data.length === 0 || data.length > RECORDING_CHUNK_BYTES) throw new Error("That piece of the file didn't arrive.");
   const [r] = await db.select().from(schema.promptRecordings).where(eq(schema.promptRecordings.id, id)).limit(1);
@@ -52,7 +55,6 @@ export async function saveRecordingChunk(id: number, idx: number, data: Buffer, 
   const kind = audioKind(bytes.subarray(0, 16));
   if (!kind) throw new Error("That file isn't an MP3 or WAV recording.");
   await db.update(schema.promptRecordings).set({ complete: true, contentType: kind }).where(eq(schema.promptRecordings.id, id));
-  await chooseRecording(r.promptKey, id, userId);
   return { complete: true };
 }
 

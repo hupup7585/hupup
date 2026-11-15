@@ -83,7 +83,7 @@ export async function recordingChunkAction(form: FormData): Promise<R> {
       const rec = await getRecording(id);
       await log(s.userId, "voice_prompt.recording_uploaded", rec?.promptKey ?? "", { recordingId: id, fileName: rec?.fileName, sizeBytes: rec?.sizeBytes });
       revalidatePath("/admin/phone/prompts");
-      return { ok: true, message: "Uploaded. Callers hear your recording on this line right away." };
+      return { ok: true, message: "Uploaded. It is waiting for you: listen to it below, then press Use this one to put it on the line." };
     }
     return { ok: true, message: "" };
   } catch (e) {

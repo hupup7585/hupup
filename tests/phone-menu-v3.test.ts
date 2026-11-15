@@ -156,10 +156,13 @@ describe("Phone Recordings (Abraham)", () => {
     expect(audioKind(Buffer.from("RIFF\0\0\0\0WAVEfmt "))).toBe("audio/wav");
     expect(audioKind(Buffer.from("%PDF-1.7 ......"))).toBeNull();
   });
-  it("upload replaces the Google voice on that line right away; Use Google voice switches back; old recordings are kept", async () => {
+  it("an upload waits until the Owner presses Use this one (Abraham, Nov 15, 2026); Use Google voice switches back; old recordings are kept", async () => {
     const r = await startRecordingUpload("main_thanks", "thanks.mp3", mp3.length, null);
     await saveRecordingChunk(r.id, 0, mp3, true, null);
-    const [row] = await db.select().from(schema.voicePrompts).where((await import("drizzle-orm")).eq(schema.voicePrompts.key, "main_thanks"));
+    const eqKey = (await import("drizzle-orm")).eq(schema.voicePrompts.key, "main_thanks");
+    expect((await db.select().from(schema.voicePrompts).where(eqKey))[0]?.recordingId ?? null).toBeNull(); // not on the line yet
+    await chooseRecording("main_thanks", r.id, null); // the Owner listened and approved it
+    const [row] = await db.select().from(schema.voicePrompts).where(eqKey);
     expect(row.recordingId).toBe(r.id);
     expect((await recordingBytes(r.id))!.equals(mp3)).toBe(true);
     // the phone plays it
