@@ -1,5 +1,6 @@
 import {
   pgTable,
+  doublePrecision,
   serial,
   text,
   integer,
@@ -1417,3 +1418,12 @@ export const deliveryPhotos = pgTable(
   },
   (t) => [index("delivery_photos_order_idx").on(t.orderId)],
 );
+
+/** Addresses already placed on the map (delivery fees by area), so each address is looked up once. */
+export const geocodeCache = pgTable("geocode_cache", {
+  address: text("address").primaryKey(),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
+  source: text("source").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

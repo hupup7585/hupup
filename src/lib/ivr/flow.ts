@@ -5,7 +5,7 @@ import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { addDays, longDate, todayISO } from "@/lib/dates";
 import { spokenMoney } from "@/lib/money";
-import { last4, spokenDigits, toE164 } from "@/lib/phone";
+import { formatPhone, last4, spokenDigits, toE164 } from "@/lib/phone";
 import { logStamp, phonePromoMode, phonePromoOn, readBack, tenDigitNumber } from "@/lib/phone-promo";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
 import { checkEventDate } from "@/lib/jewish-calendar";
@@ -25,7 +25,8 @@ import { payPageLink } from "@/lib/rental-terms";
 import { TERMS_TEXT } from "@/lib/terms-content";
 import { sendEmail, sendSms } from "@/lib/notify";
 import { getSettings } from "@/lib/settings";
-import { computeTotals, deliveryZone } from "@/lib/pricing";
+import { totalsWithFee } from "@/lib/pricing";
+import { QUOTE_WHY, deliveryQuote } from "@/lib/delivery-areas";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
 import { STEP_LABELS, track, trackStep } from "@/lib/call-journey";
@@ -1767,8 +1768,17 @@ const handlers: Record<string, Handler> = {
     if (!yes) return back(vr, "ask", { f });
     const heard = ctx.session?.data.heard;
     if (!heard) return back(vr, "ask", { f });
-    if (f === "address" && deliveryZone(heard, await getSettings()) === "outside") {
-      // Outside the delivery area: checkout stops here and asks for an in-area address.
+    const quote = f === "address" ? await deliveryQuote(heard, await getSettings()) : null;
+    if (quote && !quote.ok) {
+      // No delivery price for this address on the price map (Abraham, Nov 15, 2026): never guessed. The caller is asked
+      // for another address, and staff get a task to quote this one and call back.
+      const caller = toE164(ctx.session?.fromNumber ?? ctx.from);
+      await db.insert(schema.tasks).values({
+        title: `Quote delivery for a caller: ${heard}`.slice(0, 200),
+        notes: `A caller${caller ? ` from ${formatPhone(caller)}` : ""} gave the delivery address "${heard}", but ${QUOTE_WHY[quote.reason]}. Call them with a delivery fee if you can deliver there.`,
+        priority: "high",
+        dueDate: new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" }),
+      });
       await updateSession(ctx.callSid, { data: { heard: undefined } }, ctx.session);
       sp(vr, ctx, "address_outside_area");
       return back(vr, "ask", { f: "address" });
@@ -1927,9 +1937,10 @@ const handlers: Record<string, Handler> = {
       return back(vr, "ask", { f: "email" });
     }
     const settings = await getSettings();
-    const zone = deliveryZone(data.address, settings);
+    // Delivery fee by the price map (Abraham, Nov 15, 2026); no price = never guessed
+    const quote = await deliveryQuote(data.address, settings);
     // Each rental day is its own delivery: its own delivery fee and tax. One charge pays for all of them.
-    const perDay = days.map((o) => ({ o, t: computeTotals(o.order.subtotalCents, zone, settings) }));
+    const perDay = days.map((o) => ({ o, t: quote.ok ? totalsWithFee(o.order.subtotalCents, quote.zone, quote.feeCents, settings) : null }));
     if (perDay.some((x) => !x.t)) {
       sp(vr, ctx, "address_outside_area");
       return back(vr, "ask", { f: "address" });

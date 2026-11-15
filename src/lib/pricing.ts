@@ -11,7 +11,7 @@ import type { Settings } from "@/lib/settings";
 
 export type Zone = "kj" | "area" | "outside";
 
-export type Totals = { subtotalCents: number; deliveryFeeCents: number; taxCents: number; totalCents: number; taxPercent: string; zone: Zone };
+export type Totals = { subtotalCents: number; deliveryFeeCents: number; taxCents: number; totalCents: number; taxPercent: string; zone: string };
 
 function places(list: string): string[] {
   return list
@@ -47,4 +47,17 @@ export function computeTotals(subtotalCents: number, zone: Zone, s: Pick<Setting
   const deliveryFeeCents = Number(zone === "kj" ? s.deliveryFeeKjCents : s.deliveryFeeAreaCents) || 0;
   const taxCents = taxOn(subtotalCents + deliveryFeeCents, s.salesTaxPercent);
   return { subtotalCents, deliveryFeeCents, taxCents, totalCents: subtotalCents + deliveryFeeCents + taxCents, taxPercent: s.salesTaxPercent, zone };
+}
+
+/** Totals with a known delivery fee (from the price map, or quoted by staff). */
+export function totalsWithFee(subtotalCents: number, zone: string, deliveryFeeCents: number, s: Pick<Settings, "salesTaxPercent">): Totals {
+  const taxCents = taxOn(subtotalCents + deliveryFeeCents, s.salesTaxPercent);
+  return { subtotalCents, deliveryFeeCents, taxCents, totalCents: subtotalCents + deliveryFeeCents + taxCents, taxPercent: s.salesTaxPercent, zone };
+}
+
+/** Items + delivery (by the price map) + tax. Null = no price for this address: staff quote the delivery fee. */
+export async function priceOrder(subtotalCents: number, address: string | null | undefined, s: Settings, fetcher?: typeof fetch): Promise<Totals | null> {
+  const { deliveryQuote } = await import("@/lib/delivery-areas");
+  const q = await deliveryQuote(address, s, fetcher);
+  return q.ok ? totalsWithFee(subtotalCents, q.zone, q.feeCents, s) : null;
 }

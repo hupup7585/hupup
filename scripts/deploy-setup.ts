@@ -120,11 +120,52 @@ async function liveSettingsReport() {
   log(`Live line: card payments ${v("solaPhonePayOn") === true ? "on" : "off"} through ${v("phoneCardProvider") ?? "sola"}, ${v("solaPhonePayOwnerOnly") === false ? "for every caller" : `test numbers only (${nums(v("paymentTestNumbers")).replace(/\(\d{3}\) \d{3}-/g, "ending ")})`}.`);
 }
 
+/**
+ * Delivery price map (Abraham, Nov 15, 2026): load the shapes from his Google map, then test one real address inside
+ * each area: a point inside the shape is turned into a street address (OpenStreetMap), and that address is priced the
+ * way a booking is. The results go in the build log.
+ */
+async function deliveryMapCheck() {
+  const { reloadDeliveryMap, pointInside, deliveryQuote } = await import("../src/lib/delivery-areas");
+  const { getSettings } = await import("../src/lib/settings");
+  const r = await reloadDeliveryMap();
+  log(`Delivery map: ${r.message}`);
+  if (!r.ok || !r.areas) return;
+  const s = await getSettings();
+  for (const a of r.areas) {
+    const p = pointInside(a);
+    if (!p) {
+      log(`Delivery map test: ${a.name}: no point inside the shape.`);
+      continue;
+    }
+    const rev = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${p[1]}&lon=${p[0]}`, { headers: { "user-agent": "HupUpAttractionsBookings/1.0" }, signal: AbortSignal.timeout(10000) })
+      .then((x) => x.json() as Promise<{ address?: Record<string, string> }>)
+      .catch(() => ({ address: undefined }));
+    const ad = rev.address ?? {};
+    const street = [ad.house_number, ad.road].filter(Boolean).join(" ");
+    const town = ad.village || ad.town || ad.city || ad.hamlet || "";
+    const address = street && town ? `${street}, ${town}, NY ${ad.postcode ?? ""}`.trim() : null;
+    if (!address) {
+      log(`Delivery map test: ${a.name} ($${((a.priceCents ?? 0) / 100).toFixed(2)}): no street address found inside it.`);
+      continue;
+    }
+    const q = await deliveryQuote(address, s);
+    const pass = q.ok && q.zone === a.name && q.feeCents === a.priceCents;
+    log(`Delivery map test: ${a.name} (map price $${a.priceCents === null ? "none" : (a.priceCents / 100).toFixed(2)}): "${address}" -> ${q.ok ? `${q.zone}, $${(q.feeCents / 100).toFixed(2)}` : `no price (${q.reason})`} ${pass ? "PASS" : "CHECK"}`);
+    await new Promise((x) => setTimeout(x, 1100)); // OpenStreetMap asks for at most 1 lookup a second
+  }
+  for (const out of ["1 Main Street, Albany, NY 12207"]) {
+    const q = await deliveryQuote(out, s);
+    log(`Delivery map test: outside every area "${out}" -> ${q.ok ? `$${(q.feeCents / 100).toFixed(2)} (WRONG)` : `no price, staff quote (${q.reason}) PASS`}`);
+  }
+}
+
 async function main() {
   if (process.env.VERCEL_ENV !== "production") return log("Not a live build: payment line check and Cloudflare setup skipped.");
   for (const [name, step] of [
     ["Payment line check", twilioPayCheck],
     ["Cloudflare setup", cloudflareSetup],
+    ["Delivery map", deliveryMapCheck],
     ["Live line report", liveSettingsReport],
   ] as const) {
     try {

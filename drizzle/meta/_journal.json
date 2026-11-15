@@ -442,6 +442,13 @@
       "when": 1794772923943,
       "tag": "0062_phonepay_tries",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1794773989405,
+      "tag": "0063_delivery_map",
+      "breakpoints": true
     }
   ]
 }

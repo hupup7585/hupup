@@ -46,6 +46,10 @@ export const SETTING_DEFAULTS = {
    * PhonePay, the live default) or "stripe" (Twilio Pay with the Stripe connector, test numbers only until Abraham
    * approves Stripe live mode). Sola stays for the staff POS and the website either way. */
   phoneCardProvider: "sola",
+  /** Delivery fees by map area (Abraham, Nov 15, 2026): the shapes from his Google map, with his names and prices
+   * (JSON, filled by the live build and Admin > Delivery settings > Reload the map). Empty = the town-name rule. */
+  deliveryAreas: "",
+  deliveryAreasLoadedAt: "",
   calendarEnabled: "yes",
   calendarLatitude: "41.3407",
   calendarLongitude: "-74.1679",

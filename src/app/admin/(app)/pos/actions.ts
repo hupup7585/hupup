@@ -145,7 +145,7 @@ export async function createBookingAction(input: {
   // Price the booking (items + delivery + tax) so the link and every total include delivery and tax
   const priced = await ensurePriced(r.orderId);
   if (input.payment === "link" && phone && !priced) {
-    message += " Payment link not sent: the delivery address isn't inside the delivery area, so delivery and tax can't be added. Fix the address on the order, then send the link from the order page.";
+    message += " Payment link not sent: this address has no delivery price on the price map. A task to quote it was made: enter the quoted delivery fee on the order page, then send the link from there.";
   } else if (input.payment === "link" && phone) {
     const full = await getOrderWithItems(r.orderId);
     const link = payPageLink(r.orderId); // review-and-pay page: Terms box, then Sola
