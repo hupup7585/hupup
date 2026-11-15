@@ -30,3 +30,17 @@ export function verifyPromptRecordingLink(id: number, sig: string | null): boole
   const got = Buffer.from(sig);
   return want.length === got.length && timingSafeEqual(want, got);
 }
+
+/** The customer's own invoice page (Abraham, Nov 15, 2026): a fixed signed link, no sign-in, not guessable. */
+const signInvoice = (id: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`invoice:${id}`).digest("hex").slice(0, 32);
+
+export function invoiceCustomerLink(id: number): string {
+  return `${config.baseUrl()}/invoice/${id}?t=${signInvoice(id)}`;
+}
+
+export function verifyInvoiceLink(id: number, t: string | null | undefined): boolean {
+  if (!Number.isInteger(id) || id <= 0 || !t) return false;
+  const want = Buffer.from(signInvoice(id));
+  const got = Buffer.from(t);
+  return want.length === got.length && timingSafeEqual(want, got);
+}

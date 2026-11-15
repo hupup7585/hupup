@@ -100,3 +100,23 @@ export async function quoteToInvoiceAction(f: FormData) {
     return { msg: `${inv.number} drafted from the quote.`, to: `/admin/bookkeeping/invoice/${inv.id}` };
   });
 }
+
+/** Email the customer a link to their own printable invoice page (off until Abraham approves the wording). */
+export async function emailDocAction(f: FormData) {
+  const id = Number(s(f, "id"));
+  return run(async (userId) => {
+    const { INVOICE_EMAIL_APPROVED, INVOICE_EMAIL_DRAFT } = await import("@/lib/invoice-share");
+    if (!INVOICE_EMAIL_APPROVED) throw new BooksError("Emailing invoices waits for Abraham's OK on the wording.");
+    const { docDetail } = await import("@/lib/invoices");
+    const d = await docDetail(id);
+    if (!d?.doc.customerEmail) throw new BooksError("This invoice has no customer email.");
+    if (d.doc.status === "draft" || d.doc.status === "void") throw new BooksError("Issue the invoice first.");
+    const { invoiceCustomerLink } = await import("@/lib/signed-link");
+    const { sendEmail } = await import("@/lib/notify");
+    const num = d.doc.number ?? String(d.doc.id);
+    const r = await sendEmail(d.doc.customerEmail, INVOICE_EMAIL_DRAFT.subject(num), INVOICE_EMAIL_DRAFT.body(num, invoiceCustomerLink(d.doc.id)));
+    const { db, schema } = await import("@/lib/db");
+    await db.insert(schema.auditLog).values({ userId, action: "invoice.emailed", entityType: "book_invoice", entityId: String(id), after: { to: d.doc.customerEmail, sent: Boolean(r?.sent) } });
+    return { msg: r?.sent ? `Emailed to ${d.doc.customerEmail}.` : "The email could not be sent.", to: `/admin/bookkeeping/invoice/${id}` };
+  });
+}
