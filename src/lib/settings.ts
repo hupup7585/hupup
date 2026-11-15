@@ -49,6 +49,11 @@ export const SETTING_DEFAULTS = {
   /** Delivery fees by map area (Abraham, Nov 15, 2026): the shapes from his Google map, with his names and prices
    * (JSON, filled by the live build and Admin > Delivery settings > Reload the map). Empty = the town-name rule. */
   deliveryAreas: "",
+  /** Achird for the whole line (Abraham, Nov 15, 2026): Owner-only, off. When on, lines with changing parts are put
+   * together from Hark's recordings (pieces, numbers, letters, rental names) whenever every part is recorded. */
+  achirdWholeLine: false,
+  /** Google voice for the changing parts (option B): Owner-only, off. Needs GOOGLE_TTS_API_KEY; costs money. */
+  googleLiveVoice: false,
   deliveryAreasLoadedAt: "",
   /** The $10 streets (Hark's Kiryas Joel list, Nov 15, 2026), one per line. Every other address in the delivery areas
    * is $15 (Ruach Hchaim $20). Owner-editable in Admin > Delivery settings. */

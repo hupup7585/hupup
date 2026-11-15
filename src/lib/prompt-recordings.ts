@@ -30,7 +30,10 @@ export function audioKind(head: Buffer): "audio/mpeg" | "audio/wav" | null {
 }
 
 export async function startRecordingUpload(key: string, fileName: string, sizeBytes: number, userId: number | null) {
-  if (!knownRecordable(key)) throw new Error("This line has changing parts, so it stays live Google voice.");
+  // Every slot (whole lines, pieces, numbers, letters, rental names), and only after Abraham confirms its exact text
+  const { findSlot, isConfirmed } = await import("@/lib/slot-status");
+  if (!(await findSlot(key))) throw new Error("This line has changing parts, so it stays live Google voice.");
+  if (!(await isConfirmed(key))) throw new Error("Abraham has not confirmed this exact text yet. Record and upload it only after he confirms it.");
   if (!/\.(mp3|wav)$/i.test(fileName)) throw new Error("Upload an MP3 or WAV file.");
   if (sizeBytes <= 0 || sizeBytes > RECORDING_MAX_BYTES) throw new Error("Keep the recording under 10 MB.");
   const [r] = await db

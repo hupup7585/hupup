@@ -81,6 +81,7 @@ export default async function PromptsPage({ searchParams }: { searchParams: Prom
         Every line the phone system says, and every text and email it sends. Voice: <b className="text-navy">{config.voice().replace(/^Google\./, "")}</b>. Edit saves a
         draft waiting for your approval; the live line keeps playing until you approve it. Every version is kept.
       </p>
+      <a href="/admin/phone/prompts/slots" className="btn-dark mb-3 inline-flex" data-slots-link>Recording text list: confirm each text, then Hark records and uploads it</a>
       <form action="/admin/phone/prompts" className="card mb-3 flex flex-wrap gap-2 p-3" data-prompt-search>
         {area && <input type="hidden" name="area" value={area} />}
         <input name="q" defaultValue={q ?? ""} className="input min-w-0 flex-1" placeholder="Search the wording" aria-label="Search the wording" />

@@ -1427,3 +1427,14 @@ export const geocodeCache = pgTable("geocode_cache", {
   source: text("source").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Recording slots (Abraham, Nov 15, 2026): the exact text he confirmed and Hark's progress. Status is worked out:
+ * Waiting for Abraham, Confirmed, Recorded, Uploaded. A text that changes after confirming goes back to waiting. */
+export const recordingSlots = pgTable("recording_slots", {
+  key: text("key").primaryKey(),
+  confirmedText: text("confirmed_text"),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  confirmedBy: integer("confirmed_by"),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }),
+  recordedBy: integer("recorded_by"),
+});

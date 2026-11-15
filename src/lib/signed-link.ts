@@ -44,3 +44,19 @@ export function verifyInvoiceLink(id: number, t: string | null | undefined): boo
   const got = Buffer.from(t);
   return want.length === got.length && timingSafeEqual(want, got);
 }
+
+/**
+ * Option B (Abraham, Nov 15, 2026; off until the Owner turns it on): a changing line spoken in Achird by Google, made
+ * when Twilio fetches it. Signed so only our own words can be turned into audio.
+ */
+const signLive = (text: string) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`live-voice:${text}`).digest("hex").slice(0, 32);
+export function liveVoiceLink(text: string): string {
+  return `${config.baseUrl()}/api/voice-audio/live?t=${Buffer.from(text).toString("base64url")}&sig=${signLive(text)}`;
+}
+export function verifyLiveVoiceLink(t: string | null, sig: string | null): string | null {
+  if (!t || !sig) return null;
+  const text = Buffer.from(t, "base64url").toString("utf8");
+  const want = Buffer.from(signLive(text));
+  const got = Buffer.from(sig);
+  return want.length === got.length && timingSafeEqual(want, got) ? text : null;
+}

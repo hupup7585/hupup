@@ -1,6 +1,7 @@
 import { promptRecordingLink } from "@/lib/signed-link";
 import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
+import { wordSlotsFor } from "@/lib/spoken-words";
 
 /**
  * Every sentence the hotline speaks. Defaults are warm, upbeat and short.
@@ -451,11 +452,56 @@ export async function loadPromptOverrides(): Promise<PromptOverrides> {
       if (o.googleRecordingId) continue;
       if (g.wording === (o.text?.trim() || PROMPTS[k].text)) o.googleRecordingId = g.id;
     }
+    // Hark's recordings for pieces, numbers, letters and rental names (Abraham, Nov 15, 2026), and the Owner's
+    // "Achird for the whole line" switch: used to put lines with changing parts together (see composeClips)
+    const clips: Record<string, number> = {};
+    for (const r of rows) if (r.recordingId && !(r.key in PROMPTS)) clips[r.key] = r.recordingId;
+    const [sw] = await db.select().from(schema.appSettings).where(eq(schema.appSettings.key, "achirdWholeLine")).limit(1);
+    const [gl] = await db.select().from(schema.appSettings).where(eq(schema.appSettings.key, "googleLiveVoice")).limit(1);
+    const items = (await db.select({ id: schema.products.id, name: schema.products.name }).from(schema.products)).map((p) => ({ id: p.id, name: p.name }));
+    EXTRAS.set(out, { clips, achird: sw?.value === true, googleLive: gl?.value === true && Boolean(process.env.GOOGLE_TTS_API_KEY), items });
     return out;
   } catch (e) {
     console.error("Could not load prompt overrides, using defaults", e);
     return {};
   }
+}
+
+type Extras = { clips: Record<string, number>; achird: boolean; googleLive: boolean; items: { id: number; name: string }[] };
+const EXTRAS = new WeakMap<PromptOverrides, Extras>();
+/** Option B is on (Owner switch on, and GOOGLE_TTS_API_KEY in Vercel). */
+export const googleLiveOn = (overrides: PromptOverrides) => Boolean(EXTRAS.get(overrides)?.googleLive);
+
+/**
+ * A line with changing parts, put together from Hark's recordings: each fixed piece, then each changing part as
+ * numbers, letters, words or a rental name. Only when the Owner has turned on "Achird for the whole line" and every
+ * part has a recording; otherwise null, and the line is spoken in the live voice as before.
+ */
+export function composeClips(overrides: PromptOverrides, key: PromptKey, vars: Record<string, string | number> = {}): string[] | null {
+  const x = EXTRAS.get(overrides);
+  if (!x?.achird) return null;
+  const template = overrides[key]?.text?.trim() || PROMPTS[key].text;
+  const parts = template.split(/(\{[a-z0-9_]+\})/i).map((p) => p.trim()).filter((p) => p && (/^\{/.test(p) || /[a-z]/i.test(p)));
+  const urls: string[] = [];
+  let piece = 0;
+  for (const p of parts) {
+    const v = /^\{([a-z0-9_]+)\}$/i.exec(p);
+    if (!v) {
+      piece++;
+      const id = x.clips[`${key}#${piece}`];
+      if (!id) return null;
+      urls.push(promptRecordingLink(id));
+      continue;
+    }
+    const words = wordSlotsFor(String(vars[v[1]] ?? ""), x.items);
+    if (!words) return null;
+    for (const w of words) {
+      const id = x.clips[w];
+      if (!id) return null;
+      urls.push(promptRecordingLink(id));
+    }
+  }
+  return urls;
 }
 
 export function fill(template: string, vars: Record<string, string | number> = {}): string {

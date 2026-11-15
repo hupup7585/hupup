@@ -157,6 +157,9 @@ describe("Phone Recordings (Abraham)", () => {
     expect(audioKind(Buffer.from("%PDF-1.7 ......"))).toBeNull();
   });
   it("an upload waits until the Owner presses Use this one (Abraham, Nov 15, 2026); Use Google voice switches back; old recordings are kept", async () => {
+    const { confirmSlot } = await import("@/lib/slot-status");
+    await expect(startRecordingUpload("main_thanks", "thanks.mp3", mp3.length, null)).rejects.toThrow("not confirmed this exact text");
+    await confirmSlot("main_thanks", null); // Abraham confirmed the exact text first
     const r = await startRecordingUpload("main_thanks", "thanks.mp3", mp3.length, null);
     await saveRecordingChunk(r.id, 0, mp3, true, null);
     const eqKey = (await import("drizzle-orm")).eq(schema.voicePrompts.key, "main_thanks");

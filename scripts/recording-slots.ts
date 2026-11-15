@@ -1,15 +1,18 @@
 import { writeFileSync } from "node:fs";
-import { PROMPTS, promptRecordable, type PromptKey } from "../src/lib/ivr/prompts";
+import { allSlots } from "../src/lib/recording-slots";
 
-/** Writes docs/recording-slots.md: every hotline line that takes a recording (no changing parts), by group. */
-const all = Object.entries(PROMPTS) as [PromptKey, { group: string; label: string; text: string; pending?: boolean }][];
-const rec = all.filter(([k]) => promptRecordable(k));
-const groups = new Map<string, typeof rec>();
-for (const r of rec) groups.set(r[1].group, [...(groups.get(r[1].group) ?? []), r]);
-let out = `# Hotline recording slots\n\n${rec.length} lines take a recording. The other ${all.length - rec.length} lines have changing parts (names, dates, amounts) and are spoken by the system in the Achird voice.\n`;
+/**
+ * Writes docs/recording-slots.md: every recording slot's exact text (whole lines, pieces of lines with changing
+ * parts, numbers, dates, times, letters A to Z). Rental names come from the live catalog and are on the Admin page.
+ * The live status (Waiting for Abraham, Confirmed, Recorded, Uploaded) is on Admin > Hotline prompts > Recording text list.
+ */
+const slots = allSlots();
+const groups = new Map<string, typeof slots>();
+for (const s of slots) groups.set(s.group, [...(groups.get(s.group) ?? []), s]);
+let out = `# Hotline recording text list\n\n${slots.length} slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.\n`;
 for (const [g, list] of groups) {
-  out += `\n## ${g}\n\n| Slot | Line in Admin | Status | Wording |\n|---|---|---|---|\n`;
-  for (const [k, p] of list) out += `| ${k} | ${p.label} | ${p.pending ? "Draft, wait for Abraham" : "Approved"} | ${p.text.replace(/\|/g, "/")} |\n`;
+  out += `\n## ${g}\n\n| Slot | Line | Exact text |\n|---|---|---|\n`;
+  for (const s of list) out += `| ${s.key} | ${s.label.replace(/\|/g, "/")} | ${s.text.replace(/\|/g, "/")} |\n`;
 }
 writeFileSync("docs/recording-slots.md", out);
-console.log(`${rec.length} recordable of ${all.length}`);
+console.log(`${slots.length} slots`);

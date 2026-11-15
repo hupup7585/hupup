@@ -52,7 +52,7 @@ import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 const PHONEPAY_PROMPTS = ["phonepay_intro", "phonepay_back", "phonepay_paid", "phonepay_retry", "phonepay_retry_last", "phonepay_failed"] as const;
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
-import { voicemailPlayLink } from "@/lib/signed-link";
+import { liveVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
 import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
 import { CATALOG_ENDINGS, decodeCatalogKeys, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
 import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState, textingActive } from "@/lib/voicemail";
@@ -60,7 +60,7 @@ import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staf
 import { calendarNow } from "@/lib/clock";
 import { bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
 import { matchBlock, parseBlockList } from "./caller-filter";
-import { PROMPTS, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
+import { PROMPTS, composeClips, googleLiveOn, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
@@ -107,8 +107,13 @@ function sp(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptK
   // reach (keypad payment in owner_test mode), so he hears the drafts he is reviewing.
   if (promptWaiting(ctx.prompts, key) && !(opts.draftOk && !keypadPayOn())) return;
   const audio = promptAudio(ctx.prompts, key);
-  if (audio) target.play(audio);
-  else say(target, promptText(ctx.prompts, key, vars));
+  if (audio) return void target.play(audio);
+  // Achird for the whole line (Owner switch): put together from Hark's recordings when every part is recorded
+  const clips = vars ? composeClips(ctx.prompts, key, vars) : null;
+  if (clips) return void clips.forEach((u) => target.play(u));
+  // Option B (Owner switch, off): Google speaks the line in Achird; otherwise the live voice (Puck)
+  if (vars && googleLiveOn(ctx.prompts)) return void target.play(liveVoiceLink(promptText(ctx.prompts, key, vars)));
+  say(target, promptText(ctx.prompts, key, vars));
 }
 
 function pause(target: VR | Gather, seconds = 1) {
