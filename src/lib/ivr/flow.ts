@@ -284,7 +284,6 @@ function itemPhrase(qty: number, name: string) {
   return qty === 1 ? `one ${name}` : `${qty} ${name}`;
 }
 
-const CONSENT_HINTS = "yes, no, I agree, yes I agree, yes please, no thanks, skip";
 
 /** Keys on the "different time zone" menu. */
 const PHONE_TZ_KEYS: Record<string, string> = {
@@ -1730,7 +1729,8 @@ const handlers: Record<string, Handler> = {
         return back(vr, "finalize");
       }
     }
-    const g = speech(vr, url("sms-consent-answer", { n: ctx.query.get("n") ?? undefined }), CONSENT_HINTS, { dtmf: true, numDigits: 1 });
+    // Abraham, Nov 15, 2026: yes or no questions are answered by key only (1 yes, 2 no), never by speech
+    const g = keypad(vr, url("sms-consent-answer", { n: ctx.query.get("n") ?? undefined }), { timeout: 8 });
     sp(g, ctx, retry ? "consent_unclear" : "consent_transactional");
     return vr;
   },

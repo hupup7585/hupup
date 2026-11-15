@@ -264,7 +264,7 @@ describe("menus are keys only (Abraham): no speech in any menu", () => {
     const { readFileSync } = await import("node:fs");
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(flow).not.toContain("category-speech");
-    expect((flow.match(/= speech\(vr, url\("(\w|-)+"/g) || []).map((m) => m.match(/url\("([\w-]+)"/)![1]).sort()).toEqual(["heard", "sms-consent-answer"]); // the booking date is keys only (Abraham, Nov 9); key 8 has its own say-or-type steps
+    expect((flow.match(/= speech\(vr, url\("(\w|-)+"/g) || []).map((m) => m.match(/url\("([\w-]+)"/)![1]).sort()).toEqual(["heard"]); // only information is said (name, address, email); yes or no is keys only (Abraham, Nov 15); key 8 and directions have their own say-or-type steps
   });
 });
 

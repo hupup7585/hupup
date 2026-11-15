@@ -128,9 +128,10 @@ describe("transactional consent step (before the payment link)", () => {
     const xml = await call("phone-choice", { Digits: "1" });
     expect(xml).toContain("/api/voice/sms-consent");
   });
-  it("asks with the exact disclosure, accepting keypad or speech", async () => {
+  it("asks with the exact disclosure, keys only (Abraham, Nov 15: yes or no is never said)", async () => {
     const xml = await call("sms-consent");
-    expect(xml).toContain('input="speech dtmf"');
+    expect(xml).toContain('input="dtmf"');
+    expect(xml).not.toContain("speech");
     expect(xml).toContain("Message frequency varies. Message and data rates may apply.");
     expect(xml).toContain("/api/voice/sms-consent-answer");
   });

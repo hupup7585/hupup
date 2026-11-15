@@ -6,14 +6,14 @@ import { detectKeyword, detectKeywordDetail } from "@/lib/sms-inbound";
 import { inMarketingHours, marketingBody } from "@/lib/sms";
 
 describe("phone consent language (A2P 10DLC)", () => {
-  it("transactional disclosure: brand, program, frequency, rates, STOP, HELP, terms, keypad and voice options", () => {
+  it("transactional disclosure: brand, program, frequency, rates, STOP, HELP, terms, keypad options (no saying yes or no, Abraham Nov 15)", () => {
     const t = PROMPTS.consent_transactional.text;
-    for (const part of ["Hup Up Attractions", "reservation, order, payment, delivery, pickup, and customer service", "authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages", "Message frequency varies.", "Message and data rates may apply.", "reply STOP to opt out", "HELP for help", "text message terms and privacy policy", "press 1 or say yes", "press 2 or say no"])
+    for (const part of ["Hup Up Attractions", "reservation, order, payment, delivery, pickup, and customer service", "authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages", "Message frequency varies.", "Message and data rates may apply.", "reply STOP to opt out", "HELP for help", "text message terms and privacy policy", "To agree, press 1.", "press 2."])
       expect(t).toContain(part);
   });
   it("promotional disclosure is separate, says it is not a condition of purchase, and covers provider sharing", () => {
     const t = PROMPTS.consent_marketing.text;
-    for (const part of ["promotional text messages from Hup Up Attractions", "authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages", "Consent is not a condition of purchase.", "Message frequency varies.", "Message and data rates may apply.", "reply STOP to opt out", "HELP for help", "press 1 or say yes", "press 2 or say no"])
+    for (const part of ["promotional text messages from Hup Up Attractions", "authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages", "Consent is not a condition of purchase.", "Message frequency varies.", "Message and data rates may apply.", "reply STOP to opt out", "HELP for help", "To agree, press 1.", "press 2."])
       expect(t).toContain(part);
     expect(t).not.toBe(PROMPTS.consent_transactional.text);
   });
