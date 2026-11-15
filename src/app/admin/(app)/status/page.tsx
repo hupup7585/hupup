@@ -2,6 +2,8 @@ import Link from "next/link";
 import { CircleAlert, CircleCheck } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
 import { blockers, scanForTestData } from "@/lib/system-status";
+import { recentJobRuns } from "@/lib/jobs";
+import { dualDateTime } from "@/lib/dual-date";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "System status | Hup Up Attractions" };
@@ -9,11 +11,39 @@ export const metadata = { title: "System status | Hup Up Attractions" };
 /** Owner only (Abraham EE): what runs for real, what's waiting on an outside step, and any test data in this database. */
 export default async function StatusPage() {
   await requireOwner();
-  const [list, found] = await Promise.all([blockers(), scanForTestData()]);
+  const [list, found, jobs] = await Promise.all([blockers(), scanForTestData(), recentJobRuns(30).catch(() => [])]);
   return (
     <div className="mx-auto max-w-5xl" data-status>
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">System status</h1>
       <p className="mb-5 text-muted">Everything that runs for real, and what&rsquo;s still waiting on an outside step. Nothing on this page changes any data.</p>
+      <section className="card mb-5 p-5" data-backup>
+        <h2 className="mb-1 text-lg font-bold">Backups</h2>
+        <p className="mb-3 text-sm text-muted">
+          A full copy of the business data: orders, customers, payments, the books, calls, voicemail records, emails and settings. Keys, passwords and sign-in codes are never in it. Every Sunday a copy is emailed to you; you can also download one now.
+        </p>
+        <a href="/api/admin/backup" className="btn-dark">Download a backup now</a>
+      </section>
+      <section className="card mb-5 p-5" data-job-runs>
+        <h2 className="mb-1 text-lg font-bold">Daily jobs</h2>
+        <p className="mb-3 text-sm text-muted">Each job runs once a day. If one fails, it tries again up to 3 times, and you are emailed if it still fails.</p>
+        {jobs.length === 0 ? (
+          <p className="text-sm text-muted">No runs yet. The first run is tonight.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead><tr><th className="th">Job</th><th className="th">When</th><th className="th">Result</th><th className="th">Tries</th></tr></thead>
+            <tbody>
+              {jobs.map((j) => (
+                <tr key={j.id}>
+                  <td className="td">{j.name}</td>
+                  <td className="td">{dualDateTime(j.startedAt)}</td>
+                  <td className={`td font-semibold ${j.ok ? "text-[#13895C]" : j.ok === false ? "text-[#C83A2F]" : "text-muted"}`}>{j.ok ? "Done" : j.ok === false ? `Failed: ${j.error ?? ""}` : "Running"}</td>
+                  <td className="td">{j.attempts}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
       <section className="card mb-5 p-5">
         <h2 className="mb-3 text-lg font-bold">Features</h2>
         <ul className="divide-y divide-line">

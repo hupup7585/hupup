@@ -1354,3 +1354,19 @@ export const orderStatusHistory = pgTable(
   },
   (t) => [index("order_status_history_order_idx").on(t.orderId, t.at)],
 );
+
+/** Every run of a scheduled job (plan step 3, Abraham, Nov 15, 2026): retried up to 3 times; the Owner is emailed if it still fails. */
+export const jobRuns = pgTable(
+  "job_runs",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    ok: boolean("ok"),
+    attempts: integer("attempts").notNull().default(1),
+    result: jsonb("result"),
+    error: text("error"),
+  },
+  (t) => [index("job_runs_name_idx").on(t.name, t.startedAt)],
+);

@@ -1,6 +1,24 @@
 import { releaseExpired } from "@/lib/orders";
 import { notifyStragglers } from "@/lib/voicemail";
 import { sendJoinInvites } from "@/lib/join-invite";
+import { runJob } from "@/lib/jobs";
+import { backupFileName, buildBackup } from "@/lib/backup";
+import { config } from "@/lib/config";
+import { sendEmail } from "@/lib/notify";
+
+/** Sundays (New York time): a full backup to the Owner by email; too big to attach means a download link instead. */
+async function weeklyBackupEmail(now = new Date()) {
+  const day = now.toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long" });
+  if (day !== "Sunday") return { skipped: "not Sunday" };
+  const to = config.adminEmail();
+  if (!to) return { skipped: "no Owner email" };
+  const b = await buildBackup(now);
+  const fits = b.gz.length <= 8 * 1024 * 1024;
+  const text = `Your weekly backup of Hup Up Attractions: ${b.tables} tables, ${b.rows} rows.\n\n${fits ? "It is attached. Keep it somewhere safe." : "It is too big to attach this week. Download it here:"}\n${config.baseUrl()}/api/admin/backup\n\nKeys, passwords and sign-in codes are never in the backup.`;
+  const r = await sendEmail(to, "Hup Up Attractions: weekly backup", text, fits ? [{ filename: backupFileName(now), content: b.gz.toString("base64") }] : []);
+  if (!r?.sent) throw new Error("The backup email could not be sent.");
+  return { sent: true, bytes: b.gz.length, tables: b.tables, rows: b.rows };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +31,11 @@ export async function GET(req: Request) {
   if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
     return new Response("Unauthorized", { status: 401 });
   }
-  const released = await releaseExpired();
-  // Voicemail tables arrive with migration 0012; until then this step is skipped, not fatal.
-  const voicemailAlerts = await notifyStragglers().catch((e) => (console.error("[cron] voicemail safety net skipped:", e), null));
+  // Plan step 3 (Abraham, Nov 15, 2026): every job is logged, retried up to 3 times, and the Owner is emailed if it still fails
+  const released = await runJob("Release ended holds", () => releaseExpired());
+  const voicemailAlerts = await runJob("Voicemail alerts safety net", () => notifyStragglers());
   // JOIN invitation: switched off until Abraham picks the wording (does nothing while off).
-  const joinInvites = await sendJoinInvites().catch((e) => (console.error("[cron] JOIN invitations skipped:", e), null));
+  const joinInvites = await runJob("JOIN invitations", () => sendJoinInvites());
+  const backup = await runJob("Weekly backup by email", () => weeklyBackupEmail());
   return Response.json({ released, voicemailAlerts, joinInvites });
 }
