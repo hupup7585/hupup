@@ -228,10 +228,10 @@ export async function chooseLinkOption(primaryId: number, index: number, product
  */
 export const LATE_EMAIL_APPROVED = true; // Abraham approved the wording, Nov 13, 2026
 export const LATE_EMAIL = {
-  subject: (num: string) => `Hup Up Attractions order #${num}: please call us`,
+  subject: (num: string) => `Hup Up Attractions Order Number #${num}: please call us`,
   // Abraham's wording, Nov 13, 2026 (approved), every word spelled out per his rule
   body: (num: string) =>
-    `Thank you, we received your payment for order #${num}. Your hold ended just before it went through, so our team needs to check your booking. Please call customer service at (845) 777-7585, extension 3, and we will take care of it. If it is not available anymore, we will give you another option to book.\n\nHup Up Attractions`,
+    `Thank you, we received your payment for Order Number #${num}. Your hold ended just before it went through, so our team needs to check your booking. Please call customer service at (845) 777-7585, extension 3, and we will take care of it. If it is not available anymore, we will give you another option to book.\n\nHup Up Attractions`,
 };
 
 /** Are this order's items free on every day it needs (an ended hold isn't counted, so its own row is left out)? */

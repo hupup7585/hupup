@@ -103,7 +103,7 @@ describe("key 1: date first, several days, one charge", () => {
     const sum = pending.reduce((n, o) => n + (o.totalCents ?? 0), 0);
     expect(group!.due).toBe(sum);
     // one text with both days and one link
-    const text = h.sms.find((m) => m.body.includes("order #"))!;
+    const text = h.sms.find((m) => m.body.includes("Order Number #"))!;
     expect(text.body).toContain("Tuesday, December 1");
     expect(text.body).toContain("Tuesday, December 8");
     expect(text.body.match(/\/pay\/\d+\?t=/g)).toHaveLength(1);

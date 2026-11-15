@@ -125,7 +125,7 @@ describe("the payment subaccount: Twilio <Pay> through Stripe", () => {
     expect(JSON.stringify(o)).not.toContain("xxxx-xxxx");
     // The approved receipt replaces the short "payment received" email (Abraham, Nov 13, 2026)
     const toCaller = h.emails.filter((e) => e.to === "caller@example.com");
-    expect(toCaller.map((e) => e.subject)).toEqual([`Hup Up Attractions receipt for order #${1000 + orderId}`]);
+    expect(toCaller.map((e) => e.subject)).toEqual([`Hup Up Attractions receipt for Order Number #${1000 + orderId}`]);
     expect(toCaller[0].text).toContain("Card: ending in 4242");
     // the hotline carries on without a payment link
     const back = await mainCall("pay-done", {}, `o=${orderId}`);

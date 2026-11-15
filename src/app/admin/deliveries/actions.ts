@@ -26,7 +26,7 @@ export async function sendTemplateAction(orderId: number, key: TemplateKey): Pro
   const r = await sendOrderText({
     phone: full.customer.phone,
     email: full.customer.email,
-    subject: `${BUSINESS_NAME} order #${orderNumber(orderId)}`,
+    subject: `${BUSINESS_NAME} Order Number #${orderNumber(orderId)}`,
     body: t.body,
     orderId,
     customerId: full.customer.id,

@@ -149,7 +149,7 @@ describe("disputes", () => {
 describe("our receipt (approved; replaces the short payment email)", () => {
   it("order number, date and time with year, amount, last 4; sent from info@", async () => {
     const r = phoneReceipt({ orderId: 5, paidAt: new Date("2026-11-12T20:05:00Z"), amountCents: 23247, last4: "4242", name: "Sara Klein" });
-    expect(r.subject).toBe("Hup Up Attractions receipt for order #1005");
+    expect(r.subject).toBe("Hup Up Attractions receipt for Order Number #1005");
     expect(r.text).toContain("Paid on: Nov 12, 2026, 3:05 PM");
     expect(r.text).toContain("Amount: $232.47");
     expect(r.text).toContain("Card: ending in 4242");
@@ -158,6 +158,6 @@ describe("our receipt (approved; replaces the short payment email)", () => {
     expect((await sendPhoneReceipt("caller@example.com", { orderId: 5, paidAt: new Date(), amountCents: 1, last4: null }, false)).sent).toBe(false); // switch off: nothing sent
     expect(h.emails).toHaveLength(0);
     expect((await sendPhoneReceipt("caller@example.com", { orderId: 5, paidAt: new Date(), amountCents: 1, last4: "4242" })).sent).toBe(true);
-    expect(h.emails[0].subject).toBe("Hup Up Attractions receipt for order #1005");
+    expect(h.emails[0].subject).toBe("Hup Up Attractions receipt for Order Number #1005");
   });
 });

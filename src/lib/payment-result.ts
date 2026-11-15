@@ -45,7 +45,7 @@ export async function paymentReceivedNotices(orderId: number, cents: number, opt
       : await messageText("msg_payment_received", { number: num, date: messageDate(before.order.eventDate), pickup: messageDate(before.order.pickupDate) });
   // Order/service text only with order-text consent (checked in sendMessage); the email copy goes out as before.
   if (before.customer?.phone) await sendSms(before.customer.phone, msg, { kind: "transactional", event: "payment_confirmation", orderId, customerId: before.customer.id });
-  if (before.customer?.email && !opts.skipCustomerEmail) await sendEmail(before.customer.email, `Order #${num} confirmed`, msg);
+  if (before.customer?.email && !opts.skipCustomerEmail) await sendEmail(before.customer.email, `Order Number #${num} confirmed`, msg);
   if (process.env.ADMIN_PHONE) {
     await sendSms(process.env.ADMIN_PHONE, `New paid order #${num}: $${(cents / 100).toFixed(2)} for ${messageDate(before.order.eventDate)}${days.length > 1 ? ` and ${days.length - 1} more day${days.length > 2 ? "s" : ""}` : ""}.`, { kind: "system", event: "owner_alert" });
   }

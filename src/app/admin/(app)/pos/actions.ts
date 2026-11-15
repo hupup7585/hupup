@@ -145,8 +145,8 @@ export async function createBookingAction(input: {
     const sent = await sendOrderText({
       phone,
       email: input.email || null,
-      subject: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} payment link`,
-      body: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} for ${messageDate(input.date)}: $${((full!.order.totalCents ?? full!.order.subtotalCents) / 100).toFixed(2)}. Pay securely within ${POS_LINK_HOLD_MINUTES} minutes to confirm: ${link}`,
+      subject: `${BUSINESS_NAME} Order Number #${orderNumber(r.orderId)} payment link`,
+      body: `${BUSINESS_NAME} Order Number #${orderNumber(r.orderId)} for ${messageDate(input.date)}: $${((full!.order.totalCents ?? full!.order.subtotalCents) / 100).toFixed(2)}. Pay securely within ${POS_LINK_HOLD_MINUTES} minutes to confirm: ${link}`,
       orderId: r.orderId,
       customerId: full?.customer?.id ?? null,
       userId: session.userId ?? null,
