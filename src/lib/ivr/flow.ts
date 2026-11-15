@@ -1560,7 +1560,8 @@ const handlers: Record<string, Handler> = {
       // Read back in the Google voice (never Twilio's Say); the draft wording plays on preview for Abraham's test
       const links = await googleReadback(lineTemplate(ctx, "spoken_readback"), { text: spec.readBack(value) });
       if (!links) return back(vr, "type", { f }); // Google voice not available: type it on the keypad instead
-      const g = keypad(vr, url("confirm", { f }));
+      // Abraham, Nov 15, 2026: pound confirms; 1 records the answer again from the start of this step
+      const g = keypad(vr, url("confirm", { f, k: "pound" }));
       for (const l of links) g.play(l);
       return noInput(vr, ctx, "ask", { f });
     }
@@ -1572,7 +1573,9 @@ const handlers: Record<string, Handler> = {
   async confirm(ctx, vr) {
     const f = ctx.query.get("f") as Field;
     const d = ctx.body.Digits;
-    if (d !== "1") return back(vr, "ask", { f });
+    // Spoken answers (speech to text) confirm with pound; typed and older spoken answers with 1
+    const yes = ctx.query.get("k") === "pound" ? d === "#" : d === "1";
+    if (!yes) return back(vr, "ask", { f });
     const heard = ctx.session?.data.heard;
     if (!heard) return back(vr, "ask", { f });
     if (f === "address" && deliveryZone(heard, await getSettings()) === "outside") {

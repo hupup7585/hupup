@@ -115,13 +115,18 @@ describe("speech to text: the call", () => {
     // Google voice audio, never Twilio's Say: "We got" + the caller's words + "If that is correct..."
     expect(said(back).join(" ")).not.toContain("We got");
     expect([...back.matchAll(/<Play>[^<]*\/api\/voice-audio\/prompt\/\d+/g)]).toHaveLength(3);
-    expect(h.tts).toEqual(["We got", "Yossi Friedman.", "If that is correct, press 1. To say it again, press 2."]);
+    expect(h.tts).toEqual(["We got", "Yossi Friedman.", "If that is correct, press pound to continue. If not, or to say it again, press 1."]);
     expect(h.session.data.heard).toBe("Yossi Friedman");
     // the fixed words are made once and reused; only the caller's words are new
     h.tts = [];
     await db.update(schema.spokenAnswers).set({ text: "sara klein" }).where(eq(schema.spokenAnswers.id, a));
-    await call("heard", {}, `f=name&a=${a}`);
+    const again = await call("heard", {}, `f=name&a=${a}`);
     expect(h.tts).toEqual(["Sara Klein."]);
+    // Abraham, Nov 15: pound confirms; 1 records it again from the start of the step
+    expect(again).toContain('action="https://hupup.example/api/voice/confirm?f=name&amp;k=pound"');
+    expect(redirect(await call("confirm", { Digits: "1" }, "f=name&k=pound"))).toBe("ask?f=name");
+    expect(redirect(await call("confirm", { Digits: "#" }, "f=name&k=pound"))).toBe("ask?f=address");
+    expect(h.session.data.name).toBe("Sara Klein");
   });
   it("another call's answer is never read back", async () => {
     const [row] = await db.insert(schema.spokenAnswers).values({ callSid: "CAother", field: "name", recordingUrl: "https://api.twilio.com/x", status: "done", text: "Someone Else" }).returning();

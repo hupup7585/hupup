@@ -335,9 +335,9 @@ export const PROMPTS = {
   spoken_readback: {
     group: "Checkout",
     label: "Read back a spoken answer (speech to text, Google voice)",
-    text: "We got {text}. If that is correct, press 1. To say it again, press 2.",
+    // Abraham's wording, Nov 15, 2026 (approved): pound confirms, 1 records it again
+    text: "We got {text}. If that is correct, press pound to continue. If not, or to say it again, press 1.",
     vars: ["text"],
-    pending: true, // Abraham, Nov 13, 2026: still a draft; plays only in the preview test of speech to text
   },
 
   // Staff announcement when a staff phone answers (Abraham). Each extension can still have its own in Phone settings.
