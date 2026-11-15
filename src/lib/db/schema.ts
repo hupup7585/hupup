@@ -1391,6 +1391,12 @@ export const phonepayAttempts = pgTable(
     last4: text("last4"),
     cardType: text("card_type"),
     note: text("note"),
+    /** The payments subaccount's call that dialed Sola, so it can be hung up for sure before the next try */
+    payLegSid: text("pay_leg_sid"),
+    /** paid | declined | wrong_amount_voided | wrong_amount_not_voided | check_failed (Abraham, Nov 15, 2026) */
+    result: text("result"),
+    /** 1 to 6: which try this was on the call */
+    tryNumber: integer("try_number").notNull().default(1),
   },
   (t) => [index("phonepay_attempts_started_idx").on(t.startedAt)],
 );

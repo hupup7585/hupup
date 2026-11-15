@@ -30,9 +30,10 @@ import { toE164 } from "@/lib/phone";
  */
 export type PhonePayMode = "off" | "owner_test" | "live";
 /** Abraham, Nov 14, 2026: Sola PhonePay is the main phone payment; Stripe stays built as a backup, off by default. */
-export function stripePhonePayMode(env: Record<string, string | undefined> = process.env): PhonePayMode {
-  // Only "owner_test" can be switched on from Vercel (STRIPE_PHONE_PAY_MODE); "live" needs Abraham's OK and a code change
-  return env.STRIPE_PHONE_PAY_MODE === "owner_test" ? "owner_test" : "off";
+export function stripePhonePayMode(env: Record<string, string | undefined> = process.env, s?: { phoneCardProvider?: string }): PhonePayMode {
+  // Test numbers only: from Vercel (STRIPE_PHONE_PAY_MODE=owner_test) or when the Owner picks Stripe in Admin
+  // (Abraham, Nov 15, 2026). "live" needs Abraham's OK on Stripe live mode and a code change.
+  return env.STRIPE_PHONE_PAY_MODE === "owner_test" || s?.phoneCardProvider === "stripe" ? "owner_test" : "off";
 }
 /** Read at call time (see stripePhonePayMode). Kept for older code paths. */
 export const STRIPE_PHONE_PAY_MODE: PhonePayMode = "off";
@@ -44,11 +45,12 @@ export function phonePayConfigured(env: Record<string, string | undefined> = pro
 }
 
 /** Does this caller get keypad payment right after the read-back? */
-export function keypadPayFor(callerFrom: string | null | undefined, mode: PhonePayMode = stripePhonePayMode(), env: Record<string, string | undefined> = process.env): boolean {
+export function keypadPayFor(callerFrom: string | null | undefined, mode: PhonePayMode = stripePhonePayMode(), env: Record<string, string | undefined> = process.env, testNumbers = ""): boolean {
   if (mode === "off" || !phonePayConfigured(env)) return false;
   if (mode === "live") return true;
   const caller = toE164(callerFrom);
-  return Boolean(caller && caller === (toE164(env.ADMIN_PHONE) ?? "+18457777585"));
+  const list = [toE164(env.ADMIN_PHONE) ?? "+18457777585", ...testNumbers.split(/[\n,;]+/).map((x) => toE164(x.trim()))];
+  return Boolean(caller && list.includes(caller));
 }
 
 /** Older name kept for the read-back step. */

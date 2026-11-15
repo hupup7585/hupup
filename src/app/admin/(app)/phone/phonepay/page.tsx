@@ -45,6 +45,14 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
       </section>
 
       <form action={savePhonePayAction} className="card mb-5 grid gap-4 p-5" data-phonepay-form>
+        <label className="block" data-phone-card-provider>
+          <span className="label">Card payments on the phone line go through</span>
+          <select name="provider" defaultValue={s.phoneCardProvider} className="input">
+            <option value="sola">Sola PhonePay (the live choice)</option>
+            <option value="stripe">Stripe through Twilio Pay (test numbers only until you approve Stripe live mode)</option>
+          </select>
+          <span className="mt-1 block text-xs text-muted">Only you can change this. The staff POS and the website always use Sola.</span>
+        </label>
         <label className="flex items-start gap-2">
           <input type="checkbox" name="on" defaultChecked={s.solaPhonePayOn} className="mt-1" />
           <span><b>Turn on phone payments by card.</b> <span className="text-sm text-muted">When off, every caller gets the secure payment link, as today.</span></span>
@@ -83,7 +91,7 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
           <p className="text-sm text-muted">No attempts yet.</p>
         ) : (
           <table className="w-full text-sm">
-            <thead><tr><th className="th">When</th><th className="th">Order</th><th className="th">Amount</th><th className="th">Matched</th><th className="th">Card</th><th className="th">Sola reference</th></tr></thead>
+            <thead><tr><th className="th">When</th><th className="th">Order</th><th className="th">Try</th><th className="th">Amount</th><th className="th">Matched</th><th className="th">Card</th><th className="th">Sola reference</th></tr></thead>
             <tbody>
               {attempts.map((a) => (
                 <tr key={a.id}>
@@ -92,6 +100,7 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
                     {a.orderId ? <a className="underline" href={`/admin/orders/${a.orderId}`}>Order number {orderNumber(a.orderId)}</a> : "No order number"}
                     {a.kind === "custom" && <span className="block text-xs text-muted">Custom charge (owner)</span>}
                   </td>
+                  <td className="td">{a.kind === "custom" ? "" : `${a.tryNumber} of 6`}</td>
                   <td className="td">{formatMoney(a.amountCents)}</td>
                   <td className={`td font-semibold ${a.matched ? "text-[#13895C]" : a.matched === false ? "text-[#C83A2F]" : "text-muted"}`}>{a.matched ? "Yes" : a.matched === false ? `No (${NOTE[a.note ?? ""] ?? a.note ?? ""})` : "In progress"}</td>
                   <td className="td">{a.cardType ?? ""}{a.last4 ? ` ending ${a.last4}` : ""}</td>

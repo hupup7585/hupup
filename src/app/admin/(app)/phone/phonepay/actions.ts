@@ -38,13 +38,15 @@ export async function savePhonePayAction(form: FormData) {
   await saveSetting("solaPhonePayCustomDigits", customDigits, owner.userId);
   await saveSetting("solaPhonePayCustomCapCents", customCap, owner.userId);
   await saveSetting("paymentTestNumbers", testNumbers.join("\n"), owner.userId);
+  const provider = form.get("provider") === "stripe" ? "stripe" : "sola";
+  await saveSetting("phoneCardProvider", provider, owner.userId);
   await db.insert(schema.auditLog).values({
     userId: owner.userId,
     action: "settings.phonepay_updated",
     entityType: "settings",
     entityId: "sola_phonepay",
-    before: { on: before.solaPhonePayOn, ownerOnly: before.solaPhonePayOwnerOnly, number: before.solaPhonePayNumber, backup: before.solaPhonePayBackup, digits: before.solaPhonePayDigits },
-    after: { on, ownerOnly, number, backup, digits, customDigits, customCap, testNumbers },
+    before: { provider: before.phoneCardProvider, on: before.solaPhonePayOn, ownerOnly: before.solaPhonePayOwnerOnly, number: before.solaPhonePayNumber, backup: before.solaPhonePayBackup, digits: before.solaPhonePayDigits },
+    after: { on, ownerOnly, number, backup, digits, customDigits, customCap, testNumbers, provider },
   });
   revalidatePath("/admin/phone/phonepay");
   return back("Saved.");

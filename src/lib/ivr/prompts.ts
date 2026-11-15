@@ -274,6 +274,9 @@ export const PROMPTS = {
   phonepay_back: { group: "Pay by card (Sola PhonePay)", label: "Back from the payment line", text: "Thank you. Let us finish your order." }, // approved Nov 14 ("Let's", spelled out by the standing rule)
   phonepay_paid: { group: "Pay by card (Sola PhonePay)", label: "Payment found", text: "Your payment was received. You are all set!" }, // approved Nov 14 ("You're", spelled out)
   phonepay_not_found: { group: "Pay by card (Sola PhonePay)", label: "Payment not found", text: "We could not confirm your payment yet. We will send you a secure payment link, and our team will call you back if needed." }, // approved Nov 14 (spelled out)
+  phonepay_retry: { group: "Pay by card (Sola PhonePay)", label: "Card did not go through (tries 1 to 4)", text: "Your card did not go through. To try again, press 1." }, // approved Nov 15
+  phonepay_retry_last: { group: "Pay by card (Sola PhonePay)", label: "Card did not go through (try 5, last chance)", text: "Your card did not go through. You have one more chance to try. To try again, press 1." }, // approved Nov 15
+  phonepay_failed: { group: "Pay by card (Sola PhonePay)", label: "Card did not go through (try 6, call ends)", text: "Sorry, your card did not go through. Please call us back to try again. Goodbye." }, // approved Nov 15
   pay_start: { group: "Pay by keypad", label: "Before the card steps", text: "Let us take care of your payment now. Please have your card ready." },
   pay_card_number: { group: "Pay by keypad", label: "Card number", text: "Please enter your card number on your keypad, then press pound." },
   pay_expiration: { group: "Pay by keypad", label: "Expiration date", text: "Please enter the expiration date, two digits for the month and two digits for the year, then press pound." },

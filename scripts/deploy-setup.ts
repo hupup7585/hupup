@@ -110,11 +110,22 @@ async function cloudflareSetup(env: NodeJS.ProcessEnv) {
   }
 }
 
+/** What the live line is set to (business numbers only, last 4 digits for test phones; no secrets). */
+async function liveSettingsReport() {
+  const { getDb, schema } = await import("../src/lib/db");
+  const rows = await getDb().select().from(schema.appSettings);
+  const v = (k: string) => rows.find((r) => r.key === k)?.value;
+  const nums = (x: unknown) => String(x ?? "").match(/\+1\d{10}/g)?.map((n) => `(${n.slice(2, 5)}) ${n.slice(5, 8)}-${n.slice(8)}`).join(", ") || "none";
+  log(`Live line: key 6 Delivery/Pickup rings ${nums(v("ringTargets6"))}; key 3 customer service rings ${nums(v("ringTargets4"))}.`);
+  log(`Live line: card payments ${v("solaPhonePayOn") === true ? "on" : "off"} through ${v("phoneCardProvider") ?? "sola"}, ${v("solaPhonePayOwnerOnly") === false ? "for every caller" : `test numbers only (${nums(v("paymentTestNumbers")).replace(/\(\d{3}\) \d{3}-/g, "ending ")})`}.`);
+}
+
 async function main() {
   if (process.env.VERCEL_ENV !== "production") return log("Not a live build: payment line check and Cloudflare setup skipped.");
   for (const [name, step] of [
     ["Payment line check", twilioPayCheck],
     ["Cloudflare setup", cloudflareSetup],
+    ["Live line report", liveSettingsReport],
   ] as const) {
     try {
       await step(process.env);

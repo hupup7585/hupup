@@ -44,11 +44,11 @@ import {
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { stripePhonePayMode, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
-import { amountParts, customChargeMadeBy, matchCustomCharge, matchPhonePay, parseCustomAmount, phonePayOffered, phonePaySipUri, startAttempt } from "@/lib/sola-phonepay";
+import { PHONEPAY_MAX_TRIES, amountParts, checkPhonePayTry, customChargeMadeBy, endPayLeg, matchCustomCharge, parseCustomAmount, phonePayOffered, phonePaySipUri, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
-const PHONEPAY_PROMPTS = ["phonepay_choice", "phonepay_intro", "phonepay_back", "phonepay_paid", "phonepay_not_found"] as const;
+const PHONEPAY_PROMPTS = ["phonepay_intro", "phonepay_back", "phonepay_paid", "phonepay_retry", "phonepay_retry_last", "phonepay_failed"] as const;
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { voicemailPlayLink } from "@/lib/signed-link";
@@ -1919,7 +1919,9 @@ const handlers: Record<string, Handler> = {
     // Payment can never be skipped (Abraham, Nov 15, 2026): no texts and no email means no way to send the payment
     // link, so the email becomes required (keypad payment needs neither).
     const canText = data.smsConsent === "yes" || data.smsConsent === "existing";
-    const keypadPay = keypadPayFor(ctx.session?.fromNumber ?? ctx.from) && (stripePhonePayMode() !== "live" || PAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k)));
+    const caller = ctx.session?.fromNumber ?? ctx.from;
+    const cardCfg = await getSettings();
+    const keypadPay = cardCfg.phoneCardProvider === "stripe" ? keypadPayFor(caller, stripePhonePayMode(process.env, cardCfg), process.env, cardCfg.paymentTestNumbers) : phonePayOffered(caller, cardCfg);
     if (!canText && !data.email && !keypadPay) {
       await updateSession(ctx.callSid, { data: { emailRequired: 1 } }, ctx.session);
       return back(vr, "ask", { f: "email" });
@@ -1971,13 +1973,14 @@ const handlers: Record<string, Handler> = {
     await updateSession(ctx.callSid, { data: { placedOrderId: primary.id } }, ctx.session);
     // Pay by card through Sola PhonePay (Abraham, Nov 14, 2026), the main phone payment. Off until he switches it on in
     // Admin, and then only on his own test calls until he opens it to everyone and approves its lines.
+    // Card payment plan (Abraham, Nov 15, 2026): straight to the card, no payment link in this flow. The Owner picks
+    // Sola PhonePay (the default) or Stripe in Admin; callers not offered a card get the payment link, as before.
     const payCfg = await getSettings();
-    if (phonePayOffered(ctx.session?.fromNumber ?? ctx.from, payCfg) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k))))
-      return back(vr, "pay-choice", { o: primary.id });
-    // Backup: pay by keypad through Stripe (Abraham, Nov 12, 2026). Off by default since Nov 14 (src/lib/phone-pay.ts);
-    // everyone else gets the payment link, as before.
-    if (keypadPayFor(ctx.session?.fromNumber ?? ctx.from) && (stripePhonePayMode() !== "live" || PAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k))))
-      return back(vr, "pay-keypad", { o: primary.id });
+    if (payCfg.phoneCardProvider === "stripe") {
+      if (keypadPayFor(caller, stripePhonePayMode(process.env, payCfg), process.env, payCfg.paymentTestNumbers) && PAY_PROMPTS.every((k) => stripePhonePayMode(process.env, payCfg) !== "live" || !promptWaiting(ctx.prompts, k)))
+        return back(vr, "pay-keypad", { o: primary.id });
+    } else if (phonePayOffered(caller, payCfg) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k))))
+      return back(vr, "phonepay-go", { o: primary.id, n: 1 });
     await sendPayLinkAndSay(ctx, vr, primary.id, { phone, customerId }, perDay.map(({ o, t }) => ({ order: { ...o.order, deliveryFeeCents: t!.deliveryFeeCents, taxCents: t!.taxCents, totalCents: t!.totalCents }, items: o.items })));
     return back(vr, "promo-consent");
   },
@@ -2004,11 +2007,20 @@ const handlers: Record<string, Handler> = {
     return back(vr, "pay-done", { o }); // 2 or nothing: the secure payment link
   },
 
-  /** Hand the call to the payment subaccount, which dials Sola PhonePay. Card tones never touch the main account. */
+  /**
+   * One card try (Abraham, Nov 15, 2026): hand the call to the payment subaccount, which dials Sola PhonePay and sends
+   * the PIN, the exact order amount (from the order, never the caller) and 1 by itself. The caller only keys the card.
+   * Star brings the caller back here at any time. Card tones never touch the main account.
+   */
   async "phonepay-go"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     const group = o ? await getPaymentGroup(o) : null;
-    if (!group || group.due <= 0) return back(vr, "pay-done", { o });
+    if (!group || group.due <= 0) return back(vr, "promo-consent");
+    // Any Sola call from an earlier try is hung up first
+    const earlier = await db.select().from(schema.phonepayAttempts).where(and(eq(schema.phonepayAttempts.callSid, ctx.callSid), eq(schema.phonepayAttempts.orderId, o)));
+    for (const a of earlier) await endPayLeg(a.payLegSid);
+    const n = earlier.length + 1;
+    if (n > PHONEPAY_MAX_TRIES) return back(vr, "phonepay-done", { o, a: 0 });
     // The rentals stay held for the whole payment
     const waiting = group.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id);
     if (waiting.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES), updatedAt: new Date() }).where(inArray(orders.id, waiting));
@@ -2017,32 +2029,82 @@ const handlers: Record<string, Handler> = {
       try {
         await pauseRecording(ctx.callSid);
       } catch {
-        return back(vr, "pay-done", { o }); // could not pause: the payment link instead, never the card line
+        sp(vr, ctx, "phonepay_failed", undefined, { draftOk: true });
+        vr.hangup();
+        return vr;
       }
     }
     const attempt = await startAttempt(o, ctx.callSid, group.due);
-    await track(ctx.callSid, "step", `Sola PhonePay started for order #${orderNumber(o)}`, { attempt: attempt.id });
+    await db.update(schema.phonepayAttempts).set({ tryNumber: n }).where(eq(schema.phonepayAttempts.id, attempt.id));
+    await track(ctx.callSid, "step", `Card payment try ${n} of ${PHONEPAY_MAX_TRIES} started for order #${orderNumber(o)}`, { attempt: attempt.id });
     sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true });
-    const dial = vr.dial({ action: url("phonepay-done", { o, a: attempt.id }), method: "POST", timeLimit: 900, answerOnBridge: true });
+    const dial = vr.dial({ action: url("phonepay-done", { o, a: attempt.id }), method: "POST", timeLimit: 900, answerOnBridge: true, hangupOnStar: true });
     dial.sip({ username: process.env.TWILIO_PAY_SIP_USERNAME, password: process.env.TWILIO_PAY_SIP_PASSWORD }, phonePaySipUri(o, ctx.callSid, group.due));
     return vr;
   },
 
-  /** Back from PhonePay: find the payment in Sola. Found = Paid; not found = the link, a callback task and an email. */
+  /** Back on our line (star, or Sola hung up): Sola call hung up for sure, then this try's charge is checked in Sola. */
   async "phonepay-done"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     const a = Number(ctx.query.get("a"));
     if (ctx.session?.data.recording) await resumeRecording(ctx.callSid).catch(() => null);
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "goodbye");
-    sp(vr, ctx, "phonepay_back", undefined, { draftOk: true });
-    const r = await matchPhonePay(o, a, group.due);
-    if (r.paid) {
+    if (group.due <= 0) {
       sp(vr, ctx, "phonepay_paid", undefined, { draftOk: true });
       return back(vr, "promo-consent");
     }
-    sp(vr, ctx, "phonepay_not_found", undefined, { draftOk: true });
-    return back(vr, "pay-done", { o });
+    let n = await triesSoFar(ctx.callSid, o);
+    if (a) {
+      const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1);
+      await endPayLeg(attempt?.payLegSid);
+      sp(vr, ctx, "phonepay_back", undefined, { draftOk: true });
+      const r = await checkPhonePayTry(o, a, attempt?.amountCents ?? group.due);
+      await track(ctx.callSid, "step", `Card payment try ${attempt?.tryNumber ?? n}: ${r.result === "paid" ? "paid" : r.result === "wrong_amount" ? "wrong amount, voided" : r.result === "check_failed" ? "Sola could not be checked" : "no charge"}`, { attempt: a });
+      if (r.result === "paid") {
+        sp(vr, ctx, "phonepay_paid", undefined, { draftOk: true });
+        return back(vr, "promo-consent");
+      }
+      n = attempt?.tryNumber ?? n;
+    }
+    return back(vr, "phonepay-retry", { o, n });
+  },
+
+  /** Try again: a menu on our line, never on Sola's. Tries 1 to 4, try 5 (last chance, Owner emailed), try 6 (call ends). */
+  async "phonepay-retry"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    const n = Number(ctx.query.get("n") || 1);
+    const asked = Number(ctx.query.get("r") || 0);
+    const num = orderNumber(o);
+    const due = (await getPaymentGroup(o))?.due ?? 0;
+    const tellOwner = async (subject: string, text: string) => {
+      const to = config.adminEmail();
+      if (to) await sendEmail(to, subject, `${text}\n\n${config.baseUrl()}/admin/orders/${o}`).catch(() => null);
+    };
+    if (n >= PHONEPAY_MAX_TRIES) {
+      if (!asked) await tellOwner(`Hup Up Attractions: phone card payment failed 6 times, order #${num}`, `The caller tried to pay order #${num} ($${(due / 100).toFixed(2)}) by card 6 times on the phone and it did not go through. The call ended and the caller was asked to call back. The order is still Payment pending.`);
+      sp(vr, ctx, "phonepay_failed", undefined, { draftOk: true });
+      vr.hangup();
+      return vr;
+    }
+    if (n === PHONEPAY_MAX_TRIES - 1 && !asked)
+      await tellOwner(`Hup Up Attractions: phone card payment failed 5 times, order #${num}`, `The caller tried to pay order #${num} ($${(due / 100).toFixed(2)}) by card 5 times on the phone and it did not go through. They have one more try.`);
+    if (asked >= 2) {
+      // No key after the menu twice: the call ends with the same line as the sixth try
+      sp(vr, ctx, "phonepay_failed", undefined, { draftOk: true });
+      vr.hangup();
+      return vr;
+    }
+    const g = keypad(vr, url("phonepay-retry-answer", { o, n, r: asked }), { numDigits: 1, timeout: 8 });
+    sp(g, ctx, n === PHONEPAY_MAX_TRIES - 1 ? "phonepay_retry_last" : "phonepay_retry", undefined, { draftOk: true });
+    return back(vr, "phonepay-retry", { o, n, r: asked + 1 });
+  },
+
+  "phonepay-retry-answer"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    const n = Number(ctx.query.get("n") || 1);
+    if (ctx.body.Digits === "1") return back(vr, "phonepay-go", { o });
+    return back(vr, "phonepay-retry", { o, n, r: Number(ctx.query.get("r") || 0) + 1 });
   },
 
   /** Hand the call to the payment subaccount (Twilio Pay + Stripe). The main account never collects card digits. */

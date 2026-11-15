@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
@@ -8,12 +8,15 @@ import { toE164 } from "@/lib/phone";
  * Pay by card on the phone through Sola PhonePay (Abraham, Nov 14, 2026). Replaces Stripe as the main phone payment;
  * the Stripe keypad payment stays built as an Owner-only backup that is off.
  *
- * 1. After the order read-back the caller presses 1 to pay now by card (2 = the secure payment link).
- * 2. The hotline hands the call to the payment subaccount over SIP (PCI mode is on there, never on the main account).
- * 3. The subaccount dials Sola's free PhonePay line and sends the digits from Admin (waits, our merchant PIN from
- *    SOLA_PHONEPAY_PIN, and the amount and order number if PhonePay asks). The caller types the card there.
- * 4. When PhonePay hangs up the caller comes back to the hotline. We look the payment up in Sola's reporting API by
- *    amount and time (and order number if PhonePay passes one). Found: Paid. Not found: payment link + callback list.
+ * Approved plan (Abraham, Nov 15, 2026):
+ * 1. After the order read-back the hotline hands the call to the payment subaccount over SIP (PCI mode is on there,
+ *    never on the main account). No payment link is offered in this flow.
+ * 2. The subaccount dials Sola's free PhonePay line and sends, by itself, our PIN and pound, the order total in cents
+ *    and pound, and 1 to confirm. The caller only keys the card. Star brings the caller back to our line at any time.
+ * 3. Back on our line, the Sola call is hung up for sure, then Sola's reporting API is checked for this try's charge:
+ *    the order total = Paid; another amount = voided automatically and the Owner is emailed; none = try again.
+ * 4. Try again is a menu on our line (press 1), never on Sola's line: a new Sola call with the same order amount.
+ *    Six tries at most; the Owner is emailed on the fifth and sixth. Every try is logged on the order.
  * We never hear, record or store card digits: only status, amount, last 4, card type, Sola reference and time.
  */
 export const PHONEPAY_NUMBER_DEFAULT = "+18334343354";
@@ -262,6 +265,125 @@ export async function matchPhonePay(orderId: number, attemptId: number, dueCents
     await sendEmail(to, `Hup Up Attractions: phone payment not confirmed, order #${num}`, `A caller paid by phone through Sola PhonePay for order #${num} ($${(dueCents / 100).toFixed(2)}), but ${why}.\n\nThe order is Payment pending and the customer was sent the secure payment link. A callback task is in Admin > Tasks.\n\n${config.baseUrl()}/admin/orders/${orderId}`).catch(() => null);
   }
   return { paid: false, reason };
+}
+
+/* ---- Card payment on the phone line, approved plan (Abraham, Nov 15, 2026) ---- */
+
+export const PHONEPAY_MAX_TRIES = 6;
+
+/**
+ * Which Sola charge belongs to this card try? PhonePay sends no invoice number, and after an invalid card Sola asks for
+ * the amount again, so the caller could key a different amount. This try's charges are the approved Sola charges made
+ * between the start of the try and now (plus 2 minutes), not used before, with no invoice number (the website link
+ * and the staff POS always send our order number, so a charge without one is a PhonePay charge).
+ * - one or more for exactly the order total: the first is the payment ("paid"); any others are wrong
+ * - none for the order total but some for other amounts: "wrong_amount" (they are voided)
+ * - none: "none"
+ */
+export function classifyTry(txns: SolaTxn[], want: { amountCents: number; from: Date; to: Date }, used: Set<string>): { kind: "paid" | "wrong_amount" | "none"; paid: SolaTxn | null; wrong: SolaTxn[] } {
+  const mine = txns
+    .filter((t) => t.approved && t.refNum && !used.has(t.refNum) && !(t.invoice ?? "").replace(/\D/g, "") && t.at >= new Date(want.from.getTime() - 60_000) && t.at <= new Date(want.to.getTime() + 120_000))
+    .sort((a, b) => a.at.getTime() - b.at.getTime());
+  const paid = mine.find((t) => t.amountCents === want.amountCents) ?? null;
+  const wrong = mine.filter((t) => t !== paid);
+  return { kind: paid ? "paid" : wrong.length ? "wrong_amount" : "none", paid, wrong };
+}
+
+/** Void a Sola charge (Sola gateway, cc:void). Only used for a PhonePay charge that is not the order total. */
+export async function solaVoid(refNum: string, fetcher: typeof fetch = fetch, env: Record<string, string | undefined> = process.env): Promise<{ ok: boolean; error: string | null }> {
+  const key = env.SOLA_API_KEY;
+  if (!key) return { ok: false, error: "SOLA_API_KEY isn't in Vercel." };
+  try {
+    const res = await fetcher("https://x1.cardknox.com/gatewayjson", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ xKey: key, xVersion: "5.0.0", xSoftwareName: BUSINESS_NAME, xSoftwareVersion: "1.0", xCommand: "cc:void", xRefNum: refNum }),
+    });
+    const j = (await res.json().catch(() => ({}))) as { xResult?: string; xError?: string; xStatus?: string };
+    return j.xResult === "A" ? { ok: true, error: null } : { ok: false, error: j.xError || j.xStatus || `Sola answered ${res.status}` };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/** Make sure the payments subaccount's call to Sola is fully hung up (and anything it dialed). Best effort, quiet. */
+export async function endPayLeg(paySid: string | null | undefined, fetcher: typeof fetch = fetch, env: Record<string, string | undefined> = process.env) {
+  const acct = env.TWILIO_PAY_ACCOUNT_SID;
+  const tok = env.TWILIO_PAY_AUTH_TOKEN;
+  if (!paySid || !acct || !tok) return;
+  const auth = `Basic ${Buffer.from(`${acct}:${tok}`).toString("base64")}`;
+  const base = `https://api.twilio.com/2010-04-01/Accounts/${acct}/Calls`;
+  const end = (sid: string) =>
+    fetcher(`${base}/${sid}.json`, { method: "POST", headers: { authorization: auth, "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ Status: "completed" }) }).catch(() => null);
+  try {
+    const kids = (await (await fetcher(`${base}.json?ParentCallSid=${paySid}&Status=in-progress`, { headers: { authorization: auth } })).json().catch(() => ({}))) as { calls?: { sid: string }[] };
+    for (const c of kids.calls ?? []) await end(c.sid);
+    const me = (await (await fetcher(`${base}/${paySid}.json`, { headers: { authorization: auth } })).json().catch(() => ({}))) as { status?: string };
+    if (me.status && !["completed", "canceled", "failed", "busy", "no-answer"].includes(me.status)) await end(paySid);
+  } catch {
+    /* the call is already over */
+  }
+}
+
+/**
+ * After one card try (the caller pressed star or Sola hung up): look in Sola for this try's charge, up to 3 times.
+ * paid = the order is marked paid; wrong_amount = voided, not paid, the Owner is emailed; none = no charge.
+ * Every try is logged on the order (time and result; never card numbers).
+ */
+export async function checkPhonePayTry(orderId: number, attemptId: number, dueCents: number, deps: { fetcher?: typeof fetch; waitMs?: number; now?: () => Date } = {}): Promise<{ result: "paid" | "wrong_amount" | "none" | "check_failed" }> {
+  const { getPaymentGroup, markGroupPaid, orderNumber } = await import("@/lib/orders");
+  const { recordPaymentResult, paymentReceivedNotices } = await import("@/lib/payment-result");
+  const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
+  const from = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
+  const num = orderNumber(orderId);
+  const group = await getPaymentGroup(orderId);
+  const ids = group?.orders.map((d) => d.order.id) ?? [orderId];
+  let c: ReturnType<typeof classifyTry> | null = null;
+  let failed = "";
+  for (let i = 0; i < 3 && c?.kind !== "paid"; i++) {
+    if (i) await new Promise((r) => setTimeout(r, deps.waitMs ?? 3000));
+    try {
+      const now = deps.now?.() ?? new Date();
+      c = classifyTry(await solaApprovedBetween(new Date(from.getTime() - 60_000), now, deps.fetcher), { amountCents: dueCents, from, to: now }, await usedSolaRefs());
+      failed = "";
+    } catch (e) {
+      failed = (e as Error).message.slice(0, 200);
+    }
+  }
+  const mail = async (subject: string, text: string) => {
+    const to = config.adminEmail();
+    if (!to) return;
+    const { sendEmail } = await import("@/lib/notify");
+    await sendEmail(to, subject, `${text}\n\n${config.baseUrl()}/admin/orders/${orderId}`).catch(() => null);
+  };
+  // Charges that are not the order total: voided right away, never counted as payment
+  const voids: string[] = [];
+  for (const t of c?.wrong ?? []) {
+    const v = await solaVoid(t.refNum, deps.fetcher);
+    voids.push(`$${(t.amountCents / 100).toFixed(2)} (Sola reference ${t.refNum}): ${v.ok ? "voided" : `could NOT be voided (${v.error}), please void or refund it in Sola`}`);
+  }
+  if (voids.length) await mail(`Hup Up Attractions: wrong phone payment amount, order #${num}`, `A caller paying order #${num} by phone was charged an amount that is not the order total ($${(dueCents / 100).toFixed(2)}).\n\n${voids.join("\n")}\n\nThat charge does not count as payment.`);
+  if (c?.kind === "paid" && c.paid) {
+    await db.update(schema.phonepayAttempts).set({ result: "paid" }).where(eq(schema.phonepayAttempts.id, attemptId));
+    await finishAttempt(attemptId, { matched: true, solaRef: c.paid.refNum, last4: c.paid.last4, cardType: c.paid.cardType, note: voids.length ? "Paid; a second charge was voided" : "Paid" });
+    await markGroupPaid(orderId, c.paid.amountCents, PHONEPAY_METHOD, c.paid.refNum);
+    await recordPaymentResult(ids, "approved", c.paid.last4, c.paid.refNum, c.paid.at);
+    await paymentReceivedNotices(orderId, c.paid.amountCents);
+    return { result: "paid" };
+  }
+  const result = failed && !c ? "check_failed" : c?.kind === "wrong_amount" ? "wrong_amount" : "none";
+  const label = result === "check_failed" ? `Sola could not be checked (${failed})` : result === "wrong_amount" ? "Wrong amount, voided" : "No charge";
+  await db.update(schema.phonepayAttempts).set({ result: result === "wrong_amount" ? (voids.every((v) => v.includes(": voided")) ? "wrong_amount_voided" : "wrong_amount_not_voided") : result === "check_failed" ? "check_failed" : "declined" }).where(eq(schema.phonepayAttempts.id, attemptId));
+  await finishAttempt(attemptId, { matched: false, note: label });
+  await recordPaymentResult(ids, "declined", null, null);
+  if (result === "check_failed") await mail(`Hup Up Attractions: phone payment could not be checked, order #${num}`, `A caller tried to pay order #${num} ($${(dueCents / 100).toFixed(2)}) by phone, but Sola could not be checked (${failed}). Please look in Sola before the caller tries again.`);
+  return { result };
+}
+
+/** How many card tries this call has made for this order (the next try number is this plus 1). */
+export async function triesSoFar(callSid: string, orderId: number) {
+  const rows = await db.select({ id: schema.phonepayAttempts.id }).from(schema.phonepayAttempts).where(and(eq(schema.phonepayAttempts.callSid, callSid), eq(schema.phonepayAttempts.orderId, orderId)));
+  return rows.length;
 }
 
 type DialTarget = { number: (attrs: { sendDigits?: string }, phone: string) => unknown };

@@ -94,3 +94,35 @@ describe("PhonePay hand-off matches Abraham's Nov 15 test call", () => {
     expect(phonePayOffered("+18457990925", { ...s, solaPhonePayOn: false }, env)).toBe(false);
   });
 });
+
+describe("card payment plan (Abraham, Nov 15, 2026): the caller never controls the amount", () => {
+  const at = new Date("2026-11-17T17:05:00Z");
+  const t = (ref: string, cents: number, invoice: string | null = null, mins = 0): SolaTxn => ({ refNum: ref, amountCents: cents, at: new Date(at.getTime() + mins * 60_000), invoice, last4: "1111", cardType: "Visa", approved: true });
+  const want = { amountCents: 80000, from: new Date("2026-11-17T17:00:00Z"), to: new Date("2026-11-17T17:10:00Z") };
+  it("the order total = paid; another amount on this try = wrong amount (voided); a charge with an order number is never this call's", async () => {
+    const { classifyTry } = await import("@/lib/sola-phonepay");
+    expect(classifyTry([t("A", 80000)], want, new Set()).kind).toBe("paid");
+    const w = classifyTry([t("B", 100)], want, new Set());
+    expect(w.kind).toBe("wrong_amount");
+    expect(w.wrong.map((x) => x.refNum)).toEqual(["B"]);
+    expect(classifyTry([t("C", 100, "1438")], want, new Set()).kind).toBe("none"); // a website or POS payment
+    expect(classifyTry([t("D", 80000, null, 30)], want, new Set()).kind).toBe("none"); // outside this try
+    expect(classifyTry([t("E", 80000)], want, new Set(["E"])).kind).toBe("none"); // already used
+    const both = classifyTry([t("F", 100), t("G", 80000, null, 1)], want, new Set());
+    expect(both.kind).toBe("paid");
+    expect(both.wrong.map((x) => x.refNum)).toEqual(["F"]); // the wrong one is still voided
+  });
+  it("void goes to Sola's gateway with the reference only", async () => {
+    const { solaVoid } = await import("@/lib/sola-phonepay");
+    const calls: string[] = [];
+    const f = (async (_u: string, init: RequestInit) => (calls.push(String(init.body)), new Response(JSON.stringify({ xResult: "A" })))) as unknown as typeof fetch;
+    expect(await solaVoid("R1", f, { SOLA_API_KEY: "k" })).toEqual({ ok: true, error: null });
+    expect(JSON.parse(calls[0])).toMatchObject({ xCommand: "cc:void", xRefNum: "R1" });
+    expect(Object.keys(JSON.parse(calls[0]))).not.toContain("xAmount");
+  });
+  it("the three try-again lines are the approved wording", async () => {
+    expect(PROMPTS.phonepay_retry.text).toBe("Your card did not go through. To try again, press 1.");
+    expect(PROMPTS.phonepay_retry_last.text).toBe("Your card did not go through. You have one more chance to try. To try again, press 1.");
+    expect(PROMPTS.phonepay_failed.text).toBe("Sorry, your card did not go through. Please call us back to try again. Goodbye.");
+  });
+});

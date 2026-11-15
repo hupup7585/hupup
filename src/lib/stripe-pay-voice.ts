@@ -105,12 +105,24 @@ export async function handlePayVoice(action: string, query: URLSearchParams, bod
       vr.hangup();
       return vr.toString();
     }
+    // Remember this leg on the try, so the hotline can hang it up for sure (Abraham, Nov 15, 2026)
+    if (sid) {
+      const { and, desc, eq, isNull } = await import("drizzle-orm");
+      const [open] = await db
+        .select({ id: schema.phonepayAttempts.id })
+        .from(schema.phonepayAttempts)
+        .where(and(eq(schema.phonepayAttempts.callSid, v.mainCallSid), isNull(schema.phonepayAttempts.endedAt)))
+        .orderBy(desc(schema.phonepayAttempts.id))
+        .limit(1);
+      if (open) await db.update(schema.phonepayAttempts).set({ payLegSid: sid }).where(eq(schema.phonepayAttempts.id, open.id));
+    }
     const custom = v.kind === "custom";
     const digits = buildSendDigits(custom ? s.solaPhonePayCustomDigits : s.solaPhonePayDigits, { pin, amountCents: v.cents, orderNumber: v.orderId ? orderNumber(v.orderId) : "" });
     phonePayDialTwiml(vr, s.solaPhonePayNumber, digits, payUrl("phonepay-backup", { o: v.orderId, c: v.cents, k: v.kind, t: tok(v.orderId, sid) }));
     return vr.toString();
   }
-  if (stripePhonePayMode() === "off" || (process.env.TWILIO_PAY_ACCOUNT_SID && body.AccountSid !== process.env.TWILIO_PAY_ACCOUNT_SID)) {
+  const { getSettings } = await import("@/lib/settings");
+  if (stripePhonePayMode(process.env, await getSettings()) === "off" || (process.env.TWILIO_PAY_ACCOUNT_SID && body.AccountSid !== process.env.TWILIO_PAY_ACCOUNT_SID)) {
     vr.hangup();
     return vr.toString();
   }

@@ -87,6 +87,21 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   {paymentResultLabel(o)}
                 </div>
               )}
+              {(await (async () => {
+                // Every phone card try on this order: time and result, never card numbers (Abraham, Nov 15, 2026)
+                const tries = await db.select().from(schema.phonepayAttempts).where((await import("drizzle-orm")).eq(schema.phonepayAttempts.orderId, o.id)).orderBy(schema.phonepayAttempts.startedAt);
+                if (!tries.length) return null;
+                const label = (r: string | null) => (r === "paid" ? "Paid" : r === "wrong_amount_voided" ? "Wrong amount, voided" : r === "wrong_amount_not_voided" ? "Wrong amount, NOT voided (check Sola)" : r === "check_failed" ? "Sola could not be checked" : r === "declined" ? "Did not go through" : "In progress");
+                return (
+                  <ul className="mt-1 text-xs text-muted" data-phone-card-tries>
+                    {tries.map((t) => (
+                      <li key={t.id}>
+                        Phone card try {t.tryNumber}: {inboxWhen(t.startedAt)}, {label(t.result)}
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })())}
               {refundStatus(o) && <div className="text-sm font-bold text-coral-dark" data-refund-status>{refundStatus(o)}: {formatMoney(o.refundedCents)}</div>}
               {o.stripePaymentId && <div className="text-xs text-muted">Stripe payment {o.stripePaymentId}</div>}
               {due > 0 && <div className="text-sm font-bold text-coral">Balance due {formatMoney(due)}</div>}
