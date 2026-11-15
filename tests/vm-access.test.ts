@@ -49,7 +49,7 @@ describe("where it runs, and the wording", () => {
     const keys = Object.keys(PROMPTS).filter((k) => k.startsWith("vma_")) as (keyof typeof PROMPTS)[];
     expect(keys.length).toBeGreaterThanOrEqual(10);
     // Abraham's own lines (Nov 15, 2026) are approved; the rest wait for his OK
-    const approved = ["vma_pin", "vma_out_enter", "vma_out_bad"];
+    const approved = ["vma_pin", "vma_out_enter", "vma_out_bad", "vma_charge_amount", "vma_charge_readback", "vma_charge_note", "vma_charge_bad", "vma_charge_back"];
     for (const k of keys.filter((k) => !approved.includes(k))) expect(lineStatus(k, {}).status, k).toBe("Waiting for approval");
     expect(PROMPTS.vma_pin.text).toBe("Please enter your password.");
   });

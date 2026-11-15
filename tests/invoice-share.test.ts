@@ -25,8 +25,12 @@ describe("invoice printing and sharing", () => {
     expect(pub).toContain("verifyInvoiceLink(id, t)");
     expect(admin).toContain('label="Copy customer link"');
   });
-  it("emailing the link waits for Abraham's OK on the wording; every word spelled out", () => {
-    expect(INVOICE_EMAIL_APPROVED).toBe(false);
+  it("emailing the link uses Abraham's approved wording (Nov 15, 2026); every word spelled out", () => {
+    expect(INVOICE_EMAIL_APPROVED).toBe(true);
+    expect(INVOICE_EMAIL_DRAFT.body("INV-1001", "https://x")).toBe(
+      "Thank you for choosing Hup Up Attractions! Here is your invoice, Invoice #1001. You can view it and print it here:\nhttps://x\n\nIf you have any questions, please call us at (845) 777-7585.\n\nHup Up Attractions, We appreciate your business with us.",
+    );
+    expect(INVOICE_EMAIL_DRAFT.subject("INV-1001")).toBe("Hup Up Attractions Invoice #1001");
     const text = INVOICE_EMAIL_DRAFT.subject("INV-1001") + INVOICE_EMAIL_DRAFT.body("INV-1001", "https://x");
     expect(text).not.toMatch(/\b\w+'(s|re|ll|t|ve|d)\b/);
     expect(text).toContain("Hup Up Attractions");

@@ -1,4 +1,5 @@
 import { bookingLock } from "@/lib/jewish-calendar";
+import { calendarNow } from "@/lib/clock";
 import { getSettings } from "@/lib/settings";
 import { asc, eq } from "drizzle-orm";
 import { webConsentCopy } from "@/lib/sms-terms-v2";
@@ -14,7 +15,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
     db.select().from(schema.categories).orderBy(asc(schema.categories.sortOrder), asc(schema.categories.id)),
     db.select().from(schema.products).where(eq(schema.products.active, true)).orderBy(asc(schema.products.sortOrder), asc(schema.products.id)),
   ]);
-  const lock = bookingLock(new Date(), await getSettings());
+  const lock = bookingLock(calendarNow(), await getSettings());
   return (
     <div className="mx-auto max-w-6xl">
       <h1 className="mb-5 text-2xl font-black sm:text-3xl">New booking</h1>

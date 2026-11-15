@@ -44,7 +44,7 @@ import {
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { stripePhonePayMode, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
-import { amountParts, matchCustomCharge, matchPhonePay, parseCustomAmount, phonePayOffered, phonePaySipUri, startAttempt } from "@/lib/sola-phonepay";
+import { amountParts, customChargeMadeBy, matchCustomCharge, matchPhonePay, parseCustomAmount, phonePayOffered, phonePaySipUri, startAttempt } from "@/lib/sola-phonepay";
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
@@ -56,6 +56,7 @@ import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogE
 import { CATALOG_ENDINGS, decodeCatalogKeys, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
 import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState, textingActive } from "@/lib/voicemail";
 import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staffAnnouncement, type RingKey } from "./routing";
+import { calendarNow } from "@/lib/clock";
 import { bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
 import { matchBlock, parseBlockList } from "./caller-filter";
 import { PROMPTS, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
@@ -653,6 +654,20 @@ const handlers: Record<string, Handler> = {
       return vr;
     }
     await ensureSession(ctx.callSid, ctx.from);
+    // Shabbos and Yom Tov (Abraham, Nov 14, 2026, choice A): the whole hotline is closed. A closed greeting with the
+    // day and time we open again, then the tone; every message goes to the general voicemail (key 9's box), without
+    // that box's own greeting. Draft wording: on preview now, on the live line once Abraham approves it.
+    const lock = bookingLock(calendarNow(), await getSettings());
+    const closedKey = lock.reason === "Yom Tov" ? "closed_yomtov_greeting" : "closed_shabbos_greeting";
+    if (lock.locked && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, closedKey))) {
+      const opens = lock.opensAt ?? new Date();
+      sp(vr, ctx, closedKey, {
+        day: opens.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/New_York" }),
+        time: opens.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }),
+      }, { draftOk: true });
+      await updateSession(ctx.callSid, { outcome: "voicemail", data: { missed: "closed" } }, ctx.session);
+      return vmRecord(vr, await vmBox("9"), "closed");
+    }
     // Call recording (off unless the Owner turns it on): the notice plays first, recording starts only after it.
     if ((await getSettings()).callRecording) {
       sp(vr, ctx, "recording_notice");
@@ -1124,7 +1139,7 @@ const handlers: Record<string, Handler> = {
   /** Key 1 (Abraham, Nov 9, 2026): choose a category, then the item, then the date. */
   async book(ctx, vr) {
     // Abraham, Nov 14, 2026: no booking on Shabbos or Yom Tov (candle lighting until Rabbeinu Tam), automatically
-    const lock = bookingLock(new Date(), await getSettings());
+    const lock = bookingLock(calendarNow(), await getSettings());
     if (lock.locked) {
       await track(ctx.callSid, "step", `Booking closed (${lock.reason})`, { key: "1" });
       // "on Saturday at 5:51 PM": the day and time booking opens again (Abraham, Nov 14, 2026)
@@ -2556,7 +2571,7 @@ const handlers: Record<string, Handler> = {
     const a = Number(ctx.query.get("a"));
     const c = Number(ctx.query.get("c"));
     const o = Number(ctx.query.get("o")) || null;
-    if (a && c) await matchCustomCharge(a, c, o);
+    if (a && c) await matchCustomCharge(a, c, o, { madeBy: await customChargeMadeBy(ctx.session?.fromNumber ?? ctx.from) });
     sp(vr, ctx, "vma_charge_back", undefined, { draftOk: true });
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
     return back(vr, "vma-box");

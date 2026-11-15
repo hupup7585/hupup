@@ -67,7 +67,7 @@ export default function RoutingForm({
           <input type="number" name="erevBefore" min={0} max={240} defaultValue={initial.erevBefore ?? "0"} className="input" />
         </label>
         <p className="text-xs text-muted sm:col-span-4">
-          Leave From and Until empty to ring the whole time the office is closed. On Friday and Erev Yom Tov the line stops at the earlier of the two Erev times. Example for delivery and pickup: from 8:00 AM until 10:30 PM; Friday until 4:00 PM or 60 minutes before candle lighting.
+          Leave From and Until empty to ring the whole time the office is closed. On Friday and Erev Yom Tov the line rings until the Erev time, or until the minutes before candle lighting when that is later (summer). Example for delivery and pickup: from 8:00 AM until 10:30 PM; Friday until 4:00 PM, or 60 minutes before candle lighting when that is later.
         </p>
       </fieldset>
       <p className="text-xs text-muted">Shabbos and Yom Tov: nothing rings; callers go to this line&rsquo;s voicemail.</p>

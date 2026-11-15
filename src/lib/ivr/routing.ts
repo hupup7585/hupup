@@ -155,8 +155,8 @@ function nyMinutes(at: Date) {
 
 /**
  * After-hours ringing window per line (Abraham, Nov 14, 2026: every hour editable in Admin > Phone settings). Empty
- * "from"/"to" = the whole time the office is closed. On Friday and Erev Yom Tov the line stops at "Erev until" or the
- * set minutes before candle lighting, whichever is earlier (empty "Erev until" = only the candle lighting rule).
+ * "from"/"to" = the whole time the office is closed. On Friday and Erev Yom Tov the line rings until "Erev until", or
+ * until the set minutes before candle lighting when that is later (empty "Erev until" = only the candle lighting rule).
  * Defaults keep what was approved: key 6 8:00 AM to 10:30 PM, Erev until 4:00 PM or 60 minutes before candles.
  */
 export const AFTER_HOURS_DEFAULTS: Record<RingKey, { from: string; to: string; erevTo: string; erevBefore: string }> = {
@@ -203,9 +203,11 @@ export function lineRingsNow(k: RingKey, at: Date, s: AfterHoursSettings, cal: {
   const from = hhmm(w.from) ?? 0;
   let end = hhmm(w.to) ?? 24 * 60;
   if (cal.candleLighting) {
+    // Abraham, Nov 14, 2026: ring until the Erev time (4:00 PM), or until the set minutes before candle lighting when
+    // that is later (summer); never past candle lighting itself (checked above)
     const erevTo = hhmm(w.erevTo);
     const beforeCandles = nyMinutes(new Date(cal.candleLighting.getTime() - (Number(w.erevBefore) || 0) * 60_000));
-    end = Math.min(end, erevTo ?? 24 * 60, beforeCandles);
+    end = erevTo === null ? beforeCandles : Math.max(erevTo, beforeCandles);
   }
   return now >= from && now < end;
 }

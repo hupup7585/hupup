@@ -128,7 +128,14 @@ export async function openAttemptFor(callSid: string, orderId: number) {
 
 /** "2026-11-14 15:04:05" in New York time (Sola's reports) to a real time, daylight saving included. */
 export function easternToDate(s: string): Date {
-  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(s.trim());
+  let m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(s.trim());
+  // also "11/14/2026 3:04:05 PM" (US style), in case Sola's report uses it
+  const us = m ? null : /^(\d{1,2})\/(\d{1,2})\/(\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i.exec(s.trim());
+  if (us) {
+    let h = +us[4] % (us[7] ? 12 : 24);
+    if (us[7]?.toUpperCase() === "PM") h += 12;
+    m = ["", us[3], us[1].padStart(2, "0"), us[2].padStart(2, "0"), String(h), us[5], us[6]] as unknown as RegExpExecArray;
+  }
   if (!m) return new Date(NaN);
   const asUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] ?? 0));
   const off = (d: number) => {
@@ -265,7 +272,7 @@ export function phonePayDialTwiml(vr: DialHost, phone: string, digits: string, a
  * real order, a found payment is recorded on that order ("Phone, custom charge (owner)"). Without one, it is only
  * logged on the attempt. No card data, ever.
  */
-export async function matchCustomCharge(attemptId: number, cents: number, orderId: number | null, deps: { fetcher?: typeof fetch; waitMs?: number; now?: () => Date } = {}): Promise<{ found: boolean; reason: string }> {
+export async function matchCustomCharge(attemptId: number, cents: number, orderId: number | null, deps: { fetcher?: typeof fetch; waitMs?: number; now?: () => Date; madeBy?: string } = {}): Promise<{ found: boolean; reason: string; orderId?: number | null }> {
   const { orderNumber, markGroupPaid } = await import("@/lib/orders");
   const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
   const from = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
@@ -287,11 +294,35 @@ export async function matchCustomCharge(attemptId: number, cents: number, orderI
     await finishAttempt(attemptId, { matched: false, note: reason });
     return { found: false, reason };
   }
-  await finishAttempt(attemptId, { matched: true, solaRef: found.refNum, last4: found.last4, cardType: found.cardType, note: orderId ? "Paid" : "Paid, no order number" });
+  // No order number (Abraham, Nov 14, 2026): a new order is made for this payment, every detail left empty, marked as
+  // made on the hotline by the Owner or the Secretary with the phone number used
+  if (!orderId) {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+    const [o] = await db
+      .insert(schema.orders)
+      .values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: today, pickupDate: today, subtotalCents: cents, totalCents: cents, notes: `Custom charge made on the hotline by ${deps.madeBy ?? "the Owner"}. Fill in the customer and rental details.` })
+      .returning({ id: schema.orders.id });
+    orderId = o.id;
+    await db.update(schema.phonepayAttempts).set({ orderId }).where(eq(schema.phonepayAttempts.id, attemptId));
+  }
+  await finishAttempt(attemptId, { matched: true, solaRef: found.refNum, last4: found.last4, cardType: found.cardType, note: "Paid" });
   if (orderId) {
     await markGroupPaid(orderId, found.amountCents, PHONEPAY_CUSTOM_METHOD, found.refNum);
     const { recordPaymentResult } = await import("@/lib/payment-result");
     await recordPaymentResult([orderId], "approved", found.last4, found.refNum, found.at);
   }
-  return { found: true, reason: "found" };
+  return { found: true, reason: "found", orderId };
+}
+
+/** Who made a custom charge on the hotline: "the Owner from (845) 777-7585" or "Secretary Sara from (845) 555-0123". */
+export async function customChargeMadeBy(fromNumber: string | null | undefined, env: Record<string, string | undefined> = process.env): Promise<string> {
+  const { formatPhone } = await import("@/lib/phone");
+  const phone = toE164(fromNumber);
+  const shown = phone ? formatPhone(phone) : "a withheld number";
+  if (phone && phone === toE164(env.ADMIN_PHONE)) return `the Owner from ${shown}`;
+  if (phone) {
+    const [u] = await db.select().from(schema.adminUsers).where(eq(schema.adminUsers.phone, phone)).limit(1);
+    if (u) return `${u.role === "owner" ? "the Owner" : u.role === "secretary" ? "the Secretary" : "staff member"} ${u.name} from ${shown}`;
+  }
+  return `staff from ${shown}`;
 }

@@ -43,6 +43,8 @@ describe("Sola PhonePay", () => {
   it("Sola's New York times are read with daylight saving", () => {
     expect(easternToDate("2026-11-16 10:00:00").toISOString()).toBe("2026-11-16T15:00:00.000Z");
     expect(easternToDate("2026-07-01 10:00:00").toISOString()).toBe("2026-07-01T14:00:00.000Z");
+    expect(easternToDate("11/16/2026 3:04:05 PM").toISOString()).toBe("2026-11-16T20:04:05.000Z");
+    expect(easternToDate("11/16/2026 12:30:00 AM").toISOString()).toBe("2026-11-16T05:30:00.000Z");
   });
   it("the connect line is Abraham's exact wording, named PhonePay connect (approved; the audio waits for his OK)", () => {
     expect(PROMPTS.phonepay_intro).toMatchObject({ label: "PhonePay connect", text: "Thank you. Please hold for a moment while we connect you to our secure payment line." });

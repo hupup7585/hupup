@@ -77,7 +77,7 @@ export async function createBookingAction(input: {
     // Abraham, Nov 14, 2026: no booking on Shabbos or Yom Tov (candle lighting until Rabbeinu Tam)
     const { bookingLock } = await import("@/lib/jewish-calendar");
     const { getSettings } = await import("@/lib/settings");
-    const lock = bookingLock(new Date(), await getSettings());
+    const lock = bookingLock((await import("@/lib/clock")).calendarNow(), await getSettings());
     if (lock.locked) return { ok: false, message: `Booking is closed on ${lock.reason}. It opens again after ${lock.reason}.` } as PosResult;
   }
   const session = await requireAdmin();

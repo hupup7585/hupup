@@ -240,6 +240,9 @@ export const PROMPTS = {
   late_cholhamoed: { group: "Welcome & main menu", label: "Chol Hamoed, while open (Abraham approved)", text: "Happy Chol Hamoed! We are open late today, and you can book anytime using this automated system." },
   late_chanukah: { group: "Welcome & main menu", label: "Chanukah, while open (Abraham approved)", text: "Happy Chanukah! We are open late today, and you can book anytime using this automated system." },
   // No booking on Shabbos or Yom Tov (Abraham, Nov 14, 2026): the day and time booking opens again
+  // The whole hotline on Shabbos and Yom Tov (Abraham, Nov 14, 2026, choice A): drafts for his OK; then the tone, general voicemail
+  closed_shabbos_greeting: { group: "Welcome & main menu", label: "Whole hotline on Shabbos: closed greeting", text: "Thank you for calling Hup Up Attractions. We are closed now for Shabbos, and we will be open again on {day} at {time}. Please leave your name, phone number, and a short message after the tone, and we will call you back after Shabbos. Good Shabbos!", vars: ["day", "time"], pending: true },
+  closed_yomtov_greeting: { group: "Welcome & main menu", label: "Whole hotline on Yom Tov: closed greeting", text: "Thank you for calling Hup Up Attractions. We are closed now for Yom Tov, and we will be open again on {day} at {time}. Please leave your name, phone number, and a short message after the tone, and we will call you back after Yom Tov. Good Yom Tov!", vars: ["day", "time"], pending: true },
   booking_closed_shabbos: { group: "Welcome & main menu", label: "Key 1 on Shabbos", text: "Booking is closed on Shabbos. Please call us again after Shabbos, on {day} at {time}.", vars: ["day", "time"] }, // approved Nov 14 with the day and time
   booking_closed_yomtov: { group: "Welcome & main menu", label: "Key 1 on Yom Tov", text: "Booking is closed on Yom Tov. Please call us again after Yom Tov, on {day} at {time}.", vars: ["day", "time"] }, // approved Nov 14 with the day and time
   office_closed: { group: "Welcome & main menu", label: "Office closed (booking still available)", text: "Our office is closed right now, but you can book anytime using this automated system." },
@@ -298,17 +301,17 @@ export const PROMPTS = {
   },
   // Staff voicemail access by phone (Abraham, Nov 13, 2026): drafts, hidden (7 then 4 during a greeting), preview only.
   vma_pin: { group: "Voicemail", label: "Staff access: ask for the password (Abraham, word for word)", text: "Please enter your password." },
-  vma_wrong: { group: "Voicemail", label: "Staff access: wrong PIN", text: "Sorry, that PIN is not right. Please try again.", pending: true },
+  vma_wrong: { group: "Voicemail", label: "Staff access: wrong password", text: "Sorry, that password is not right. Please try again.", pending: true },
   vma_locked: { group: "Voicemail", label: "Staff access: locked", text: "Voicemail access is locked for now. Please try again later. Goodbye.", pending: true },
   vma_box: { group: "Voicemail", label: "Staff access: choose a box or call out", text: "Please enter the number of the voicemail box. For the main box, press 1. To call a customer, press 0. To charge a custom amount, press 7. To change your password, press star.", pending: true },
   vma_out_enter: { group: "Voicemail", label: "Staff access: call out, enter the number (Abraham, word for word)", text: "Please enter the phone number." },
   vma_out_bad: { group: "Voicemail", label: "Staff access: call out, not a valid number (Abraham)", text: "It is not a valid phone number. Please try again." },
-  // Owner custom charge (Abraham, Nov 14, 2026): owner voicemail menu, key 7; drafts until he approves the text and audio
-  vma_charge_amount: { group: "Voicemail", label: "Owner custom charge: enter the amount", text: "Enter the amount in dollars and cents, then press pound. For example, for 125 dollars, press 1 2 5 0 0, then pound.", pending: true },
-  vma_charge_readback: { group: "Voicemail", label: "Owner custom charge: read the amount back", text: "You entered {dollars} dollars and {cents} cents. Press 1 to confirm, or 2 to enter it again.", vars: ["dollars", "cents"], pending: true },
-  vma_charge_note: { group: "Voicemail", label: "Owner custom charge: optional order number", text: "To add an order number, enter it now and press pound. To skip, just press pound.", pending: true },
-  vma_charge_bad: { group: "Voicemail", label: "Owner custom charge: amount not allowed", text: "That amount is not allowed. Please try again.", pending: true },
-  vma_charge_back: { group: "Voicemail", label: "Owner custom charge: back in the menu", text: "You are back in the owner menu.", pending: true },
+  // Owner custom charge (Abraham, Nov 14, 2026): owner voicemail menu, key 7; wording approved (no recording until he picks the voice)
+  vma_charge_amount: { group: "Voicemail", label: "Owner custom charge: enter the amount", text: "Enter the amount in dollars and cents, then press pound. For example, for 125 dollars, press 1 2 5 0 0, then pound." }, // approved Nov 14
+  vma_charge_readback: { group: "Voicemail", label: "Owner custom charge: read the amount back", text: "You entered {dollars} dollars and {cents} cents. Press 1 to confirm, or 2 to enter it again.", vars: ["dollars", "cents"] }, // approved Nov 14
+  vma_charge_note: { group: "Voicemail", label: "Owner custom charge: optional order number", text: "To add an order number, enter it now and press pound. To skip, just press pound." }, // approved Nov 14
+  vma_charge_bad: { group: "Voicemail", label: "Owner custom charge: amount not allowed", text: "That amount is not allowed. Please try again." }, // approved Nov 14
+  vma_charge_back: { group: "Voicemail", label: "Owner custom charge: back in the menu", text: "You are back in the owner menu." }, // approved Nov 14
   vma_count: { group: "Voicemail", label: "Staff access: how many messages", text: "You have {count} messages, newest first.", vars: ["count"], pending: true },
   vma_none: { group: "Voicemail", label: "Staff access: empty box", text: "There are no messages in this box.", pending: true },
   vma_message: { group: "Voicemail", label: "Staff access: before each message", text: "Message {n}, from {number}, on {date} at {time}.", vars: ["n", "number", "date", "time"], pending: true },

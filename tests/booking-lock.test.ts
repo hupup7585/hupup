@@ -43,3 +43,15 @@ describe("the lock is used everywhere booking or paying can happen", () => {
     expect(readFileSync("src/app/admin/(app)/pos/page.tsx", "utf8")).toContain("data-booking-locked");
   });
 });
+
+describe("choice A: the whole hotline is closed on Shabbos and Yom Tov (Abraham, Nov 14, 2026)", () => {
+  it("closed greeting with the opening day and time, then every message to the general voicemail; live only once approved", async () => {
+    const { readFileSync } = await import("node:fs");
+    const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
+    expect(flow).toContain('return vmRecord(vr, await vmBox("9"), "closed");');
+    expect(flow).toContain('process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, closedKey)');
+    const { PROMPTS, fill } = await import("@/lib/ivr/prompts");
+    expect(PROMPTS.closed_shabbos_greeting.vars).toEqual(["day", "time"]);
+    expect(fill(PROMPTS.closed_shabbos_greeting.text, { day: "Saturday", time: "5:51 PM" })).toContain("open again on Saturday at 5:51 PM");
+  });
+});
