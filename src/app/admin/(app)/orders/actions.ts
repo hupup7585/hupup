@@ -1,6 +1,6 @@
 "use server";
 
-import { ensurePriced } from "@/lib/order-pricing";
+import { ensurePriced, pricingProblem } from "@/lib/order-pricing";
 
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
@@ -54,7 +54,7 @@ export async function recordPaymentAction(orderId: number, amount: string, metho
 
 export async function sendPayLinkAction(orderId: number): Promise<ActionResult> {
   const session = await requireAdmin();
-  if (!(await ensurePriced(orderId))) return { ok: false, message: "This address has no delivery price on the price map. Enter the quoted delivery fee on this order first, so the link includes delivery and tax." };
+  if (!(await ensurePriced(orderId))) return { ok: false, message: (await pricingProblem(orderId)) ?? "This order could not be priced." };
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found" };
   const phone = full.customer?.phone;
@@ -95,24 +95,3 @@ export async function updateDetailsAction(orderId: number, form: FormData): Prom
   return { ok: true, message: "Saved" };
 }
 
-/**
- * Delivery fee quoted by staff (Abraham, Nov 15, 2026): for an address with no price on the price map. Owner and
- * Secretary. Adds tax and the total, then the payment link can go out. Audited.
- */
-export async function setQuotedFeeAction(orderId: number, form: FormData): Promise<void> {
-  const session = await requireAdmin();
-  if (session.role === "delivery") return;
-  const cents = parseMoneyToCents(String(form.get("fee") ?? ""));
-  if (cents === null || cents < 0) return;
-  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
-  if (!o || o.paidCents > 0) return;
-  const { getSettings } = await import("@/lib/settings");
-  const { totalsWithFee } = await import("@/lib/pricing");
-  const t = totalsWithFee(o.subtotalCents, "Quoted by staff", cents, await getSettings());
-  await db
-    .update(schema.orders)
-    .set({ deliveryZone: t.zone, deliveryFeeCents: t.deliveryFeeCents, taxPercent: t.taxPercent, taxCents: t.taxCents, totalCents: t.totalCents, updatedAt: new Date() })
-    .where(eq(schema.orders.id, orderId));
-  await db.insert(schema.auditLog).values({ userId: session.userId, action: "order.delivery_fee_quoted", entityType: "order", entityId: String(orderId), before: { deliveryFeeCents: o.deliveryFeeCents, totalCents: o.totalCents }, after: { deliveryFeeCents: cents, totalCents: t.totalCents } });
-  revalidatePath(`/admin/orders/${orderId}`);
-}

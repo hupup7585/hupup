@@ -41,5 +41,5 @@ export async function checkAddressAction(form: FormData) {
   const address = String(form.get("address") ?? "").trim();
   if (!address) return back("Type an address to check.");
   const q = await deliveryQuote(address, await getSettings());
-  return back(q.ok ? `${address}: ${q.zone}, delivery $${(q.feeCents / 100).toFixed(2)}.` : `${address}: no price, because ${QUOTE_WHY[q.reason]}${"area" in q && q.area ? ` (${q.area})` : ""}. Staff would quote it.`);
+  return back(q.ok ? `${address}: ${q.zone}, delivery $${(q.feeCents / 100).toFixed(2)}.` : `${address}: no price, because ${QUOTE_WHY[q.reason]}${"area" in q && q.area ? ` (${q.area})` : ""}.`);
 }

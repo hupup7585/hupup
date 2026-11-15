@@ -248,6 +248,7 @@ export const PROMPTS = {
   office_closed: { group: "Welcome & main menu", label: "Office closed (booking still available)", text: "Our office is closed right now, but you can book anytime using this automated system." },
   date_closed: { group: "Date & quantity", label: "Chosen date is a closed day", text: "Sorry, we are closed on {date} for {reason}. Let us pick another date.", vars: ["date", "reason"] },
   address_outside_area: { group: "Checkout", label: "Address outside the delivery area", text: "Sorry, we only deliver in Kiryas Joel and nearby Orange County towns. Please say a delivery address in our area." },
+  address_not_found: { group: "Checkout", label: "Address not found on the map", text: "Sorry, we could not find that address. Please say the full address again: the house number, the street, and the town.", pending: true },
   checkout_total: { group: "Checkout", label: "Order total read-back", text: "Your total is {total}. That is {items} for the rentals, {delivery} for delivery, and {tax} sales tax.", vars: ["total", "items", "delivery", "tax"] },
   terms_notice: {
     group: "Checkout",

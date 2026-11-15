@@ -26,7 +26,7 @@ import { TERMS_TEXT } from "@/lib/terms-content";
 import { sendEmail, sendSms } from "@/lib/notify";
 import { getSettings } from "@/lib/settings";
 import { totalsWithFee } from "@/lib/pricing";
-import { QUOTE_WHY, deliveryQuote } from "@/lib/delivery-areas";
+import { deliveryQuote } from "@/lib/delivery-areas";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
 import { STEP_LABELS, track, trackStep } from "@/lib/call-journey";
@@ -1769,16 +1769,14 @@ const handlers: Record<string, Handler> = {
     const heard = ctx.session?.data.heard;
     if (!heard) return back(vr, "ask", { f });
     const quote = f === "address" ? await deliveryQuote(heard, await getSettings()) : null;
+    if (quote && !quote.ok && quote.reason === "not_found") {
+      // The house could not be found on the map (Abraham, Nov 15, 2026): ask for the address again
+      await updateSession(ctx.callSid, { data: { heard: undefined } }, ctx.session);
+      sp(vr, ctx, "address_not_found");
+      return back(vr, "ask", { f: "address" });
+    }
     if (quote && !quote.ok) {
-      // No delivery price for this address on the price map (Abraham, Nov 15, 2026): never guessed. The caller is asked
-      // for another address, and staff get a task to quote this one and call back.
-      const caller = toE164(ctx.session?.fromNumber ?? ctx.from);
-      await db.insert(schema.tasks).values({
-        title: `Quote delivery for a caller: ${heard}`.slice(0, 200),
-        notes: `A caller${caller ? ` from ${formatPhone(caller)}` : ""} gave the delivery address "${heard}", but ${QUOTE_WHY[quote.reason]}. Call them with a delivery fee if you can deliver there.`,
-        priority: "high",
-        dueDate: new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" }),
-      });
+      // Outside every zone on the price map: we don't deliver there; the caller is asked for another address
       await updateSession(ctx.callSid, { data: { heard: undefined } }, ctx.session);
       sp(vr, ctx, "address_outside_area");
       return back(vr, "ask", { f: "address" });

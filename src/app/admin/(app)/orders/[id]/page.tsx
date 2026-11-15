@@ -26,7 +26,6 @@ import { confirmAttentionAction } from "./attention-actions";
 import { attentionItemsFree } from "@/lib/late-payment";
 import { STATUS_LABEL, statusHistory } from "@/lib/status-history";
 import { paymentSourceLabel } from "@/lib/sola-phonepay";
-import { setQuotedFeeAction } from "../actions";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -82,16 +81,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               ) : (
                 <>
                   <div>Total <b className="ml-3 text-lg">{formatMoney(o.subtotalCents)}</b></div>
-                  {staff.role !== "delivery" && o.paidCents === 0 && (
-                    <form action={setQuotedFeeAction.bind(null, o.id)} className="flex flex-wrap items-end justify-end gap-2 text-left" data-quote-fee>
-                      <label className="block text-sm">
-                        <span className="label">Delivery fee, quoted by staff</span>
-                        <input name="fee" inputMode="decimal" placeholder="15.00" className="input w-28" required />
-                        <span className="mt-1 block max-w-xs text-xs text-muted">Only when the address has no price on the price map. Tax and the total are added for you.</span>
-                      </label>
-                      <button className="btn-dark">Save fee</button>
-                    </form>
-                  )}
+                  {(await (async () => {
+                    // No delivery price: the reason, in words (the price is never set by hand)
+                    const { pricingProblem } = await import("@/lib/order-pricing");
+                    const why = await pricingProblem(o.id);
+                    return why ? <div className="text-sm font-semibold text-coral-dark" data-no-delivery-price>{why}</div> : null;
+                  })())}
                 </>
               )}
               <div className="text-sm text-muted">Paid {formatMoney(o.paidCents)}{o.paymentMethod ? ` (${paymentSourceLabel(o.paymentMethod)})` : ""}{o.solaRefNum ? ` · Sola ref ${o.solaRefNum}` : ""}</div>

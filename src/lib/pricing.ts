@@ -55,7 +55,7 @@ export function totalsWithFee(subtotalCents: number, zone: string, deliveryFeeCe
   return { subtotalCents, deliveryFeeCents, taxCents, totalCents: subtotalCents + deliveryFeeCents + taxCents, taxPercent: s.salesTaxPercent, zone };
 }
 
-/** Items + delivery (by the price map) + tax. Null = no price for this address: staff quote the delivery fee. */
+/** Items + delivery (by the price map) + tax. Null = no price: outside every zone (we don't deliver there) or not found (ask for the address again). Never set by hand. */
 export async function priceOrder(subtotalCents: number, address: string | null | undefined, s: Settings, fetcher?: typeof fetch): Promise<Totals | null> {
   const { deliveryQuote } = await import("@/lib/delivery-areas");
   const q = await deliveryQuote(address, s, fetcher);

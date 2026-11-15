@@ -154,9 +154,48 @@ async function deliveryMapCheck() {
     log(`Delivery map test: ${a.name} (map price $${a.priceCents === null ? "none" : (a.priceCents / 100).toFixed(2)}): "${address}" -> ${q.ok ? `${q.zone}, $${(q.feeCents / 100).toFixed(2)}` : `no price (${q.reason})`} ${pass ? "PASS" : "CHECK"}`);
     await new Promise((x) => setTimeout(x, 1100)); // OpenStreetMap asks for at most 1 lookup a second
   }
+  // Two houses on the same street with different prices (the house decides): look across each zone line
+  const { inRing } = await import("../src/lib/delivery-areas");
+  const reverse = async (lng: number, lat: number) => {
+    await new Promise((x) => setTimeout(x, 1100));
+    const j = (await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${lat}&lon=${lng}`, { headers: { "user-agent": "HupUpAttractionsBookings/1.0" }, signal: AbortSignal.timeout(10000) })
+      .then((x) => x.json())
+      .catch(() => ({}))) as { address?: Record<string, string> };
+    const ad = j.address ?? {};
+    const town = ad.village || ad.town || ad.city || ad.hamlet || "";
+    return ad.house_number && ad.road && town ? { road: ad.road, address: `${ad.house_number} ${ad.road}, ${town}, NY ${ad.postcode ?? ""}`.trim() } : null;
+  };
+  let found = false;
+  let tries = 0;
+  for (const a of r.areas) {
+    const ring = a.polygons[0];
+    const step = Math.max(1, Math.floor(ring.length / 6));
+    for (let i = 0; i + 1 < ring.length && tries < 30 && !found; i += step) {
+      tries++;
+      const [x1, y1] = ring[i];
+      const [x2, y2] = ring[i + 1];
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+      const nx = (-(y2 - y1) / len) * 0.0012, ny = ((x2 - x1) / len) * 0.0012; // about 100 m each side
+      const pin = inRing([mx + nx, my + ny], ring) ? [mx + nx, my + ny] : [mx - nx, my - ny];
+      const pout = pin[0] === mx + nx ? [mx - nx, my - ny] : [mx + nx, my + ny];
+      const h1 = await reverse(pin[0], pin[1]);
+      if (!h1) continue;
+      const h2 = await reverse(pout[0], pout[1]);
+      if (!h2 || h2.road !== h1.road || h2.address === h1.address) continue;
+      const q1 = await deliveryQuote(h1.address, s);
+      const q2 = await deliveryQuote(h2.address, s);
+      if (q1.ok && q2.ok && q1.feeCents !== q2.feeCents) {
+        found = true;
+        log(`Delivery map test, same street: "${h1.address}" -> ${q1.zone}, $${(q1.feeCents / 100).toFixed(2)}; "${h2.address}" -> ${q2.zone}, $${(q2.feeCents / 100).toFixed(2)} PASS`);
+      }
+    }
+    if (found || tries >= 30) break;
+  }
+  if (!found) log(`Delivery map test, same street: no street with houses on both sides of a zone line found in ${tries} tries.`);
   for (const out of ["1 Main Street, Albany, NY 12207"]) {
     const q = await deliveryQuote(out, s);
-    log(`Delivery map test: outside every area "${out}" -> ${q.ok ? `$${(q.feeCents / 100).toFixed(2)} (WRONG)` : `no price, staff quote (${q.reason}) PASS`}`);
+    log(`Delivery map test: outside every area "${out}" -> ${q.ok ? `$${(q.feeCents / 100).toFixed(2)} (WRONG)` : `no price, we don\u2019t deliver there (${q.reason}) PASS`}`);
   }
 }
 

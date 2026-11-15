@@ -8,7 +8,7 @@ vi.mock("@/lib/db", async () => {
 });
 
 import { db, schema } from "@/lib/db";
-import { areaAt, deliveryQuote, mergeAreas, parseKml, withState } from "@/lib/delivery-areas";
+import { areaAt, deliveryQuote, mergeAreas, parseKml, spellingHint, withState } from "@/lib/delivery-areas";
 import { SETTING_DEFAULTS } from "@/lib/settings";
 
 const square = (x: number, y: number, d: number) => `${x},${y},0 ${x + d},${y},0 ${x + d},${y + d},0 ${x},${y + d},0 ${x},${y},0`;
@@ -36,7 +36,20 @@ describe("delivery price map", () => {
     ]);
   });
 
-  it("the fee is the area the address falls in; where shapes overlap the smaller one wins", () => {
+  it("the house decides: two houses on the same street get different prices; on a zone line the lower price", async () => {
+    // Main Street crosses from Local ($10) into Local Town ($15)
+    expect(await deliveryQuote("10 Main Street, Kiryas Joel, NY 10950", s, census(-74.16, 41.34))).toMatchObject({ ok: true, feeCents: 1000 });
+    expect(await deliveryQuote("40 Main Street, Monroe, NY 10950", s, census(-74.12, 41.34))).toMatchObject({ ok: true, feeCents: 1500 });
+    // Exactly on the Local line (x = -74.17), from the Local Town side: the lower price
+    expect(areaAt(-74.17005, 41.34, areas)?.name).toBe("Local");
+  });
+
+  it("the street list only checks spelling", () => {
+    expect(spellingHint("12 Karlsberg Rd, Monroe", "Karlsburg Road\nSatmar Drive")).toBe("Karlsburg Road");
+    expect(spellingHint("12 Satmar Dr", "Karlsburg Road\nSatmar Drive")).toBeNull(); // spelled right
+  });
+
+  it("the fee is the area the address falls in; where shapes overlap the lower price wins", () => {
     expect(areaAt(-74.16, 41.34, areas)?.name).toBe("Local"); // inside both: Local is smaller
     expect(areaAt(-74.11, 41.31, areas)?.name).toBe("Local Town");
     expect(areaAt(-74.28, 41.32, areas)?.name).toBe("Chester");

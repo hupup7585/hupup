@@ -5,8 +5,9 @@ import { eq } from "drizzle-orm";
  * Delivery fees by map area (Abraham, Nov 15, 2026). The source is his Google My Maps "Price list"; the live site
  * downloads its shapes (KML) during each live build and when the Owner presses "Reload the map" in Admin. The Owner
  * can rename each area and change its price; a reload keeps those edits. An address is placed on the map with the
- * free US Census address service (OpenStreetMap as a backup); no key and no cost. An address outside every area is
- * never given a guessed price: staff quote it.
+ * free US Census address service (OpenStreetMap as a backup); no key and no cost. The house decides the price, never
+ * the street, and nobody changes it by hand. Outside every zone = we don\u2019t deliver there; not found = the
+ * address is asked for again.
  */
 export const DELIVERY_MAP_KML = "https://www.google.com/maps/d/kml?mid=1Wuj9Q746oXbWSeTPs0nO7yVpJ0En6N8&forcekml=1";
 
@@ -65,16 +66,30 @@ export function inRing([x, y]: [number, number], ring: Ring): boolean {
 }
 const ringArea = (r: Ring) => Math.abs(r.reduce((s, [x, y], i) => s + x * r[(i + 1) % r.length][1] - r[(i + 1) % r.length][0] * y, 0) / 2);
 
-/** The area a point is in. Where shapes overlap, the smallest (most exact) shape wins. */
+/** Distance in meters from a point to a shape's edge (good enough at this size). */
+function metersToEdge([x, y]: [number, number], ring: Ring): number {
+  const kx = 111_320 * Math.cos((y * Math.PI) / 180);
+  const ky = 110_540;
+  let best = Infinity;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const ax = (ring[j][0] - x) * kx, ay = (ring[j][1] - y) * ky, bx = (ring[i][0] - x) * kx, by = (ring[i][1] - y) * ky;
+    const dx = bx - ax, dy = by - ay;
+    const t = dx || dy ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / (dx * dx + dy * dy))) : 0;
+    best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
+  }
+  return best;
+}
+/** A house this close to a zone line counts as on the line. */
+export const ON_LINE_METERS = 10;
+
+/**
+ * The zone a house is in (Abraham, Nov 15, 2026: the house decides, not the street). On a zone line (or where two
+ * zones overlap), the lower price wins.
+ */
 export function areaAt(lng: number, lat: number, areas: DeliveryArea[]): DeliveryArea | null {
-  let best: { a: DeliveryArea; size: number } | null = null;
-  for (const a of areas)
-    for (const r of a.polygons)
-      if (inRing([lng, lat], r)) {
-        const size = ringArea(r);
-        if (!best || size < best.size) best = { a, size };
-      }
-  return best?.a ?? null;
+  const hits = areas.filter((a) => a.polygons.some((r) => inRing([lng, lat], r) || metersToEdge([lng, lat], r) <= ON_LINE_METERS));
+  if (!hits.length) return null;
+  return hits.slice().sort((p, q) => (p.priceCents ?? Infinity) - (q.priceCents ?? Infinity))[0];
 }
 
 /** A point inside an area (for the build's one-address-per-area test). */
@@ -164,14 +179,50 @@ export async function reloadDeliveryMap(fetcher: typeof fetch = fetch): Promise<
 
 /* ---- The quote ---- */
 
+/* ---- The street list (Hark, Nov 15, 2026): only to check spelling, never to set a price ---- */
+
+const SUFFIX: Record<string, string> = { rd: "road", dr: "drive", st: "street", ct: "court", blvd: "boulevard", ln: "lane", pl: "place", pkwy: "parkway", ave: "avenue", av: "avenue", tpke: "turnpike", rte: "route", hwy: "highway", cir: "circle", ter: "terrace", e: "east", w: "west", n: "north", s: "south" };
+/** "12 Forest Rd., Apt 3, Monroe" -> "forest road" */
+export function streetOf(address: string): string {
+  const first = address.split(",")[0] ?? "";
+  return first
+    .toLowerCase()
+    .replace(/\b(apt|apartment|unit|suite|ste|#)\s*\S+/g, " ")
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/^\s*\d+[a-z]?\s+/, "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => SUFFIX[w] ?? w)
+    .join(" ");
+}
+function editDistance(a: string, b: string) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+/** A street on the list that looks like what was typed ("Karlsberg Rd" -> "Karlsburg Road"), or null. */
+export function spellingHint(address: string, list: string): string | null {
+  const typed = streetOf(address);
+  if (!typed) return null;
+  const names = list.split("\n").map((x) => x.trim()).filter(Boolean);
+  if (names.some((n) => streetOf(`0 ${n}`) === typed)) return null;
+  let best: { n: string; d: number } | null = null;
+  for (const n of names) {
+    const d = editDistance(typed, streetOf(`0 ${n}`));
+    if (!best || d < best.d) best = { n, d };
+  }
+  return best && best.d <= Math.max(2, Math.floor(typed.length / 5)) ? best.n : null;
+}
+
 export type DeliveryQuote = { ok: true; zone: string; feeCents: number } | { ok: false; reason: "no_address" | "not_found" | "outside" | "no_price"; area?: string };
 
 /**
  * The delivery fee for an address: the price of the map area it is in. Before the map is loaded, the older town-name
  * rule is used. No price is ever guessed: outside every area, a place the map service can't find, or an area with
- * no price = staff quote it.
+ * no price = the booking does not go on (outside: we don't deliver there; not found: the address is asked again).
  */
-export async function deliveryQuote(address: string | null | undefined, s: { deliveryAreas: string; zoneKjPlaces: string; zoneAreaPlaces: string; deliveryFeeKjCents: string; deliveryFeeAreaCents: string }, fetcher: typeof fetch = fetch): Promise<DeliveryQuote> {
+export async function deliveryQuote(address: string | null | undefined, s: { deliveryAreas: string; zoneKjPlaces: string; zoneAreaPlaces: string; deliveryFeeKjCents: string; deliveryFeeAreaCents: string; localStreets?: string }, fetcher: typeof fetch = fetch): Promise<DeliveryQuote> {
   if (!address?.trim()) return { ok: false, reason: "no_address" };
   const areas = savedAreas(s.deliveryAreas);
   if (!areas.length) {
@@ -179,6 +230,7 @@ export async function deliveryQuote(address: string | null | undefined, s: { del
     const z = deliveryZone(address, s);
     return z === "outside" ? { ok: false, reason: "outside" } : { ok: true, zone: z, feeCents: Number(z === "kj" ? s.deliveryFeeKjCents : s.deliveryFeeAreaCents) || 0 };
   }
+  // The house decides (Abraham, Nov 15, 2026): its spot on the map, from the free US Census address service
   const at = await geocode(address, fetcher);
   if (!at) return { ok: false, reason: "not_found" };
   const a = areaAt(at.lng, at.lat, areas);
@@ -189,7 +241,7 @@ export async function deliveryQuote(address: string | null | undefined, s: { del
 
 export const QUOTE_WHY: Record<string, string> = {
   no_address: "there is no delivery address",
-  not_found: "the address could not be found on the map",
-  outside: "the address is outside every delivery area on the price map",
+  not_found: "the address could not be found on the map: check the spelling of the house number, street, town and ZIP",
+  outside: "we don't deliver there (the house is outside every zone on the price map)",
   no_price: "its area has no price yet",
 };

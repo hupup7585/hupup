@@ -20,7 +20,7 @@ export default async function DeliverySettingsPage({ searchParams }: { searchPar
       <section className="card mb-6 p-5" id="areas" data-delivery-areas>
         <h2 className="mb-1 text-lg font-extrabold">Delivery prices by map area</h2>
         <p className="mb-3 text-sm text-muted">
-          The delivery fee comes from the area on your Google map (&ldquo;Price list&rdquo;) that the delivery address falls in. The phone line, New booking and the payment total all use it. An address outside every area never gets a guessed price: staff get a task to quote it. To change a shape, edit it on the Google map, then press Reload the map; your names and prices here are kept.
+          The delivery price is decided by the house, not the street: the zone on your Google map (&ldquo;Price list&rdquo;) that the house sits in. On a zone line, the lower price. Outside every zone, we don&rsquo;t deliver there. The phone line, New booking and the payment total all use it, and nobody can change the price on an order by hand. To change a shape, edit it on the Google map, then press Reload the map; your names and prices here are kept.
         </p>
         {areas.length === 0 ? (
           <p className="mb-3 text-sm">The map is not loaded yet, so the town lists below are used. Press Reload the map.</p>
@@ -32,7 +32,7 @@ export default async function DeliverySettingsPage({ searchParams }: { searchPar
                 <label className="block"><span className="label">Price</span><input name={`price:${a.id}`} inputMode="decimal" defaultValue={a.priceCents === null ? "" : (a.priceCents / 100).toFixed(2)} placeholder="no price" className="input" /></label>
               </div>
             ))}
-            <span className="text-xs text-muted">Leave a price empty if staff should quote that area. Where two areas overlap, the smaller one wins.</span>
+            <span className="text-xs text-muted">Where two zones overlap, or a house is on a zone line, the lower price is used.</span>
             <button className="btn-dark w-fit">Save names and prices</button>
           </form>
         )}
