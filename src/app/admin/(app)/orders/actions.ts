@@ -65,8 +65,8 @@ export async function sendPayLinkAction(orderId: number): Promise<ActionResult> 
   const r = await sendOrderText({
     phone,
     email: full.customer?.email,
-    subject: `${BUSINESS_NAME} Order Number #${orderNumber(orderId)} payment link`,
-    body: `${BUSINESS_NAME} Order Number #${orderNumber(orderId)} for ${messageDate(full.order.eventDate)}: $${(due / 100).toFixed(2)} due. Pay securely here: ${link}`,
+    subject: `${BUSINESS_NAME} order #${orderNumber(orderId)} payment link`,
+    body: `${BUSINESS_NAME} order #${orderNumber(orderId)} for ${messageDate(full.order.eventDate)}: $${(due / 100).toFixed(2)} due. Pay securely here: ${link}`,
     orderId,
     customerId: full.customer?.id,
     userId: session.userId ?? null,
