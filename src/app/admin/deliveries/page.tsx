@@ -16,6 +16,7 @@ import StopActions from "./StopActions";
 import DualDate from "@/components/DualDate";
 import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
 import { driverOf, isMyStop } from "@/lib/drivers";
+import { STAGE_LABEL, stagesFor } from "@/lib/delivery-stages";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Deliveries · Hup Up Attractions", robots: { index: false } };
@@ -40,6 +41,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
         .innerJoin(schema.products, eq(schema.products.id, schema.orderItems.productId))
         .where(inArray(schema.orderItems.orderId, ids))
     : [];
+  const stages = await stagesFor(ids);
   const driverNames = new Map((await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers).where(eq(schema.adminUsers.role, "delivery"))).map((d) => [d.id, d.name]));
   const custIds = rows.map((r) => r.customerId).filter((x): x is number => Boolean(x));
   const customers = custIds.length ? await db.select().from(schema.customers).where(inArray(schema.customers.id, custIds)) : [];
@@ -150,7 +152,11 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
                       <span>{stop === "delivery" ? DELIVERY_WINDOW : `By ${PICKUP_BY}`}</span>
                       <span className="text-muted">· {stop === "delivery" ? "Delivery" : "Pickup"} · Order number {orderNumber(o.id)}</span>
                     </div>
-                    <Badge tone={tone}>{done ? (stop === "delivery" ? "Delivered" : "Picked up") : stop === "delivery" ? "Scheduled" : "To pick up"}</Badge>
+                    {(() => {
+                      const now = stages.get(`${o.id}-${stop}`);
+                      const label = done ? (stop === "delivery" ? STAGE_LABEL.delivered : STAGE_LABEL.picked_up) : now ? STAGE_LABEL[now.stage] : STAGE_LABEL.booked;
+                      return <Badge tone={now?.stage === "problem" ? "pending" : tone} data-stage={now?.stage ?? "booked"}>{label}{now?.at ? ` ${now.at.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })}` : ""}</Badge>;
+                    })()}
                   </div>
                   {staff.role !== "delivery" && (
                     <div className="mt-1 text-sm" data-stop-driver>
@@ -170,7 +176,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
                   </div>
                   <div className="mt-0.5 text-sm text-muted">{its.map((i) => `${i.qty} × ${i.name}`).join(", ")}</div>
                   {o.notes && <div className="mt-1 text-sm">Note: {o.notes}</div>}
-                  <StopActions orderId={o.id} phone={c?.phone ?? null} stop={stop} done={done} />
+                  <StopActions orderId={o.id} phone={c?.phone ?? null} stop={stop} done={done} stage={stages.get(`${o.id}-${stop}`)?.stage} />
                   {(() => {
                     const leg = nextLeg(route, route.findIndex((r) => r.key === `${o.id}-${stop}`), stockAddress);
                     return leg ? <LegLinks leg={leg} prefix={leg.toStock ? "Then" : "Next"} /> : null;

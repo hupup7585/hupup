@@ -9,6 +9,7 @@ import { BUSINESS_NAME } from "@/lib/config";
 import { DELIVERY_TEMPLATES, type TemplateKey } from "@/lib/delivery-templates";
 import { isCurrentStop } from "@/lib/delivery-stops";
 import { hasAnyStop, isMyStop } from "@/lib/drivers";
+import { recordStage, type Stage } from "@/lib/delivery-stages";
 
 export type DeliveryResult = { ok: boolean; message: string };
 
@@ -47,7 +48,25 @@ export async function markDoneAction(orderId: number, stop: "delivery" | "pickup
   if (!ok) return { ok: false, message: stop === "delivery" ? "Only confirmed (paid) orders can be marked delivered." : "Mark it delivered first." };
   const to = stop === "delivery" ? "DELIVERED" : "PICKED_UP";
   await setOrderStatus(orderId, to);
+  await recordStage(orderId, stop, stop === "delivery" ? "delivered" : "picked_up", staff.userId, null, staff.name);
   await db.insert(schema.auditLog).values({ userId: staff.userId, action: `delivery.${to.toLowerCase()}`, entityType: "order", entityId: String(orderId), before: { status: from }, after: { status: to } });
   revalidatePath("/admin/deliveries");
   return { ok: true, message: to === "DELIVERED" ? "Marked delivered." : "Marked picked up." };
+}
+
+/** Out for delivery, Out for pickup, or Problem reported (with a note; the office is emailed). Audited. */
+export async function stageAction(orderId: number, stop: "delivery" | "pickup", stage: Stage, note?: string): Promise<DeliveryResult> {
+  const staff = await requireStaff(["owner", "secretary", "delivery"]);
+  const full = await getOrderWithItems(orderId);
+  if (!full) return { ok: false, message: "Order not found." };
+  if (staff.role === "delivery" && !isMyStop(full.order, stop, staff.userId)) return { ok: false, message: "This stop isn't assigned to you." };
+  if (stage === "delivered" || stage === "picked_up") return markDoneAction(orderId, stop);
+  try {
+    await recordStage(orderId, stop, stage, staff.userId, note, staff.name);
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+  await db.insert(schema.auditLog).values({ userId: staff.userId, action: `delivery.${stage}`, entityType: "order", entityId: String(orderId), after: { stop, stage, note: note ?? null } });
+  revalidatePath("/admin/deliveries");
+  return { ok: true, message: stage === "problem" ? "Problem reported. The office was told." : stage === "out_for_delivery" ? "Out for delivery." : "Out for pickup." };
 }

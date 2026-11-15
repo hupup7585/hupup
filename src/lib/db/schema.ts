@@ -1240,3 +1240,20 @@ export const apiKeysUnlocks = pgTable("api_keys_unlocks", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Delivery statuses with their times (Abraham, Nov 15, 2026): Booked, Out for delivery, Delivered, Out for pickup, Picked up, Problem reported. */
+export const deliveryEvents = pgTable(
+  "delivery_events",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id").notNull(),
+    /** delivery | pickup */
+    stop: text("stop").notNull(),
+    /** out_for_delivery | delivered | out_for_pickup | picked_up | problem */
+    stage: text("stage").notNull(),
+    note: text("note"),
+    userId: integer("user_id"),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("delivery_events_order_idx").on(t.orderId, t.at)],
+);
