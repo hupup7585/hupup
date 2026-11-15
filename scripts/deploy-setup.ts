@@ -89,7 +89,14 @@ async function cloudflareSetup(env: NodeJS.ProcessEnv) {
     const up = await cf("PUT", `/accounts/${account}/workers/scripts/${SCHEDULER_NAME}`, form);
     log(`Cloudflare: scheduler Worker upload ${up.ok ? "done" : `failed (${up.status} ${up.errors})`} (code ${createHash("sha256").update(code).digest("hex").slice(0, 8)}).`);
     if (up.ok) {
-      const sch = await cf("PUT", `/accounts/${account}/workers/scripts/${SCHEDULER_NAME}/schedules`, JSON.stringify([{ cron: "*/5 * * * *" }]), "application/json");
+      const setSchedule = () => cf("PUT", `/accounts/${account}/workers/scripts/${SCHEDULER_NAME}/schedules`, JSON.stringify([{ cron: "*/5 * * * *" }]), "application/json");
+      let sch = await setSchedule();
+      // A new Workers account needs its free workers.dev name first (Cloudflare's own address; not our domain or DNS)
+      if (!sch.ok && /workers\.dev subdomain/i.test(sch.errors)) {
+        const sub = await cf("PUT", `/accounts/${account}/workers/subdomain`, JSON.stringify({ subdomain: "hupup-attractions" }), "application/json");
+        log(`Cloudflare: free workers.dev name ${sub.ok ? "created" : `could not be created (${sub.status} ${sub.errors})`}.`);
+        if (sub.ok) sch = await setSchedule();
+      }
       log(`Cloudflare: every-5-minutes schedule ${sch.ok ? "set" : `failed (${sch.status} ${sch.errors})`}.`);
     }
   }
