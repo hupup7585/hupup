@@ -62,7 +62,7 @@ import { categoryProducts, itemFreeOn, nearestFreeDay, nearestSize } from "@/lib
 import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_PIN_TRIES, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinSet } from "@/lib/vm-access";
 import { STT_HOLD_FILE, STT_MAX_WAITS, googleReadback, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
 
-const { categories, products, orders } = schema;
+const { categories, products, orders, orderItems } = schema;
 type VR = InstanceType<typeof twilio.twiml.VoiceResponse>;
 type Gather = ReturnType<VR["gather"]>;
 
@@ -214,6 +214,39 @@ export const MENU_WAIT_SECONDS = 4;
 /** No choice after the main menu: the whole menu again, from the greeting (3 plays and 20 seconds rule). */
 function menuNoChoice(vr: VR, ctx: Ctx) {
   return repeatMenu(vr, ctx, "menu", { first: 1 });
+}
+
+/** How long an unfinished phone cart is offered again to the same number (Abraham, Nov 15, 2026). */
+export const RESUME_HOURS = 24;
+
+/** Unfinished-cart offer: once Abraham approves its two lines; on preview it runs for his test. */
+function resumeActive(ctx: Ctx, env: Record<string, string | undefined> = process.env) {
+  return env.VERCEL_ENV !== "production" || (!promptWaiting(ctx.prompts, "resume_offer") && !promptWaiting(ctx.prompts, "resume_added"));
+}
+
+/**
+ * The cart from this number's most recent earlier call that ended without an order (the hold was released when they
+ * hung up), from the last 24 hours, rental days still ahead.
+ */
+async function unfinishedCart(ctx: Ctx): Promise<{ productId: number; name: string; qty: number; date: string }[]> {
+  const from = toE164(ctx.session?.fromNumber ?? ctx.from);
+  if (!from) return [];
+  const since = new Date(Date.now() - RESUME_HOURS * 3_600_000);
+  const res = await db.execute(sql`
+    SELECT cs.call_sid FROM call_sessions cs
+    WHERE cs.from_number = ${from} AND cs.call_sid <> ${ctx.callSid} AND cs.started_at > ${since}
+      AND EXISTS (SELECT 1 FROM orders o WHERE o.call_sid = cs.call_sid AND o.status = 'CANCELLED' AND o.paid_cents = 0)
+      AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.call_sid = cs.call_sid AND o.status <> 'CANCELLED')
+    ORDER BY cs.started_at DESC LIMIT 1`);
+  const last = (res.rows[0] as { call_sid: string } | undefined)?.call_sid;
+  if (!last) return [];
+  const rows = await db
+    .select({ productId: orderItems.productId, qty: orderItems.qty, date: orders.eventDate, name: products.name })
+    .from(orderItems)
+    .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .innerJoin(products, eq(products.id, orderItems.productId))
+    .where(and(eq(orders.callSid, last), eq(orders.status, "CANCELLED")));
+  return rows.filter((r) => r.date >= todayISO()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** The directions step plays once Abraham approves its two lines; on preview it runs for his test. */
@@ -1080,6 +1113,8 @@ const handlers: Record<string, Handler> = {
    */
   /** Key 1 (Abraham, Nov 9, 2026): choose a category, then the item, then the date. */
   async book(ctx, vr) {
+    // Abraham, Nov 15, 2026: a caller back from the same number is offered last call's unfinished cart (once)
+    if (resumeActive(ctx) && !ctx.session?.data.resumeAsked && !(await callOrders(ctx)).length && (await unfinishedCart(ctx)).length) return back(vr, "resume");
     const cats = await phoneCategories();
     const g = keypad(vr, url("book-choice")); // keys only (Abraham); # is an invalid choice
     // Abraham (Nov 11, 2026), word for word. Categories, their names and order come from Admin; numbered 1, 2, 3...
@@ -1095,6 +1130,42 @@ const handlers: Record<string, Handler> = {
     sp(g, ctx, "book_back");
     // Before a booking starts this is a menu (3 plays and 20 seconds); with something held it follows the idle rule
     return (await callOrders(ctx)).length ? idleNoKey(vr, ctx, "book") : repeatMenu(vr, ctx, "book");
+  },
+
+  /** "Welcome back! On your last call you had ... To check if it is still available and continue, press 1." */
+  async resume(ctx, vr) {
+    const lines = await unfinishedCart(ctx);
+    await updateSession(ctx.callSid, { data: { resumeAsked: 1 } }, ctx.session);
+    if (!lines.length) return back(vr, "book");
+    const g = keypad(vr, url("resume-choice"));
+    // grouped by day: "one Castle and one Laser tag set for Tuesday, December 22"
+    const byDay = [...new Set(lines.map((l) => l.date))].map((d) => `${lines.filter((l) => l.date === d).map((l) => itemPhrase(l.qty, l.name)).join(" and ")} for ${longDate(d)}`);
+    sp(g, ctx, "resume_offer", { items: byDay.join(", and ") }, { draftOk: true });
+    return idleNoKey(vr, ctx, "book");
+  },
+
+  async "resume-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (d !== "1") return back(vr, "book"); // 2 (or anything else): a new order
+    const lines = await unfinishedCart(ctx);
+    const session = ctx.session ?? (await ensureSession(ctx.callSid, ctx.from));
+    const gone: { p: number; d: string }[] = [];
+    let ids = [...(session.data?.dayOrderIds ?? [])];
+    const added: string[] = [];
+    for (const l of lines) {
+      if (l.date < todayISO()) continue;
+      const existing = (await callOrders({ ...ctx, session: { ...session, data: { ...session.data, dayOrderIds: ids } } })).find((o) => o.order.eventDate === l.date) ?? null;
+      const r = await reserveItem({ orderId: existing?.order.id ?? null, productId: l.productId, qty: l.qty, eventDate: l.date, channel: "PHONE", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid });
+      if (r.ok) {
+        ids = [...new Set([...ids, r.orderId])];
+        added.push(`${itemPhrase(l.qty, l.name)} for ${longDate(l.date)}`);
+        await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted", data: { day: l.date, dayOrderIds: ids } }, session);
+      } else gone.push({ p: l.productId, d: l.date });
+    }
+    await track(ctx.callSid, "step", `Unfinished cart from the last call: ${added.length} back in the cart, ${gone.length} no longer free`, { added, gone });
+    await updateSession(ctx.callSid, { data: { resumeGone: gone } }, ctx.session);
+    if (added.length) sp(vr, ctx, "resume_added", { items: added.join(", and ") }, { draftOk: true });
+    return back(vr, "cart"); // the cart plays the nearest options for each taken item first, then the whole cart
   },
 
   async "book-choice"(ctx, vr) {
@@ -1406,6 +1477,12 @@ const handlers: Record<string, Handler> = {
 
   /** The whole cart: every day on this call, then one total. */
   async cart(ctx, vr) {
+    const queue = ctx.session?.data.resumeGone ?? [];
+    if (queue.length) {
+      const [next, ...rest] = queue;
+      await updateSession(ctx.callSid, { data: { resumeGone: rest } }, ctx.session);
+      return back(vr, "booked", { p: next.p, d: next.d }); // its nearest options: a size up or down, or another day
+    }
     const days = await callOrders(ctx);
     const c = ctx.query.get("c") ?? undefined; // the item list the caller came from (Abraham, Phone Menu v3)
     if (!days.length) {

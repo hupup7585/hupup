@@ -177,6 +177,9 @@ export type CallData = {
   address?: string;
   /** No texts and no email: the email is required for the payment link (Abraham, Nov 15, 2026) */
   emailRequired?: number;
+  /** Unfinished cart from the last call: offered once, and the taken items still waiting for their options */
+  resumeAsked?: number;
+  resumeGone?: { p: number; d: string }[];
   /** Optional directions for the driver, said after the address (Abraham, Nov 15, 2026) */
   directions?: string;
   email?: string;

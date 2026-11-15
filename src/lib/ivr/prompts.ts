@@ -116,6 +116,9 @@ export const PROMPTS = {
   book_category_list: { group: "Booking by item (key 1)", label: "Before the items in a category", text: "Here are our {category}.", vars: ["category"] },
   book_date_prompt: { group: "Booking by item (key 1)", label: "Ask for the event date (keypad)", text: "Please enter your event date: two digits for the month, then two digits for the day. For example, for March 5th, press 0, 3, 0, 5." },
   book_date_entered: { group: "Booking by item (key 1)", label: "Confirm the date", text: "You entered {date}. If that is correct, press 1. To enter a different date, press 2.", vars: ["date"] },
+  // Abraham, Nov 15, 2026: unfinished cart from the last call (drafts for his OK)
+  resume_offer: { group: "Booking by item (key 1)", label: "Welcome back: last call's unfinished cart", text: "Welcome back! On your last call you had {items} in your cart. To check if it is still available and continue, press 1. To start a new order, press 2.", vars: ["items"], pending: true },
+  resume_added: { group: "Booking by item (key 1)", label: "Unfinished cart: back in the cart", text: "Good news! These are still available and back in your cart: {items}.", vars: ["items"], pending: true },
   booked_intro: { group: "Booking by item (key 1)", label: "Item booked that day", text: "I am sorry, the {item} is already booked on {date}.", vars: ["item", "date"] },
   booked_closest: { group: "Booking by item (key 1)", label: "Closest options intro", text: "Here are the closest options for that day." },
   booked_bigger: { group: "Booking by item (key 1)", label: "Next size up", text: "For the next size up, the {item}, press 1.", vars: ["item"] },
