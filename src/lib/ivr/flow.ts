@@ -59,7 +59,7 @@ import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
 import { categoryProducts, itemFreeOn, nearestFreeDay, nearestSize } from "@/lib/alternatives";
-import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_PIN_TRIES, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinSet } from "@/lib/vm-access";
+import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_ACCESS_KEY_GAP, VM_PIN_TRIES, callOutNumber, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinSet } from "@/lib/vm-access";
 import { STT_HOLD_FILE, STT_MAX_WAITS, googleReadback, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
 
 const { categories, products, orders, orderItems } = schema;
@@ -2201,9 +2201,10 @@ const handlers: Record<string, Handler> = {
       return back(vr, "menu");
     }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail" }, ctx.session);
-    if (vmAccessActive()) {
-      // Staff access (preview only): 7 then 4 while the greeting plays. Never announced; any other key just records.
-      const g = vr.gather({ input: ["dtmf"], numDigits: 2, timeout: 1, finishOnKey: "", action: url("vm-greeting-key", { x: x ?? undefined }), method: "POST" });
+    if (vmAccessActive() && x === "9") {
+      // Staff access, general voicemail only (Abraham, Nov 15, 2026): star 7 4 while the greeting plays, no pause of
+      // 3 seconds or more between keys. Never announced; any other key just records.
+      const g = vr.gather({ input: ["dtmf"], numDigits: VM_ACCESS_KEYS.length, timeout: VM_ACCESS_KEY_GAP, finishOnKey: "", action: url("vm-greeting-key", { x: x ?? undefined }), method: "POST" });
       sp(g, ctx, await vmGreeting(x, ctx.prompts));
       return vmRecord(vr, box, x);
     }
@@ -2214,7 +2215,7 @@ const handlers: Record<string, Handler> = {
   /** A key during the greeting: 7 4 = staff access; anything else goes straight to the tone (as if the greeting ended). */
   async "vm-greeting-key"(ctx, vr) {
     const x = ctx.query.get("x");
-    if (ctx.body.Digits === VM_ACCESS_KEYS && vmAccessActive()) return back(vr, "vma-pin");
+    if (ctx.body.Digits === VM_ACCESS_KEYS && x === "9" && vmAccessActive()) return back(vr, "vma-pin");
     return vmRecord(vr, await vmBox(x), x);
   },
 
@@ -2237,8 +2238,8 @@ const handlers: Record<string, Handler> = {
     }
     const t = Number(ctx.query.get("t") || 0);
     const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-pin-check", { t }), method: "POST" });
-    sp(g, ctx, "vma_pin", undefined, { draftOk: true });
-    vr.hangup(); // no PIN entered
+    sp(g, ctx, "vma_pin");
+    vr.hangup(); // no password entered
     return vr;
   },
 
@@ -2282,6 +2283,7 @@ const handlers: Record<string, Handler> = {
 
   async "vma-box-choice"(ctx, vr) {
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    if (ctx.body.Digits === "0") return back(vr, "vma-out"); // call a customer out
     const key = BOX_BY_NUMBER[ctx.body.Digits ?? ""];
     if (!key) {
       sp(vr, ctx, "not_valid");
@@ -2358,6 +2360,29 @@ const handlers: Record<string, Handler> = {
     }
     sp(vr, ctx, "not_valid");
     return back(vr, "vma-options", { b, i, v: ctx.query.get("v") ?? undefined });
+  },
+
+  /** Call a customer out (Abraham, Nov 15, 2026): the number, then pound; the customer sees (845) 777-7585. */
+  "vma-out"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const n = Number(ctx.query.get("n") || 0);
+    if (n >= 3) return back(vr, "vma-box");
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-out-dial"), method: "POST" });
+    sp(g, ctx, "vma_out_enter");
+    return back(vr, "vma-out", { n: n + 1 });
+  },
+
+  async "vma-out-dial"(ctx, vr) {
+    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    const to = callOutNumber(ctx.body.Digits);
+    if (!to) {
+      sp(vr, ctx, "vma_out_bad");
+      return back(vr, "vma-out");
+    }
+    await track(ctx.callSid, "vm_access", `Called out to ${to} from voicemail by phone`, { to });
+    // Shows (845) 777-7585; after the call, back to the box menu
+    vr.dial({ callerId: CALLBACK_CALLER_ID, action: url("vma-box"), method: "POST", timeout: 30 }, to);
+    return vr;
   },
 
   /**

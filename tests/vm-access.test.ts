@@ -25,7 +25,7 @@ import { handleVoice } from "@/lib/ivr/flow";
 import { PROMPTS } from "@/lib/ivr/prompts";
 import { lineStatus } from "@/lib/prompt-status";
 import { mainBox } from "@/lib/voicemail";
-import { VM_ACCESS_LIVE_APPROVED, callbackNumber, setVmPin, vmAccessActive, vmLockedUntil } from "@/lib/vm-access";
+import { VM_ACCESS_LIVE_APPROVED, callOutNumber, callbackNumber, setVmPin, vmAccessActive, vmLockedUntil } from "@/lib/vm-access";
 
 const call = (action: string, body: Record<string, string> = {}, query = "") =>
   handleVoice({ action, query: new URLSearchParams(query), body: { CallSid: "CAvma", ...body }, callSid: "CAvma", from: "+18455550199" });
@@ -48,7 +48,10 @@ describe("where it runs, and the wording", () => {
     expect(vmAccessActive({ VERCEL_ENV: "preview" })).toBe(true);
     const keys = Object.keys(PROMPTS).filter((k) => k.startsWith("vma_")) as (keyof typeof PROMPTS)[];
     expect(keys.length).toBeGreaterThanOrEqual(10);
-    for (const k of keys) expect(lineStatus(k, {}).status, k).toBe("Waiting for approval");
+    // Abraham's own lines (Nov 15, 2026) are approved; the rest wait for his OK
+    const approved = ["vma_pin", "vma_out_enter", "vma_out_bad"];
+    for (const k of keys.filter((k) => !approved.includes(k))) expect(lineStatus(k, {}).status, k).toBe("Waiting for approval");
+    expect(PROMPTS.vma_pin.text).toBe("Please enter your password.");
   });
   it("call-backs only to US and Canada numbers, never premium", () => {
     expect(callbackNumber("+18455550123")).toBe("+18455550123");
@@ -59,11 +62,16 @@ describe("where it runs, and the wording", () => {
 });
 
 describe("getting in", () => {
-  it("7 then 4 during the greeting asks for the PIN; any other key just records; the greeting never mentions it", async () => {
+  it("only the general voicemail (key 9): star 7 4 within 3 seconds per key asks for the password; any other key just records; never mentioned", async () => {
     const vm = await call("voicemail", {}, "x=9");
-    expect(vm).toMatch(/<Gather [^>]*numDigits="2"[^>]*action="https:\/\/hupup\.example\/api\/voice\/vm-greeting-key\?x=9"/);
-    expect(said(vm).join(" ")).not.toMatch(/PIN|7|seven/i);
-    expect(redirect(await call("vm-greeting-key", { Digits: "74" }, "x=9"))).toBe("vma-pin");
+    expect(vm).toMatch(/<Gather [^>]*numDigits="3"[^>]*action="https:\/\/hupup\.example\/api\/voice\/vm-greeting-key\?x=9"/);
+    expect(vm).toMatch(/<Gather [^>]*timeout="3"/);
+    expect(said(vm).join(" ")).not.toMatch(/PIN|password|7|seven/i);
+    expect(redirect(await call("vm-greeting-key", { Digits: "*74" }, "x=9"))).toBe("vma-pin");
+    expect(await call("vm-greeting-key", { Digits: "74" }, "x=9")).toContain("<Record");
+    // other boxes: no staff access at all
+    expect(await call("voicemail", {}, "x=5")).not.toContain("vm-greeting-key");
+    expect(await call("vm-greeting-key", { Digits: "*74" }, "x=5")).toContain("<Record");
     expect(await call("vm-greeting-key", { Digits: "5" }, "x=9")).toContain("<Record");
   });
   it("no PIN set: refused and logged", async () => {
@@ -76,7 +84,7 @@ describe("getting in", () => {
     const [row] = await db.select().from(schema.appSettings).where(eq(schema.appSettings.key, "vm_access_pin_hash"));
     expect(String(row.value)).not.toContain("4821");
     expect(String(row.value)).toMatch(/^\$2[aby]\$/);
-    expect(said(await call("vma-pin"))).toContain("Please enter your voicemail PIN, then press pound.");
+    expect(said(await call("vma-pin"))).toContain("Please enter your password.");
     expect(redirect(await call("vma-pin-check", { Digits: "4821" }))).toBe("vma-box");
     expect(h.session.data.vmaOk).toBe(1);
     expect(await log()).toEqual(["ok"]);
@@ -98,7 +106,8 @@ describe("getting in", () => {
     expect(await vmLockedUntil(new Date(Date.now() + 16 * 60_000))).toBeNull();
   });
   it("the steps after the PIN refuse anyone not signed in on this call", async () => {
-    expect(redirect(await call("vma-box-choice", { Digits: "0" }))).toBe("vma-pin");
+    expect(redirect(await call("vma-box-choice", { Digits: "1" }))).toBe("vma-pin");
+    expect(redirect(await call("vma-out-dial", { Digits: "8455550123" }))).toBe("vma-pin");
     expect(redirect(await call("vma-choice", { Digits: "4" }, "b=1&i=0&v=1"))).toBe("vma-pin");
   });
 });
@@ -111,7 +120,7 @@ describe("after the PIN", () => {
     const [newer] = await db.insert(schema.voicemails).values({ boxId: box.id, fromNumber: "+18455550122", recordingSid: "REv2", recordingUrl: "https://api.twilio.com/x/REv2", durationSec: 9, state: "submitted", createdAt: new Date("2026-11-13T01:00:00Z") }).returning();
     await db.insert(schema.voicemails).values({ boxId: box.id, fromNumber: "+18455550133", recordingSid: "REv3", recordingUrl: "https://api.twilio.com/x/REv3", durationSec: 9, state: "submitted", deletedAt: new Date() }); // hidden: never played
 
-    const chose = await call("vma-box-choice", { Digits: "0" });
+    const chose = await call("vma-box-choice", { Digits: "1" }); // 1 = main box
     expect(said(chose)).toContain("You have 2 messages, newest first.");
     expect(redirect(chose)).toBe(`vma-play?b=${box.id}&i=0`);
 
@@ -140,5 +149,19 @@ describe("after the PIN", () => {
     const none = await call("vma-box-choice", { Digits: "3" });
     expect(said(none)).toContain("There are no messages in this box.");
     expect(redirect(await call("vma-box-choice", { Digits: "7" }))).toBe("vma-box");
+  });
+  it("0 calls a customer out from (845) 777-7585: enter the number, pound; not valid asks again", async () => {
+    h.session.data = { vmaOk: 1 };
+    expect(redirect(await call("vma-box-choice", { Digits: "0" }))).toBe("vma-out");
+    const ask = await call("vma-out");
+    expect(said(ask)).toContain("Please enter the phone number.");
+    expect(ask).toMatch(/<Gather [^>]*finishOnKey="#"/);
+    const bad = await call("vma-out-dial", { Digits: "12345" });
+    expect(said(bad)).toContain("It is not a valid phone number. Please try again.");
+    expect(redirect(bad)).toBe("vma-out");
+    expect(said(await call("vma-out-dial", { Digits: "9005550123" }))).toContain("It is not a valid phone number. Please try again.");
+    const dial = await call("vma-out-dial", { Digits: "8455550123" });
+    expect(dial).toMatch(/<Dial [^>]*callerId="\+18457777585"[^>]*>\+18455550123<\/Dial>/);
+    expect(callOutNumber("18455550123")).toBe("+18455550123");
   });
 });

@@ -6,12 +6,15 @@ import { sendEmail } from "@/lib/notify";
 import { formatPhone } from "@/lib/phone";
 
 /**
- * Staff voicemail access from any phone (Abraham, Nov 13, 2026). While any voicemail greeting plays (key 9 too), 7 then
- * 4 (never announced) asks for the voicemail PIN. 3 wrong tries end the call and lock access for 15 minutes; the Owner
+ * Staff voicemail access from any phone (Abraham, Nov 13 and Nov 15, 2026). Only from the general voicemail (main menu
+ * key 9): while its greeting plays, star 7 4, pressed without a pause of 3 seconds or more (never announced), asks
+ * for the password. Then each box by its number, or 0 to call a customer out from (845) 777-7585. 3 wrong tries end the call and lock access for 15 minutes; the Owner
  * gets an email about every lockout. PREVIEW ONLY until Abraham approves it and the call-back price.
  */
 export const VM_ACCESS_LIVE_APPROVED = false;
-export const VM_ACCESS_KEYS = "74";
+export const VM_ACCESS_KEYS = "*74";
+/** Seconds allowed between the keys of star 7 4. */
+export const VM_ACCESS_KEY_GAP = 3;
 export const VM_PIN_TRIES = 3;
 export const VM_LOCK_MINUTES = 15;
 /** Call-backs show the business number (a verified caller ID in Twilio). */
@@ -84,8 +87,18 @@ export async function recentVmAccess(limit = 50) {
   return db.select().from(schema.vmAccessLog).orderBy(desc(schema.vmAccessLog.createdAt)).limit(limit);
 }
 
-/** Box chosen by its extension number on the keypad: 0 = main box. Key 4 is extension 3; key 8 has no number. */
-export const BOX_BY_NUMBER: Record<string, string> = { "0": "0", "2": "2", "3": "4", "5": "5", "6": "6", "8": "8", "9": "9" };
+/**
+ * Box chosen by its number on the keypad (Abraham, Nov 15, 2026): each extension's own number (extension 3 is main
+ * menu key 4), 8 schools and corporate, 9 general voicemail, 1 the main box. 0 is no longer a box: it calls out.
+ */
+export const BOX_BY_NUMBER: Record<string, string> = { "1": "0", "2": "2", "3": "4", "5": "5", "6": "6", "8": "8", "9": "9" };
+
+/** A number typed by staff to call out: 10 digits (or 1 and 10 digits), US or Canada, never 900 or 976. */
+export function callOutNumber(digits: string | null | undefined): string | null {
+  const d = (digits ?? "").replace(/\D/g, "");
+  const ten = d.length === 11 && d.startsWith("1") ? d.slice(1) : d;
+  return ten.length === 10 ? callbackNumber(`+1${ten}`) : null;
+}
 
 /** A number we may dial back: US or Canada, never premium 900 or 976. */
 export function callbackNumber(from: string | null | undefined): string | null {
