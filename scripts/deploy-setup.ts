@@ -155,45 +155,28 @@ async function deliveryMapCheck() {
     log(`Delivery map test: ${a.name} (rule price $${(want / 100).toFixed(2)}): "${address}" -> ${q.ok ? `${q.zone}, $${(q.feeCents / 100).toFixed(2)}` : `no price (${q.reason})`} ${pass ? "PASS" : "CHECK"}`);
     await new Promise((x) => setTimeout(x, 1100)); // OpenStreetMap asks for at most 1 lookup a second
   }
-  // Two houses on the same street with different prices (the house decides): look across each zone line
-  const { inRing } = await import("../src/lib/delivery-areas");
-  const reverse = async (lng: number, lat: number) => {
-    await new Promise((x) => setTimeout(x, 1100));
-    const j = (await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${lat}&lon=${lng}`, { headers: { "user-agent": "HupUpAttractionsBookings/1.0" }, signal: AbortSignal.timeout(10000) })
-      .then((x) => x.json())
-      .catch(() => ({}))) as { address?: Record<string, string> };
-    const ad = j.address ?? {};
-    const town = ad.village || ad.town || ad.city || ad.hamlet || "";
-    return ad.house_number && ad.road && town ? { road: ad.road, address: `${ad.house_number} ${ad.road}, ${town}, NY ${ad.postcode ?? ""}`.trim() } : null;
-  };
+  // Two houses on the same street with different prices (the house decides): house numbers along roads that cross
+  // the KJ line, each placed on the map by the US Census address service
+  const roads = ["Forest Road", "Mountain Road", "Bakertown Road", "Acres Road", "Seven Springs Mountain Road", "Schunnemunk Road", "Larkin Drive", "Dinev Road"];
+  const numbers = [1, 10, 25, 40, 60, 80, 100, 130, 160, 200, 250, 300, 400, 500, 600];
   let found = false;
-  let tries = 0;
-  for (const a of r.areas) {
-    const ring = a.polygons[0];
-    const step = Math.max(1, Math.floor(ring.length / 6));
-    for (let i = 0; i + 1 < ring.length && tries < 30 && !found; i += step) {
-      tries++;
-      const [x1, y1] = ring[i];
-      const [x2, y2] = ring[i + 1];
-      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-      const len = Math.hypot(x2 - x1, y2 - y1) || 1;
-      const nx = (-(y2 - y1) / len) * 0.0012, ny = ((x2 - x1) / len) * 0.0012; // about 100 m each side
-      const pin = inRing([mx + nx, my + ny], ring) ? [mx + nx, my + ny] : [mx - nx, my - ny];
-      const pout = pin[0] === mx + nx ? [mx - nx, my - ny] : [mx + nx, my + ny];
-      const h1 = await reverse(pin[0], pin[1]);
-      if (!h1) continue;
-      const h2 = await reverse(pout[0], pout[1]);
-      if (!h2 || h2.road !== h1.road || h2.address === h1.address) continue;
-      const q1 = await deliveryQuote(h1.address, s);
-      const q2 = await deliveryQuote(h2.address, s);
-      if (q1.ok && q2.ok && q1.feeCents !== q2.feeCents) {
+  for (const road of roads) {
+    const seen: { address: string; fee: number; zone: string }[] = [];
+    for (const n of numbers) {
+      const address = `${n} ${road}, Monroe, NY 10950`;
+      const q = await deliveryQuote(address, s);
+      if (!q.ok) continue;
+      const other = seen.find((x) => x.fee !== q.feeCents);
+      if (other) {
+        log(`Delivery map test, same street: "${other.address}" -> ${other.zone}, $${(other.fee / 100).toFixed(2)}; "${address}" -> ${q.zone}, $${(q.feeCents / 100).toFixed(2)} PASS`);
         found = true;
-        log(`Delivery map test, same street: "${h1.address}" -> ${q1.zone}, $${(q1.feeCents / 100).toFixed(2)}; "${h2.address}" -> ${q2.zone}, $${(q2.feeCents / 100).toFixed(2)} PASS`);
+        break;
       }
+      seen.push({ address, fee: q.feeCents, zone: q.zone });
     }
-    if (found || tries >= 30) break;
+    if (found) break;
   }
-  if (!found) log(`Delivery map test, same street: no street with houses on both sides of a zone line found in ${tries} tries.`);
+  if (!found) log("Delivery map test, same street: none of the test roads had two houses in different zones.");
   for (const out of ["25 Main Street, Goshen, NY 10924"]) {
     const q = await deliveryQuote(out, s);
     log(`Delivery map test: outside every colored area "${out}" -> ${q.ok ? `$${(q.feeCents / 100).toFixed(2)} ${q.feeCents === 2000 ? "PASS" : "CHECK"}` : `no price (${q.reason}) CHECK`}`);
