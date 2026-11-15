@@ -115,7 +115,7 @@ describe("speech to text: the call", () => {
     // Google voice audio, never Twilio's Say: "We got" + the caller's words + "If that is correct..."
     expect(said(back).join(" ")).not.toContain("We got");
     expect([...back.matchAll(/<Play>[^<]*\/api\/voice-audio\/prompt\/\d+/g)]).toHaveLength(3);
-    expect(h.tts).toEqual(["We got", "Yossi Friedman.", "If that is correct, press pound to continue. If not, or to say it again, press 1."]);
+    expect(h.tts).toEqual(["We got", "Yossi Friedman.", "If that is correct, press pound to continue. To say it again, press 1."]);
     expect(h.session.data.heard).toBe("Yossi Friedman");
     // the fixed words are made once and reused; only the caller's words are new
     h.tts = [];

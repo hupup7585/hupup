@@ -336,7 +336,7 @@ export const PROMPTS = {
     group: "Checkout",
     label: "Read back a spoken answer (speech to text, Google voice)",
     // Abraham's wording, Nov 15, 2026 (approved): pound confirms, 1 records it again
-    text: "We got {text}. If that is correct, press pound to continue. If not, or to say it again, press 1.",
+    text: "We got {text}. If that is correct, press pound to continue. To say it again, press 1.",
     vars: ["text"],
   },
 
