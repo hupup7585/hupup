@@ -29,7 +29,13 @@ import { toE164 } from "@/lib/phone";
  * The Stripe keys are connected inside Twilio's Stripe Pay Connector; this code doesn't read them.
  */
 export type PhonePayMode = "off" | "owner_test" | "live";
-export const STRIPE_PHONE_PAY_MODE: PhonePayMode = "owner_test";
+/** Abraham, Nov 14, 2026: Sola PhonePay is the main phone payment; Stripe stays built as a backup, off by default. */
+export function stripePhonePayMode(env: Record<string, string | undefined> = process.env): PhonePayMode {
+  // Only "owner_test" can be switched on from Vercel (STRIPE_PHONE_PAY_MODE); "live" needs Abraham's OK and a code change
+  return env.STRIPE_PHONE_PAY_MODE === "owner_test" ? "owner_test" : "off";
+}
+/** Read at call time (see stripePhonePayMode). Kept for older code paths. */
+export const STRIPE_PHONE_PAY_MODE: PhonePayMode = "off";
 
 export const PAY_ENV_NAMES = ["TWILIO_PAY_ACCOUNT_SID", "TWILIO_PAY_AUTH_TOKEN", "TWILIO_PAY_SIP_DOMAIN", "TWILIO_PAY_SIP_USERNAME", "TWILIO_PAY_SIP_PASSWORD"] as const;
 
@@ -38,7 +44,7 @@ export function phonePayConfigured(env: Record<string, string | undefined> = pro
 }
 
 /** Does this caller get keypad payment right after the read-back? */
-export function keypadPayFor(callerFrom: string | null | undefined, mode: PhonePayMode = STRIPE_PHONE_PAY_MODE, env: Record<string, string | undefined> = process.env): boolean {
+export function keypadPayFor(callerFrom: string | null | undefined, mode: PhonePayMode = stripePhonePayMode(), env: Record<string, string | undefined> = process.env): boolean {
   if (mode === "off" || !phonePayConfigured(env)) return false;
   if (mode === "live") return true;
   const caller = toE164(callerFrom);
@@ -47,7 +53,7 @@ export function keypadPayFor(callerFrom: string | null | undefined, mode: PhoneP
 
 /** Older name kept for the read-back step. */
 export function keypadPayOn() {
-  return STRIPE_PHONE_PAY_MODE === "live" && phonePayConfigured();
+  return stripePhonePayMode() === "live" && phonePayConfigured();
 }
 
 export const payConnector = (env: Record<string, string | undefined> = process.env) => env.TWILIO_PAY_CONNECTOR || "Stripe_Connector";
@@ -76,7 +82,7 @@ export function payLast4(masked: string | null | undefined): string | null {
 }
 
 /** For Admin: Off / Owner test / Live, whether the subaccount is set up, and Stripe test or live mode (from the key). */
-export function phonePayStatus(env: Record<string, string | undefined> = process.env, mode: PhonePayMode = STRIPE_PHONE_PAY_MODE) {
+export function phonePayStatus(env: Record<string, string | undefined> = process.env, mode: PhonePayMode = stripePhonePayMode()) {
   const k = env.STRIPE_READ_KEY || env.STRIPE_REFUNDS_KEY || env.STRIPE_DISPUTES_KEY || "";
   const stripe = /^(rk|sk)_test_/.test(k) ? "Stripe test mode" : /^(rk|sk)_live_/.test(k) ? "Stripe live mode" : "Stripe keys not in Vercel yet";
   const missing = PAY_ENV_NAMES.filter((n) => !env[n]);

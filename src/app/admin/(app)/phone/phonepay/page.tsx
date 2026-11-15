@@ -1,0 +1,94 @@
+import { requireOwner } from "@/lib/auth";
+import { getSettings } from "@/lib/settings";
+import { recentAttempts } from "@/lib/sola-phonepay";
+import { orderNumber } from "@/lib/orders";
+import { formatMoney } from "@/lib/money";
+import { formatPhone } from "@/lib/phone";
+import { dualDateTime } from "@/lib/dual-date";
+import { savePhonePayAction } from "./actions";
+
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Sola PhonePay · Hup Up Attractions", robots: { index: false } };
+
+const NOTE: Record<string, string> = {
+  Paid: "Paid",
+  not_found: "No Sola payment found",
+  amount_mismatch: "Different amount",
+  ambiguous: "Two payments with the same amount",
+};
+
+/** Owner only (Abraham, Nov 14, 2026): callers pay by card through Sola's free PhonePay line. No card data, ever. */
+export default async function PhonePayPage({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
+  await requireOwner();
+  const { m } = await searchParams;
+  const [s, attempts] = await Promise.all([getSettings(), recentAttempts(20)]);
+  const ready = {
+    pin: Boolean(process.env.SOLA_PHONEPAY_PIN),
+    sub: Boolean(process.env.TWILIO_PAY_SIP_DOMAIN && process.env.TWILIO_PAY_SIP_USERNAME && process.env.TWILIO_PAY_SIP_PASSWORD && process.env.TWILIO_PAY_AUTH_TOKEN),
+    api: Boolean(process.env.SOLA_API_KEY),
+  };
+  return (
+    <div className="mx-auto max-w-4xl" data-phonepay>
+      <h1 className="text-2xl font-black sm:text-3xl">Sola PhonePay</h1>
+      <p className="mb-4 mt-1 text-muted">
+        Callers pay by card on the phone. After the order is read back, a caller who presses 1 is passed to Sola&rsquo;s secure PhonePay line, types the card on the keypad, and comes back to finish the order. We never hear, record or keep the card number. The payment is then found in Sola and the order is marked paid.
+      </p>
+      {m && <p className="card mb-4 p-3 text-sm font-semibold" data-phonepay-message>{m}</p>}
+
+      <section className="card mb-5 p-5" data-phonepay-ready>
+        <h2 className="mb-2 text-lg font-bold">Set up</h2>
+        <ul className="space-y-1 text-sm">
+          <li>{ready.pin ? "Yes" : "Not yet"}: our PhonePay merchant PIN (SOLA_PHONEPAY_PIN in Vercel, added by Hark)</li>
+          <li>{ready.sub ? "Yes" : "Not yet"}: the payment subaccount &ldquo;Hup Up Payments&rdquo; and its SIP domain</li>
+          <li>{ready.api ? "Yes" : "Not yet"}: the Sola key used to find each payment (SOLA_API_KEY)</li>
+        </ul>
+      </section>
+
+      <form action={savePhonePayAction} className="card mb-5 grid gap-4 p-5" data-phonepay-form>
+        <label className="flex items-start gap-2">
+          <input type="checkbox" name="on" defaultChecked={s.solaPhonePayOn} className="mt-1" />
+          <span><b>Turn on phone payments by card.</b> <span className="text-sm text-muted">When off, every caller gets the secure payment link, as today.</span></span>
+        </label>
+        <label className="flex items-start gap-2">
+          <input type="checkbox" name="ownerOnly" defaultChecked={s.solaPhonePayOwnerOnly} className="mt-1" />
+          <span><b>Only my own test calls</b> from (845) 777-7585. <span className="text-sm text-muted">Untick this to offer it to every caller, after your test payment and once the 5 phone lines are approved.</span></span>
+        </label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block"><span className="label">PhonePay number</span><input name="number" defaultValue={formatPhone(s.solaPhonePayNumber)} className="input" placeholder="(833) 434-3354" /></label>
+          <label className="block"><span className="label">Backup number (used if the first does not answer)</span><input name="backup" defaultValue={formatPhone(s.solaPhonePayBackup)} className="input" placeholder="(844) 422-7356" /></label>
+        </div>
+        <label className="block">
+          <span className="label">Digits sent to PhonePay</span>
+          <input name="digits" defaultValue={s.solaPhonePayDigits} className="input font-mono" />
+          <span className="mt-1 block text-xs text-muted">
+            Sent automatically after PhonePay answers. <code>w</code> waits half a second. <code>{"{pin}"}</code> is our merchant PIN (kept secret in Vercel), <code>{"{amount}"}</code> the total in cents with no point (230.00 is 23000), <code>{"{dollars}"}</code> whole dollars, <code>{"{order}"}</code> the order number. Example: <code>{"wwwwwwwwww{pin}#ww{amount}#"}</code> waits 5 seconds, enters the PIN and pound, waits 1 second, then the amount and pound. Set this to match PhonePay&rsquo;s prompts from your test call.
+          </span>
+        </label>
+        <button className="btn-dark w-fit">Save</button>
+      </form>
+
+      <section className="card p-5" data-phonepay-attempts>
+        <h2 className="mb-2 text-lg font-bold">Last 20 attempts</h2>
+        {attempts.length === 0 ? (
+          <p className="text-sm text-muted">No attempts yet.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead><tr><th className="th">When</th><th className="th">Order</th><th className="th">Amount</th><th className="th">Matched</th><th className="th">Card</th><th className="th">Sola reference</th></tr></thead>
+            <tbody>
+              {attempts.map((a) => (
+                <tr key={a.id}>
+                  <td className="td">{dualDateTime(a.startedAt)}</td>
+                  <td className="td"><a className="underline" href={`/admin/orders/${a.orderId}`}>Order number {orderNumber(a.orderId)}</a></td>
+                  <td className="td">{formatMoney(a.amountCents)}</td>
+                  <td className={`td font-semibold ${a.matched ? "text-[#13895C]" : a.matched === false ? "text-[#C83A2F]" : "text-muted"}`}>{a.matched ? "Yes" : a.matched === false ? `No (${NOTE[a.note ?? ""] ?? a.note ?? ""})` : "In progress"}</td>
+                  <td className="td">{a.cardType ?? ""}{a.last4 ? ` ending ${a.last4}` : ""}</td>
+                  <td className="td font-mono text-xs">{a.solaRef ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </div>
+  );
+}

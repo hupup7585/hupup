@@ -260,6 +260,13 @@ export const PROMPTS = {
     vars: ["minutes"],
   },
   // Pay by keypad through Stripe (Abraham, Nov 12, 2026). Wording approved Nov 13, 2026; still owner test only.
+  // Sola PhonePay (Abraham, Nov 14, 2026): drafts until he approves them; they play only on his own test calls until then
+  phonepay_choice: { group: "Pay by card (Sola PhonePay)", label: "Pay now or get a link", text: "Press 1 to pay now by card. Press 2 to get a secure payment link instead.", pending: true },
+  // Abraham's approved wording (Nov 14, 2026); stays "Waiting" until he approves the recorded audio
+  phonepay_intro: { group: "Pay by card (Sola PhonePay)", label: "PhonePay connect", text: "Thank you. Please hold for a moment while we connect you to our secure payment line.", pending: true },
+  phonepay_back: { group: "Pay by card (Sola PhonePay)", label: "Back from the payment line", text: "Thank you, let us finish your order.", pending: true },
+  phonepay_paid: { group: "Pay by card (Sola PhonePay)", label: "Payment found", text: "Your payment was received. You are all set!", pending: true },
+  phonepay_not_found: { group: "Pay by card (Sola PhonePay)", label: "Payment not found", text: "We could not confirm your payment yet. We will send you a secure payment link, and our team will call you back if needed.", pending: true },
   pay_start: { group: "Pay by keypad", label: "Before the card steps", text: "Let us take care of your payment now. Please have your card ready." },
   pay_card_number: { group: "Pay by keypad", label: "Card number", text: "Please enter your card number on your keypad, then press pound." },
   pay_expiration: { group: "Pay by keypad", label: "Expiration date", text: "Please enter the expiration date, two digits for the month and two digits for the year, then press pound." },
@@ -391,6 +398,7 @@ export const PROMPT_AREAS: Record<string, string> = {
   "Text message consent": "Key 1: Bookings",
   "Promo texts by phone (keys only)": "Key 1: Bookings",
   "Pay by keypad": "Key 1: Bookings",
+  "Pay by card (Sola PhonePay)": "Key 1: Bookings",
   "Key 2: Instructions": "Key 2: Instructions",
   "Key 4: Learn about our rentals": "Key 4: Learn about our rentals",
   "Talk to a person": "Keys 0, 3, 5, 6 and Schools: ringing staff",

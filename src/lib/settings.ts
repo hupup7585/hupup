@@ -24,6 +24,13 @@ export const SETTING_DEFAULTS = {
   /** Surrounding towns ($15 zone), all in Orange County. */
   zoneAreaPlaces: "Monroe\nBlooming Grove\nWoodbury\nHighland Mills\nChester\nHarriman\nMiddletown\nWashingtonville",
   /* Jewish calendar (Abraham, 2026-11-06). Diaspora; zmanim for Monroe / Kiryas Joel. Booleans as "yes"/"no". */
+  /* Sola PhonePay (Abraham, Nov 14, 2026): card by phone through Sola's free PhonePay line. Off; Owner test first. */
+  solaPhonePayOn: false,
+  solaPhonePayOwnerOnly: true,
+  solaPhonePayNumber: "+18334343354",
+  solaPhonePayBackup: "+18444227356",
+  /** Digits sent to PhonePay: w = half a second; {pin} {amount} {dollars} {order}. Set from Abraham's test call. */
+  solaPhonePayDigits: "wwwwwwwwww{pin}#",
   calendarEnabled: "yes",
   calendarLatitude: "41.3407",
   calendarLongitude: "-74.1679",

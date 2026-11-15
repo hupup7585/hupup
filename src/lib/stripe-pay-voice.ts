@@ -7,7 +7,7 @@ import { PAYMENT_HOLD_MINUTES, getPaymentGroup, markGroupPaid, minutesFromNow, o
 import { RECEIPT_APPROVED, sendPhoneReceipt } from "@/lib/phone-receipt";
 import { ensureGroupPriced } from "@/lib/order-pricing";
 import { loadPromptOverrides, promptText, type PromptKey, type PromptOverrides } from "@/lib/ivr/prompts";
-import { STRIPE_PHONE_PAY_MODE, payConnector, payLast4, verifyPaySip } from "@/lib/phone-pay";
+import { stripePhonePayMode, payConnector, payLast4, verifyPaySip } from "@/lib/phone-pay";
 import { paymentReceivedNotices, recordPaymentResult } from "@/lib/payment-result";
 
 /**
@@ -75,7 +75,40 @@ export async function handlePayVoice(action: string, query: URLSearchParams, bod
   const vr = new twilio.twiml.VoiceResponse();
   const prompts = await loadPromptOverrides();
   const sid = body.CallSid ?? "";
-  if (STRIPE_PHONE_PAY_MODE === "off" || (process.env.TWILIO_PAY_ACCOUNT_SID && body.AccountSid !== process.env.TWILIO_PAY_ACCOUNT_SID)) {
+  // Sola PhonePay (Abraham, Nov 14, 2026): a signed hand-over from the hotline is dialed straight to PhonePay with the
+  // digits from Admin. The PIN comes only from SOLA_PHONEPAY_PIN and is never logged. If PhonePay doesn't answer, the
+  // backup number is tried once; then the call ends here and the caller is back on the hotline (payment link).
+  if (body["SipHeader_X-Hup-Mode"] === "phonepay" || action === "phonepay-backup") {
+    if (process.env.TWILIO_PAY_ACCOUNT_SID && body.AccountSid !== process.env.TWILIO_PAY_ACCOUNT_SID) {
+      vr.hangup();
+      return vr.toString();
+    }
+    const { buildSendDigits, phonePayDialTwiml, verifyPhonePaySip } = await import("@/lib/sola-phonepay");
+    const { getSettings } = await import("@/lib/settings");
+    const s = await getSettings();
+    const pin = process.env.SOLA_PHONEPAY_PIN ?? "";
+    if (action === "phonepay-backup") {
+      const o = Number(query.get("o"));
+      const cents = Number(query.get("c"));
+      const answered = body.DialCallStatus === "completed" || body.DialCallStatus === "answered";
+      if (answered || !o || !cents || !tokOk(o, sid, query.get("t")) || !pin) {
+        vr.hangup();
+        return vr.toString();
+      }
+      phonePayDialTwiml(vr, s.solaPhonePayBackup, buildSendDigits(s.solaPhonePayDigits, { pin, amountCents: cents, orderNumber: orderNumber(o) }), null);
+      vr.hangup();
+      return vr.toString();
+    }
+    const v = verifyPhonePaySip(body);
+    if (!v || !s.solaPhonePayOn || !pin) {
+      vr.hangup();
+      return vr.toString();
+    }
+    const digits = buildSendDigits(s.solaPhonePayDigits, { pin, amountCents: v.cents, orderNumber: orderNumber(v.orderId) });
+    phonePayDialTwiml(vr, s.solaPhonePayNumber, digits, payUrl("phonepay-backup", { o: v.orderId, c: v.cents, t: tok(v.orderId, sid) }));
+    return vr.toString();
+  }
+  if (stripePhonePayMode() === "off" || (process.env.TWILIO_PAY_ACCOUNT_SID && body.AccountSid !== process.env.TWILIO_PAY_ACCOUNT_SID)) {
     vr.hangup();
     return vr.toString();
   }

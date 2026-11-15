@@ -25,6 +25,7 @@ import { assignDriversAction } from "./driver-actions";
 import { confirmAttentionAction } from "./attention-actions";
 import { attentionItemsFree } from "@/lib/late-payment";
 import { STATUS_LABEL, statusHistory } from "@/lib/status-history";
+import { paymentSourceLabel } from "@/lib/sola-phonepay";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -80,7 +81,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               ) : (
                 <div>Total <b className="ml-3 text-lg">{formatMoney(o.subtotalCents)}</b></div>
               )}
-              <div className="text-sm text-muted">Paid {formatMoney(o.paidCents)}{o.paymentMethod ? ` (${o.paymentMethod})` : ""}{o.solaRefNum ? ` · Sola ref ${o.solaRefNum}` : ""}</div>
+              <div className="text-sm text-muted">Paid {formatMoney(o.paidCents)}{o.paymentMethod ? ` (${paymentSourceLabel(o.paymentMethod)})` : ""}{o.solaRefNum ? ` · Sola ref ${o.solaRefNum}` : ""}</div>
               {o.paymentResult && (
                 <div data-payment-result className={`text-sm ${o.paymentResult === "declined" ? "font-bold text-coral-dark" : "text-[#13895C] font-semibold"}`}>
                   {paymentResultLabel(o)}
@@ -91,7 +92,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               {due > 0 && <div className="text-sm font-bold text-coral">Balance due {formatMoney(due)}</div>}
             </div>
           </div>
-          {staff.role === "owner" && (o.paymentMethod === "stripe" || o.paymentMethod === "sola") && o.paidCents > 0 && (await (async () => {
+          {staff.role === "owner" && (o.paymentMethod === "stripe" || o.paymentMethod === "sola" || o.paymentMethod === "sola_phonepay") && o.paidCents > 0 && (await (async () => {
             // Refund (Owner only; Secretary and Delivery never see it). Stripe phone or Sola website payments.
             const [refunds, disputes] = await Promise.all([refundsFor(o.id), o.paymentMethod === "stripe" ? disputesFor(o.id) : Promise.resolve([])]);
             const users = await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers);

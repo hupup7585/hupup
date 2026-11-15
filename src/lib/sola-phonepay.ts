@@ -1,0 +1,241 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { desc, eq } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
+import { BUSINESS_NAME, config } from "@/lib/config";
+import { toE164 } from "@/lib/phone";
+
+/**
+ * Pay by card on the phone through Sola PhonePay (Abraham, Nov 14, 2026). Replaces Stripe as the main phone payment;
+ * the Stripe keypad payment stays built as an Owner-only backup that is off.
+ *
+ * 1. After the order read-back the caller presses 1 to pay now by card (2 = the secure payment link).
+ * 2. The hotline hands the call to the payment subaccount over SIP (PCI mode is on there, never on the main account).
+ * 3. The subaccount dials Sola's free PhonePay line and sends the digits from Admin (waits, our merchant PIN from
+ *    SOLA_PHONEPAY_PIN, and the amount and order number if PhonePay asks). The caller types the card there.
+ * 4. When PhonePay hangs up the caller comes back to the hotline. We look the payment up in Sola's reporting API by
+ *    amount and time (and order number if PhonePay passes one). Found: Paid. Not found: payment link + callback list.
+ * We never hear, record or store card digits: only status, amount, last 4, card type, Sola reference and time.
+ */
+export const PHONEPAY_NUMBER_DEFAULT = "+18334343354";
+export const PHONEPAY_BACKUP_DEFAULT = "+18444227356";
+/** Default digits: wait 5 seconds, the PIN, pound. Abraham sets the real sequence after his test call. */
+export const PHONEPAY_DIGITS_DEFAULT = "wwwwwwwwww{pin}#";
+
+export type PhonePaySettings = {
+  solaPhonePayOn: boolean;
+  solaPhonePayOwnerOnly: boolean;
+  solaPhonePayNumber: string;
+  solaPhonePayBackup: string;
+  solaPhonePayDigits: string;
+};
+
+/** Is PhonePay offered to this caller right now? Off by default; Owner-test only by default. */
+export function phonePayOffered(caller: string | null | undefined, s: Partial<PhonePaySettings>, env: Record<string, string | undefined> = process.env): boolean {
+  if (!s.solaPhonePayOn) return false;
+  if (!env.SOLA_PHONEPAY_PIN || !env.TWILIO_PAY_SIP_DOMAIN || !env.TWILIO_PAY_SIP_USERNAME || !env.TWILIO_PAY_SIP_PASSWORD) return false;
+  if (s.solaPhonePayOwnerOnly !== false) return Boolean(toE164(caller) && toE164(caller) === (toE164(env.ADMIN_PHONE) ?? "+18457777585"));
+  return true;
+}
+
+/**
+ * The digits sent to PhonePay (Twilio sendDigits). Tokens: {pin}, {amount} (dollars and cents with no point, 230.00
+ * = 23000), {dollars} (whole dollars, 230), {order} (order number, 1438). "w" waits half a second. Only 0-9, * , # and
+ * w may remain; anything else is refused so a typo can never send stray tones.
+ */
+export function buildSendDigits(template: string, v: { pin: string; amountCents: number; orderNumber: string }): string {
+  const out = (template || PHONEPAY_DIGITS_DEFAULT)
+    .replace(/\s+/g, "")
+    .replace(/\{pin\}/gi, v.pin.replace(/\D/g, ""))
+    .replace(/\{amount\}/gi, String(Math.round(v.amountCents)))
+    .replace(/\{dollars\}/gi, String(Math.floor(v.amountCents / 100)))
+    .replace(/\{order\}/gi, v.orderNumber.replace(/\D/g, ""));
+  if (!/^[0-9*#wW]*$/.test(out)) throw new Error("The PhonePay digits may hold only numbers, star, pound, w (half a second wait) and {pin}, {amount}, {dollars}, {order}.");
+  if (out.length > 64) throw new Error("The PhonePay digits are too long (64 at most).");
+  return out;
+}
+
+/** Check a template before saving (Admin). Returns an error or null. */
+export function digitsTemplateError(template: string): string | null {
+  try {
+    buildSendDigits(template, { pin: "1234", amountCents: 23000, orderNumber: "1438" });
+    return null;
+  } catch (e) {
+    return (e as Error).message;
+  }
+}
+
+/** The order travels to the subaccount in SIP headers, signed so it can't be changed on the way. */
+const sig = (orderId: number, callSid: string, cents: number) =>
+  createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`sola-phonepay:${orderId}:${callSid}:${cents}`).digest("hex").slice(0, 32);
+
+export function phonePaySipUri(orderId: number, callSid: string, cents: number, env: Record<string, string | undefined> = process.env): string {
+  return `sip:phonepay@${env.TWILIO_PAY_SIP_DOMAIN}?X-Hup-Mode=phonepay&X-Hup-Order=${orderId}&X-Hup-Call=${encodeURIComponent(callSid)}&X-Hup-Cents=${cents}&X-Hup-Sig=${sig(orderId, callSid, cents)}`;
+}
+
+export function verifyPhonePaySip(body: Record<string, string>): { orderId: number; mainCallSid: string; cents: number } | null {
+  if (body["SipHeader_X-Hup-Mode"] !== "phonepay") return null;
+  const orderId = Number(body["SipHeader_X-Hup-Order"]);
+  const cents = Number(body["SipHeader_X-Hup-Cents"]);
+  const mainCallSid = body["SipHeader_X-Hup-Call"] ?? "";
+  const got = Buffer.from(body["SipHeader_X-Hup-Sig"] ?? "");
+  if (!Number.isInteger(orderId) || orderId <= 0 || !Number.isInteger(cents) || cents <= 0 || !mainCallSid) return null;
+  const want = Buffer.from(sig(orderId, mainCallSid, cents));
+  return want.length === got.length && timingSafeEqual(want, got) ? { orderId, mainCallSid, cents } : null;
+}
+
+/* ---- Attempts (Admin shows the last 20; never any card data) ---- */
+
+export async function startAttempt(orderId: number, callSid: string, amountCents: number) {
+  const [row] = await db.insert(schema.phonepayAttempts).values({ orderId, callSid, amountCents }).returning();
+  return row;
+}
+
+export async function finishAttempt(id: number, r: { matched: boolean; solaRef?: string | null; last4?: string | null; cardType?: string | null; note?: string | null }) {
+  await db
+    .update(schema.phonepayAttempts)
+    .set({ endedAt: new Date(), matched: r.matched, solaRef: r.solaRef ?? null, last4: r.last4 && /^\d{4}$/.test(r.last4) ? r.last4 : null, cardType: r.cardType?.slice(0, 30) ?? null, note: r.note?.slice(0, 300) ?? null })
+    .where(eq(schema.phonepayAttempts.id, id));
+}
+
+export async function recentAttempts(limit = 20) {
+  return db.select().from(schema.phonepayAttempts).orderBy(desc(schema.phonepayAttempts.startedAt)).limit(limit);
+}
+
+export async function openAttemptFor(callSid: string, orderId: number) {
+  const [row] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.callSid, callSid)).orderBy(desc(schema.phonepayAttempts.id)).limit(1);
+  return row && row.orderId === orderId && !row.endedAt ? row : null;
+}
+
+/* ---- Finding the payment in Sola ---- */
+
+/** "2026-11-14 15:04:05" in New York time (Sola's reports) to a real time, daylight saving included. */
+export function easternToDate(s: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(s.trim());
+  if (!m) return new Date(NaN);
+  const asUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] ?? 0));
+  const off = (d: number) => {
+    const p = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", timeZoneName: "longOffset" }).formatToParts(new Date(d)).find((x) => x.type === "timeZoneName")?.value ?? "GMT-05:00";
+    const mm = /GMT([+-])(\d{2}):(\d{2})/.exec(p);
+    return mm ? (mm[1] === "-" ? -1 : 1) * (+mm[2] * 60 + +mm[3]) : -300;
+  };
+  return new Date(asUtc - off(asUtc) * 60_000);
+}
+
+export type SolaTxn = { refNum: string; amountCents: number; at: Date; invoice: string | null; last4: string | null; cardType: string | null; approved: boolean };
+
+/**
+ * Sola (Cardknox) reporting API: POST https://x1.cardknox.com/reportjson, xCommand "Report:Approved" with xBeginDate
+ * and xEndDate (Eastern time, "YYYY-MM-DD HH:MM:SS"). Read-only; uses SOLA_API_KEY. Confirm the field names against
+ * Sola's docs on the first real test (Abraham's test call).
+ */
+export async function solaApprovedBetween(from: Date, to: Date, fetcher: typeof fetch = fetch, env: Record<string, string | undefined> = process.env): Promise<SolaTxn[]> {
+  const key = env.SOLA_API_KEY;
+  if (!key) throw new Error("Not active yet: SOLA_API_KEY isn't in Vercel.");
+  const et = (d: Date) => d.toLocaleString("sv-SE", { timeZone: "America/New_York" }).replace("T", " ");
+  const res = await fetcher("https://x1.cardknox.com/reportjson", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ xKey: key, xVersion: "5.0.0", xSoftwareName: BUSINESS_NAME, xSoftwareVersion: "1.0", xCommand: "Report:Approved", xBeginDate: et(from), xEndDate: et(to) }),
+  });
+  const j = (await res.json().catch(() => ({}))) as { xResult?: string; xError?: string; xReportData?: Record<string, string>[] };
+  if (j.xResult && j.xResult !== "S") throw new Error(`Sola report: ${j.xError || j.xResult}`);
+  return (j.xReportData ?? []).map((r) => ({
+    refNum: String(r.xRefNum ?? ""),
+    amountCents: Math.round(Number(r.xAmount ?? 0) * 100),
+    at: easternToDate(String(r.xEnteredDate ?? "")),
+    invoice: r.xInvoice ? String(r.xInvoice) : null,
+    last4: (String(r.xMaskedCardNumber ?? "").match(/(\d{4})\s*$/) ?? [])[1] ?? null,
+    cardType: r.xCardType ? String(r.xCardType) : null,
+    approved: String(r.xResponseResult ?? r.xStatus ?? "Approved").toLowerCase().startsWith("approv") || !r.xResponseResult,
+  }));
+}
+
+/**
+ * Which Sola payment is this caller's? Same amount to the cent, made during the call window; the order number wins
+ * when PhonePay passes one. Two equal candidates and no order number = no match (staff check it; never a guess).
+ */
+export function pickMatch(txns: SolaTxn[], want: { amountCents: number; orderNumber: string; from: Date; to: Date }, alreadyUsed: Set<string> = new Set()): { match: SolaTxn | null; reason: "found" | "not_found" | "amount_mismatch" | "ambiguous" } {
+  const inWindow = txns.filter((t) => t.approved && t.refNum && !alreadyUsed.has(t.refNum) && t.at >= new Date(want.from.getTime() - 60_000) && t.at <= new Date(want.to.getTime() + 120_000));
+  const byInvoice = inWindow.filter((t) => t.invoice && t.invoice.replace(/\D/g, "") === want.orderNumber);
+  if (byInvoice.length === 1) return byInvoice[0].amountCents === want.amountCents ? { match: byInvoice[0], reason: "found" } : { match: null, reason: "amount_mismatch" };
+  const byAmount = inWindow.filter((t) => t.amountCents === want.amountCents);
+  if (byAmount.length === 1) return { match: byAmount[0], reason: "found" };
+  if (byAmount.length > 1) return { match: null, reason: "ambiguous" };
+  return { match: null, reason: inWindow.length ? "amount_mismatch" : "not_found" };
+}
+
+export async function usedSolaRefs(): Promise<Set<string>> {
+  const rows = await db.select({ ref: schema.phonepayAttempts.solaRef }).from(schema.phonepayAttempts);
+  return new Set(rows.map((r) => r.ref).filter((r): r is string => Boolean(r)));
+}
+
+export const phonePayAdminUrl = () => `${config.baseUrl()}/admin/phone/phonepay`;
+
+/** PhonePay payments are Sola payments: refunds, the books and reports treat them like any Sola payment. */
+export const PHONEPAY_METHOD = "sola_phonepay";
+export const isSolaMethod = (m: string | null | undefined) => m === "sola" || m === PHONEPAY_METHOD;
+export const paymentSourceLabel = (m: string | null | undefined) =>
+  m === PHONEPAY_METHOD ? "Phone (Sola PhonePay)" : m === "sola" ? "Sola payment link" : m === "stripe" ? "Phone (Stripe keypad)" : m ? m.charAt(0).toUpperCase() + m.slice(1) : "";
+
+/**
+ * After the caller is back from PhonePay: look for the payment in Sola (Sola may take a few seconds to list it, so it
+ * looks up to 3 times). Found = Paid with status, amount, last 4, card type, Sola reference and time. Not found, a
+ * decline or a different amount = Payment pending: a high-priority callback task, an email to the Owner, and the
+ * caller gets the secure payment link.
+ */
+export async function matchPhonePay(orderId: number, attemptId: number, dueCents: number, deps: { fetcher?: typeof fetch; waitMs?: number; now?: () => Date } = {}): Promise<{ paid: boolean; reason: string }> {
+  const { getPaymentGroup, markGroupPaid, orderNumber } = await import("@/lib/orders");
+  const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
+  const from = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
+  const num = orderNumber(orderId);
+  let reason = "not_found";
+  let found: SolaTxn | null = null;
+  for (let i = 0; i < 3 && !found; i++) {
+    if (i) await new Promise((r) => setTimeout(r, deps.waitMs ?? 3000));
+    try {
+      const txns = await solaApprovedBetween(new Date(from.getTime() - 60_000), deps.now?.() ?? new Date(), deps.fetcher);
+      const r = pickMatch(txns, { amountCents: dueCents, orderNumber: num, from, to: deps.now?.() ?? new Date() }, await usedSolaRefs());
+      reason = r.reason;
+      found = r.match;
+    } catch (e) {
+      reason = `lookup_failed: ${(e as Error).message}`.slice(0, 200);
+    }
+  }
+  if (found) {
+    if (attemptId) await finishAttempt(attemptId, { matched: true, solaRef: found.refNum, last4: found.last4, cardType: found.cardType, note: "Paid" });
+    await markGroupPaid(orderId, found.amountCents, PHONEPAY_METHOD, found.refNum);
+    const group = await getPaymentGroup(orderId);
+    const ids = group?.orders.map((d) => d.order.id) ?? [orderId];
+    const { recordPaymentResult, paymentReceivedNotices } = await import("@/lib/payment-result");
+    await recordPaymentResult(ids, "approved", found.last4, found.refNum, found.at);
+    await paymentReceivedNotices(orderId, found.amountCents);
+    return { paid: true, reason: "found" };
+  }
+  if (attemptId) await finishAttempt(attemptId, { matched: false, note: reason });
+  const why = reason === "amount_mismatch" ? "a Sola payment was found, but not for the order total" : reason === "ambiguous" ? "two Sola payments with the same amount were found" : reason.startsWith("lookup_failed") ? "Sola could not be checked" : "no Sola payment was found";
+  await db.insert(schema.tasks).values({
+    title: `Call back: phone payment not confirmed, order #${num}`,
+    notes: `The caller went to Sola PhonePay for $${(dueCents / 100).toFixed(2)}, but ${why}. Check Sola, then mark the order paid or call the customer. The secure payment link was sent.`,
+    priority: "high",
+    dueDate: new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" }),
+  });
+  const to = config.adminEmail();
+  if (to) {
+    const { sendEmail } = await import("@/lib/notify");
+    await sendEmail(to, `Hup Up Attractions: phone payment not confirmed, order #${num}`, `A caller paid by phone through Sola PhonePay for order #${num} ($${(dueCents / 100).toFixed(2)}), but ${why}.\n\nThe order is Payment pending and the customer was sent the secure payment link. A callback task is in Admin > Tasks.\n\n${config.baseUrl()}/admin/orders/${orderId}`).catch(() => null);
+  }
+  return { paid: false, reason };
+}
+
+type DialTarget = { number: (attrs: { sendDigits?: string }, phone: string) => unknown };
+type DialHost = { dial: (attrs: Record<string, unknown>) => DialTarget };
+
+/**
+ * In the payment subaccount: dial PhonePay and send the digits once it answers. Never recorded. With an action URL,
+ * an unanswered or failed call goes on to the backup number.
+ */
+export function phonePayDialTwiml(vr: DialHost, phone: string, digits: string, action: string | null) {
+  const dial = vr.dial({ timeout: 30, timeLimit: 900, record: "do-not-record", ...(action ? { action, method: "POST" } : {}) });
+  dial.number({ sendDigits: digits }, toE164(phone) ?? phone);
+  return vr;
+}

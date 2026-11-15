@@ -242,7 +242,7 @@ export async function mileageSummary(from: string, to: string) {
 
 /** Sola payments with the estimated fee and net deposit (actual fees can be entered as Processor fee entries). */
 export function processorView(entries: Entry[], percent: string, fixed: string) {
-  const sola = entries.filter((e) => e.kind === "income" && e.method === "sola");
+  const sola = entries.filter((e) => e.kind === "income" && (e.method === "sola" || e.method === "sola_phonepay"));
   const rows = sola.map((e) => ({ id: e.id, date: e.entryDate, orderId: e.orderId, ref: e.ref, grossCents: e.amountCents, feeCents: e.amountCents > 0 ? solaFee(e.amountCents, percent, fixed) : -solaFee(-e.amountCents, percent, fixed) }));
   const actualFees = entries.filter((e) => e.kind === "processor_fee").reduce((s, e) => s + e.amountCents, 0);
   return {

@@ -43,9 +43,12 @@ import {
   wordingVersion,
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
-import { STRIPE_PHONE_PAY_MODE, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
+import { stripePhonePayMode, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
+import { matchPhonePay, phonePayOffered, phonePaySipUri, startAttempt } from "@/lib/sola-phonepay";
+import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
+const PHONEPAY_PROMPTS = ["phonepay_choice", "phonepay_intro", "phonepay_back", "phonepay_paid", "phonepay_not_found"] as const;
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { voicemailPlayLink } from "@/lib/signed-link";
@@ -1888,7 +1891,7 @@ const handlers: Record<string, Handler> = {
     // Payment can never be skipped (Abraham, Nov 15, 2026): no texts and no email means no way to send the payment
     // link, so the email becomes required (keypad payment needs neither).
     const canText = data.smsConsent === "yes" || data.smsConsent === "existing";
-    const keypadPay = keypadPayFor(ctx.session?.fromNumber ?? ctx.from) && (STRIPE_PHONE_PAY_MODE !== "live" || PAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k)));
+    const keypadPay = keypadPayFor(ctx.session?.fromNumber ?? ctx.from) && (stripePhonePayMode() !== "live" || PAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k)));
     if (!canText && !data.email && !keypadPay) {
       await updateSession(ctx.callSid, { data: { emailRequired: 1 } }, ctx.session);
       return back(vr, "ask", { f: "email" });
@@ -1938,12 +1941,80 @@ const handlers: Record<string, Handler> = {
     sp(vr, ctx, "thanks_order", { name: first, number: spokenDigits(num) });
     sp(vr, ctx, "checkout_total", { total: spokenMoney(totals.totalCents), items: spokenMoney(totals.subtotalCents), delivery: spokenMoney(totals.deliveryFeeCents), tax: spokenMoney(totals.taxCents) });
     await updateSession(ctx.callSid, { data: { placedOrderId: primary.id } }, ctx.session);
-    // Pay by keypad through Stripe, right after the read-back (Abraham, Nov 12, 2026). Only for callers it's on for
-    // (src/lib/phone-pay.ts); everyone else gets the payment link, as before.
-    if (keypadPayFor(ctx.session?.fromNumber ?? ctx.from) && (STRIPE_PHONE_PAY_MODE !== "live" || PAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k))))
+    // Pay by card through Sola PhonePay (Abraham, Nov 14, 2026), the main phone payment. Off until he switches it on in
+    // Admin, and then only on his own test calls until he opens it to everyone and approves its lines.
+    const payCfg = await getSettings();
+    if (phonePayOffered(ctx.session?.fromNumber ?? ctx.from, payCfg) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k))))
+      return back(vr, "pay-choice", { o: primary.id });
+    // Backup: pay by keypad through Stripe (Abraham, Nov 12, 2026). Off by default since Nov 14 (src/lib/phone-pay.ts);
+    // everyone else gets the payment link, as before.
+    if (keypadPayFor(ctx.session?.fromNumber ?? ctx.from) && (stripePhonePayMode() !== "live" || PAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k))))
       return back(vr, "pay-keypad", { o: primary.id });
     await sendPayLinkAndSay(ctx, vr, primary.id, { phone, customerId }, perDay.map(({ o, t }) => ({ order: { ...o.order, deliveryFeeCents: t!.deliveryFeeCents, taxCents: t!.taxCents, totalCents: t!.totalCents }, items: o.items })));
     return back(vr, "promo-consent");
+  },
+
+  /* ---- Sola PhonePay (Abraham, Nov 14, 2026) ---- */
+
+  /** "Press 1 to pay now by card. Press 2 to get a secure payment link instead." Nothing pressed = the link. */
+  "pay-choice"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    if (!o) return back(vr, "goodbye");
+    const g = keypad(vr, url("pay-choice-answer", { o }), { numDigits: 1, timeout: 8 });
+    sp(g, ctx, "phonepay_choice", undefined, { draftOk: true });
+    return back(vr, "pay-choice-answer", { o, none: 1 });
+  },
+
+  async "pay-choice-answer"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    if (!o) return back(vr, "goodbye");
+    if (ctx.body.Digits === "1" && !ctx.query.get("none")) return back(vr, "phonepay-go", { o });
+    if (ctx.body.Digits && !["1", "2"].includes(ctx.body.Digits)) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "pay-choice", { o });
+    }
+    return back(vr, "pay-done", { o }); // 2 or nothing: the secure payment link
+  },
+
+  /** Hand the call to the payment subaccount, which dials Sola PhonePay. Card tones never touch the main account. */
+  async "phonepay-go"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    const group = o ? await getPaymentGroup(o) : null;
+    if (!group || group.due <= 0) return back(vr, "pay-done", { o });
+    // The rentals stay held for the whole payment
+    const waiting = group.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id);
+    if (waiting.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES), updatedAt: new Date() }).where(inArray(orders.id, waiting));
+    // Never record card tones: pause a running call recording first (resumed when the caller comes back)
+    if (ctx.session?.data.recording) {
+      try {
+        await pauseRecording(ctx.callSid);
+      } catch {
+        return back(vr, "pay-done", { o }); // could not pause: the payment link instead, never the card line
+      }
+    }
+    const attempt = await startAttempt(o, ctx.callSid, group.due);
+    await track(ctx.callSid, "step", `Sola PhonePay started for order #${orderNumber(o)}`, { attempt: attempt.id });
+    sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true });
+    const dial = vr.dial({ action: url("phonepay-done", { o, a: attempt.id }), method: "POST", timeLimit: 900, answerOnBridge: true });
+    dial.sip({ username: process.env.TWILIO_PAY_SIP_USERNAME, password: process.env.TWILIO_PAY_SIP_PASSWORD }, phonePaySipUri(o, ctx.callSid, group.due));
+    return vr;
+  },
+
+  /** Back from PhonePay: find the payment in Sola. Found = Paid; not found = the link, a callback task and an email. */
+  async "phonepay-done"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    const a = Number(ctx.query.get("a"));
+    if (ctx.session?.data.recording) await resumeRecording(ctx.callSid).catch(() => null);
+    const group = o ? await getPaymentGroup(o) : null;
+    if (!group) return back(vr, "goodbye");
+    sp(vr, ctx, "phonepay_back", undefined, { draftOk: true });
+    const r = await matchPhonePay(o, a, group.due);
+    if (r.paid) {
+      sp(vr, ctx, "phonepay_paid", undefined, { draftOk: true });
+      return back(vr, "promo-consent");
+    }
+    sp(vr, ctx, "phonepay_not_found", undefined, { draftOk: true });
+    return back(vr, "pay-done", { o });
   },
 
   /** Hand the call to the payment subaccount (Twilio Pay + Stripe). The main account never collects card digits. */

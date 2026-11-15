@@ -26,6 +26,7 @@ vi.mock("@/lib/notify", async (orig) => ({
   sendEmail: async (to: string, subject: string, text: string) => (h.emails.push({ to, subject, text }), { sent: true }),
 }));
 
+process.env.STRIPE_PHONE_PAY_MODE = "owner_test"; // Stripe is the off-by-default backup since Nov 14, 2026 (Sola PhonePay is main)
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { handleVoice } from "@/lib/ivr/flow";

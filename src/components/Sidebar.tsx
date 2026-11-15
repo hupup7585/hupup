@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { BOOK_GROUPS, bookTabHref } from "@/lib/bookkeeping-tabs";
 import { Fragment, useEffect, useState } from "react";
-import { Activity, Boxes, Search, ArrowDownToLine, BadgePercent, BookOpen, Car, ChartColumn, FileClock, FileText, Gauge, IdCard, Landmark, List, Percent, Receipt, Settings2, Wrench, CircleUser, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, Inbox, KeyRound, ChevronDown, ChevronRight, LayoutDashboard, Megaphone, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PhoneForwarded, PlusCircle, Settings, ShieldCheck, SlidersHorizontal, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
+import { Activity, Boxes, CreditCard, Search, ArrowDownToLine, BadgePercent, BookOpen, Car, ChartColumn, FileClock, FileText, Gauge, IdCard, Landmark, List, Percent, Receipt, Settings2, Wrench, CircleUser, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, Inbox, KeyRound, ChevronDown, ChevronRight, LayoutDashboard, Megaphone, LogOut, Menu, MessageSquare, Mic, Package, Palette, PhoneCall, PhoneForwarded, PlusCircle, Settings, ShieldCheck, SlidersHorizontal, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
 import type { Role } from "@/lib/db/schema";
 
 const O: Role[] = ["owner"];
@@ -80,6 +80,7 @@ export const NAV_GROUPS: Group[] = [
       ["/admin/phone/prompts", Mic, "Hotline prompts", O],
       ["/admin/compliance", ShieldCheck, "Compliance", OS],
       ["/admin/phone/settings", PhoneForwarded, "Phone settings", O],
+      ["/admin/phone/phonepay", CreditCard, "Sola PhonePay", O], // card payments by phone (Abraham, Nov 14, 2026)
     ],
   },
   { title: "Bookkeeping", items: BOOK_GROUPS.flatMap((g) => g.tabs.map(([tab, label]): Item => [bookTabHref(tab), BOOK_ICONS[tab] ?? List, label, O, g.label])) },

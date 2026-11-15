@@ -1372,3 +1372,22 @@ export const jobRuns = pgTable(
   },
   (t) => [index("job_runs_name_idx").on(t.name, t.startedAt)],
 );
+
+/** Sola PhonePay tries (Abraham, Nov 14, 2026): time, order, amount, matched or not. Never any card data. */
+export const phonepayAttempts = pgTable(
+  "phonepay_attempts",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id").notNull().references(() => orders.id),
+    callSid: text("call_sid").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    matched: boolean("matched"),
+    solaRef: text("sola_ref"),
+    last4: text("last4"),
+    cardType: text("card_type"),
+    note: text("note"),
+  },
+  (t) => [index("phonepay_attempts_started_idx").on(t.startedAt)],
+);

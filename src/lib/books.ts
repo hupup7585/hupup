@@ -444,7 +444,7 @@ export async function autoMatch(feePercent: string, feeCents: string) {
       ids = [one.id];
       note = `${KIND_LABEL[one.kind as EntryKind] ?? one.kind} #${one.id}`;
     } else if (l.amountCents > 0) {
-      const sola = entries.filter((e) => !used.has(e.id) && e.kind === "income" && e.method === "sola" && near(e.entryDate, 4, 0));
+      const sola = entries.filter((e) => !used.has(e.id) && e.kind === "income" && (e.method === "sola" || e.method === "sola_phonepay") && near(e.entryDate, 4, 0));
       const byDay = new Map<string, typeof sola>();
       for (const e of sola) byDay.set(e.entryDate, [...(byDay.get(e.entryDate) ?? []), e]);
       for (const [day, group] of byDay) {
