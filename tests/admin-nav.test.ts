@@ -11,7 +11,7 @@ describe("grouped admin menu", () => {
     expect(titles("owner")).toEqual([null, "Orders & bookings", "Deliveries", "Phone system", "Bookkeeping", "Staff", "Settings"]);
     expect(labels("owner")).toEqual({
       top: ["Dashboard", "Inbox"], // Inbox: info@ (Abraham, Nov 12, 2026; Owner only)
-      "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Catalog"],
+      "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Catalog", "Equipment units"],
       Deliveries: ["Deliveries", "Delivery settings"],
       "Phone system": ["Call log", "Voicemail", "Messages", "Campaigns", "Hotline prompts", "Compliance", "Phone settings"],
       Bookkeeping: ["Overview", "Income", "Invoices", "Expenses", "Bills I owe", "Sola fees", "Stripe fees", "Bank & card", "Sales tax", "Equipment", "Staff & 1099", "Mileage", "Reports", "All entries", "General ledger", "Settings"],
@@ -22,7 +22,7 @@ describe("grouped admin menu", () => {
 
   it("role rules: Secretary and Delivery see only their items; empty groups are hidden", () => {
     expect(labels("secretary")).toEqual({
-      "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers"],
+      "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Equipment units"],
       Deliveries: ["Deliveries"],
       "Phone system": ["Call log", "Voicemail", "Messages", "Campaigns", "Compliance"],
       Staff: ["Tasks"],

@@ -1257,3 +1257,53 @@ export const deliveryEvents = pgTable(
   },
   (t) => [index("delivery_events_order_idx").on(t.orderId, t.at)],
 );
+
+/* Equipment units (Abraham, Nov 15, 2026): each physical unit, its status history, and which unit serves which booking day. */
+export const UNIT_STATUSES = ["available", "maintenance", "damaged", "missing", "unavailable"] as const;
+export type UnitStatus = (typeof UNIT_STATUSES)[number];
+
+export const equipmentUnits = pgTable(
+  "equipment_units",
+  {
+    id: serial("id").primaryKey(),
+    productId: integer("product_id").notNull(),
+    /** e.g. CASTLE-01 */
+    code: text("code").notNull(),
+    serial: text("serial"),
+    model: text("model"),
+    purchaseDate: date("purchase_date"),
+    purchasePriceCents: integer("purchase_price_cents"),
+    replacementValueCents: integer("replacement_value_cents"),
+    /** good | fair | poor */
+    condition: text("condition").notNull().default("good"),
+    location: text("location"),
+    status: text("status").$type<UnitStatus>().notNull().default("available"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("equipment_units_code_idx").on(t.code)],
+);
+
+export const unitStatusHistory = pgTable("unit_status_history", {
+  id: serial("id").primaryKey(),
+  unitId: integer("unit_id").notNull(),
+  fromStatus: text("from_status"),
+  toStatus: text("to_status").notNull(),
+  reason: text("reason"),
+  userId: integer("user_id"),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** One row per unit per rental day; the unique index means the database itself refuses a second booking of a unit on the same day. */
+export const unitBookings = pgTable(
+  "unit_bookings",
+  {
+    id: serial("id").primaryKey(),
+    unitId: integer("unit_id").notNull(),
+    day: date("day").notNull(),
+    orderId: integer("order_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("unit_bookings_unit_day_idx").on(t.unitId, t.day), index("unit_bookings_order_idx").on(t.orderId)],
+);

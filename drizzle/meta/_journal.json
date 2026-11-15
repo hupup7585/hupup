@@ -344,6 +344,13 @@
       "when": 1794703898484,
       "tag": "0048_delivery_events",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1794704077354,
+      "tag": "0049_equipment_units",
+      "breakpoints": true
     }
   ]
 }

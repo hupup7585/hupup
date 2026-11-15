@@ -234,6 +234,9 @@ export async function setOrderStatus(orderId: number, status: OrderStatus, extra
     .update(orders)
     .set({ status, updatedAt: new Date(), ...extra })
     .where(eq(orders.id, orderId));
+  // Equipment units (Abraham, Nov 15, 2026): a confirmed booking gets its units; a cancelled one gives them back
+  if (status === "CONFIRMED") await (await import("@/lib/units")).assignUnits(orderId);
+  if (status === "CANCELLED") await (await import("@/lib/units")).releaseUnits(orderId);
 }
 
 /** Empty a held cart (keeps the order row as CANCELLED for the call log). */
@@ -287,6 +290,7 @@ export async function markPaid(orderId: number, cents: number, method: string, r
     .where(eq(orders.id, orderId))
     .returning();
   if (late) await handleLatePayment(orderId, cents, method, stillFree);
+  if (updated?.status === "CONFIRMED") await (await import("@/lib/units")).assignUnits(orderId);
   // Bookkeeping (Abraham T): every paid booking is recorded as income automatically (rental, delivery, tax, tip).
   const { recordBookingPayment } = await import("@/lib/books");
   await recordBookingPayment(orderId, cents, method, ref);
