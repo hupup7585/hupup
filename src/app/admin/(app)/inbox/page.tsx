@@ -5,6 +5,7 @@ import { db, schema } from "@/lib/db";
 import { inboxWhen } from "@/lib/inbox-format";
 import { FOLDERS, PAGE_SIZE, isFolder, listDrafts, listEmails, listLabels, listSent, type Folder } from "@/lib/inbox-folders";
 import MailShell from "./MailShell";
+import RefreshMail from "./RefreshMail";
 import MailList, { type MailRow } from "./MailList";
 
 export const dynamic = "force-dynamic";
@@ -85,6 +86,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       <div className="mb-2 flex items-center justify-between gap-2">
         <h1 className="text-xl font-black">{q ? `Search: ${q}` : title}</h1>
         <div className="flex items-center gap-2 text-sm text-muted" data-mail-pages>
+          <RefreshMail />
           <span>{total ? `${from} to ${to} of ${total}` : ""}</span>
           {page > 1 && <Link className="btn-ghost !py-1" href={qs(page - 1)} aria-label="Newer">Newer</Link>}
           {to < total && <Link className="btn-ghost !py-1" href={qs(page + 1)} aria-label="Older">Older</Link>}
