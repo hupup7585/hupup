@@ -41,7 +41,7 @@ export const SETTING_DEFAULTS = {
   solaPhonePayCustomCapCents: "500000",
   /** Payment test list (Abraham, Nov 15, 2026): while PhonePay is "test numbers only", only these callers are offered
    * pay by card. One phone number per line. */
-  paymentTestNumbers: "+18457777585\n+18457990925",
+  paymentTestNumbers: "+18457777585\n+18457990925\n+18452135239",
   /** Which service takes card payments on the phone line (Owner only, Admin > Phone > Sola PhonePay): "sola" (Sola
    * PhonePay, the live default) or "stripe" (Twilio Pay with the Stripe connector, test numbers only until Abraham
    * approves Stripe live mode). Sola stays for the staff POS and the website either way. */

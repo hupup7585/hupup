@@ -44,6 +44,9 @@ export function decodeCatalogKeys(digits: string, start = ""): KeysResult {
 export function spokenLetters(said: string): string {
   return said
     .toLowerCase()
+    // Speech results come back punctuated ("Y. O. S. S. I."): those periods are not dots in the address (Abraham,
+    // Nov 17, 2026). Only a spoken "dot" (or "period", "point") is a real dot.
+    .replace(/[.,!?;:]/g, " ")
     .replace(/\b(dot|period|point)\b/g, ".")
     .replace(/\b(underscore|under score)\b/g, "_")
     .replace(/\b(dash|hyphen|minus)\b/g, "-")

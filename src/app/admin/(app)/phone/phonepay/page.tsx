@@ -24,7 +24,6 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
   const [s, attempts] = await Promise.all([getSettings(), recentAttempts(20)]);
   const ready = {
     pin: Boolean(process.env.SOLA_PHONEPAY_PIN),
-    sub: Boolean(process.env.TWILIO_PAY_SIP_DOMAIN && process.env.TWILIO_PAY_SIP_USERNAME && process.env.TWILIO_PAY_SIP_PASSWORD && process.env.TWILIO_PAY_AUTH_TOKEN),
     api: Boolean(process.env.SOLA_API_KEY),
   };
   return (
@@ -39,7 +38,7 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
         <h2 className="mb-2 text-lg font-bold">Set up</h2>
         <ul className="space-y-1 text-sm">
           <li>{ready.pin ? "Yes" : "Not yet"}: our PhonePay merchant PIN (SOLA_PHONEPAY_PIN in Vercel, added by Hark)</li>
-          <li>{ready.sub ? "Yes" : "Not yet"}: the payment subaccount &ldquo;Hup Up Payments&rdquo; and its SIP domain</li>
+          <li>Yes: the hotline dials PhonePay itself ({s.solaPhonePayNumber}, backup {s.solaPhonePayBackup}); no payment subaccount is needed</li>
           <li>{ready.api ? "Yes" : "Not yet"}: the Sola key used to find each payment (SOLA_API_KEY)</li>
         </ul>
       </section>

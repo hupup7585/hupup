@@ -34,6 +34,7 @@ vi.mock("@/lib/sola-phonepay", async (orig) => {
   return {
     ...real,
     endPayLeg: async () => undefined,
+    endMainPayLeg: async () => undefined,
     checkPhonePayTry: (o: number, a: number, due: number) => real.checkPhonePayTry(o, a, due, { fetcher: fake, waitMs: 0 }),
   };
 });
@@ -58,10 +59,27 @@ beforeAll(async () => {
 });
 
 describe("card payment on the phone line", () => {
-  it("each try dials the payment line with star to come back; the amount comes from the order", async () => {
-    const x = await call("phonepay-go", {}, `o=${orderId}`);
+  it("before the first try: card is the default; 2 gets a payment link by text instead (draft, preview only)", async () => {
+    const ask = await call("phonepay-go", {}, `o=${orderId}`);
+    expect(said(ask)).toEqual(["To pay by card now, please stay on the line. To get a secure payment link by text instead, press 2."]);
+    expect(redirect(ask)).toBe(`phonepay-go?o=${orderId}&c=1`); // no key: on to the card
+    expect(ask).not.toContain("<Dial");
+    // on the live line it never plays until Abraham approves it: straight to the card
+    process.env.VERCEL_ENV = "production";
+    const live = await call("phonepay-go", {}, `o=${orderId}&c=0`);
+    delete process.env.VERCEL_ENV;
+    expect(said(live)).not.toContain("To pay by card now, please stay on the line. To get a secure payment link by text instead, press 2.");
+    expect(live).toContain("<Dial");
+    await db.delete(schema.phonepayAttempts);
+    expect(redirect(await call("phonepay-option", { Digits: "5" }, `o=${orderId}`))).toBe(`phonepay-go?o=${orderId}`);
+  });
+
+  it("each try dials Sola PhonePay straight from the hotline (no SIP), with the PIN, the order amount and star to come back", async () => {
+    const x = await call("phonepay-go", {}, `o=${orderId}&c=1`);
     expect(x).toContain('hangupOnStar="true"');
-    expect(x).toContain("X-Hup-Cents=80000");
+    expect(x).not.toContain("<Sip");
+    expect(x).toMatch(/<Number sendDigits="w+4321#w+80000#w+1">\+18334343354<\/Number>/);
+    expect(x).toContain('record="do-not-record"');
     expect(said(x)).toContain("Thank you. Please hold for a moment while we connect you to our secure payment line.");
     const [a] = await db.select().from(schema.phonepayAttempts);
     expect(a).toMatchObject({ orderId, tryNumber: 1, amountCents: 80000 });
@@ -69,12 +87,18 @@ describe("card payment on the phone line", () => {
 
   it("no charge: the try-again menu on our line; a wrong amount is voided and the Owner is emailed", async () => {
     const tries = await db.select().from(schema.phonepayAttempts);
-    let x = await call("phonepay-done", {}, `o=${orderId}&a=${tries[0].id}`);
+    // PhonePay did not answer: the backup number on the same try, no retry menu
+    const backup = await call("phonepay-done", { DialCallStatus: "failed" }, `o=${orderId}&a=${tries[0].id}`);
+    expect(backup).toContain(">+18444227356</Number>");
+    expect(backup).toContain(`phonepay-done?o=${orderId}&amp;a=${tries[0].id}&amp;b=1`);
+    let x = await call("phonepay-done", { DialCallStatus: "completed", DialCallSid: "CAleg1" }, `o=${orderId}&a=${tries[0].id}&b=1`);
     expect(redirect(x)).toBe(`phonepay-retry?o=${orderId}&n=1`);
+    const [t1] = await db.select().from(schema.phonepayAttempts).where((await import("drizzle-orm")).eq(schema.phonepayAttempts.id, tries[0].id));
+    expect(t1.payLegSid).toBe("CAleg1");
     x = await call("phonepay-retry", {}, `o=${orderId}&n=1`);
     expect(said(x)).toContain("Your card did not go through. To try again, press 1.");
     expect(redirect(await call("phonepay-retry-answer", { Digits: "1" }, `o=${orderId}&n=1`))).toBe(`phonepay-go?o=${orderId}`);
-    await call("phonepay-go", {}, `o=${orderId}`);
+    await call("phonepay-go", {}, `o=${orderId}`); // a later try: straight to the card (the link question is only before the first)
     const [, second] = await db.select().from(schema.phonepayAttempts).orderBy(schema.phonepayAttempts.id);
     expect(second.tryNumber).toBe(2);
     h.sola = [{ xRefNum: "WRONG1", xAmount: "1.00", xEnteredDate: nowEastern() }];

@@ -43,7 +43,8 @@ export function paymentTestList(s: Partial<PhonePaySettings>, env: Record<string
 /** Is PhonePay offered to this caller right now? Off by default; Owner-test only by default. */
 export function phonePayOffered(caller: string | null | undefined, s: Partial<PhonePaySettings>, env: Record<string, string | undefined> = process.env): boolean {
   if (!s.solaPhonePayOn) return false;
-  if (!env.SOLA_PHONEPAY_PIN || !env.TWILIO_PAY_SIP_DOMAIN || !env.TWILIO_PAY_SIP_USERNAME || !env.TWILIO_PAY_SIP_PASSWORD) return false;
+  // The hotline dials PhonePay itself (Abraham, Nov 17, 2026): only the PIN is needed, no payment subaccount
+  if (!env.SOLA_PHONEPAY_PIN) return false;
   if (s.solaPhonePayOwnerOnly !== false) {
     const c = toE164(caller);
     return Boolean(c && paymentTestList(s, env).includes(c));
@@ -406,6 +407,38 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
 export async function triesSoFar(callSid: string, orderId: number) {
   const rows = await db.select({ id: schema.phonepayAttempts.id }).from(schema.phonepayAttempts).where(and(eq(schema.phonepayAttempts.callSid, callSid), eq(schema.phonepayAttempts.orderId, orderId)));
   return rows.length;
+}
+
+/**
+ * Sola PhonePay, dialed straight from the main hotline account (Abraham, Nov 17, 2026). The old hand-off through the
+ * payment subaccount's SIP domain could never work: Twilio only lets an account dial its own SIP domains (error
+ * 32214), so no call ever reached the subaccount. Same digits as before (PIN, the order amount, then 1), sent only once
+ * PhonePay answers. Never recorded; no PCI mode is needed on the main account because we never collect card digits:
+ * the caller keys them to Sola. Star (hangupOnStar) or Sola hanging up runs the action, back in our flow.
+ */
+export function phonePayDirectDial(
+  vr: { dial: (attrs: Record<string, unknown>) => DialTarget },
+  input: { number: string; digits: string; action: string; hangupOnStar?: boolean },
+) {
+  const dial = vr.dial({ action: input.action, method: "POST", timeout: 30, timeLimit: 900, answerOnBridge: true, record: "do-not-record", ...(input.hangupOnStar ? { hangupOnStar: true } : {}) });
+  dial.number({ sendDigits: input.digits }, toE164(input.number) ?? input.number);
+  return vr;
+}
+
+/** Dial results where PhonePay never answered: the backup number is tried once on the same card try. */
+export const PHONEPAY_NOT_REACHED = ["failed", "busy", "no-answer", "canceled"];
+
+/** The payment call on the main account ends for sure (it normally already has when the Dial action runs). */
+export async function endMainPayLeg(sid: string | null | undefined) {
+  if (!sid) return;
+  try {
+    const { getTwilio } = await import("@/lib/twilio-client");
+    const c = getTwilio();
+    const leg = c ? await c.calls(sid).fetch() : null;
+    if (c && leg && !["completed", "canceled", "failed", "busy", "no-answer"].includes(leg.status)) await c.calls(sid).update({ status: "completed" });
+  } catch {
+    /* already over */
+  }
 }
 
 type DialTarget = { number: (attrs: { sendDigits?: string }, phone: string) => unknown };

@@ -44,7 +44,7 @@ import {
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { stripePhonePayMode, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
-import { PHONEPAY_MAX_TRIES, amountParts, checkPhonePayTry, customChargeMadeBy, endPayLeg, matchCustomCharge, parseCustomAmount, phonePayOffered, phonePaySipUri, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
+import { PHONEPAY_MAX_TRIES, PHONEPAY_NOT_REACHED, amountParts, buildSendDigits, checkPhonePayTry, customChargeMadeBy, endMainPayLeg, endPayLeg, matchCustomCharge, parseCustomAmount, phonePayDirectDial, phonePayOffered, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
@@ -148,9 +148,20 @@ function bookNoInput(vr: VR, ctx: Ctx, retryAction: string, retryParams: Record<
 }
 
 /** The item is free on that day, and the day is open (not past, not Shabbes/Yom Tov/closed, pickup rules applied). */
+/**
+ * A line still waiting for Abraham's OK: plays on preview for his test, and on the live line only once approved
+ * (unlike draftOk, which also plays on the live line in the Owner-only payment steps).
+ */
+function spPreviewDraft(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptKey) {
+  if (process.env.VERCEL_ENV === "production" && promptWaiting(ctx.prompts, key)) return;
+  if (promptWaiting(ctx.prompts, key)) say(target, promptText(ctx.prompts, key));
+  else sp(target, ctx, key);
+}
+
 /** Speech (plus optional keypad) gather tuned for phone audio. */
-function speech(vr: VR, action: string, hints: string, opts: { dtmf?: boolean; numDigits?: number; finishOnKey?: string } = {}) {
+function speech(vr: VR, action: string, hints: string, opts: { dtmf?: boolean; numDigits?: number; finishOnKey?: string; partial?: string } = {}) {
   return vr.gather({
+    ...(opts.partial ? { partialResultCallback: opts.partial, partialResultCallbackMethod: "POST" } : {}),
     input: opts.dtmf ? ["speech", "dtmf"] : ["speech"],
     action,
     method: "POST",
@@ -1648,13 +1659,25 @@ const handlers: Record<string, Handler> = {
       const k = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 1, finishOnKey: "", action: url("heard", { f, n }), method: "POST" });
       sp(k, ctx, prompt);
       sp(k, ctx, "type_hint");
+      spPreviewDraft(k, ctx, "press_pound_done");
       vr.record({ maxLength: 20, timeout: 3, playBeep: false, finishOnKey: "#*", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
       return vr;
     }
     // Say it, or press star to type it on the keypad (Abraham L). finishOnKey "" so star and # arrive as keys.
-    const g = speech(vr, url("heard", { f, n }), spec.hints, { dtmf: true, numDigits: 1, finishOnKey: "" });
+    // Pound ends a spoken answer and keeps what was said so far (Abraham, Nov 17, 2026): Twilio's partial results are
+    // saved as the caller speaks, because a key press alone would drop the words.
+    await updateSession(ctx.callSid, { data: { speechPartial: undefined } }, ctx.session);
+    const g = speech(vr, url("heard", { f, n }), spec.hints, { dtmf: true, numDigits: 1, finishOnKey: "", partial: url("speech-partial") });
     sp(g, ctx, prompt);
     sp(g, ctx, "type_hint");
+    spPreviewDraft(g, ctx, "press_pound_done");
+    return vr;
+  },
+
+  /** Twilio's partial speech results while the caller answers: kept so pound can end the answer without losing it. */
+  async "speech-partial"(ctx, vr) {
+    const said = `${ctx.body.StableSpeechResult ?? ""} ${ctx.body.UnstableSpeechResult ?? ""}`.replace(/\s+/g, " ").trim();
+    if (said) await updateSession(ctx.callSid, { data: { speechPartial: said.slice(0, 300) } }, ctx.session);
     return vr;
   },
 
@@ -1665,6 +1688,7 @@ const handlers: Record<string, Handler> = {
     if (!ctx.query.get("again")) {
       sp(g, ctx, "type_instructions");
       if (f === "email") sp(g, ctx, "type_email_symbols");
+      spPreviewDraft(g, ctx, "press_pound_done");
     }
     return back(vr, "typed", { f });
   },
@@ -1728,8 +1752,11 @@ const handlers: Record<string, Handler> = {
     // Speech to text: the typed-up answer comes from our own record of this call, not from Twilio's speech result
     const typedUp = await callSpokenAnswer(ctx, Number(ctx.query.get("a")));
     const viaStt = Boolean(typedUp) || ctx.query.get("empty") === "1";
+    // Pound in the middle of a spoken answer: the words said so far are the answer (Abraham, Nov 17, 2026)
+    const partial = ctx.session?.data.speechPartial;
+    if (!viaStt && ctx.body.Digits === "#" && !ctx.body.SpeechResult && partial) ctx.body.SpeechResult = partial;
     if (!viaStt) {
-      if (f === "email" && (ctx.body.Digits === "#" || (ctx.body.Digits === "" && !ctx.body.SpeechResult))) return required ? back(vr, "ask", { f }) : back(vr, "phone"); // skip email (as before), unless it is required
+      if (f === "email" && ((ctx.body.Digits === "#" && !ctx.body.SpeechResult) || (ctx.body.Digits === "" && !ctx.body.SpeechResult))) return required ? back(vr, "ask", { f }) : back(vr, "phone"); // skip email (as before), unless it is required
       if (ctx.body.Digits && !ctx.body.SpeechResult) return back(vr, "ask", { f }); // another key: ask again
     } else if (ctx.body.Digits === "#" && f === "email") return required ? back(vr, "ask", { f }) : back(vr, "phone");
     const raw = (viaStt ? typedUp?.text || "" : ctx.body.SpeechResult || "").trim();
@@ -1902,6 +1929,7 @@ const handlers: Record<string, Handler> = {
   "phone-enter"(ctx, vr) {
     const g = keypad(vr, url("phone-heard"), { numDigits: 10, timeout: 10, finishOnKey: "#" });
     sp(g, ctx, "phone_enter");
+    spPreviewDraft(g, ctx, "press_pound_done");
     return noInput(vr, ctx, "phone-enter");
   },
 
@@ -2085,7 +2113,14 @@ const handlers: Record<string, Handler> = {
     if (!group || group.due <= 0) return back(vr, "promo-consent");
     // Any Sola call from an earlier try is hung up first
     const earlier = await db.select().from(schema.phonepayAttempts).where(and(eq(schema.phonepayAttempts.callSid, ctx.callSid), eq(schema.phonepayAttempts.orderId, o)));
-    for (const a of earlier) await endPayLeg(a.payLegSid);
+    // Card on the call is the default (Abraham, Nov 17, 2026); before the first try the caller may press 2 for a
+    // payment link by text instead. Only once its wording is approved (on preview it plays for his test).
+    if (!earlier.length && ctx.query.get("c") !== "1" && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "phonepay_link_option"))) {
+      const g = keypad(vr, url("phonepay-option", { o }), { numDigits: 1, timeout: 5 });
+      sp(g, ctx, "phonepay_link_option", undefined, { draftOk: true });
+      return back(vr, "phonepay-go", { o, c: 1 }); // no key: on to the card
+    }
+    for (const a of earlier) await (a.payLegSid?.startsWith("CA") ? Promise.all([endPayLeg(a.payLegSid), endMainPayLeg(a.payLegSid)]) : null);
     const n = earlier.length + 1;
     if (n > PHONEPAY_MAX_TRIES) return back(vr, "phonepay-done", { o, a: 0 });
     // The rentals stay held for the whole payment
@@ -2105,9 +2140,30 @@ const handlers: Record<string, Handler> = {
     await db.update(schema.phonepayAttempts).set({ tryNumber: n }).where(eq(schema.phonepayAttempts.id, attempt.id));
     await track(ctx.callSid, "step", `Card payment try ${n} of ${PHONEPAY_MAX_TRIES} started for order #${orderNumber(o)}`, { attempt: attempt.id });
     sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true });
-    const dial = vr.dial({ action: url("phonepay-done", { o, a: attempt.id }), method: "POST", timeLimit: 900, answerOnBridge: true, hangupOnStar: true });
-    dial.sip({ username: process.env.TWILIO_PAY_SIP_USERNAME, password: process.env.TWILIO_PAY_SIP_PASSWORD }, phonePaySipUri(o, ctx.callSid, group.due));
+    // Straight from the hotline to Sola PhonePay (Abraham, Nov 17, 2026): PIN, the order amount (from the order, never
+    // the caller) and 1, sent once PhonePay answers. Star brings the caller back at any time.
+    const s = await getSettings();
+    const digits = buildSendDigits(s.solaPhonePayDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: group.due, orderNumber: orderNumber(o) });
+    phonePayDirectDial(vr, { number: s.solaPhonePayNumber, digits, action: url("phonepay-done", { o, a: attempt.id }), hangupOnStar: true });
     return vr;
+  },
+
+  /** Before the first card try: 2 = a payment link by text instead; any other key = the shared line, then the question again. */
+  async "phonepay-option"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    if (!o) return back(vr, "goodbye");
+    if (ctx.body.Digits === "2") {
+      await track(ctx.callSid, "step", `Asked for a payment link by text instead of the card (order #${orderNumber(o)})`);
+      const [ord] = await db.select({ customerId: orders.customerId }).from(orders).where(eq(orders.id, o)).limit(1);
+      const [c] = ord?.customerId ? await db.select().from(schema.customers).where(eq(schema.customers.id, ord.customerId)).limit(1) : [];
+      await sendPayLinkAndSay(ctx, vr, o, { phone: c?.phone ?? toE164(ctx.from), customerId: c?.id ?? null });
+      return back(vr, "promo-consent");
+    }
+    if (ctx.body.Digits) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "phonepay-go", { o });
+    }
+    return back(vr, "phonepay-go", { o, c: 1 });
   },
 
   /** Back on our line (star, or Sola hung up): Sola call hung up for sure, then this try's charge is checked in Sola. */
@@ -2122,9 +2178,19 @@ const handlers: Record<string, Handler> = {
       return back(vr, "promo-consent");
     }
     let n = await triesSoFar(ctx.callSid, o);
+    // PhonePay never answered: the backup number once, on the same card try (no "try" is used up)
+    const status = ctx.body.DialCallStatus ?? "";
+    if (a && PHONEPAY_NOT_REACHED.includes(status) && ctx.query.get("b") !== "1") {
+      await track(ctx.callSid, "step", `Payment line did not answer (${status}); trying the backup number`, { attempt: a });
+      const s = await getSettings();
+      const digits = buildSendDigits(s.solaPhonePayDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: group.due, orderNumber: orderNumber(o) });
+      phonePayDirectDial(vr, { number: s.solaPhonePayBackup, digits, action: url("phonepay-done", { o, a, b: 1 }), hangupOnStar: true });
+      return vr;
+    }
     if (a) {
+      if (ctx.body.DialCallSid) await db.update(schema.phonepayAttempts).set({ payLegSid: ctx.body.DialCallSid }).where(eq(schema.phonepayAttempts.id, a));
       const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1);
-      await endPayLeg(attempt?.payLegSid);
+      await endMainPayLeg(attempt?.payLegSid);
       sp(vr, ctx, "phonepay_back", undefined, { draftOk: true });
       const r = await checkPhonePayTry(o, a, attempt?.amountCents ?? group.due);
       await track(ctx.callSid, "step", `Card payment try ${attempt?.tryNumber ?? n}: ${r.result === "paid" ? "paid" : r.result === "wrong_amount" ? "wrong amount, voided" : r.result === "check_failed" ? "Sola could not be checked" : "no charge"}`, { attempt: a });
@@ -2676,8 +2742,9 @@ const handlers: Record<string, Handler> = {
     const attempt = await startAttempt(order?.id ?? null, ctx.callSid, c, "custom");
     await track(ctx.callSid, "vm_access", `Owner custom charge started: $${(c / 100).toFixed(2)}${order ? ` for order #${orderNumber(order.id)}` : ""}`, { attempt: attempt.id });
     sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true });
-    const dial = vr.dial({ action: url("vma-charge-done", { a: attempt.id, c, o: order?.id ?? 0 }), method: "POST", timeLimit: 900, answerOnBridge: true });
-    dial.sip({ username: process.env.TWILIO_PAY_SIP_USERNAME, password: process.env.TWILIO_PAY_SIP_PASSWORD }, phonePaySipUri(order?.id ?? 0, ctx.callSid, c, process.env, "custom"));
+    const s = await getSettings();
+    const digits = buildSendDigits(s.solaPhonePayCustomDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: c, orderNumber: order ? orderNumber(order.id) : "" });
+    phonePayDirectDial(vr, { number: s.solaPhonePayNumber, digits, action: url("vma-charge-done", { a: attempt.id, c, o: order?.id ?? 0 }) });
     return vr;
   },
 

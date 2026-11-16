@@ -188,6 +188,8 @@ export type CallData = {
   phone?: string;
   /** Value heard but not yet confirmed */
   heard?: string;
+  /** What the caller has said so far in a spoken answer (Twilio's partial results), so pound can end the answer and keep it */
+  speechPartial?: string;
   retries?: number;
   /** Transactional SMS consent outcome for this call: yes | no | existing | stopped */
   smsConsent?: string;

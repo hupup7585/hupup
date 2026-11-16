@@ -83,11 +83,12 @@ describe("PhonePay hand-off matches Abraham's Nov 15 test call", () => {
     expect(d).toBe("wwwwwwwwww4321#wwwwwwwwwwwwwwwwwwwwwwww80000#wwwwwwwwww1");
     expect(d.endsWith("1")).toBe(true); // the caller types the card after this
   });
-  it("test list: the Owner's phone and (845) 799-0925 are offered pay by card while it is test-only; others are not", async () => {
+  it("test list: the Owner's phone, (845) 799-0925 and (845) 213-5239 are offered pay by card while it is test-only; others are not", async () => {
     const { paymentTestList } = await import("@/lib/sola-phonepay");
     const { SETTING_DEFAULTS } = await import("@/lib/settings");
     const s = { solaPhonePayOn: true, solaPhonePayOwnerOnly: true, paymentTestNumbers: SETTING_DEFAULTS.paymentTestNumbers };
-    expect(paymentTestList(s, env)).toEqual(["+18457777585", "+18457990925"]);
+    expect(paymentTestList(s, env)).toEqual(["+18457777585", "+18457990925", "+18452135239"]);
+    expect(phonePayOffered("(845) 213-5239", s, env)).toBe(true);
     expect(phonePayOffered("+18457990925", s, env)).toBe(true);
     expect(phonePayOffered("(845) 777-7585", s, env)).toBe(true);
     expect(phonePayOffered("+18455550100", s, env)).toBe(false);
