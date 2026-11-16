@@ -79,6 +79,32 @@ export const isLocalArea = (a: DeliveryArea) => /^\s*local\s*$/i.test(a.mapName.
  */
 export const RULE_CENTS = { local: 1000, area: 1500, outside: 2000 } as const;
 
+/** The Owner's zone prices (Admin, Delivery settings), with Abraham's rule as the default. */
+export type ZonePrices = { deliveryFeeKjCents?: string; deliveryFeeAreaCents?: string; deliveryFeeOutsideCents?: string; deliveryPromoOn?: boolean | string; deliveryPromoStart?: string; deliveryPromoEnd?: string };
+/** Free delivery promo prices (Abraham, Nov 17, 2026): KJ free, nearby towns $10; the $20 zone is unchanged. */
+export const PROMO_CENTS = { local: 0, area: 1000 } as const;
+
+const cents = (v: string | undefined, fallback: number) => (v !== undefined && v !== "" && Number.isFinite(Number(v)) ? Number(v) : fallback);
+
+/** Is the free delivery promo on today (Eastern time)? On, and today within the start and end dates (blank = open). */
+export function deliveryPromoActive(s: ZonePrices, now = new Date()): boolean {
+  if (!(s.deliveryPromoOn === true || s.deliveryPromoOn === "true")) return false;
+  const today = now.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  if (s.deliveryPromoStart && today < s.deliveryPromoStart) return false;
+  if (s.deliveryPromoEnd && today > s.deliveryPromoEnd) return false;
+  return true;
+}
+
+/** The delivery fee for a zone: the Owner's prices, or the promo price while the promo is on. */
+export function zoneFee(kind: "local" | "area" | "outside", s: ZonePrices = {}, now = new Date()): number {
+  if (kind !== "outside" && deliveryPromoActive(s, now)) return PROMO_CENTS[kind];
+  if (kind === "local") return cents(s.deliveryFeeKjCents, RULE_CENTS.local);
+  if (kind === "area") return cents(s.deliveryFeeAreaCents, RULE_CENTS.area);
+  return cents(s.deliveryFeeOutsideCents, RULE_CENTS.outside);
+}
+
+export const zoneKind = (a: DeliveryArea | null): "local" | "area" | "outside" => (!a ? "outside" : isLocalArea(a) ? "local" : "area");
+
 /** The zones a house is in or on the line of. */
 export function areasAt(lng: number, lat: number, areas: DeliveryArea[]): DeliveryArea[] {
   return areas.filter((a) => a.polygons.some((r) => inRing([lng, lat], r) || metersToEdge([lng, lat], r) <= ON_LINE_METERS));
@@ -90,8 +116,8 @@ export function areaAt(lng: number, lat: number, areas: DeliveryArea[]): Deliver
   return hits.find(isLocalArea) ?? hits[0] ?? null;
 }
 
-export function priceFor(a: DeliveryArea | null): number {
-  return !a ? RULE_CENTS.outside : isLocalArea(a) ? RULE_CENTS.local : RULE_CENTS.area;
+export function priceFor(a: DeliveryArea | null, s: ZonePrices = {}, now = new Date()): number {
+  return zoneFee(zoneKind(a), s, now);
 }
 
 /** A point inside an area (for the build's one-address-per-area test). */
@@ -141,6 +167,30 @@ export async function geocode(address: string, fetcher: typeof fetch = fetch): P
     .values({ address: key, lat: found?.lat ?? null, lng: found?.lng ?? null, source: found?.source ?? "none" })
     .onConflictDoNothing();
   return found;
+}
+
+/** Orange County, New York (Census county code). */
+export const ORANGE_COUNTY_NY = "36071";
+const countyCache = new Map<string, string | null>();
+
+/**
+ * Which county a spot is in, from the free US Census service (no key). Used only for houses outside every colored area:
+ * those pay the "anywhere else in Orange County" price, and only inside Orange County, NY (Abraham, Nov 17, 2026).
+ * Null when the service can't answer (then the house is not refused for that reason).
+ */
+export async function countyAt(lng: number, lat: number, fetcher: typeof fetch = fetch): Promise<string | null> {
+  const k = `${lng.toFixed(5)},${lat.toFixed(5)}`;
+  if (countyCache.has(k)) return countyCache.get(k) ?? null;
+  let geoid: string | null = null;
+  try {
+    const r = await fetcher(`https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=${lng}&y=${lat}&benchmark=Public_AR_Current&vintage=Current_Current&layers=Counties&format=json`, { signal: AbortSignal.timeout(8000) });
+    const j = (await r.json().catch(() => ({}))) as { result?: { geographies?: { Counties?: { GEOID?: string }[] } } };
+    geoid = j.result?.geographies?.Counties?.[0]?.GEOID ?? null;
+  } catch {
+    geoid = null;
+  }
+  if (geoid) countyCache.set(k, geoid);
+  return geoid;
 }
 
 /* ---- Saved areas ---- */
@@ -224,24 +274,29 @@ export type DeliveryQuote = { ok: true; zone: string; feeCents: number } | { ok:
  * rule is used. No price is ever guessed: outside every area, a place the map service can't find, or an area with
  * not found = the address is asked for again.
  */
-export async function deliveryQuote(address: string | null | undefined, s: { deliveryAreas: string; zoneKjPlaces: string; zoneAreaPlaces: string; deliveryFeeKjCents: string; deliveryFeeAreaCents: string; localStreets?: string }, fetcher: typeof fetch = fetch): Promise<DeliveryQuote> {
+export async function deliveryQuote(address: string | null | undefined, s: ZonePrices & { deliveryAreas: string; zoneKjPlaces: string; zoneAreaPlaces: string; deliveryFeeKjCents: string; deliveryFeeAreaCents: string; localStreets?: string }, fetcher: typeof fetch = fetch, now = new Date()): Promise<DeliveryQuote> {
   if (!address?.trim()) return { ok: false, reason: "no_address" };
   const areas = savedAreas(s.deliveryAreas);
   if (!areas.length) {
     const { deliveryZone } = await import("@/lib/pricing");
     const z = deliveryZone(address, s);
-    return z === "outside" ? { ok: false, reason: "outside" } : { ok: true, zone: z, feeCents: Number(z === "kj" ? s.deliveryFeeKjCents : s.deliveryFeeAreaCents) || 0 };
+    return z === "outside" ? { ok: false, reason: "outside" } : { ok: true, zone: z, feeCents: zoneFee(z === "kj" ? "local" : "area", s, now) };
   }
   // The house decides (Abraham, Nov 15, 2026): its spot on the map, from the free US Census address service
   const at = await geocode(address, fetcher);
   if (!at) return { ok: false, reason: "not_found" };
   const a = areaAt(at.lng, at.lat, areas);
-  return { ok: true, zone: a ? a.name : "Outside the colored areas", feeCents: priceFor(a) };
+  // Outside every colored area: Orange County, NY only (Abraham, Nov 17, 2026)
+  if (!a) {
+    const county = await countyAt(at.lng, at.lat, fetcher);
+    if (county && county !== ORANGE_COUNTY_NY) return { ok: false, reason: "outside" };
+  }
+  return { ok: true, zone: a ? a.name : "Anywhere else in Orange County", feeCents: priceFor(a, s, now) };
 }
 
 export const QUOTE_WHY: Record<string, string> = {
   no_address: "there is no delivery address",
   not_found: "the address could not be found on the map: check the spelling of the house number, street, town and ZIP",
-  outside: "the house is outside the delivery area",
+  outside: "the house is outside the delivery area (Orange County, NY only)",
   no_price: "its area has no price yet",
 };

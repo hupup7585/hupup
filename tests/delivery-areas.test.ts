@@ -8,7 +8,7 @@ vi.mock("@/lib/db", async () => {
 });
 
 import { db, schema } from "@/lib/db";
-import { areaAt, deliveryQuote, mergeAreas, parseKml, spellingHint, withState } from "@/lib/delivery-areas";
+import { areaAt, deliveryPromoActive, deliveryQuote, mergeAreas, parseKml, spellingHint, withState, zoneFee } from "@/lib/delivery-areas";
 import { SETTING_DEFAULTS } from "@/lib/settings";
 
 const square = (x: number, y: number, d: number) => `${x},${y},0 ${x + d},${y},0 ${x + d},${y + d},0 ${x},${y + d},0 ${x},${y},0`;
@@ -62,7 +62,7 @@ describe("delivery price map", () => {
     expect(await deliveryQuote("2 Town Rd, Monroe", s, census(-74.11, 41.31))).toEqual({ ok: true, zone: "Local Town", feeCents: 1500 });
     expect(await deliveryQuote("3 Main St, Chester", s, census(-74.28, 41.32))).toEqual({ ok: true, zone: "Chester", feeCents: 1500 });
     expect(await deliveryQuote("4 Ruach Way, Monroe", s, census(-73.99, 41.51))).toEqual({ ok: true, zone: "Ruach Hchaim", feeCents: 1500 });
-    expect(await deliveryQuote("25 Main Street, Goshen", s, census(-74.32, 41.40))).toEqual({ ok: true, zone: "Outside the colored areas", feeCents: 2000 });
+    expect(await deliveryQuote("25 Main Street, Goshen", s, census(-74.32, 41.40))).toEqual({ ok: true, zone: "Anywhere else in Orange County", feeCents: 2000 });
     expect(await deliveryQuote("nowhere at all", s, nowhere)).toMatchObject({ ok: false, reason: "not_found" });
     expect(await deliveryQuote("", s)).toMatchObject({ ok: false, reason: "no_address" });
   });
@@ -95,5 +95,42 @@ describe("delivery price map", () => {
 
   it("before the map is loaded, the town-name rule still works", async () => {
     expect(await deliveryQuote("5 Main St, Chester NY", { ...SETTING_DEFAULTS, deliveryAreas: "" })).toEqual({ ok: true, zone: "area", feeCents: 1500 });
+  });
+});
+
+describe("zone prices, Orange County only, and the free delivery promo (Abraham, Nov 17, 2026)", () => {
+  /** Census stand-in: the address spot, and the county for that spot. */
+  const censusIn = (lng: number, lat: number, county: string) =>
+    (async (u: string) =>
+      new Response(JSON.stringify(u.includes("/geographies/") ? { result: { geographies: { Counties: [{ GEOID: county }] } } } : { result: { addressMatches: [{ coordinates: { x: lng, y: lat } }] } }))) as unknown as typeof fetch;
+  it("the three prices are the Owner's, with $10, $15 and $20 as the defaults", () => {
+    expect([zoneFee("local"), zoneFee("area"), zoneFee("outside")]).toEqual([1000, 1500, 2000]);
+    expect(zoneFee("outside", { deliveryFeeOutsideCents: "2500" })).toBe(2500);
+    expect(zoneFee("local", { deliveryFeeKjCents: "1200" })).toBe(1200);
+  });
+  it("outside every colored area: $20 inside Orange County, NY; refused anywhere else", async () => {
+    const areas = parseKml(KML);
+    const s = { ...SETTING_DEFAULTS, deliveryAreas: JSON.stringify(areas) };
+    expect(await deliveryQuote("9 Far Road, Warwick", s, censusIn(-74.36, 41.25, "36071"))).toEqual({ ok: true, zone: "Anywhere else in Orange County", feeCents: 2000 });
+    expect(await deliveryQuote("9 Far Road, Suffern", s, censusIn(-74.15, 41.11, "36087"))).toMatchObject({ ok: false, reason: "outside" });
+  });
+  it("the promo: KJ free, nearby towns $10, the $20 zone unchanged; only within its dates; off = regular prices", () => {
+    const on = { deliveryPromoOn: true, deliveryPromoStart: "2026-11-20", deliveryPromoEnd: "2026-11-30" };
+    const inside = new Date("2026-11-25T17:00:00Z");
+    expect(deliveryPromoActive(on, inside)).toBe(true);
+    expect([zoneFee("local", on, inside), zoneFee("area", on, inside), zoneFee("outside", on, inside)]).toEqual([0, 1000, 2000]);
+    expect(deliveryPromoActive(on, new Date("2026-12-01T17:00:00Z"))).toBe(false);
+    expect(deliveryPromoActive(on, new Date("2026-11-19T17:00:00Z"))).toBe(false);
+    expect(zoneFee("local", { ...on, deliveryPromoOn: false }, inside)).toBe(1000);
+    expect(deliveryPromoActive({ deliveryPromoOn: true }, inside)).toBe(true); // no dates: on until switched off
+  });
+  it("the promo price is what the phone line, New booking and the payment total charge (all use deliveryQuote)", async () => {
+    const areas = parseKml(KML);
+    const s = { ...SETTING_DEFAULTS, deliveryAreas: JSON.stringify(areas), deliveryPromoOn: true };
+    expect(await deliveryQuote("1 Local St, Kiryas Joel", s, censusIn(-74.16, 41.34, "36071"))).toEqual({ ok: true, zone: "Local", feeCents: 0 });
+    expect(await deliveryQuote("2 Town Rd, Monroe", s, censusIn(-74.11, 41.31, "36071"))).toEqual({ ok: true, zone: "Local Town", feeCents: 1000 });
+    const { priceOrder } = await import("@/lib/pricing");
+    const t = await priceOrder(10000, "1 Local St, Kiryas Joel", s as never, censusIn(-74.16, 41.34, "36071"));
+    expect(t?.deliveryFeeCents).toBe(0);
   });
 });

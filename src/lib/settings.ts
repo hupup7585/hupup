@@ -17,6 +17,15 @@ export const SETTING_DEFAULTS = {
   /* Checkout pricing (Abram's decisions; editable in admin). Lists are one place per line. */
   deliveryFeeKjCents: "1000",
   deliveryFeeAreaCents: "1500",
+  /** Anywhere else in Orange County (outside every colored area on the map), Owner-editable (Abraham, Nov 17, 2026). */
+  deliveryFeeOutsideCents: "2000",
+  /**
+   * Free delivery promo (Abraham, Nov 17, 2026), Owner only, off by default. While on (and today is within the dates,
+   * Eastern time; a blank date is open-ended): Kiryas Joel free, the nearby towns $10. The $20 zone keeps its price.
+   */
+  deliveryPromoOn: false,
+  deliveryPromoStart: "",
+  deliveryPromoEnd: "",
   /** Orange County, NY sales tax, applied to the whole order including delivery. */
   salesTaxPercent: "8.125",
   /** Kiryas Joel ($10 zone). Full list to come from Abram. */
