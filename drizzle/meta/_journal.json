@@ -484,6 +484,13 @@
       "when": 1794863116531,
       "tag": "0068_ocean_balls",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1794863807327,
+      "tag": "0069_product_garbage",
+      "breakpoints": true
     }
   ]
 }

@@ -56,8 +56,9 @@ export function totalsWithFee(subtotalCents: number, zone: string, deliveryFeeCe
 }
 
 /** Items + delivery (by the price map) + tax. Null = no price: outside every zone (we don't deliver there) or not found (ask for the address again). Never set by hand. */
-export async function priceOrder(subtotalCents: number, address: string | null | undefined, s: Settings, fetcher?: typeof fetch): Promise<Totals | null> {
+export async function priceOrder(subtotalCents: number, address: string | null | undefined, s: Settings, fetcher?: typeof fetch, deliveryDate?: string): Promise<Totals | null> {
   const { deliveryQuote } = await import("@/lib/delivery-areas");
-  const q = await deliveryQuote(address, s, fetcher);
+  // The free delivery promo counts by the delivery date (Abraham, Nov 17, 2026)
+  const q = await deliveryQuote(address, s, fetcher, deliveryDate ?? new Date());
   return q.ok ? totalsWithFee(subtotalCents, q.zone, q.feeCents, s) : null;
 }

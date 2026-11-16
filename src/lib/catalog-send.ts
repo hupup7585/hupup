@@ -122,7 +122,7 @@ export function isCatalogText(body: string | null | undefined): boolean {
  */
 export async function replyToCatalogText(
   from: string,
-  opts: { optedOut: boolean; on?: boolean; now?: Date; send: (to: string, body: string) => Promise<{ sent: boolean }> },
+  opts: { optedOut: boolean; on?: boolean; now?: Date; send: (to: string, body: string, mediaUrls?: string[]) => Promise<{ sent: boolean }> },
 ) {
   const on = opts.on ?? SMS_CATALOG_REPLY_ON;
   const now = opts.now ?? new Date();
@@ -135,7 +135,31 @@ export async function replyToCatalogText(
     .where(and(eq(schema.messages.toNumber, from), eq(schema.messages.event, "catalog_reply"), gte(schema.messages.createdAt, new Date(now.getTime() - 36 * 3600_000))));
   if (earlier.some((r) => nyDay(r.at) === nyDay(now))) return { replied: false, reason: "already_today" as const };
   const { messageText } = await import("@/lib/ivr/prompts");
-  const r = await opts.send(from, await messageText("msg_catalog_text"));
+  const r = await sendCatalogMessages(await messageText("msg_catalog_text"), (body, media) => opts.send(from, body, media));
   await recordCatalogRequest({ callerPhone: from, channel: "text", to: from, sent: r.sent, source: "text_keyword" });
   return { replied: r.sent, reason: r.sent ? null : ("send_failed" as const) };
+}
+
+/**
+ * The catalog by text as separate messages (Abraham, Nov 17, 2026): first picture 1 with the catalog words, then
+ * picture 2 alone (no words), in that order. Without pictures it is the words only, as before.
+ */
+export async function catalogTextMessages(words: string): Promise<{ body: string; mediaUrls: string[] }[]> {
+  const { getSettings } = await import("@/lib/settings");
+  const { config } = await import("@/lib/config");
+  const s = await getSettings();
+  const abs = (p: string) => (p ? new URL(p, config.baseUrl()).toString() : "");
+  const one = abs(s.catalogTextPicture1);
+  const two = abs(s.catalogTextPicture2);
+  const out = [{ body: words, mediaUrls: one ? [one] : [] }];
+  if (two) out.push({ body: "", mediaUrls: [two] });
+  return out;
+}
+
+/** Send the catalog messages one after the other; the first decides whether it counts as sent. */
+export async function sendCatalogMessages(words: string, send: (body: string, mediaUrls: string[]) => Promise<{ sent: boolean }>) {
+  const msgs = await catalogTextMessages(words);
+  const first = await send(msgs[0].body, msgs[0].mediaUrls);
+  if (first.sent) for (const m of msgs.slice(1)) await send(m.body, m.mediaUrls);
+  return first;
 }

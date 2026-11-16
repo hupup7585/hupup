@@ -58,11 +58,11 @@ describe("delivery price map", () => {
   });
 
   it("one address in each area is priced by the rule; outside every colored area $20; not found = ask again", async () => {
-    expect(await deliveryQuote("1 Local St, Kiryas Joel", s, census(-74.16, 41.34))).toEqual({ ok: true, zone: "Local", feeCents: 1000 });
-    expect(await deliveryQuote("2 Town Rd, Monroe", s, census(-74.11, 41.31))).toEqual({ ok: true, zone: "Local Town", feeCents: 1500 });
-    expect(await deliveryQuote("3 Main St, Chester", s, census(-74.28, 41.32))).toEqual({ ok: true, zone: "Chester", feeCents: 1500 });
-    expect(await deliveryQuote("4 Ruach Way, Monroe", s, census(-73.99, 41.51))).toEqual({ ok: true, zone: "Ruach Hchaim", feeCents: 1500 });
-    expect(await deliveryQuote("25 Main Street, Goshen", s, census(-74.32, 41.40))).toEqual({ ok: true, zone: "Anywhere else in Orange County", feeCents: 2000 });
+    expect(await deliveryQuote("1 Local St, Kiryas Joel", s, census(-74.16, 41.34))).toMatchObject({ ok: true, zone: "Local", feeCents: 1000 });
+    expect(await deliveryQuote("2 Town Rd, Monroe", s, census(-74.11, 41.31))).toMatchObject({ ok: true, zone: "Local Town", feeCents: 1500 });
+    expect(await deliveryQuote("3 Main St, Chester", s, census(-74.28, 41.32))).toMatchObject({ ok: true, zone: "Chester", feeCents: 1500 });
+    expect(await deliveryQuote("4 Ruach Way, Monroe", s, census(-73.99, 41.51))).toMatchObject({ ok: true, zone: "Ruach Hchaim", feeCents: 1500 });
+    expect(await deliveryQuote("25 Main Street, Goshen", s, census(-74.32, 41.40))).toMatchObject({ ok: true, zone: "Anywhere else in Orange County", feeCents: 2000 });
     expect(await deliveryQuote("nowhere at all", s, nowhere)).toMatchObject({ ok: false, reason: "not_found" });
     expect(await deliveryQuote("", s)).toMatchObject({ ok: false, reason: "no_address" });
   });
@@ -90,11 +90,11 @@ describe("delivery price map", () => {
     await saveSetting("deliveryAreas", JSON.stringify(areas), null);
     const back = (await getSettings()).deliveryAreas;
     expect(JSON.parse(back)).toHaveLength(4);
-    expect(await deliveryQuote("4 Ruach Way, Monroe", await getSettings(), census(-73.99, 41.51))).toEqual({ ok: true, zone: "Ruach Hchaim", feeCents: 1500 });
+    expect(await deliveryQuote("4 Ruach Way, Monroe", await getSettings(), census(-73.99, 41.51))).toMatchObject({ ok: true, zone: "Ruach Hchaim", feeCents: 1500 });
   });
 
   it("before the map is loaded, the town-name rule still works", async () => {
-    expect(await deliveryQuote("5 Main St, Chester NY", { ...SETTING_DEFAULTS, deliveryAreas: "" })).toEqual({ ok: true, zone: "area", feeCents: 1500 });
+    expect(await deliveryQuote("5 Main St, Chester NY", { ...SETTING_DEFAULTS, deliveryAreas: "" })).toMatchObject({ ok: true, zone: "area", feeCents: 1500 });
   });
 });
 
@@ -111,7 +111,7 @@ describe("zone prices, Orange County only, and the free delivery promo (Abraham,
   it("outside every colored area: $20 inside Orange County, NY; refused anywhere else", async () => {
     const areas = parseKml(KML);
     const s = { ...SETTING_DEFAULTS, deliveryAreas: JSON.stringify(areas) };
-    expect(await deliveryQuote("9 Far Road, Warwick", s, censusIn(-74.36, 41.25, "36071"))).toEqual({ ok: true, zone: "Anywhere else in Orange County", feeCents: 2000 });
+    expect(await deliveryQuote("9 Far Road, Warwick", s, censusIn(-74.36, 41.25, "36071"))).toMatchObject({ ok: true, zone: "Anywhere else in Orange County", feeCents: 2000 });
     expect(await deliveryQuote("9 Far Road, Suffern", s, censusIn(-74.15, 41.11, "36087"))).toMatchObject({ ok: false, reason: "outside" });
   });
   it("the promo: KJ free, nearby towns $10, the $20 zone unchanged; only within its dates; off = regular prices", () => {
@@ -127,8 +127,8 @@ describe("zone prices, Orange County only, and the free delivery promo (Abraham,
   it("the promo price is what the phone line, New booking and the payment total charge (all use deliveryQuote)", async () => {
     const areas = parseKml(KML);
     const s = { ...SETTING_DEFAULTS, deliveryAreas: JSON.stringify(areas), deliveryPromoOn: true };
-    expect(await deliveryQuote("1 Local St, Kiryas Joel", s, censusIn(-74.16, 41.34, "36071"))).toEqual({ ok: true, zone: "Local", feeCents: 0 });
-    expect(await deliveryQuote("2 Town Rd, Monroe", s, censusIn(-74.11, 41.31, "36071"))).toEqual({ ok: true, zone: "Local Town", feeCents: 1000 });
+    expect(await deliveryQuote("1 Local St, Kiryas Joel", s, censusIn(-74.16, 41.34, "36071"))).toMatchObject({ ok: true, zone: "Local", feeCents: 0 });
+    expect(await deliveryQuote("2 Town Rd, Monroe", s, censusIn(-74.11, 41.31, "36071"))).toMatchObject({ ok: true, zone: "Local Town", feeCents: 1000 });
     const { priceOrder } = await import("@/lib/pricing");
     const t = await priceOrder(10000, "1 Local St, Kiryas Joel", s as never, censusIn(-74.16, 41.34, "36071"));
     expect(t?.deliveryFeeCents).toBe(0);

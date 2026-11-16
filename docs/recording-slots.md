@@ -1,6 +1,6 @@
 # Hotline recording text list
 
-414 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
+415 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
 
 ## Welcome & main menu
 
@@ -169,6 +169,7 @@ Thank you for choosing Hup Up Attractions! |
 |---|---|---|
 | item_added | Item added to cart (every time) | This item is successfully added to your cart. |
 | keep_shopping | After an item is added: keep shopping or the cart | To keep shopping, press 1. To go to your shopping cart, press 0. |
+| another_day | After an item is added: book another day (Abraham) | To book another day, press 2. |
 | ocean_balls | Ocean balls (after every jumping balloon) | Would you like to add ocean balls? To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3. To skip, press pound. |
 | added#1 | Item added to cart, piece 1 | Woohoo! I added |
 | added#2 | Item added to cart, piece 2 | to your cart for |

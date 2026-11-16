@@ -194,7 +194,7 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
   if (!keyword && isCatalogText(text)) {
     await replyToCatalogText(from, {
       optedOut: Boolean(customer?.smsOptOut),
-      send: (to, b) => sendMessage({ to, body: b, kind: "transactional", event: "catalog_reply", customerId: customer?.id }),
+      send: (to, b, media) => sendMessage({ to, body: b, ...(media?.length ? { mediaUrls: media } : {}), kind: "transactional", event: "catalog_reply", customerId: customer?.id }),
     }).catch((e) => console.error("catalog text reply failed", e));
   }
 

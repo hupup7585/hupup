@@ -26,7 +26,7 @@ import { TERMS_TEXT } from "@/lib/terms-content";
 import { sendEmail, sendSms } from "@/lib/notify";
 import { getSettings } from "@/lib/settings";
 import { totalsWithFee } from "@/lib/pricing";
-import { deliveryQuote } from "@/lib/delivery-areas";
+import { deliveryQuote, zoneFee } from "@/lib/delivery-areas";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
 import { STEP_LABELS, track, trackStep } from "@/lib/call-journey";
@@ -630,7 +630,9 @@ const catalogEmailOf = (ctx: Ctx) => {
 const catalogTextReady = () => textingActive() || process.env.VERCEL_ENV !== "production";
 
 async function catalogSendText(ctx: Ctx, vr: VR, to: string) {
-  const r = await sendMessage({ to, body: promptText(ctx.prompts, "msg_catalog_text"), kind: "system", event: "catalog_request", callSid: ctx.callSid });
+  // Two messages when the Owner has set the pictures: picture 1 with the words, then picture 2 alone (Nov 17, 2026)
+  const { sendCatalogMessages } = await import("@/lib/catalog-send");
+  const r = await sendCatalogMessages(promptText(ctx.prompts, "msg_catalog_text"), (body, media) => sendMessage({ to, body, ...(media.length ? { mediaUrls: media } : {}), kind: "system", event: "catalog_request", callSid: ctx.callSid }));
   await logCatalogRequest(ctx, "text", to, r.sent);
   if (!r.sent) {
     sp(vr, ctx, "catalog_text_not_yet");
@@ -1650,6 +1652,7 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("after-add"));
     sp(g, ctx, "item_added");
     sp(g, ctx, "keep_shopping");
+    sp(g, ctx, "another_day");
     return noInput(vr, ctx, "cart");
   },
 
@@ -1657,6 +1660,7 @@ const handlers: Record<string, Handler> = {
   "added-menu"(ctx, vr) {
     const g = keypad(vr, url("after-add"));
     sp(g, ctx, "keep_shopping");
+    sp(g, ctx, "another_day");
     return noInput(vr, ctx, "cart");
   },
 
@@ -1664,7 +1668,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (d === "*") return back(vr, "menu"); // star always returns to the main menu (as in the other sub-menus)
     if (d === "1") return back(vr, "book"); // keep shopping (the same day; the date was already chosen)
-    if (d === "2") return back(vr, "date"); // another day: not read out any more (Nov 17), still works for several days
+    if (d === "2") return back(vr, "date"); // "To book another day, press 2." (Abraham, Nov 17, 2026)
     if (d === "0") return back(vr, "cart");
     if (d) {
       sp(vr, ctx, "not_valid");
@@ -2128,7 +2132,8 @@ const handlers: Record<string, Handler> = {
     // Delivery fee by the price map (Abraham, Nov 15, 2026); no price = never guessed
     const quote = await deliveryQuote(data.address, settings);
     // Each rental day is its own delivery: its own delivery fee and tax. One charge pays for all of them.
-    const perDay = days.map((o) => ({ o, t: quote.ok ? totalsWithFee(o.order.subtotalCents, quote.zone, quote.feeCents, settings) : null }));
+    // The free delivery promo counts by each day's delivery date (Abraham, Nov 17, 2026)
+    const perDay = days.map((o) => ({ o, t: quote.ok ? totalsWithFee(o.order.subtotalCents, quote.zone, quote.kind ? zoneFee(quote.kind, settings, o.order.eventDate) : quote.feeCents, settings) : null }));
     if (perDay.some((x) => !x.t)) {
       sp(vr, ctx, "address_outside_area");
       return back(vr, "ask", { f: "address" });

@@ -50,6 +50,8 @@ export const products = pgTable(
     /** Size within its category (1 = smallest); the phone line offers the next size up or down when an item is booked */
     sizeOrder: integer("size_order"),
     active: boolean("active").notNull().default(true),
+    /** In Garbage (Abraham, Nov 17, 2026): off the catalog list, website and phone menu until the Owner restores it */
+    trashedAt: timestamp("trashed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("products_category_idx").on(t.categoryId)],

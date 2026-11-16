@@ -3,9 +3,12 @@ import { asc } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Category, Product } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/money";
-import { saveCategoryAction, saveProductAction } from "./actions";
+import { saveCategoryAction, saveProductAction, trashProductAction } from "./actions";
+import PhotoUpload from "./PhotoUpload";
+import ConfirmSubmit from "@/components/ConfirmSubmit";
 import { currentCatalog } from "@/lib/catalog-pdf";
 import CatalogPdf from "./CatalogPdf";
+import { getSettings } from "@/lib/settings";
 
 function CategoryForm({ c }: { c?: Category }) {
   return (
@@ -15,7 +18,6 @@ function CategoryForm({ c }: { c?: Category }) {
       <div><label className="label">Phone key</label><input name="ivrDigit" type="number" min={1} max={8} defaultValue={c?.ivrDigit ?? ""} className="input" placeholder="1-8" /></div>
       <div><label className="label">Sort</label><input name="sortOrder" type="number" defaultValue={c?.sortOrder ?? 0} className="input" /></div>
       <div className="sm:col-span-3"><label className="label">Spoken on phone as</label><input name="spokenName" defaultValue={c?.spokenName} className="input" placeholder="e.g. Laser Tag and Inflatable Mazes" /></div>
-      <div className="sm:col-span-3"><label className="label">Photo URL (landing page)</label><input name="imageUrl" defaultValue={c?.imageUrl ?? ""} className="input" placeholder="https://…" /></div>
       <div className="sm:col-span-6"><label className="label">Description (landing page)</label><input name="description" defaultValue={c?.description} className="input" /></div>
       <label className="flex items-center gap-2 font-semibold sm:col-span-4"><input type="checkbox" name="active" defaultChecked={c?.active ?? true} /> Active (shown on website & phone)</label>
       <button className="btn-dark sm:col-span-2">{c ? "Save category" : "Add category"}</button>
@@ -44,7 +46,7 @@ function ProductForm({ p, categories, categoryId }: { p?: Product; categories: C
       </div>
       <div className="sm:col-span-6"><label className="label">Description</label><input name="description" defaultValue={p?.description} className="input" /></div>
       <div className="sm:col-span-6"><label className="label">What the phone voice says for “hear description”</label><textarea name="spokenDescription" defaultValue={p?.spokenDescription} rows={2} className="input" /></div>
-      <div className="sm:col-span-4"><label className="label">Photo URL</label><input name="imageUrl" defaultValue={p?.imageUrl ?? ""} className="input" /></div>
+      <div className="sm:col-span-4 text-sm text-muted">{p ? "Photo: use Upload photo above this form." : "Add the item first, then upload its photo."}</div>
       <label className="flex items-end gap-2 pb-2 font-semibold sm:col-span-2"><input type="checkbox" name="active" defaultChecked={p?.active ?? true} /> Active</label>
       <button className="btn-dark sm:col-span-6">{p ? "Save item" : "Add item"}</button>
     </form>
@@ -59,11 +61,12 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
     db.select().from(schema.products).orderBy(asc(schema.products.sortOrder), asc(schema.products.id)),
   ]);
   const pdf = await currentCatalog();
+  const settings = await getSettings();
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="text-2xl font-black sm:text-3xl">Catalog</h1>
       <p className="mb-5 mt-1 text-muted">
-        Categories with a phone key appear in the hotline menu automatically (“For Bounce Houses, press 1”). Items are read in phone-menu order (up to 9 per category).
+        Categories with a phone key appear in the hotline menu automatically (“For Bounce Houses, press 1”). Items are read in phone-menu order (10 or more: item 10 is press 10).
       </p>
       {sp.ok && <p className="mb-4 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]">{sp.ok}</p>}
       {sp.error && <p className="mb-4 rounded-xl bg-coral/10 p-3 font-semibold text-coral-dark">{sp.error}</p>}
@@ -80,8 +83,17 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
         }
       />
 
+      <section className="card mb-5 p-5" data-catalog-text-pictures>
+        <h2 className="text-xl font-black">Catalog by text: two pictures</h2>
+        <p className="mb-3 mt-1 text-sm text-muted">A caller who asks for the catalog by text (key 8, or texting CATALOG) gets two messages: first picture 1 with the catalog words, then picture 2 alone. Without pictures, only the words are sent.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div><div className="label">Picture 1 (with the words)</div><PhotoUpload kind="text" id={1} current={settings.catalogTextPicture1 || null} /></div>
+          <div><div className="label">Picture 2 (alone)</div><PhotoUpload kind="text" id={2} current={settings.catalogTextPicture2 || null} /></div>
+        </div>
+      </section>
+
       {cats.map((c) => {
-        const items = prods.filter((p) => p.categoryId === c.id);
+        const items = prods.filter((p) => p.categoryId === c.id && !p.trashedAt);
         return (
           <section key={c.id} className={`card mb-5 p-5 ${c.active ? "" : "opacity-60"}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -95,7 +107,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             </div>
             <details className="mt-2">
               <summary className="cursor-pointer text-sm font-bold text-navy underline-offset-2 hover:underline">Edit category</summary>
-              <div className="mt-3"><CategoryForm c={c} /></div>
+              <div className="mt-3 grid gap-3"><PhotoUpload kind="category" id={c.id} current={c.imageUrl} /><CategoryForm c={c} /></div>
             </details>
             <div className="mt-4 divide-y divide-line">
               {items.map((p) => (
@@ -107,7 +119,14 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                     <span className="font-bold">{formatMoney(p.priceCents)}</span>
                     <span className="text-sm font-bold text-navy underline-offset-2 hover:underline">Edit</span>
                   </summary>
-                  <div className="mt-3 rounded-xl bg-bg p-4"><ProductForm p={p} categories={cats} /></div>
+                  <div className="mt-3 grid gap-3 rounded-xl bg-bg p-4">
+                    <PhotoUpload kind="product" id={p.id} current={p.imageUrl} />
+                    <ProductForm p={p} categories={cats} />
+                    <form action={trashProductAction} className="border-t border-line pt-3" data-trash-item>
+                      <input type="hidden" name="id" value={p.id} />
+                      <ConfirmSubmit message={`Put "${p.name}" in Garbage? It comes off the catalog list, the website and the phone menu. You can restore it from Garbage.`} className="btn-ghost text-coral">Put in Garbage</ConfirmSubmit>
+                    </form>
+                  </div>
                 </details>
               ))}
               {items.length === 0 && <p className="py-3 text-muted">No items yet.</p>}
@@ -119,6 +138,25 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           </section>
         );
       })}
+
+      {prods.some((p) => p.trashedAt) && (
+        <section className="card mb-5 p-5" data-garbage>
+          <h2 className="mb-1 text-xl font-black">Garbage</h2>
+          <p className="mb-3 text-sm text-muted">Items here are off the catalog list, the website and the phone menu. Orders that already have them are not changed.</p>
+          <ul className="divide-y divide-line">
+            {prods.filter((p) => p.trashedAt).map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span><b>{p.name}</b> <span className="text-sm text-muted">({cats.find((c) => c.id === p.categoryId)?.name ?? "No category"}, {formatMoney(p.priceCents)})</span></span>
+                <form action={trashProductAction}>
+                  <input type="hidden" name="id" value={p.id} />
+                  <input type="hidden" name="restore" value="1" />
+                  <button className="btn-ghost">Restore</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="card p-5">
         <h2 className="mb-3 text-xl font-black">+ Add a new category</h2>

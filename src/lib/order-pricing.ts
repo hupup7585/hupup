@@ -14,7 +14,7 @@ export async function ensurePriced(orderId: number): Promise<boolean> {
   if (!o) return false;
   if (o.totalCents !== null) return true;
   const s = await getSettings();
-  const t = await priceOrder(o.subtotalCents, o.deliveryAddress, s);
+  const t = await priceOrder(o.subtotalCents, o.deliveryAddress, s, undefined, o.eventDate);
   if (!t) return false; // outside every zone, or not found: never guessed (pricingProblem says which)
   await db
     .update(schema.orders)

@@ -35,7 +35,7 @@ export async function saveCategoryAction(fd: FormData) {
     spokenName: s(fd, "spokenName") || name.replace(/&/g, "and"),
     description: s(fd, "description"),
     // The old category emoji field is no longer shown or edited (no emoji, Abraham); the stored value is kept
-    imageUrl: s(fd, "imageUrl") || null,
+    // The photo is set by Upload photo (never by saving this form, so a new upload is not overwritten)
     ivrDigit,
     sortOrder: Number(fd.get("sortOrder") || 0),
     active: fd.get("active") === "on",
@@ -62,7 +62,6 @@ export async function saveProductAction(fd: FormData) {
     quantity,
     description: s(fd, "description"),
     spokenDescription: s(fd, "spokenDescription"),
-    imageUrl: s(fd, "imageUrl") || null,
     sortOrder: Number(fd.get("sortOrder") || 0),
     sizeOrder: (() => {
       const n = Number(fd.get("sizeOrder"));
@@ -73,4 +72,52 @@ export async function saveProductAction(fd: FormData) {
   if (id) await db.update(schema.products).set(values).where(eq(schema.products.id, id));
   else await db.insert(schema.products).values(values);
   done(id ? "Item saved" : "Item added");
+}
+
+/**
+ * A real photo upload for an item or a category (Abraham, Nov 17, 2026): JPEG, PNG or WebP up to 4 MB (the browser
+ * shrinks big phone photos first), kept in Cloudflare R2 and shown on the website through /api/catalog-photo/.
+ */
+export async function uploadCatalogPhotoAction(fd: FormData): Promise<{ ok: boolean; message: string }> {
+  await requireOwner();
+  const k = String(fd.get("kind"));
+  const kind = k === "category" ? "categories" : k === "text" ? "text" : "products";
+  const id = Number(fd.get("id"));
+  const file = fd.get("photo") as File | null;
+  if (!id || !file || typeof file === "string") return { ok: false, message: "Choose a photo first." };
+  const data = new Uint8Array(await file.arrayBuffer());
+  const { photoKind } = await import("@/lib/delivery-photos");
+  const { PHOTO_MAX_BYTES, r2Put } = await import("@/lib/r2");
+  const type = photoKind(data.subarray(0, 16));
+  if (!type) return { ok: false, message: "That file isn't a photo. Use a JPG, PNG or WebP picture." };
+  if (data.length > PHOTO_MAX_BYTES) return { ok: false, message: "Keep the photo under 4 MB." };
+  const { randomUUID } = await import("node:crypto");
+  const key = `catalog/${kind}/${id}-${randomUUID()}.${type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg"}`;
+  try {
+    await r2Put(key, data, type);
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+  const imageUrl = `/api/catalog-photo/${key}`;
+  if (kind === "text") {
+    // Catalog by text, picture 1 or 2 (Abraham, Nov 17, 2026)
+    if (id !== 1 && id !== 2) return { ok: false, message: "Choose picture 1 or picture 2." };
+    const { saveSetting } = await import("@/lib/settings");
+    await saveSetting(id === 1 ? "catalogTextPicture1" : "catalogTextPicture2", imageUrl);
+  } else if (kind === "categories") await db.update(schema.categories).set({ imageUrl }).where(eq(schema.categories.id, id));
+  else await db.update(schema.products).set({ imageUrl }).where(eq(schema.products.id, id));
+  revalidatePath("/admin", "layout");
+  revalidatePath("/");
+  return { ok: true, message: "Photo saved." };
+}
+
+/** Owner only: put an item in Garbage (off the catalog list, website and phone menu) or restore it. Audited. */
+export async function trashProductAction(fd: FormData) {
+  const owner = await requireOwner();
+  const id = Number(fd.get("id"));
+  const restore = fd.get("restore") === "1";
+  if (!id) done("Item not found", true);
+  await db.update(schema.products).set(restore ? { trashedAt: null, active: true } : { trashedAt: new Date(), active: false }).where(eq(schema.products.id, id));
+  await db.insert(schema.auditLog).values({ userId: owner.userId, action: restore ? "catalog.item_restored" : "catalog.item_to_garbage", entityType: "product", entityId: String(id) });
+  done(restore ? "Item restored: it's back on the catalog list, website and phone menu." : "Item moved to Garbage. You can restore it from the Garbage list.");
 }

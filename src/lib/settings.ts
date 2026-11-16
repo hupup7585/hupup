@@ -24,6 +24,12 @@ export const SETTING_DEFAULTS = {
    * Eastern time; a blank date is open-ended): Kiryas Joel free, the nearby towns $10. The $20 zone keeps its price.
    */
   deliveryPromoOn: false,
+  /**
+   * Catalog by text (Abraham, Nov 17, 2026): two messages, picture 1 with the catalog words, then picture 2 alone.
+   * Owner uploads them in Admin, Catalog. Blank = the words only, as before.
+   */
+  catalogTextPicture1: "",
+  catalogTextPicture2: "",
   deliveryPromoStart: "",
   deliveryPromoEnd: "",
   /** Orange County, NY sales tax, applied to the whole order including delivery. */

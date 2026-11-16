@@ -136,6 +136,23 @@ async function liveSettingsReport() {
   log(`Live line: card payments ${v("solaPhonePayOn") === true ? "on" : "off"} through ${v("phoneCardProvider") ?? "sola"}, ${v("solaPhonePayOwnerOnly") === false ? "for every caller" : `test numbers only (${nums(v("paymentTestNumbers")).replace(/\(\d{3}\) \d{3}-/g, "ending ")})`}.`);
 }
 
+/** The live catalog as the phone line and the website see it (Abraham, Nov 17, 2026): no customer data. */
+async function catalogReport() {
+  const { getDb, schema } = await import("../src/lib/db");
+  const { asc } = await import("drizzle-orm");
+  const db = getDb();
+  const cats = await db.select().from(schema.categories).orderBy(asc(schema.categories.sortOrder), asc(schema.categories.id));
+  const prods = await db.select().from(schema.products).orderBy(asc(schema.products.sortOrder), asc(schema.products.id));
+  for (const c of cats) {
+    const items = prods.filter((p) => p.categoryId === c.id);
+    const shown = items.filter((p) => p.active && !p.trashedAt);
+    const where = c.active ? (c.ivrDigit ? `website and phone (key ${c.ivrDigit})` : "website only") : "hidden";
+    log(`Catalog: ${c.name}, ${where}: ${shown.length} shown${shown.length ? `: ${shown.map((p, i) => `${i + 1} ${p.name} $${(p.priceCents / 100).toFixed(2)}`).join("; ")}` : ""}.`);
+    const hidden = items.filter((p) => !p.active || p.trashedAt);
+    if (hidden.length) log(`Catalog: ${c.name}, not shown: ${hidden.map((p) => `${p.name}${p.trashedAt ? " (in Garbage)" : ""}`).join("; ")}.`);
+  }
+}
+
 /**
  * Delivery price map (Abraham, Nov 15, 2026): load the shapes from his Google map, then test one real address inside
  * each area: a point inside the shape is turned into a street address (OpenStreetMap), and that address is priced the
@@ -235,6 +252,7 @@ async function main() {
     ["Cloudflare setup", cloudflareSetup],
     ["Delivery map", deliveryMapCheck],
     ["Live line report", liveSettingsReport],
+    ["Catalog report", catalogReport],
   ] as const) {
     try {
       await step(process.env);

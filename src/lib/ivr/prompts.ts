@@ -168,6 +168,7 @@ export const PROMPTS = {
   // Item added, whole phone system (Abraham, Nov 17, 2026), his wording
   item_added: { group: "Cart", label: "Item added to cart (every time)", text: "This item is successfully added to your cart." },
   keep_shopping: { group: "Cart", label: "After an item is added: keep shopping or the cart", text: "To keep shopping, press 1. To go to your shopping cart, press 0." },
+  another_day: { group: "Cart", label: "After an item is added: book another day (Abraham)", text: "To book another day, press 2." },
   // Ocean balls after every jumping balloon (Abraham, Nov 17, 2026), his wording ("#" is said as pound)
   ocean_balls: { group: "Cart", label: "Ocean balls (after every jumping balloon)", text: "Would you like to add ocean balls? To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3. To skip, press pound." },
   added: { group: "Cart", label: "Item added to cart", text: "Woohoo! I added {items} to your cart for {date}. It's saved just for you while we are on the phone.", vars: ["items", "date"] },

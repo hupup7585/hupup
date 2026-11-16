@@ -86,17 +86,20 @@ export const PROMO_CENTS = { local: 0, area: 1000 } as const;
 
 const cents = (v: string | undefined, fallback: number) => (v !== undefined && v !== "" && Number.isFinite(Number(v)) ? Number(v) : fallback);
 
-/** Is the free delivery promo on today (Eastern time)? On, and today within the start and end dates (blank = open). */
-export function deliveryPromoActive(s: ZonePrices, now = new Date()): boolean {
+/**
+ * Is the free delivery promo on for this delivery? Counted by the delivery date (Abraham, Nov 17, 2026): on, and the
+ * delivery date within the start and end dates (blank = open). A Date means that day in Eastern time.
+ */
+export function deliveryPromoActive(s: ZonePrices, when: Date | string = new Date()): boolean {
   if (!(s.deliveryPromoOn === true || s.deliveryPromoOn === "true")) return false;
-  const today = now.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const today = typeof when === "string" ? when.slice(0, 10) : when.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
   if (s.deliveryPromoStart && today < s.deliveryPromoStart) return false;
   if (s.deliveryPromoEnd && today > s.deliveryPromoEnd) return false;
   return true;
 }
 
 /** The delivery fee for a zone: the Owner's prices, or the promo price while the promo is on. */
-export function zoneFee(kind: "local" | "area" | "outside", s: ZonePrices = {}, now = new Date()): number {
+export function zoneFee(kind: "local" | "area" | "outside", s: ZonePrices = {}, now: Date | string = new Date()): number {
   if (kind !== "outside" && deliveryPromoActive(s, now)) return PROMO_CENTS[kind];
   if (kind === "local") return cents(s.deliveryFeeKjCents, RULE_CENTS.local);
   if (kind === "area") return cents(s.deliveryFeeAreaCents, RULE_CENTS.area);
@@ -116,7 +119,7 @@ export function areaAt(lng: number, lat: number, areas: DeliveryArea[]): Deliver
   return hits.find(isLocalArea) ?? hits[0] ?? null;
 }
 
-export function priceFor(a: DeliveryArea | null, s: ZonePrices = {}, now = new Date()): number {
+export function priceFor(a: DeliveryArea | null, s: ZonePrices = {}, now: Date | string = new Date()): number {
   return zoneFee(zoneKind(a), s, now);
 }
 
@@ -267,20 +270,20 @@ export function spellingHint(address: string, list: string): string | null {
   return best && best.d <= Math.max(2, Math.floor(typed.length / 5)) ? best.n : null;
 }
 
-export type DeliveryQuote = { ok: true; zone: string; feeCents: number } | { ok: false; reason: "no_address" | "not_found" | "outside" | "no_price"; area?: string };
+export type DeliveryQuote = { ok: true; zone: string; feeCents: number; kind?: "local" | "area" | "outside" } | { ok: false; reason: "no_address" | "not_found" | "outside" | "no_price"; area?: string };
 
 /**
  * The delivery fee for an address: the price of the map area it is in. Before the map is loaded, the older town-name
  * rule is used. No price is ever guessed: outside every area, a place the map service can't find, or an area with
  * not found = the address is asked for again.
  */
-export async function deliveryQuote(address: string | null | undefined, s: ZonePrices & { deliveryAreas: string; zoneKjPlaces: string; zoneAreaPlaces: string; deliveryFeeKjCents: string; deliveryFeeAreaCents: string; localStreets?: string }, fetcher: typeof fetch = fetch, now = new Date()): Promise<DeliveryQuote> {
+export async function deliveryQuote(address: string | null | undefined, s: ZonePrices & { deliveryAreas: string; zoneKjPlaces: string; zoneAreaPlaces: string; deliveryFeeKjCents: string; deliveryFeeAreaCents: string; localStreets?: string }, fetcher: typeof fetch = fetch, now: Date | string = new Date()): Promise<DeliveryQuote> {
   if (!address?.trim()) return { ok: false, reason: "no_address" };
   const areas = savedAreas(s.deliveryAreas);
   if (!areas.length) {
     const { deliveryZone } = await import("@/lib/pricing");
     const z = deliveryZone(address, s);
-    return z === "outside" ? { ok: false, reason: "outside" } : { ok: true, zone: z, feeCents: zoneFee(z === "kj" ? "local" : "area", s, now) };
+    return z === "outside" ? { ok: false, reason: "outside" } : { ok: true, zone: z, feeCents: zoneFee(z === "kj" ? "local" : "area", s, now), kind: z === "kj" ? "local" : "area" };
   }
   // The house decides (Abraham, Nov 15, 2026): its spot on the map, from the free US Census address service
   const at = await geocode(address, fetcher);
@@ -291,7 +294,7 @@ export async function deliveryQuote(address: string | null | undefined, s: ZoneP
     const county = await countyAt(at.lng, at.lat, fetcher);
     if (county && county !== ORANGE_COUNTY_NY) return { ok: false, reason: "outside" };
   }
-  return { ok: true, zone: a ? a.name : "Anywhere else in Orange County", feeCents: priceFor(a, s, now) };
+  return { ok: true, zone: a ? a.name : "Anywhere else in Orange County", feeCents: priceFor(a, s, now), kind: zoneKind(a) };
 }
 
 export const QUOTE_WHY: Record<string, string> = {
