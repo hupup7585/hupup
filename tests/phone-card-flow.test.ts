@@ -59,19 +59,20 @@ beforeAll(async () => {
 });
 
 describe("card payment on the phone line", () => {
-  it("before the first try: card is the default; 2 gets a payment link by text instead (draft, preview only)", async () => {
+  it("before the first try: card is the default; 0 gets a payment link by text instead (approved, live)", async () => {
     const ask = await call("phonepay-go", {}, `o=${orderId}`);
-    expect(said(ask)).toEqual(["To pay by card now, please stay on the line. To get a secure payment link by text instead, press 2."]);
+    expect(said(ask)).toEqual(["To pay by card now, please stay on the line. To get a secure payment link by text instead, press 0."]);
     expect(redirect(ask)).toBe(`phonepay-go?o=${orderId}&c=1`); // no key: on to the card
     expect(ask).not.toContain("<Dial");
-    // on the live line it never plays until Abraham approves it: straight to the card
+    // approved: it plays on the live line too
     process.env.VERCEL_ENV = "production";
-    const live = await call("phonepay-go", {}, `o=${orderId}&c=0`);
+    const live = await call("phonepay-go", {}, `o=${orderId}`);
     delete process.env.VERCEL_ENV;
-    expect(said(live)).not.toContain("To pay by card now, please stay on the line. To get a secure payment link by text instead, press 2.");
-    expect(live).toContain("<Dial");
+    expect(said(live)).toEqual(["To pay by card now, please stay on the line. To get a secure payment link by text instead, press 0."]);
+    expect(redirect(await call("phonepay-option", { Digits: "2" }, `o=${orderId}`))).toBe(`phonepay-go?o=${orderId}`); // 2 is not a choice here
     await db.delete(schema.phonepayAttempts);
     expect(redirect(await call("phonepay-option", { Digits: "5" }, `o=${orderId}`))).toBe(`phonepay-go?o=${orderId}`);
+    expect(redirect(await call("phonepay-option", { Digits: "0" }, `o=${orderId}`))).toBe("promo-consent"); // 0: the link by text
   });
 
   it("each try dials Sola PhonePay straight from the hotline (no SIP), with the PIN, the order amount and star to come back", async () => {

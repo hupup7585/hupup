@@ -54,15 +54,15 @@ describe("catalog email: dot only where the address has one", () => {
 });
 
 describe("pound to continue", () => {
-  it("the pound line is a draft: it plays on preview, never on the live line until approved", async () => {
+  it("the pound line (approved Nov 17) plays on the live line and in keypad typing", async () => {
     await withCart();
     const preview = await call("ask", {}, "f=name");
-    expect(said(preview)).toContain("When you are finished, press pound.");
+    expect(said(preview)).toContain("When you are finished, please press pound.");
     process.env.VERCEL_ENV = "production";
     const live = await call("ask", {}, "f=name");
     delete process.env.VERCEL_ENV;
-    expect(said(live)).not.toContain("When you are finished, press pound.");
-    expect(said(await call("type", {}, "f=name"))).toContain("When you are finished, press pound.");
+    expect(said(live)).toContain("When you are finished, please press pound.");
+    expect(said(await call("type", {}, "f=name"))).toContain("When you are finished, please press pound.");
   });
   it("pound in the middle of a spoken answer ends it and keeps what was said", async () => {
     await withCart();

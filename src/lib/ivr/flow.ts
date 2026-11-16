@@ -2113,8 +2113,8 @@ const handlers: Record<string, Handler> = {
     if (!group || group.due <= 0) return back(vr, "promo-consent");
     // Any Sola call from an earlier try is hung up first
     const earlier = await db.select().from(schema.phonepayAttempts).where(and(eq(schema.phonepayAttempts.callSid, ctx.callSid), eq(schema.phonepayAttempts.orderId, o)));
-    // Card on the call is the default (Abraham, Nov 17, 2026); before the first try the caller may press 2 for a
-    // payment link by text instead. Only once its wording is approved (on preview it plays for his test).
+    // Card on the call is the default (Abraham, Nov 17, 2026); before the first try the caller may press 0 for a
+    // payment link by text instead (approved Nov 17).
     if (!earlier.length && ctx.query.get("c") !== "1" && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "phonepay_link_option"))) {
       const g = keypad(vr, url("phonepay-option", { o }), { numDigits: 1, timeout: 5 });
       sp(g, ctx, "phonepay_link_option", undefined, { draftOk: true });
@@ -2148,11 +2148,11 @@ const handlers: Record<string, Handler> = {
     return vr;
   },
 
-  /** Before the first card try: 2 = a payment link by text instead; any other key = the shared line, then the question again. */
+  /** Before the first card try: 0 = a payment link by text instead (Abraham, Nov 17, 2026); any other key = the shared line, then the question again. */
   async "phonepay-option"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     if (!o) return back(vr, "goodbye");
-    if (ctx.body.Digits === "2") {
+    if (ctx.body.Digits === "0") {
       await track(ctx.callSid, "step", `Asked for a payment link by text instead of the card (order #${orderNumber(o)})`);
       const [ord] = await db.select({ customerId: orders.customerId }).from(orders).where(eq(orders.id, o)).limit(1);
       const [c] = ord?.customerId ? await db.select().from(schema.customers).where(eq(schema.customers.id, ord.customerId)).limit(1) : [];

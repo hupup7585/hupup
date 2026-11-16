@@ -197,7 +197,7 @@ Thank you for choosing Hup Up Attractions! |
 | directions_saved | Delivery directions saved | Thank you, we saved that for our delivery team. |
 | ask_email_required | Ask for email (required: no texts) | To send your secure payment link, we need your email address. Please say your email address, like john at gmail dot com. |
 | ask_email | Ask for email | Almost done! Please say your email address for your receipt, like john at gmail dot com. Or press pound to skip. |
-| press_pound_done | After every information question: press pound when finished (draft) | When you are finished, press pound. |
+| press_pound_done | After every information question: press pound when finished | When you are finished, please press pound. |
 | type_hint | Typing: how to switch | To type it on your keypad instead, press star. |
 | type_instructions | Typing: how to type | To type, press each key until you reach the letter: press 2 once for A, twice for B, three times for C, and the same for every key. To type two letters on the same key, press star once between them. For example, A then B is 2, star, 2 2. Press star twice for a space. Press pound when you are done. |
 | type_email_symbols | Typing: email symbols | For a dot, press 1 once. For the at sign, press 1 twice. |
@@ -269,7 +269,7 @@ Thank you for choosing Hup Up Attractions! |
 
 | Slot | Line | Exact text |
 |---|---|---|
-| phonepay_link_option | Before the card: get a payment link by text instead (draft) | To pay by card now, please stay on the line. To get a secure payment link by text instead, press 2. |
+| phonepay_link_option | Before the card: get a payment link by text instead | To pay by card now, please stay on the line. To get a secure payment link by text instead, press 0. |
 | phonepay_intro | PhonePay connect | Thank you. Please hold for a moment while we connect you to our secure payment line. |
 | phonepay_back | Back from the payment line | Thank you. Let us finish your order. |
 | phonepay_paid | Payment found | Your payment was received. You are all set! |

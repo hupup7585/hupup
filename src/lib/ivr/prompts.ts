@@ -191,8 +191,9 @@ export const PROMPTS = {
   // Call recording notice (Abraham O): PROPOSED wording, not approved yet; plays only if the Owner turns recording on.
   recording_notice: { group: "Welcome & main menu", label: "Call recording notice (after the greeting; plays only when call recording is on)", text: "This call may be monitored and recorded for quality and training purposes." },
   // Keypad typing (Abraham L; proposed wording approved under P, Nov 8, 2026)
-  // Abraham, Nov 17, 2026: every question that asks for information ends with this; pound ends the answer. Draft for his OK.
-  press_pound_done: { group: "Checkout", label: "After every information question: press pound when finished (draft)", text: "When you are finished, press pound.", pending: true },
+  // Abraham, Nov 17, 2026: every question that asks for information ends with this; pound ends the answer. Approved
+  // with "please" added.
+  press_pound_done: { group: "Checkout", label: "After every information question: press pound when finished", text: "When you are finished, please press pound." },
   type_hint: { group: "Checkout", label: "Typing: how to switch", text: "To type it on your keypad instead, press star." },
   type_instructions: { group: "Checkout", label: "Typing: how to type", text: "To type, press each key until you reach the letter: press 2 once for A, twice for B, three times for C, and the same for every key. To type two letters on the same key, press star once between them. For example, A then B is 2, star, 2 2. Press star twice for a space. Press pound when you are done." },
   type_email_symbols: { group: "Checkout", label: "Typing: email symbols", text: "For a dot, press 1 once. For the at sign, press 1 twice." },
@@ -278,8 +279,8 @@ export const PROMPTS = {
   phonepay_choice: { group: "Pay by card (Sola PhonePay)", label: "Pay now or get a link", text: "Press 1 to pay now by card. Press 2 to get a secure payment link instead." }, // approved Nov 14
   // Abraham approved the wording (Nov 14, 2026). No recording is made until he picks the voice and approves the audio;
   // until then the lines play in the live voice and PhonePay stays on his own test calls only.
-  // Abraham, Nov 17, 2026: card on the call stays the default; this offers a link by text instead. Draft for his OK.
-  phonepay_link_option: { group: "Pay by card (Sola PhonePay)", label: "Before the card: get a payment link by text instead (draft)", text: "To pay by card now, please stay on the line. To get a secure payment link by text instead, press 2.", pending: true },
+  // Abraham, Nov 17, 2026: card on the call stays the default; this offers a link by text instead. Approved with "press 0".
+  phonepay_link_option: { group: "Pay by card (Sola PhonePay)", label: "Before the card: get a payment link by text instead", text: "To pay by card now, please stay on the line. To get a secure payment link by text instead, press 0." },
   phonepay_intro: { group: "Pay by card (Sola PhonePay)", label: "PhonePay connect", text: "Thank you. Please hold for a moment while we connect you to our secure payment line." }, // approved Nov 14
   phonepay_back: { group: "Pay by card (Sola PhonePay)", label: "Back from the payment line", text: "Thank you. Let us finish your order." }, // approved Nov 14 ("Let's", spelled out by the standing rule)
   phonepay_paid: { group: "Pay by card (Sola PhonePay)", label: "Payment found", text: "Your payment was received. You are all set!" }, // approved Nov 14 ("You're", spelled out)
