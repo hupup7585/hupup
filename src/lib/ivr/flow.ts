@@ -64,7 +64,7 @@ import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
 import { categoryProducts, itemFreeOn, nearestFreeDay, nearestSize } from "@/lib/alternatives";
-import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_ACCESS_KEY_GAP, VM_PIN_TRIES, callOutNumber, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinChangedByPhone, vmPinSet, validPin } from "@/lib/vm-access";
+import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_ACCESS_KEY_GAP, VM_PIN_TRIES, callOutActive, callOutNumber, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinChangedByPhone, validPin } from "@/lib/vm-access";
 import { STT_HOLD_FILE, STT_MAX_WAITS, googleReadback, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
 
 const { categories, products, orders, orderItems } = schema;
@@ -563,6 +563,16 @@ function vmRecord(vr: VR, box: { id: number; maxLengthSec: number; transcribe: b
 
 /** Staff voicemail access: signed in with the PIN on THIS call. */
 const vmaSignedIn = (ctx: Ctx) => vmAccessActive() && ctx.session?.data.vmaOk === 1;
+
+/**
+ * A staff menu line with a call-out choice: while calling out is off on the live line (until Abraham approves the
+ * price), that one sentence is left out so it is never offered. Otherwise the line plays as usual.
+ */
+function spCallOut(target: VR | Gather, ctx: Ctx, key: PromptKey, callOutSentence: string) {
+  if (callOutActive()) return sp(target, ctx, key);
+  const text = promptText(ctx.prompts, key).replace(callOutSentence, "").replace(/\s{2,}/g, " ").trim();
+  say(target, text);
+}
 
 /** A box's messages for staff by phone: sent (not hidden), newest first. */
 async function vmaMessages(boxId: number) {
@@ -2414,7 +2424,10 @@ const handlers: Record<string, Handler> = {
   /** A key during the greeting: 7 4 = staff access; anything else goes straight to the tone (as if the greeting ended). */
   async "vm-greeting-key"(ctx, vr) {
     const x = ctx.query.get("x");
-    if (ctx.body.Digits === VM_ACCESS_KEYS && x === "9" && vmAccessActive()) return back(vr, "vma-pin");
+    const d = ctx.body.Digits ?? "";
+    if (d === VM_ACCESS_KEYS && x === "9" && vmAccessActive()) return back(vr, "vma-pin");
+    // Star and then the wrong keys (Abraham, Nov 16, 2026): the shared wrong-key line, then the voicemail as usual
+    if (d.startsWith("*")) sp(vr, ctx, "not_valid");
     return vmRecord(vr, await vmBox(x), x);
   },
 
@@ -2429,12 +2442,7 @@ const handlers: Record<string, Handler> = {
       vr.hangup();
       return vr;
     }
-    if (!(await vmPinSet())) {
-      await logVmAccess(ctx.callSid, from, "no_pin");
-      sp(vr, ctx, "vma_locked", undefined, { draftOk: true });
-      vr.hangup();
-      return vr;
-    }
+    // No password set yet: the default 1234 works (Abraham, Nov 16, 2026), so there is no "no password" refusal
     const t = Number(ctx.query.get("t") || 0);
     const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-pin-check", { t }), method: "POST" });
     sp(g, ctx, "vma_pin");
@@ -2476,13 +2484,13 @@ const handlers: Record<string, Handler> = {
       return vr;
     }
     const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, finishOnKey: "", action: url("vma-box-choice"), method: "POST" });
-    sp(g, ctx, "vma_box", undefined, { draftOk: true });
+    spCallOut(g, ctx, "vma_box", "To call a customer, press 0.");
     return back(vr, "vma-box", { n: n + 1 });
   },
 
   async "vma-box-choice"(ctx, vr) {
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
-    if (ctx.body.Digits === "0") return back(vr, "vma-out"); // call a customer out
+    if (ctx.body.Digits === "0" && callOutActive()) return back(vr, "vma-out"); // call a customer out (off on live for now)
     if (ctx.body.Digits === "*") return back(vr, "vma-newpin"); // change the password (Abraham, Nov 15, 2026)
     if (ctx.body.Digits === "7") return back(vr, "vma-charge"); // Owner custom charge through Sola PhonePay (Nov 14, 2026)
     const key = BOX_BY_NUMBER[ctx.body.Digits ?? ""];
@@ -2527,7 +2535,7 @@ const handlers: Record<string, Handler> = {
       return vr;
     }
     const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, finishOnKey: "", action: url("vma-choice", p), method: "POST" });
-    sp(g, ctx, "vma_options", undefined, { draftOk: true });
+    spCallOut(g, ctx, "vma_options", "To call this person back, press 4.");
     return back(vr, "vma-options", { ...p, n: n + 1 });
   },
 
@@ -2547,7 +2555,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "vma_heard", undefined, { draftOk: true });
       return back(vr, "vma-options", { b, i, v: v.id });
     }
-    if (d === "4" && v) {
+    if (d === "4" && v && callOutActive()) {
       const to = callbackNumber(v.fromNumber);
       if (!to) {
         sp(vr, ctx, "vma_no_number", undefined, { draftOk: true });
@@ -2687,6 +2695,7 @@ const handlers: Record<string, Handler> = {
   /** Call a customer out (Abraham, Nov 15, 2026): the number, then pound; the customer sees (845) 777-7585. */
   "vma-out"(ctx, vr) {
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    if (!callOutActive()) return back(vr, "vma-box");
     const n = Number(ctx.query.get("n") || 0);
     if (n >= 3) return back(vr, "vma-box");
     const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-out-dial"), method: "POST" });
@@ -2696,6 +2705,7 @@ const handlers: Record<string, Handler> = {
 
   async "vma-out-dial"(ctx, vr) {
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    if (!callOutActive()) return back(vr, "vma-box");
     const to = callOutNumber(ctx.body.Digits);
     if (!to) {
       sp(vr, ctx, "vma_out_bad");

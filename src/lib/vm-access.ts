@@ -9,9 +9,14 @@ import { formatPhone } from "@/lib/phone";
  * Staff voicemail access from any phone (Abraham, Nov 13 and Nov 15, 2026). Only from the general voicemail (main menu
  * key 9): while its greeting plays, star 7 4, pressed without a pause of 3 seconds or more (never announced), asks
  * for the password. Then each box by its number, or 0 to call a customer out from (845) 777-7585. 3 wrong tries end the call and lock access for 15 minutes; the Owner
- * gets an email about every lockout. PREVIEW ONLY until Abraham approves it and the call-back price.
+ * gets an email about every lockout. Live since Abraham approved it (Nov 16, 2026). Calling out (key 0, and calling
+ * a message back) stays off on the live line until he approves the call-out price (CALL_OUT_LIVE_APPROVED).
  */
-export const VM_ACCESS_LIVE_APPROVED = false;
+export const VM_ACCESS_LIVE_APPROVED = true;
+/** Key 0 call-out and "call this person back" from (845) 777-7585: off on the live line until Abraham approves the price. */
+export const CALL_OUT_LIVE_APPROVED = false;
+/** Until a password is set (in Admin or by phone), this one works (Abraham, Nov 16, 2026). */
+export const VM_DEFAULT_PIN = "1234";
 export const VM_ACCESS_KEYS = "*74";
 /** Seconds allowed between the keys of star 7 4. */
 export const VM_ACCESS_KEY_GAP = 3;
@@ -24,6 +29,10 @@ const PIN_KEY = "vm_access_pin_hash";
 
 export function vmAccessActive(env: Record<string, string | undefined> = process.env) {
   return VM_ACCESS_LIVE_APPROVED || env.VERCEL_ENV !== "production";
+}
+
+export function callOutActive(env: Record<string, string | undefined> = process.env) {
+  return CALL_OUT_LIVE_APPROVED || env.VERCEL_ENV !== "production";
 }
 
 export function validPin(pin: string) {
@@ -51,7 +60,8 @@ export async function vmPinSet() {
 
 export async function checkVmPin(pin: string) {
   const h = await pinHash();
-  return Boolean(h && pin && (await bcrypt.compare(pin, h)));
+  if (!h) return pin === VM_DEFAULT_PIN; // the default until a password is set
+  return Boolean(pin && (await bcrypt.compare(pin, h)));
 }
 
 export async function logVmAccess(callSid: string | null, from: string | null, result: "ok" | "wrong_pin" | "locked" | "refused_locked" | "no_pin" | "pin_changed") {

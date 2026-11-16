@@ -25,7 +25,7 @@ import { handleVoice } from "@/lib/ivr/flow";
 import { PROMPTS } from "@/lib/ivr/prompts";
 import { lineStatus } from "@/lib/prompt-status";
 import { mainBox } from "@/lib/voicemail";
-import { VM_ACCESS_LIVE_APPROVED, callOutNumber, callbackNumber, setVmPin, vmAccessActive, vmLockedUntil } from "@/lib/vm-access";
+import { CALL_OUT_LIVE_APPROVED, VM_ACCESS_LIVE_APPROVED, VM_DEFAULT_PIN, callOutActive, callOutNumber, callbackNumber, setVmPin, vmAccessActive, vmLockedUntil } from "@/lib/vm-access";
 
 const call = (action: string, body: Record<string, string> = {}, query = "") =>
   handleVoice({ action, query: new URLSearchParams(query), body: { CallSid: "CAvma", ...body }, callSid: "CAvma", from: "+18455550199" });
@@ -42,15 +42,16 @@ beforeEach(async () => {
 });
 
 describe("where it runs, and the wording", () => {
-  it("preview only until Abraham approves; every new line is a draft waiting for approval", () => {
-    expect(VM_ACCESS_LIVE_APPROVED).toBe(false);
-    expect(vmAccessActive({ VERCEL_ENV: "production" })).toBe(false);
+  it("live (Abraham approved it, Nov 16, 2026); every line approved; calling out stays off on the live line", () => {
+    expect(VM_ACCESS_LIVE_APPROVED).toBe(true);
+    expect(vmAccessActive({ VERCEL_ENV: "production" })).toBe(true);
     expect(vmAccessActive({ VERCEL_ENV: "preview" })).toBe(true);
+    expect(CALL_OUT_LIVE_APPROVED).toBe(false);
+    expect(callOutActive({ VERCEL_ENV: "production" })).toBe(false);
+    expect(callOutActive({ VERCEL_ENV: "preview" })).toBe(true);
     const keys = Object.keys(PROMPTS).filter((k) => k.startsWith("vma_")) as (keyof typeof PROMPTS)[];
     expect(keys.length).toBeGreaterThanOrEqual(10);
-    // Abraham's own lines (Nov 15, 2026) are approved; the rest wait for his OK
-    const approved = ["vma_pin", "vma_out_enter", "vma_out_bad", "vma_charge_amount", "vma_charge_readback", "vma_charge_note", "vma_charge_bad", "vma_charge_back"];
-    for (const k of keys.filter((k) => !approved.includes(k))) expect(lineStatus(k, {}).status, k).toBe("Waiting for approval");
+    for (const k of keys) expect(lineStatus(k, {}).status, k).not.toBe("Waiting for approval");
     expect(PROMPTS.vma_pin.text).toBe("Please enter your password.");
   });
   it("call-backs only to US and Canada numbers, never premium", () => {
@@ -74,10 +75,20 @@ describe("getting in", () => {
     expect(await call("vm-greeting-key", { Digits: "*74" }, "x=5")).toContain("<Record");
     expect(await call("vm-greeting-key", { Digits: "5" }, "x=9")).toContain("<Record");
   });
-  it("no PIN set: refused and logged", async () => {
-    const xml = await call("vma-pin");
-    expect(xml).toContain("<Hangup/>");
-    expect(await log()).toEqual(["no_pin"]);
+  it("star and then the wrong keys: the shared wrong-key line, then the voicemail as usual", async () => {
+    for (const d of ["*", "*7", "*75", "*12"]) {
+      const xml = await call("vm-greeting-key", { Digits: d }, "x=9");
+      expect(said(xml)[0], d).toBe("Sorry, that is not a valid selection. Please try again.");
+      expect(xml, d).toContain("<Record");
+    }
+  });
+  it("no password set yet: the default 1234 signs in from the first call", async () => {
+    expect(VM_DEFAULT_PIN).toBe("1234");
+    expect(said(await call("vma-pin"))).toContain("Please enter your password.");
+    expect(redirect(await call("vma-pin-check", { Digits: "1234" }))).toBe("vma-box");
+    expect(await log()).toEqual(["ok"]);
+    h.session.data = {};
+    expect(redirect(await call("vma-pin-check", { Digits: "1111" }, "t=0"))).toBe("vma-pin?t=1");
   });
   it("PIN stored hashed; right PIN signs in and is logged", async () => {
     await setVmPin("4821", null);
@@ -179,5 +190,35 @@ describe("after the PIN", () => {
     const dial = await call("vma-out-dial", { Digits: "8455550123" });
     expect(dial).toMatch(/<Dial [^>]*callerId="\+18457777585"[^>]*>\+18455550123<\/Dial>/);
     expect(callOutNumber("18455550123")).toBe("+18455550123");
+  });
+});
+
+describe("on the live line (Abraham, Nov 16, 2026): calling out stays off until he approves the price", () => {
+  it("key 0 and call back are not offered and do nothing; the rest works", async () => {
+    const prev = process.env.VERCEL_ENV;
+    process.env.VERCEL_ENV = "production";
+    try {
+      h.session.data = { vmaOk: 1 };
+      const menu = said(await call("vma-box")).join(" ");
+      expect(menu).not.toContain("press 0");
+      expect(menu).toContain("To change your password, press star.");
+      const zero = await call("vma-box-choice", { Digits: "0" });
+      expect(said(zero)).toEqual(["Sorry, that is not a valid selection. Please try again."]);
+      expect(redirect(zero)).toBe("vma-box");
+      expect(redirect(await call("vma-out"))).toBe("vma-box");
+      expect(await call("vma-out-dial", { Digits: "8455550123" })).not.toContain("<Dial");
+      const box = await mainBox();
+      const [v] = await db.insert(schema.voicemails).values({ boxId: box.id, fromNumber: "+18455550144", recordingSid: "RElive", recordingUrl: "https://api.twilio.com/x/RElive", durationSec: 5, state: "submitted" }).returning();
+      const opts = said(await call("vma-options", {}, `b=${box.id}&i=0&v=${v.id}`)).join(" ");
+      expect(opts).not.toContain("press 4");
+      expect(opts).toContain("To choose another box, press star.");
+      const four = await call("vma-choice", { Digits: "4" }, `b=${box.id}&i=0&v=${v.id}`);
+      expect(four).not.toContain("<Dial");
+      expect(said(four)).toEqual(["Sorry, that is not a valid selection. Please try again."]);
+      // changing the password works on the live line
+      expect(redirect(await call("vma-box-choice", { Digits: "*" }))).toBe("vma-newpin");
+    } finally {
+      process.env.VERCEL_ENV = prev;
+    }
   });
 });

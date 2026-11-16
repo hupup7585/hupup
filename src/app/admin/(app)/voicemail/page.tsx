@@ -8,7 +8,7 @@ import { db, schema } from "@/lib/db";
 import { PROMPTS } from "@/lib/ivr/prompts";
 import { setVmPinAction, deleteVoicemailAction, purgeVoicemailAction, restoreVoicemailAction, saveBoxAction, setHeardAction, setUrgentAction } from "./actions";
 import { dualDateTime } from "@/lib/dual-date";
-import { VM_ACCESS_LIVE_APPROVED, VM_LOCK_MINUTES, recentVmAccess, vmLockedUntil, vmPinSet } from "@/lib/vm-access";
+import { CALL_OUT_LIVE_APPROVED, VM_ACCESS_LIVE_APPROVED, VM_LOCK_MINUTES, recentVmAccess, vmLockedUntil, vmPinSet } from "@/lib/vm-access";
 
 export const dynamic = "force-dynamic";
 
@@ -116,8 +116,9 @@ export default async function VoicemailPage() {
           <p className="mt-1 text-sm text-muted">
             Call the hotline, press 9 for the general voicemail, and while the greeting plays press star 7 4, with no pause of 3 seconds or more between keys. Then enter this password and press pound. Choose a box by its number (1 is the main box), press 0 to call a customer, who sees (845) 777-7585, or press star to change this password. Callers are never told about it. 3 wrong tries end the call and lock access for {VM_LOCK_MINUTES} minutes, and you get an email.
             {!VM_ACCESS_LIVE_APPROVED && <b> Preview only until you approve it.</b>}
+            {!CALL_OUT_LIVE_APPROVED && <b> Calling out (key 0, and calling a message back) is off on the live line until you approve the price.</b>}
           </p>
-          <p className="mt-2 text-sm font-semibold">{access.pinSet ? "A password is set." : "No password set yet: access by phone is refused until you set one."}{access.lockedUntil ? ` Locked until ${when(access.lockedUntil)}.` : ""}</p>
+          <p className="mt-2 text-sm font-semibold">{access.pinSet ? "A password is set." : "No password set yet: the default password 1234 works until you change it here or by phone."}{access.lockedUntil ? ` Locked until ${when(access.lockedUntil)}.` : ""}</p>
           <form action={setVmPinAction} className="mt-3 flex flex-wrap items-end gap-3">
             <label className="block"><span className="label">{access.pinSet ? "New password" : "Password"} (4 to 8 digits)</span><input name="pin" type="password" inputMode="numeric" pattern="[0-9]{4,8}" required className="input w-40" autoComplete="new-password" /></label>
             <label className="block"><span className="label">Same password again</span><input name="pinAgain" type="password" inputMode="numeric" pattern="[0-9]{4,8}" required className="input w-40" autoComplete="new-password" /></label>

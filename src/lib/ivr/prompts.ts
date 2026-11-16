@@ -310,9 +310,9 @@ export const PROMPTS = {
   },
   // Staff voicemail access by phone (Abraham, Nov 13, 2026): drafts, hidden (7 then 4 during a greeting), preview only.
   vma_pin: { group: "Voicemail", label: "Staff access: ask for the password (Abraham, word for word)", text: "Please enter your password." },
-  vma_wrong: { group: "Voicemail", label: "Staff access: wrong password", text: "Sorry, that password is not right. Please try again.", pending: true },
-  vma_locked: { group: "Voicemail", label: "Staff access: locked", text: "Voicemail access is locked for now. Please try again later. Goodbye.", pending: true },
-  vma_box: { group: "Voicemail", label: "Staff access: choose a box or call out", text: "Please enter the number of the voicemail box. For the main box, press 1. To call a customer, press 0. To charge a custom amount, press 7. To change your password, press star.", pending: true },
+  vma_wrong: { group: "Voicemail", label: "Staff access: wrong password", text: "Sorry, that password is not right. Please try again." },
+  vma_locked: { group: "Voicemail", label: "Staff access: locked", text: "Voicemail access is locked for now. Please try again later. Goodbye." },
+  vma_box: { group: "Voicemail", label: "Staff access: choose a box or call out", text: "Please enter the number of the voicemail box. For the main box, press 1. To call a customer, press 0. To charge a custom amount, press 7. To change your password, press star." },
   vma_out_enter: { group: "Voicemail", label: "Staff access: call out, enter the number (Abraham, word for word)", text: "Please enter the phone number." },
   vma_out_bad: { group: "Voicemail", label: "Staff access: call out, not a valid number (Abraham)", text: "It is not a valid phone number. Please try again." },
   // Owner custom charge (Abraham, Nov 14, 2026): owner voicemail menu, key 7; wording approved (no recording until he picks the voice)
@@ -321,18 +321,18 @@ export const PROMPTS = {
   vma_charge_note: { group: "Voicemail", label: "Owner custom charge: optional order number", text: "To add an order number, enter it now and press pound. To skip, just press pound." }, // approved Nov 14
   vma_charge_bad: { group: "Voicemail", label: "Owner custom charge: amount not allowed", text: "That amount is not allowed. Please try again." }, // approved Nov 14
   vma_charge_back: { group: "Voicemail", label: "Owner custom charge: back in the menu", text: "You are back in the owner menu." }, // approved Nov 14
-  vma_count: { group: "Voicemail", label: "Staff access: how many messages", text: "You have {count} messages, newest first.", vars: ["count"], pending: true },
-  vma_none: { group: "Voicemail", label: "Staff access: empty box", text: "There are no messages in this box.", pending: true },
-  vma_message: { group: "Voicemail", label: "Staff access: before each message", text: "Message {n}, from {number}, on {date} at {time}.", vars: ["n", "number", "date", "time"], pending: true },
-  vma_options: { group: "Voicemail", label: "Staff access: after each message", text: "To replay this message, press 1. For the next message, press 2. To mark it as heard, press 3. To call this person back, press 4. To choose another box, press star.", pending: true },
-  vma_heard: { group: "Voicemail", label: "Staff access: marked as heard", text: "Marked as heard.", pending: true },
-  vma_end: { group: "Voicemail", label: "Staff access: no more messages", text: "That was the last message. To choose another box, press star, or hang up.", pending: true },
-  vma_calling: { group: "Voicemail", label: "Staff access: calling back", text: "Calling them back now.", pending: true },
-  vma_newpin: { group: "Voicemail", label: "Staff access: change the password, step 1", text: "Please enter your new password, 4 to 8 digits, then press pound.", pending: true },
-  vma_newpin_again: { group: "Voicemail", label: "Staff access: change the password, step 2", text: "Please enter the new password again, then press pound.", pending: true },
-  vma_newpin_saved: { group: "Voicemail", label: "Staff access: password changed", text: "Your password was changed.", pending: true },
-  vma_newpin_bad: { group: "Voicemail", label: "Staff access: new password not accepted", text: "The passwords did not match, or it was not 4 to 8 digits. Please try again.", pending: true },
-  vma_no_number: { group: "Voicemail", label: "Staff access: no number to call", text: "Sorry, there is no number we can call back for this message.", pending: true },
+  vma_count: { group: "Voicemail", label: "Staff access: how many messages", text: "You have {count} messages, newest first.", vars: ["count"] },
+  vma_none: { group: "Voicemail", label: "Staff access: empty box", text: "There are no messages in this box." },
+  vma_message: { group: "Voicemail", label: "Staff access: before each message", text: "Message {n}, from {number}, on {date} at {time}.", vars: ["n", "number", "date", "time"] },
+  vma_options: { group: "Voicemail", label: "Staff access: after each message", text: "To replay this message, press 1. For the next message, press 2. To mark it as heard, press 3. To call this person back, press 4. To choose another box, press star." },
+  vma_heard: { group: "Voicemail", label: "Staff access: marked as heard", text: "Marked as heard." },
+  vma_end: { group: "Voicemail", label: "Staff access: no more messages", text: "That was the last message. To choose another box, press star, or hang up." },
+  vma_calling: { group: "Voicemail", label: "Staff access: calling back", text: "Calling them back now." },
+  vma_newpin: { group: "Voicemail", label: "Staff access: change the password, step 1", text: "Please enter your new password, 4 to 8 digits, then press pound." },
+  vma_newpin_again: { group: "Voicemail", label: "Staff access: change the password, step 2", text: "Please enter the new password again, then press pound." },
+  vma_newpin_saved: { group: "Voicemail", label: "Staff access: password changed", text: "Your password was changed." },
+  vma_newpin_bad: { group: "Voicemail", label: "Staff access: new password not accepted", text: "The passwords did not match, or it was not 4 to 8 digits. Please try again." },
+  vma_no_number: { group: "Voicemail", label: "Staff access: no number to call", text: "Sorry, there is no number we can call back for this message." },
   // Key 9 (Abraham, Nov 11, 2026, word for word): feedback and comments only.
   // Key 8 catalog (Abraham, Phone Menu v3), approved word for word.
   catalog_menu: { group: "Catalog (key 8)", label: "Text or email", text: "To receive our catalog by text, press 1. To get it by email, press 2. To go back, press star." },
