@@ -2399,7 +2399,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "operator_unavailable");
       return back(vr, "menu");
     }
-    await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail" }, ctx.session);
+    await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail", data: { vmEntry: x ?? undefined } }, ctx.session);
     if (vmAccessActive() && x === "9") {
       // Staff access, general voicemail only (Abraham, Nov 15, 2026): star 7 4 while the greeting plays, no pause of
       // 3 seconds or more between keys. Never announced; any other key just records.
@@ -2928,7 +2928,10 @@ export async function handleCallStatus(callSid: string, status: string) {
   const keptMessages = await finalizeCallRecordings(callSid).catch((e) => (console.error("voicemail finalize failed", e), 0));
   // Owner alert (Abraham): missed call = reached voicemail and hung up without a message, or hung up while ringing.
   // Once per call; never when a voicemail was left (that one gets the voicemail alert).
-  if (!s.data?.missedAlerted && !s.data?.leftMessage && !keptMessages) {
+  // Key 9 (Abraham, Nov 16, 2026): a message box only, nobody is called there, so it is never a missed call. A
+  // message left on key 9 gets the usual voicemail alert; hanging up without one sends nothing.
+  const feedbackBox = s.data?.vmEntry === "9" && !s.data?.missed;
+  if (!feedbackBox && !s.data?.missedAlerted && !s.data?.leftMessage && !keptMessages) {
     const how = s.outcome === "voicemail" || last?.step === "voicemail" ? "voicemail_no_message" : last?.step === "ring" ? "hung_up_ringing" : null;
     if (how) {
       await updateSession(callSid, { data: { missedAlerted: true } }, s);

@@ -72,6 +72,26 @@ describe("missed-call alert", () => {
     expect(h.emails).toHaveLength(0);
     await saveSetting("missedCallAlerts", true);
   });
+  it("key 9 (feedback and comments, Abraham, Nov 16, 2026): a message box only, never a missed call", async () => {
+    h.emails.length = 0;
+    h.sms.length = 0;
+    // pressed 9, heard the greeting, hung up without a message: nothing at all, and not on the missed list
+    h.session = { ...h.session, callSid: "CAk9", data: { menuKeys: ["9"] }, outcome: "browsing" };
+    const { handleVoice } = await import("@/lib/ivr/flow");
+    await handleVoice({ action: "voicemail", query: new URLSearchParams("x=9"), body: { CallSid: "CAk9" }, callSid: "CAk9", from: "+18455550701" });
+    expect(h.session.data.vmEntry).toBe("9");
+    await step("CAk9", "voicemail");
+    await handleCallStatus("CAk9", "completed");
+    expect(h.emails).toHaveLength(0);
+    expect(h.sms).toHaveLength(0);
+    expect(h.session.data.missed).toBeUndefined(); // the Admin missed-call count reads "missed"
+    expect(h.session.data.missedAlerted).toBeUndefined();
+    // another key's voicemail with no message is still a missed call
+    h.session = { ...h.session, callSid: "CAk5", data: { menuKeys: ["5"], missed: "no_answer", vmEntry: "5" }, outcome: "voicemail" };
+    await step("CAk5", "voicemail");
+    await handleCallStatus("CAk5", "completed");
+    expect(h.emails).toHaveLength(1);
+  });
   it("key wording", () => {
     expect(missedKey({ menuKeys: ["1", "6"], missed: "closed" })).toBe("Key 6 (office closed)");
     expect(missedKey({})).toBe("before choosing a key");

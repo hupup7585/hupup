@@ -202,6 +202,8 @@ export type CallData = {
   /** A voicemail was left on this call / the missed-call alert went out (once per call) */
   leftMessage?: boolean;
   missedAlerted?: boolean;
+  /** The voicemail box the caller was last sent to, by key ("9" = feedback and comments, a message box only) */
+  vmEntry?: string;
   /** Call recording (only when the Owner has turned it on): started, and the finished recording */
   recording?: boolean;
   recordingSid?: string;
