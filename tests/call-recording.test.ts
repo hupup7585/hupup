@@ -17,7 +17,8 @@ vi.mock("@/lib/ivr/session", () => ({
   getSession: async () => h.session,
   updateSession: async (_s: string, patch: Record<string, unknown> & { data?: Record<string, unknown> }) => Object.assign(h.session, { ...patch, data: { ...h.session.data, ...(patch.data ?? {}) } }),
 }));
-vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
+const approved = vi.hoisted(() => ({ notice: true }));
+vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => (approved.notice ? { recording_notice: { text: null, audioUrl: null, approvedAt: new Date() } } : {}) }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/lib/auth", () => ({
   requireOwner: async () => {
@@ -60,6 +61,10 @@ describe("call recording", () => {
     expect(h.started).toEqual([]); // nothing recorded while the notice plays
     expect(redirect(await call("record-start"))).toBe("menu?first=1");
     expect(h.started).toEqual(["CArec"]);
+    // The notice is still waiting for Abraham's approval (Nov 16, 2026): no notice, so no recording at all
+    approved.notice = false;
+    expect(redirect(await call("incoming"))).toBe("menu?first=1");
+    approved.notice = true;
     await saveSetting("callRecording", false);
   });
 

@@ -1,3 +1,4 @@
+import { inboundEmailSecret } from "@/lib/signed-link";
 import { timingSafeEqual } from "node:crypto";
 import { handleCatalogEmail } from "@/lib/catalog-send";
 
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
  * Not active yet: needs Abraham's OK for the DNS change (Cloudflare Email Routing) and INBOUND_EMAIL_SECRET set.
  */
 export async function POST(req: Request) {
-  const secret = process.env.INBOUND_EMAIL_SECRET;
+  const secret = inboundEmailSecret();
   const got = req.headers.get("x-inbound-secret") ?? "";
   if (!secret || got.length !== secret.length || !timingSafeEqual(Buffer.from(got), Buffer.from(secret))) return new Response("Forbidden", { status: 403 });
   const body = (await req.json().catch(() => null)) as { from?: string; subject?: string } | null;

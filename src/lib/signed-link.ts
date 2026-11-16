@@ -73,3 +73,13 @@ export function verifyDeliveryPhotoLink(id: number, exp: number, sig: string | n
   const got = Buffer.from(sig);
   return want.length === got.length && timingSafeEqual(want, got);
 }
+
+/**
+ * The shared secret between the Cloudflare info@ email Worker and our site (Abraham, Nov 16, 2026). INBOUND_EMAIL_SECRET
+ * when set; otherwise made from AUTH_SECRET, so the live build can give it to the Worker without anyone seeing it.
+ */
+export function inboundEmailSecret(env: Record<string, string | undefined> = process.env): string {
+  if (env.INBOUND_EMAIL_SECRET) return env.INBOUND_EMAIL_SECRET;
+  if (!env.AUTH_SECRET) return "";
+  return createHmac("sha256", env.AUTH_SECRET).update("inbound-email:v1").digest("hex");
+}

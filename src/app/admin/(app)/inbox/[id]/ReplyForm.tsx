@@ -1,5 +1,7 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
+
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { discardDraftAction, replyFileChunkAction, saveDraftAction, sendNewEmailAction, sendReplyAction, startReplyFileAction } from "../actions";
@@ -113,28 +115,28 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
         <button className="btn-dark" disabled={!props.active || pending || !body.trim() || (isNew && (!to.trim() || !subject.trim()))} onClick={() => start(send)}>
           {isNew ? "Send email" : "Send reply"}
         </button>
-        {draftId && (
-          <button
-            type="button"
-            className="btn-ghost"
-            disabled={pending}
-            onClick={() =>
-              start(async () => {
-                await discardDraftAction(draftId);
-                setDraftId(undefined);
-                setBody("");
-                setSubject(isNew ? "" : subject);
-                setTo("");
-                setSaved("Draft discarded");
-                first.current = true;
-                if (isNew) router.push("/admin/inbox?f=drafts");
-              })
-            }
-            data-discard-draft
-          >
-            Discard draft
-          </button>
-        )}
+        {/* A trash can that is always there (Abraham, Nov 16, 2026): throws away what was typed, and the saved draft if any */}
+        <button
+          type="button"
+          className="btn-ghost inline-flex items-center gap-1"
+          disabled={pending}
+          title="Discard"
+          onClick={() =>
+            start(async () => {
+              if (draftId) await discardDraftAction(draftId);
+              setDraftId(undefined);
+              setBody("");
+              setSubject(isNew ? "" : subject);
+              setTo("");
+              setSaved("Discarded");
+              first.current = true;
+              if (isNew) router.push("/admin/inbox");
+            })
+          }
+          data-discard-draft
+        >
+          <Trash2 className="h-4 w-4" aria-hidden /> Discard
+        </button>
         {saved && !progress && <span className="text-xs text-muted" data-draft-status>{saved}</span>}
         {progress && <span className="text-sm">{progress}…</span>}
         {msg?.message && <span className={`text-sm font-semibold ${msg.ok ? "text-[#13895C]" : "text-coral-dark"}`}>{msg.message}</span>}

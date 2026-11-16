@@ -15,7 +15,7 @@ import { logStamp } from "@/lib/phone-promo";
  * The info@ "subject Catalog" auto-reply (section 9). Abraham approved the wording on Nov 13, 2026 (the key 8 catalog
  * email with his PDF). It runs once the Cloudflare Email Worker is connected (INBOUND_EMAIL_SECRET set in Vercel).
  */
-export const infoCatalogAutoreplyOn = (env: Record<string, string | undefined> = process.env) => Boolean(env.INBOUND_EMAIL_SECRET);
+export const infoCatalogAutoreplyOn = (env: Record<string, string | undefined> = process.env) => Boolean(env.INBOUND_EMAIL_SECRET || env.AUTH_SECRET);
 
 export async function catalogLines() {
   const cats = await db.select().from(schema.categories).where(eq(schema.categories.active, true)).orderBy(asc(schema.categories.ivrDigit), asc(schema.categories.id));

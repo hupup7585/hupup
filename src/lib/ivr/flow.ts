@@ -675,7 +675,8 @@ const handlers: Record<string, Handler> = {
       return vmRecord(vr, await vmBox("9"), "closed");
     }
     // Call recording (off unless the Owner turns it on): the notice plays first, recording starts only after it.
-    if ((await getSettings()).callRecording) {
+    // Recording only with its notice (Abraham, Nov 16, 2026): while the notice waits for his approval, no recording
+    if ((await getSettings()).callRecording && !promptWaiting(ctx.prompts, "recording_notice")) {
       sp(vr, ctx, "recording_notice");
       return back(vr, "record-start");
     }

@@ -101,6 +101,22 @@ async function cloudflareSetup(env: NodeJS.ProcessEnv) {
     }
   }
 
+  // The info@ email Worker (Abraham, Nov 16, 2026): forwards every email to Gmail first, then sends it to the Admin
+  // Inbox. Cloudflare starts using it once info@ is set to "Send to a Worker" in Email Routing (Hark, in the dashboard).
+  {
+    const { inboundEmailSecret } = await import("../src/lib/signed-link");
+    const secret = inboundEmailSecret(env);
+    if (!secret) log("Cloudflare: email Worker not uploaded (no AUTH_SECRET).");
+    else {
+      const code = readFileSync(join(process.cwd(), "cloudflare/info-inbox-worker.js"), "utf8");
+      const form = new FormData();
+      form.append("metadata", JSON.stringify({ main_module: "info-inbox-worker.js", compatibility_date: "2026-11-01", bindings: [{ type: "plain_text", name: "SITE_URL", text: env.PUBLIC_BASE_URL || "https://hupupattractions.com" }, { type: "secret_text", name: "INBOUND_EMAIL_SECRET", text: secret }] }));
+      form.append("info-inbox-worker.js", new Blob([code], { type: "application/javascript+module" }), "info-inbox-worker.js");
+      const up = await cf("PUT", `/accounts/${account}/workers/scripts/hupup-info-inbox`, form);
+      log(`Cloudflare: info@ email Worker (hupup-info-inbox) upload ${up.ok ? "done" : `failed (${up.status} ${up.errors})`}.`);
+    }
+  }
+
   // Delivery photos bucket (R2 free tier: 10 GB stored a month)
   const b = await cf("GET", `/accounts/${account}/r2/buckets/${R2_PHOTOS_BUCKET}`);
   if (b.ok) log(`Cloudflare: R2 bucket ${R2_PHOTOS_BUCKET} is there.`);

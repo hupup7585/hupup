@@ -178,7 +178,7 @@ export const PROMPTS = {
   ask_email_required: { group: "Checkout", label: "Ask for email (required: no texts)", text: "To send your secure payment link, we need your email address. Please say your email address, like john at gmail dot com." },
   ask_email: { group: "Checkout", label: "Ask for email", text: "Almost done! Please say your email address for your receipt, like john at gmail dot com. Or press pound to skip." },
   // Call recording notice (Abraham O): PROPOSED wording, not approved yet; plays only if the Owner turns recording on.
-  recording_notice: { group: "Welcome & main menu", label: "Call recording notice (proposed, plays only when recording is on)", text: "This call may be recorded for quality and training. Please do not share card numbers or security codes on this call." },
+  recording_notice: { group: "Welcome & main menu", label: "Call recording notice (proposed, plays only when recording is on)", text: "This call may be recorded for quality and training. Please do not share card numbers or security codes on this call.", pending: true },
   // Keypad typing (Abraham L; proposed wording approved under P, Nov 8, 2026)
   type_hint: { group: "Checkout", label: "Typing: how to switch", text: "To type it on your keypad instead, press star." },
   type_instructions: { group: "Checkout", label: "Typing: how to type", text: "To type, press each key until you reach the letter: press 2 once for A, twice for B, three times for C, and the same for every key. To type two letters on the same key, press star once between them. For example, A then B is 2, star, 2 2. Press star twice for a space. Press pound when you are done." },
