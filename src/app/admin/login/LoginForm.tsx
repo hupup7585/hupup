@@ -9,7 +9,7 @@ export type SignInWay = "password" | "email" | "sms";
 /** Remembered on this device only (never per account on this page, so the page tells a stranger nothing). */
 export const SIGNIN_WAY_COOKIE = "hup_signin_way";
 
-export default function LoginForm({ smsActive = true, emailActive = true, initialWay = "password" }: { smsActive?: boolean; emailActive?: boolean; initialWay?: SignInWay }) {
+export default function LoginForm({ smsActive = true, emailActive = true, googleActive = false, googleError = null, initialWay = "password" }: { smsActive?: boolean; emailActive?: boolean; googleActive?: boolean; googleError?: string | null; initialWay?: SignInWay }) {
   const [phone, setPhone] = useState("");
   const [way, setWay] = useState<SignInWay>(initialWay);
   const mode: "code" | "password" = way === "password" ? "password" : "code";
@@ -26,7 +26,7 @@ export default function LoginForm({ smsActive = true, emailActive = true, initia
   const [password, setPassword] = useState("");
   const [trust, setTrust] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(googleError);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -145,6 +145,27 @@ export default function LoginForm({ smsActive = true, emailActive = true, initia
           </form>
         )}
 
+        {!sent && (
+          <div className="space-y-2" data-google-signin>
+            <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wider text-muted" aria-hidden>
+              <span className="h-px flex-1 bg-line" /> or <span className="h-px flex-1 bg-line" />
+            </div>
+            {googleActive ? (
+              <a href={`/api/auth/google${trust ? "?trust=1" : ""}`} data-google-button className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-line bg-white px-4 py-3 font-bold text-navy hover:border-navy">
+                <GoogleMark /> Continue with Google
+              </a>
+            ) : (
+              <>
+                <button type="button" disabled data-google-button className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-line bg-white px-4 py-3 font-bold text-navy opacity-60">
+                  <GoogleMark /> Continue with Google
+                </button>
+                <p data-not-active="google-login" className="rounded-lg bg-[#FFF8E1] p-3 text-sm text-[#5C4600]"><b>Not active yet:</b> Google sign-in needs the free Google sign-in key set up. Use another way for now.</p>
+              </>
+            )}
+            <p className="text-xs text-muted">Only a Google account the Owner saved on your staff account in Admin &gt; Staff.</p>
+          </div>
+        )}
+
         <label className="flex items-center gap-2 text-sm text-muted">
           <input type="checkbox" checked={trust} onChange={(e) => setTrust(e.target.checked)} /> Keep me signed in on this device for 30 days
         </label>
@@ -155,5 +176,17 @@ export default function LoginForm({ smsActive = true, emailActive = true, initia
         )}
       </div>
     </div>
+  );
+}
+
+/** Google's "G" mark, as Google asks it to be shown on sign-in buttons. */
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 48 48" className="h-5 w-5" aria-hidden>
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
   );
 }

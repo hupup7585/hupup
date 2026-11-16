@@ -169,7 +169,22 @@ export async function sendLoginCode(rawPhone: string): Promise<{ ok: boolean; me
   return { ok: true, message: GENERIC, devCode: res.dev ? code : undefined };
 }
 
-async function startSession(staffIn: StaffUser, method: "sms_code" | "email_code" | "password", trustDevice: boolean) {
+/**
+ * Sign-in with Google (Abraham, Nov 16, 2026): only a Google account the Owner saved on an active staff member in
+ * Admin > Staff. The email comes from Google itself (verified there), never from the browser.
+ */
+export async function googleLogin(googleEmail: string, trustDevice: boolean): Promise<{ ok: boolean; role?: Role }> {
+  const email = googleEmail.trim().toLowerCase();
+  const [u] = email ? await db.select().from(adminUsers).where(sql`lower(${adminUsers.googleEmail}) = ${email}`).limit(1) : [];
+  if (!u || !u.active) {
+    await audit("login.google_refused", u?.id ?? null, { reason: !u ? "not_set_up" : "inactive" });
+    return { ok: false };
+  }
+  await startSession({ userId: u.id, role: u.role, name: u.name, phone: u.phone }, "google", trustDevice);
+  return { ok: true, role: u.role };
+}
+
+async function startSession(staffIn: StaffUser, method: "sms_code" | "email_code" | "password" | "google", trustDevice: boolean) {
   // The Owner (ADMIN_PHONE) becomes a real account on first sign-in, so the Owner can set a password and own history.
   let staff = staffIn;
   if (staff.role === "owner" && !staff.userId) {

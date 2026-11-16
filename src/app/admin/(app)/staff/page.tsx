@@ -43,10 +43,11 @@ export default async function StaffPage() {
                   <Badge tone={u.role === "owner" ? "done" : u.role === "secretary" ? "scheduled" : "pending"}>{u.role}</Badge>
                   {!u.active && <Badge tone="muted">Deactivated</Badge>}
                   {u.passwordHash && <Badge tone="muted">Password set</Badge>}
+                  {u.googleEmail && <Badge tone="muted">Google sign-in</Badge>}
                   {u.lockedUntil && u.lockedUntil > new Date() && <Badge tone="alert">Locked</Badge>}
                 </div>
               </div>
-              <StaffRowActions userId={u.id} role={u.role} active={u.active} username={u.username} />
+              <StaffRowActions userId={u.id} role={u.role} active={u.active} username={u.username} googleEmail={u.googleEmail} />
             </li>
           ))}
         </ul>

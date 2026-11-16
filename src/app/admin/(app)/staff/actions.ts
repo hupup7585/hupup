@@ -102,6 +102,23 @@ export async function setUsernameAction(userId: number, username: string): Promi
   return { ok: true, message: un.value ? `${u.name} can now sign in as "${un.value}".` : `Username removed for ${u.name}.` };
 }
 
+/** Owner only: the Google account that may sign in as this staff member (Abraham, Nov 16, 2026). Blank removes it. */
+export async function setGoogleEmailAction(userId: number, googleEmail: string): Promise<StaffResult> {
+  const owner = await requireOwner();
+  const { cleanGoogleEmail } = await import("@/lib/google-login");
+  const g = cleanGoogleEmail(googleEmail);
+  if (g.error) return { ok: false, message: g.error };
+  if (g.value) {
+    const { sql } = await import("drizzle-orm");
+    const [other] = await db.select({ id: schema.adminUsers.id }).from(schema.adminUsers).where(sql`lower(${schema.adminUsers.googleEmail}) = ${g.value}`).limit(1);
+    if (other && other.id !== userId) return { ok: false, message: "That Google account is already saved on another staff member." };
+  }
+  await db.update(schema.adminUsers).set({ googleEmail: g.value }).where(eq(schema.adminUsers.id, userId));
+  await log(owner.userId, g.value ? "staff.google_email_set" : "staff.google_email_removed", userId, { googleEmail: g.value });
+  revalidatePath("/admin/staff");
+  return { ok: true, message: g.value ? "Saved. This Google account can now sign in to Admin." : "Removed. No Google account can sign in as this person." };
+}
+
 /** Owner only: the Owner's own sign-in username (the Owner has no staff row; kept in settings). */
 export async function setOwnerUsernameAction(username: string): Promise<StaffResult> {
   const owner = await requireOwner();

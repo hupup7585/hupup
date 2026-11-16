@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { Role } from "@/lib/db/schema";
-import { createStaffAction, setActiveAction, setOwnerUsernameAction, setPasswordAction, setUsernameAction } from "./actions";
+import { createStaffAction, setActiveAction, setOwnerUsernameAction, setPasswordAction, setGoogleEmailAction, setUsernameAction } from "./actions";
 
 export function AddStaffForm() {
   const [f, setF] = useState({ name: "", phone: "", role: "secretary" as Role, email: "", password: "", username: "" });
@@ -51,9 +51,10 @@ export function AddStaffForm() {
   );
 }
 
-export function StaffRowActions({ userId, role, active, username }: { userId: number; role: Role; active: boolean; username?: string | null }) {
+export function StaffRowActions({ userId, role, active, username, googleEmail }: { userId: number; role: Role; active: boolean; username?: string | null; googleEmail?: string | null }) {
   const [pw, setPw] = useState("");
   const [un, setUn] = useState(username ?? "");
+  const [ge, setGe] = useState(googleEmail ?? "");
   const [msg, setMsg] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, start] = useTransition();
   return (
@@ -61,6 +62,10 @@ export function StaffRowActions({ userId, role, active, username }: { userId: nu
       <div className="flex flex-wrap gap-2" data-username-row>
         <input className="input max-w-[12rem]" autoCapitalize="none" spellCheck={false} placeholder="Username" value={un} onChange={(e) => setUn(e.target.value)} aria-label="Username" />
         <button type="button" className="btn-ghost" disabled={pending} onClick={() => start(async () => setMsg(await setUsernameAction(userId, un)))}>Save username</button>
+      </div>
+      <div className="flex flex-wrap gap-2" data-google-email-row>
+        <input className="input max-w-[16rem]" type="email" autoCapitalize="none" spellCheck={false} placeholder="Google email for sign-in" value={ge} onChange={(e) => setGe(e.target.value)} aria-label="Google email for sign-in" />
+        <button type="button" className="btn-ghost" disabled={pending} onClick={() => start(async () => setMsg(await setGoogleEmailAction(userId, ge)))}>{ge.trim() ? "Save Google email" : "Remove Google email"}</button>
       </div>
       <div className="flex flex-wrap gap-2">
         {role !== "delivery" && (
