@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Archive, Inbox, MailOpen, Mail, Paperclip, Star, Tag, Trash2, Undo2 } from "lucide-react";
-import { bulkAction, toggleStarAction } from "./actions";
+import { bulkAction, toggleStarAction, trashOneAction } from "./actions";
 
 export type MailRow = { id: number; from: string; subject: string; snippet: string; when: string; unread: boolean; starred: boolean; labels: { name: string; color: string }[]; attach: boolean };
 
@@ -12,6 +12,7 @@ export default function MailList({ rows, folder, back, labels }: { rows: MailRow
   const [picked, setPicked] = useState<number[]>([]);
   const [stars, setStars] = useState<Record<number, boolean>>({});
   const [, start] = useTransition();
+  const [gone, setGone] = useState<number[]>([]);
   const all = rows.length > 0 && picked.length === rows.length;
   const tool = "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm hover:bg-bg disabled:opacity-40";
   const none = picked.length === 0;
@@ -49,7 +50,7 @@ export default function MailList({ rows, folder, back, labels }: { rows: MailRow
         {!none && <span className="ml-auto text-xs text-muted">{picked.length} selected</span>}
       </div>
       <ul className="divide-y divide-line">
-        {rows.map((r) => {
+        {rows.filter((r) => !gone.includes(r.id)).map((r) => {
           const on = picked.includes(r.id);
           const starred = stars[r.id] ?? r.starred;
           return (
@@ -79,6 +80,19 @@ export default function MailList({ rows, folder, back, labels }: { rows: MailRow
                 {r.attach && <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted" aria-label="Has attachments" />}
                 <span className={`shrink-0 text-xs ${r.unread ? "" : "font-normal text-muted"}`}>{r.when}</span>
               </Link>
+              <button
+                type="button"
+                className="shrink-0 rounded-full p-1.5 text-muted hover:bg-bg hover:text-coral-dark"
+                aria-label={folder === "trash" ? "Restore" : "Move to Trash"}
+                title={folder === "trash" ? "Restore" : "Move to Trash"}
+                data-row-trash={r.id}
+                onClick={() => {
+                  setGone([...gone, r.id]);
+                  start(async () => void (await trashOneAction(r.id, folder === "trash")));
+                }}
+              >
+                {folder === "trash" ? <Undo2 className="h-4 w-4" aria-hidden /> : <Trash2 className="h-4 w-4" aria-hidden />}
+              </button>
             </li>
           );
         })}

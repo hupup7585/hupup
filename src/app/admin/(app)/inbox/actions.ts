@@ -118,3 +118,18 @@ export async function toggleStarAction(id: number, on: boolean): Promise<R> {
   revalidatePath("/admin/inbox");
   return { ok: true, message: on ? "Starred" : "Star removed" };
 }
+
+/** One click on a row (Abraham, Nov 16, 2026): Trash, or Restore from Trash. Trash only hides the email. */
+export async function trashOneAction(id: number, restore = false) {
+  await requireOwner();
+  await bulkEmails([id], restore ? "restore" : "trash");
+  revalidatePath("/admin", "layout");
+}
+
+/** Discard a draft from the Drafts list (it stops showing; nothing was sent). */
+export async function discardDraftRowAction(id: number) {
+  await requireOwner();
+  const { discardDraft } = await import("@/lib/inbox-folders");
+  await discardDraft(id);
+  revalidatePath("/admin", "layout");
+}

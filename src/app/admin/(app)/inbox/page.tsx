@@ -6,6 +6,7 @@ import { inboxWhen } from "@/lib/inbox-format";
 import { FOLDERS, PAGE_SIZE, isFolder, listDrafts, listEmails, listLabels, listSent, type Folder } from "@/lib/inbox-folders";
 import MailShell from "./MailShell";
 import RefreshMail from "./RefreshMail";
+import { discardDraftRowAction } from "./actions";
 import MailList, { type MailRow } from "./MailList";
 
 export const dynamic = "force-dynamic";
@@ -49,11 +50,16 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     body = (
       <div className="card divide-y divide-line" data-mail-drafts>
         {drafts.map((d) => (
-          <Link key={d.id} href={`/admin/inbox/new?draft=${d.id}`} className="flex flex-wrap items-baseline gap-x-3 px-4 py-2 hover:bg-bg sm:flex-nowrap">
-            <span className="w-full truncate font-semibold text-coral-dark sm:w-48 sm:shrink-0">Draft{d.toAddress ? `: ${d.toAddress}` : ""}</span>
-            <span className="min-w-0 flex-1 truncate">{d.subject || "(no subject)"}<span className="text-muted"> - {snippet(d.body)}</span></span>
-            <span className="shrink-0 text-xs text-muted">{inboxWhen(d.updatedAt)}</span>
-          </Link>
+          <div key={d.id} className="flex items-center gap-2 px-4 py-2 hover:bg-bg">
+            <Link href={`/admin/inbox/new?draft=${d.id}`} className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 sm:flex-nowrap">
+              <span className="w-full truncate font-semibold text-coral-dark sm:w-48 sm:shrink-0">Draft{d.toAddress ? `: ${d.toAddress}` : ""}</span>
+              <span className="min-w-0 flex-1 truncate">{d.subject || "(no subject)"}<span className="text-muted"> - {snippet(d.body)}</span></span>
+              <span className="shrink-0 text-xs text-muted">{inboxWhen(d.updatedAt)}</span>
+            </Link>
+            <form action={discardDraftRowAction.bind(null, d.id)}>
+              <button className="rounded-full px-2 py-1 text-xs font-semibold text-muted hover:bg-white hover:text-coral-dark" data-discard-draft={d.id}>Discard</button>
+            </form>
+          </div>
         ))}
         {!drafts.length && <p className="px-4 py-10 text-center text-muted">No drafts.</p>}
       </div>
