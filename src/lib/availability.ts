@@ -99,9 +99,33 @@ export function bookableQty(quantity: number, usage: UsageMap, productId: number
   return free;
 }
 
-/** Bookable units for one product on one event date (fresh DB read). Pass `pickupDate` when inside a transaction. */
+/** The items that share this item's unit (its stock group), itself included; just itself when it has no group. */
+export async function stockGroupIds(productId: number, exec: Executor = db): Promise<number[]> {
+  const r = await exec.execute(sql`
+    SELECT p2.id FROM products p1 JOIN products p2 ON p2.stock_group = p1.stock_group
+    WHERE p1.id = ${productId} AND p1.stock_group IS NOT NULL`);
+  const ids = (r.rows as { id: number }[]).map((x) => Number(x.id));
+  return ids.length ? ids : [productId];
+}
+
+/**
+ * Bookable units for one product on one event date (fresh DB read). Pass `pickupDate` when inside a transaction.
+ * Items in a stock group share their units (Abraham, Nov 17, 2026: one maze for both maze items), so a booking of
+ * any of them counts against all of them.
+ */
 export async function checkBookable(productId: number, quantity: number, eventDate: string, exec: Executor = db, pickupDate?: string) {
   const pickup = pickupDate ?? pickupDateFor(eventDate, await getSettings());
-  const usage = await getUsage(eventDate, pickup, [productId], exec);
+  const ids = await stockGroupIds(productId, exec);
+  const usage = await getUsage(eventDate, pickup, ids, exec);
+  if (ids.length > 1) {
+    // Add the whole group's use onto this item, day by day
+    const merged = new Map<string, Usage>();
+    for (const id of ids)
+      for (const [day, u] of usage.get(id) ?? []) {
+        const m = merged.get(day) ?? { event: 0, pickup: 0, held: 0 };
+        merged.set(day, { event: m.event + u.event, pickup: m.pickup + u.pickup, held: m.held + u.held });
+      }
+    usage.set(productId, merged);
+  }
   return bookableQty(quantity, usage, productId, eventDate, pickup);
 }

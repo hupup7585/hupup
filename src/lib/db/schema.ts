@@ -52,6 +52,8 @@ export const products = pgTable(
     active: boolean("active").notNull().default(true),
     /** In Garbage (Abraham, Nov 17, 2026): off the catalog list, website and phone menu until the Owner restores it */
     trashedAt: timestamp("trashed_at", { withTimezone: true }),
+    /** Items that share one unit (Abraham, Nov 17, 2026: one maze, two maze items): booked together at most `quantity` a day */
+    stockGroup: text("stock_group"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("products_category_idx").on(t.categoryId)],
@@ -130,6 +132,9 @@ export const orders = pgTable(
     paidCents: integer("paid_cents").notNull().default(0),
     /** Orders paid together with one charge (several rental days on one call) share the first order's id here */
     paymentGroupId: integer("payment_group_id"),
+    /** Offers (Abraham, Nov 17, 2026): the discount already taken off subtotal_cents, and which offer */
+    offerDiscountCents: integer("offer_discount_cents").notNull().default(0),
+    offerNote: text("offer_note"),
     /** sola | cash | check | other */
     paymentMethod: text("payment_method"),
     solaRefNum: text("sola_ref_num"),

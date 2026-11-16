@@ -14,8 +14,21 @@ export async function ensurePriced(orderId: number): Promise<boolean> {
   if (!o) return false;
   if (o.totalCents !== null) return true;
   const s = await getSettings();
-  const t = await priceOrder(o.subtotalCents, o.deliveryAddress, s, undefined, o.eventDate);
+  // Offers first (the customer is on the order now): the rentals total after the one offer (Nov 17, 2026)
+  const { refreshOrderTotals } = await import("@/lib/orders");
+  await refreshOrderTotals(orderId);
+  const [fresh] = await db.select({ subtotalCents: schema.orders.subtotalCents, offerNote: schema.orders.offerNote }).from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
+  let t = await priceOrder(fresh.subtotalCents, o.deliveryAddress, s, undefined, o.eventDate);
   if (!t) return false; // outside every zone, or not found: never guessed (pricingProblem says which)
+  // A free 4th Sunday pays its own delivery ($20 / $30 / $40)
+  const { OFFER_NOTES } = await import("@/lib/offers");
+  if (fresh.offerNote === OFFER_NOTES.fourthSunday) {
+    const { deliveryQuote } = await import("@/lib/delivery-areas");
+    const { deliveryFeeFor } = await import("@/lib/offer-delivery");
+    const { totalsWithFee } = await import("@/lib/pricing");
+    const q = await deliveryQuote(o.deliveryAddress, s, undefined, o.eventDate);
+    if (q.ok && q.kind) t = totalsWithFee(fresh.subtotalCents, q.zone, deliveryFeeFor(q.kind, s, o.eventDate, fresh.offerNote), s);
+  }
   await db
     .update(schema.orders)
     .set({ deliveryZone: t.zone, deliveryFeeCents: t.deliveryFeeCents, taxPercent: t.taxPercent, taxCents: t.taxCents, totalCents: t.totalCents, updatedAt: new Date() })

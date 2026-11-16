@@ -21,11 +21,15 @@ export default function PosForm(props: {
   /** Ask how the customer accepted the Terms (off on the live site until the final Terms are in) */
   askTerms?: boolean;
   consent?: { transactionalText: string; marketingText: string; smsNumber: string };
+  /** Thursday to Sunday offer is on (Owner switch) */
+  offerThuSun?: boolean;
 }) {
   const [date, setDate] = useState(props.initialDate);
   const [avail, setAvail] = useState<Record<string, number>>({});
   const [qty, setQty] = useState<Record<string, number>>(props.initialProduct ? { [props.initialProduct]: 1 } : {});
   const [sms, setSms] = useState({ transactional: false, marketing: false });
+  const [thuSun, setThuSun] = useState(false);
+  const isThursday = Boolean(date) && new Date(`${date}T12:00:00Z`).getUTCDay() === 4;
   const [form, setForm] = useState({ name: "", termsVia: "", phone: "", email: "", address: "", deliveryTime: "", notes: "", amountPaid: "" });
   const [payment, setPayment] = useState<"link" | "cash" | "check" | "later">("link");
   const [result, setResult] = useState<PosResult | null>(null);
@@ -60,7 +64,7 @@ export default function PosForm(props: {
 
   const submit = () =>
     start(async () => {
-      const r = await createBookingAction({ date, items: qty, ...form, payment, smsTransactional: sms.transactional, smsMarketing: sms.marketing });
+      const r = await createBookingAction({ date, items: qty, ...form, payment, smsTransactional: sms.transactional, smsMarketing: sms.marketing, thuSun: thuSun && isThursday });
       setResult(r);
       if (r.ok) {
         setQty({});
@@ -99,7 +103,12 @@ export default function PosForm(props: {
             </div>
             {!check.ok && <div>{check.message}</div>}
             {check.day.closesAtLabel && <div className="badge badge-pending mt-1">{check.day.closesAtLabel}</div>}
-            {check.ok && <div className="mt-1">Pickup: <DualDate yi iso={check.pickup} /></div>}
+            {check.ok && !(thuSun && isThursday) && <div className="mt-1">Pickup: <DualDate yi iso={check.pickup} /></div>}
+            {check.ok && props.offerThuSun && isThursday && (
+              <label className="mt-2 flex items-center gap-2 font-semibold" data-thu-sun>
+                <input type="checkbox" checked={thuSun} onChange={(e) => setThuSun(e.target.checked)} /> Thursday to Sunday offer: pickup Monday, 1.5 times the rental
+              </label>
+            )}
             {check.pickupWarning && <div className="mt-1 font-semibold text-navy">{check.pickupWarning}</div>}
           </div>
         )}

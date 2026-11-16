@@ -15,7 +15,8 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
     db.select().from(schema.categories).orderBy(asc(schema.categories.sortOrder), asc(schema.categories.id)),
     db.select().from(schema.products).where(eq(schema.products.active, true)).orderBy(asc(schema.products.sortOrder), asc(schema.products.id)),
   ]);
-  const lock = bookingLock(calendarNow(), await getSettings());
+  const settings = await getSettings();
+  const lock = bookingLock(calendarNow(), settings);
   return (
     <div className="mx-auto max-w-6xl">
       <h1 className="mb-5 text-2xl font-black sm:text-3xl">New booking</h1>
@@ -31,6 +32,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
         categories={cats.map((c) => ({ id: c.id, name: c.name }))}
         products={prods.map((p) => ({ id: p.id, categoryId: p.categoryId, name: p.name, priceCents: p.priceCents, quantity: p.quantity }))}
         askTerms={termsActive()}
+        offerThuSun={Boolean(settings.offerThuSunOn)}
         consent={{ transactionalText: webConsentCopy().transactional, marketingText: webConsentCopy().marketing, smsNumber: smsNumberDisplay() }}
       />
     </div>

@@ -18,6 +18,7 @@ import {
   getPaymentGroup,
   minutesFromNow,
   orderNumber,
+  refreshOrderTotals,
   reserveItem,
   upsertCustomer,
 } from "@/lib/orders";
@@ -26,7 +27,8 @@ import { TERMS_TEXT } from "@/lib/terms-content";
 import { sendEmail, sendSms } from "@/lib/notify";
 import { getSettings } from "@/lib/settings";
 import { totalsWithFee } from "@/lib/pricing";
-import { deliveryQuote, zoneFee } from "@/lib/delivery-areas";
+import { deliveryQuote } from "@/lib/delivery-areas";
+import { deliveryFeeFor } from "@/lib/offer-delivery";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
 import { STEP_LABELS, track, trackStep } from "@/lib/call-journey";
@@ -273,16 +275,25 @@ async function hotlineClosed(ctx: Ctx, vr: VR): Promise<VR | null> {
 /** Item lists with 10 or more items: seconds to wait for a second key after the first (Abraham, Nov 17, 2026). */
 export const MULTI_KEY_WAIT_SECONDS = 2;
 
-/** The three ocean ball sets (a hidden category "Ocean balls", sizes 1 to 3: 200, 500 and 700 balls). */
-async function oceanBallProducts() {
+/** Items in a hidden add-on group (ocean balls, laser tag extra packs), in size order. */
+async function addOnProducts(categoryName: string) {
   return db
     .select({ id: products.id, name: products.name })
     .from(products)
     .innerJoin(categories, eq(products.categoryId, categories.id))
-    .where(and(eq(categories.name, OCEAN_BALLS_CATEGORY), eq(products.active, true)))
+    .where(and(eq(categories.name, categoryName), eq(products.active, true)))
     .orderBy(asc(products.sizeOrder), asc(products.id));
 }
+/** The three ocean ball sets (a hidden category "Ocean balls", sizes 1 to 3: 200, 500 and 700 balls). */
+const oceanBallProducts = () => addOnProducts(OCEAN_BALLS_CATEGORY);
 export const OCEAN_BALLS_CATEGORY = "Ocean balls";
+export const LASER_ADDONS_CATEGORY = "Laser tag add-ons";
+
+/** A maze or laser guns (the laser tag category, not its hidden extra packs). */
+async function isLaserBase(categoryId: number) {
+  const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, categoryId));
+  return Boolean(cat && /laser/i.test(cat.name) && cat.name !== LASER_ADDONS_CATEGORY);
+}
 
 type ResumeLine = NonNullable<CallSession["data"]["resumeLines"]>[number];
 
@@ -1298,7 +1309,7 @@ const handlers: Record<string, Handler> = {
     if (day) {
       await db.update(orderItems).set({ orderId: day.order.id }).where(eq(orderItems.orderId, l.holdId!));
       await cancelHold(l.holdId!);
-      await db.execute(sql`UPDATE orders SET subtotal_cents = COALESCE((SELECT SUM(qty * unit_price_cents) FROM order_items WHERE order_id = ${day.order.id}), 0) WHERE id = ${day.order.id}`);
+      await refreshOrderTotals(day.order.id);
       cartOrder = day.order.id;
     }
     await db.update(orders).set({ holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES) }).where(eq(orders.id, cartOrder));
@@ -1649,6 +1660,11 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "item_added");
       return back(vr, "ocean", { d: date });
     }
+    // A maze or laser guns: the extra gun packs (once the wording is approved; on preview it plays for his test)
+    if ((await isLaserBase(p.categoryId)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) {
+      sp(vr, ctx, "item_added");
+      return back(vr, "packs", { d: date });
+    }
     const g = keypad(vr, url("after-add"));
     sp(g, ctx, "item_added");
     sp(g, ctx, "keep_shopping");
@@ -1675,6 +1691,38 @@ const handlers: Record<string, Handler> = {
       return back(vr, "added-menu");
     }
     return noInput(vr, ctx, "cart");
+  },
+
+  /** Extra laser gun packs after a maze or guns (Abraham, Nov 17, 2026): 1 = 6-pack $75, 2 = 4-pack $50, # skips. */
+  packs(ctx, vr) {
+    const d = ctx.query.get("d")!;
+    const g = keypad(vr, url("packs-choice", { d }));
+    if (promptWaiting(ctx.prompts, "laser_packs")) say(g, promptText(ctx.prompts, "laser_packs"));
+    else sp(g, ctx, "laser_packs");
+    return bookNoInput(vr, ctx, "packs", { d });
+  },
+
+  async "packs-choice"(ctx, vr) {
+    const date = ctx.query.get("d")!;
+    const k = ctx.body.Digits ?? "";
+    if (k === "#") return back(vr, "added-menu");
+    const packs = await addOnProducts(LASER_ADDONS_CATEGORY);
+    const pick = /^[12]$/.test(k) ? packs[Number(k) - 1] : undefined;
+    if (!pick) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "packs", { d: date });
+    }
+    const day = (await callOrders(ctx)).find((o) => o.order.eventDate === date) ?? null;
+    const r = await reserveItem({ orderId: day?.order.id ?? null, productId: pick.id, qty: 1, eventDate: date, channel: "PHONE", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid });
+    if (r.ok) {
+      await track(ctx.callSid, "item_added", `Added ${pick.name} for ${longDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
+      const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), r.orderId])];
+      await updateSession(ctx.callSid, { data: { dayOrderIds: ids } }, ctx.session);
+      sp(vr, ctx, "item_added");
+      return back(vr, "packs", { d: date }); // more packs, or pound to go on
+    }
+    sp(vr, ctx, r.reason === "unavailable" ? "just_booked" : "went_wrong", { item: pick.name });
+    return back(vr, "added-menu");
   },
 
   /** Ocean balls after every jumping balloon (Abraham, Nov 17, 2026): 1 = 200 for $10, 2 = 500 for $15, 3 = 700 for $20, # skips. */
@@ -2131,10 +2179,7 @@ const handlers: Record<string, Handler> = {
     const settings = await getSettings();
     // Delivery fee by the price map (Abraham, Nov 15, 2026); no price = never guessed
     const quote = await deliveryQuote(data.address, settings);
-    // Each rental day is its own delivery: its own delivery fee and tax. One charge pays for all of them.
-    // The free delivery promo counts by each day's delivery date (Abraham, Nov 17, 2026)
-    const perDay = days.map((o) => ({ o, t: quote.ok ? totalsWithFee(o.order.subtotalCents, quote.zone, quote.kind ? zoneFee(quote.kind, settings, o.order.eventDate) : quote.feeCents, settings) : null }));
-    if (perDay.some((x) => !x.t)) {
+    if (!quote.ok) {
       sp(vr, ctx, "address_outside_area");
       return back(vr, "ask", { f: "address" });
     }
@@ -2145,6 +2190,19 @@ const handlers: Record<string, Handler> = {
       email: data.email ?? null,
       address: data.address,
     });
+    // Offers need the customer (4th Sunday free counts their Sundays): attach, then the rentals totals again
+    for (const o of days) {
+      await db.update(orders).set({ customerId }).where(and(eq(orders.id, o.order.id), eq(orders.status, "HOLD")));
+      await refreshOrderTotals(o.order.id);
+    }
+    const fresh = await db.select({ id: orders.id, subtotalCents: orders.subtotalCents, offerNote: orders.offerNote }).from(orders).where(inArray(orders.id, days.map((d) => d.order.id)));
+    for (const o of days) {
+      const f = fresh.find((x) => x.id === o.order.id);
+      if (f) Object.assign(o.order, { subtotalCents: f.subtotalCents, offerNote: f.offerNote });
+    }
+    // Each rental day is its own delivery: its own delivery fee and tax. One charge pays for all of them.
+    // The free delivery promo counts by each day's delivery date; a free 4th Sunday has its own delivery (Nov 17, 2026)
+    const perDay = days.map((o) => ({ o, t: totalsWithFee(o.order.subtotalCents, quote.zone, quote.kind ? deliveryFeeFor(quote.kind, settings, o.order.eventDate, o.order.offerNote) : quote.feeCents, settings) }));
     const primary = days[0].order;
     for (const { o, t } of perDay) {
       await db

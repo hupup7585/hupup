@@ -49,6 +49,9 @@ async function reserveInTx(
   },
 ): Promise<ReserveResult> {
   const pickupDate = opts.pickupDate ?? addDays(opts.eventDate, 1);
+  // Items that share one unit (the maze): lock the whole group first, in id order, so two callers can't take it at the
+  // same moment (and never lock the group in two different orders)
+  await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${opts.productId}) ORDER BY id FOR UPDATE`);
   const locked = await tx.execute(
     sql`SELECT id, quantity, price_cents, active FROM products WHERE id = ${opts.productId} FOR UPDATE`,
   );
@@ -100,12 +103,26 @@ async function reserveInTx(
 }
 
 async function recalcSubtotal(tx: Tx | typeof db, orderId: number) {
+  // Offers (Abraham, Nov 17, 2026; Owner switches, all off by default): the rentals total after the one offer
+  const { bestOffer, offerSwitches } = await import("@/lib/offers");
+  const offer = await bestOffer(tx, orderId, await offerSwitches(tx));
   await tx.execute(sql`
     UPDATE orders SET
-      subtotal_cents = COALESCE((SELECT SUM(qty * unit_price_cents) FROM order_items WHERE order_id = ${orderId}), 0),
+      subtotal_cents = COALESCE((SELECT SUM(qty * unit_price_cents) FROM order_items WHERE order_id = ${orderId}), 0) - ${offer.discountCents},
+      offer_discount_cents = ${offer.discountCents},
+      offer_note = ${offer.note},
       updated_at = now()
     WHERE id = ${orderId}
   `);
+}
+
+/**
+ * Recompute an order's rentals total and offers (after a customer, date or offer switch changes). Orders with no item
+ * lines (an Owner custom charge, or an amount set by hand) keep their amount.
+ */
+export async function refreshOrderTotals(orderId: number) {
+  const [line] = await db.select({ id: orderItems.id }).from(orderItems).where(eq(orderItems.orderId, orderId)).limit(1);
+  if (line) await recalcSubtotal(db, orderId);
 }
 
 /** Phone cart: add one product to the caller's held order. */
@@ -130,10 +147,12 @@ export async function createOrderWithItems(opts: {
   notes?: string | null;
   paymentMethod?: string | null;
   paidCents?: number;
+  /** Thursday to Sunday (Abraham, Nov 17, 2026): the Monday pickup instead of the next open day */
+  pickupDate?: string;
 }): Promise<ReserveResult> {
   const items = [...opts.items].filter((i) => i.qty > 0).sort((a, b) => a.productId - b.productId);
   if (!items.length) return { ok: false, reason: "not_found" };
-  const pickupDate = pickupDateFor(opts.eventDate, await getSettings());
+  const pickupDate = opts.pickupDate ?? pickupDateFor(opts.eventDate, await getSettings());
   try {
     return await db.transaction(async (tx) => {
       let orderId: number | null = null;

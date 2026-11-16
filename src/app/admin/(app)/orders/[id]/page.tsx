@@ -78,6 +78,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               {o.totalCents !== null ? (
                 <>
                   <div className="text-sm text-muted">Rentals {formatMoney(o.subtotalCents)} · Delivery {formatMoney(o.deliveryFeeCents)} · Sales tax ({o.taxPercent}%) {formatMoney(o.taxCents)}</div>
+                  {o.offerNote && <div className="text-sm font-semibold text-navy" data-offer>Offer: {o.offerNote} ({o.offerDiscountCents >= 0 ? `${formatMoney(o.offerDiscountCents)} off` : `${formatMoney(-o.offerDiscountCents)} added`}, already in the rentals)</div>}
                   <div>Total <b className="ml-3 text-lg">{formatMoney(o.totalCents)}</b></div>
                 </>
               ) : (

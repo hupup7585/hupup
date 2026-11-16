@@ -171,6 +171,8 @@ export const PROMPTS = {
   another_day: { group: "Cart", label: "After an item is added: book another day (Abraham)", text: "To book another day, press 2." },
   // Ocean balls after every jumping balloon (Abraham, Nov 17, 2026), his wording ("#" is said as pound)
   ocean_balls: { group: "Cart", label: "Ocean balls (after every jumping balloon)", text: "Would you like to add ocean balls? To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3. To skip, press pound." },
+  // Laser tag extra packs (Abraham, Nov 17, 2026): offered after a maze or guns, like ocean balls. Draft for his exact-text OK.
+  laser_packs: { group: "Cart", label: "Extra laser gun packs (after a maze or guns) (draft)", text: "Would you like to add more laser guns? To add a 6-pack of laser guns for $75, press 1. To add a 4-pack of laser guns for $50, press 2. To skip, press pound.", pending: true },
   added: { group: "Cart", label: "Item added to cart", text: "Woohoo! I added {items} to your cart for {date}. It's saved just for you while we are on the phone.", vars: ["items", "date"] },
   after_add: { group: "Cart", label: "After adding", text: "To keep shopping, press 1. To check out, press 9." },
   cart_empty: { group: "Cart", label: "Cart is empty (Abraham, Phone Menu v3)", text: "Your cart is empty. Let us start shopping!" },

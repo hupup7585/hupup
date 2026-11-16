@@ -72,6 +72,8 @@ export async function createBookingAction(input: {
   /** The two optional text-consent boxes (both unchecked by default; never required) */
   smsTransactional?: boolean;
   smsMarketing?: boolean;
+  /** Thursday to Sunday (Abraham, Nov 17, 2026): delivered Thursday, picked up Monday, 1.5 times the rental */
+  thuSun?: boolean;
 }): Promise<PosResult> {
   {
     // Abraham, Nov 14, 2026: no booking on Shabbes or Yom Tov (candle lighting until Rabbeinu Tam)
@@ -98,7 +100,11 @@ export async function createBookingAction(input: {
   const paidCents = input.payment === "cash" || input.payment === "check" ? parseMoneyToCents(input.amountPaid) ?? 0 : 0;
   const status = input.payment === "link" ? "PENDING_PAYMENT" : "CONFIRMED";
 
+  // Thursday to Sunday: only while the offer is on, and only for a Thursday (pickup Monday)
+  const s = await getSettings();
+  const thuSun = Boolean(input.thuSun) && Boolean(s.offerThuSunOn) && new Date(`${input.date}T12:00:00Z`).getUTCDay() === 4;
   const r = await createOrderWithItems({
+    ...(thuSun ? { pickupDate: addDays(input.date, 4) } : {}),
     items,
     eventDate: input.date,
     channel: "POS",
@@ -113,6 +119,11 @@ export async function createBookingAction(input: {
   if (!r.ok) {
     if (r.reason === "unavailable") return { ok: false, message: `Not enough units available for ${dualDate(input.date)} (only ${r.free} left of one item). Refresh availability.` };
     return { ok: false, message: "Could not create the booking." };
+  }
+  // Offers need the customer on the order (4th Sunday free counts their Sundays): the rentals total again
+  {
+    const { refreshOrderTotals } = await import("@/lib/orders");
+    await refreshOrderTotals(r.orderId);
   }
 
   // Log the customer's acceptance of the Terms, as chosen by staff (only while the Terms flow is on).
