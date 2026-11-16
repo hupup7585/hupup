@@ -6,7 +6,7 @@ import { OPT_OUT_KEYWORDS, PROMO_OPENING, PROVIDER_DISCLOSURE, WEB_CONSENT_MARKE
 
 /* Abram's "Hup Up Attractions SMS Terms - Additional Requirements" (2026-11-05). */
 
-describe("1. promotional hours in the recipient's local time (area code, New York fallback)", () => {
+describe("1. promotional hours: always Eastern time (area code table kept for reference)", () => {
   it("maps area codes to zones", () => {
     expect(timeZonesForPhone("+18455550100")).toEqual({ zones: ["America/New_York"], source: "area_code" });
     expect(timeZonesForPhone("+13125550100").zones).toEqual(["America/Chicago"]);
@@ -20,31 +20,16 @@ describe("1. promotional hours in the recipient's local time (area code, New Yor
   it("unknown, toll-free or foreign numbers fall back to New York", () => {
     for (const p of ["+18005550100", "+19995550100", "+442071234567", "", null]) expect(timeZonesForPhone(p)).toEqual({ zones: [FALLBACK_TIME_ZONE], source: "fallback" });
   });
-  it("uses the customer's recorded time zone first", () => {
-    const ninePmNY = new Date("2026-07-02T01:30:00Z"); // 9:30 PM EDT, 6:30 PM PDT
-    expect(inRecipientPromoHours("+18455550100", ninePmNY, "America/Los_Angeles")).toBe(true); // NY number, lives in California
-    expect(inRecipientPromoHours("+14155550100", ninePmNY, "America/New_York")).toBe(false); // CA number, lives in New York
-  });
-  it("without a recorded zone: area code AND New York must both be inside the window (documented fallback)", () => {
-    const noonNY = new Date("2026-07-01T16:00:00Z"); // 12:00 PM EDT, 9:00 AM PDT, 6:00 AM HST
-    expect(inRecipientPromoHours("+18455550100", noonNY)).toBe(true);
-    expect(inRecipientPromoHours("+14155550100", noonNY)).toBe(true);
-    expect(inRecipientPromoHours("+18085550100", noonNY)).toBe(false); // 6 AM in Hawaii
-    const ninePmNY = new Date("2026-07-02T01:30:00Z");
-    expect(inRecipientPromoHours("+18455550100", ninePmNY)).toBe(false);
-    expect(inRecipientPromoHours("+14155550100", ninePmNY)).toBe(false); // 6:30 PM in CA but 9:30 PM in NY
-    expect(promoTimeZones("+14155550100")).toEqual({ zones: ["America/Los_Angeles", "America/New_York"], basis: "area_code_and_new_york" });
-    expect(promoTimeZones("+18005550100")).toEqual({ zones: ["America/New_York"], basis: "new_york" });
-    expect(promoTimeZones("+14155550100", "America/Chicago")).toEqual({ zones: ["America/Chicago"], basis: "customer" });
-  });
-  it("an area code spanning two zones must be inside the window in both", () => {
-    const eightAmEastern = new Date("2026-07-01T12:30:00Z"); // 8:30 AM EDT = 7:30 AM CDT
-    expect(inRecipientPromoHours("+18505550100", eightAmEastern)).toBe(false);
-    expect(inRecipientPromoHours("+18505550100", new Date("2026-07-01T13:30:00Z"))).toBe(true);
-  });
-  it("Arizona has no daylight saving", () => {
-    expect(inRecipientPromoHours("+16025550100", new Date("2026-07-01T14:30:00Z"))).toBe(false); // 7:30 AM MST
-    expect(inRecipientPromoHours("+16025550100", new Date("2026-07-01T15:00:00Z"))).toBe(true); // 8:00 AM MST
+  it("promo hours are always Eastern (Abraham, Nov 16, 2026): no stored zone or area code changes it", () => {
+    const ninePmNY = new Date("2026-07-02T01:30:00Z"); // 9:30 PM EDT
+    const noonNY = new Date("2026-07-01T16:00:00Z"); // 12:00 PM EDT
+    for (const p of ["+18455550100", "+14155550100", "+18085550100", "+18505550100", "+16025550100"]) {
+      expect(inRecipientPromoHours(p, noonNY)).toBe(true);
+      expect(inRecipientPromoHours(p, ninePmNY, "America/Los_Angeles")).toBe(false);
+      expect(promoTimeZones(p, "America/Chicago")).toEqual({ zones: ["America/New_York"], basis: "eastern" });
+    }
+    expect(inRecipientPromoHours("+14155550100", new Date("2026-07-01T12:00:00Z"))).toBe(true); // 8:00 AM Eastern
+    expect(inRecipientPromoHours("+14155550100", new Date("2026-07-01T11:59:00Z"))).toBe(false); // 7:59 AM Eastern
   });
   it("table is well formed: 3-digit codes, valid IANA zones, no code listed in two single-zone groups by mistake", () => {
     const src = readFileSync("src/lib/area-code-tz.ts", "utf8");

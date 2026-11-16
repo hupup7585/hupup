@@ -39,7 +39,6 @@ import {
   consentState,
   parseConsentAnswer,
   recordConsent,
-  setCustomerTimeZone,
   shouldAskMarketing,
   wordingVersion,
 } from "@/lib/sms-consent";
@@ -367,15 +366,6 @@ function itemPhrase(qty: number, name: string) {
 }
 
 
-/** Keys on the "different time zone" menu. */
-const PHONE_TZ_KEYS: Record<string, string> = {
-  "1": "America/Chicago",
-  "2": "America/Denver",
-  "3": "America/Phoenix",
-  "4": "America/Los_Angeles",
-  "5": "America/Anchorage",
-  "6": "Pacific/Honolulu",
-};
 
 async function customerByPhone(phone: string) {
   const [c] = await db.select().from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1);
@@ -2284,46 +2274,6 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
       const g = keypad(vr, url("promo-confirm"), { numDigits: 1, timeout: 6 });
       sp(g, ctx, "promo_heard", { number: readBack(heard) });
-    }
-    return back(vr, "goodbye");
-  },
-
-  /* ---- time zone for promotional quiet hours (asked only after a promotional yes; skipping keeps the fallback) ---- */
-
-  tz(ctx, vr) {
-    const g = keypad(vr, url("tz-answer"));
-    sp(g, ctx, "tz_ask");
-    return back(vr, "goodbye");
-  },
-
-  async "tz-answer"(ctx, vr) {
-    const phone = ctx.session?.data.phone;
-    const d = ctx.body.Digits;
-    if (phone && d === "1") {
-      await setCustomerTimeZone(phone, "America/New_York", "phone");
-      sp(vr, ctx, "tz_saved");
-      return back(vr, "goodbye");
-    }
-    if (d === "2") {
-      const g = keypad(vr, url("tz-pick"));
-      sp(g, ctx, "tz_pick");
-    } else if (d) {
-      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
-      return back(vr, "tz");
-    }
-    return back(vr, "goodbye");
-  },
-
-  async "tz-pick"(ctx, vr) {
-    const phone = ctx.session?.data.phone;
-    const zone = PHONE_TZ_KEYS[ctx.body.Digits ?? ""];
-    if (phone && zone) {
-      await setCustomerTimeZone(phone, zone, "phone");
-      sp(vr, ctx, "tz_saved");
-    } else if (ctx.body.Digits) {
-      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
-      const g = keypad(vr, url("tz-pick"));
-      sp(g, ctx, "tz_pick");
     }
     return back(vr, "goodbye");
   },

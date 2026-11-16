@@ -317,23 +317,12 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
   });
 });
 
-describe("time zone question (after a promotional yes)", () => {
-  it("asks Eastern first; press 1 saves New York", async () => {
-    let xml = await call("tz");
-    expect(xml).toContain("Are you in the Eastern time zone, the same as New York?");
-    xml = await call("tz-answer", { Digits: "1" });
-    expect(h.zones).toEqual([{ phone: "+18455550100", zone: "America/New_York", source: "phone" }]);
-    expect(xml).toContain("/api/voice/goodbye");
-  });
-  it("press 2 offers the other zones; press 4 saves Pacific", async () => {
-    const xml = await call("tz-answer", { Digits: "2" });
-    expect(xml).toContain("Pacific, press 4");
-    await call("tz-pick", { Digits: "4" });
-    expect(h.zones).toEqual([{ phone: "+18455550100", zone: "America/Los_Angeles", source: "phone" }]);
-  });
-  it("skipping or silence saves nothing (fallback rule applies)", async () => {
-    await call("tz-answer", {});
-    await call("tz-pick", { Digits: "0" });
+describe("no time zone question (Abraham, Nov 16, 2026): every customer is on Eastern time", () => {
+  it("the phone line never asks for a time zone", async () => {
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    for (const k of ["tz_ask", "tz_pick", "tz_saved"]) expect(PROMPTS).not.toHaveProperty(k);
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).not.toMatch(/"tz-answer"|"tz-pick"|PHONE_TZ_KEYS/);
     expect(h.zones).toEqual([]);
   });
 });

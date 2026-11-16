@@ -1,5 +1,8 @@
 /**
- * Recipient local time for promotional quiet hours (8:00 AM - 9:00 PM).
+ * Promotional quiet hours (8:00 AM - 9:00 PM): always Eastern time (Abraham, Nov 16, 2026; see promoTimeZones).
+ * The area code table below is kept for reference only; it no longer decides anything.
+ *
+ * Earlier rule, for history: recipient local time.
  *
  * Order of preference (see promoTimeZones):
  *  1. The time zone the customer told us (website form, phone menu, or staff), stored on the customer.
@@ -134,21 +137,13 @@ export function isSelectableTimeZone(zone: string | null | undefined): boolean {
   return SELECTABLE_TIME_ZONES.some((z) => z.zone === zone);
 }
 
-/** Zones that must all be inside promotional hours for this customer, and why. */
-export function promoTimeZones(phone: string | null | undefined, recordedZone?: string | null): { zones: string[]; basis: "customer" | "area_code_and_new_york" | "new_york" } {
-  if (recordedZone && isValidZone(recordedZone)) return { zones: [recordedZone], basis: "customer" };
-  const byArea = timeZonesForPhone(phone);
-  if (byArea.source === "fallback") return { zones: [FALLBACK_TIME_ZONE], basis: "new_york" };
-  return { zones: [...new Set([...byArea.zones, FALLBACK_TIME_ZONE])], basis: "area_code_and_new_york" };
-}
-
-function isValidZone(z: string): boolean {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: z });
-    return true;
-  } catch {
-    return false;
-  }
+/**
+ * Zones that must be inside promotional hours (Abraham, Nov 16, 2026): we serve only Orange County, NY, one time
+ * zone, so every customer is on Eastern time. A stored zone or the area code no longer changes anything, and no
+ * caller, website visitor or staff member is ever asked for a time zone.
+ */
+export function promoTimeZones(_phone?: string | null, _recordedZone?: string | null): { zones: string[]; basis: "eastern" } {
+  return { zones: [FALLBACK_TIME_ZONE], basis: "eastern" };
 }
 
 /** True when it is 8:00 AM - 8:59 PM in every zone that applies to this customer. */

@@ -6,8 +6,7 @@ import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
 import { sendMessage } from "@/lib/sms";
-import { MARKETING_CONFIRMATION_SMS, TRANSACTIONAL_CONFIRMATION_SMS, recordConsent, setCustomerTimeZone } from "@/lib/sms-consent";
-import { isSelectableTimeZone } from "@/lib/area-code-tz";
+import { MARKETING_CONFIRMATION_SMS, TRANSACTIONAL_CONFIRMATION_SMS, recordConsent } from "@/lib/sms-consent";
 import { smsTermsV2Active, webConsentCopy } from "@/lib/sms-terms-v2";
 import { requestPromoByCustomer } from "@/lib/sms-reenroll";
 
@@ -31,9 +30,7 @@ export async function signUpForTexts(_prev: SignUpState, form: FormData): Promis
   const orders = form.get("transactional") === "on";
   const promo = form.get("marketing") === "on";
   if (!orders && !promo) return { error: "Please check at least one box to sign up." };
-  const timeZone = String(form.get("timeZone") || "");
   // SMS v3: the time zone is optional (without it, promos go out only when both the area-code zone and Eastern Time allow)
-  if (promo && !smsTermsV2Active() && !isSelectableTimeZone(timeZone)) return { error: "Please choose your time zone so we only send promotional texts at reasonable hours." };
 
   const disabled = await signUpsDisabledReason();
   if (disabled) return { error: disabled };
@@ -68,7 +65,6 @@ export async function signUpForTexts(_prev: SignUpState, form: FormData): Promis
   const v3 = smsTermsV2Active();
   if (promo && !v3) customerId = await recordConsent({ ...base, scope: "marketing", action: "opt_in", wording: copy.marketing });
 
-  if (isSelectableTimeZone(timeZone)) await setCustomerTimeZone(phone, timeZone, "web_form");
 
   const firstName = String(form.get("firstName") || "").trim().slice(0, 60);
   if (firstName && customerId && !customer?.name) await db.update(schema.customers).set({ name: firstName }).where(eq(schema.customers.id, customerId));

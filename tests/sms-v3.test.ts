@@ -200,13 +200,12 @@ describe("the 6 limit, January 1 reset, promo hours, segment length", () => {
     expect(await promosThisYear(P, NOON)).toBe(6);
     expect(await promosThisYear(P, new Date("2027-01-01T12:00:00Z"))).toBe(0); // January 1 reset (New York time)
   });
-  it("promos only 8 AM - 9 PM local time; unknown zone: both the area-code zone and Eastern Time", () => {
+  it("promos only 8 AM - 9 PM Eastern, for every customer (Abraham, Nov 16, 2026)", () => {
     const at = (iso: string) => new Date(iso);
-    expect(inMarketingHours("+13105550100", at("2026-11-10T16:30:00Z"), "America/Los_Angeles")).toBe(true); // 8:30 AM LA
-    expect(inMarketingHours("+13105550100", at("2026-11-10T15:30:00Z"), "America/Los_Angeles")).toBe(false); // 7:30 AM LA
-    expect(inMarketingHours("+13105550100", at("2026-11-11T01:30:00Z"), null)).toBe(true); // 5:30 PM LA and 8:30 PM New York: both allow
-    expect(inMarketingHours("+13105550100", at("2026-11-11T02:30:00Z"), null)).toBe(false); // 6:30 PM LA, but 9:30 PM in New York
-    expect(inMarketingHours("+13105550100", at("2026-11-10T13:30:00Z"), null)).toBe(false); // 8:30 AM New York, but 5:30 AM LA
+    expect(inMarketingHours("+13105550100", at("2026-11-10T13:30:00Z"), "America/Los_Angeles")).toBe(true); // 8:30 AM Eastern
+    expect(inMarketingHours("+13105550100", at("2026-11-10T12:30:00Z"), null)).toBe(false); // 7:30 AM Eastern
+    expect(inMarketingHours("+18455550100", at("2026-11-11T01:30:00Z"), null)).toBe(true); // 8:30 PM Eastern
+    expect(inMarketingHours("+18455550100", at("2026-11-11T02:30:00Z"), "America/Los_Angeles")).toBe(false); // 9:30 PM Eastern
   });
   it("promo format; segments counted for the SMS cost (texts up to 1,600 characters are allowed, Abraham section 7)", () => {
     const t = marketingBodyV2("Spring sale: 10% off jumping balloons booked this week.");

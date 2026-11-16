@@ -1,8 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState } from "react";
 import { Check } from "lucide-react";
-import { SELECTABLE_TIME_ZONES } from "@/lib/area-code-tz";
 import { PROMO_BENEFITS, PROMO_BENEFITS_NOTE, PROMO_HEADING, PROMO_TITLE } from "@/lib/sms-consent-copy";
 import { signUpForTexts, type SignUpState } from "./actions";
 import ConsentText from "@/components/ConsentText";
@@ -13,16 +12,6 @@ import ConsentText from "@/components/ConsentText";
  */
 export default function SignUpForm({ transactionalText, marketingText, smsNumber, disabledReason, v3 = false, notActive = null }: { transactionalText: string; marketingText: string; smsNumber: string; disabledReason: string | null; v3?: boolean; notActive?: string | null }) {
   const [state, action, pending] = useActionState<SignUpState, FormData>(signUpForTexts, {});
-  // Pre-select the time zone this device reports; the customer can change it.
-  const [zone, setZone] = useState("");
-  useEffect(() => {
-    try {
-      const z = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (SELECTABLE_TIME_ZONES.some((o) => o.zone === z)) setZone(z);
-    } catch {
-      /* keep blank */
-    }
-  }, []);
 
   if (state.ok && v3) {
     return (
@@ -101,19 +90,6 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
           </span>
         </label>
       </fieldset>
-
-      <label className="block">
-        <span className="font-bold">Your time zone</span> <span className="opacity-70">{v3 ? "(optional)" : "(required for promotional texts)"}</span>
-        <span className="mt-1 block text-base">We send promotional texts only between 8:00 a.m. and 9:00 p.m. in your time zone.</span>
-        <select name="timeZone" value={zone} onChange={(e) => setZone(e.target.value)} className="mt-2 block w-full rounded-xl border-2 border-hu-deep/30 bg-white px-4 py-3 text-lg focus:border-hu-deep focus:outline-none">
-          <option value="">Choose your time zone</option>
-          {SELECTABLE_TIME_ZONES.map((o) => (
-            <option key={o.zone} value={o.zone}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
 
       <p className="text-base">
         {v3 && (

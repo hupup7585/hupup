@@ -237,7 +237,6 @@ export async function recordStaffConsent(input: {
     orderId: input.orderId ?? null,
     disclosureRead: input.disclosureRead,
   });
-  if (optIn && input.scope === "marketing" && input.timeZone) await setCustomerTimeZone(input.phone, input.timeZone, "staff");
   return customerId;
 }
 

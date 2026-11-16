@@ -1,6 +1,6 @@
 # Hotline recording text list
 
-419 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
+408 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
 
 ## Welcome & main menu
 
@@ -30,12 +30,12 @@ Thank you for choosing Hup Up Attractions! |
 | menu_repeat | Menu option: repeat | To hear this again, press star. |
 | menu_empty | No rentals set up yet | We are getting our rentals ready right now. Please call back soon! |
 | recording_notice | Call recording notice (after the greeting; plays only when call recording is on) | This call may be monitored and recorded for quality and training purposes. |
-| closed_shabbos_greeting#1 | Whole hotline on Shabbes: closed greeting, piece 1 | Thank you for calling Hup Up Attractions. We are closed now for Shabbes, and we will be open again on |
-| closed_shabbos_greeting#2 | Whole hotline on Shabbes: closed greeting, piece 2 | at |
-| closed_shabbos_greeting#3 | Whole hotline on Shabbes: closed greeting, piece 3 | . Please leave your name, phone number, and a short message after the tone, and we will call you back after Shabbes. Good Shabbes! |
-| closed_yomtov_greeting#1 | Whole hotline on Yom Tov: closed greeting, piece 1 | Thank you for calling Hup Up Attractions. We are closed now for Yom Tov, and we will be open again on |
-| closed_yomtov_greeting#2 | Whole hotline on Yom Tov: closed greeting, piece 2 | at |
-| closed_yomtov_greeting#3 | Whole hotline on Yom Tov: closed greeting, piece 3 | . Please leave your name, phone number, and a short message after the tone, and we will call you back after Yom Tov. Good Yom Tov! |
+| closed_shabbos_greeting#1 | Whole hotline on Shabbes: closed greeting (approved Nov 16), piece 1 | Thank you for calling Hup Up Attractions. We are closed now for Shabbes, and we will be open again on |
+| closed_shabbos_greeting#2 | Whole hotline on Shabbes: closed greeting (approved Nov 16), piece 2 | at |
+| closed_shabbos_greeting#3 | Whole hotline on Shabbes: closed greeting (approved Nov 16), piece 3 | . Please leave your name, phone number, and a short message after the tone, and we will call you back after Shabbes. Good Shabbes! |
+| closed_yomtov_greeting#1 | Whole hotline on Yom Tov: closed greeting (approved Nov 16), piece 1 | Thank you for calling Hup Up Attractions. We are closed now for Yom Tov, and we will be open again on |
+| closed_yomtov_greeting#2 | Whole hotline on Yom Tov: closed greeting (approved Nov 16), piece 2 | at |
+| closed_yomtov_greeting#3 | Whole hotline on Yom Tov: closed greeting (approved Nov 16), piece 3 | . Please leave your name, phone number, and a short message after the tone, and we will call you back after Yom Tov. Good Yom Tov! |
 | office_closed | Office closed (after the greeting, only when the office is closed; also key 7) | Our office is closed right now, but you can book anytime using our automated system. |
 
 ## Booking by item (key 1)
@@ -134,12 +134,6 @@ Thank you for choosing Hup Up Attractions! |
 | category_item#2 | Item option in a category, piece 2 | , press |
 | back_to_menu | Go back option | To go back to the main menu, press star. |
 | category_empty | Category has no items | Sorry, nothing is available in that section right now. Let us head back to the main menu. |
-| product_intro#1 | Item intro, piece 1 | Great choice! The |
-| product_intro#2 | Item intro, piece 2 | is |
-| product_intro#3 | Item intro, piece 3 | . Delivery is available for an additional fee, and our team will give you the delivery price. |
-| product_options | Item options | To hear more about it, press 1. To add it to your cart, press 2. To go back, press star. |
-| product_default_desc#1 | Description when an item has none, piece 1 | The |
-| product_default_desc#2 | Description when an item has none, piece 2 | is one of our most popular rentals. Kids love it! |
 
 ## Date & quantity
 
@@ -256,9 +250,6 @@ Thank you for choosing Hup Up Attractions! |
 | consent_stopped | Number replied STOP before | This number has opted out of our text messages, so we will not text you. To get our texts again, text the word START to this hotline number. |
 | consent_marketing_yes | Signed up for promotional texts | Thank you, you are signed up for promotional texts. We just texted you a confirmation. |
 | consent_marketing_no | Said no to promotional texts | No problem, you will not get promotional texts. |
-| tz_ask | Ask the caller's time zone (after a promotional yes) | Last question, so we only send promotional texts at reasonable hours. Are you in the Eastern time zone, the same as New York? Press 1 for yes, or 2 for a different time zone. |
-| tz_pick | Pick a different time zone | For Central time, press 1. Mountain, press 2. Arizona, press 3. Pacific, press 4. Alaska, press 5. Hawaii, press 6. To skip, press 0. |
-| tz_saved | Time zone saved | Got it, thank you. |
 
 ## Promo texts by phone (keys only)
 
@@ -277,11 +268,9 @@ Thank you for choosing Hup Up Attractions! |
 
 | Slot | Line | Exact text |
 |---|---|---|
-| phonepay_choice | Pay now or get a link | Press 1 to pay now by card. Press 2 to get a secure payment link instead. |
 | phonepay_intro | PhonePay connect | Thank you. Please hold for a moment while we connect you to our secure payment line. |
 | phonepay_back | Back from the payment line | Thank you. Let us finish your order. |
 | phonepay_paid | Payment found | Your payment was received. You are all set! |
-| phonepay_not_found | Payment not found | We could not confirm your payment yet. We will send you a secure payment link, and our team will call you back if needed. |
 | phonepay_retry | Card did not go through (tries 1 to 4) | Your card did not go through. To try again, press 1. |
 | phonepay_retry_last | Card did not go through (try 5, last chance) | Your card did not go through. You have one more chance to try. To try again, press 1. |
 | phonepay_failed | Card did not go through (try 6, call ends) | Sorry, your card did not go through. Please call us back to try again. Goodbye. |

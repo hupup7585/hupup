@@ -350,7 +350,6 @@ describe("wrong key everywhere (Abraham, Nov 16, 2026): the one shared line, the
     ["resume-choice", "", "5", "resume"],
     ["phone-choice", "", "7", "phone"],
     ["promo-which-answer", "", "5", "promo-which"],
-    ["tz-answer", "", "5", "tz"],
     ["phonepay-retry-answer", "o=1&n=1&r=0", "5", "phonepay-retry?o=1&n=1&r=1"],
     ["vm-none-choice", "b=1&x=9", "5", "vm-none?b=1&x=9"],
   ];
@@ -372,5 +371,29 @@ describe("wrong key everywhere (Abraham, Nov 16, 2026): the one shared line, the
     expect(redirect(xml)).toBe("readback?f=name");
     expect(says(await call("readback", {}, "f=name")).join(" ")).toContain("Yossi Friedman");
     h.session.data = {};
+  });
+});
+
+describe("Abraham's answers (Nov 16, 2026)", () => {
+  it("8 works during the start-of-call prompts: greeting, office closed and catalog offer are all inside the keypad listener", async () => {
+    h.open = false;
+    const xml = await call("menu", {}, "first=1");
+    const g = gatherOf(xml);
+    for (const line of [GREETING, CLOSED, CATALOG]) expect(g).toContain(line);
+    expect(g).toMatch(/action="https:\/\/hupup\.example\/api\/voice\/menu-choice/);
+    expect(redirect(await press("8"))).toBe("catalog");
+  });
+  it("the Shabbes and Yom Tov closed greetings are approved (live on the live line)", async () => {
+    const { PROMPTS, promptWaiting } = await import("@/lib/ivr/prompts");
+    for (const k of ["closed_shabbos_greeting", "closed_yomtov_greeting"] as const) {
+      expect((PROMPTS[k] as { pending?: boolean }).pending).toBeUndefined();
+      expect(promptWaiting({}, k)).toBe(false);
+    }
+    expect(PROMPTS.closed_yomtov_greeting.text).toBe("Thank you for calling Hup Up Attractions. We are closed now for Yom Tov, and we will be open again on {day} at {time}. Please leave your name, phone number, and a short message after the tone, and we will call you back after Yom Tov. Good Yom Tov!");
+  });
+  it("recording list: all eight lines that never play are dropped (the time zone lines are gone)", async () => {
+    const { allSlots } = await import("@/lib/recording-slots");
+    const s = allSlots();
+    for (const k of ["product_intro", "product_options", "product_default_desc", "phonepay_choice", "phonepay_not_found", "tz_ask", "tz_pick", "tz_saved"]) expect(s.some((x) => x.key === k || x.key.startsWith(`${k}#`)), k).toBe(false);
   });
 });

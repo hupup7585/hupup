@@ -57,12 +57,12 @@ const noConsentEditsOrDeletes = () => {
   expect(h.deletes.filter((d) => d === schema.smsConsents)).toEqual([]);
 };
 
-describe("1. customer's own time zone first", () => {
-  const ninePmNY = new Date("2026-07-02T01:30:00Z"); // 6:30 PM in California
-  it("a promo to a customer who told us they're in California goes out at 6:30 PM Pacific", async () => {
+describe("1. promo hours are always Eastern (Abraham, Nov 16, 2026)", () => {
+  const ninePmNY = new Date("2026-07-02T01:30:00Z"); // 9:30 PM in New York
+  it("a stored zone from before no longer changes anything: 9:30 PM Eastern is held", async () => {
     h.rows.set(schema.customers, [cust({ marketingOptIn: true, timeZone: "America/Los_Angeles" })]);
     const r = await sendMessage({ to: PHONE, body: "Spring deals", kind: "marketing", now: ninePmNY });
-    expect(r.blocked).toBeUndefined();
+    expect(r.blocked).toBe("quiet_hours");
   });
   it("without a recorded zone the New York fallback applies and blocks it", async () => {
     h.rows.set(schema.customers, [cust({ marketingOptIn: true })]);
@@ -84,9 +84,9 @@ describe("3. staff must read the entire disclosure; silence or unclear = no cons
   });
   it("clear yes after a full reading is an opt-in, with who/when/what stored", async () => {
     h.rows.set(schema.customers, [cust()]);
-    await consent.recordStaffConsent({ ...base, scope: "marketing", response: "clear_yes", disclosureRead: true, timeZone: "America/Denver" });
+    await consent.recordStaffConsent({ ...base, scope: "marketing", response: "clear_yes", disclosureRead: true });
     expect(consentInserts()[0]).toMatchObject({ scope: "marketing", action: "opt_in", source: "staff", method: "staff", disclosureRead: true, userId: 3, wording: base.wording, response: "customer clearly said yes" });
-    expect(h.updates.some((u) => u.v.timeZone === "America/Denver")).toBe(true);
+    expect(h.updates.some((u) => u.v.timeZone)).toBe(false); // no time zone is asked or stored
   });
   it("silence, uncertainty or an unclear answer is recorded as declined", async () => {
     h.rows.set(schema.customers, [cust()]);

@@ -16,6 +16,9 @@ export { LETTERS, WORDS, numberWords, ordinalWords, wordSlotsFor } from "@/lib/s
 export type SlotKind = "line" | "piece" | "word" | "letter" | "item";
 export type Slot = { key: string; kind: SlotKind; group: string; label: string; text: string };
 
+/** Lines no step leads to any more (Abraham, Nov 16, 2026): dropped from the recording list. */
+export const NOT_RECORDED: readonly string[] = ["product_intro", "product_options", "product_default_desc", "phonepay_choice", "phonepay_not_found"];
+
 /** The fixed pieces of a line with changing parts: the words between the {blanks}. */
 export function pieces(text: string): string[] {
   return text
@@ -27,7 +30,7 @@ export function pieces(text: string): string[] {
 export function allSlots(items: { id: number; name: string }[] = []): Slot[] {
   const out: Slot[] = [];
   for (const [k, d] of Object.entries(PROMPTS) as [PromptKey, PromptDef][]) {
-    if ((d as { textOnly?: boolean }).textOnly) continue;
+    if ((d as { textOnly?: boolean }).textOnly || NOT_RECORDED.includes(k)) continue;
     if (promptRecordable(k)) out.push({ key: k, kind: "line", group: d.group, label: d.label, text: d.text });
     else pieces(d.text).forEach((p, i) => out.push({ key: `${k}#${i + 1}`, kind: "piece", group: d.group, label: `${d.label}, piece ${i + 1}`, text: p }));
   }

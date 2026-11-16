@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { recordStaffConsentAction } from "../consent-actions";
-import { SELECTABLE_TIME_ZONES } from "@/lib/area-code-tz";
 import type { ConsentScope, StaffResponse } from "@/lib/sms-consent";
 
 /**
@@ -26,7 +25,6 @@ export default function ConsentPanel({
   const [scope, setScope] = useState<ConsentScope>("transactional");
   const [read, setRead] = useState(false);
   const [response, setResponse] = useState<StaffResponse | "">("");
-  const [timeZone, setTimeZone] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, start] = useTransition();
 
@@ -78,19 +76,6 @@ export default function ConsentPanel({
           </label>
         ))}
       </fieldset>
-      {scope === "marketing" && response === "clear_yes" && (
-        <label className="mb-3 block text-sm">
-          <span className="font-semibold">Ask: &ldquo;Which time zone are you in?&rdquo;</span>
-          <select value={timeZone} onChange={(e) => setTimeZone(e.target.value)} className="mt-1 block w-full rounded-lg border px-2 py-1.5">
-            <option value="">Customer didn&rsquo;t say (use the fallback rule)</option>
-            {SELECTABLE_TIME_ZONES.map((o) => (
-              <option key={o.zone} value={o.zone}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
       {response === "clear_yes" && !read && <p className="mb-2 text-sm font-semibold text-coral">Check the box above first: a yes can only be recorded after the full disclosure was read.</p>}
       <button
         type="button"
@@ -98,7 +83,7 @@ export default function ConsentPanel({
         disabled={!canSave || pending}
         onClick={() =>
           start(async () => {
-            const r = await recordStaffConsentAction(orderId, { scope, response: response as StaffResponse, disclosureRead: read, timeZone });
+            const r = await recordStaffConsentAction(orderId, { scope, response: response as StaffResponse, disclosureRead: read });
             setMsg(r);
             if (r.ok) {
               setRead(false);
