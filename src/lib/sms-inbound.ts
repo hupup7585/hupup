@@ -124,6 +124,14 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
     })
     .returning({ id: schema.messages.id });
 
+  // Pictures and files the customer sent (Abraham, Nov 16, 2026): our own copy in R2, saved with this message, the
+  // customer and their booking. A file that can't be fetched never stops the text from being handled.
+  if (numMedia > 0) {
+    const media = Array.from({ length: numMedia }, (_, i) => ({ url: body[`MediaUrl${i}`], contentType: body[`MediaContentType${i}`] })).filter((m) => m.url);
+    const { saveIncomingMedia } = await import("@/lib/message-files");
+    await saveIncomingMedia({ messageId: row.id, from, customerId: customer?.id ?? null, media }).catch((e) => console.error("[incoming text file] failed:", (e as Error).message));
+  }
+
   const settings = await getSettings();
   let reply: string | null = null;
 

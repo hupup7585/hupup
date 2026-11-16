@@ -8,6 +8,8 @@ import { formatPhone } from "@/lib/phone";
 import { formatMoney } from "@/lib/money";
 import { orderNumber } from "@/lib/orders";
 import { CUSTOMER_COLS } from "@/lib/messages";
+import { filesForCustomer } from "@/lib/message-files";
+import MessageFiles from "@/components/staff/MessageFiles";
 import { StatusBadge } from "@/components/StatusBadge";
 import { saveCustomerAction, setTestEntryAction } from "../actions";
 import DualDate from "@/components/DualDate";
@@ -114,6 +116,19 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           </ul>
         </div>
       </div>
+
+      {await (async () => {
+        // Pictures and files sent or received by text (Abraham, Nov 16, 2026)
+        const files = await filesForCustomer(c.id);
+        if (!files.length) return null;
+        return (
+          <div className="card mt-4 p-5" data-customer-text-files>
+            <h2 className="mb-1 text-lg font-black">Files from texts ({files.length})</h2>
+            <p className="text-sm text-muted">Pictures and files sent to or received from this customer by text.</p>
+            <MessageFiles files={files} />
+          </div>
+        );
+      })()}
 
       <div className="card mt-4 p-5" data-text-consent>
         <h2 className="mb-3 text-lg font-black">Text messages</h2>

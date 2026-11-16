@@ -4,6 +4,8 @@ import { requireStaff } from "@/lib/auth";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { listThreads, markThreadRead, threadMessages } from "@/lib/messages";
 import ReplyForm from "./ReplyForm";
+import MessageFiles from "@/components/staff/MessageFiles";
+import { filesForMessages } from "@/lib/message-files";
 import { dualDateTime } from "@/lib/dual-date";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
   const phone = sp.p ? toE164(sp.p) : null;
   const msgs = phone ? await threadMessages(phone) : [];
   if (phone) await markThreadRead(phone);
+  const files = await filesForMessages(msgs.map((m) => m.id));
   const current = threads.find((t) => t.contact_phone === phone);
   return (
     <div className="mx-auto max-w-6xl">
@@ -69,7 +72,11 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
                 {msgs.map((m) => (
                   <li key={m.id} className={`flex ${m.direction === "out" ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-[15px] ${m.direction === "out" ? "bg-navy text-white" : "bg-bg"}`}>
-                      <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                      {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
+                      <MessageFiles files={files.filter((f) => f.messageId === m.id)} dark={m.direction === "out"} />
+                      {m.mediaUrls.length > 0 && !files.some((f) => f.messageId === m.id) && (
+                        <p className={`text-xs ${m.direction === "out" ? "text-white/80" : "text-muted"}`}>{m.mediaUrls.length} file{m.mediaUrls.length > 1 ? "s" : ""} (from before files were saved here)</p>
+                      )}
                       <p className={`mt-1 text-[11px] ${m.direction === "out" ? "text-white/70" : "text-muted"}`}>
                         {when(m.createdAt)}
                         {m.direction === "out" && ` · ${m.status}`}

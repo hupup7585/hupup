@@ -44,9 +44,11 @@ async function r2(env: Record<string, string | undefined> = process.env, fetcher
   return cached;
 }
 
+/** Everything stored in the bucket: delivery photos and files sent or received with texts. */
 export async function r2Used(): Promise<number> {
   const [row] = await db.select({ n: sum(schema.deliveryPhotos.sizeBytes) }).from(schema.deliveryPhotos);
-  return Number(row?.n ?? 0);
+  const [files] = await db.select({ n: sum(schema.messageFiles.sizeBytes) }).from(schema.messageFiles);
+  return Number(row?.n ?? 0) + Number(files?.n ?? 0);
 }
 
 export async function r2Put(key: string, data: Uint8Array, contentType: string) {

@@ -1423,6 +1423,28 @@ export const deliveryPhotos = pgTable(
   (t) => [index("delivery_photos_order_idx").on(t.orderId)],
 );
 
+/** Files sent and received with texts (Abraham, Nov 16, 2026): the files live in Cloudflare R2; only the key here. */
+export const messageFiles = pgTable(
+  "message_files",
+  {
+    id: serial("id").primaryKey(),
+    messageId: integer("message_id"),
+    direction: text("direction").notNull(), // in | out
+    contactPhone: text("contact_phone").notNull(),
+    customerId: integer("customer_id"),
+    orderId: integer("order_id"),
+    storageKey: text("storage_key").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    fileName: text("file_name"),
+    /** Incoming: where Twilio had the file (kept for the record; we serve our own copy). */
+    sourceUrl: text("source_url"),
+    userId: integer("user_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("message_files_message_idx").on(t.messageId), index("message_files_customer_idx").on(t.customerId), index("message_files_order_idx").on(t.orderId)],
+);
+
 /** Addresses already placed on the map (delivery fees by area), so each address is looked up once. */
 export const geocodeCache = pgTable("geocode_cache", {
   address: text("address").primaryKey(),

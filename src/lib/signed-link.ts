@@ -74,6 +74,19 @@ export function verifyDeliveryPhotoLink(id: number, exp: number, sig: string | n
   return want.length === got.length && timingSafeEqual(want, got);
 }
 
+/** A file sent with a text (Abraham, Nov 16, 2026): Twilio fetches it; the link works for 24 hours. */
+const signMsgFile = (id: number, exp: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`message-file:${id}:${exp}`).digest("hex").slice(0, 32);
+export function messageFileLink(id: number, now = Date.now()): string {
+  const exp = Math.floor(now / 1000) + 24 * 3600;
+  return `${config.baseUrl()}/api/media/message-file/${id}?exp=${exp}&sig=${signMsgFile(id, exp)}`;
+}
+export function verifyMessageFileLink(id: number, exp: number, sig: string | null, now = Date.now()): boolean {
+  if (!sig || !Number.isInteger(id) || !Number.isFinite(exp) || exp * 1000 < now) return false;
+  const want = Buffer.from(signMsgFile(id, exp));
+  const got = Buffer.from(sig);
+  return want.length === got.length && timingSafeEqual(want, got);
+}
+
 /**
  * The shared secret between the Cloudflare info@ email Worker and our site (Abraham, Nov 16, 2026). INBOUND_EMAIL_SECRET
  * when set; otherwise made from AUTH_SECRET, so the live build can give it to the Worker without anyone seeing it.

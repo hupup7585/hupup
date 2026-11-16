@@ -26,6 +26,8 @@ import { confirmAttentionAction } from "./attention-actions";
 import { attentionItemsFree } from "@/lib/late-payment";
 import { STATUS_LABEL, statusHistory } from "@/lib/status-history";
 import { paymentSourceLabel } from "@/lib/sola-phonepay";
+import { filesForOrder } from "@/lib/message-files";
+import MessageFiles from "@/components/staff/MessageFiles";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -200,6 +202,19 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               </div>
             );
           })()}
+          {staff.role !== "delivery" &&
+            (await (async () => {
+              // Pictures and files sent or received by text for this booking (Abraham, Nov 16, 2026)
+              const files = await filesForOrder(o.id);
+              if (!files.length) return null;
+              return (
+                <div className="card p-5" data-order-text-files>
+                  <h2 className="mb-1 font-bold">Files from texts ({files.length})</h2>
+                  <p className="text-xs text-muted">Sent to or received from the customer by text.</p>
+                  <MessageFiles files={files} />
+                </div>
+              );
+            })())}
           {await (async () => {
             const hist = await statusHistory(o.id);
             if (!hist.length) return null;
