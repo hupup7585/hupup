@@ -43,8 +43,12 @@ beforeEach(async () => {
   for (const k of ["2", "4", "5", "6"] as const) await saveSetting(`ringTargets${k}`, "");
 });
 
-// Abraham's main menu (Nov 11, 2026), word for word
-const MENU = [
+// Abraham's start of the call and main menu (Nov 16, 2026), word for word
+const GREETING = "Hi, thank you for calling Hup Up Attractions! Bringing something special to every occasion!";
+const CLOSED = "Our office is closed right now, but you can book anytime using our automated system.";
+const CATALOG = "To receive our catalog by text or email, press 8.";
+const MAIN = [
+  "If you know your desired extension, you may press it at any time.",
   "For reservations and bookings, press 1.",
   "For instructions and guidance on using our rental equipment, press 2.",
   "For customer service and general inquiries, press 3.",
@@ -53,66 +57,64 @@ const MENU = [
   "For delivery and pickup information, press 6.",
   "To hear our hours of operation, press 7.",
   "To receive our catalog by text or email, press 8.",
-  "For feedback and comments, press 9.", // Abraham, Phone Menu v3
+  "For feedback and comments, press 9.",
   "To speak with an operator, press 0.",
+  "To hear this menu again, press the star key.",
+  "Thank you for choosing Hup Up Attractions!",
 ];
-const HI = "Hi! Thank you for calling Hup Up Attractions!";
-const SLOGAN = "Bringing something special to every occasion!";
-const INTRO = ["If you know your desired extension, you may press it at any time.", "To receive our catalog by text or email, press 8."];
-const GREETING = HI;
-const OUTRO = ["To hear this menu again, press the star key.", "Thank you for choosing Hup Up Attractions."]; // Abraham, Phone Menu v3
-const FULL = [HI, SLOGAN, ...INTRO, ...MENU, ...OUTRO];
+// The greeting is one prompt; spoken from the text, its two sentences are one Say
+const FULL = [GREETING, CATALOG, ...MAIN];
 const gatherOf = (xml: string) => xml.slice(xml.indexOf("<Gather"), xml.indexOf("</Gather>"));
 const saidIn = (xml: string) => [...gatherOf(xml).matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&amp;/g, "&"));
 
-describe("Abraham's main menu wording (approved Nov 8, 2026)", () => {
+describe("Abraham's start of the call and main menu (Nov 16, 2026)", () => {
   it("the call starts with the greeting inside the menu, so a key pressed during the greeting works", async () => {
     const incoming = await call("incoming");
     expect(redirect(incoming)).toBe("menu?first=1");
     expect(incoming).not.toContain("<Say"); // nothing plays before the keypad listens
     const xml = await call("menu", {}, "first=1");
-    expect(saidIn(xml)).toEqual(FULL); // word for word, in order, all inside one Gather
+    expect(saidIn(xml)).toEqual(FULL); // greeting, catalog offer, main menu: word for word, in order, one Gather
     expect(gatherOf(xml)).toMatch(/<Gather [^>]*input="dtmf"[^>]*numDigits="1"/); // keys only
     expect(gatherOf(xml).split("pause-500ms.wav").length - 1).toBe(FULL.length - 1); // half a second between lines
     expect(gatherOf(xml)).not.toContain("pause-750ms.wav");
   });
   it("any valid key works at any time: the whole menu, greeting included, is one Gather", async () => {
     const xml = await call("menu", {}, "first=1");
-    expect(xml.indexOf("<Gather")).toBeLessThan(xml.indexOf(GREETING)); // the keypad is listening before the first word
-    expect(xml.indexOf("</Gather>")).toBeGreaterThan(xml.lastIndexOf(OUTRO[OUTRO.length - 1]));
+    expect(xml.indexOf("<Gather")).toBeLessThan(xml.indexOf("Hi, thank you"));
+    expect(xml.indexOf("</Gather>")).toBeGreaterThan(xml.lastIndexOf(MAIN[MAIN.length - 1]));
     for (const k of ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "*"]) expect(await press(k)).not.toContain("Oops");
   });
-  it("star replays the entire main menu, from the greeting", async () => {
-    expect(redirect(await press("*"))).toBe("menu?first=1");
-    expect(saidIn(await call("menu", {}, "first=1"))).toEqual(FULL);
+  it("star replays only the main menu prompt, without the greeting prompts", async () => {
+    expect(redirect(await press("*"))).toBe("menu");
+    expect(saidIn(await call("menu"))).toEqual(MAIN);
   });
-  it("waits 4 seconds after the last line; no choice replays the whole menu; ends only after 3 plays AND 20 seconds (Abraham, Nov 11)", async () => {
+  it("waits 3 seconds after the last line; no choice replays the main menu only; ends only after 3 plays AND 20 seconds", async () => {
     const first = await call("menu", {}, "first=1");
-    expect(gatherOf(first)).toMatch(/<Gather [^>]*timeout="4"/);
+    expect(gatherOf(first)).toMatch(/<Gather [^>]*timeout="3"/);
     const r1 = redirect(first)!;
-    expect(r1).toMatch(/^no-key\?to=menu&q=first%3D1&np=1&t0=\d+$/);
+    expect(r1).toMatch(/^no-key\?to=menu&np=1&t0=\d+$/);
     expect(first.slice(first.indexOf("</Gather>"))).not.toContain("<Say");
     const t0 = Number(r1.match(/t0=(\d+)/)![1]);
-    // the menu comes back from the greeting, the same t0 carried along
-    expect(redirect(await call("no-key", {}, `to=menu&q=first%3D1&np=1&t0=${t0}`))).toBe(`menu?first=1&np=1&t0=${t0}`);
-    const second = await call("menu", {}, `first=1&np=1&t0=${t0}`);
-    expect(saidIn(second)).toEqual(FULL);
-    expect(redirect(second)).toBe(`no-key?to=menu&q=first%3D1&np=2&t0=${t0}`);
+    expect(redirect(await call("no-key", {}, `to=menu&np=1&t0=${t0}`))).toBe(`menu?np=1&t0=${t0}`);
+    const second = await call("menu", {}, `np=1&t0=${t0}`);
+    expect(saidIn(second)).toEqual(MAIN);
+    expect(redirect(second)).toBe(`no-key?to=menu&np=2&t0=${t0}`);
     // after 3 plays, but under 20 seconds: one more play
-    expect(redirect(await call("no-key", {}, `to=menu&q=first%3D1&np=3&t0=${t0}`))).toBe(`menu?first=1&np=3&t0=${t0}`);
-    // 3 plays and 20 seconds: goodbye
-    const end = await call("no-key", {}, `to=menu&q=first%3D1&np=3&t0=${t0 - 25_000}`);
-    expect(end).toContain("It sounds like we got disconnected. Please call us back anytime, we would love to help. Thanks for calling Hup Up Attractions. Bye for now!");
+    expect(redirect(await call("no-key", {}, `to=menu&np=3&t0=${t0}`))).toBe(`menu?np=3&t0=${t0}`);
+    // 3 plays and 20 seconds: the disconnect line
+    const end = await call("no-key", {}, `to=menu&np=3&t0=${t0 - 25_000}`);
+    expect(end).toContain("It sounds like we got disconnected. You can call us back at any time. Thank you for calling Hup Up Attractions. Bye for now!");
     expect(end).toContain("<Hangup/>");
     // a key press always works
     expect(redirect(await call("menu-choice", { Digits: "1" }, `np=2&t0=${t0}`))).toBe("book");
   });
-  it("office closed: the approved closed line plays right after the greeting, inside the menu", async () => {
+  it("office closed: the closed line plays after the greeting and before the catalog offer, inside the menu", async () => {
     h.open = false;
-    const said = saidIn(await call("menu", {}, "first=1"));
-    expect(said.slice(0, 2)).toEqual([HI, SLOGAN]);
-    expect(said[2]).toBe("Our office is closed right now, but you can book anytime using this automated system.");
-    expect(said.slice(3)).toEqual([...INTRO, ...MENU, ...OUTRO]);
+    expect(saidIn(await call("menu", {}, "first=1"))).toEqual([GREETING, CLOSED, CATALOG, ...MAIN]);
+  });
+  it("the Chol Hamoed and Chanukah lines, the Shabbes key 1 lines and the separate menu lines are gone", async () => {
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    for (const k of ["late_cholhamoed", "late_chanukah", "booking_closed_shabbos", "booking_closed_yomtov", "main_hi", "main_slogan", "main_any_time", "main_catalog", "main_star_again", "main_thanks"]) expect(PROMPTS).not.toHaveProperty(k);
   });
 });
 
@@ -169,12 +171,14 @@ describe("every key, office open", () => {
     expect(vm).toMatch(/<Record /);
     expect(vm).not.toContain("<Dial");
   });
-  it("# is not an option: Abraham's line, then the main menu again; star repeats the whole menu", async () => {
-    const hash = await press("#");
-    expect(hash).toContain("Sorry, that is not a valid selection. Please try again.");
-    expect(hash).not.toContain("Oops");
-    expect(redirect(hash)).toBe("menu");
-    expect(redirect(await press("*"))).toBe("menu?first=1");
+  it("# or a wrong key: only Abraham's line, then the main menu prompt again; star repeats the main menu", async () => {
+    for (const k of ["#"]) {
+      const hash = await press(k);
+      expect([...hash.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1])).toEqual(["Sorry, that is not a valid selection. Please try again."]);
+      expect(redirect(hash)).toBe("menu");
+    }
+    expect(saidIn(await call("menu"))).toEqual(MAIN);
+    expect(redirect(await press("*"))).toBe("menu");
   });
   it("key 1: Abraham's bookings menu word for word; categories from Admin numbered in order; 0 customer service, 9 corporate, star back", async () => {
     h.session.data = {};
@@ -238,7 +242,7 @@ describe("menus are keys only (Abraham): no speech in any menu", () => {
   });
   it("anything a caller says in a menu is ignored (counts as no choice); the old Oops line is gone", async () => {
     const xml = await call("menu-choice", { SpeechResult: "jumping balloons", Confidence: "0.9" });
-    expect(redirect(xml)).toMatch(/^no-key\?to=menu&q=first%3D1&np=1&t0=\d+$/);
+    expect(redirect(xml)).toMatch(/^no-key\?to=menu&np=1&t0=\d+$/);
     expect(xml).not.toContain("Oops");
     const { PROMPTS } = await import("@/lib/ivr/prompts");
     expect(Object.values(PROMPTS).map((p) => p.text)).not.toContain(OLD_OOPS);
@@ -329,5 +333,44 @@ describe("key 7: our hours (Abraham, Nov 9, 2026)", () => {
     const closed = await call("hours", { CallSid: "CAhours2" });
     expect(closed).not.toContain("<Dial");
     expect(redirect(closed)).toBe("menu");
+  });
+});
+
+describe("wrong key everywhere (Abraham, Nov 16, 2026): the one shared line, then the same menu again", () => {
+  const NOT_VALID = "Sorry, that is not a valid selection. Please try again.";
+  const says = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&amp;/g, "&").replace(/&apos;/g, "'"));
+  const cases: [string, string, string, string][] = [
+    // step, query, key, where the caller goes back to
+    ["menu-choice", "", "#", "menu"],
+    ["catalog-choice", "", "5", "catalog"],
+    ["attraction-choice", "m=l", "7", "learn?again=1"], // key 4
+    ["attraction-choice", "m=i", "7", "instructions?again=1"], // key 2
+    ["attraction-after", "m=l&t=1", "9", "attraction-options?m=l&t=1"],
+    ["book-choice", "", "8", "book"],
+    ["resume-choice", "", "5", "resume"],
+    ["phone-choice", "", "7", "phone"],
+    ["promo-which-answer", "", "5", "promo-which"],
+    ["tz-answer", "", "5", "tz"],
+    ["phonepay-retry-answer", "o=1&n=1&r=0", "5", "phonepay-retry?o=1&n=1&r=1"],
+    ["vm-none-choice", "b=1&x=9", "5", "vm-none?b=1&x=9"],
+  ];
+  for (const [step, q, key, to] of cases)
+    it(`${step} ${q}: key ${key}`, async () => {
+      const xml = await call(step, { Digits: key }, q);
+      expect(says(xml)).toEqual([NOT_VALID]);
+      expect(redirect(xml)).toBe(to);
+    });
+  it("Item added: the shared line, then the same choices (no other wording)", async () => {
+    const xml = await call("after-add", { Digits: "7" });
+    expect(says(xml)[0]).toBe(NOT_VALID);
+    expect(xml).toContain('action="https://hupup.example/api/voice/after-add"');
+  });
+  it("a read-back: the shared line, then the same read-back again", async () => {
+    h.session.data = { heard: "Yossi Friedman" };
+    const xml = await call("confirm", { Digits: "5" }, "f=name");
+    expect(says(xml)).toEqual([NOT_VALID]);
+    expect(redirect(xml)).toBe("readback?f=name");
+    expect(says(await call("readback", {}, "f=name")).join(" ")).toContain("Yossi Friedman");
+    h.session.data = {};
   });
 });

@@ -15,7 +15,7 @@ import { composeClips, loadPromptOverrides } from "@/lib/ivr/prompts";
 describe("recording slots", () => {
   it("every fixed line, the fixed pieces of lines with changing parts, numbers, dates, times and letters A to Z", () => {
     const s = allSlots([{ id: 7, name: "Royal Castle" }]);
-    expect(s.find((x) => x.key === "main_hi")?.text).toBe("Hi! Thank you for calling Hup Up Attractions!");
+    expect(s.find((x) => x.key === "greeting")?.text).toBe("Hi, thank you for calling Hup Up Attractions! Bringing something special to every occasion!");
     expect(pieces("Your total is {total}. That is {items} for the rentals, {delivery} for delivery, and {tax} sales tax.")).toEqual(["Your total is", ". That is", "for the rentals,", "for delivery, and", "sales tax."]);
     for (const k of ["word:seven", "word:hundred", "word:dollars", "word:cents", "word:march", "word:tuesday", "word:fifth", "word:pm", "letter:a", "letter:z", "item:7"]) expect(s.some((x) => x.key === k), k).toBe(true);
   });
@@ -29,12 +29,12 @@ describe("recording slots", () => {
     expect(wordSlotsFor("Yossi")).toBeNull();
   });
   it("status: Waiting for Abraham until he confirms; a text change sends it back to Waiting", async () => {
-    expect(await isConfirmed("main_hi")).toBe(false);
-    await confirmSlot("main_hi", null);
-    expect(await isConfirmed("main_hi")).toBe(true);
-    expect((await slotsWithStatus()).find((x) => x.key === "main_hi")?.status).toBe("confirmed");
+    expect(await isConfirmed("greeting")).toBe(false);
+    await confirmSlot("greeting", null);
+    expect(await isConfirmed("greeting")).toBe(true);
+    expect((await slotsWithStatus()).find((x) => x.key === "greeting")?.status).toBe("confirmed");
     await db.update(schema.recordingSlots).set({ confirmedText: "an older wording" });
-    expect(await isConfirmed("main_hi")).toBe(false);
+    expect(await isConfirmed("greeting")).toBe(false);
   });
   it("a line with changing parts is put together only when the Owner switch is on and every part is recorded", async () => {
     const vars = { total: "15 dollars", items: "10 dollars", delivery: "5 dollars", tax: "0 dollars" };

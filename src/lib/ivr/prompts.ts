@@ -19,27 +19,38 @@ export type PromptDef = {
   pending?: boolean;
   /** A text or email the phone system sends (not spoken): longer, can have new lines, no recording. */
   message?: boolean;
+  /** A spoken prompt of several lines (the main menu): one line per sentence, new lines allowed, up to 1,200 characters. */
+  lines?: boolean;
 };
 
 export const PROMPTS = {
   // Welcome & main menu
-  // Abraham's exact main menu (greeting, then one line per key, with a 0.75-second pause after each)
-  // Main menu (Abraham, Nov 11, 2026), approved word for word. Half-second pauses between the greeting lines.
-  main_hi: { group: "Welcome & main menu", label: "Greeting, line 1 (Abraham)", text: "Hi! Thank you for calling Hup Up Attractions!" },
-  main_slogan: { group: "Welcome & main menu", label: "Greeting, line 2 (Abraham)", text: "Bringing something special to every occasion!" },
-  main_any_time: { group: "Welcome & main menu", label: "Greeting, line 3 (Abraham)", text: "If you know your desired extension, you may press it at any time." },
-  main_catalog: { group: "Welcome & main menu", label: "Main menu key 8, catalog (Abraham; said twice)", text: "To receive our catalog by text or email, press 8." },
-  main_book: { group: "Welcome & main menu", label: "Main menu key 1 (Abraham)", text: "For reservations and bookings, press 1." },
-  main_equipment: { group: "Welcome & main menu", label: "Main menu key 2 (Abraham)", text: "For instructions and guidance on using our rental equipment, press 2." },
-  main_service_3: { group: "Welcome & main menu", label: "Main menu key 3 (Abraham)", text: "For customer service and general inquiries, press 3." },
-  main_learn_4: { group: "Welcome & main menu", label: "Main menu key 4 (Abraham)", text: "To learn more about our rental attractions and the services we offer, press 4." },
-  main_rental_help: { group: "Welcome & main menu", label: "Main menu key 5 (Abraham)", text: "For questions or assistance with any issues during your rental, press 5." },
-  main_6: { group: "Welcome & main menu", label: "Main menu key 6 (Abraham)", text: "For delivery and pickup information, press 6." },
-  main_hours: { group: "Welcome & main menu", label: "Main menu key 7 (Abraham)", text: "To hear our hours of operation, press 7." },
-  main_9: { group: "Welcome & main menu", label: "Main menu key 9 (Abraham, Phone Menu v3)", text: "For feedback and comments, press 9." },
-  main_star_again: { group: "Welcome & main menu", label: "Main menu: hear it again (Abraham)", text: "To hear this menu again, press the star key." },
-  main_thanks: { group: "Welcome & main menu", label: "Main menu: closing line (Abraham, Phone Menu v3)", text: "Thank you for choosing Hup Up Attractions." },
-  main_0: { group: "Welcome & main menu", label: "Main menu key 0 (Abraham)", text: "To speak with an operator, press 0." },
+  // Start of the call (Abraham, Nov 16, 2026): separate prompts, in this order. Greeting (always), call recording
+  // notice (only when call recording is on), office closed (only when closed), catalog offer (always), main menu.
+  greeting: { group: "Welcome & main menu", label: "Greeting (start of every call)", text: "Hi, thank you for calling Hup Up Attractions! Bringing something special to every occasion!" },
+  catalog_offer: { group: "Welcome & main menu", label: "Catalog offer (start of every call, before the main menu)", text: "To receive our catalog by text or email, press 8." },
+  // Main menu (Abraham, Nov 16, 2026): one prompt, word for word, one line per sentence (a half-second pause between
+  // lines when spoken from the text). The same prompt plays every time the menu plays again, without the greeting.
+  main_menu: {
+    group: "Welcome & main menu",
+    label: "Main menu (plays at the start and every time the menu plays again)",
+    lines: true,
+    text: [
+      "If you know your desired extension, you may press it at any time.",
+      "For reservations and bookings, press 1.",
+      "For instructions and guidance on using our rental equipment, press 2.",
+      "For customer service and general inquiries, press 3.",
+      "To learn more about our rental attractions and the services we offer, press 4.",
+      "For questions or assistance with any issues during your rental, press 5.",
+      "For delivery and pickup information, press 6.",
+      "To hear our hours of operation, press 7.",
+      "To receive our catalog by text or email, press 8.",
+      "For feedback and comments, press 9.",
+      "To speak with an operator, press 0.",
+      "To hear this menu again, press the star key.",
+      "Thank you for choosing Hup Up Attractions!",
+    ].join("\n"),
+  },
   // Bookings menu after pressing 1 (Abraham, Nov 11, 2026), approved word for word; categories come from Admin.
   book_note: { group: "Booking by item (key 1)", label: "Bookings menu: first line (Abraham)", text: "Please note, orders can be placed only through our automated system. For information or questions, press 0 for customer service." },
   book_corporate: { group: "Booking by item (key 1)", label: "Bookings menu key 9 (Abraham)", text: "For schools, corporate events, and organizational bookings, press 9." },
@@ -99,7 +110,7 @@ export const PROMPTS = {
   // Errors & retries
   idle_warning: { group: "Errors & retries", label: "Inside a booking: 9 minutes with no key (Abraham)", text: "Are you still there? Please press any key to continue. Otherwise, this call will end in one minute." },
   no_input: { group: "Errors & retries", label: "Didn't hear anything", text: "Sorry, I did not catch that. No problem, let us try that again." },
-  no_input_final: { group: "Errors & retries", label: "Giving up after no input", text: "It sounds like we got disconnected. Please call us back anytime, we would love to help. Thanks for calling Hup Up Attractions. Bye for now!" },
+  no_input_final: { group: "Errors & retries", label: "Disconnect line (no key after 3 plays of a menu, or 10 minutes idle in a booking)", text: "It sounds like we got disconnected. You can call us back at any time. Thank you for calling Hup Up Attractions. Bye for now!" },
   tech_error: { group: "Errors & retries", label: "Technical problem", text: "Oops, something went wrong on our end. Please call back in a few minutes. Sorry about that!" },
   went_wrong: { group: "Errors & retries", label: "Something went wrong, back to menu", text: "Sorry, something went wrong. Let us head back to the main menu." },
 
@@ -178,7 +189,7 @@ export const PROMPTS = {
   ask_email_required: { group: "Checkout", label: "Ask for email (required: no texts)", text: "To send your secure payment link, we need your email address. Please say your email address, like john at gmail dot com." },
   ask_email: { group: "Checkout", label: "Ask for email", text: "Almost done! Please say your email address for your receipt, like john at gmail dot com. Or press pound to skip." },
   // Call recording notice (Abraham O): PROPOSED wording, not approved yet; plays only if the Owner turns recording on.
-  recording_notice: { group: "Welcome & main menu", label: "Call recording notice (proposed, plays only when recording is on)", text: "This call may be recorded for quality and training. Please do not share card numbers or security codes on this call.", pending: true },
+  recording_notice: { group: "Welcome & main menu", label: "Call recording notice (after the greeting; plays only when call recording is on)", text: "This call may be monitored and recorded for quality and training purposes." },
   // Keypad typing (Abraham L; proposed wording approved under P, Nov 8, 2026)
   type_hint: { group: "Checkout", label: "Typing: how to switch", text: "To type it on your keypad instead, press star." },
   type_instructions: { group: "Checkout", label: "Typing: how to type", text: "To type, press each key until you reach the letter: press 2 once for A, twice for B, three times for C, and the same for every key. To type two letters on the same key, press star once between them. For example, A then B is 2, star, 2 2. Press star twice for a space. Press pound when you are done." },
@@ -238,15 +249,11 @@ export const PROMPTS = {
   tz_ask: { group: "Text message consent", label: "Ask the caller's time zone (after a promotional yes)", text: "Last question, so we only send promotional texts at reasonable hours. Are you in the Eastern time zone, the same as New York? Press 1 for yes, or 2 for a different time zone." },
   tz_pick: { group: "Text message consent", label: "Pick a different time zone", text: "For Central time, press 1. Mountain, press 2. Arizona, press 3. Pacific, press 4. Alaska, press 5. Hawaii, press 6. To skip, press 0." },
   tz_saved: { group: "Text message consent", label: "Time zone saved", text: "Got it, thank you." },
-  late_cholhamoed: { group: "Welcome & main menu", label: "Chol Hamoed, while open (Abraham approved)", text: "Happy Chol Hamoed! We are open late today, and you can book anytime using this automated system." },
-  late_chanukah: { group: "Welcome & main menu", label: "Chanukah, while open (Abraham approved)", text: "Happy Chanukah! We are open late today, and you can book anytime using this automated system." },
   // No booking on Shabbes or Yom Tov (Abraham, Nov 14, 2026): the day and time booking opens again
   // The whole hotline on Shabbes and Yom Tov (Abraham, Nov 14, 2026, choice A): drafts for his OK; then the tone, general voicemail
   closed_shabbos_greeting: { group: "Welcome & main menu", label: "Whole hotline on Shabbes: closed greeting", text: "Thank you for calling Hup Up Attractions. We are closed now for Shabbes, and we will be open again on {day} at {time}. Please leave your name, phone number, and a short message after the tone, and we will call you back after Shabbes. Good Shabbes!", vars: ["day", "time"], pending: true },
   closed_yomtov_greeting: { group: "Welcome & main menu", label: "Whole hotline on Yom Tov: closed greeting", text: "Thank you for calling Hup Up Attractions. We are closed now for Yom Tov, and we will be open again on {day} at {time}. Please leave your name, phone number, and a short message after the tone, and we will call you back after Yom Tov. Good Yom Tov!", vars: ["day", "time"], pending: true },
-  booking_closed_shabbos: { group: "Welcome & main menu", label: "Key 1 on Shabbes", text: "Booking is closed on Shabbes. Please call us again after Shabbes, on {day} at {time}.", vars: ["day", "time"] }, // approved Nov 14 with the day and time
-  booking_closed_yomtov: { group: "Welcome & main menu", label: "Key 1 on Yom Tov", text: "Booking is closed on Yom Tov. Please call us again after Yom Tov, on {day} at {time}.", vars: ["day", "time"] }, // approved Nov 14 with the day and time
-  office_closed: { group: "Welcome & main menu", label: "Office closed (booking still available)", text: "Our office is closed right now, but you can book anytime using this automated system." },
+  office_closed: { group: "Welcome & main menu", label: "Office closed (after the greeting, only when the office is closed; also key 7)", text: "Our office is closed right now, but you can book anytime using our automated system." },
   date_closed: { group: "Date & quantity", label: "Chosen date is a closed day", text: "Sorry, we are closed on {date} for {reason}. Let us pick another date.", vars: ["date", "reason"] },
   address_outside_area: { group: "Checkout", label: "Address outside the delivery area", text: "Sorry, we only deliver in Kiryas Joel and nearby Orange County towns. Please say a delivery address in our area." },
   address_not_found: { group: "Checkout", label: "Address not found on the map", text: "Sorry, we could not find that address. Please say the full address again: the house number, the street, and the town.", pending: true },

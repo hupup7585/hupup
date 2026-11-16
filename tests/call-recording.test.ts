@@ -32,10 +32,10 @@ import { setTwilioForTests } from "@/lib/twilio-client";
 import { getSettings, saveSetting } from "@/lib/settings";
 import { saveRecordingAction } from "@/app/admin/(app)/settings/recording-actions";
 
-const call = (action: string, body: Record<string, string> = {}) =>
-  handleVoice({ action, query: new URLSearchParams(), body: { CallSid: "CArec", ...body }, callSid: "CArec", from: "+18455550155" });
+const call = (action: string, body: Record<string, string> = {}, query = "") =>
+  handleVoice({ action, query: new URLSearchParams(query), body: { CallSid: "CArec", ...body }, callSid: "CArec", from: "+18455550155" });
 const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/Redirect>/)?.[1].replace("https://hupup.example/api/voice/", "").replace(/&amp;/g, "&");
-const NOTICE = "This call may be recorded for quality and training. Please do not share card numbers or security codes on this call.";
+const NOTICE = "This call may be monitored and recorded for quality and training purposes.";
 
 beforeEach(() => {
   process.env.PUBLIC_BASE_URL = "https://hupup.example";
@@ -53,18 +53,18 @@ describe("call recording", () => {
     expect(h.started).toEqual([]);
   });
 
-  it("ON: the notice plays first; recording starts only after it; then the main menu", async () => {
+  it("ON: the greeting, then the notice; recording starts only after it; then the rest of the start and the main menu", async () => {
     await saveSetting("callRecording", true);
     const first = await call("incoming");
     expect(first.replace(/'/g, "&apos;")).toContain(NOTICE);
+    expect(first.indexOf("Hi, thank you for calling Hup Up Attractions!")).toBeLessThan(first.indexOf(NOTICE)); // greeting first
     expect(redirect(first)).toBe("record-start");
     expect(h.started).toEqual([]); // nothing recorded while the notice plays
-    expect(redirect(await call("record-start"))).toBe("menu?first=1");
+    expect(redirect(await call("record-start"))).toBe("menu?first=1&gr=1");
+    const menu = await call("menu", {}, "first=1&gr=1");
+    expect(menu).not.toContain("Hi, thank you"); // the greeting is not said twice
+    expect(menu).toContain("To receive our catalog by text or email, press 8.");
     expect(h.started).toEqual(["CArec"]);
-    // The notice is still waiting for Abraham's approval (Nov 16, 2026): no notice, so no recording at all
-    approved.notice = false;
-    expect(redirect(await call("incoming"))).toBe("menu?first=1");
-    approved.notice = true;
     await saveSetting("callRecording", false);
   });
 

@@ -5,8 +5,7 @@ import { PROMPTS, fill, promptAudio, promptText, type PromptDef } from "@/lib/iv
 
 describe("hotline prompts", () => {
   it("greeting is warm and uses the exact business name", () => {
-    expect(PROMPTS.main_hi.text).toBe("Hi! Thank you for calling Hup Up Attractions!");
-    expect(PROMPTS.main_slogan.text).toBe("Bringing something special to every occasion!");
+    expect(PROMPTS.greeting.text).toBe("Hi, thank you for calling Hup Up Attractions! Bringing something special to every occasion!");
   });
   it("are plain text (no SSML/markup) for Chirp3-HD voices", () => {
     for (const def of Object.values(PROMPTS) as PromptDef[]) expect(def.text).not.toMatch(/<[^>]+>/);
@@ -21,13 +20,13 @@ describe("hotline prompts", () => {
     expect(PROMPTS.no_input.text).toContain("No problem, let us try that again");
   });
   it("admin overrides replace the default; empty override falls back", () => {
-    expect(promptText({ main_hi: { text: "Hello from Hup Up Attractions!", audioUrl: null } }, "main_hi")).toBe("Hello from Hup Up Attractions!");
-    expect(promptText({ main_hi: { text: "  ", audioUrl: null } }, "main_hi")).toBe(PROMPTS.main_hi.text);
+    expect(promptText({ greeting: { text: "Hello from Hup Up Attractions!", audioUrl: null } }, "greeting")).toBe("Hello from Hup Up Attractions!");
+    expect(promptText({ greeting: { text: "  ", audioUrl: null } }, "greeting")).toBe(PROMPTS.greeting.text);
     expect(promptText({}, "menu_category", { category: "Jumping Balloons", key: 1 })).toBe("For Jumping Balloons, press 1.");
     expect(fill("{a} and {b}", { a: 1 })).toBe("1 and {b}");
   });
   it("recordings only replace prompts without placeholders", () => {
-    expect(promptAudio({ main_hi: { text: null, audioUrl: "https://x/a.mp3" } }, "main_hi")).toBe("https://x/a.mp3");
+    expect(promptAudio({ greeting: { text: null, audioUrl: "https://x/a.mp3" } }, "greeting")).toBe("https://x/a.mp3");
     expect(promptAudio({ date_confirm_day: { text: null, audioUrl: "https://x/b.mp3" } }, "date_confirm_day")).toBeNull();
   });
   it("the business name is never misspelled anywhere in the source", () => {
@@ -63,7 +62,7 @@ describe("delivery is an additional fee on the phone", () => {
     expect(PROMPTS.cart_summary.text).toContain("plus delivery and sales tax");
   });
   it("greeting never says bounce houses", () => {
-    expect(PROMPTS.main_hi.text + PROMPTS.main_slogan.text).not.toMatch(/bounce/i);
+    expect(PROMPTS.greeting.text).not.toMatch(/bounce/i);
   });
 });
 

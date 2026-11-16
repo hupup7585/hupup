@@ -21,7 +21,7 @@ describe("every line is on the page", () => {
       expect(promptArea(d.group), k).not.toBe("Other");
       expect(["Live", "Waiting for approval", "Not active yet", "Not used"]).toContain(lineStatus(k, o).status);
     }
-    expect(lineStatus("main_hi", o).status).toBe("Live");
+    expect(lineStatus("greeting", o).status).toBe("Live");
     expect(lineStatus("instr_balloons", o).status).toBe("Waiting for approval");
     expect(lineStatus("promo_ask", o).status).toBe("Not active yet");
     expect(lineStatus("spoken_readback", o).status).toBe("Not active yet"); // wording approved Nov 15; speech to text still waits for his OK
@@ -44,30 +44,32 @@ describe("every line is on the page", () => {
 
 describe("edit, approve, go back", () => {
   it("an edit is a draft; the live line keeps playing until it's approved", async () => {
-    const before = await liveText("main_thanks");
-    const d = await saveDraft("main_thanks", "Thank you for choosing Hup Up Attractions, have a great day.", 1);
+    const before = await liveText("greeting");
+    const d = await saveDraft("greeting", "Thank you for choosing Hup Up Attractions, have a great day.", 1);
     expect(d.status).toBe("draft");
-    expect(await liveText("main_thanks")).toBe(before);
-    expect(promptText(await loadPromptOverrides(), "main_thanks")).toBe(before);
+    expect(await liveText("greeting")).toBe(before);
+    expect(promptText(await loadPromptOverrides(), "greeting")).toBe(before);
     await approveDraft(d.id, 1);
-    expect(await liveText("main_thanks")).toBe("Thank you for choosing Hup Up Attractions, have a great day.");
-    const v = await versionsFor("main_thanks");
+    expect(await liveText("greeting")).toBe("Thank you for choosing Hup Up Attractions, have a great day.");
+    const v = await versionsFor("greeting");
     expect(v.map((x) => x.status)).toEqual(["live", "replaced"]);
-    expect(v[1].text).toBe(PROMPTS.main_thanks.text); // the original wording is kept
+    expect(v[1].text).toBe(PROMPTS.greeting.text); // the original wording is kept
     expect(v[1].note).toBe("Original wording");
   });
   it("go back to an older version: it's live again, and the history keeps everything", async () => {
-    const [, original] = await versionsFor("main_thanks");
+    const [, original] = await versionsFor("greeting");
     await restoreVersion(original.id, 1);
-    expect(await liveText("main_thanks")).toBe(PROMPTS.main_thanks.text);
-    expect((await versionsFor("main_thanks")).map((x) => x.status)).toEqual(["live", "replaced", "replaced"]);
+    expect(await liveText("greeting")).toBe(PROMPTS.greeting.text);
+    expect((await versionsFor("greeting")).map((x) => x.status)).toEqual(["live", "replaced", "replaced"]);
   });
   it("a draft can be set aside (kept); changing parts must stay; spoken lines are one paragraph; texts can have new lines", async () => {
-    const d = await saveDraft("main_9", "For feedback, press 9.", 1);
+    const d = await saveDraft("catalog_offer", "For feedback, press 9.", 1);
     await discardDraft(d.id, 1);
-    expect((await versionsFor("main_9"))[0].status).toBe("discarded");
+    expect((await versionsFor("catalog_offer"))[0].status).toBe("discarded");
     expect(() => validateWording("catalog_final", "Your email is ready.")).toThrow("{email}");
-    expect(() => validateWording("main_9", "line one\nline two")).toThrow("one paragraph");
+    expect(() => validateWording("catalog_offer", "line one\nline two")).toThrow("one paragraph");
+    // the main menu is one prompt of several lines (Abraham, Nov 16, 2026): new lines are kept
+    expect(validateWording("main_menu", PROMPTS.main_menu.text)).toBe(PROMPTS.main_menu.text);
     expect(validateWording("msg_catalog_email_top", "Hi!\n\nHere it is:")).toBe("Hi!\n\nHere it is:");
   });
   it("approving a line waiting for approval (a Key 2 script) makes it play", async () => {
@@ -76,10 +78,10 @@ describe("edit, approve, go back", () => {
     expect(lineStatus("instr_balloons", await loadPromptOverrides()).status).not.toBe("Waiting for approval");
   });
   it("the Google recording of the live wording plays; an edit falls back to the live voice until it's recorded again", async () => {
-    const rec = await storeGoogleRecording("main_star_again", "main_star_again-google.mp3", PROMPTS.main_star_again.text, Buffer.from("ID3x"), 1);
-    expect(promptAudio(await loadPromptOverrides(), "main_star_again")).toContain(`/prompt/${rec.id}?`);
-    const d = await saveDraft("main_star_again", "To hear this menu again, press star.", 1);
+    const rec = await storeGoogleRecording("catalog_offer", "catalog_offer-google.mp3", PROMPTS.catalog_offer.text, Buffer.from("ID3x"), 1);
+    expect(promptAudio(await loadPromptOverrides(), "catalog_offer")).toContain(`/prompt/${rec.id}?`);
+    const d = await saveDraft("catalog_offer", "To hear this menu again, press star.", 1);
     await approveDraft(d.id, 1);
-    expect(promptAudio(await loadPromptOverrides(), "main_star_again")).toBeNull();
+    expect(promptAudio(await loadPromptOverrides(), "catalog_offer")).toBeNull();
   });
 });

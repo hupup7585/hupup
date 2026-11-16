@@ -158,35 +158,35 @@ describe("Phone Recordings (Abraham)", () => {
   });
   it("an upload waits until the Owner presses Use this one (Abraham, Nov 15, 2026); Use Google voice switches back; old recordings are kept", async () => {
     const { confirmSlot } = await import("@/lib/slot-status");
-    await expect(startRecordingUpload("main_thanks", "thanks.mp3", mp3.length, null)).rejects.toThrow("not confirmed this exact text");
-    await confirmSlot("main_thanks", null); // Abraham confirmed the exact text first
-    const r = await startRecordingUpload("main_thanks", "thanks.mp3", mp3.length, null);
+    await expect(startRecordingUpload("greeting", "thanks.mp3", mp3.length, null)).rejects.toThrow("not confirmed this exact text");
+    await confirmSlot("greeting", null); // Abraham confirmed the exact text first
+    const r = await startRecordingUpload("greeting", "thanks.mp3", mp3.length, null);
     await saveRecordingChunk(r.id, 0, mp3, true, null);
-    const eqKey = (await import("drizzle-orm")).eq(schema.voicePrompts.key, "main_thanks");
+    const eqKey = (await import("drizzle-orm")).eq(schema.voicePrompts.key, "greeting");
     expect((await db.select().from(schema.voicePrompts).where(eqKey))[0]?.recordingId ?? null).toBeNull(); // not on the line yet
-    await chooseRecording("main_thanks", r.id, null); // the Owner listened and approved it
+    await chooseRecording("greeting", r.id, null); // the Owner listened and approved it
     const [row] = await db.select().from(schema.voicePrompts).where(eqKey);
     expect(row.recordingId).toBe(r.id);
     expect((await recordingBytes(r.id))!.equals(mp3)).toBe(true);
     // the phone plays it
-    h.overrides = { main_thanks: { text: null, audioUrl: null, recordingId: r.id } };
+    h.overrides = { greeting: { text: null, audioUrl: null, recordingId: r.id } };
     const menu = await call("menu", {}, "first=1");
     expect(menu).toContain(`<Play>${promptRecordingLink(r.id).replace(/&/g, "&amp;")}</Play>`);
-    expect(said(menu)).not.toContain("Thank you for choosing Hup Up Attractions.");
+    expect(said(menu)).not.toContain("Hi, thank you for calling Hup Up Attractions! Bringing something special to every occasion!");
     // a second upload; then back to Google voice; both kept
-    const r2 = await startRecordingUpload("main_thanks", "thanks2.wav", 44, null);
+    const r2 = await startRecordingUpload("greeting", "thanks2.wav", 44, null);
     await saveRecordingChunk(r2.id, 0, Buffer.concat([Buffer.from("RIFF\0\0\0\0WAVE"), Buffer.alloc(32)]), true, null);
-    await chooseGoogleVoice("main_thanks", null);
-    const [after] = await db.select().from(schema.voicePrompts).where((await import("drizzle-orm")).eq(schema.voicePrompts.key, "main_thanks"));
+    await chooseGoogleVoice("greeting", null);
+    const [after] = await db.select().from(schema.voicePrompts).where((await import("drizzle-orm")).eq(schema.voicePrompts.key, "greeting"));
     expect(after.recordingId).toBeNull();
-    expect((await recordingsByKey()).get("main_thanks")!.map((x) => x.fileName)).toEqual(["thanks2.wav", "thanks.mp3"]);
-    await chooseRecording("main_thanks", r.id, null); // "Use this one" on an older recording
+    expect((await recordingsByKey()).get("greeting")!.map((x) => x.fileName)).toEqual(["thanks2.wav", "thanks.mp3"]);
+    await chooseRecording("greeting", r.id, null); // "Use this one" on an older recording
     h.overrides = {};
-    expect(said(await call("menu", {}, "first=1"))).toContain("Thank you for choosing Hup Up Attractions.");
+    expect(said(await call("menu", {}, "first=1"))).toContain("Hi, thank you for calling Hup Up Attractions! Bringing something special to every occasion!");
   });
   it("rejects files that are not MP3 or WAV, and lines with changing parts (they stay live Google voice)", async () => {
-    await expect(startRecordingUpload("main_thanks", "x.pdf", 10, null)).rejects.toThrow("MP3 or WAV");
-    const bad = await startRecordingUpload("main_thanks", "fake.mp3", 8, null);
+    await expect(startRecordingUpload("greeting", "x.pdf", 10, null)).rejects.toThrow("MP3 or WAV");
+    const bad = await startRecordingUpload("greeting", "fake.mp3", 8, null);
     await expect(saveRecordingChunk(bad.id, 0, Buffer.from("%PDF-1.7"), true, null)).rejects.toThrow("isn't an MP3 or WAV");
     await expect(startRecordingUpload("added", "a.mp3", 10, null)).rejects.toThrow("changing parts");
     expect(promptAudio({ added: { text: null, audioUrl: null, recordingId: 5 } }, "added")).toBeNull();
@@ -199,13 +199,13 @@ describe("Phone Recordings (Abraham)", () => {
   it("lines waiting for approval never play; approved, they do", () => {
     expect(promptWaiting({}, "instr_balloons")).toBe(true);
     expect(promptWaiting({ instr_balloons: { text: null, audioUrl: null, approvedAt: new Date() } }, "instr_balloons")).toBe(false);
-    expect(promptWaiting({}, "main_thanks")).toBe(false);
+    expect(promptWaiting({}, "greeting")).toBe(false);
     // Approved Nov 13, 2026 (the promo steps themselves stay off: PHONE_PROMO_MODE)
     for (const k of ["promo_ask", "promo_which", "promo_final", "promo_disclosure", "pay_start", "pay_declined", "vm_after_hours"] as const) expect(promptWaiting({}, k), k).toBe(false);
   });
   it("Google voice recording: Not active yet without a Google Text-to-Speech key; with one, saved in the hotline voice and reused", async () => {
     delete process.env.GOOGLE_TTS_API_KEY;
-    expect(await makeGoogleRecording("main_thanks", PROMPTS.main_thanks.text, null)).toBeNull();
+    expect(await makeGoogleRecording("greeting", PROMPTS.greeting.text, null)).toBeNull();
     process.env.GOOGLE_TTS_API_KEY = "test-key";
     process.env.IVR_VOICE = "Google.en-US-Chirp3-HD-Puck";
     expect(googleVoiceName()).toBe("en-US-Chirp3-HD-Puck");
@@ -214,10 +214,10 @@ describe("Phone Recordings (Abraham)", () => {
       bodies.push(String(init.body));
       return new Response(JSON.stringify({ audioContent: mp3.toString("base64") }));
     }) as unknown as typeof fetch;
-    const g = await makeGoogleRecording("main_thanks", PROMPTS.main_thanks.text, null, fake);
+    const g = await makeGoogleRecording("greeting", PROMPTS.greeting.text, null, fake);
     expect(g!.source).toBe("google");
     expect(JSON.parse(bodies[0]).voice.name).toBe("en-US-Chirp3-HD-Puck");
-    await makeGoogleRecording("main_thanks", PROMPTS.main_thanks.text, null, fake);
+    await makeGoogleRecording("greeting", PROMPTS.greeting.text, null, fake);
     expect(bodies).toHaveLength(1); // same wording: reused
     delete process.env.GOOGLE_TTS_API_KEY;
     delete process.env.IVR_VOICE;

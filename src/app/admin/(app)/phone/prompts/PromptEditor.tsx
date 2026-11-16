@@ -130,7 +130,7 @@ export default function PromptEditor(props: {
       </div>
       {editing && (
         <div className="mt-2" data-prompt-edit>
-          <textarea className="input" rows={props.message ? 8 : 3} value={text} onChange={(e) => setText(e.target.value)} aria-label={`New wording: ${props.label}`} />
+          <textarea className="input" rows={props.message ? 8 : text.includes("\n") ? 14 : 3} value={text} onChange={(e) => setText(e.target.value)} aria-label={`New wording: ${props.label}`} />
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               className="btn-dark !py-1.5 text-sm"

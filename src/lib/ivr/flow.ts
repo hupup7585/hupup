@@ -9,7 +9,7 @@ import { formatPhone, last4, spokenDigits, toE164 } from "@/lib/phone";
 import { logStamp, phonePromoMode, phonePromoOn, readBack, tenDigitNumber } from "@/lib/phone-promo";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
 import { checkEventDate } from "@/lib/jewish-calendar";
-import { lateHoursToday, officeOpenNow, websiteHoursLines } from "@/lib/business-hours";
+import { officeOpenNow, websiteHoursLines } from "@/lib/business-hours";
 import {
   PAYMENT_HOLD_MINUTES,
   PHONE_HOLD_MINUTES,
@@ -220,11 +220,44 @@ function toStep(vr: VR, ctx: Ctx, extra: Record<string, string | number | undefi
 }
 
 /** Main menu (Abraham): seconds to wait for a choice after the last menu line. */
-export const MENU_WAIT_SECONDS = 4;
+export const MENU_WAIT_SECONDS = 3;
 
-/** No choice after the main menu: the whole menu again, from the greeting (3 plays and 20 seconds rule). */
+/** No choice after the main menu: the main menu prompt again, without the greeting (3 plays and 20 seconds rule). */
 function menuNoChoice(vr: VR, ctx: Ctx) {
-  return repeatMenu(vr, ctx, "menu", { first: 1 });
+  return repeatMenu(vr, ctx, "menu");
+}
+
+/**
+ * A prompt of several lines (the main menu): an uploaded recording plays as one file; spoken from the text, each
+ * sentence is said on its own with a half-second pause between them.
+ */
+function spLines(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptKey) {
+  if (promptWaiting(ctx.prompts, key)) return;
+  const audio = promptAudio(ctx.prompts, key);
+  if (audio) return void target.play(audio);
+  const lines = promptText(ctx.prompts, key).split(/(?<=[.!?])\s+|\n+/).map((l) => l.trim()).filter(Boolean);
+  lines.forEach((l, i) => {
+    say(target, l);
+    if (i < lines.length - 1) halfPause(target);
+  });
+}
+
+/**
+ * Shabbes and Yom Tov (Abraham, Nov 14, 2026, choice A): the whole hotline is closed. The closed greeting with the day
+ * and time we open again, then the tone; the message goes to the general voicemail (key 9's box). Draft wording: on
+ * preview now, on the live line once Abraham approves it. Returns null when the hotline is open (or the greeting waits).
+ */
+async function hotlineClosed(ctx: Ctx, vr: VR): Promise<VR | null> {
+  const lock = bookingLock(calendarNow(), await getSettings());
+  const closedKey = lock.reason === "Yom Tov" ? "closed_yomtov_greeting" : "closed_shabbos_greeting";
+  if (!lock.locked || (process.env.VERCEL_ENV === "production" && promptWaiting(ctx.prompts, closedKey))) return null;
+  const opens = lock.opensAt ?? new Date();
+  sp(vr, ctx, closedKey, {
+    day: opens.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/New_York" }),
+    time: opens.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }),
+  }, { draftOk: true });
+  await updateSession(ctx.callSid, { outcome: "voicemail", data: { missed: "closed" } }, ctx.session);
+  return vmRecord(vr, await vmBox("9"), "closed");
 }
 
 type ResumeLine = NonNullable<CallSession["data"]["resumeLines"]>[number];
@@ -663,20 +696,13 @@ const handlers: Record<string, Handler> = {
     // Shabbes and Yom Tov (Abraham, Nov 14, 2026, choice A): the whole hotline is closed. A closed greeting with the
     // day and time we open again, then the tone; every message goes to the general voicemail (key 9's box), without
     // that box's own greeting. Draft wording: on preview now, on the live line once Abraham approves it.
-    const lock = bookingLock(calendarNow(), await getSettings());
-    const closedKey = lock.reason === "Yom Tov" ? "closed_yomtov_greeting" : "closed_shabbos_greeting";
-    if (lock.locked && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, closedKey))) {
-      const opens = lock.opensAt ?? new Date();
-      sp(vr, ctx, closedKey, {
-        day: opens.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/New_York" }),
-        time: opens.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }),
-      }, { draftOk: true });
-      await updateSession(ctx.callSid, { outcome: "voicemail", data: { missed: "closed" } }, ctx.session);
-      return vmRecord(vr, await vmBox("9"), "closed");
-    }
-    // Call recording (off unless the Owner turns it on): the notice plays first, recording starts only after it.
-    // Recording only with its notice (Abraham, Nov 16, 2026): while the notice waits for his approval, no recording
+    const closed = await hotlineClosed(ctx, vr);
+    if (closed) return closed;
+    // Call recording (off unless the Owner turns it on): the greeting, then the notice; recording starts only after
+    // the notice, then the rest of the start of the call. Recording only with its notice (Abraham, Nov 16, 2026).
     if ((await getSettings()).callRecording && !promptWaiting(ctx.prompts, "recording_notice")) {
+      sp(vr, ctx, "greeting");
+      halfPause(vr);
       sp(vr, ctx, "recording_notice");
       return back(vr, "record-start");
     }
@@ -688,7 +714,7 @@ const handlers: Record<string, Handler> = {
   async "record-start"(ctx, vr) {
     const ok = await startRecording(ctx.callSid);
     await updateSession(ctx.callSid, { data: { recording: ok } }, ctx.session);
-    return back(vr, "menu", { first: 1 });
+    return back(vr, "menu", { first: 1, gr: 1 }); // gr: the greeting already played (before the notice)
   },
 
   /** Twilio: a call recording finished. Saved on the call for the call log (recording itself stays in Twilio). */
@@ -700,13 +726,12 @@ const handlers: Record<string, Handler> = {
   },
 
   /**
-   * Abraham's main menu (approved Nov 8, 2026). 1 bookings (rental list), 2/4/5/6/8/0 ring a live employee (each
-   * key's own list), 9 general voicemail, * repeats. Until Abraham approves their messages: 3 opens the rental list,
-   * 7 rings the operator. Voice commands keep working in the background (not announced).
-   * With ?first=1 (the incoming call, star, and each replay after silence) the greeting and the closed / open-late
-   * line play inside the same Gather, so any key works at any time, even during the greeting. After the last line it
-   * waits 4 seconds; no choice replays the whole menu, and after 3 plays the existing goodbye line plays and the call
-   * ends. A wrong key ("Sorry, that is not a valid selection…") replays the menu lines without the greeting, as before.
+   * The start of the call and the main menu (Abraham, Nov 16, 2026). With ?first=1 (only the incoming call): the
+   * greeting, the call recording notice (only when recording is on; played before this step, see incoming), the
+   * office closed line (only when closed) and the catalog offer, then the main menu prompt. Every other time the menu
+   * plays (star, after the hours, back to the main menu, a wrong key, no key) only the main menu prompt plays.
+   * All of it is inside one Gather, so any key works at any time. After the last line it waits 3 seconds; after 3
+   * plays with no key the disconnect line plays and the call ends.
    */
   async menu(ctx, vr) {
     // Abraham: menus are keys only (no speech). finishOnKey "" makes # arrive as a key, so # is an invalid choice.
@@ -714,38 +739,27 @@ const handlers: Record<string, Handler> = {
       input: ["dtmf"],
       numDigits: 1,
       finishOnKey: "",
-      timeout: MENU_WAIT_SECONDS, // Abraham: 4 seconds after the last line, then the menu plays again
+      timeout: MENU_WAIT_SECONDS, // Abraham: 3 seconds after the last line, then the menu plays again
       action: url("menu-choice", { np: ctx.query.get("np") || undefined, t0: ctx.query.get("t0") || Date.now() }),
       method: "POST",
     });
     if (ctx.query.get("first") === "1") {
-      sp(g, ctx, "main_hi");
-      halfPause(g);
-      sp(g, ctx, "main_slogan");
-      halfPause(g);
-      // Booking by phone is available 24/7; outside office hours (Jewish calendar + business hours) callers are told
-      // the office is closed. Chol Hamoed and Chanukah: Abraham's approved "open late" line.
-      const settings = await getSettings();
-      const late = lateHoursToday(new Date(), settings);
-      const open = officeOpenNow(new Date(), settings);
-      // Call journey (Abraham): what the system decided about office hours for this call
-      await track(ctx.callSid, "step", open ? "Office open" : "Office closed", { open });
-      const status = !open ? "office_closed" : late === "cholHamoed" ? "late_cholhamoed" : late === "chanukah" ? "late_chanukah" : null;
-      if (status) {
-        sp(g, ctx, status);
+      if (ctx.query.get("gr") !== "1") {
+        sp(g, ctx, "greeting");
         halfPause(g);
       }
-      sp(g, ctx, "main_any_time");
-      halfPause(g);
-      sp(g, ctx, "main_catalog");
+      // Booking by phone is available 24/7; outside office hours callers are told the office is closed.
+      const open = officeOpenNow(new Date(), await getSettings());
+      // Call journey (Abraham): what the system decided about office hours for this call
+      await track(ctx.callSid, "step", open ? "Office open" : "Office closed", { open });
+      if (!open) {
+        sp(g, ctx, "office_closed");
+        halfPause(g);
+      }
+      sp(g, ctx, "catalog_offer");
       halfPause(g);
     }
-    // Abraham's main menu (Nov 11, 2026), word for word. Any key works at any time, even during the greeting.
-    const lines = ["main_book", "main_equipment", "main_service_3", "main_learn_4", "main_rental_help", "main_6", "main_hours", "main_catalog", "main_9", "main_0", "main_star_again", "main_thanks"] as const;
-    lines.forEach((k, i) => {
-      sp(g, ctx, k);
-      if (i < lines.length - 1) halfPause(g);
-    });
+    spLines(g, ctx, "main_menu");
     return menuNoChoice(vr, ctx);
   },
 
@@ -758,8 +772,8 @@ const handlers: Record<string, Handler> = {
     }
     await track(ctx.callSid, "step", `Main menu key ${d}: ${MAIN_KEY_LABELS[d] ?? "not a menu choice"}`, { key: d }, "menu-choice");
     switch (d) {
-      case "*": // Abraham: star replays the entire main menu, from the greeting
-        return back(vr, "menu", { first: 1 });
+      case "*": // Abraham (Nov 16, 2026): star replays the main menu prompt, without the greeting
+        return back(vr, "menu");
       case "1":
         return back(vr, "book");
       case "2": // Abraham W: instructions for each type of attraction
@@ -1145,17 +1159,17 @@ const handlers: Record<string, Handler> = {
    */
   /** Key 1 (Abraham, Nov 9, 2026): choose a category, then the item, then the date. */
   async book(ctx, vr) {
+    // Shabbes and Yom Tov: the whole-hotline closed greeting replaces the main menu, so there is no "key 1 on
+    // Shabbes" line (removed, Abraham, Nov 16, 2026). Booking stays locked: a call already in the menu when Shabbes
+    // starts gets the closed greeting and the general voicemail; while that greeting waits for approval on the live
+    // line, "not a valid selection" and the main menu.
     // Abraham, Nov 14, 2026: no booking on Shabbes or Yom Tov (candle lighting until Rabbeinu Tam), automatically
     const lock = bookingLock(calendarNow(), await getSettings());
     if (lock.locked) {
       await track(ctx.callSid, "step", `Booking closed (${lock.reason})`, { key: "1" });
-      // "on Saturday at 5:51 PM": the day and time booking opens again (Abraham, Nov 14, 2026)
-      const opens = lock.opensAt ?? new Date();
-      const when = {
-        day: opens.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/New_York" }),
-        time: opens.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }),
-      };
-      sp(vr, ctx, lock.reason === "Yom Tov" ? "booking_closed_yomtov" : "booking_closed_shabbos", when);
+      const closed = await hotlineClosed(ctx, vr);
+      if (closed) return closed;
+      sp(vr, ctx, "not_valid");
       return back(vr, "menu");
     }
     // Abraham, Nov 15, 2026: a caller back from the same number is offered last call's unfinished cart (once)
@@ -1194,7 +1208,12 @@ const handlers: Record<string, Handler> = {
    * take them) but NOT put in the cart; the caller adds each one by key. Taken items get the nearest options.
    */
   async "resume-choice"(ctx, vr) {
-    if (ctx.body.Digits !== "1") return back(vr, "book"); // 2 (or anything else): a new order
+    const rd = ctx.body.Digits;
+    if (rd === "2" || !rd) return back(vr, "book"); // 2 (or no key): a new order
+    if (rd !== "1") {
+      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
+      return back(vr, "resume");
+    }
     const lines: ResumeLine[] = [];
     for (const l of (await unfinishedCart(ctx)).filter((x) => x.date >= todayISO())) {
       // each item its own hold, outside the cart, until the caller adds it
@@ -1769,8 +1788,13 @@ const handlers: Record<string, Handler> = {
   async confirm(ctx, vr) {
     const f = ctx.query.get("f") as Field;
     const d = ctx.body.Digits;
-    // Abraham, Nov 15, 2026: every read-back confirms with pound; 1 (or any other key) asks again
+    // Abraham, Nov 15, 2026: every read-back confirms with pound; 1 asks again. Any other key (Nov 16, 2026): the
+    // shared wrong-key line, then the same read-back again.
     const yes = d === "#";
+    if (d && d !== "1" && !yes && ctx.session?.data.heard) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "readback", { f });
+    }
     if (!yes) return back(vr, "ask", { f });
     const heard = ctx.session?.data.heard;
     if (!heard) return back(vr, "ask", { f });
@@ -1790,6 +1814,16 @@ const handlers: Record<string, Handler> = {
     const wasRequired = f === "email" && Boolean(ctx.session?.data.emailRequired);
     await updateSession(ctx.callSid, { data: { [f]: heard, heard: undefined, ...(wasRequired ? { emailRequired: undefined } : {}) } }, ctx.session);
     return back(vr, wasRequired ? "finalize" : FIELDS[f].next);
+  },
+
+  /** The same read-back again after a wrong key (the answer is still in the session). */
+  readback(ctx, vr) {
+    const f = ctx.query.get("f") as Field;
+    const heard = ctx.session?.data.heard;
+    if (!heard || !FIELDS[f]) return back(vr, "ask", { f });
+    const g = keypad(vr, url("confirm", { f }));
+    sp(g, ctx, "heard", { value: FIELDS[f].readBack(heard) });
+    return noInput(vr, ctx, "ask", { f });
   },
 
   /* ---- Terms: "By pressing #, you agree to our Terms and Conditions..." (logged with time, phone, order, version) ---- */
@@ -1834,6 +1868,7 @@ const handlers: Record<string, Handler> = {
       return back(vr, "finalize");
     }
     const n = Number(ctx.query.get("n") || 0) + 1;
+    if (ctx.body.Digits && n < 2) sp(vr, ctx, "not_valid"); // wrong key: the shared line, then the terms again
     if (n >= 2) {
       sp(vr, ctx, "terms_required");
       vr.hangup(); // hanging up releases the held items
@@ -1857,6 +1892,10 @@ const handlers: Record<string, Handler> = {
       return back(vr, "sms-consent");
     }
     if (d === "2") return back(vr, "phone-enter");
+    if (d) {
+      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
+      return back(vr, "phone");
+    }
     return noInput(vr, ctx, "phone");
   },
 
@@ -1879,8 +1918,16 @@ const handlers: Record<string, Handler> = {
   },
 
   async "phone-confirm"(ctx, vr) {
-    if (ctx.body.Digits !== "#" || !ctx.session?.data.heard) return back(vr, "phone-enter");
-    await updateSession(ctx.callSid, { data: { phone: ctx.session.data.heard, heard: undefined } }, ctx.session);
+    const d = ctx.body.Digits;
+    const heard = ctx.session?.data.heard;
+    if (d && d !== "#" && d !== "1" && heard) {
+      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
+      const g = keypad(vr, url("phone-confirm"));
+      sp(g, ctx, "phone_heard", { number: `${spokenDigits(heard.slice(2, 5))}, ${spokenDigits(heard.slice(5, 8))}, ${spokenDigits(heard.slice(8))}` });
+      return noInput(vr, ctx, "phone-enter");
+    }
+    if (d !== "#" || !heard) return back(vr, "phone-enter");
+    await updateSession(ctx.callSid, { data: { phone: heard, heard: undefined } }, ctx.session);
     return back(vr, "sms-consent");
   },
 
@@ -1906,7 +1953,7 @@ const handlers: Record<string, Handler> = {
     }
     // Abraham, Nov 15, 2026: yes or no questions are answered by key only (1 yes, 2 no), never by speech
     const g = keypad(vr, url("sms-consent-answer", { n: ctx.query.get("n") ?? undefined }), { timeout: 8 });
-    sp(g, ctx, retry ? "consent_unclear" : "consent_transactional");
+    sp(g, ctx, retry && ctx.query.get("k") !== "1" ? "consent_unclear" : "consent_transactional");
     return vr;
   },
 
@@ -1915,6 +1962,11 @@ const handlers: Record<string, Handler> = {
     if (!phone) return back(vr, "phone");
     const n = Number(ctx.query.get("n") || 0);
     const answer = parseConsentAnswer({ digits: ctx.body.Digits, speech: ctx.body.SpeechResult, confidence: ctx.body.Confidence });
+    // A wrong key (Abraham, Nov 16, 2026): the shared line, then the same question again
+    if (answer === "unclear" && ctx.body.Digits && n < 2) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "sms-consent", { n: n + 1, k: 1 });
+    }
     if (answer === "unclear" && n < 1) return back(vr, "sms-consent", { n: n + 1 });
     await recordPhoneConsent(ctx, "transactional", answer === "yes" ? "opt_in" : "declined", phone);
     await updateSession(ctx.callSid, { data: { smsConsent: answer === "yes" ? "yes" : "no" } }, ctx.session);
@@ -2119,6 +2171,7 @@ const handlers: Record<string, Handler> = {
     const o = Number(ctx.query.get("o"));
     const n = Number(ctx.query.get("n") || 1);
     if (ctx.body.Digits === "1") return back(vr, "phonepay-go", { o });
+    if (ctx.body.Digits) sp(vr, ctx, "not_valid"); // wrong key: the shared line, then the same question again
     return back(vr, "phonepay-retry", { o, n, r: Number(ctx.query.get("r") || 0) + 1 });
   },
 
@@ -2168,6 +2221,10 @@ const handlers: Record<string, Handler> = {
 
   async "promo-consent-answer"(ctx, vr) {
     if (ctx.body.Digits === "1") return back(vr, "promo-which");
+    if (ctx.body.Digits && ctx.body.Digits !== "2" && ctx.body.Digits !== "#") {
+      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
+      return back(vr, "promo-consent");
+    }
     const caller = toE164(ctx.from);
     if (caller) await recordPhoneConsent(ctx, "marketing", "declined", caller, "promo_ask");
     return back(vr, "goodbye");
@@ -2187,6 +2244,10 @@ const handlers: Record<string, Handler> = {
       return promoSend(ctx, vr, caller, "caller");
     }
     if (d === "2") return back(vr, "promo-enter");
+    if (d) {
+      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
+      return back(vr, "promo-which");
+    }
     return back(vr, "goodbye");
   },
 
@@ -2219,6 +2280,11 @@ const handlers: Record<string, Handler> = {
       return promoSend(ctx, vr, heard, "entered");
     }
     if (ctx.body.Digits === "1") return back(vr, "promo-enter");
+    if (ctx.body.Digits && heard) {
+      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
+      const g = keypad(vr, url("promo-confirm"), { numDigits: 1, timeout: 6 });
+      sp(g, ctx, "promo_heard", { number: readBack(heard) });
+    }
     return back(vr, "goodbye");
   },
 
@@ -2241,6 +2307,9 @@ const handlers: Record<string, Handler> = {
     if (d === "2") {
       const g = keypad(vr, url("tz-pick"));
       sp(g, ctx, "tz_pick");
+    } else if (d) {
+      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
+      return back(vr, "tz");
     }
     return back(vr, "goodbye");
   },
@@ -2251,6 +2320,10 @@ const handlers: Record<string, Handler> = {
     if (phone && zone) {
       await setCustomerTimeZone(phone, zone, "phone");
       sp(vr, ctx, "tz_saved");
+    } else if (ctx.body.Digits) {
+      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
+      const g = keypad(vr, url("tz-pick"));
+      sp(g, ctx, "tz_pick");
     }
     return back(vr, "goodbye");
   },
@@ -2613,7 +2686,14 @@ const handlers: Record<string, Handler> = {
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
     const c = Number(ctx.query.get("c"));
     const t = Number(ctx.query.get("t") || 0);
-    if (ctx.body.Digits !== "1") return back(vr, "vma-charge", { t: ctx.body.Digits === "2" ? t : t + 1 });
+    const cd = ctx.body.Digits;
+    if (cd && cd !== "1" && cd !== "2" && c) {
+      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
+      const g = keypad(vr, url("vma-charge-confirm", { c, t }), { numDigits: 1, timeout: 8 });
+      sp(g, ctx, "vma_charge_readback", amountParts(c), { draftOk: true });
+      return back(vr, "vma-charge", { t: t + 1 });
+    }
+    if (cd !== "1") return back(vr, "vma-charge", { t: cd === "2" ? t : t + 1 });
     const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-charge-go", { c }), method: "POST", actionOnEmptyResult: true });
     sp(g, ctx, "vma_charge_note", undefined, { draftOk: true });
     return back(vr, "vma-charge-go", { c });
@@ -2737,6 +2817,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "vm_rerecord");
       return vmRecord(vr, await boxById(Number(b) || null), x);
     }
+    if (ctx.body.Digits) sp(vr, ctx, "not_valid"); // wrong key: the shared line, then the same options again
     return back(vr, "vm-none", { b, x });
   },
 
@@ -2763,7 +2844,8 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "vm_rerecord");
       return vmRecord(vr, box, ctx.session?.data.vmKey ?? null);
     }
-    // Wrong key: the options again
+    // Wrong key (Abraham, Nov 16, 2026): the shared line, then the same options again
+    if (d) sp(vr, ctx, "not_valid");
     return back(vr, "vm-options");
   },
 

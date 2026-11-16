@@ -31,9 +31,13 @@ describe("booking lock", () => {
 describe("the lock is used everywhere booking or paying can happen", () => {
   it("phone key 1, the payment page and its pay button, and Admin New booking (page and server)", async () => {
     const { readFileSync } = await import("node:fs");
-    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toContain('sp(vr, ctx, lock.reason === "Yom Tov" ? "booking_closed_yomtov" : "booking_closed_shabbos", when);');
-    const { PROMPTS, fill } = await import("@/lib/ivr/prompts");
-    expect(fill(PROMPTS.booking_closed_shabbos.text, { day: "Saturday", time: "5:51 PM" })).toBe("Booking is closed on Shabbes. Please call us again after Shabbes, on Saturday at 5:51 PM.");
+    // Key 1 on Shabbes or Yom Tov: no separate line any more (Abraham, Nov 16, 2026); booking stays locked and the
+    // caller gets the whole-hotline closed greeting (or, while it waits for approval, "not a valid selection")
+    const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
+    expect(flow).toContain('await track(ctx.callSid, "step", `Booking closed (${lock.reason})`, { key: "1" });\n      const closed = await hotlineClosed(ctx, vr);');
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    expect(PROMPTS).not.toHaveProperty("booking_closed_shabbos");
+    expect(PROMPTS).not.toHaveProperty("booking_closed_yomtov");
     expect(readFileSync("src/app/pay/[orderId]/page.tsx", "utf8")).toContain("await paymentsClosedLine()");
     expect(readFileSync("src/app/pay/[orderId]/actions.ts", "utf8")).toContain("await paymentsClosedLine()");
     const { paymentsClosedLine } = await import("@/lib/payments-closed");
@@ -49,7 +53,7 @@ describe("choice A: the whole hotline is closed on Shabbes and Yom Tov (Abraham,
     const { readFileSync } = await import("node:fs");
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(flow).toContain('return vmRecord(vr, await vmBox("9"), "closed");');
-    expect(flow).toContain('process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, closedKey)');
+    expect(flow).toContain('if (!lock.locked || (process.env.VERCEL_ENV === "production" && promptWaiting(ctx.prompts, closedKey))) return null;');
     const { PROMPTS, fill } = await import("@/lib/ivr/prompts");
     expect(PROMPTS.closed_shabbos_greeting.vars).toEqual(["day", "time"]);
     expect(fill(PROMPTS.closed_shabbos_greeting.text, { day: "Saturday", time: "5:51 PM" })).toContain("open again on Saturday at 5:51 PM");

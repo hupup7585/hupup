@@ -47,22 +47,19 @@ describe("Chanukah late hours (Abraham)", () => {
   });
 });
 
-describe("hotline 'open late' lines (Abraham approved, exact)", () => {
-  it("has the exact wording", () => {
-    expect(PROMPTS.late_cholhamoed.text).toBe("Happy Chol Hamoed! We are open late today, and you can book anytime using this automated system.");
-    expect(PROMPTS.late_chanukah.text).toBe("Happy Chanukah! We are open late today, and you can book anytime using this automated system.");
+describe("hotline: the Chol Hamoed and Chanukah lines are removed (Abraham, Nov 16, 2026)", () => {
+  it("the lines are gone from the prompts", () => {
+    expect(PROMPTS).not.toHaveProperty("late_cholhamoed");
+    expect(PROMPTS).not.toHaveProperty("late_chanukah");
   });
-  it("Chanukah weekday while open: says the Chanukah line, no closing time", async () => {
-    const xml = await greet("2026-12-07T20:00:00Z"); // Mon 3:00 PM
-    expect(xml).toContain("Happy Chanukah! We are open late today, and you can book anytime using this automated system.");
-    expect(xml).not.toMatch(/10:30|until/);
+  it("Chanukah and Chol Hamoed while open: no holiday line, no closing time", async () => {
+    for (const t of ["2026-12-07T20:00:00Z", "2027-04-25T18:00:00Z"]) {
+      const xml = await greet(t);
+      expect(xml).not.toMatch(/Happy Chanukah|Happy Chol Hamoed|10:30|until/);
+      expect(xml).toContain("Hi, thank you for calling Hup Up Attractions!");
+    }
   });
-  it("Chol Hamoed while open: says the Chol Hamoed line", async () => {
-    const xml = await greet("2027-04-25T18:00:00Z"); // Sun Apr 25, 2027 (Pesach IV), 2:00 PM EDT
-    expect(xml).toContain("Happy Chol Hamoed! We are open late today, and you can book anytime using this automated system.");
-    expect(xml).not.toContain("Happy Chanukah");
-  });
-  it("not on ordinary days or when closed", async () => {
+  it("never on ordinary days; when closed, the office closed line", async () => {
     const plain = await greet("2026-11-16T20:00:00Z"); // ordinary Monday
     expect(plain).not.toMatch(/Happy Chol Hamoed|Happy Chanukah/);
     const late = await greet("2026-12-08T03:45:00Z"); // Chanukah, 10:45 PM: closed

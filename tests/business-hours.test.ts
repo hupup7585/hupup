@@ -54,7 +54,7 @@ describe("office hours (Abraham 2026-11-06, Eastern time)", () => {
   });
   it("the hotline never hangs up for closed hours: booking stays 24/7, live person only in hours", () => {
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
-    expect(flow).toContain('const status = !open ? "office_closed"'); // closed line in the menu greeting
+    expect(flow).toContain('sp(g, ctx, "office_closed");'); // closed line after the greeting, in the menu
     expect(flow).toContain("if (!list.targets.length || !(await lineRingsNowFor(k, settings))) {"); // live person only when that line rings (Phone Menu v3: 0, 5, 6 after hours)
     expect(flow).not.toContain("closed_now");
   });
@@ -91,6 +91,6 @@ describe("phone line holiday schedule (Abraham, phone system and admin only)", (
   });
   it("phone booking stays available 24/7 (the closed message still offers booking)", async () => {
     const { PROMPTS } = await import("@/lib/ivr/prompts");
-    expect(PROMPTS.office_closed.text).toBe("Our office is closed right now, but you can book anytime using this automated system.");
+    expect(PROMPTS.office_closed.text).toBe("Our office is closed right now, but you can book anytime using our automated system.");
   });
 });

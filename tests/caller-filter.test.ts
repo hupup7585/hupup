@@ -46,7 +46,7 @@ describe("blocked callers on the hotline", () => {
     const ok = await handleVoice({ action: "incoming", query: new URLSearchParams(), body: { CallSid: "CAok" }, callSid: "CAok", from: "+18455550100" });
     expect(ok).toContain("/api/voice/menu?first=1"); // on to the main menu, which opens with the greeting
     const menu = await handleVoice({ action: "menu", query: new URLSearchParams("first=1"), body: { CallSid: "CAok" }, callSid: "CAok", from: "+18455550100" });
-    expect(menu).toContain("Thank you for calling Hup Up Attractions");
+    expect(menu).toContain("thank you for calling Hup Up Attractions");
     expect(h.ensured).toContain("CAok");
   });
 });

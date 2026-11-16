@@ -1,26 +1,26 @@
 # Hotline recording text list
 
-437 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
+419 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
 
 ## Welcome & main menu
 
 | Slot | Line | Exact text |
 |---|---|---|
-| main_hi | Greeting, line 1 (Abraham) | Hi! Thank you for calling Hup Up Attractions! |
-| main_slogan | Greeting, line 2 (Abraham) | Bringing something special to every occasion! |
-| main_any_time | Greeting, line 3 (Abraham) | If you know your desired extension, you may press it at any time. |
-| main_catalog | Main menu key 8, catalog (Abraham; said twice) | To receive our catalog by text or email, press 8. |
-| main_book | Main menu key 1 (Abraham) | For reservations and bookings, press 1. |
-| main_equipment | Main menu key 2 (Abraham) | For instructions and guidance on using our rental equipment, press 2. |
-| main_service_3 | Main menu key 3 (Abraham) | For customer service and general inquiries, press 3. |
-| main_learn_4 | Main menu key 4 (Abraham) | To learn more about our rental attractions and the services we offer, press 4. |
-| main_rental_help | Main menu key 5 (Abraham) | For questions or assistance with any issues during your rental, press 5. |
-| main_6 | Main menu key 6 (Abraham) | For delivery and pickup information, press 6. |
-| main_hours | Main menu key 7 (Abraham) | To hear our hours of operation, press 7. |
-| main_9 | Main menu key 9 (Abraham, Phone Menu v3) | For feedback and comments, press 9. |
-| main_star_again | Main menu: hear it again (Abraham) | To hear this menu again, press the star key. |
-| main_thanks | Main menu: closing line (Abraham, Phone Menu v3) | Thank you for choosing Hup Up Attractions. |
-| main_0 | Main menu key 0 (Abraham) | To speak with an operator, press 0. |
+| greeting | Greeting (start of every call) | Hi, thank you for calling Hup Up Attractions! Bringing something special to every occasion! |
+| catalog_offer | Catalog offer (start of every call, before the main menu) | To receive our catalog by text or email, press 8. |
+| main_menu | Main menu (plays at the start and every time the menu plays again) | If you know your desired extension, you may press it at any time.
+For reservations and bookings, press 1.
+For instructions and guidance on using our rental equipment, press 2.
+For customer service and general inquiries, press 3.
+To learn more about our rental attractions and the services we offer, press 4.
+For questions or assistance with any issues during your rental, press 5.
+For delivery and pickup information, press 6.
+To hear our hours of operation, press 7.
+To receive our catalog by text or email, press 8.
+For feedback and comments, press 9.
+To speak with an operator, press 0.
+To hear this menu again, press the star key.
+Thank you for choosing Hup Up Attractions! |
 | not_valid | Any menu: a key that is not a choice (Abraham) | Sorry, that is not a valid selection. Please try again. |
 | menu_category#1 | Menu option for a category, piece 1 | For |
 | menu_category#2 | Menu option for a category, piece 2 | , press |
@@ -29,20 +29,14 @@
 | menu_speech | Menu: you can also speak | Or just tell me what you are looking for. |
 | menu_repeat | Menu option: repeat | To hear this again, press star. |
 | menu_empty | No rentals set up yet | We are getting our rentals ready right now. Please call back soon! |
-| recording_notice | Call recording notice (proposed, plays only when recording is on) | This call may be recorded for quality and training. Please do not share card numbers or security codes on this call. |
-| late_cholhamoed | Chol Hamoed, while open (Abraham approved) | Happy Chol Hamoed! We are open late today, and you can book anytime using this automated system. |
-| late_chanukah | Chanukah, while open (Abraham approved) | Happy Chanukah! We are open late today, and you can book anytime using this automated system. |
+| recording_notice | Call recording notice (after the greeting; plays only when call recording is on) | This call may be monitored and recorded for quality and training purposes. |
 | closed_shabbos_greeting#1 | Whole hotline on Shabbes: closed greeting, piece 1 | Thank you for calling Hup Up Attractions. We are closed now for Shabbes, and we will be open again on |
 | closed_shabbos_greeting#2 | Whole hotline on Shabbes: closed greeting, piece 2 | at |
 | closed_shabbos_greeting#3 | Whole hotline on Shabbes: closed greeting, piece 3 | . Please leave your name, phone number, and a short message after the tone, and we will call you back after Shabbes. Good Shabbes! |
 | closed_yomtov_greeting#1 | Whole hotline on Yom Tov: closed greeting, piece 1 | Thank you for calling Hup Up Attractions. We are closed now for Yom Tov, and we will be open again on |
 | closed_yomtov_greeting#2 | Whole hotline on Yom Tov: closed greeting, piece 2 | at |
 | closed_yomtov_greeting#3 | Whole hotline on Yom Tov: closed greeting, piece 3 | . Please leave your name, phone number, and a short message after the tone, and we will call you back after Yom Tov. Good Yom Tov! |
-| booking_closed_shabbos#1 | Key 1 on Shabbes, piece 1 | Booking is closed on Shabbes. Please call us again after Shabbes, on |
-| booking_closed_shabbos#2 | Key 1 on Shabbes, piece 2 | at |
-| booking_closed_yomtov#1 | Key 1 on Yom Tov, piece 1 | Booking is closed on Yom Tov. Please call us again after Yom Tov, on |
-| booking_closed_yomtov#2 | Key 1 on Yom Tov, piece 2 | at |
-| office_closed | Office closed (booking still available) | Our office is closed right now, but you can book anytime using this automated system. |
+| office_closed | Office closed (after the greeting, only when the office is closed; also key 7) | Our office is closed right now, but you can book anytime using our automated system. |
 
 ## Booking by item (key 1)
 
@@ -127,7 +121,7 @@
 |---|---|---|
 | idle_warning | Inside a booking: 9 minutes with no key (Abraham) | Are you still there? Please press any key to continue. Otherwise, this call will end in one minute. |
 | no_input | Didn't hear anything | Sorry, I did not catch that. No problem, let us try that again. |
-| no_input_final | Giving up after no input | It sounds like we got disconnected. Please call us back anytime, we would love to help. Thanks for calling Hup Up Attractions. Bye for now! |
+| no_input_final | Disconnect line (no key after 3 plays of a menu, or 10 minutes idle in a booking) | It sounds like we got disconnected. You can call us back at any time. Thank you for calling Hup Up Attractions. Bye for now! |
 | tech_error | Technical problem | Oops, something went wrong on our end. Please call back in a few minutes. Sorry about that! |
 | went_wrong | Something went wrong, back to menu | Sorry, something went wrong. Let us head back to the main menu. |
 

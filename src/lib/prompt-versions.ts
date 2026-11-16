@@ -19,9 +19,9 @@ export function validateWording(key: string, text: string): string {
   const clean = text.replace(/\r\n/g, "\n").trim();
   if (!clean) throw new PromptError("Write the wording first.");
   if (/<[^>]+>/.test(clean)) throw new PromptError("Plain text only: no tags.");
-  const max = def.message ? 1600 : 600;
+  const max = def.message ? 1600 : def.lines ? 1200 : 600;
   if (clean.length > max) throw new PromptError(`Please keep it under ${max} characters.`);
-  if (!def.message && clean.includes("\n")) throw new PromptError("A spoken line is one paragraph (no new lines).");
+  if (!def.message && !def.lines && clean.includes("\n")) throw new PromptError("A spoken line is one paragraph (no new lines).");
   const missing = (def.vars ?? []).filter((v) => !clean.includes(`{${v}}`));
   if (missing.length) throw new PromptError(`Keep these changing parts in the wording: ${missing.map((m) => `{${m}}`).join(", ")}`);
   return clean;
