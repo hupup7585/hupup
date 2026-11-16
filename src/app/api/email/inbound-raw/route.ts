@@ -11,12 +11,18 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const secret = inboundEmailSecret();
   const got = req.headers.get("x-inbound-secret") ?? "";
-  if (!secret || got.length !== secret.length || !timingSafeEqual(Buffer.from(got), Buffer.from(secret))) return new Response("Forbidden", { status: 403 });
+  if (!secret || got.length !== secret.length || !timingSafeEqual(Buffer.from(got), Buffer.from(secret))) {
+    console.warn("[inbound email] refused: wrong or missing secret");
+    return new Response("Forbidden", { status: 403 });
+  }
   const q = new URL(req.url).searchParams;
   try {
     const r = await receiveRawPiece(q.get("id") ?? "", Number(q.get("i")), Number(q.get("n")), Buffer.from(await req.arrayBuffer()));
+    // One line per piece, so a test email can be confirmed in the logs; no sender, subject or text is logged
+    console.log(`[inbound email] piece ${q.get("i")} of ${q.get("n")} received${r.complete ? (r.duplicate ? ", already in the Admin inbox" : ", saved to the Admin inbox") : ""}`);
     return Response.json(r);
   } catch (e) {
+    console.error("[inbound email] failed:", (e as Error).message);
     return new Response((e as Error).message, { status: 400 });
   }
 }
