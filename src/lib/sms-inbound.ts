@@ -7,7 +7,6 @@ import { emailIncomingText } from "@/lib/owner-alerts";
 import { cancelQueuedMessages, cancelQueuedPromotions, sendMessage } from "@/lib/sms";
 import { TRANSACTIONAL_CONFIRMATION_SMS } from "@/lib/sms-consent";
 import { PROMO_ENROLLED_SMS, promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
-import { START_CONFIRMATION_SMS } from "@/lib/sms-consent-copy";
 import { isCatalogText, replyToCatalogText } from "@/lib/catalog-send";
 import { cancelPendingReenroll, handleStart, handleYes, requestPromoConfirmation } from "@/lib/sms-reenroll";
 
@@ -24,18 +23,20 @@ export type Keyword = "stop" | "start" | "yes" | "help" | "nopromo" | "join" | n
 
 /** Unambiguous opt-out words that also count anywhere in a short message ("unsubscribe me", "opt me out"). */
 const OPT_OUT_IN_PHRASE = ["STOPALL", "UNSUBSCRIBE", "OPTOUT", "REVOKE"];
-/** "Stop" alone is ambiguous ("stop by at 5?"), so in a phrase it only counts in these shapes. */
-const STOP_PHRASE = /^(?:(?:PLEASE|OK|OKAY|JUST)\s+)*STOP(?:\s+(?:TEXTING|MESSAGING|SENDING|CONTACTING|TEXT|TEXTS|MESSAGES|IT|NOW|PLEASE|ALL|THIS|THESE)\b.*)?$|\bSTOP\s*$/;
-/** Other reasonable ways people ask us to stop texting (Requirement 5). Matched on the whole short message. */
-const STOP_REQUESTS = [
-  /\b(?:DONT|DO NOT|PLEASE DONT|PLEASE DO NOT)\s+(?:TEXT|MESSAGE|SMS|CONTACT)\b/,
-  /\bNO MORE\s+(?:TEXTS|TEXT|MESSAGES|MESSAGE|SMS)\b/,
-  /\b(?:REMOVE|DELETE|TAKE)\s+(?:ME|MY NUMBER|THIS NUMBER)\s*(?:OFF|FROM)?\s*(?:YOUR|THE|THIS)?\s*(?:LIST|TEXTS|TEXT LIST|MAILING LIST|CONTACTS)?\s*$/,
-  /\bTAKE ME OFF\b/,
-  /\b(?:I )?(?:DONT|DO NOT) WANT (?:ANY )?(?:MORE )?(?:TEXTS|MESSAGES|THESE)\b/,
-  /\bWRONG NUMBER\b.*\bSTOP\b|\bLEAVE ME ALONE\b/,
+/**
+ * A clear request to stop all texts (Abraham, Nov 16, 2026): Stop texting me, Stop messaging me, Don't text me,
+ * No more texts, Take me off your list, Remove my number, Unsubscribe me, Leave me alone, Wrong number.
+ */
+const FULL_STOP_REQUESTS = [
+  /\bSTOP (?:TEXTING|MESSAGING|CONTACTING) (?:ME|THIS NUMBER|MY NUMBER|US)\b/,
+  /\b(?:DONT|DO NOT) (?:TEXT|MESSAGE|CONTACT) (?:ME|THIS NUMBER|MY NUMBER|US)\b/,
+  /\bNO MORE (?:TEXTS?|MESSAGES?)\b/,
+  /\b(?:TAKE|REMOVE) ME (?:OFF|FROM) (?:YOUR |THE |THIS )?LIST\b/,
+  /\bREMOVE (?:MY|THIS) NUMBER\b/,
+  /\bLEAVE ME ALONE\b/,
+  /\bWRONG NUMBER\b/,
+  /\b(?:DONT|DO NOT) WANT (?:ANY )?(?:MORE )?(?:TEXTS|MESSAGES|THESE)\b/,
 ];
-const MAX_PHRASE_WORDS = 8;
 const WRONG_NUMBER = /^(?:(?:SORRY|HI|HELLO|PLEASE)\s+)*(?:THIS IS (?:THE |A )?)?WRONG (?:NUMBER|NUMBR|NUM|PERSON)\b/;
 
 /**
@@ -56,8 +57,10 @@ export function detectKeywordDetail(body: string, v2 = smsTermsV2Active()): { ke
   if (v2 && JOIN_WORDS.includes(w)) return { keyword: "join", exact: true };
   const words = body.toUpperCase().replace(/\bOPT[\s-]+(?:ME[\s-]+)?OUT\b/g, "OPTOUT").replace(/[^A-Z\s]/g, " ").split(/\s+/).filter(Boolean);
   const joined = words.join(" ").replace(/\bDON T\b/g, "DONT");
-  if (words.length <= MAX_PHRASE_WORDS && (words.some((x) => OPT_OUT_IN_PHRASE.includes(x)) || STOP_PHRASE.test(joined) || STOP_REQUESTS.some((r) => r.test(joined))))
-    return { keyword: "stop", exact: false };
+  // Abraham, Nov 16, 2026: only a clear request to stop all texts stops everything...
+  if (words.some((x) => OPT_OUT_IN_PHRASE.includes(x)) || FULL_STOP_REQUESTS.some((r) => r.test(joined))) return { keyword: "stop", exact: false };
+  // ...any other sentence with STOP in it stops promotional texts only (order texts keep coming)
+  if (words.includes("STOP")) return { keyword: "nopromo", exact: false };
   return { keyword: null, exact: false };
 }
 
@@ -162,15 +165,16 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
         if (!c.smsOptOut) reply = NOPROMO_CONFIRMATION;
       } else if (keyword === "help") {
         // Always answered (SMS Terms): identifies Hup Up Attractions and gives the support phone and email.
-        reply = helpReply(settings.smsHelpText);
+        // Twilio Advanced Opt-Out answers HELP with the approved text (Abraham, Nov 16, 2026): one reply only
+        reply = null;
       }
     });
   }
   // Immediately after the opt-out is saved: no promotion that was queued, held or scheduled may still go out.
   if (effects.cancelAll) await cancelQueuedMessages(from);
   else if (effects.cancelPromos) await cancelQueuedPromotions(from);
-  if (effects.sendStartConfirmation && customer)
-    await sendMessage({ to: from, body: START_CONFIRMATION_SMS, kind: "system", event: "reenroll_request", customerId: customer.id });
+  // START: Twilio Advanced Opt-Out sends the approved "reply YES to confirm" text (Abraham, Nov 16, 2026), so the app
+  // sends nothing; the waiting confirmation is still recorded, and YES re-enrolls as before.
   if (effects.sendReenrolled && customer)
     await sendMessage({ to: from, body: TRANSACTIONAL_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId: customer.id });
   if (effects.sendPromoConfirm && customer)

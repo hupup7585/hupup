@@ -161,9 +161,9 @@ describe("START then YES, and HELP", () => {
     expect(after.smsOptOut).toBe(false);
     expect(after.marketingOptIn).toBe(false);
   });
-  it("HELP replies with the business name, (845) 777-7585 and info@hupupattractions.com", async () => {
+  it("HELP: Twilio answers with the approved text, the app sends nothing (one reply only, Nov 16, 2026); the text still names the business, phone and email", async () => {
     const r = await text("+18455551002", "HELP");
-    expect(r.reply).toBe(HELP_REPLY);
+    expect(r.reply).toBeNull();
     for (const part of ["Hup Up Attractions", "(845) 777-7585", "info@hupupattractions.com"]) expect(HELP_REPLY).toContain(part);
   });
 });
@@ -234,15 +234,18 @@ describe("website request, staff restrictions, A2P off", () => {
     expect(readFileSync("src/app/admin/(app)/campaigns/page.tsx", "utf8")).toContain('requireStaff(["owner", "secretary"])');
     expect(readFileSync("src/app/admin/(app)/staff/page.tsx", "utf8")).toContain("data-staff-permissions");
   });
-  it("until A2P is approved, no customer text goes out on the live site; owner alerts still do", async () => {
+  it("live site: nothing goes out until the Messaging Service ID is set; then the test window lets only the test numbers get customer texts (Nov 16, 2026)", async () => {
     const P = "+18455551401";
     await optInOrders(P);
     process.env.VERCEL_ENV = "production";
     const r = await sendMessage({ to: P, body: "Your order is confirmed.", kind: "transactional" });
-    expect(r).toMatchObject({ sent: false, blocked: "not_active", error: "Not active yet: waiting for Twilio A2P approval" });
+    expect(r).toMatchObject({ sent: false, blocked: "not_active" });
+    expect((await sendMessage({ to: "+18457777585", body: "New voicemail", kind: "system", event: "owner_alert" })).blocked).toBe("not_active"); // every text goes through the Messaging Service
+    process.env.TWILIO_MESSAGING_SERVICE_SID = "MG1";
+    expect((await sendMessage({ to: P, body: "Your order is confirmed.", kind: "transactional" })).blocked).toBe("test_only");
     const owner = await sendMessage({ to: "+18457777585", body: "New voicemail", kind: "system", event: "owner_alert" });
     expect(owner.blocked).toBeUndefined();
-    process.env.TWILIO_MESSAGING_SERVICE_SID = "MG1";
+    await (await import("@/lib/settings")).saveSetting("smsTestOnly", false, null); // Abraham opens it to everyone
     expect((await sendMessage({ to: P, body: "Your order is confirmed.", kind: "transactional" })).sent).toBe(true);
     delete process.env.TWILIO_MESSAGING_SERVICE_SID;
     delete process.env.VERCEL_ENV;

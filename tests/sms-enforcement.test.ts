@@ -240,13 +240,13 @@ describe("3. START, then YES", () => {
     sent.length = 0;
     return p;
   };
-  it("START alone enrolls no one: block stays, no consent, one confirmation text with the approved wording", async () => {
+  it("START alone enrolls no one: block stays, no consent; Twilio sends the approved confirmation, the app sends nothing (Nov 16, 2026)", async () => {
     const p = await stopNumber();
     const before = (await consents(p)).length;
     await inbound(p, "START");
     expect((await customer(p)).smsOptOut).toBe(true);
     expect((await consents(p)).length).toBe(before);
-    expect(sent.filter((x) => x.to === p).map((x) => x.body)).toEqual([copy.START_CONFIRMATION_SMS]);
+    expect(sent.filter((x) => x.to === p)).toEqual([]); // one reply only: Twilio's
     expect((await sms.sendMessage({ to: p, body: "Order", kind: "transactional" })).blocked).toBe("opted_out");
     const [req] = await pendingRequests(p);
     expect(req).toMatchObject({ status: "pending", scope: "transactional", promptText: copy.START_CONFIRMATION_SMS });
@@ -299,13 +299,13 @@ describe("3. START, then YES", () => {
     await inbound(p, "YES");
     expect((await customer(p)).smsOptOut).toBe(true);
   });
-  it("repeated STARTs create one confirmation and one text", async () => {
+  it("repeated STARTs create one waiting confirmation and no app text", async () => {
     const p = await stopNumber();
     await inbound(p, "START");
     await inbound(p, "START");
     await inbound(p, "unstop");
     expect((await pendingRequests(p)).filter((r) => r.status === "pending")).toHaveLength(1);
-    expect(sent.filter((x) => x.to === p)).toHaveLength(1);
+    expect(sent.filter((x) => x.to === p)).toHaveLength(0);
   });
   it("the database itself allows only one pending confirmation per number", async () => {
     const p = await stopNumber();

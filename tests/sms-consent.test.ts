@@ -73,8 +73,8 @@ describe("opt-out words (STOP and NY GBL 399-z list)", () => {
     for (const w of ["stop", "STOP", "Stop.", "unsubscribe", "cancel", "end", "quit", "opt out", "Opt-Out", "optout", "revoke", "stopall"])
       expect(detectKeyword(w), w).toBe("stop");
   });
-  it("clear opt-out phrases count too, and get our own confirmation", () => {
-    for (const w of ["please stop", "Stop texting me", "unsubscribe me please", "opt me out", "please opt out", "I revoke consent"]) {
+  it("clear requests to stop all texts count too, and get our own confirmation (Abraham, Nov 16, 2026)", () => {
+    for (const w of ["Stop texting me", "Stop messaging me", "Don't text me", "No more texts", "Take me off your list", "Remove my number", "unsubscribe me please", "Leave me alone", "Wrong number", "opt me out", "please opt out", "I revoke consent"]) {
       const d = detectKeywordDetail(w);
       expect(d.keyword, w).toBe("stop");
       expect(d.exact, w).toBe(false);
@@ -82,8 +82,10 @@ describe("opt-out words (STOP and NY GBL 399-z list)", () => {
     expect(detectKeywordDetail("STOP").exact).toBe(true);
   });
   it("ordinary messages that merely contain cancel/end are not opt-outs", () => {
-    for (const w of ["cancel my order", "can you deliver by end of day", "is it ok to end at 6", "we need to quit early tomorrow", "stop by at 5?", "where is the bus stop near you"])
-      expect(detectKeyword(w), w).toBeNull();
+    for (const w of ["cancel my order", "can you deliver by end of day", "is it ok to end at 6", "we need to quit early tomorrow"]) expect(detectKeyword(w), w).toBeNull();
+  });
+  it("any other sentence with STOP in it stops promo texts only (Abraham, Nov 16, 2026)", () => {
+    for (const w of ["Please stop", "Stop sending these", "Stop the deals", "stop by at 5?"]) expect(detectKeyword(w), w).toBe("nopromo");
   });
   it("START, HELP, NOPROMO unchanged", () => {
     expect(detectKeyword("start")).toBe("start");

@@ -32,7 +32,7 @@ export type SendResult = {
   messageId?: number;
   sid?: string;
   dev?: boolean;
-  blocked?: "opted_out" | "no_marketing_consent" | "no_transactional_consent" | "not_allowed" | "card_number" | "quiet_hours" | "yearly_limit" | "not_active";
+  blocked?: "opted_out" | "no_marketing_consent" | "no_transactional_consent" | "not_allowed" | "card_number" | "quiet_hours" | "yearly_limit" | "not_active" | "test_only";
   /** A promotion outside quiet hours: saved and sent in the next window (after rechecking consent). */
   held?: boolean;
   error?: string;
@@ -142,9 +142,21 @@ async function customerByPhone(phone: string) {
   return c ?? null;
 }
 
+/** Every text goes through the Twilio Messaging Service (Abraham, Nov 16, 2026); never straight from the number on
+ * the live site. Off the live site (local tests) the number is used. */
 function senderParams(): { from?: string; messagingServiceSid?: string } {
   if (process.env.TWILIO_MESSAGING_SERVICE_SID) return { messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID };
-  return { from: process.env.TWILIO_PHONE_NUMBER };
+  return config.isProd() ? {} : { from: process.env.TWILIO_PHONE_NUMBER };
+}
+
+/** The texting test window (Abraham, Nov 16, 2026): until he opens it, only the test numbers get customer texts. */
+export async function testWindowBlocks(to: string, event: string | undefined): Promise<boolean> {
+  if (process.env.VERCEL_ENV !== "production" || STAFF_EVENTS.has(event ?? "")) return false;
+  const { getSettings } = await import("@/lib/settings");
+  const s = await getSettings();
+  if (!s.smsTestOnly) return false;
+  const list = String(s.smsTestNumbers).split(/[\n,;]+/).map((x) => x.replace(/\D/g, "").slice(-10)).filter(Boolean);
+  return !list.includes(to.replace(/\D/g, "").slice(-10));
 }
 
 /**
@@ -233,15 +245,16 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
     ? (await db.select().from(schema.customers).where(eq(schema.customers.id, input.customerId)))[0] ?? null
     : await customerByPhone(to);
 
-  // SMS v3: until Twilio approves texting (A2P), no customer text goes out on the live site. Owner alerts and sign-in
-  // codes to staff are not customer texts.
-  const a2pOff = smsTermsV2Active() && process.env.VERCEL_ENV === "production" && !process.env.TWILIO_MESSAGING_SERVICE_SID && !STAFF_EVENTS.has(input.event ?? "");
+  // Texting is approved (A2P, Nov 15, 2026). On the live site every text goes through the Messaging Service, so none
+  // goes out until its ID is in Vercel; then the test window holds customer texts to the test numbers only.
+  const a2pOff = process.env.VERCEL_ENV === "production" && !process.env.TWILIO_MESSAGING_SERVICE_SID;
+  const testOnly = !a2pOff && (await testWindowBlocks(to, input.event));
 
   // Promotions: the count and the save happen under a lock on this number, so campaigns running at the same time can
   // never push a customer past the yearly limit.
   const decideAndSave = async (exec: typeof db) => {
     if (kind === "marketing" && typeof exec.execute === "function") await exec.execute(sql`select pg_advisory_xact_lock(hashtext(${"promo:" + to}))`);
-    const blocked: Blocked | null = a2pOff ? "not_active" : await checkEligibility({ to, kind, event: input.event, customer, now: input.now, exec });
+    const blocked: Blocked | null = a2pOff ? "not_active" : testOnly ? "test_only" : await checkEligibility({ to, kind, event: input.event, customer, now: input.now, exec });
     const held = blocked === "quiet_hours";
     const sendAfter = held ? nextPromoWindow(to, input.now ?? new Date(), customer?.timeZone) : null;
     let messageId: number | undefined;
@@ -395,6 +408,7 @@ const BLOCK_REASON: Record<Blocked, string> = {
   quiet_hours: "Held: promotional texts are sent only between 8 AM and 9 PM in the customer's local time.",
   yearly_limit: `Not sent: this customer already got ${PROMOS_PER_YEAR} promotional texts this year (the most allowed).`,
   not_active: TEXTING_NOT_ACTIVE,
+  test_only: "Not sent: texting is in its test window, so only the test numbers get texts until Abraham opens it to everyone.",
 };
 
 async function markFailed(messageId: number | undefined, code: unknown, message: string | undefined) {

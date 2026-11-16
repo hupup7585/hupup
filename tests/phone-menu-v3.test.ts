@@ -274,9 +274,9 @@ describe("Nov 12 decisions: staff reject, caller ID, after hours, keypad pay, CA
     expect(keypadPayOn()).toBe(false);
     expect(keypadPayFor("+18455550133")).toBe(false);
   });
-  it("text CATALOG: any capitals or catalogue; not active until texting is approved; once on, once per number per day, never after STOP", async () => {
+  it("text CATALOG: any capitals or catalogue; on since texting was approved (Nov 16, 2026); once per number per day, never after STOP", async () => {
     const { isCatalogText, replyToCatalogText, SMS_CATALOG_REPLY_ON } = await import("@/lib/catalog-send");
-    expect(SMS_CATALOG_REPLY_ON).toBe(false);
+    expect(SMS_CATALOG_REPLY_ON).toBe(true);
     for (const t of ["catalog", "CATALOG", "Catalogue", " catalog. "]) expect(isCatalogText(t), t).toBe(true);
     for (const t of ["send me a catalog", "cat", ""]) expect(isCatalogText(t), t).toBe(false);
     const sent: string[] = [];
@@ -285,9 +285,9 @@ describe("Nov 12 decisions: staff reject, caller ID, after hours, keypad pay, CA
       await db.insert(schema.messages).values({ direction: "out", fromNumber: "+18454157585", toNumber: to, contactPhone: to, body, kind: "transactional", event: "catalog_reply", status: "sent" });
       return { sent: true };
     };
-    expect(await replyToCatalogText("+18455550188", { optedOut: false, send })).toEqual({ replied: false, reason: "not_active" });
+    expect(await replyToCatalogText("+18455550188", { optedOut: false, on: false, send })).toEqual({ replied: false, reason: "not_active" });
     expect(sent).toHaveLength(0);
-    expect((await replyToCatalogText("+18455550188", { optedOut: false, on: true, send })).replied).toBe(true);
+    expect((await replyToCatalogText("+18455550188", { optedOut: false, send })).replied).toBe(true); // on by default now
     expect(sent[0]).toBe("Hup Up Attractions: Here is our catalog: hupupattractions.com/#rentals To book, call (845) 777-7585.");
     expect((await replyToCatalogText("+18455550188", { optedOut: false, on: true, send })).reason).toBe("already_today");
     expect((await replyToCatalogText("+18455550199", { optedOut: true, on: true, send })).reason).toBe("opted_out");

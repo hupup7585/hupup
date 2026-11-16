@@ -111,7 +111,7 @@ describe.skipIf(!hasDb)("SMS: inbound, keywords, status, sending", async () => {
     expect(detectKeyword("Unsubscribe")).toBe("stop");
     expect(detectKeyword("start")).toBe("start");
     expect(detectKeyword("help")).toBe("help");
-    expect(detectKeyword("stop by at 5?")).toBeNull();
+    expect(detectKeyword("stop by at 5?")).toBe("nopromo"); // Abraham, Nov 16, 2026: any other sentence with STOP stops promos only
 
     const [c0] = await db.select().from(schema.customers).where(eq(schema.customers.phone, phone));
     await db.update(schema.customers).set({ marketingOptIn: true }).where(eq(schema.customers.id, c0.id));

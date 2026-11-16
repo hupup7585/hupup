@@ -23,17 +23,22 @@ export async function sendTemplateAction(orderId: number, key: TemplateKey): Pro
   // Delivery staff (Abraham U): only for an order that is one of their current stops (delivery or pickup today,
   // or yesterday's late stop), and only to that order's own phone number (taken from the order, never the browser).
   if (staff.role === "delivery" && (!isCurrentStop(full.order) || !hasAnyStop(full.order, staff.userId))) return { ok: false, message: "You can only text the customer of one of your own stops today." };
+  // The stop's newest photo goes with the template as a picture text (Abraham, Nov 16, 2026); a link only Twilio uses
+  const { desc, eq } = await import("drizzle-orm");
+  const { deliveryPhotoLink } = await import("@/lib/signed-link");
+  const [photo] = await db.select({ id: schema.deliveryPhotos.id }).from(schema.deliveryPhotos).where(eq(schema.deliveryPhotos.orderId, orderId)).orderBy(desc(schema.deliveryPhotos.createdAt)).limit(1);
   const r = await sendOrderText({
     phone: full.customer.phone,
     email: full.customer.email,
     subject: `${BUSINESS_NAME} order #${orderNumber(orderId)}`,
     body: t.body,
+    mediaUrls: photo ? [deliveryPhotoLink(photo.id)] : [],
     orderId,
     customerId: full.customer.id,
     userId: staff.userId,
     event: `delivery_${key}`,
   });
-  return { ok: r.texted || r.emailed, message: r.texted ? `Sent: ${t.label}` : r.message };
+  return { ok: r.texted || r.emailed, message: r.texted ? `Sent: ${t.label}${photo ? " (with the photo)" : ""}` : r.message };
 }
 
 /** Delivered (delivery stop) or Picked up (pickup stop). Audited. */

@@ -109,7 +109,7 @@ export async function handleCatalogEmail(senderRaw: string, subject: string | nu
 }
 
 /** Section 18: texting CATALOG to the hotline gets the catalog text back. Not active yet: waits for Twilio texting. */
-export const SMS_CATALOG_REPLY_ON = false;
+export const SMS_CATALOG_REPLY_ON = true; // Abraham, Nov 16, 2026: on (same text as key 8; once per number per day; never after STOP)
 
 /** The whole text is "catalog" or "catalogue", any capitals, spaces and punctuation ignored. */
 export function isCatalogText(body: string | null | undefined): boolean {

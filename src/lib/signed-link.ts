@@ -60,3 +60,16 @@ export function verifyLiveVoiceLink(t: string | null, sig: string | null): strin
   const got = Buffer.from(sig);
   return want.length === got.length && timingSafeEqual(want, got) ? text : null;
 }
+
+/** A delivery photo for a picture text: Twilio fetches it once; the link works for 30 minutes only (Abraham, Nov 16, 2026). */
+const signPhoto = (id: number, exp: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`delivery-photo:${id}:${exp}`).digest("hex").slice(0, 32);
+export function deliveryPhotoLink(id: number, now = Date.now()): string {
+  const exp = Math.floor(now / 1000) + 30 * 60;
+  return `${config.baseUrl()}/api/media/delivery-photo/${id}?exp=${exp}&sig=${signPhoto(id, exp)}`;
+}
+export function verifyDeliveryPhotoLink(id: number, exp: number, sig: string | null, now = Date.now()): boolean {
+  if (!sig || !Number.isInteger(id) || !Number.isFinite(exp) || exp * 1000 < now) return false;
+  const want = Buffer.from(signPhoto(id, exp));
+  const got = Buffer.from(sig);
+  return want.length === got.length && timingSafeEqual(want, got);
+}

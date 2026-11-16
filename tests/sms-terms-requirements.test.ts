@@ -106,7 +106,7 @@ describe("5. opt-out requests", () => {
     for (const k of OPT_OUT_KEYWORDS) expect(detectKeyword(k), k).toBe("stop");
   });
   it("other reasonable requests to stop", () => {
-    for (const w of ["Don't text me anymore", "please do not text this number", "No more texts please", "remove me from your list", "take me off your list", "I don't want these messages", "wrong number stop", "leave me alone"]) {
+    for (const w of ["Don't text me anymore", "please do not text this number", "No more texts please", "remove me from your list", "take me off your list", "I don't want these messages", "wrong number", "leave me alone"]) {
       const d = detectKeywordDetail(w);
       expect(d.keyword, w).toBe("stop");
       expect(d.exact, w).toBe(false); // the app sends the one confirmation itself

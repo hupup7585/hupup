@@ -13,8 +13,8 @@ export async function sendSms(to: string, body: string, opts: Omit<SendInput, "t
  * Order/service text with the required fallback: if the customer has no order-text consent, don't text; email
  * when there is an address; otherwise report "No text consent; call or email." for staff.
  */
-export async function sendOrderText(input: { phone: string; email?: string | null; subject: string; body: string; orderId?: number | null; customerId?: number | null; userId?: number | null; event: string }): Promise<{ texted: boolean; emailed: boolean; message: string }> {
-  const r = await sendSms(input.phone, input.body, { kind: "transactional", event: input.event, orderId: input.orderId, customerId: input.customerId, userId: input.userId });
+export async function sendOrderText(input: { phone: string; email?: string | null; subject: string; body: string; orderId?: number | null; customerId?: number | null; userId?: number | null; event: string; mediaUrls?: string[] }): Promise<{ texted: boolean; emailed: boolean; message: string }> {
+  const r = await sendSms(input.phone, input.body, { kind: "transactional", event: input.event, orderId: input.orderId, customerId: input.customerId, userId: input.userId, ...(input.mediaUrls?.length ? { mediaUrls: input.mediaUrls } : {}) });
   if (r.sent) return { texted: true, emailed: false, message: "Texted" };
   if (r.blocked === "no_transactional_consent" || r.blocked === "opted_out") {
     if (input.email) {

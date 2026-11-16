@@ -54,6 +54,9 @@ export const SETTING_DEFAULTS = {
   achirdWholeLine: false,
   /** Google voice for the changing parts (option B): Owner-only, off. Needs GOOGLE_TTS_API_KEY; costs money. */
   googleLiveVoice: false,
+  /** Texting test window (Abraham, Nov 16, 2026): on until he says OK after the four tests; then everyone gets texts. */
+  smsTestOnly: true,
+  smsTestNumbers: "+18457777585\n+18457990925",
   deliveryAreasLoadedAt: "",
   /** The $10 streets (Hark's Kiryas Joel list, Nov 15, 2026), one per line. Every other address in the delivery areas
    * is $15 (Ruach Hchaim $20). Owner-editable in Admin > Delivery settings. */

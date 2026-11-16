@@ -124,10 +124,9 @@ describe("written promotional consent (phone keypress only sends a confirmation 
 });
 
 describe("WRONG NUMBER (v2) and the terms page", () => {
-  it("WRONG NUMBER removes the number in v2 only", () => {
+  it("WRONG NUMBER removes the number (Abraham's stop list, Nov 16, 2026)", () => {
     expect(detectKeywordDetail("Wrong number", true)).toEqual({ keyword: "stop", exact: false });
     expect(detectKeywordDetail("sorry wrong number!", true).keyword).toBe("stop");
-    expect(detectKeywordDetail("Wrong number", false).keyword).toBeNull();
     expect(detectKeywordDetail("Is the bounce house the wrong size?", true).keyword).toBeNull();
   });
 

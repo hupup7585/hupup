@@ -1,4 +1,5 @@
 import InboxCard from "./InboxCard";
+import FailedTextsCard from "./FailedTextsCard";
 import SearchBar from "@/components/SearchBar";
 import { Download, Trophy } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
@@ -75,6 +76,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
       <MyTasksCard staff={staff} />
       <InboxCard />
+      <FailedTextsCard />
       <NotActive k="sms" />
       <NotActive k="payments" />
 
