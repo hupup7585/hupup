@@ -41,6 +41,7 @@ const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/R
 const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&apos;/g, "'").replace(/&amp;/g, "&"));
 
 let productId = 0;
+let catId = 0;
 const DAY1 = "2026-12-01";
 const DAY2 = "2026-12-08";
 
@@ -50,24 +51,28 @@ beforeAll(async () => {
   const [cat] = await db.insert(schema.categories).values({ name: "Jumping Balloons", spokenName: "Jumping Balloons", ivrDigit: 1, sortOrder: 1, active: true }).returning();
   const [p] = await db.insert(schema.products).values({ categoryId: cat.id, name: "Castle", priceCents: 20000, quantity: 3, active: true, sortOrder: 1 }).returning();
   productId = p.id;
+  catId = cat.id;
 });
 
 describe("key 1: date first, several days, one charge", () => {
   it("item first, then the date (Abraham, Nov 9); the chosen day is kept for more items", async () => {
     expect(redirect(await call("menu-choice", { Digits: "1" }))).toBe("book");
     expect(said(await call("book"))[0]).toBe("Please note, orders can be placed only through our automated system. For information or questions, press 0 for customer service.");
-    expect(redirect(await call("category-choice", { Digits: "1" }, "c=1"))).toBe(`date?p=${productId}`);
+    expect(redirect(await call("category-choice", { Digits: "1" }, `c=${catId}`))).toBe(`date?p=${productId}`);
     expect(said(await call("date", {}, `p=${productId}`))[0]).toMatch(/^Please enter your event date: two digits for the month/);
     expect(redirect(await call("date-confirm", { Digits: "#" }, `d=${DAY1}`))).toBe("book");
     expect(h.session.data.day).toBe(DAY1);
-    expect(said(await call("category", {}, "c=1"))).toContain("To go to your shopping cart, press 0."); // the bookings menu's 0 is customer service now
+    expect(said(await call("category", {}, `c=${catId}`))).toContain("To go to your shopping cart, press 0."); // the bookings menu's 0 is customer service now
   });
 
-  it("after an item: Abraham's two lines; 1 = same day, 2 = another day", async () => {
+  it("after a jumping balloon (Abraham, Nov 17): the item added line, ocean balls, then keep shopping (1) or the cart (0); 2 still books another day", async () => {
     expect(redirect(await call("product-choice", { Digits: "2" }, `p=${productId}`))).toBe(`qty?p=${productId}&d=${DAY1}`);
-    const added = said(await call("add", {}, `p=${productId}&d=${DAY1}&q=1`));
-    expect(added).toContain("For the same day, press 1. For another day, press 2.");
-    expect(added).toContain("To go to your shopping cart, press 0.");
+    const addXml = await call("add", {}, `p=${productId}&d=${DAY1}&q=1`);
+    expect(said(addXml)).toContain("This item is successfully added to your cart.");
+    expect(redirect(addXml)).toBe(`ocean?d=${DAY1}`);
+    expect(said(await call("ocean", {}, `d=${DAY1}`))).toEqual(["Would you like to add ocean balls? To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3. To skip, press pound."]);
+    expect(redirect(await call("ocean-choice", { Digits: "#" }, `d=${DAY1}`))).toBe("added-menu");
+    expect(said(await call("added-menu"))[0]).toBe("To keep shopping, press 1. To go to your shopping cart, press 0.");
     expect(redirect(await call("after-add", { Digits: "1" }))).toBe("book");
     expect(redirect(await call("after-add", { Digits: "0" }))).toBe("cart");
     expect(redirect(await call("after-add", { Digits: "2" }))).toBe("date");

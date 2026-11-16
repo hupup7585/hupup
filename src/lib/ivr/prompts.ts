@@ -129,12 +129,14 @@ export const PROMPTS = {
   book_date_prompt: { group: "Booking by item (key 1)", label: "Ask for the event date (keypad)", text: "Please enter your event date: two digits for the month, then two digits for the day. For example, for March 5th, press 0, 3, 0, 5." },
   book_date_entered: { group: "Booking by item (key 1)", label: "Confirm the date", text: "You entered {date}. If that is correct, press pound to continue. To enter a different date, press 1.", vars: ["date"] },
   // Abraham, Nov 15, 2026: unfinished cart from the last call (drafts for his OK)
-  resume_offer: { group: "Booking by item (key 1)", label: "Welcome back: last call's unfinished cart", text: "Welcome back! On your last call you had {items} in your cart. To check if they are still available, press 1. To start a new order, press 2.", vars: ["items"], pending: true },
-  resume_free_one: { group: "Booking by item (key 1)", label: "Unfinished cart, one item: free", text: "Good news! The {item} is free for {date}, as you chose. To add it to your cart and check out, press 1. To start a new order, press 2.", vars: ["item", "date"], pending: true },
-  resume_free: { group: "Booking by item (key 1)", label: "Unfinished cart, several items: one is free", text: "The {item} is free for {date}, as you chose. To add it to your cart, press {key}.", vars: ["item", "date", "key"], pending: true },
-  resume_taken: { group: "Booking by item (key 1)", label: "Unfinished cart, several items: one is taken", text: "The {item} is no longer available for {date}. For the nearest options, press {key}.", vars: ["item", "date", "key"], pending: true },
-  resume_done: { group: "Booking by item (key 1)", label: "Unfinished cart: finish", text: "When you are done, press pound to go to your cart.", pending: true },
-  resume_added: { group: "Booking by item (key 1)", label: "Unfinished cart: added", text: "The {item} is now in your cart.", vars: ["item"], pending: true },
+  // Welcome back (Abraham, Nov 17, 2026), his wording: approved. {items} = "one Castle and one Laser tag set for Tuesday, December 22"
+  resume_offer: { group: "Booking by item (key 1)", label: "Welcome back: last call's unfinished cart", text: "Welcome back! On your last call you had in your cart {items}. To check if they are still available, press 1. To start a new order, press 2.", vars: ["items"] },
+  resume_free_one: { group: "Booking by item (key 1)", label: "Unfinished cart, one item: free", text: "Good news! The {item} is free for {date}, as you chose. To add it to your cart and check out, press 1. To start a new order, press 2.", vars: ["item", "date"] },
+  resume_free: { group: "Booking by item (key 1)", label: "Unfinished cart, several items: one is free", text: "The {item} is free for {date}, as you chose. To add it to your cart, press {key}.", vars: ["item", "date", "key"] },
+  resume_taken: { group: "Booking by item (key 1)", label: "Unfinished cart, several items: one is taken", text: "The {item} is no longer available for {date}. For the nearest options, press {key}.", vars: ["item", "date", "key"] },
+  // Item taken, whole phone system (Abraham, Nov 17, 2026), his wording
+  item_taken: { group: "Booking by item (key 1)", label: "Item not available (whole phone system)", text: "The {item} is no longer available for {date}. For the nearest options, press {key}.", vars: ["item", "date", "key"] },
+  taken_options: { group: "Booking by item (key 1)", label: "Item not available: same date or nearest date", text: "For the same date, press 1. For the nearest date this item is free, press 2." },
   booked_intro: { group: "Booking by item (key 1)", label: "Item booked that day", text: "I am sorry, the {item} is already booked on {date}.", vars: ["item", "date"] },
   booked_closest: { group: "Booking by item (key 1)", label: "Closest options intro", text: "Here are the closest options for that day." },
   booked_bigger: { group: "Booking by item (key 1)", label: "Next size up", text: "For the next size up, the {item}, press 1.", vars: ["item"] },
@@ -163,6 +165,11 @@ export const PROMPTS = {
   just_booked: { group: "Date & quantity", label: "Someone just booked it", text: "Oh no, someone just grabbed the last {item} for that date.", vars: ["item"] },
 
   // Cart
+  // Item added, whole phone system (Abraham, Nov 17, 2026), his wording
+  item_added: { group: "Cart", label: "Item added to cart (every time)", text: "This item is successfully added to your cart." },
+  keep_shopping: { group: "Cart", label: "After an item is added: keep shopping or the cart", text: "To keep shopping, press 1. To go to your shopping cart, press 0." },
+  // Ocean balls after every jumping balloon (Abraham, Nov 17, 2026), his wording ("#" is said as pound)
+  ocean_balls: { group: "Cart", label: "Ocean balls (after every jumping balloon)", text: "Would you like to add ocean balls? To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3. To skip, press pound." },
   added: { group: "Cart", label: "Item added to cart", text: "Woohoo! I added {items} to your cart for {date}. It's saved just for you while we are on the phone.", vars: ["items", "date"] },
   after_add: { group: "Cart", label: "After adding", text: "To keep shopping, press 1. To check out, press 9." },
   cart_empty: { group: "Cart", label: "Cart is empty (Abraham, Phone Menu v3)", text: "Your cart is empty. Let us start shopping!" },

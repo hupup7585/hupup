@@ -32,11 +32,12 @@ beforeEach(async () => {
   h.session.orderId = null;
   if (!castle) {
     const [c] = await db.insert(schema.categories).values({ name: "Bounce", sortOrder: 1, active: true }).returning();
+    const [lt] = await db.insert(schema.categories).values({ name: "Laser Tag", sortOrder: 2, active: true }).returning();
     const [a, b] = await db
       .insert(schema.products)
       .values([
         { categoryId: c.id, name: "Castle", priceCents: 20000, quantity: 1, sizeOrder: 2, active: true },
-        { categoryId: c.id, name: "Laser tag set", priceCents: 30000, quantity: 1, active: true },
+        { categoryId: lt.id, name: "Laser tag set", priceCents: 30000, quantity: 1, active: true },
       ])
       .returning();
     castle = a.id;
@@ -60,7 +61,7 @@ describe("unfinished phone order", () => {
     void callOrdersFor;
     expect(redirect(await call("book"))).toBe("resume");
     const offer = await call("resume");
-    expect(said(offer).join(" ")).toContain("Welcome back! On your last call you had one Castle and one Laser tag set for Tuesday, December 22 in your cart. To check if they are still available, press 1. To start a new order, press 2.");
+    expect(said(offer).join(" ")).toContain("Welcome back! On your last call you had in your cart one Castle and one Laser tag set for Tuesday, December 22. To check if they are still available, press 1. To start a new order, press 2.");
     expect(redirect(await call("resume-choice", { Digits: "1" }))).toBe("resume-items");
     // nothing in the cart yet
     expect(h.session.data.dayOrderIds ?? []).toEqual([]);
@@ -71,14 +72,14 @@ describe("unfinished phone order", () => {
     const items = said(await call("resume-items")).join(" ");
     expect(items).toContain("The Castle is no longer available for Tuesday, December 22. For the nearest options, press 1.");
     expect(items).toContain("The Laser tag set is free for Tuesday, December 22, as you chose. To add it to your cart, press 2.");
-    expect(items).toContain("When you are done, press pound to go to your cart.");
+    expect(items).not.toContain("When you are done, press pound to go to your cart."); // removed (Abraham, Nov 17)
     // 2 adds the Laser tag set
     const added = await call("resume-pick", { Digits: "2" });
-    expect(said(added).join(" ")).toContain("The Laser tag set is now in your cart.");
+    expect(said(added)).toEqual(["This item is successfully added to your cart."]); // laser tag: no ocean balls
     expect((h.session.data.dayOrderIds as number[]).length).toBe(1);
     expect(redirect(added)).toBe("resume-items");
     // 1 for the Castle: its nearest options
-    expect(redirect(await call("resume-pick", { Digits: "1" }))).toBe(`booked?p=${castle}&d=2026-12-22`);
+    expect(redirect(await call("resume-pick", { Digits: "1" }))).toBe(`booked-near?p=${castle}&d=2026-12-22`); // same date or nearest date
     // asked once only
     expect(redirect(await call("book"))).not.toBe("resume");
     void laser;
@@ -91,6 +92,15 @@ describe("unfinished phone order", () => {
     const r = await call("resume-pick", { Digits: "1" });
     expect(redirect(r)).toBe("cart");
     expect(h.session.data.dayOrderIds).toEqual([hold.id]);
+  });
+  it("a jumping balloon added back: the item added line, then ocean balls, then the next item", async () => {
+    const [hold] = await db.insert(schema.orders).values({ status: "HOLD", channel: "PHONE", eventDate: "2027-01-05", pickupDate: "2027-01-06", holdExpiresAt: new Date(Date.now() + 600_000), callSid: "CAnew" }).returning();
+    await db.insert(schema.orderItems).values({ orderId: hold.id, productId: castle, qty: 1, unitPriceCents: 20000 });
+    h.session.data = { resumeAsked: 1, resumeLines: [{ p: castle, name: "Castle", qty: 1, d: "2027-01-05", holdId: hold.id, state: "free" }, { p: laser, name: "Laser tag set", qty: 1, d: "2027-01-05", holdId: null, state: "taken" }] };
+    const r = await call("resume-pick", { Digits: "1" });
+    expect(said(r)).toEqual(["This item is successfully added to your cart."]);
+    expect(redirect(r)).toBe("ocean?d=2027-01-05&n=resume");
+    expect(redirect(await call("ocean-choice", { Digits: "#" }, "d=2027-01-05&n=resume"))).toBe("resume-items");
   });
   it("press 2 starts a new order", async () => {
     h.session.data = { resumeAsked: undefined };

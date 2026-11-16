@@ -75,12 +75,17 @@ describe("key 1: booking by item", () => {
     expect(redirect(xml)).toBe(`add?p=${medium}&d=${TUE}&q=1`);
   });
 
-  it("booked: next size up and down (only those free that day), or keep the item and pick another date", async () => {
+  it("item taken (Abraham, Nov 17): the taken line with key 1, then same date (1) or nearest date (2); same date offers the next size up and down", async () => {
     await book(medium, TUE);
     expect(redirect(await call("qty", {}, `p=${medium}&d=${TUE}`))).toBe(`booked?p=${medium}&d=${TUE}`);
-    const both = await call("booked", {}, `p=${medium}&d=${TUE}`);
+    const taken = await call("booked", {}, `p=${medium}&d=${TUE}`);
+    expect(said(taken)[0]).toMatch(/^The Medium Castle is no longer available for Tuesday, December 1(st)?\. For the nearest options, press 1\.$/);
+    expect(redirect(await call("taken-choice", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`booked-near?p=${medium}&d=${TUE}`);
+    expect(said(await call("booked-near", {}, `p=${medium}&d=${TUE}`))).toEqual(["For the same date, press 1. For the nearest date this item is free, press 2."]);
+    expect(redirect(await call("near-choice", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`booked-same?p=${medium}&d=${TUE}`);
+    expect(redirect(await call("near-choice", { Digits: "2" }, `p=${medium}&d=${TUE}`))).toBe(`altdates?p=${medium}&d=${TUE}`);
+    const both = await call("booked-same", {}, `p=${medium}&d=${TUE}`);
     expect(said(both)).toEqual([
-      "I am sorry, the Medium Castle is already booked on Tuesday, December 1st.",
       "Here are the closest options for that day.",
       "For the next size up, the Large Castle, press 1.",
       "For the next size down, the Small Castle, press 2.",
@@ -89,7 +94,7 @@ describe("key 1: booking by item", () => {
     expect(redirect(await call("booked-choice", { Digits: "1" }, action(both)!.split("?")[1]))).toBe(`qty?p=${large}&d=${TUE}`);
     expect(redirect(await call("booked-choice", { Digits: "2" }, action(both)!.split("?")[1]))).toBe(`qty?p=${small}&d=${TUE}`);
     await book(large, TUE);
-    const onlySmall = said(await call("booked", {}, `p=${medium}&d=${TUE}`));
+    const onlySmall = said(await call("booked-same", {}, `p=${medium}&d=${TUE}`));
     expect(onlySmall).not.toContain("For the next size up, the Large Castle, press 1.");
     expect(onlySmall).toContain("For the next size down, the Small Castle, press 2.");
     expect(redirect(await call("booked-choice", { Digits: "3" }, `p=${medium}&d=${TUE}&s=${small}`))).toBe(`altdates?p=${medium}&d=${TUE}`);

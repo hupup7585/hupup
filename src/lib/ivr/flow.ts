@@ -270,9 +270,23 @@ async function hotlineClosed(ctx: Ctx, vr: VR): Promise<VR | null> {
   return vmRecord(vr, await vmBox("9"), "closed");
 }
 
+/** Item lists with 10 or more items: seconds to wait for a second key after the first (Abraham, Nov 17, 2026). */
+export const MULTI_KEY_WAIT_SECONDS = 2;
+
+/** The three ocean ball sets (a hidden category "Ocean balls", sizes 1 to 3: 200, 500 and 700 balls). */
+async function oceanBallProducts() {
+  return db
+    .select({ id: products.id, name: products.name })
+    .from(products)
+    .innerJoin(categories, eq(products.categoryId, categories.id))
+    .where(and(eq(categories.name, OCEAN_BALLS_CATEGORY), eq(products.active, true)))
+    .orderBy(asc(products.sizeOrder), asc(products.id));
+}
+export const OCEAN_BALLS_CATEGORY = "Ocean balls";
+
 type ResumeLine = NonNullable<CallSession["data"]["resumeLines"]>[number];
 
-const RESUME_PROMPTS = ["resume_offer", "resume_free_one", "resume_free", "resume_taken", "resume_done", "resume_added"] as const;
+const RESUME_PROMPTS = ["resume_offer", "resume_free_one", "resume_free", "resume_taken"] as const;
 
 /** Unfinished-cart offer: once Abraham approves its two lines; on preview it runs for his test. */
 function resumeActive(ctx: Ctx, env: Record<string, string | undefined> = process.env) {
@@ -342,7 +356,8 @@ async function phoneCategories() {
 }
 
 async function phoneProducts(categoryId: number) {
-  return (await categoryProducts(categoryId)).slice(0, 9); // keypad 1-9
+  // Every item (Abraham, Nov 17, 2026): item 10 is "press 10" (two keys); lists of 10 or more wait briefly for a second key
+  return (await categoryProducts(categoryId)).slice(0, 99);
 }
 
 async function getProduct(id: number) {
@@ -1210,7 +1225,7 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("resume-choice"));
     // grouped by day: "one Castle and one Laser tag set for Tuesday, December 22"
     const byDay = [...new Set(lines.map((l) => l.date))].map((d) => `${lines.filter((l) => l.date === d).map((l) => itemPhrase(l.qty, l.name)).join(" and ")} for ${longDate(d)}`);
-    sp(g, ctx, "resume_offer", { items: byDay.join(", and ") }, { draftOk: true });
+    sp(g, ctx, "resume_offer", { items: byDay.join(", and ") });
     return idleNoKey(vr, ctx, "book");
   },
 
@@ -1243,13 +1258,12 @@ const handlers: Record<string, Handler> = {
     if (!open.length) return back(vr, "cart");
     const g = keypad(vr, url("resume-pick"));
     if (lines.length === 1 && open[0].state === "free") {
-      sp(g, ctx, "resume_free_one", { item: open[0].name, date: longDate(open[0].d) }, { draftOk: true });
+      sp(g, ctx, "resume_free_one", { item: open[0].name, date: longDate(open[0].d) });
     } else {
       lines.forEach((l, i) => {
-        if (l.state === "free") sp(g, ctx, "resume_free", { item: l.name, date: longDate(l.d), key: i + 1 }, { draftOk: true });
-        else if (l.state === "taken") sp(g, ctx, "resume_taken", { item: l.name, date: longDate(l.d), key: i + 1 }, { draftOk: true });
+        if (l.state === "free") sp(g, ctx, "resume_free", { item: l.name, date: longDate(l.d), key: i + 1 });
+        else if (l.state === "taken") sp(g, ctx, "resume_taken", { item: l.name, date: longDate(l.d), key: i + 1 });
       });
-      sp(g, ctx, "resume_done", undefined, { draftOk: true });
     }
     return idleNoKey(vr, ctx, "resume-items");
   },
@@ -1258,7 +1272,7 @@ const handlers: Record<string, Handler> = {
     const lines = [...(ctx.session?.data.resumeLines ?? [])];
     const d = ctx.body.Digits ?? "";
     const single = lines.length === 1;
-    if (d === "#" || (single && d === "2")) {
+    if (d === "#" || d === "0" || (single && d === "2")) {
       // done: release what was not added, then the cart (or a new order when nothing was added)
       for (const l of lines) if (l.state === "free" && l.holdId) await cancelHold(l.holdId);
       await updateSession(ctx.callSid, { data: { resumeLines: lines.map((l) => (l.state === "added" ? l : { ...l, state: "done" as const })) } }, ctx.session);
@@ -1273,7 +1287,7 @@ const handlers: Record<string, Handler> = {
     if (l.state === "taken") {
       lines[i] = { ...l, state: "done" };
       await updateSession(ctx.callSid, { data: { resumeLines: lines } }, ctx.session);
-      return back(vr, "booked", { p: l.p, d: l.d }); // the nearest options: a size up or down, or another day
+      return back(vr, "booked-near", { p: l.p, d: l.d }); // Abraham (Nov 17): same date, or the nearest date it is free
     }
     // free: move its hold into the cart (the day's cart order if there is one)
     const session = ctx.session ?? (await ensureSession(ctx.callSid, ctx.from));
@@ -1290,7 +1304,10 @@ const handlers: Record<string, Handler> = {
     const ids = [...new Set([...(session.data?.dayOrderIds ?? []), cartOrder])];
     await updateSession(ctx.callSid, { orderId: cartOrder, outcome: "carted", data: { day: l.d, dayOrderIds: ids, resumeLines: lines } }, session);
     await track(ctx.callSid, "item_added", `Added ${itemPhrase(l.qty, l.name)} for ${longDate(l.d)} from the last call`, { item: l.name, productId: l.p, qty: l.qty, date: l.d, orderId: cartOrder });
-    sp(vr, ctx, "resume_added", { item: l.name }, { draftOk: true });
+    // Abraham (Nov 17): the item added line, ocean balls after a jumping balloon, then the next item
+    sp(vr, ctx, "item_added");
+    const prod = await getProduct(l.p);
+    if (prod && (await isBounceHouse(prod.categoryId))) return back(vr, "ocean", { d: l.d, n: "resume" });
     // one item: straight to the cart and checkout; several: the list again for the rest
     return back(vr, single ? "cart" : "resume-items");
   },
@@ -1318,7 +1335,8 @@ const handlers: Record<string, Handler> = {
       return back(vr, "menu");
     }
     await track(ctx.callSid, "category_heard", `Listened to ${cat.name}`, { category: cat.name, items: items.map((p) => p.name) });
-    const g = keypad(vr, url("category-choice", { c }));
+    // 10 or more items (Abraham, Nov 17, 2026): two-key choices (10, 11, 12) work; a single key acts after a short wait
+    const g = keypad(vr, url("category-choice", { c }), items.length > 9 ? { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS } : {});
     sp(g, ctx, "book_category_list", { category: cat.spokenName || cat.name });
     sp(g, ctx, "cart_key"); // Abraham (Phone Menu v3): the cart line before the items and again after them
     items.forEach((p, i) => sp(g, ctx, "category_item", { item: p.name, key: i + 1 }));
@@ -1334,7 +1352,7 @@ const handlers: Record<string, Handler> = {
     if (d === "*") return back(vr, "book"); // one step back: the bookings menu
     if (d === "0") return back(vr, "cart", { c }); // after the cart, the same item list plays again
     const items = await phoneProducts(c);
-    const p = items[Number(d) - 1];
+    const p = /^\d{1,2}$/.test(d) && !d.startsWith("0") ? items[Number(d) - 1] : undefined;
     if (!p) {
       sp(vr, ctx, "not_valid");
       return back(vr, "category", { c });
@@ -1437,20 +1455,65 @@ const handlers: Record<string, Handler> = {
     return p ? back(vr, "qty", { p, d: date }) : back(vr, "book");
   },
 
-  /** The item is booked on that day: next size up / down that's free, or keep the item and pick another date. */
+  /**
+   * The item is not available (Abraham, Nov 17, 2026, whole phone system): "The {item} is no longer available for
+   * {date}. For the nearest options, press 1." Then the same date (the closest items) or the nearest date it is free.
+   */
   async booked(ctx, vr) {
+    const p = await getProduct(Number(ctx.query.get("p")));
+    const date = ctx.query.get("d")!;
+    if (!p) return back(vr, "menu");
+    const g = keypad(vr, url("taken-choice", { p: p.id, d: date }));
+    sp(g, ctx, "item_taken", { item: p.name, date: longDate(date), key: 1 });
+    sp(g, ctx, "cart_key");
+    return bookNoInput(vr, ctx, "booked", { p: p.id, d: date });
+  },
+
+  async "taken-choice"(ctx, vr) {
+    const p = Number(ctx.query.get("p"));
+    const date = ctx.query.get("d")!;
+    const d = ctx.body.Digits;
+    if (d === "1") return back(vr, "booked-near", { p, d: date });
+    if (d === "0") return back(vr, "cart");
+    if (d === "*") return back(vr, "menu");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "booked", { p, d: date });
+  },
+
+  /** "For the same date, press 1. For the nearest date this item is free, press 2." */
+  "booked-near"(ctx, vr) {
+    const p = ctx.query.get("p")!;
+    const date = ctx.query.get("d")!;
+    const g = keypad(vr, url("near-choice", { p, d: date }));
+    sp(g, ctx, "taken_options");
+    return bookNoInput(vr, ctx, "booked-near", { p, d: date });
+  },
+
+  async "near-choice"(ctx, vr) {
+    const p = ctx.query.get("p")!;
+    const date = ctx.query.get("d")!;
+    const d = ctx.body.Digits;
+    if (d === "1") return back(vr, "booked-same", { p, d: date }); // the closest items free on the same date
+    if (d === "2") return back(vr, "altdates", { p, d: date }); // the nearest dates this item is free
+    if (d === "0") return back(vr, "cart");
+    if (d === "*") return back(vr, "menu");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "booked-near", { p, d: date });
+  },
+
+  /** Same date: the next size up / down that's free, or keep the item and pick another date. */
+  async "booked-same"(ctx, vr) {
     const p = await getProduct(Number(ctx.query.get("p")));
     const date = ctx.query.get("d")!;
     if (!p) return back(vr, "menu");
     const cal = await getSettings();
     const [big, small] = await Promise.all([nearestSize(p, date, 1, cal), nearestSize(p, date, -1, cal)]);
     const g = keypad(vr, url("booked-choice", { p: p.id, d: date, b: big?.id, s: small?.id }));
-    sp(g, ctx, "booked_intro", { item: p.name, date: spokenDate(date) });
     if (big || small) sp(g, ctx, "booked_closest");
     if (big) sp(g, ctx, "booked_bigger", { item: big.name });
     if (small) sp(g, ctx, "booked_smaller", { item: small.name });
     sp(g, ctx, "booked_keep", { item: p.name });
-    return bookNoInput(vr, ctx, "booked", { p: p.id, d: date });
+    return bookNoInput(vr, ctx, "booked-same", { p: p.id, d: date });
   },
 
   async "booked-choice"(ctx, vr) {
@@ -1465,7 +1528,7 @@ const handlers: Record<string, Handler> = {
     if (d === "*") return back(vr, "menu");
     if (d === "0") return back(vr, "cart");
     sp(vr, ctx, "not_valid");
-    return back(vr, "booked", { p, d: date });
+    return back(vr, "booked-same", { p, d: date });
   },
 
   /** Same item, another date: the day before / after, else the nearest open dates before and after. */
@@ -1579,27 +1642,68 @@ const handlers: Record<string, Handler> = {
     await track(ctx.callSid, "item_added", `Added ${itemPhrase(q, p.name)} for ${longDate(date)}`, { item: p.name, productId: p.id, qty: q, date, orderId: r.orderId });
     const ids = [...new Set([...(session.data?.dayOrderIds ?? []), r.orderId])];
     await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted", data: { day: date, dayOrderIds: ids } }, session);
+    // Abraham (Nov 17, 2026): the item added line every time; ocean balls after a jumping balloon; then keep shopping
+    if (await isBounceHouse(p.categoryId)) {
+      sp(vr, ctx, "item_added");
+      return back(vr, "ocean", { d: date });
+    }
     const g = keypad(vr, url("after-add"));
-    sp(g, ctx, "added", { items: itemPhrase(q, p.name), date: longDate(date) });
-    sp(g, ctx, "day_choice");
-    sp(g, ctx, "cart_key");
+    sp(g, ctx, "item_added");
+    sp(g, ctx, "keep_shopping");
+    return noInput(vr, ctx, "cart");
+  },
+
+  /** "To keep shopping, press 1. To go to your shopping cart, press 0." */
+  "added-menu"(ctx, vr) {
+    const g = keypad(vr, url("after-add"));
+    sp(g, ctx, "keep_shopping");
     return noInput(vr, ctx, "cart");
   },
 
   async "after-add"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "*") return back(vr, "menu"); // star always returns to the main menu (as in the other sub-menus)
-    if (d === "1") return back(vr, "book"); // same day: more items
-    if (d === "2") return back(vr, "date"); // another day: ask the day, then the items for that day
+    if (d === "1") return back(vr, "book"); // keep shopping (the same day; the date was already chosen)
+    if (d === "2") return back(vr, "date"); // another day: not read out any more (Nov 17), still works for several days
     if (d === "0") return back(vr, "cart");
     if (d) {
       sp(vr, ctx, "not_valid");
-      const g = keypad(vr, url("after-add"));
-      sp(g, ctx, "day_choice");
-      sp(g, ctx, "cart_key");
-      return noInput(vr, ctx, "cart");
+      return back(vr, "added-menu");
     }
     return noInput(vr, ctx, "cart");
+  },
+
+  /** Ocean balls after every jumping balloon (Abraham, Nov 17, 2026): 1 = 200 for $10, 2 = 500 for $15, 3 = 700 for $20, # skips. */
+  ocean(ctx, vr) {
+    const d = ctx.query.get("d")!;
+    const n = ctx.query.get("n") ?? undefined;
+    const g = keypad(vr, url("ocean-choice", { d, n }));
+    sp(g, ctx, "ocean_balls");
+    return bookNoInput(vr, ctx, "ocean", { d, n });
+  },
+
+  async "ocean-choice"(ctx, vr) {
+    const date = ctx.query.get("d")!;
+    const n = ctx.query.get("n") ?? undefined;
+    const next = () => (n === "resume" ? back(vr, "resume-items") : back(vr, "added-menu"));
+    const k = ctx.body.Digits ?? "";
+    if (k === "#") return next();
+    const sets = await oceanBallProducts();
+    const pick = /^[1-3]$/.test(k) ? sets[Number(k) - 1] : undefined;
+    if (!pick) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "ocean", { d: date, n });
+    }
+    // On the same day's order as the balloon, so it is on the order and in the payment total
+    const day = (await callOrders(ctx)).find((o) => o.order.eventDate === date) ?? null;
+    const r = await reserveItem({ orderId: day?.order.id ?? null, productId: pick.id, qty: 1, eventDate: date, channel: "PHONE", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid });
+    if (r.ok) {
+      await track(ctx.callSid, "item_added", `Added ${pick.name} for ${longDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
+      const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), r.orderId])];
+      await updateSession(ctx.callSid, { data: { dayOrderIds: ids } }, ctx.session);
+      sp(vr, ctx, "item_added");
+    } else sp(vr, ctx, "went_wrong");
+    return next();
   },
 
   /** The whole cart: every day on this call, then one total. */

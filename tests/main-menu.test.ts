@@ -361,8 +361,11 @@ describe("wrong key everywhere (Abraham, Nov 16, 2026): the one shared line, the
     });
   it("Item added: the shared line, then the same choices (no other wording)", async () => {
     const xml = await call("after-add", { Digits: "7" });
-    expect(says(xml)[0]).toBe(NOT_VALID);
-    expect(xml).toContain('action="https://hupup.example/api/voice/after-add"');
+    expect(says(xml)).toEqual([NOT_VALID]);
+    expect(redirect(xml)).toBe("added-menu");
+    const menu = await call("added-menu");
+    expect(says(menu)[0]).toBe("To keep shopping, press 1. To go to your shopping cart, press 0.");
+    expect(menu).toContain('action="https://hupup.example/api/voice/after-add"');
   });
   it("a read-back: the shared line, then the same read-back again", async () => {
     h.session.data = { heard: "Yossi Friedman" };

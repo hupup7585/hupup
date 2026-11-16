@@ -1,6 +1,6 @@
 # Hotline recording text list
 
-410 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
+414 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
 
 ## Welcome & main menu
 
@@ -50,8 +50,8 @@ Thank you for choosing Hup Up Attractions! |
 | book_date_prompt | Ask for the event date (keypad) | Please enter your event date: two digits for the month, then two digits for the day. For example, for March 5th, press 0, 3, 0, 5. |
 | book_date_entered#1 | Confirm the date, piece 1 | You entered |
 | book_date_entered#2 | Confirm the date, piece 2 | . If that is correct, press pound to continue. To enter a different date, press 1. |
-| resume_offer#1 | Welcome back: last call's unfinished cart, piece 1 | Welcome back! On your last call you had |
-| resume_offer#2 | Welcome back: last call's unfinished cart, piece 2 | in your cart. To check if they are still available, press 1. To start a new order, press 2. |
+| resume_offer#1 | Welcome back: last call's unfinished cart, piece 1 | Welcome back! On your last call you had in your cart |
+| resume_offer#2 | Welcome back: last call's unfinished cart, piece 2 | . To check if they are still available, press 1. To start a new order, press 2. |
 | resume_free_one#1 | Unfinished cart, one item: free, piece 1 | Good news! The |
 | resume_free_one#2 | Unfinished cart, one item: free, piece 2 | is free for |
 | resume_free_one#3 | Unfinished cart, one item: free, piece 3 | , as you chose. To add it to your cart and check out, press 1. To start a new order, press 2. |
@@ -61,9 +61,10 @@ Thank you for choosing Hup Up Attractions! |
 | resume_taken#1 | Unfinished cart, several items: one is taken, piece 1 | The |
 | resume_taken#2 | Unfinished cart, several items: one is taken, piece 2 | is no longer available for |
 | resume_taken#3 | Unfinished cart, several items: one is taken, piece 3 | . For the nearest options, press |
-| resume_done | Unfinished cart: finish | When you are done, press pound to go to your cart. |
-| resume_added#1 | Unfinished cart: added, piece 1 | The |
-| resume_added#2 | Unfinished cart: added, piece 2 | is now in your cart. |
+| item_taken#1 | Item not available (whole phone system), piece 1 | The |
+| item_taken#2 | Item not available (whole phone system), piece 2 | is no longer available for |
+| item_taken#3 | Item not available (whole phone system), piece 3 | . For the nearest options, press |
+| taken_options | Item not available: same date or nearest date | For the same date, press 1. For the nearest date this item is free, press 2. |
 | booked_intro#1 | Item booked that day, piece 1 | I am sorry, the |
 | booked_intro#2 | Item booked that day, piece 2 | is already booked on |
 | booked_closest | Closest options intro | Here are the closest options for that day. |
@@ -166,6 +167,9 @@ Thank you for choosing Hup Up Attractions! |
 
 | Slot | Line | Exact text |
 |---|---|---|
+| item_added | Item added to cart (every time) | This item is successfully added to your cart. |
+| keep_shopping | After an item is added: keep shopping or the cart | To keep shopping, press 1. To go to your shopping cart, press 0. |
+| ocean_balls | Ocean balls (after every jumping balloon) | Would you like to add ocean balls? To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3. To skip, press pound. |
 | added#1 | Item added to cart, piece 1 | Woohoo! I added |
 | added#2 | Item added to cart, piece 2 | to your cart for |
 | added#3 | Item added to cart, piece 3 | . It's saved just for you while we are on the phone. |
