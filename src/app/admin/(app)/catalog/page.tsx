@@ -111,7 +111,8 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             </details>
             <div className="mt-4 divide-y divide-line">
               {items.map((p) => (
-                <details key={p.id} className="py-3">
+                <div key={p.id} className="flex items-start gap-2 py-3" data-item-row>
+                <details className="min-w-0 flex-1">
                   <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3">
                     <span className="grid h-7 w-7 place-items-center rounded-lg bg-navy text-sm font-black text-white" title="Phone key in this category">{p.active ? items.filter((x) => x.active).indexOf(p) + 1 : "–"}</span>
                     <span className={`flex-1 font-bold ${p.active ? "" : "text-muted line-through"}`}>{p.name}</span>
@@ -122,12 +123,14 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                   <div className="mt-3 grid gap-3 rounded-xl bg-bg p-4">
                     <PhotoUpload kind="product" id={p.id} current={p.imageUrl} />
                     <ProductForm p={p} categories={cats} />
-                    <form action={trashProductAction} className="border-t border-line pt-3" data-trash-item>
-                      <input type="hidden" name="id" value={p.id} />
-                      <ConfirmSubmit message={`Put "${p.name}" in Garbage? It comes off the catalog list, the website and the phone menu. You can restore it from Garbage.`} className="btn-ghost text-coral">Put in Garbage</ConfirmSubmit>
-                    </form>
                   </div>
                 </details>
+                {/* Every item, on its own row (Abraham, Nov 17, 2026): Put in Garbage without opening Edit */}
+                <form action={trashProductAction} data-trash-item>
+                  <input type="hidden" name="id" value={p.id} />
+                  <ConfirmSubmit message={`Put "${p.name}" in Garbage? It comes off the catalog list, the website and the phone menu. You can restore it from Garbage.`} className="btn-ghost px-3 py-1 text-sm text-coral">Put in Garbage</ConfirmSubmit>
+                </form>
+                </div>
               ))}
               {items.length === 0 && <p className="py-3 text-muted">No items yet.</p>}
             </div>
