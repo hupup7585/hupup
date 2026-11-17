@@ -37,6 +37,9 @@ export const SETTING_DEFAULTS = {
   musicStaffWait: "",
   // Email signature (Abraham, Nov 17, 2026): empty = the approved default (src/lib/email-brand.ts)
   emailSignature: "",
+  // Catalog email (Abraham, Nov 17, 2026): the catalog's name (added to the subject) and attach the PDF automatically
+  catalogName: "",
+  catalogAutoAttach: true,
   musicPayConnect: "",
   catalogTextPicture2: "",
   deliveryPromoStart: "",

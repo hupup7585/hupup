@@ -59,19 +59,21 @@ export function brandedEmail(text: string, opts: { baseUrl: string; signature?: 
     .map((p) => `<p style="margin:0 0 16px 0">${p.replace(/\n/g, "<br>").replace(/(https?:\/\/[^\s<]+)/g, `<a href="$1" style="color:${LINK}">$1</a>`)}</p>`)
     .join("");
   const logo = `${opts.baseUrl.replace(/\/$/, "")}${EMAIL_LOGO_PATH}`;
-  const html = `<!doctype html><html><body style="margin:0;padding:24px 12px;background:#EEF2F7;font-family:Helvetica,Arial,sans-serif">
+  // On a phone (Abraham, Nov 17, 2026, item 7): the logo and the name stack, the text gets more room
+  const phoneCss = `@media only screen and (max-width:480px){.hu-hdr td{display:block!important;width:auto!important}.hu-name{padding:10px 0 0 0!important;font-size:20px!important}.hu-logo{width:64px!important;height:64px!important}.hu-pad{padding-left:18px!important;padding-right:18px!important}.hu-body{font-size:15px!important}}`;
+  const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>${phoneCss}</style></head><body style="margin:0;padding:24px 12px;background:#EEF2F7;font-family:Helvetica,Arial,sans-serif">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #D9DEE7;border-radius:14px;overflow:hidden">
-<tr><td style="padding:20px 28px;background:#ffffff">
-<table role="presentation" cellpadding="0" cellspacing="0"><tr>
-<td style="vertical-align:middle"><img src="${logo}" width="80" height="80" alt="Hup Up Attractions" style="display:block;border:0;width:80px;height:80px"></td>
-<td style="vertical-align:middle;padding-left:18px;font-size:24px;font-weight:700;color:${NAVY}">${EMAIL_BUSINESS_NAME}</td>
+<tr><td class="hu-pad" style="padding:20px 28px;background:#ffffff">
+<table role="presentation" class="hu-hdr" cellpadding="0" cellspacing="0"><tr>
+<td style="vertical-align:middle"><img class="hu-logo" src="${logo}" width="80" height="80" alt="Hup Up Attractions" style="display:block;border:0;width:80px;height:80px"></td>
+<td class="hu-name" style="vertical-align:middle;padding-left:18px;font-size:24px;font-weight:700;color:${NAVY}">${EMAIL_BUSINESS_NAME}</td>
 </tr></table>
 </td></tr>
 <tr><td style="height:5px;background:${YELLOW};font-size:0;line-height:0">&nbsp;</td></tr>
-<tr><td style="padding:28px 28px 8px 28px;font-size:16px;line-height:1.6;color:#2B2B2B">${bodyHtml}</td></tr>
-<tr><td style="padding:0 28px"><div style="border-top:1px solid ${BLUE_LINE}"></div></td></tr>
-<tr><td style="padding:20px 28px 28px 28px">${signatureHtml(signature)}</td></tr>
+<tr><td class="hu-pad hu-body" style="padding:28px 28px 8px 28px;font-size:16px;line-height:1.6;color:#2B2B2B">${bodyHtml}</td></tr>
+<tr><td class="hu-pad" style="padding:0 28px"><div style="border-top:1px solid ${BLUE_LINE}"></div></td></tr>
+<tr><td class="hu-pad" style="padding:20px 28px 28px 28px">${signatureHtml(signature)}</td></tr>
 </table>
 </td></tr></table>
 </body></html>`;

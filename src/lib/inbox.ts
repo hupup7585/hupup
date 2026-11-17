@@ -196,9 +196,9 @@ export async function sendReply(input: { emailId: number; body: string; fileIds:
   if (files.reduce((n, f) => n + f.data.length, 0) > INBOX_FILE_MAX_BYTES) throw new Error(`Attachments can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
   const e = found.email;
   const subject = /^re:/i.test(e.subject ?? "") ? e.subject! : `Re: ${e.subject ?? ""}`.trim();
-  const text = `${body}\n\n${REPLY_SIGNATURE}`;
+  const text = body; // the logo and signature are added to every email (src/lib/email-brand.ts)
   const headers = e.messageId ? { "In-Reply-To": e.messageId, References: e.messageId } : undefined;
-  const res = await sendEmail(e.fromAddress, subject, text, files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), { headers });
+  const res = await sendEmail(e.fromAddress, subject, text, files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), { headers, record: false });
   const [reply] = await db
     .insert(schema.inboxReplies)
     .values({ emailId: e.id, toAddress: e.fromAddress, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })
@@ -236,8 +236,8 @@ export async function sendNewEmail(input: { to: string; subject: string; body: s
   if (files.reduce((n, f) => n + f.data.length, 0) > INBOX_FILE_MAX_BYTES) throw new Error(`Attachments can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
   if (files.reduce((n, f) => n + f.data.length, 0) + forwarded.reduce((n, f) => n + Buffer.byteLength(f.content, "base64"), 0) > INBOX_FILE_MAX_BYTES)
     throw new Error(`Attachments, with the forwarded ones, can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
-  const text = `${body}\n\n${REPLY_SIGNATURE}`;
-  const res = await sendEmail(to, subject, text, [...files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), ...forwarded]);
+  const text = body; // the logo and signature are added to every email (src/lib/email-brand.ts)
+  const res = await sendEmail(to, subject, text, [...files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), ...forwarded], { record: false });
   const [sent] = await db
     .insert(schema.inboxReplies)
     .values({ emailId: null, toAddress: to, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })
@@ -275,4 +275,20 @@ export function infoEmailText(e: { fromName: string | null; fromAddress: string;
 async function textOwnerAboutEmail(e: { fromName: string | null; fromAddress: string; subject: string | null; textBody: string | null }) {
   const { sendSms } = await import("@/lib/notify");
   await sendSms(INFO_ALERT_PHONE, infoEmailText(e), { kind: "system", event: "info_email_alert" });
+}
+
+/** A sent email (booking, payment, catalog, alerts...) kept under Sent in the Admin inbox, with its files. */
+export async function recordSentEmail(input: { to: string; subject: string; body: string; attachments: { filename: string; content: string }[]; sent: boolean; error: string | null }) {
+  const [row] = await db
+    .insert(schema.inboxReplies)
+    .values({ emailId: null, toAddress: input.to, subject: input.subject, body: input.body, sent: input.sent, error: input.sent ? null : (input.error ?? "not sent"), userId: null })
+    .returning();
+  for (const a of input.attachments) {
+    const data = Buffer.from(a.content, "base64");
+    const name = a.filename.toLowerCase();
+    const type = name.endsWith(".pdf") ? "application/pdf" : name.endsWith(".png") ? "image/png" : /\.jpe?g$/.test(name) ? "image/jpeg" : "application/octet-stream";
+    const f = await storeFile({ fileName: a.filename, contentType: type, data });
+    await db.update(schema.inboxFiles).set({ replyId: row.id }).where(eq(schema.inboxFiles.id, f.id));
+  }
+  return row;
 }

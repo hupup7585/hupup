@@ -40,7 +40,7 @@ export function emailEnvelope(to: string, env: Record<string, string | undefined
 
 export type EmailAttachment = { filename: string; content: string /* base64 */ };
 
-export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string> } = {}): Promise<SendResult> {
+export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string>; record?: boolean } = {}): Promise<SendResult> {
   if (!config.resendConfigured()) {
     if (config.isProd()) return { sent: false, error: "Email (Resend) is not configured" };
     console.log(`[dev EMAIL to ${to}] ${subject}\n${text}${attachments.length ? `\n[attachments: ${attachments.map((a) => a.filename).join(", ")}]` : ""}`);
@@ -64,8 +64,14 @@ export async function sendEmail(to: string, subject: string, text: string, attac
         ...(opts.headers ? { headers: opts.headers } : {}),
       }),
     });
-    if (!res.ok) return { sent: false, error: `Resend ${res.status}: ${await res.text()}` };
-    return { sent: true };
+    const result: SendResult = res.ok ? { sent: true } : { sent: false, error: `Resend ${res.status}: ${await res.text()}` };
+    // Every email sent from info@ is kept in the Admin inbox under Sent, with its files (Abraham, Nov 17, 2026, item 10).
+    // The Admin inbox's own replies and new emails save themselves (record: false).
+    if (opts.record !== false) {
+      const { recordSentEmail } = await import("@/lib/inbox");
+      await recordSentEmail({ to, subject, body: text, attachments, sent: result.sent, error: result.error ?? null }).catch((e) => console.error("could not keep the sent copy", e));
+    }
+    return result;
   } catch (e) {
     return { sent: false, error: (e as Error).message };
   }

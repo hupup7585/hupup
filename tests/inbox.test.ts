@@ -102,7 +102,7 @@ describe("Inbox", () => {
     const sent = h.emails[0];
     expect(sent.to).toBe("sara@example.com");
     expect(sent.subject).toBe("Re: Question about the castle");
-    expect(sent.text).toBe("Yes, it's free that day!\n\nHup Up Attractions");
+    expect(sent.text).toBe("Yes, it's free that day!"); // the logo and signature are added when sent (email-brand)
     expect(sent.attachments).toHaveLength(1);
     expect(sent.opts?.headers?.["In-Reply-To"]).toBe("<abc123@example.com>");
     const after = (await getInboxEmail(e.id))!;
@@ -118,7 +118,7 @@ describe("Inbox", () => {
     h.emails.length = 0;
     const r = await sendNewEmail({ to: "dovid@example.com", subject: "Your rental catalog", body: "Here is our catalog.", fileIds: [f.id], userId: null });
     expect(r.sent).toBe(true);
-    expect(h.emails[0]).toMatchObject({ to: "dovid@example.com", subject: "Your rental catalog", text: "Here is our catalog.\n\nHup Up Attractions" });
+    expect(h.emails[0]).toMatchObject({ to: "dovid@example.com", subject: "Your rental catalog", text: "Here is our catalog." }); // the logo and signature are added when sent
     expect(h.emails[0].attachments).toHaveLength(1);
     expect((await sentNewEmails()).map((x) => [x.toAddress, x.subject, x.emailId])).toEqual([["dovid@example.com", "Your rental catalog", null]]);
     await expect(sendNewEmail({ to: "not an address", subject: "x", body: "y", fileIds: [], userId: null })).rejects.toThrow("Enter one email address");

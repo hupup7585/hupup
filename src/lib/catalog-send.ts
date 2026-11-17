@@ -47,9 +47,13 @@ export async function catalogEmail() {
 
 export async function sendCatalogEmail(to: string) {
   const { subject, text } = await catalogEmail();
+  const { getSettings } = await import("@/lib/settings");
+  const s = await getSettings();
+  // The PDF goes along only while "attach automatically" is on; the catalog's name is added to the subject
   const { catalogPdfAttachment } = await import("@/lib/catalog-pdf");
-  const pdf = await catalogPdfAttachment().catch(() => null);
-  return sendEmail(to, subject, text, pdf ? [pdf] : []);
+  const pdf = s.catalogAutoAttach !== false ? await catalogPdfAttachment().catch(() => null) : null;
+  const name = String(s.catalogName ?? "").trim();
+  return sendEmail(to, name ? `${subject}: ${name}` : subject, text, pdf ? [pdf] : []);
 }
 
 /** The catalog text (Abraham, word for word). */
