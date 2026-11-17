@@ -133,15 +133,12 @@ function keypad(vr: VR, action: string, opts: { numDigits?: number; timeout?: nu
   });
 }
 
-/** "Tuesday, March 5th": day name, month and day number, for the booking steps (Abraham). */
+/** "Sunday, November 22": week day, month, day in month. Every date the phone reads (Abraham, Nov 17, 2026). */
 export function spokenDate(iso: string): string {
   const d = new Date(`${iso}T12:00:00Z`);
   const wd = d.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long" });
   const mo = d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long" });
-  const n = d.getUTCDate();
-  const v = n % 100;
-  const suf = v >= 11 && v <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
-  return `${wd}, ${mo} ${n}${n % 10 > 3 ? "th" : suf}`;
+  return `${wd}, ${mo} ${d.getUTCDate()}`;
 }
 
 /** Booking steps (Abraham, Nov 11): no key pressed -> the same step again; 9 minutes idle the warning, 10 minutes end. */
@@ -647,7 +644,7 @@ async function catalogSendText(ctx: Ctx, vr: VR, to: string) {
   await logCatalogRequest(ctx, "text", to, r.sent);
   if (!r.sent) {
     sp(vr, ctx, "catalog_text_not_yet");
-    return back(vr, "catalog-email");
+    return back(vr, "catalog-email", { p: "cat" });
   }
   sp(vr, ctx, "catalog_texted");
   vr.hangup();
@@ -672,12 +669,14 @@ async function lineRingsNowFor(k: RingKey, settings: Awaited<ReturnType<typeof g
  */
 type LinkDay = { order: { id: number; eventDate: string; pickupDate: string; subtotalCents: number; deliveryFeeCents: number; taxCents: number; totalCents: number | null }; items: { qty: number; name: string }[] };
 
-async function sendPayLinkAndSay(ctx: Ctx, vr: VR, orderId: number, who: { phone: string | null; customerId: number | null }, known?: LinkDay[]) {
-  // At checkout the days are already known (and priced); after the payment line they're read again
-  const days: LinkDay[] = known ?? (await getPaymentGroup(orderId))?.orders ?? [];
-  if (!days.length) return;
-  const group = { primary: { order: { id: orderId } } };
-  const data = ctx.session?.data ?? {};
+/**
+ * Send the payment link for the whole reservation by text or email (Abraham, Nov 17, 2026). The booking is held 10
+ * minutes from now (box 146); opening the link gives 4 more minutes once (see late-payment). True when it went out.
+ */
+async function deliverPayLink(ctx: Ctx, orderId: number, via: { phone?: string; email?: string }): Promise<boolean> {
+  const group = await getPaymentGroup(orderId);
+  const days: LinkDay[] = group?.orders ?? [];
+  if (!days.length) return false;
   const sum = (f: (o: (typeof days)[number]["order"]) => number) => days.reduce((n, d) => n + f(d.order), 0);
   const totals = {
     subtotalCents: sum((o) => o.subtotalCents),
@@ -685,8 +684,8 @@ async function sendPayLinkAndSay(ctx: Ctx, vr: VR, orderId: number, who: { phone
     taxCents: sum((o) => o.taxCents),
     totalCents: sum((o) => o.totalCents ?? o.subtotalCents),
   };
-  const num = orderNumber(group.primary.order.id);
-  const link = payPageLink(group.primary.order.id); // review-and-pay page for the whole reservation, then Sola
+  const num = orderNumber(orderId);
+  const link = payPageLink(orderId); // review-and-pay page for the whole reservation, then Sola
   const dayText = (o: (typeof days)[number]) => `${o.items.map((i) => `${i.qty} x ${i.name}`).join(", ")} for ${messageDate(o.order.eventDate)} (pickup ${messageDate(o.order.pickupDate)})`;
   const details = promptText(ctx.prompts, "msg_payment_link", {
     number: num,
@@ -698,24 +697,63 @@ async function sendPayLinkAndSay(ctx: Ctx, vr: VR, orderId: number, who: { phone
     minutes: PAYMENT_HOLD_MINUTES,
     link,
   });
-  // Texts go out only with transactional consent given on this call or recorded before.
-  const consented = data.smsConsent === "yes" || data.smsConsent === "existing";
-  let texted = false;
-  let emailed = false;
-  if (who.phone && consented) {
+  const customerId = group?.primary.customer?.id ?? null;
+  let sent = false;
+  if (via.phone) {
     // The STOP line is added by the text system on the first order text (or after 30 days without one)
-    const res = await sendSms(who.phone, details, { kind: "transactional", event: "order_payment_link", customerId: who.customerId, orderId: group.primary.order.id, callSid: ctx.callSid });
-    texted = res.sent;
+    sent = (await sendSms(via.phone, details, { kind: "transactional", event: "order_payment_link", customerId, orderId, callSid: ctx.callSid })).sent;
+  } else if (via.email) {
+    sent = (await sendEmail(via.email, promptText(ctx.prompts, "msg_payment_link_subject", { number: num }), details)).sent;
+    if (sent && customerId) await db.update(schema.customers).set({ email: via.email }).where(eq(schema.customers.id, customerId));
   }
-  if (data.email) {
-    const res = await sendEmail(data.email, promptText(ctx.prompts, "msg_payment_link_subject", { number: num }), details);
-    emailed = res.sent;
+  if (sent) {
+    const ids = days.map((d) => d.order.id);
+    await db.update(orders).set({ holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES), linkOpenedAt: null, updatedAt: new Date() }).where(and(inArray(orders.id, ids), eq(orders.status, "PENDING_PAYMENT")));
   }
-  if (texted) sp(vr, ctx, "link_sent", { minutes: PAYMENT_HOLD_MINUTES });
-  else if (emailed && !consented) sp(vr, ctx, "link_emailed", { minutes: PAYMENT_HOLD_MINUTES });
-  else if (emailed && !promptWaiting(ctx.prompts, "link_emailed_consented")) sp(vr, ctx, "link_emailed_consented", { minutes: PAYMENT_HOLD_MINUTES });
-  else if (!consented && !data.email) sp(vr, ctx, "link_call_back");
-  else sp(vr, ctx, "link_failed");
+  await track(ctx.callSid, "step", `Payment link ${sent ? "sent" : "could not be sent"} by ${via.phone ? "text" : "email"} (order #${num})`, { orderId, sent });
+  return sent;
+}
+
+/** What the shared text steps are for (boxes 142 to 144). */
+function txPurpose(ctx: Ctx): "cat" | "pay" {
+  return ctx.query.get("p") === "pay" ? "pay" : "cat";
+}
+
+/** The number is chosen: the catalog, or the payment link (after the caller's OK for order texts). */
+async function txSend(ctx: Ctx, vr: VR, p: "cat" | "pay", to: string) {
+  if (p === "cat") return catalogSendText(ctx, vr, to);
+  const o = Number(ctx.query.get("o"));
+  if (!o) return back(vr, "goodbye");
+  return payTextTo(ctx, vr, o, to);
+}
+
+/** The payment link by text: needs order-text consent (asked once with the approved line); no texts = the email steps. */
+async function payTextTo(ctx: Ctx, vr: VR, o: number, to: string, agreedNow = false) {
+  await updateSession(ctx.callSid, { data: { txPhone: to } }, ctx.session);
+  // Agreed on this call, or a recorded OK from before, for this same number
+  const saidYes = (ctx.session?.data.smsConsent === "yes" || ctx.session?.data.smsConsent === "existing") && ctx.session?.data.phone === to;
+  if (!agreedNow && !saidYes) {
+    const customer = await customerByPhone(to);
+    if (customer?.smsOptOut) {
+      sp(vr, ctx, "consent_stopped");
+      return back(vr, "catalog-email", { p: "pay", o });
+    }
+    const state = await consentState(to);
+    if (state.transactional?.action !== "opt_in") return back(vr, "pay-consent", { o });
+  }
+  const sent = await deliverPayLink(ctx, o, { phone: to });
+  if (!sent) {
+    sp(vr, ctx, "catalog_text_not_yet"); // "Sorry, we cannot send it by text just yet. Let us send it by email instead."
+    return back(vr, "catalog-email", { p: "pay", o });
+  }
+  sp(vr, ctx, "pay_link_sent");
+  return back(vr, "promo-consent");
+}
+
+/** Star from the first email step: back to where the email steps started (key 8 menu, or box 141). */
+function emailHome(ctx: Ctx, vr: VR) {
+  const o = ctx.session?.data.emailFor === "pay" ? ctx.session.data.payOrder : undefined;
+  return o ? back(vr, "paylink", { o }) : back(vr, "catalog");
 }
 
 /* ------------------------------------------------------------------ handlers */
@@ -886,76 +924,99 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (d === "*") return back(vr, "menu");
     if (d === "1") {
-      if (catalogTextReady()) return back(vr, "catalog-text");
+      if (catalogTextReady()) return back(vr, "tx-which", { p: "cat" });
       sp(vr, ctx, "catalog_text_not_yet");
-      return back(vr, "catalog-email");
+      return back(vr, "catalog-email", { p: "cat" });
     }
-    if (d === "2") return back(vr, "catalog-email");
+    if (d === "2") return back(vr, "catalog-email", { p: "cat" });
     sp(vr, ctx, "not_valid");
     return back(vr, "catalog");
   },
 
+  /** Older links to the key 8 text steps: the shared steps (boxes 142 to 144). */
   "catalog-text"(ctx, vr) {
-    const g = keypad(vr, url("catalog-text-choice"));
-    sp(g, ctx, "catalog_text_which");
-    return repeatMenu(vr, ctx, "catalog-text");
+    return back(vr, "tx-which", { p: "cat" });
   },
 
-  async "catalog-text-choice"(ctx, vr) {
+  /*
+   * Every flow that texts the caller (Abraham, Nov 17, 2026, boxes 142 to 144): p = cat (key 8 catalog) or pay (the
+   * payment link, o = the order). The caller's number is never read out.
+   */
+  "tx-which"(ctx, vr) {
+    const p = txPurpose(ctx);
+    const o = ctx.query.get("o") ?? undefined;
+    const g = keypad(vr, url("tx-which-choice", { p, o }));
+    sp(g, ctx, "text_which");
+    return repeatMenu(vr, ctx, "tx-which", { p, o });
+  },
+
+  async "tx-which-choice"(ctx, vr) {
+    const p = txPurpose(ctx);
+    const o = ctx.query.get("o") ?? undefined;
     const d = ctx.body.Digits;
-    if (d === "*") return back(vr, "catalog");
+    if (d === "*") return p === "pay" ? back(vr, "paylink", { o }) : back(vr, "catalog");
     if (d === "1") {
       const to = toE164(ctx.from);
-      return to ? catalogSendText(ctx, vr, to) : back(vr, "catalog-text-enter");
+      return to ? txSend(ctx, vr, p, to) : back(vr, "tx-enter", { p, o });
     }
-    if (d === "2") return back(vr, "catalog-text-enter");
+    if (d === "2") return back(vr, "tx-enter", { p, o });
     sp(vr, ctx, "not_valid");
-    return back(vr, "catalog-text");
+    return back(vr, "tx-which", { p, o });
   },
 
-  "catalog-text-enter"(ctx, vr) {
-    const g = keypad(vr, url("catalog-text-heard"), { numDigits: 11, timeout: 10, finishOnKey: "#" });
-    sp(g, ctx, "catalog_text_enter");
-    return repeatMenu(vr, ctx, "catalog-text-enter");
+  "tx-enter"(ctx, vr) {
+    const p = txPurpose(ctx);
+    const o = ctx.query.get("o") ?? undefined;
+    const g = keypad(vr, url("tx-heard", { p, o }), { numDigits: 11, timeout: 10, finishOnKey: "#" });
+    sp(g, ctx, "text_enter");
+    return repeatMenu(vr, ctx, "tx-enter", { p, o });
   },
 
-  async "catalog-text-heard"(ctx, vr) {
+  async "tx-heard"(ctx, vr) {
+    const p = txPurpose(ctx);
+    const o = ctx.query.get("o") ?? undefined;
     const digits = ctx.body.Digits || "";
-    if (digits.includes("*")) return back(vr, "catalog-text"); // star: one step back
+    if (digits.includes("*")) return back(vr, "tx-which", { p, o }); // star: one step back
     const e164 = tenDigitNumber(digits);
     if (!e164) {
       sp(vr, ctx, "not_valid");
-      return back(vr, "catalog-text-enter");
+      return back(vr, "tx-enter", { p, o });
     }
     await updateSession(ctx.callSid, { data: { catPhone: e164 } }, ctx.session);
-    const g = keypad(vr, url("catalog-text-confirm"));
-    sp(g, ctx, "catalog_text_heard", { number: readBack(e164) });
-    return repeatMenu(vr, ctx, "catalog-text-heard-again");
+    return back(vr, "tx-heard-again", { p, o });
   },
 
-  "catalog-text-heard-again"(ctx, vr) {
-    const p = ctx.session?.data.catPhone;
-    if (!p) return back(vr, "catalog-text-enter");
-    const g = keypad(vr, url("catalog-text-confirm"));
-    sp(g, ctx, "catalog_text_heard", { number: readBack(p) });
-    return repeatMenu(vr, ctx, "catalog-text-heard-again");
+  /** "I have {number}. If that is correct, press 1. To enter a different number, press 2." */
+  "tx-heard-again"(ctx, vr) {
+    const p = txPurpose(ctx);
+    const o = ctx.query.get("o") ?? undefined;
+    const n = ctx.session?.data.catPhone;
+    if (!n) return back(vr, "tx-enter", { p, o });
+    const g = keypad(vr, url("tx-confirm", { p, o }));
+    sp(g, ctx, "text_heard", { number: readBack(n) });
+    return repeatMenu(vr, ctx, "tx-heard-again", { p, o });
   },
 
-  async "catalog-text-confirm"(ctx, vr) {
+  async "tx-confirm"(ctx, vr) {
+    const p = txPurpose(ctx);
+    const o = ctx.query.get("o") ?? undefined;
     const d = ctx.body.Digits;
     const to = ctx.session?.data.catPhone;
-    // Abraham, Nov 15, 2026: pound continues, 1 does it again
-    if (d === "#" && to) return catalogSendText(ctx, vr, to);
-    if (d === "1") return back(vr, "catalog-text-enter");
-    if (d === "*") return back(vr, "catalog-text");
+    if (d === "1" && to) return txSend(ctx, vr, p, to);
+    if (d === "2") return back(vr, "tx-enter", { p, o });
+    if (d === "*") return back(vr, "tx-which", { p, o });
     sp(vr, ctx, "not_valid");
-    return back(vr, "catalog-text-heard-again");
+    return back(vr, "tx-heard-again", { p, o });
   },
 
   /** Email: the info@ tip (once that auto-reply is on), then step 1, the first part of the address. */
   async "catalog-email"(ctx, vr) {
-    if (infoCatalogAutoreplyOn()) sp(vr, ctx, "catalog_email_info");
-    await updateSession(ctx.callSid, { data: { catLocal: "", catDomain: "" } }, ctx.session);
+    // p = pay: the same email steps for a payment link (Abraham, Nov 17, 2026, box 145); p = cat: the catalog.
+    // No p (start over inside the steps): keep what they are for.
+    const p = ctx.query.get("p");
+    const forPay = p === "pay" || (p !== "cat" && ctx.session?.data.emailFor === "pay");
+    if (!forPay && infoCatalogAutoreplyOn()) sp(vr, ctx, "catalog_email_info");
+    await updateSession(ctx.callSid, { data: { catLocal: "", catDomain: "", ...(p === "pay" ? { emailFor: "pay" as const, payOrder: Number(ctx.query.get("o")) || ctx.session?.data.payOrder } : p === "cat" ? { emailFor: undefined } : {}) } }, ctx.session);
     return back(vr, "catalog-part", { part: "local" });
   },
 
@@ -996,7 +1057,7 @@ const handlers: Record<string, Handler> = {
     const keep = ctx.query.get("add") === "1" ? catPart(ctx, part) : "";
     const r = decodeCatalogKeys(`${ctx.session?.data.catKeys ?? ""}${ctx.body.Digits ?? ""}`, keep);
     await updateSession(ctx.callSid, { data: { catKeys: "", [part === "domain" ? "catDomain" : "catLocal"]: r.text, catStt: undefined } }, ctx.session);
-    if (r.back) return back(vr, part === "domain" ? "catalog-ending" : "catalog"); // star three times: one step back
+    if (r.back) return part === "domain" ? back(vr, "catalog-ending") : emailHome(ctx, vr); // star three times: one step back
     return back(vr, "catalog-got", { part });
   },
 
@@ -1067,7 +1128,7 @@ const handlers: Record<string, Handler> = {
     }
     if (d === "1") return back(vr, "catalog-part", { part }); // start over
     if (d === "2") return back(vr, "catalog-part", { part, add: 1 }); // add more, keeping what was entered
-    if (d === "*") return back(vr, part === "domain" ? "catalog-ending" : "catalog");
+    if (d === "*") return part === "domain" ? back(vr, "catalog-ending") : emailHome(ctx, vr);
     sp(vr, ctx, "not_valid");
     return back(vr, "catalog-got", { part });
   },
@@ -1101,6 +1162,14 @@ const handlers: Record<string, Handler> = {
   async "catalog-final-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     const email = catalogEmailOf(ctx);
+    if (d === "#" && email && ctx.session?.data.emailFor === "pay") {
+      // The payment link by email (box 145), then box 146
+      const o = ctx.session.data.payOrder;
+      await updateSession(ctx.callSid, { data: { emailFor: undefined } }, ctx.session);
+      const sent = o ? await deliverPayLink(ctx, o, { email }) : false;
+      sp(vr, ctx, sent ? "pay_link_sent" : "link_failed");
+      return back(vr, "promo-consent");
+    }
     if (d === "#" && email) {
       const r = await sendCatalogEmail(email);
       await logCatalogRequest(ctx, "email", email, r.sent);
@@ -1842,9 +1911,8 @@ const handlers: Record<string, Handler> = {
     const f = ctx.query.get("f") as Field;
     const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 15, action: url("typed", { f }), method: "POST" });
     if (!ctx.query.get("again")) {
-      sp(g, ctx, "type_instructions");
       if (f === "email") sp(g, ctx, "type_email_symbols");
-      spPreviewDraft(g, ctx, "press_pound_done");
+      sp(g, ctx, "type_instructions"); // ends with "When you are finished, please press pound."
     }
     return back(vr, "typed", { f });
   },
@@ -1952,10 +2020,10 @@ const handlers: Record<string, Handler> = {
    * The wording is a draft: the step runs on preview only until Abraham approves the two lines.
    */
   directions(ctx, vr) {
-    if (!directionsActive(ctx)) return back(vr, "ask", { f: "email" });
+    if (!directionsActive(ctx)) return back(vr, "finalize"); // no email in the booking (Abraham, Nov 17, 2026)
     const g = vr.gather({ input: ["speech", "dtmf"], finishOnKey: "#", numDigits: 1, timeout: 6, speechTimeout: "auto", language: "en-US", speechModel: "phone_call", enhanced: true, action: url("directions-heard"), method: "POST", actionOnEmptyResult: true });
     sp(g, ctx, "ask_directions", undefined, { draftOk: true });
-    return back(vr, "ask", { f: "email" }); // nothing said: skip
+    return back(vr, "finalize"); // nothing said: skip
   },
 
   async "directions-heard"(ctx, vr) {
@@ -1965,7 +2033,7 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "said", `Delivery directions: ${said.slice(0, 200)}`, { field: "directions", value: said });
       sp(vr, ctx, "directions_saved", undefined, { draftOk: true });
     }
-    return back(vr, "ask", { f: "email" });
+    return back(vr, "finalize");
   },
 
   async confirm(ctx, vr) {
@@ -2025,8 +2093,8 @@ const handlers: Record<string, Handler> = {
     }
     if (ctx.body.Digits === "1") {
       // Text the Terms link (only with order-text consent from this call or before).
-      const phone = ctx.session?.data.phone;
-      const consented = ctx.session?.data.smsConsent === "yes" || ctx.session?.data.smsConsent === "existing";
+      const phone = ctx.session?.data.phone ?? toE164(ctx.from);
+      const consented = ctx.session?.data.smsConsent === "yes" || ctx.session?.data.smsConsent === "existing" || (phone ? (await consentState(phone)).transactional?.action === "opt_in" : false);
       const r = phone && consented ? await sendSms(phone, promptText(ctx.prompts, "msg_terms_link", { link: `${config.baseUrl()}/terms` }), { kind: "transactional", event: "terms_link", orderId: order.order.id, callSid: ctx.callSid }) : null;
       sp(vr, ctx, r?.sent ? "terms_link_sent" : "terms_link_no_text");
       return back(vr, "terms", { n: ctx.query.get("n") ?? undefined });
@@ -2166,16 +2234,8 @@ const handlers: Record<string, Handler> = {
     }
     if (!data.name || !data.address) return back(vr, "ask", { f: !data.name ? "name" : "address" });
     if (termsActive() && !data.termsAccepted) return back(vr, "terms"); // off on live until the final Terms are in
-    // Payment can never be skipped (Abraham, Nov 15, 2026): no texts and no email means no way to send the payment
-    // link, so the email becomes required (keypad payment needs neither).
-    const canText = data.smsConsent === "yes" || data.smsConsent === "existing";
+    // No email in the booking (Abraham, Nov 17, 2026): it is asked only for a payment link by email (box 145)
     const caller = ctx.session?.fromNumber ?? ctx.from;
-    const cardCfg = await getSettings();
-    const keypadPay = cardCfg.phoneCardProvider === "stripe" ? keypadPayFor(caller, stripePhonePayMode(process.env, cardCfg), process.env, cardCfg.paymentTestNumbers) : phonePayOffered(caller, cardCfg);
-    if (!canText && !data.email && !keypadPay) {
-      await updateSession(ctx.callSid, { data: { emailRequired: 1 } }, ctx.session);
-      return back(vr, "ask", { f: "email" });
-    }
     const settings = await getSettings();
     // Delivery fee by the price map (Abraham, Nov 15, 2026); no price = never guessed
     const quote = await deliveryQuote(data.address, settings);
@@ -2243,8 +2303,55 @@ const handlers: Record<string, Handler> = {
         return back(vr, "pay-keypad", { o: primary.id });
     } else if (phonePayOffered(caller, payCfg) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k))))
       return back(vr, "phonepay-go", { o: primary.id, n: 1 });
-    await sendPayLinkAndSay(ctx, vr, primary.id, { phone, customerId }, perDay.map(({ o, t }) => ({ order: { ...o.order, deliveryFeeCents: t!.deliveryFeeCents, taxCents: t!.taxCents, totalCents: t!.totalCents }, items: o.items })));
-    return back(vr, "promo-consent");
+    // Card on the phone not offered to this caller: the payment link, by text or email (box 141)
+    return back(vr, "paylink", { o: primary.id });
+  },
+
+  /** Box 141: "To receive the payment link by text, press 1. To receive by email, press 2." */
+  paylink(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    if (!o) return back(vr, "goodbye");
+    const g = keypad(vr, url("paylink-choice", { o }));
+    sp(g, ctx, "pay_link_how");
+    return repeatMenu(vr, ctx, "paylink", { o });
+  },
+
+  async "paylink-choice"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    if (!o) return back(vr, "goodbye");
+    const d = ctx.body.Digits;
+    if (d === "1") {
+      if (catalogTextReady()) return back(vr, "tx-which", { p: "pay", o });
+      sp(vr, ctx, "catalog_text_not_yet"); // "Sorry, we cannot send it by text just yet. Let us send it by email instead."
+      return back(vr, "catalog-email", { p: "pay", o });
+    }
+    if (d === "2") return back(vr, "catalog-email", { p: "pay", o });
+    sp(vr, ctx, "not_valid");
+    return back(vr, "paylink", { o });
+  },
+
+  /** Texts need the caller's OK for order texts first (the approved consent line); no means the email steps. */
+  "pay-consent"(ctx, vr) {
+    const o = ctx.query.get("o") ?? undefined;
+    const g = keypad(vr, url("pay-consent-answer", { o, n: ctx.query.get("n") ?? undefined }), { timeout: 8 });
+    sp(g, ctx, Number(ctx.query.get("n") || 0) > 0 ? "consent_unclear" : "consent_transactional");
+    return back(vr, "pay-consent-answer", { o, n: ctx.query.get("n") ?? undefined });
+  },
+
+  async "pay-consent-answer"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    const to = ctx.session?.data.txPhone;
+    if (!o || !to) return back(vr, "paylink", { o: o || undefined });
+    const n = Number(ctx.query.get("n") || 0);
+    const answer = parseConsentAnswer({ digits: ctx.body.Digits, speech: ctx.body.SpeechResult, confidence: ctx.body.Confidence });
+    if (answer === "unclear" && n < 1) {
+      if (ctx.body.Digits) sp(vr, ctx, "not_valid");
+      return back(vr, "pay-consent", { o, n: n + 1 });
+    }
+    await recordPhoneConsent(ctx, "transactional", answer === "yes" ? "opt_in" : "declined", to);
+    await updateSession(ctx.callSid, { data: { smsConsent: answer === "yes" ? "yes" : "no" } }, ctx.session);
+    if (answer !== "yes") return back(vr, "catalog-email", { p: "pay", o });
+    return payTextTo(ctx, vr, o, to, true);
   },
 
   /* ---- Sola PhonePay (Abraham, Nov 14, 2026) ---- */
@@ -2280,12 +2387,11 @@ const handlers: Record<string, Handler> = {
     if (!group || group.due <= 0) return back(vr, "promo-consent");
     // Any Sola call from an earlier try is hung up first
     const earlier = await db.select().from(schema.phonepayAttempts).where(and(eq(schema.phonepayAttempts.callSid, ctx.callSid), eq(schema.phonepayAttempts.orderId, o)));
-    // Card on the call is the default (Abraham, Nov 17, 2026); before the first try the caller may press 0 for a
-    // payment link by text instead (approved Nov 17).
-    if (!earlier.length && ctx.query.get("c") !== "1" && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "phonepay_link_option"))) {
+    // Box 140 (Abraham, Nov 17, 2026): card on the call is the default; 0 = a payment link (text or email) instead
+    if (!earlier.length && ctx.query.get("c") !== "1") {
       const g = keypad(vr, url("phonepay-option", { o }), { numDigits: 1, timeout: 5 });
-      sp(g, ctx, "phonepay_link_option", undefined, { draftOk: true });
-      return back(vr, "phonepay-go", { o, c: 1 }); // no key: on to the card
+      sp(g, ctx, "pay_card_line");
+      return back(vr, "phonepay-go", { o, c: 1 }); // no key: straight on to the payment line
     }
     for (const a of earlier) await (a.payLegSid?.startsWith("CA") ? Promise.all([endPayLeg(a.payLegSid), endMainPayLeg(a.payLegSid)]) : null);
     const n = earlier.length + 1;
@@ -2306,7 +2412,8 @@ const handlers: Record<string, Handler> = {
     const attempt = await startAttempt(o, ctx.callSid, group.due);
     await db.update(schema.phonepayAttempts).set({ tryNumber: n }).where(eq(schema.phonepayAttempts.id, attempt.id));
     await track(ctx.callSid, "step", `Card payment try ${n} of ${PHONEPAY_MAX_TRIES} started for order #${orderNumber(o)}`, { attempt: attempt.id });
-    sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true });
+    // Box 140 already told the caller they are being connected; later tries keep the "please hold" line
+    if (earlier.length) sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true });
     // Straight from the hotline to Sola PhonePay (Abraham, Nov 17, 2026): PIN, the order amount (from the order, never
     // the caller) and 1, sent once PhonePay answers. Star brings the caller back at any time.
     const s = await getSettings();
@@ -2315,16 +2422,13 @@ const handlers: Record<string, Handler> = {
     return vr;
   },
 
-  /** Before the first card try: 0 = a payment link by text instead (Abraham, Nov 17, 2026); any other key = the shared line, then the question again. */
+  /** Before the first card try: 0 = a payment link (box 141) instead; any other key = the shared line, then box 140 again. */
   async "phonepay-option"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     if (!o) return back(vr, "goodbye");
     if (ctx.body.Digits === "0") {
-      await track(ctx.callSid, "step", `Asked for a payment link by text instead of the card (order #${orderNumber(o)})`);
-      const [ord] = await db.select({ customerId: orders.customerId }).from(orders).where(eq(orders.id, o)).limit(1);
-      const [c] = ord?.customerId ? await db.select().from(schema.customers).where(eq(schema.customers.id, ord.customerId)).limit(1) : [];
-      await sendPayLinkAndSay(ctx, vr, o, { phone: c?.phone ?? toE164(ctx.from), customerId: c?.id ?? null });
-      return back(vr, "promo-consent");
+      await track(ctx.callSid, "step", `Asked for a payment link instead of the card (order #${orderNumber(o)})`);
+      return back(vr, "paylink", { o });
     }
     if (ctx.body.Digits) {
       sp(vr, ctx, "not_valid");
@@ -2427,10 +2531,7 @@ const handlers: Record<string, Handler> = {
     const o = Number(ctx.query.get("o"));
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "goodbye");
-    if (group.due > 0) {
-      const c = group.primary.customer;
-      await sendPayLinkAndSay(ctx, vr, o, { phone: c?.phone ?? toE164(ctx.from), customerId: c?.id ?? null });
-    }
+    if (group.due > 0) return back(vr, "paylink", { o }); // not paid: the payment link, text or email (box 141)
     return back(vr, "promo-consent");
   },
 
@@ -2487,7 +2588,7 @@ const handlers: Record<string, Handler> = {
   "promo-enter"(ctx, vr) {
     const tries = Number(ctx.query.get("t") || 0);
     const g = keypad(vr, url("promo-heard", { t: tries }), { numDigits: 10, timeout: 10, finishOnKey: "#" });
-    sp(g, ctx, "promo_enter");
+    sp(g, ctx, "text_enter"); // box 143, the same line in every flow that texts the caller
     vr.redirect({ method: "POST" }, url("promo-heard", { t: tries })); // nothing typed counts as a try
     return vr;
   },
@@ -2502,21 +2603,21 @@ const handlers: Record<string, Handler> = {
     }
     await updateSession(ctx.callSid, { data: { promoHeard: e164 } }, ctx.session);
     const g = keypad(vr, url("promo-confirm"), { numDigits: 1, timeout: 6 });
-    sp(g, ctx, "promo_heard", { number: readBack(e164) });
+    sp(g, ctx, "text_heard", { number: readBack(e164) }); // box 144: 1 correct, 2 a different number
     return back(vr, "goodbye");
   },
 
   async "promo-confirm"(ctx, vr) {
     const heard = ctx.session?.data.promoHeard;
-    if (ctx.body.Digits === "#" && heard) {
+    if (ctx.body.Digits === "1" && heard) {
       await updateSession(ctx.callSid, { data: { promoHeard: undefined } }, ctx.session);
       return promoSend(ctx, vr, heard, "entered");
     }
-    if (ctx.body.Digits === "1") return back(vr, "promo-enter");
+    if (ctx.body.Digits === "2") return back(vr, "promo-enter");
     if (ctx.body.Digits && heard) {
       sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
       const g = keypad(vr, url("promo-confirm"), { numDigits: 1, timeout: 6 });
-      sp(g, ctx, "promo_heard", { number: readBack(heard) });
+      sp(g, ctx, "text_heard", { number: readBack(heard) });
     }
     return back(vr, "goodbye");
   },
@@ -3104,7 +3205,7 @@ const FIELDS: Record<
       const [user, domain] = v.split("@");
       return `${user.split("").join(" ")}, at ${domain.replace(/\./g, " dot ")}`;
     },
-    next: "phone",
+    next: "finalize",
   },
 };
 

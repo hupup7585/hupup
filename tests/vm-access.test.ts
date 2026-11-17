@@ -165,7 +165,7 @@ describe("after the PIN", () => {
     h.session.data = { vmaOk: 1 };
     await setVmPin("4821", null);
     expect(redirect(await call("vma-box-choice", { Digits: "*" }))).toBe("vma-newpin");
-    expect(said(await call("vma-newpin"))).toContain("Please enter your new password, 4 to 8 digits, then press pound.");
+    expect(said(await call("vma-newpin"))).toContain("Please enter your new password, 4 to 8 digits. When you are finished, please press pound.");
     expect(redirect(await call("vma-newpin-again", { Digits: "12" }))).toBe("vma-newpin"); // too short
     await call("vma-newpin-again", { Digits: "5566" });
     expect(String(h.session.data.vmaNewPin)).not.toContain("5566");

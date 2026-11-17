@@ -53,7 +53,7 @@ describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
     const xml = plain(await call("catalog", {}, "", "+18455550100"));
     expect(xml).toContain("To receive our catalog by text, press 1. To get it by email, press 2. To go back, press star.");
     expect(redirect(await call("catalog-choice", { Digits: "*" }))).toBe("menu");
-    expect(redirect(await call("catalog-choice", { Digits: "2" }))).toBe("catalog-email");
+    expect(redirect(await call("catalog-choice", { Digits: "2" }))).toBe("catalog-email?p=cat");
   });
   it("email by keypad: the first part, the ending, the final check; 1 sends the catalog from Admin, logged on the contact", async () => {
     expect(redirect(await call("catalog-email"))).toBe("catalog-part?part=local");
@@ -94,7 +94,7 @@ describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
     process.env.VERCEL_ENV = "production"; // live site, texting not approved
     const xml = plain(await call("catalog-choice", { Digits: "1" }));
     expect(xml).toContain("Sorry, we cannot send it by text just yet. Let us send it by email instead.");
-    expect(redirect(xml)).toBe("catalog-email");
+    expect(redirect(xml)).toBe("catalog-email?p=cat");
     expect(h.sms).toHaveLength(0);
     process.env.VERCEL_ENV = prev;
     expect((await db.select().from(schema.smsConsents)).filter((r) => r.scope === "marketing")).toHaveLength(0);

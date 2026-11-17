@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { checkBookable, getUsage, pickupDateFor, usedOn } from "@/lib/availability";
 import { addDays } from "@/lib/dates";
@@ -11,11 +11,9 @@ import { sendEmail } from "@/lib/notify";
 /*
  * Payment links and late payments (Abraham, Nov 13, 2026).
  *
- * The link rule:
- *  - A link holds the rentals 10 minutes after a phone booking (25 after an Admin New booking).
- *  - Activity on our payment page (opening it, pressing "Agree and pay") keeps the hold: no activity for 4 minutes
- *    and it ends (opened at minute 9, nothing more: expired at minute 13).
- *  - Pressing "Agree and pay" gives 10 minutes to finish on Sola's card page (Sola can't tell us about typing there).
+ * The link rule (Abraham, Nov 17, 2026, replacing the earlier one):
+ *  - A link holds the rentals 10 minutes after it is sent from the phone (25 after an Admin New booking).
+ *  - If the customer opened the link, 4 more minutes when that time runs out (once), then the items are released.
  *  - After the hold ends the link shows "expired" with a "Check availability again" button: if everything is still
  *    free, the same order is held again (database lock, so no one else can take it) and the customer pays.
  *
@@ -46,22 +44,21 @@ export function holdEnded(o: HoldFields, now = new Date()) {
   return (o.status === "PENDING_PAYMENT" || o.status === "HOLD") && Boolean(o.holdExpiresAt && o.holdExpiresAt <= now);
 }
 
-/** Activity on our payment page: keep the hold at least 4 more minutes (never revives an ended hold). */
+/**
+ * The customer opened the payment link (Abraham, Nov 17, 2026): 4 more minutes added to the hold, once per link sent
+ * (never revives an ended hold). Opening it again, or pressing "Agree and pay", adds nothing more.
+ */
 export async function keepHoldWhileActive(orderIds: number[], now = new Date()) {
   if (!orderIds.length) return;
   await db
     .update(schema.orders)
-    .set({ holdExpiresAt: sql`GREATEST(${schema.orders.holdExpiresAt}, ${inMinutes(IDLE_MINUTES, now)})` })
-    .where(and(inArray(schema.orders.id, orderIds), eq(schema.orders.status, "PENDING_PAYMENT"), gt(schema.orders.holdExpiresAt, now)));
+    .set({ linkOpenedAt: now, holdExpiresAt: sql`${schema.orders.holdExpiresAt} + interval '${sql.raw(String(IDLE_MINUTES))} minutes'` })
+    .where(and(inArray(schema.orders.id, orderIds), eq(schema.orders.status, "PENDING_PAYMENT"), gt(schema.orders.holdExpiresAt, now), isNull(schema.orders.linkOpenedAt)));
 }
 
-/** "Agree and pay" pressed: 10 minutes to finish on the card page. */
+/** "Agree and pay" pressed, or straight to the card page: the same one-time 4 minutes as opening the link. */
 export async function holdForCardPage(orderIds: number[], now = new Date()) {
-  if (!orderIds.length) return;
-  await db
-    .update(schema.orders)
-    .set({ holdExpiresAt: sql`GREATEST(${schema.orders.holdExpiresAt}, ${inMinutes(CARD_MINUTES, now)})` })
-    .where(and(inArray(schema.orders.id, orderIds), eq(schema.orders.status, "PENDING_PAYMENT"), gt(schema.orders.holdExpiresAt, now)));
+  return keepHoldWhileActive(orderIds, now);
 }
 
 /**

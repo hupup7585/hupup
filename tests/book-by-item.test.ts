@@ -65,7 +65,7 @@ describe("key 1: booking by item", () => {
     expect(said(date)).toEqual(["Please enter your event date: two digits for the month, then two digits for the day. For example, for March 5th, press 0, 3, 0, 5."]);
     expect(date).not.toContain('input="dtmf speech"');
     expect(redirect(await call("date-heard", { Digits: "1201" }, `p=${medium}`))).toBe(`date-ask?p=${medium}&d=${TUE}`);
-    expect(said(await call("date-ask", {}, `p=${medium}&d=${TUE}`))).toEqual(["You entered Tuesday, December 1st. If that is correct, press pound to continue. To enter a different date, press 1."]);
+    expect(said(await call("date-ask", {}, `p=${medium}&d=${TUE}`))).toEqual(["You entered Tuesday, December 1. If that is correct, press pound to continue. To enter a different date, press 1."]);
     expect(redirect(await call("date-confirm", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`date?p=${medium}`);
     expect(redirect(await call("date-confirm", { Digits: "#" }, `p=${medium}&d=${TUE}`))).toBe(`qty?p=${medium}&d=${TUE}`);
   });
@@ -104,14 +104,14 @@ describe("key 1: booking by item", () => {
     // The day before (Monday) would be picked up Tuesday morning, while the castle is out on Tuesday: not offered.
     const xml = await call("altdates", {}, `p=${medium}&d=${TUE}`);
     expect(said(xml)).toEqual([
-      "The Medium Castle is available on Wednesday, December 2nd, the day after. To choose that day, press 2.",
+      "The Medium Castle is available on Wednesday, December 2, the day after. To choose that day, press 2.",
       "To try a different date, press 3.",
     ]);
     // An item free on both sides gets both offers
     const both = said(await call("altdates", {}, `p=${large}&d=2026-12-16`));
     expect(both).toEqual([
-      "The Large Castle is available on Tuesday, December 15th, the day before. To choose that day, press 1.",
-      "It's also available on Thursday, December 17th, the day after. To choose that day, press 2.",
+      "The Large Castle is available on Tuesday, December 15, the day before. To choose that day, press 1.",
+      "It is also available on Thursday, December 17, the day after. To choose that day, press 2.",
       "To try a different date, press 3.",
     ]);
     expect(redirect(await call("altdate-choice", { Digits: "2" }, action(xml)!.split("?")[1]))).toBe(`qty?p=${medium}&d=2026-12-02`);
@@ -128,8 +128,8 @@ describe("key 1: booking by item", () => {
     const xml = await call("altdates", {}, `p=${small}&d=2026-12-10`);
     expect(said(xml)).toEqual([
       "The Small Castle is not available the day before or after.",
-      "The nearest date before your date is Monday, December 7th. To choose it, press 1.",
-      "The nearest date after your date is Sunday, December 13th. To choose it, press 2.",
+      "The nearest date before your date is Monday, December 7. To choose it, press 1.",
+      "The nearest date after your date is Sunday, December 13. To choose it, press 2.",
       "To try a different date, press 3.",
     ]);
   });
@@ -153,11 +153,11 @@ describe("key 1: booking by item", () => {
   });
 
   it("day names and day numbers", () => {
-    expect(spokenDate("2026-03-05")).toBe("Thursday, March 5th");
-    expect(spokenDate("2026-03-01")).toBe("Sunday, March 1st");
-    expect(spokenDate("2026-03-02")).toBe("Monday, March 2nd");
-    expect(spokenDate("2026-03-03")).toBe("Tuesday, March 3rd");
-    expect(spokenDate("2026-03-11")).toBe("Wednesday, March 11th");
-    expect(spokenDate("2026-03-22")).toBe("Sunday, March 22nd");
+    expect(spokenDate("2026-03-05")).toBe("Thursday, March 5");
+    expect(spokenDate("2026-03-01")).toBe("Sunday, March 1");
+    expect(spokenDate("2026-03-02")).toBe("Monday, March 2");
+    expect(spokenDate("2026-03-03")).toBe("Tuesday, March 3");
+    expect(spokenDate("2026-03-11")).toBe("Wednesday, March 11");
+    expect(spokenDate("2026-03-22")).toBe("Sunday, March 22");
   });
 });

@@ -62,7 +62,7 @@ describe("pound to continue", () => {
     const live = await call("ask", {}, "f=name");
     delete process.env.VERCEL_ENV;
     expect(said(live)).toContain("When you are finished, please press pound.");
-    expect(said(await call("type", {}, "f=name"))).toContain("When you are finished, please press pound.");
+    expect(said(await call("type", {}, "f=name")).some((s) => s.endsWith("When you are finished, please press pound."))).toBe(true);
   });
   it("pound in the middle of a spoken answer ends it and keeps what was said", async () => {
     await withCart();

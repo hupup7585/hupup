@@ -61,18 +61,18 @@ beforeAll(async () => {
 describe("card payment on the phone line", () => {
   it("before the first try: card is the default; 0 gets a payment link by text instead (approved, live)", async () => {
     const ask = await call("phonepay-go", {}, `o=${orderId}`);
-    expect(said(ask)).toEqual(["To pay by card now, please stay on the line. To get a secure payment link by text instead, press 0."]);
+    expect(said(ask)).toEqual(["To pay with a credit or debit card, please stay on the line to connect to our secure payment line. To get a payment link instead, press 0."]);
     expect(redirect(ask)).toBe(`phonepay-go?o=${orderId}&c=1`); // no key: on to the card
     expect(ask).not.toContain("<Dial");
     // approved: it plays on the live line too
     process.env.VERCEL_ENV = "production";
     const live = await call("phonepay-go", {}, `o=${orderId}`);
     delete process.env.VERCEL_ENV;
-    expect(said(live)).toEqual(["To pay by card now, please stay on the line. To get a secure payment link by text instead, press 0."]);
+    expect(said(live)).toEqual(["To pay with a credit or debit card, please stay on the line to connect to our secure payment line. To get a payment link instead, press 0."]);
     expect(redirect(await call("phonepay-option", { Digits: "2" }, `o=${orderId}`))).toBe(`phonepay-go?o=${orderId}`); // 2 is not a choice here
     await db.delete(schema.phonepayAttempts);
     expect(redirect(await call("phonepay-option", { Digits: "5" }, `o=${orderId}`))).toBe(`phonepay-go?o=${orderId}`);
-    expect(redirect(await call("phonepay-option", { Digits: "0" }, `o=${orderId}`))).toBe("promo-consent"); // 0: the link by text
+    expect(redirect(await call("phonepay-option", { Digits: "0" }, `o=${orderId}`))).toBe(`paylink?o=${orderId}`); // 0: the payment link, text or email (box 141)
   });
 
   it("each try dials Sola PhonePay straight from the hotline (no SIP), with the PIN, the order amount and star to come back", async () => {
@@ -81,7 +81,7 @@ describe("card payment on the phone line", () => {
     expect(x).not.toContain("<Sip");
     expect(x).toMatch(/<Number sendDigits="w+4321#w+80000#w+1">\+18334343354<\/Number>/);
     expect(x).toContain('record="do-not-record"');
-    expect(said(x)).toContain("Thank you. Please hold for a moment while we connect you to our secure payment line.");
+    expect(said(x)).not.toContain("Thank you. Please hold for a moment while we connect you to our secure payment line."); // box 140 already said it
     const [a] = await db.select().from(schema.phonepayAttempts);
     expect(a).toMatchObject({ orderId, tryNumber: 1, amountCents: 80000 });
   });

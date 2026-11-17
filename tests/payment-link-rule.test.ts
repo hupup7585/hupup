@@ -43,15 +43,18 @@ describe("payment link rule", () => {
     expect(linkOptionsActive({ VERCEL_ENV: "production" })).toBe(true);
     expect(linkOptionsActive({ VERCEL_ENV: "preview" })).toBe(true);
   });
-  it("opened at minute 9 and nothing more: ends at minute 13; Agree and pay: 10 minutes for the card", async () => {
+  it("Abraham, Nov 17, 2026: held 10 minutes; opened the link: 4 more minutes once (minute 14), then released", async () => {
     const { mk } = await setup();
     const id = await mk(10);
-    await keepHoldWhileActive([id], at(9));
-    expect((await get(id)).holdExpiresAt!.getTime()).toBe(at(13).getTime());
-    expect(holdEnded(await get(id), at(12.9))).toBe(false);
-    expect(holdEnded(await get(id), at(13))).toBe(true);
-    await holdForCardPage([id], at(11));
-    expect((await get(id)).holdExpiresAt!.getTime()).toBe(at(21).getTime());
+    await keepHoldWhileActive([id], at(2)); // opened early: still 14 in all
+    expect((await get(id)).holdExpiresAt!.getTime()).toBe(at(14).getTime());
+    await keepHoldWhileActive([id], at(9)); // opened again: nothing more
+    await holdForCardPage([id], at(11)); // Agree and pay: nothing more either
+    expect((await get(id)).holdExpiresAt!.getTime()).toBe(at(14).getTime());
+    expect(holdEnded(await get(id), at(13.9))).toBe(false);
+    expect(holdEnded(await get(id), at(14))).toBe(true);
+    const never = await mk(10); // never opened: released at minute 10
+    expect(holdEnded(await get(never), at(10))).toBe(true);
   });
   it("activity never brings back a hold that already ended", async () => {
     const { mk } = await setup();

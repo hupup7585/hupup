@@ -26,7 +26,7 @@ describe("every line is on the page", () => {
     expect(lineStatus("promo_ask", o).status).toBe("Not active yet");
     expect(lineStatus("spoken_readback", o).status).toBe("Not active yet"); // wording approved Nov 15; speech to text still waits for his OK
     expect(lineStatus("voicemail_thanks", o).status).toBe("Not used");
-    expect(RETIRED_PROMPTS.size).toBe(24);
+    expect(RETIRED_PROMPTS.size).toBe(41);
   });
   it("the page reads the prompt list itself, and is Owner only", () => {
     const page = readFileSync("src/app/admin/(app)/phone/prompts/page.tsx", "utf8");
@@ -73,7 +73,7 @@ describe("edit, approve, go back", () => {
     expect(validateWording("msg_catalog_email_top", "Hi!\n\nHere it is:")).toBe("Hi!\n\nHere it is:");
   });
   it("approving a line waiting for approval (a Key 2 script) makes it play", async () => {
-    const d = await saveDraft("instr_balloons", "Here's how to enjoy your jumping balloon safely. Keep shoes off.", 1);
+    const d = await saveDraft("instr_balloons", "Here is how to enjoy your jumping balloon safely. Keep shoes off.", 1);
     await approveDraft(d.id, 1);
     expect(lineStatus("instr_balloons", await loadPromptOverrides()).status).not.toBe("Waiting for approval");
   });

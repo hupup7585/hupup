@@ -95,6 +95,11 @@ vi.mock("@/lib/orders", async (orig) => ({
     order: { id: 7, status: "HOLD", eventDate: "2026-11-15", pickupDate: "2026-11-16", subtotalCents: 25000 },
     items: [{ qty: 1, name: "Castle Bouncer" }],
   }),
+  // The payment link reads the reservation as priced at checkout (KJ: $10 delivery + 8.125% tax)
+  getPaymentGroup: async () => {
+    const o = { order: { id: 7, status: "PENDING_PAYMENT", eventDate: "2026-11-15", pickupDate: "2026-11-16", subtotalCents: 25000, deliveryFeeCents: 1000, taxCents: 2113, totalCents: 28113, paidCents: 0 }, items: [{ qty: 1, name: "Castle Bouncer" }], customer: { id: 42 } };
+    return { primary: o, orders: [o], due: 28113 };
+  },
 }));
 
 const { handleVoice } = await import("@/lib/ivr/flow");
@@ -184,31 +189,41 @@ describe("transactional consent step (before the payment link)", () => {
   });
 });
 
-describe("finalize sends texts only with consent", () => {
-  it("with consent: order text (STOP line added by the text system when due), then the promotional question", async () => {
-    h.session.data.smsConsent = "yes";
+describe("payment link: box 141, text or email (Abraham, Nov 17, 2026)", () => {
+  it("after the order: the link choice (box 141), nothing sent yet", async () => {
     const xml = await call("finalize");
+    expect(xml).toContain("/api/voice/paylink?o=7");
+    expect(h.sms).toHaveLength(0);
+    expect(h.emails).toHaveLength(0);
+    expect(await call("paylink", {}, "o=7")).toContain("To receive the payment link by text, press 1. To receive by email, press 2.");
+  });
+  it("text to the caller's number with consent: one order text (STOP line added by the text system when due), box 146, then the promotional question", async () => {
+    h.session.data.smsConsent = "yes";
+    expect(await call("tx-which", {}, "p=pay&o=7")).toContain("To text it to the number you are calling from, press 1. To enter a different number, press 2.");
+    const xml = await call("tx-which-choice", { Digits: "1" }, "p=pay&o=7");
     expect(h.sms).toHaveLength(1);
-    // The STOP line is added by the text system (first order text, or after 30 days without one): see tests/order-stop-line.test.ts
+    expect(h.sms[0].to).toBe("+18455550100");
     expect(h.sms[0].body).not.toContain("Reply HELP for help, STOP to opt out.");
     expect(h.sms[0].opts).toMatchObject({ kind: "transactional", orderId: 7, callSid: "CA1" });
+    expect(xml).toContain("Done! We just sent you the payment link. To keep your booking, please complete your payment within the next ten minutes. Otherwise, the booking will be released. Thank you for choosing Hup Up Attractions!");
     expect(xml).toContain("/api/voice/promo-consent");
-    expect(xml).not.toContain("<Hangup");
+    expect(xml).not.toContain("0100"); // the caller's number is never read out
   });
-  it("without consent: no text; email link if we have an email", async () => {
-    h.session.data.smsConsent = "no";
-    h.session.data.email = "yossi@example.com";
-    const xml = await call("finalize");
+  it("no consent yet: the approved consent question first; no means the email steps", async () => {
+    h.session.data.smsConsent = undefined;
+    expect(await call("tx-which-choice", { Digits: "1" }, "p=pay&o=7")).toContain("/api/voice/pay-consent?o=7");
+    const no = await call("pay-consent-answer", { Digits: "2" }, "o=7");
     expect(h.sms).toHaveLength(0);
-    expect(h.emails).toEqual([{ to: "yossi@example.com" }]);
-    expect(xml).toContain("We just emailed you a secure payment link");
+    expect(no).toContain("/api/voice/catalog-email?p=pay&amp;o=7");
   });
-  it("without consent or email: no text; the email becomes required so the payment link can be sent (Abraham, Nov 15)", async () => {
-    h.session.data.smsConsent = "no";
-    const xml = await call("finalize");
-    expect(h.sms).toHaveLength(0);
-    expect(xml).toContain("/api/voice/ask?f=email");
-    expect(h.session.data.emailRequired).toBe(1);
+  it("by email: the key 8 email steps, then the link by email and box 146", async () => {
+    expect(await call("paylink-choice", { Digits: "2" }, "o=7")).toContain("/api/voice/catalog-email?p=pay&amp;o=7");
+    await call("catalog-email", {}, "p=pay&o=7");
+    h.session.data = { ...h.session.data, catLocal: "yossi", catDomain: "gmail.com" };
+    const xml = await call("catalog-final-choice", { Digits: "#" });
+    expect(h.emails).toEqual([{ to: "yossi@gmail.com" }]);
+    expect(xml).toContain("Done! We just sent you the payment link.");
+    expect(xml).toContain("/api/voice/promo-consent");
   });
 });
 
@@ -257,14 +272,14 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
     expect(xml).toContain("/api/voice/goodbye");
     expect(h.recorded.filter((r) => r.action === "opt_in")).toEqual([]); // nothing is signed up until YES
   });
-  it("Step 3: a different number is read back in groups, confirmed with 1, and the text goes to that number", async () => {
+  it("Step 3 (boxes 143 and 144): a different number is read back in groups, confirmed with 1, and the text goes to that number", async () => {
     expect(await call("promo-which-answer", { Digits: "2" })).toContain("/api/voice/promo-enter");
     const ask = await call("promo-enter");
-    expect(ask).toContain("Please enter the 10-digit mobile number, then press pound.");
+    expect(ask).toContain("Please enter the 10-digit phone number. When you are finished, please press pound.");
     expect(ask).toContain('finishOnKey="#"');
     const heard = await call("promo-heard", { Digits: "8455551234" });
-    expect(heard).toContain("You entered 8 4 5, 5 5 5, 1 2 3 4. If that is right, press pound to continue. To enter it again, press 1.");
-    const xml = await call("promo-confirm", { Digits: "#" });
+    expect(heard).toContain("I have 8 4 5, 5 5 5, 1 2 3 4. If that is correct, press 1. To enter a different number, press 2.");
+    const xml = await call("promo-confirm", { Digits: "1" });
     expect(h.promoRequests[0].to).toBe("+18455551234");
     expect(h.promoRequests[0].how).toContain("number chosen: entered number +18455551234");
     expect(h.messages.find((x) => x.event === "promo_confirm_request")!.to).toBe("+18455551234");
@@ -272,7 +287,7 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
   });
   it("Step 3: press 2 enters it again; not 10 digits says sorry, and after 2 tries skips", async () => {
     await call("promo-heard", { Digits: "8455551234" });
-    expect(await call("promo-confirm", { Digits: "1" })).toContain("/api/voice/promo-enter");
+    expect(await call("promo-confirm", { Digits: "2" })).toContain("/api/voice/promo-enter");
     const bad = plain(await call("promo-heard", { Digits: "84555" }));
     expect(bad).toContain("Sorry, that number did not work. Please try again.");
     expect(bad).toContain("/api/voice/promo-enter?t=1");
@@ -364,9 +379,10 @@ describe("checkout pricing, delivery area and terms (Abram's final decisions)", 
   it("the payment text and read-back include delivery and tax (KJ: $10 + 8.125% on everything)", async () => {
     h.session.data.smsConsent = "yes";
     const xml = await call("finalize");
+    expect(xml).toContain("Your total is");
+    await call("tx-which-choice", { Digits: "1" }, "p=pay&o=7");
     // $250.00 rentals + $10.00 delivery = $260.00; tax 8.125% = $21.13; total $281.13
     expect(h.sms[0].body).toContain("Rentals $250.00 + delivery $10.00 + sales tax $21.13 = total $281.13.");
-    expect(xml).toContain("Your total is");
   });
 });
 
@@ -386,7 +402,7 @@ describe("Terms on the phone: text the link (press 1)", () => {
   });
   it("payment text links to the review-and-pay page (Terms box), not straight to Sola", async () => {
     h.session.data.smsConsent = "yes";
-    await call("finalize");
+    await call("tx-which-choice", { Digits: "1" }, "p=pay&o=7");
     expect(h.sms[0].body).toMatch(/https:\/\/hupup\.vercel\.app\/pay\/7\?t=/);
   });
 });

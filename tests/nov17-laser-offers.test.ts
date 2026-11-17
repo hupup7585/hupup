@@ -148,7 +148,7 @@ describe("4th Sunday free (Owner switch)", () => {
   });
 });
 
-describe("phone: extra laser gun packs after a maze or guns (draft wording, preview only)", () => {
+describe("phone: extra laser gun packs after a maze or guns (approved Nov 17)", () => {
   it("after the guns: the item added line, then the packs question; 1 adds a 6-pack to the same day", async () => {
     const day = "2026-12-28";
     const add = await call("add", {}, `p=${guns6}&d=${day}&q=1`);
@@ -161,10 +161,10 @@ describe("phone: extra laser gun packs after a maze or guns (draft wording, prev
     expect(items.map((i) => i.productId)).toContain(ids.pack6);
     expect(redirect(await call("packs-choice", { Digits: "#" }, `d=${day}`))).toBe("added-menu");
   });
-  it("on the live line the packs question waits for Abraham's OK: straight to the keep shopping menu", async () => {
+  it("approved (box 25b): the packs question plays on the live line too", async () => {
     process.env.VERCEL_ENV = "production";
     const add = await call("add", {}, `p=${guns6}&d=2026-12-29&q=1`);
     delete process.env.VERCEL_ENV;
-    expect(redirect(add)).not.toMatch(/^packs/);
+    expect(redirect(add)).toBe("packs?d=2026-12-29");
   });
 });

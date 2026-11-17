@@ -65,7 +65,7 @@ export const PROMPTS = {
     group: "Key 2: Instructions",
     pending: true, // Abraham (Phone Menu v3): his scripts are coming
     label: "Instructions: jumping balloons",
-    text: "Here is how to enjoy your jumping balloon safely. Setup: our team sets it up on a flat, open area, away from trees, fences, power lines and anything sharp. Keep the blower running and its cord and air tube clear the whole time it's in use. Safe use: everyone takes off their shoes, glasses and anything in their pockets. No food, drinks, gum, silly string or sharp toys inside. Keep big and small children apart, and do not overcrowd it. No flips, wrestling or climbing on the walls. Supervision: a responsible adult must watch the jumping balloon at all times while it's in use. Please follow the age and rider limits printed on the unit. Weather: if the wind picks up, if it rains, or if you hear thunder, have everyone get out right away and unplug the blower. Getting ready for pickup: make sure everyone is out, unplug the blower, remove any toys or trash, and leave the unit where it is. We will take care of folding it. Thank you!",
+    text: "Here is how to enjoy your jumping balloon safely. Setup: our team sets it up on a flat, open area, away from trees, fences, power lines and anything sharp. Keep the blower running and its cord and air tube clear the whole time it is in use. Safe use: everyone takes off their shoes, glasses and anything in their pockets. No food, drinks, gum, silly string or sharp toys inside. Keep big and small children apart, and do not overcrowd it. No flips, wrestling or climbing on the walls. Supervision: a responsible adult must watch the jumping balloon at all times while it is in use. Please follow the age and rider limits printed on the unit. Weather: if the wind picks up, if it rains, or if you hear thunder, have everyone get out right away and unplug the blower. Getting ready for pickup: make sure everyone is out, unplug the blower, remove any toys or trash, and leave the unit where it is. We will take care of folding it. Thank you!",
   },
   instr_laser: {
     group: "Key 2: Instructions",
@@ -90,7 +90,7 @@ export const PROMPTS = {
   learn_laser: {
     group: "Key 4: Learn about our rentals",
     label: "About laser tag",
-    text: "Our laser tag comes with blasters and vests, and our inflatable mazes make the game even more exciting. It's a hit with kids around age six and up, teens, and adults, and it's great for parties, schools, camps and group events. Laser tag can be played outdoors, or indoors in a large hall or gym. The maze needs a good amount of open space and a power outlet for the blower.",
+    text: "Our laser tag comes with blasters and vests, and our inflatable mazes make the game even more exciting. It is a hit with kids around age six and up, teens, and adults, and it is great for parties, schools, camps and group events. Laser tag can be played outdoors, or indoors in a large hall or gym. The maze needs a good amount of open space and a power outlet for the blower.",
   },
   learn_paddle: {
     group: "Key 4: Learn about our rentals",
@@ -143,7 +143,7 @@ export const PROMPTS = {
   booked_smaller: { group: "Booking by item (key 1)", label: "Next size down", text: "For the next size down, the {item}, press 2.", vars: ["item"] },
   booked_keep: { group: "Booking by item (key 1)", label: "Keep the item, choose another date", text: "To keep the {item} and choose a different date, press 3.", vars: ["item"] },
   altdate_before: { group: "Booking by item (key 1)", label: "Available the day before", text: "The {item} is available on {date}, the day before. To choose that day, press 1.", vars: ["item", "date"] },
-  altdate_after_also: { group: "Booking by item (key 1)", label: "Also available the day after", text: "It's also available on {date}, the day after. To choose that day, press 2.", vars: ["date"] },
+  altdate_after_also: { group: "Booking by item (key 1)", label: "Also available the day after", text: "It is also available on {date}, the day after. To choose that day, press 2.", vars: ["date"] },
   altdate_after: { group: "Booking by item (key 1)", label: "Available the day after (only)", text: "The {item} is available on {date}, the day after. To choose that day, press 2.", vars: ["item", "date"] },
   altdate_not_near: { group: "Booking by item (key 1)", label: "Not available the day before or after", text: "The {item} is not available the day before or after.", vars: ["item"] },
   altdate_nearest_before: { group: "Booking by item (key 1)", label: "Nearest date before", text: "The nearest date before your date is {date}. To choose it, press 1.", vars: ["date"] },
@@ -171,9 +171,9 @@ export const PROMPTS = {
   another_day: { group: "Cart", label: "After an item is added: book another day (Abraham)", text: "To book another day, press 2." },
   // Ocean balls after every jumping balloon (Abraham, Nov 17, 2026), his wording ("#" is said as pound)
   ocean_balls: { group: "Cart", label: "Ocean balls (after every jumping balloon)", text: "Would you like to add ocean balls? To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3. To skip, press pound." },
-  // Laser tag extra packs (Abraham, Nov 17, 2026): offered after a maze or guns, like ocean balls. Draft for his exact-text OK.
-  laser_packs: { group: "Cart", label: "Extra laser gun packs (after a maze or guns) (draft)", text: "Would you like to add more laser guns? To add a 6-pack of laser guns for $75, press 1. To add a 4-pack of laser guns for $50, press 2. To skip, press pound.", pending: true },
-  added: { group: "Cart", label: "Item added to cart", text: "Woohoo! I added {items} to your cart for {date}. It's saved just for you while we are on the phone.", vars: ["items", "date"] },
+  // Laser tag extra packs (Abraham, Nov 17, 2026): offered after a maze or guns, like ocean balls. Approved word for word.
+  laser_packs: { group: "Cart", label: "Extra laser gun packs (after a maze or guns; sheet box 25b, approved)", text: "Would you like to add more laser guns? To add a 6-pack of laser guns for $75, press 1. To add a 4-pack of laser guns for $50, press 2. To skip, press pound." },
+  added: { group: "Cart", label: "Item added to cart", text: "Woohoo! I added {items} to your cart for {date}. It is saved just for you while we are on the phone.", vars: ["items", "date"] },
   after_add: { group: "Cart", label: "After adding", text: "To keep shopping, press 1. To check out, press 9." },
   cart_empty: { group: "Cart", label: "Cart is empty (Abraham, Phone Menu v3)", text: "Your cart is empty. Let us start shopping!" },
   bounce_water_note: { group: "Cart", label: "Before a bounce house is added (Abraham, Phone Menu v3)", text: "Please note, our bounce houses are not for water use." },
@@ -205,7 +205,7 @@ export const PROMPTS = {
   // with "please" added.
   press_pound_done: { group: "Checkout", label: "After every information question: press pound when finished", text: "When you are finished, please press pound." },
   type_hint: { group: "Checkout", label: "Typing: how to switch", text: "To type it on your keypad instead, press star." },
-  type_instructions: { group: "Checkout", label: "Typing: how to type", text: "To type, press each key until you reach the letter: press 2 once for A, twice for B, three times for C, and the same for every key. To type two letters on the same key, press star once between them. For example, A then B is 2, star, 2 2. Press star twice for a space. Press pound when you are done." },
+  type_instructions: { group: "Checkout", label: "Typing: how to type", text: "To type, press each key until you reach the letter: press 2 once for A, twice for B, three times for C, and the same for every key. To type two letters on the same key, press star once between them. For example, A then B is 2, star, 2 2. Press star twice for a space. When you are finished, please press pound." },
   type_email_symbols: { group: "Checkout", label: "Typing: email symbols", text: "For a dot, press 1 once. For the at sign, press 1 twice." },
   typed_back: { group: "Checkout", label: "Typing: read back", text: "You typed: {value}. If that is right, press pound to continue. To try again, press 1.", vars: ["value"] },
   heard: { group: "Checkout", label: "Read back what we heard", text: "I heard: {value}. If that is right, press pound to continue. To try again, press 1.", vars: ["value"] },
@@ -250,7 +250,7 @@ export const PROMPTS = {
   // Promo texts by phone, keys only (Abraham, Nov 10, 2026): replaces consent_marketing_v2, which is no longer played.
   promo_ask: { group: "Promo texts by phone (keys only)", label: "Step 1: after the order", text: "To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1. To skip, press pound." },
   promo_which: { group: "Promo texts by phone (keys only)", label: "Step 2: which number", text: "To get texts at the number you are calling from, press 1. To use a different phone number, press 2." },
-  promo_enter: { group: "Promo texts by phone (keys only)", label: "Step 3: enter a number", text: "Please enter the 10-digit mobile number, then press pound." },
+  promo_enter: { group: "Promo texts by phone (keys only)", label: "Step 3: enter a number", text: "Please enter the 10-digit mobile number. When you are finished, please press pound." },
   promo_heard: { group: "Promo texts by phone (keys only)", label: "Step 3: read the number back", text: "You entered {number}. If that is right, press pound to continue. To enter it again, press 1.", vars: ["number"] },
   promo_bad: { group: "Promo texts by phone (keys only)", label: "Step 3: not 10 digits", text: "Sorry, that number did not work. Please try again." },
   promo_final: { group: "Promo texts by phone (keys only)", label: "Final line", text: "Thanks! We just sent a text. Reply YES within 24 hours to finish signing up." },
@@ -291,6 +291,10 @@ export const PROMPTS = {
   // until then the lines play in the live voice and PhonePay stays on his own test calls only.
   // Abraham, Nov 17, 2026: card on the call stays the default; this offers a link by text instead. Approved with "press 0".
   phonepay_link_option: { group: "Pay by card (Sola PhonePay)", label: "Before the card: get a payment link by text instead", text: "To pay by card now, please stay on the line. To get a secure payment link by text instead, press 0." },
+  // Payment flow on the phone (Abraham, Nov 17, 2026, sheet boxes 140 to 146): approved word for word
+  pay_card_line: { group: "Pay by card (Sola PhonePay)", label: "Box 140: card line (no key: the payment line; 0: a payment link)", text: "To pay with a credit or debit card, please stay on the line to connect to our secure payment line. To get a payment link instead, press 0." },
+  pay_link_how: { group: "Pay by card (Sola PhonePay)", label: "Box 141: payment link by text or email", text: "To receive the payment link by text, press 1. To receive by email, press 2." },
+  pay_link_sent: { group: "Pay by card (Sola PhonePay)", label: "Box 146: payment link sent", text: "Done! We just sent you the payment link. To keep your booking, please complete your payment within the next ten minutes. Otherwise, the booking will be released. Thank you for choosing Hup Up Attractions!" },
   phonepay_intro: { group: "Pay by card (Sola PhonePay)", label: "PhonePay connect", text: "Thank you. Please hold for a moment while we connect you to our secure payment line." }, // approved Nov 14
   phonepay_back: { group: "Pay by card (Sola PhonePay)", label: "Back from the payment line", text: "Thank you. Let us finish your order." }, // approved Nov 14 ("Let's", spelled out by the standing rule)
   phonepay_paid: { group: "Pay by card (Sola PhonePay)", label: "Payment found", text: "Your payment was received. You are all set!" }, // approved Nov 14 ("You're", spelled out)
@@ -299,10 +303,10 @@ export const PROMPTS = {
   phonepay_retry_last: { group: "Pay by card (Sola PhonePay)", label: "Card did not go through (try 5, last chance)", text: "Your card did not go through. You have one more chance to try. To try again, press 1." }, // approved Nov 15
   phonepay_failed: { group: "Pay by card (Sola PhonePay)", label: "Card did not go through (try 6, call ends)", text: "Sorry, your card did not go through. Please call us back to try again. Goodbye." }, // approved Nov 15
   pay_start: { group: "Pay by keypad", label: "Before the card steps", text: "Let us take care of your payment now. Please have your card ready." },
-  pay_card_number: { group: "Pay by keypad", label: "Card number", text: "Please enter your card number on your keypad, then press pound." },
-  pay_expiration: { group: "Pay by keypad", label: "Expiration date", text: "Please enter the expiration date, two digits for the month and two digits for the year, then press pound." },
-  pay_security_code: { group: "Pay by keypad", label: "Security code", text: "Please enter the security code on your card, then press pound." },
-  pay_postal_code: { group: "Pay by keypad", label: "Billing ZIP code", text: "Please enter the billing ZIP code for your card, then press pound." },
+  pay_card_number: { group: "Pay by keypad", label: "Card number", text: "Please enter your card number on your keypad. When you are finished, please press pound." },
+  pay_expiration: { group: "Pay by keypad", label: "Expiration date", text: "Please enter the expiration date, two digits for the month and two digits for the year. When you are finished, please press pound." },
+  pay_security_code: { group: "Pay by keypad", label: "Security code", text: "Please enter the security code on your card. When you are finished, please press pound." },
+  pay_postal_code: { group: "Pay by keypad", label: "Billing ZIP code", text: "Please enter the billing ZIP code for your card. When you are finished, please press pound." },
   pay_processing: { group: "Pay by keypad", label: "While the payment goes through", text: "One moment while we process your payment." },
   pay_success: { group: "Pay by keypad", label: "Payment approved (Abraham)", text: "Payment received, thank you!" },
   pay_declined: { group: "Pay by keypad", label: "Card declined: try again or link", text: "Sorry, that card did not go through. To try again, press 1. To get a secure payment link by email instead, press 2." },
@@ -331,9 +335,9 @@ export const PROMPTS = {
   vma_out_enter: { group: "Voicemail", label: "Staff access: call out, enter the number (Abraham, word for word)", text: "Please enter the phone number." },
   vma_out_bad: { group: "Voicemail", label: "Staff access: call out, not a valid number (Abraham)", text: "It is not a valid phone number. Please try again." },
   // Owner custom charge (Abraham, Nov 14, 2026): owner voicemail menu, key 7; wording approved (no recording until he picks the voice)
-  vma_charge_amount: { group: "Voicemail", label: "Owner custom charge: enter the amount", text: "Enter the amount in dollars and cents, then press pound. For example, for 125 dollars, press 1 2 5 0 0, then pound." }, // approved Nov 14
+  vma_charge_amount: { group: "Voicemail", label: "Owner custom charge: enter the amount", text: "Enter the amount in dollars and cents. For example, for 125 dollars, press 1 2 5 0 0. When you are finished, please press pound." }, // approved Nov 14
   vma_charge_readback: { group: "Voicemail", label: "Owner custom charge: read the amount back", text: "You entered {dollars} dollars and {cents} cents. Press 1 to confirm, or 2 to enter it again.", vars: ["dollars", "cents"] }, // approved Nov 14
-  vma_charge_note: { group: "Voicemail", label: "Owner custom charge: optional order number", text: "To add an order number, enter it now and press pound. To skip, just press pound." }, // approved Nov 14
+  vma_charge_note: { group: "Voicemail", label: "Owner custom charge: optional order number", text: "To add an order number, enter it now. When you are finished, please press pound. To skip, just press pound." }, // approved Nov 14
   vma_charge_bad: { group: "Voicemail", label: "Owner custom charge: amount not allowed", text: "That amount is not allowed. Please try again." }, // approved Nov 14
   vma_charge_back: { group: "Voicemail", label: "Owner custom charge: back in the menu", text: "You are back in the owner menu." }, // approved Nov 14
   vma_count: { group: "Voicemail", label: "Staff access: how many messages", text: "You have {count} messages, newest first.", vars: ["count"] },
@@ -343,25 +347,30 @@ export const PROMPTS = {
   vma_heard: { group: "Voicemail", label: "Staff access: marked as heard", text: "Marked as heard." },
   vma_end: { group: "Voicemail", label: "Staff access: no more messages", text: "That was the last message. To choose another box, press star, or hang up." },
   vma_calling: { group: "Voicemail", label: "Staff access: calling back", text: "Calling them back now." },
-  vma_newpin: { group: "Voicemail", label: "Staff access: change the password, step 1", text: "Please enter your new password, 4 to 8 digits, then press pound." },
-  vma_newpin_again: { group: "Voicemail", label: "Staff access: change the password, step 2", text: "Please enter the new password again, then press pound." },
+  vma_newpin: { group: "Voicemail", label: "Staff access: change the password, step 1", text: "Please enter your new password, 4 to 8 digits. When you are finished, please press pound." },
+  vma_newpin_again: { group: "Voicemail", label: "Staff access: change the password, step 2", text: "Please enter the new password again. When you are finished, please press pound." },
   vma_newpin_saved: { group: "Voicemail", label: "Staff access: password changed", text: "Your password was changed." },
   vma_newpin_bad: { group: "Voicemail", label: "Staff access: new password not accepted", text: "The passwords did not match, or it was not 4 to 8 digits. Please try again." },
   vma_no_number: { group: "Voicemail", label: "Staff access: no number to call", text: "Sorry, there is no number we can call back for this message." },
   // Key 9 (Abraham, Nov 11, 2026, word for word): feedback and comments only.
   // Key 8 catalog (Abraham, Phone Menu v3), approved word for word.
   catalog_menu: { group: "Catalog (key 8)", label: "Text or email", text: "To receive our catalog by text, press 1. To get it by email, press 2. To go back, press star." },
+  // Every phone flow that texts the caller (payment link, key 8 catalog, promo texts): boxes 142 to 144 (Abraham,
+  // Nov 17, 2026), approved word for word. They replace the old key 8 lines. The caller's number is never read out.
+  text_which: { group: "Texts to the caller (every flow)", label: "Box 142: which number", text: "To text it to the number you are calling from, press 1. To enter a different number, press 2." },
+  text_enter: { group: "Texts to the caller (every flow)", label: "Box 143: enter a different number", text: "Please enter the 10-digit phone number. When you are finished, please press pound." },
+  text_heard: { group: "Texts to the caller (every flow)", label: "Box 144: read the number back", text: "I have {number}. If that is correct, press 1. To enter a different number, press 2.", vars: ["number"] },
   catalog_text_which: { group: "Catalog (key 8)", label: "Text: which number", text: "We will text it to the number you are calling from. To use this number, press 1. To enter a different number, press 2." },
   catalog_text_enter: { group: "Catalog (key 8)", label: "Text: enter a number", text: "Please enter the 10-digit phone number, then press pound." },
   catalog_text_heard: { group: "Catalog (key 8)", label: "Text: read the number back", text: "I have {number}. If that is correct, press pound to continue. To try again, press 1.", vars: ["number"] },
   catalog_texted: { group: "Catalog (key 8)", label: "Text: done", text: "Done! We just texted you our catalog. Thank you for choosing Hup Up Attractions!" },
   catalog_text_not_yet: { group: "Catalog (key 8)", label: "Text: not available yet", text: "Sorry, we cannot send it by text just yet. Let us send it by email instead." },
   catalog_email_info: { group: "Catalog (key 8)", label: "Email: send us an empty email (plays once the info@ auto-reply is on)", text: "You can also send us an empty email to info at hup up attractions dot com, with the subject Catalog, and we will send it right back to you." },
-  catalog_email_local: { group: "Catalog (key 8)", label: "Email step 1: the first part", text: "Please enter the first part of your email address, up to the at symbol. To type it, start pressing keys on your keypad now. To say it, wait for the tone, then say it letter by letter. When you are finished, press pound." },
-  catalog_keypad_help: { group: "Catalog (key 8)", label: "Email: keypad directions (when the caller starts typing)", text: "To type, press each key once, twice, or three times for its letter. For example, press 2 once for A, twice for B, or three times for C. To type another letter on the same key, press star once first. To erase the last letter, press star twice. To go back, press star three times. For a dot, press 1 once. For an underscore, press 1 twice. For a dash, press 1 three times. To switch between letters and numbers, press 0. When you are finished, press pound." },
+  catalog_email_local: { group: "Catalog (key 8)", label: "Email step 1: the first part", text: "Please enter the first part of your email address, up to the at symbol. To type it, start pressing keys on your keypad now. To say it, wait for the tone, then say it letter by letter. When you are finished, please press pound." },
+  catalog_keypad_help: { group: "Catalog (key 8)", label: "Email: keypad directions (when the caller starts typing)", text: "To type, press each key once, twice, or three times for its letter. For example, press 2 once for A, twice for B, or three times for C. To type another letter on the same key, press star once first. To erase the last letter, press star twice. To go back, press star three times. For a dot, press 1 once. For an underscore, press 1 twice. For a dash, press 1 three times. To switch between letters and numbers, press 0. When you are finished, please press pound." },
   catalog_got: { group: "Catalog (key 8)", label: "Email: read back what we got", text: "We got {letters}. To continue, press pound. To start over, press 1. To add more, press 2.", vars: ["letters"] },
   catalog_ending: { group: "Catalog (key 8)", label: "Email: choose the ending", text: "Now choose the ending. For at gmail dot com, press 1. For at outlook dot com, press 2. For at yahoo dot com, press 3. For at icloud dot com, press 4. For a different ending, press 5." },
-  catalog_domain: { group: "Catalog (key 8)", label: "Email: a different ending", text: "Please give us the ending, after the at symbol. To type it, start pressing keys now. To say it, wait for the tone. When you are finished, press pound." },
+  catalog_domain: { group: "Catalog (key 8)", label: "Email: a different ending", text: "Please give us the ending, after the at symbol. To type it, start pressing keys now. To say it, wait for the tone. When you are finished, please press pound." },
   catalog_final: { group: "Catalog (key 8)", label: "Email: final check", text: "Your email address is {email}. If that is correct, press pound to continue. To start over, press 1.", vars: ["email"] },
   catalog_emailed: { group: "Catalog (key 8)", label: "Email: done", text: "We just emailed you our catalog! Check your inbox for a variety of attractions and endless fun for your entire family. Thank you for choosing Hup Up Attractions! To hear the main menu, press star. Otherwise, you may hang up." },
   vm9_greeting: {
@@ -380,7 +389,7 @@ export const PROMPTS = {
     label: "After-hours greeting (approved by Abraham, Nov 13, 2026)",
     text: "Thank you for calling Hup Up Attractions! Our office is closed right now. Please leave your name, phone number, and a short message after the tone, and we will call you back as soon as we open. To see our rentals anytime, visit hupupattractions.com. Have a wonderful day!",
   },
-  vm_rerecord: { group: "Voicemail", label: "Before the tone when re-recording (press 3)", text: "Please re-record your message. When you are finished, press pound." },
+  vm_rerecord: { group: "Voicemail", label: "Before the tone when re-recording (press 3)", text: "Please re-record your message. When you are finished, please press pound." },
   vm_none_retry: { group: "Voicemail", label: "Nothing was recorded (Abraham)", text: "We did not receive a message. To try again, press 3. Otherwise, you may hang up." },
   vm_closed: {
     group: "Voicemail",
@@ -421,7 +430,7 @@ export const PROMPTS = {
 } satisfies Record<string, PromptDef>;
 
 /** Old lines no longer played anywhere (kept so nothing is lost; shown as "Not used"). */
-export const RETIRED_PROMPTS = new Set<string>(["instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none"]);
+export const RETIRED_PROMPTS = new Set<string>(["instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_heard", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard"]);
 
 /** The extension (or part of the call) each group of lines belongs to, for the Admin filter. New groups fall into "Other". */
 export const PROMPT_AREAS: Record<string, string> = {
@@ -441,6 +450,7 @@ export const PROMPT_AREAS: Record<string, string> = {
   "Talk to a person": "Keys 0, 3, 5, 6 and Schools: ringing staff",
   "Ringing staff": "Keys 0, 3, 5, 6 and Schools: ringing staff",
   "Catalog (key 8)": "Key 8: Catalog",
+  "Texts to the caller (every flow)": "Texts to the caller (every flow)",
   Voicemail: "Voicemail (every box) and Key 9",
   "Texts and emails": "Texts and emails",
 };

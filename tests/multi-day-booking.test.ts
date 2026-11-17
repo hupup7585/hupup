@@ -107,7 +107,9 @@ describe("key 1: date first, several days, one charge", () => {
     const group = await getPaymentGroup(primary.id);
     const sum = pending.reduce((n, o) => n + (o.totalCents ?? 0), 0);
     expect(group!.due).toBe(sum);
-    // one text with both days and one link
+    // box 141: the link by text, to the caller's number; one text with both days and one link
+    expect(xml).toContain(`/api/voice/paylink?o=${primary.id}`);
+    await call("tx-which-choice", { Digits: "1" }, `p=pay&o=${primary.id}`);
     const text = h.sms.find((m) => m.body.includes("order #"))!;
     expect(text.body).toContain("Tuesday, December 1");
     expect(text.body).toContain("Tuesday, December 8");

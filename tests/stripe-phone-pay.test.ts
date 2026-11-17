@@ -147,12 +147,9 @@ describe("the payment subaccount: Twilio <Pay> through Stripe", () => {
     expect([o.paymentResult, o.cardLast4, o.status]).toEqual(["declined", "0002", "PENDING_PAYMENT"]);
     expect(await sub("retry", { Digits: "1" }, `o=${orderId}&n=1&t=${t}`)).toContain("<Pay ");
     expect(await sub("retry", { Digits: "2" }, `o=${orderId}&n=1&t=${t}`)).toContain("<Hangup/>");
-    // back on the hotline: the Sola link is emailed (items + delivery + tax)
+    // back on the hotline: the payment link, by text or email (box 141, Abraham, Nov 17, 2026)
     const back = await mainCall("pay-done", {}, `o=${orderId}`);
-    expect(redirect(back)).toBe("promo-consent");
-    const mail = h.emails.find((e) => e.to === "caller@example.com");
-    expect(mail?.text).toContain("total $232.47");
-    expect(mail?.text).toContain("/pay/");
+    expect(redirect(back)).toBe(`paylink?o=${orderId}`);
   });
   it("after 3 tries no more retries: the hotline sends the link", async () => {
     expect(await sub("result", { Result: "too-many-failed-attempts" }, `o=${orderId}&n=3&t=${_payLegToken(orderId, "CApay")}`)).toBe('<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>');

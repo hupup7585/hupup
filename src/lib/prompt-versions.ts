@@ -13,6 +13,12 @@ export type Version = typeof schema.promptVersions.$inferSelect;
 
 export class PromptError extends Error {}
 
+/** A short form like "it's", "we'll" or "don't" in a spoken line, or null (possessives like "Abraham's" are fine). */
+export function shortForm(text: string): string | null {
+  const m = /\b([A-Za-z]+['’](?:ll|re|ve|m|d|t)|(?:it|that|there|here|what|let|he|she|who|where)['’]s)\b/i.exec(text);
+  return m ? m[1] : null;
+}
+
 export function validateWording(key: string, text: string): string {
   if (!(key in PROMPTS)) throw new PromptError("Unknown line.");
   const def = PROMPTS[key as PromptKey] as PromptDef;
@@ -22,6 +28,9 @@ export function validateWording(key: string, text: string): string {
   const max = def.message ? 1600 : def.lines ? 1200 : 600;
   if (clean.length > max) throw new PromptError(`Please keep it under ${max} characters.`);
   if (!def.message && !def.lines && clean.includes("\n")) throw new PromptError("A spoken line is one paragraph (no new lines).");
+  // No short forms in any phone prompt (Abraham, Nov 17, 2026): "it is", never "it's"
+  const short = def.message ? null : shortForm(clean);
+  if (short) throw new PromptError(`Please spell it out: no short forms on the phone (found "${short}"). For example "it is", "that is", "we will", "do not".`);
   const missing = (def.vars ?? []).filter((v) => !clean.includes(`{${v}}`));
   if (missing.length) throw new PromptError(`Keep these changing parts in the wording: ${missing.map((m) => `{${m}}`).join(", ")}`);
   return clean;

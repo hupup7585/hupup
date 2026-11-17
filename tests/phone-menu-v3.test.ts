@@ -87,7 +87,7 @@ describe("section 2 and 3: ringing staff, after hours", () => {
 
 describe("section 4: voicemail re-record line", () => {
   it("is Abraham's wording, played before the tone", () => {
-    expect(PROMPTS.vm_rerecord.text).toBe("Please re-record your message. When you are finished, press pound.");
+    expect(PROMPTS.vm_rerecord.text).toBe("Please re-record your message. When you are finished, please press pound.");
   });
 });
 
@@ -265,7 +265,7 @@ describe("Nov 12 decisions: staff reject, caller ID, after hours, keypad pay, CA
     // Approved Nov 13, 2026 with Abraham's change ("To see our rentals anytime"; there is no online booking)
     expect(PROMPTS.vm_after_hours.text).toBe("Thank you for calling Hup Up Attractions! Our office is closed right now. Please leave your name, phone number, and a short message after the tone, and we will call you back as soon as we open. To see our rentals anytime, visit hupupattractions.com. Have a wonderful day!");
     expect(promptWaiting({}, "vm_after_hours")).toBe(false);
-    expect(PROMPTS.pay_security_code.text).toBe("Please enter the security code on your card, then press pound.");
+    expect(PROMPTS.pay_security_code.text).toBe("Please enter the security code on your card. When you are finished, please press pound.");
     expect(PROMPTS.vm_closed.text).toBe("Thank you for calling Hup Up Attractions. Our office is closed right now. Please leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.");
   });
   it("pay by keypad: prepared only, not active", async () => {

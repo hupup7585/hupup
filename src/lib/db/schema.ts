@@ -135,6 +135,8 @@ export const orders = pgTable(
     /** Offers (Abraham, Nov 17, 2026): the discount already taken off subtotal_cents, and which offer */
     offerDiscountCents: integer("offer_discount_cents").notNull().default(0),
     offerNote: text("offer_note"),
+    /** When the customer first opened the payment link (Abraham, Nov 17, 2026: then 4 more minutes, once) */
+    linkOpenedAt: timestamp("link_opened_at", { withTimezone: true }),
     /** sola | cash | check | other */
     paymentMethod: text("payment_method"),
     solaRefNum: text("sola_ref_num"),
@@ -223,6 +225,13 @@ export type CallData = {
   dayOrderIds?: number[];
   /** Key 8 catalog: the number to text, the two parts of the email, and keys typed so far */
   catPhone?: string;
+  /** Shared text steps (boxes 142 to 144): what the number is for, and the order whose payment link it gets */
+  txFor?: "cat" | "pay";
+  /** The number a payment link is texted to */
+  txPhone?: string;
+  /** The email steps are for a payment link (not the catalog), and the order */
+  emailFor?: "pay";
+  payOrder?: number;
   catLocal?: string;
   /** The catalog email letters came from speech to text (read back in the Google voice). */
   catStt?: number;
