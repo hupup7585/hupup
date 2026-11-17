@@ -29,7 +29,7 @@ import { getSettings } from "@/lib/settings";
 import { totalsWithFee } from "@/lib/pricing";
 import { deliveryQuote } from "@/lib/delivery-areas";
 import { DEFAULT_ZIP, townForZip } from "@/lib/orange-zips";
-import { nextPiece } from "@/lib/music";
+import { nextPiece, placeTracks } from "@/lib/music";
 import { deliveryFeeFor } from "@/lib/offer-delivery";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
@@ -48,7 +48,7 @@ import {
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { stripePhonePayMode, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
-import { PHONEPAY_MAX_TRIES, PHONEPAY_NOT_REACHED, amountParts, buildSendDigits, checkPhonePayTry, customChargeMadeBy, endMainPayLeg, endPayLeg, matchCustomCharge, parseCustomAmount, phonePayDirectDial, phonePayOffered, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
+import { PHONEPAY_MAX_TRIES, PHONEPAY_NOT_REACHED, amountParts, buildSendDigits, checkPhonePayTry, customChargeMadeBy, endMainPayLeg, endPayLeg, matchCustomCharge, parseCustomAmount, payQueueName, phonePayDirectDial, phonePayOffered, startPayLegWithMusic, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
@@ -2592,7 +2592,47 @@ const handlers: Record<string, Handler> = {
     // the caller) and 1, sent once PhonePay answers. Star brings the caller back at any time.
     const s = await getSettings();
     const digits = buildSendDigits(s.solaPhonePayDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: group.due, orderNumber: orderNumber(o) });
+    // Music while connecting (Abraham, Nov 17, 2026): when songs are chosen for the payment line, the caller waits with
+    // them while a separate call enters the merchant code and amount, then joins the caller to Sola
+    if ((await placeTracks("pay")).length && (await startPayLegWithMusic({ callerSid: ctx.callSid, number: s.solaPhonePayNumber, attemptId: attempt.id, baseUrl: config.baseUrl() }))) {
+      vr.enqueue({ waitUrl: url("music", { place: "pay" }), waitUrlMethod: "POST", action: url("phonepay-done", { o, a: attempt.id }), method: "POST" }, payQueueName(ctx.callSid));
+      return vr;
+    }
     phonePayDirectDial(vr, { number: s.solaPhonePayNumber, digits, action: url("phonepay-done", { o, a: attempt.id }), hangupOnStar: true });
+    return vr;
+  },
+
+  /** The separate call to Sola (with music): enter the merchant code and amount, then join the waiting caller. */
+  async "pay-leg"(ctx, vr) {
+    const a = Number(ctx.query.get("a"));
+    const [attempt] = a ? await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1) : [];
+    if (!attempt?.orderId) {
+      vr.hangup();
+      return vr;
+    }
+    const s = await getSettings();
+    const digits = buildSendDigits(s.solaPhonePayDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: attempt.amountCents, orderNumber: orderNumber(attempt.orderId) });
+    vr.play({ digits }); // the key tones go to Sola only; the caller is still on hold with the music
+    const dial = vr.dial({ record: "do-not-record", timeLimit: 900 });
+    dial.queue(payQueueName(attempt.callSid));
+    return vr;
+  },
+
+  /** The call to Sola ended or never connected: if it never reached Sola, the waiting caller goes on (backup number). */
+  async "pay-leg-status"(ctx, vr) {
+    const a = Number(ctx.query.get("a"));
+    const status = ctx.body.CallStatus ?? "";
+    if (a && PHONEPAY_NOT_REACHED.includes(status)) {
+      const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1);
+      if (attempt?.orderId) {
+        try {
+          const { getTwilio } = await import("@/lib/twilio-client");
+          await getTwilio()?.calls(attempt.callSid).update({ url: url("phonepay-done", { o: attempt.orderId, a, nr: 1 }), method: "POST" });
+        } catch {
+          /* the caller already left */
+        }
+      }
+    }
     return vr;
   },
 
@@ -2625,7 +2665,7 @@ const handlers: Record<string, Handler> = {
     let n = await triesSoFar(ctx.callSid, o);
     // PhonePay never answered: the backup number once, on the same card try (no "try" is used up)
     const status = ctx.body.DialCallStatus ?? "";
-    if (a && PHONEPAY_NOT_REACHED.includes(status) && ctx.query.get("b") !== "1") {
+    if (a && (PHONEPAY_NOT_REACHED.includes(status) || ctx.query.get("nr") === "1") && ctx.query.get("b") !== "1") {
       await track(ctx.callSid, "step", `Payment line did not answer (${status}); trying the backup number`, { attempt: a });
       const s = await getSettings();
       const digits = buildSendDigits(s.solaPhonePayDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: group.due, orderNumber: orderNumber(o) });
@@ -3406,7 +3446,7 @@ const FIELDS: Record<
 
 /* ------------------------------------------------------------------ dispatcher */
 
-const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music"]); // music: wait music pieces, not a step of the caller's journey
+const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music", "pay-leg", "pay-leg-status"]); // music: wait music pieces, not a step of the caller's journey
 
 export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Promise<string> {
   const vr = new twilio.twiml.VoiceResponse();

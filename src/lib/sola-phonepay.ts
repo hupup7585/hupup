@@ -514,3 +514,35 @@ export async function customChargeMadeBy(fromNumber: string | null | undefined, 
   }
   return `staff from ${shown}`;
 }
+
+/**
+ * Music while connecting to the payment line (Abraham, Nov 17, 2026, items 4 and 10): the caller waits in a private
+ * queue with the Owner's music, while a separate call to Sola PhonePay enters the merchant code and the amount; then
+ * that call joins the caller, so the caller never hears the key tones. Same cost as before (one call to Sola).
+ * Returns false when the call to Sola could not be started (the caller then gets the direct way, as before).
+ */
+export const payQueueName = (callerSid: string) => `pay-${callerSid}`;
+export async function startPayLegWithMusic(input: { callerSid: string; number: string; attemptId: number; baseUrl: string }): Promise<boolean> {
+  try {
+    const { getTwilio } = await import("@/lib/twilio-client");
+    const c = getTwilio();
+    const from = process.env.TWILIO_PHONE_NUMBER;
+    if (!c || !from) return false;
+    const leg = await c.calls.create({
+      to: toE164(input.number) ?? input.number,
+      from,
+      url: `${input.baseUrl}/api/voice/pay-leg?a=${input.attemptId}`,
+      method: "POST",
+      statusCallback: `${input.baseUrl}/api/voice/pay-leg-status?a=${input.attemptId}`,
+      statusCallbackMethod: "POST",
+      statusCallbackEvent: ["completed"],
+      timeout: 30,
+      timeLimit: 900,
+    });
+    await db.update(schema.phonepayAttempts).set({ payLegSid: leg.sid }).where(eq(schema.phonepayAttempts.id, input.attemptId));
+    return true;
+  } catch (e) {
+    console.error("payment line call could not start", e);
+    return false;
+  }
+}
