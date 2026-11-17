@@ -2138,8 +2138,13 @@ const handlers: Record<string, Handler> = {
       return back(vr, "ask", { f: "street" });
     }
     if (!quote.ok) return back(vr, "addr-outside");
-    await updateSession(ctx.callSid, { data: { address, town, zip } }, ctx.session);
-    await track(ctx.callSid, "said", `Address: ${address} (${quote.zone}, ${money(quote.feeCents)})`, { field: "address", value: address });
+    // Kiryas Joel streets (the Kiryas Joel zone on the delivery map) are read back and saved as Kiryas Joel, not
+    // Monroe (Abraham, Nov 17, 2026); the zip alone can't tell, 10950 covers both
+    const kj = zip === DEFAULT_ZIP && quote.kind === "local";
+    const placeTown = kj ? "Kiryas Joel" : town;
+    const placeAddress = kj ? address.replace(`, ${town}, NY`, ", Kiryas Joel, NY") : address;
+    await updateSession(ctx.callSid, { data: { address: placeAddress, town: placeTown, zip } }, ctx.session);
+    await track(ctx.callSid, "said", `Address: ${placeAddress} (${quote.zone}, ${money(quote.feeCents)})`, { field: "address", value: placeAddress });
     return back(vr, "addr-readback");
   },
 

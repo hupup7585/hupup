@@ -32,9 +32,10 @@ const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/R
 const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&apos;/g, "'"));
 
 describe("speech to text: where it runs", () => {
-  it("is not approved for the live line; preview only, and only with a Google key", () => {
-    expect(STT_LIVE_APPROVED).toBe(false);
-    expect(sttActive({ VERCEL_ENV: "production", GOOGLE_STT_API_KEY: "k", GOOGLE_TTS_API_KEY: "k" })).toBe(false);
+  it("on for the live line (Abraham, Nov 17, 2026), only with a Google key", () => {
+    expect(STT_LIVE_APPROVED).toBe(true);
+    expect(sttActive({ VERCEL_ENV: "production", GOOGLE_STT_API_KEY: "k", GOOGLE_TTS_API_KEY: "k" })).toBe(true);
+    expect(sttActive({ VERCEL_ENV: "production" })).toBe(false); // no key: keypad and Twilio speech as before
     expect(sttActive({ VERCEL_ENV: "preview", GOOGLE_STT_API_KEY: "k", GOOGLE_TTS_API_KEY: "k" })).toBe(true);
     expect(sttActive({ VERCEL_ENV: "preview", GOOGLE_TTS_API_KEY: "k" })).toBe(true); // one key with both APIs ticked
     expect(sttActive({ VERCEL_ENV: "preview", GOOGLE_STT_API_KEY: "k" })).toBe(false); // the read-back needs the Google voice key

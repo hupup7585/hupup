@@ -7,11 +7,11 @@ import { promptRecordingLink } from "@/lib/signed-link";
 /**
  * Spoken answers: record what the caller says, type it up with Google Speech-to-Text, read it back (Abraham, Nov 13,
  * 2026). PREVIEW ONLY: on the live line callers keep today's spoken answers until Abraham approves the price per call
- * (STT_LIVE_APPROVED). Uses the V1 API, standard model (Abraham, Nov 13: V1 standard with data logging on, $0.016 a minute, first 60 minutes a
- * month free; data logging is switched on in the Google Cloud console). Needs a Google key with the Cloud Speech-to-Text API allowed: GOOGLE_STT_API_KEY, or the same
+ * (STT_LIVE_APPROVED). Uses the V1 API, standard model (Abraham, Nov 17, 2026: turned on, data logging OFF, about $0.024 a minute after the first 60 minutes a
+ * month free; data logging stays off in the Google Cloud console). Needs a Google key with the Cloud Speech-to-Text API allowed: GOOGLE_STT_API_KEY, or the same
  * GOOGLE_TTS_API_KEY if both APIs are ticked on it.
  */
-export const STT_LIVE_APPROVED = false;
+export const STT_LIVE_APPROVED = true; // Abraham, Nov 17, 2026: "Turn on" (data logging off)
 
 export function sttKey(env: Record<string, string | undefined> = process.env) {
   return env.GOOGLE_STT_API_KEY || env.GOOGLE_TTS_API_KEY || null;
