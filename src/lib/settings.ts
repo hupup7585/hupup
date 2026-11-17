@@ -39,6 +39,8 @@ export const SETTING_DEFAULTS = {
   emailSignature: "",
   // Catalog email (Abraham, Nov 17, 2026): the catalog's name (added to the subject) and attach the PDF automatically
   catalogName: "",
+  // Catalog by text (Abraham, Nov 17, 2026, item 14): the photos in order, each with its own text (JSON list)
+  catalogTextItems: "",
   catalogAutoAttach: true,
   musicPayConnect: "",
   catalogTextPicture2: "",

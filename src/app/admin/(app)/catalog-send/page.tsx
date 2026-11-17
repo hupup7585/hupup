@@ -4,6 +4,8 @@ import { getSettings } from "@/lib/settings";
 import CatalogPdf from "../catalog/CatalogPdf";
 import PhotoUpload from "../catalog/PhotoUpload";
 import CatalogEmailForm from "./CatalogEmailForm";
+import CatalogTextItems from "./CatalogTextItems";
+import { parseCatalogTextItems } from "@/lib/catalog-send";
 
 /**
  * What callers get when they ask for the catalog (Abraham, Nov 17, 2026): the PDF for email and the two pictures for
@@ -34,12 +36,9 @@ export default async function CatalogSendPage() {
         <CatalogEmailForm name={String(settings.catalogName ?? "")} auto={settings.catalogAutoAttach !== false} />
       </section>
       <section className="card mb-5 p-5" data-catalog-text-pictures>
-        <h2 className="text-xl font-black">Catalog by text: two pictures</h2>
-        <p className="mb-3 mt-1 text-sm text-muted">A caller who asks for the catalog by text gets two messages: first picture 1 with the catalog words, then picture 2 alone. Without pictures, only the words are sent. JPG or PNG.</p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div><div className="label">Picture 1 (with the words)</div><PhotoUpload kind="text" id={1} current={settings.catalogTextPicture1 || null} /></div>
-          <div><div className="label">Picture 2 (alone)</div><PhotoUpload kind="text" id={2} current={settings.catalogTextPicture2 || null} /></div>
-        </div>
+        <h2 className="text-xl font-black">Catalog by text (photos)</h2>
+        <p className="mb-3 mt-1 text-sm text-muted">A caller who asks for the catalog by text gets each photo in its own message, with its own text, in this order (up to 10). JPG, PNG or WebP, under 4 MB. No photos here: the catalog words are sent as before.</p>
+        <CatalogTextItems initial={parseCatalogTextItems(settings.catalogTextItems)} />
       </section>
     </div>
   );

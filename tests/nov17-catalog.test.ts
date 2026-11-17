@@ -161,3 +161,23 @@ describe("item dimensions (Abraham, Nov 17, 2026)", () => {
     expect(p.dimensions).toBe("15 by 15 feet");
   });
 });
+
+describe("catalog by text: photos, each with its own text, in order (Abraham, Nov 17, 2026, item 14)", () => {
+  it("each photo in its own message with its own text; only saved catalog photos; the words alone without photos", async () => {
+    await saveSetting(
+      "catalogTextItems",
+      JSON.stringify([
+        { photo: "/api/catalog-photo/catalog/text/aaa.jpg", text: "Jumping balloons" },
+        { photo: "/api/catalog-photo/catalog/text/bbb.png", text: "Laser tag" },
+        { photo: "https://evil.example/x.jpg", text: "not ours" },
+      ]),
+    );
+    const msgs = await catalogTextMessages("Hup Up Attractions: Here is our catalog");
+    expect(msgs).toEqual([
+      { body: "Jumping balloons", mediaUrls: ["https://hupup.example/api/catalog-photo/catalog/text/aaa.jpg"] },
+      { body: "Laser tag", mediaUrls: ["https://hupup.example/api/catalog-photo/catalog/text/bbb.png"] },
+    ]);
+    await saveSetting("catalogTextItems", "");
+    expect((await catalogTextMessages("W"))[0].body).toBe("W");
+  });
+});

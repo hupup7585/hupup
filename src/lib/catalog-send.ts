@@ -148,11 +148,29 @@ export async function replyToCatalogText(
  * The catalog by text as separate messages (Abraham, Nov 17, 2026): first picture 1 with the catalog words, then
  * picture 2 alone (no words), in that order. Without pictures it is the words only, as before.
  */
+/** The catalog photos for texts, in order, each with its own text (Abraham, Nov 17, 2026, item 14). */
+export type CatalogTextItem = { photo: string; text: string };
+export function parseCatalogTextItems(raw: unknown): CatalogTextItem[] {
+  try {
+    const list = JSON.parse(String(raw || "[]"));
+    if (!Array.isArray(list)) return [];
+    return list
+      .map((x) => ({ photo: String(x?.photo ?? ""), text: String(x?.text ?? "").slice(0, 1500) }))
+      .filter((x) => /^\/api\/catalog-photo\/catalog\/text\/[a-z0-9-]+\.(jpg|png|webp)$/.test(x.photo))
+      .slice(0, 10);
+  } catch {
+    return [];
+  }
+}
+
 export async function catalogTextMessages(words: string): Promise<{ body: string; mediaUrls: string[] }[]> {
   const { getSettings } = await import("@/lib/settings");
   const { config } = await import("@/lib/config");
   const s = await getSettings();
   const abs = (p: string) => (p ? new URL(p, config.baseUrl()).toString() : "");
+  // The photo catalog: each photo in its own message with its own text, in the Owner's order
+  const items = parseCatalogTextItems(s.catalogTextItems);
+  if (items.length) return items.map((i) => ({ body: i.text, mediaUrls: [abs(i.photo)] }));
   const one = abs(s.catalogTextPicture1);
   const two = abs(s.catalogTextPicture2);
   const out = [{ body: words, mediaUrls: one ? [one] : [] }];
