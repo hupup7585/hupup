@@ -17,9 +17,9 @@ describe("New booking month calendar", () => {
     expect(shiftMonth("2026-12", 1)).toBe("2027-01");
     expect(shiftMonth("2027-01", -1)).toBe("2026-12");
   });
-  it("live keeps the old day row until approved; the summary stays", () => {
+  it("approved: on for staff on the live Admin; the summary stays", () => {
     const page = readFileSync("src/app/admin/(app)/pos/page.tsx", "utf8");
-    expect(page).toContain("const MONTH_CALENDAR_LIVE_APPROVED = false;");
+    expect(page).toContain("const MONTH_CALENDAR_LIVE_APPROVED = true;");
     expect(page).toContain('monthCalendar={MONTH_CALENDAR_LIVE_APPROVED || process.env.VERCEL_ENV !== "production"}');
     const form = readFileSync("src/app/admin/(app)/pos/PosForm.tsx", "utf8");
     expect(form).toContain("data-date-check");

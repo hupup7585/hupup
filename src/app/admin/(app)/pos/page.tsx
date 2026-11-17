@@ -10,7 +10,7 @@ import { termsActive } from "@/lib/rental-terms";
 import PosForm from "./PosForm";
 
 /** Month calendar date picker (Abraham, Nov 17, 2026): preview only until he approves the screenshot. */
-const MONTH_CALENDAR_LIVE_APPROVED = false;
+const MONTH_CALENDAR_LIVE_APPROVED = true; // approved by Abraham, Nov 17, 2026
 
 export default async function PosPage({ searchParams }: { searchParams: Promise<{ date?: string; product?: string }> }) {
   const sp = await searchParams;
