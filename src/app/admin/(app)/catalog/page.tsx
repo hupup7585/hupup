@@ -42,7 +42,8 @@ function ProductForm({ p, categories, categoryId }: { p?: Product; categories: C
         <input id={`size-${p?.id ?? "new"}`} name="sizeOrder" type="number" min={1} max={99} defaultValue={p?.sizeOrder ?? ""} className="input" placeholder="Leave empty if not a size" />
         <span className="mt-1 block text-xs text-muted">When this item is booked, the phone line offers the next size up or down in the same category.</span>
       </div>
-      <div className="sm:col-span-6"><label className="label">Description</label><input name="description" defaultValue={p?.description} className="input" /></div>
+      <div className="sm:col-span-4"><label className="label">Description</label><input name="description" defaultValue={p?.description} className="input" /></div>
+      <div className="sm:col-span-2" data-dimensions><label className="label">Dimensions</label><input name="dimensions" defaultValue={p?.dimensions} className="input" placeholder="e.g. 15 by 15 feet" maxLength={120} /></div>
       <div className="sm:col-span-6"><label className="label">What the phone voice says for “hear description”</label><textarea name="spokenDescription" defaultValue={p?.spokenDescription} rows={2} className="input" /></div>
       <div className="sm:col-span-4 text-sm text-muted">{p ? "Photo: use Upload photo above this form." : "Add the item first, then upload its photo."}</div>
       <div className="flex items-end gap-4 pb-2 sm:col-span-2">

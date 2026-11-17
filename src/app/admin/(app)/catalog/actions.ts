@@ -62,6 +62,7 @@ export async function saveProductAction(fd: FormData) {
     quantity,
     description: s(fd, "description"),
     spokenDescription: s(fd, "spokenDescription"),
+    dimensions: s(fd, "dimensions").slice(0, 120),
     sortOrder: Number(fd.get("sortOrder") || 0),
     sizeOrder: (() => {
       const n = Number(fd.get("sizeOrder"));

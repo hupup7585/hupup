@@ -150,3 +150,14 @@ describe("catalog by text: two messages", () => {
     expect(await catalogTextMessages("W")).toHaveLength(1);
   });
 });
+
+describe("item dimensions (Abraham, Nov 17, 2026)", () => {
+  it("each catalog item has a Dimensions field in Admin, saved with the item", async () => {
+    const page = readFileSync("src/app/admin/(app)/catalog/page.tsx", "utf8");
+    expect(page).toContain('name="dimensions"');
+    expect(readFileSync("src/app/admin/(app)/catalog/actions.ts", "utf8")).toContain('dimensions: s(fd, "dimensions")');
+    await db.update(schema.products).set({ dimensions: "15 by 15 feet" }).where(eq(schema.products.id, productId));
+    const [p] = await db.select().from(schema.products).where(eq(schema.products.id, productId));
+    expect(p.dimensions).toBe("15 by 15 feet");
+  });
+});

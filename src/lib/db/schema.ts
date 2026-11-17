@@ -42,6 +42,8 @@ export const products = pgTable(
     description: text("description").notNull().default(""),
     /** What the phone voice reads when the caller presses "hear description" */
     spokenDescription: text("spoken_description").notNull().default(""),
+    /** Size of the item, e.g. "15 by 15 feet" (Abraham, Nov 17, 2026); Admin now, the website once he approves */
+    dimensions: text("dimensions").notNull().default(""),
     priceCents: integer("price_cents").notNull(),
     /** Units owned */
     quantity: integer("quantity").notNull().default(1),

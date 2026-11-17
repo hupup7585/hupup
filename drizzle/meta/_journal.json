@@ -505,6 +505,13 @@
       "when": 1794886517886,
       "tag": "0071_phone_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1794944631267,
+      "tag": "0072_item_dimensions",
+      "breakpoints": true
     }
   ]
 }
