@@ -50,10 +50,15 @@ function signatureHtml(signature: string): string {
 }
 
 /** The email in both forms: HTML (logo header, message, signature) and plain text (message, then the signature). */
-export function brandedEmail(text: string, opts: { baseUrl: string; signature?: string | null }): { html: string; text: string } {
+export function brandedEmail(text: string, opts: { baseUrl: string; signature?: string | null; promo?: { address: string; unsubscribeUrl: string } }): { html: string; text: string } {
   const signature = (opts.signature ?? "").trim() || EMAIL_SIGNATURE_DEFAULT;
   const body = text.trim();
-  const plain = `${body}\n\n--\n${signature}\n`;
+  // Promotional emails only (the law requires them): the mailing address and an Unsubscribe link at the very bottom
+  const promoText = opts.promo ? `\n${opts.promo.address.trim() ? `${opts.promo.address.trim()}\n` : ""}Unsubscribe: ${opts.promo.unsubscribeUrl}\n` : "";
+  const promoHtml = opts.promo
+    ? `<tr><td class="hu-pad" style="padding:0 28px 24px 28px;font-size:12px;line-height:1.6;color:#888888">${opts.promo.address.trim() ? `<div>${esc(opts.promo.address.trim())}</div>` : ""}<div><a href="${esc(opts.promo.unsubscribeUrl)}" style="color:#888888">Unsubscribe</a></div></td></tr>`
+    : "";
+  const plain = `${body}\n\n--\n${signature}\n${promoText}`;
   const bodyHtml = esc(body)
     .split(/\n{2,}/)
     .map((p) => `<p style="margin:0 0 16px 0">${p.replace(/\n/g, "<br>").replace(/(https?:\/\/[^\s<]+)/g, `<a href="$1" style="color:${LINK}">$1</a>`)}</p>`)
@@ -74,6 +79,7 @@ export function brandedEmail(text: string, opts: { baseUrl: string; signature?: 
 <tr><td class="hu-pad hu-body" style="padding:28px 28px 8px 28px;font-size:16px;line-height:1.6;color:#2B2B2B">${bodyHtml}</td></tr>
 <tr><td class="hu-pad" style="padding:0 28px"><div style="border-top:1px solid ${BLUE_LINE}"></div></td></tr>
 <tr><td class="hu-pad" style="padding:20px 28px 28px 28px">${signatureHtml(signature)}</td></tr>
+${promoHtml}
 </table>
 </td></tr></table>
 </body></html>`;

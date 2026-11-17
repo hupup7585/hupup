@@ -40,7 +40,7 @@ export function emailEnvelope(to: string, env: Record<string, string | undefined
 
 export type EmailAttachment = { filename: string; content: string /* base64 */ };
 
-export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string>; record?: boolean } = {}): Promise<SendResult> {
+export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string>; record?: boolean; promo?: boolean } = {}): Promise<SendResult> {
   if (!config.resendConfigured()) {
     if (config.isProd()) return { sent: false, error: "Email (Resend) is not configured" };
     console.log(`[dev EMAIL to ${to}] ${subject}\n${text}${attachments.length ? `\n[attachments: ${attachments.map((a) => a.filename).join(", ")}]` : ""}`);
@@ -50,8 +50,19 @@ export async function sendEmail(to: string, subject: string, text: string, attac
     // Logo and signature on every email (Abraham, Nov 17, 2026): HTML with the hosted logo, plus a plain-text version
     const { brandedEmail } = await import("@/lib/email-brand");
     const { getSettings } = await import("@/lib/settings");
-    const signature = await getSettings().then((s) => s.emailSignature).catch(() => null);
-    const branded = brandedEmail(text, { baseUrl: config.baseUrl(), signature });
+    const s = await getSettings().catch(() => null);
+    let promo: { address: string; unsubscribeUrl: string } | undefined;
+    if (opts.promo) {
+      // Promotional emails: never to an address that unsubscribed; the address and Unsubscribe link at the bottom
+      const { db, schema } = await import("@/lib/db");
+      const { eq } = await import("drizzle-orm");
+      const [gone] = await db.select().from(schema.emailUnsubscribes).where(eq(schema.emailUnsubscribes.email, to.trim().toLowerCase())).limit(1);
+      if (gone) return { sent: false, error: "This address unsubscribed from promotional emails." };
+      const { unsubscribeLink } = await import("@/lib/signed-link");
+      promo = { address: String(s?.emailMailingAddress ?? ""), unsubscribeUrl: unsubscribeLink(to.trim(), config.baseUrl()) };
+      opts = { ...opts, headers: { ...(opts.headers ?? {}), "List-Unsubscribe": `<${promo.unsubscribeUrl.replace("/unsubscribe?", "/api/unsubscribe?")}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } };
+    }
+    const branded = brandedEmail(text, { baseUrl: config.baseUrl(), signature: s?.emailSignature ?? null, promo });
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },

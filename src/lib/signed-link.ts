@@ -96,3 +96,15 @@ export function inboundEmailSecret(env: Record<string, string | undefined> = pro
   if (!env.AUTH_SECRET) return "";
   return createHmac("sha256", env.AUTH_SECRET).update("inbound-email:v1").digest("hex");
 }
+
+/** Unsubscribe link for promotional emails (Abraham, Nov 17, 2026): signed per address, never expires. */
+const signUnsub = (email: string) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`unsubscribe:${email.toLowerCase()}`).digest("hex").slice(0, 32);
+export function unsubscribeLink(email: string, base: string): string {
+  return `${base.replace(/\/$/, "")}/unsubscribe?e=${encodeURIComponent(email.toLowerCase())}&s=${signUnsub(email)}`;
+}
+export function verifyUnsubscribe(email: string | null, sig: string | null): boolean {
+  if (!email || !sig) return false;
+  const want = Buffer.from(signUnsub(email));
+  const got = Buffer.from(sig);
+  return want.length === got.length && timingSafeEqual(want, got);
+}

@@ -479,6 +479,12 @@ export const musicRadio = pgTable("music_radio", {
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Addresses that unsubscribed from promotional emails (booking and payment emails still go out). */
+export const emailUnsubscribes = pgTable("email_unsubscribes", {
+  email: text("email").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const voicePrompts = pgTable("voice_prompts", {
   key: text("key").primaryKey(),
   text: text("text"),

@@ -53,8 +53,19 @@ export async function sendCatalogEmail(to: string) {
   const { catalogPdfAttachment } = await import("@/lib/catalog-pdf");
   const pdf = s.catalogAutoAttach !== false ? await catalogPdfAttachment().catch(() => null) : null;
   const name = String(s.catalogName ?? "").trim();
-  return sendEmail(to, name ? `${subject}: ${name}` : subject, text, pdf ? [pdf] : []);
+  // Abraham, Nov 17, 2026 (approved, word for word): with the PDF attached, the catalog email reads exactly this
+  if (pdf) {
+    const n = name || "catalog";
+    return sendEmail(to, catalogEmailSubject(n), catalogEmailBody(n), [pdf]);
+  }
+  return sendEmail(to, subject, text, []);
 }
+
+/** "{Catalog Name} - Hup Up Attractions" */
+export const catalogEmailSubject = (name: string) => `${name} - Hup Up Attractions`;
+/** The approved catalog email (the logo header and signature are added to every email). */
+export const catalogEmailBody = (name: string) =>
+  `Dear valued customer,\n\nFind our ${name} attached. To book with our automated system, call us at (845) 777-7585 Ext. 1\n\nThank you for choosing Hup Up Attractions!`;
 
 /** The catalog text (Abraham, word for word). */
 export const catalogText = () => `${BUSINESS_NAME}: Here is our catalog: hupupattractions.com/#rentals To book, call ${PUBLIC_PHONE_DISPLAY}.`;

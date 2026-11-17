@@ -45,7 +45,34 @@ describe("email items 7, 10 and 13 (Abraham, Nov 17, 2026)", () => {
   it("catalog email: the PDF attached while the switch is on, and the catalog's name in the subject", () => {
     const s = readFileSync("src/lib/catalog-send.ts", "utf8");
     expect(s).toContain('s.catalogAutoAttach !== false ? await catalogPdfAttachment()');
-    expect(s).toContain("name ? `${subject}: ${name}` : subject");
+    expect(s).toContain("catalogEmailSubject(n), catalogEmailBody(n), [pdf]");
     expect(readFileSync("src/app/admin/(app)/catalog-send/page.tsx", "utf8")).toContain("<CatalogEmailForm");
+  });
+});
+
+describe("the approved catalog email (Abraham, Nov 17, 2026)", () => {
+  it("subject and text, word for word", async () => {
+    const { catalogEmailBody, catalogEmailSubject } = await import("@/lib/catalog-send");
+    expect(catalogEmailSubject("Chanukah Catalog 2026")).toBe("Chanukah Catalog 2026 - Hup Up Attractions");
+    expect(catalogEmailBody("Chanukah Catalog 2026")).toBe("Dear valued customer,\n\nFind our Chanukah Catalog 2026 attached. To book with our automated system, call us at (845) 777-7585 Ext. 1\n\nThank you for choosing Hup Up Attractions!");
+  });
+});
+
+describe("promotional emails only: mailing address and Unsubscribe (Abraham, Nov 17, 2026)", () => {
+  it("promo: the address (blank until given) and an Unsubscribe link; booking emails have neither", async () => {
+    const promo = brandedEmail("Sale!", { baseUrl: "https://x.com", promo: { address: "", unsubscribeUrl: "https://x.com/unsubscribe?e=a%40b.com&s=1" } });
+    expect(promo.html).toContain(">Unsubscribe</a>");
+    expect(promo.text).toContain("Unsubscribe: https://x.com/unsubscribe?e=a%40b.com&s=1");
+    const booking = brandedEmail("Your booking", { baseUrl: "https://x.com" });
+    expect(booking.html).not.toContain("Unsubscribe");
+    const withAddress = brandedEmail("Sale!", { baseUrl: "https://x.com", promo: { address: "1 Main Street, Monroe, NY 10950", unsubscribeUrl: "https://x.com/u" } });
+    expect(withAddress.text).toContain("1 Main Street, Monroe, NY 10950\nUnsubscribe: https://x.com/u");
+  });
+  it("the unsubscribe link is signed per address", async () => {
+    process.env.AUTH_SECRET = "test-secret-unsub-0123456789";
+    const { unsubscribeLink, verifyUnsubscribe } = await import("@/lib/signed-link");
+    const link = new URL(unsubscribeLink("Sara@Example.com", "https://x.com"));
+    expect(verifyUnsubscribe(link.searchParams.get("e"), link.searchParams.get("s"))).toBe(true);
+    expect(verifyUnsubscribe("other@example.com", link.searchParams.get("s"))).toBe(false);
   });
 });
