@@ -29,6 +29,7 @@ import { getSettings } from "@/lib/settings";
 import { totalsWithFee } from "@/lib/pricing";
 import { deliveryQuote } from "@/lib/delivery-areas";
 import { DEFAULT_ZIP, townForZip } from "@/lib/orange-zips";
+import { nextPiece } from "@/lib/music";
 import { deliveryFeeFor } from "@/lib/offer-delivery";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
@@ -768,6 +769,18 @@ function emailHome(ctx: Ctx, vr: VR) {
 type Handler = (ctx: Ctx, vr: VR) => Promise<VR> | VR;
 
 const handlers: Record<string, Handler> = {
+  /**
+   * Music while a caller waits (Abraham, Nov 17, 2026): one piece at a time, like a radio (src/lib/music.ts). Used as
+   * the wait music of a queue: Twilio asks again for the next piece when one ends. place = staff | pay.
+   */
+  async music(ctx, vr) {
+    const place = ctx.query.get("place") === "pay" ? "pay" : "staff";
+    const piece = await nextPiece(place);
+    if (piece) vr.play(piece.url);
+    else vr.pause({ length: 8 }); // no music chosen for this place: quiet
+    return vr;
+  },
+
   async incoming(ctx, vr) {
     // Blocked callers (Settings → Caller blocking) get a busy signal before anything else, and no session.
     const blocked = matchBlock(ctx.from, parseBlockList((await getSettings()).blockedCallers || ""));
@@ -3393,7 +3406,7 @@ const FIELDS: Record<
 
 /* ------------------------------------------------------------------ dispatcher */
 
-const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept"]);
+const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music"]); // music: wait music pieces, not a step of the caller's journey
 
 export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Promise<string> {
   const vr = new twilio.twiml.VoiceResponse();

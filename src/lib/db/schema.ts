@@ -456,6 +456,29 @@ export const appSettings = pgTable("app_settings", {
   updatedBy: integer("updated_by"),
 });
 
+/**
+ * Music the Owner uploads (Abraham, Nov 17, 2026). Each song is kept as short phone-quality pieces (8 kHz WAV, a few
+ * seconds each) in R2, so the music can play like a radio (see src/lib/music.ts).
+ */
+export const musicTracks = pgTable("music_tracks", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  pieces: integer("pieces").notNull().default(0),
+  pieceSeconds: integer("piece_seconds").notNull().default(8),
+  durationSec: integer("duration_sec").notNull().default(0),
+  complete: boolean("complete").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  trashedAt: timestamp("trashed_at", { withTimezone: true }),
+});
+
+/** Where each place's music is now: the song in its list, the piece, and when that piece started. */
+export const musicRadio = pgTable("music_radio", {
+  place: text("place").primaryKey(),
+  trackPos: integer("track_pos").notNull().default(0),
+  piece: integer("piece").notNull().default(0),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const voicePrompts = pgTable("voice_prompts", {
   key: text("key").primaryKey(),
   text: text("text"),

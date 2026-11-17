@@ -33,6 +33,9 @@ export const SETTING_DEFAULTS = {
    * Owner uploads them in Admin, Catalog. Blank = the words only, as before.
    */
   catalogTextPicture1: "",
+  // Music (Abraham, Nov 17, 2026): the songs (ids, in order) for each place; empty = no music there
+  musicStaffWait: "",
+  musicPayConnect: "",
   catalogTextPicture2: "",
   deliveryPromoStart: "",
   deliveryPromoEnd: "",
