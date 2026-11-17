@@ -13,6 +13,16 @@ export async function GET(req: Request) {
   if (process.env.VERCEL_ENV !== "preview") return new Response("Not found", { status: 404 });
   if (!process.env.RESEND_API_KEY) return Response.json({ verified: false, reason: "RESEND_API_KEY is not set on preview" });
   const owner = new URL(req.url).searchParams.get("send") === "owner";
+  // Abraham, Nov 17, 2026: the test email with the logo and signature, to hupupattractions@gmail.com
+  if (new URL(req.url).searchParams.get("send") === "branded") {
+    const { sendEmail } = await import("@/lib/notify");
+    const r = await sendEmail(
+      "hupupattractions@gmail.com",
+      "Hup Up Attractions: test email with the logo and signature",
+      "Hi Abraham,\n\nThis is the test email you asked for, with the logo at the top and the signature at the bottom. Email apps that block pictures show the same text without the logo.\n\nWe will see you soon.",
+    );
+    return Response.json({ sent: r.sent, error: r.error ?? null });
+  }
   const to = owner ? process.env.ADMIN_EMAIL || "hupupattractions@gmail.com" : "delivered@resend.dev";
   const env = owner ? process.env : { EMAIL_FROM: "Hup Up Attractions <info@hupupattractions.com>" };
   const envelope = emailEnvelope(to, env);

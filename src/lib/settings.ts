@@ -35,6 +35,8 @@ export const SETTING_DEFAULTS = {
   catalogTextPicture1: "",
   // Music (Abraham, Nov 17, 2026): the songs (ids, in order) for each place; empty = no music there
   musicStaffWait: "",
+  // Email signature (Abraham, Nov 17, 2026): empty = the approved default (src/lib/email-brand.ts)
+  emailSignature: "",
   musicPayConnect: "",
   catalogTextPicture2: "",
   deliveryPromoStart: "",

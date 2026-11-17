@@ -4,6 +4,8 @@ import NotActive from "@/components/NotActive";
 import { config } from "@/lib/config";
 import { requireOwner } from "@/lib/auth";
 import { SalesTaxForm } from "./PricingForms";
+import EmailSignatureForm from "./EmailSignatureForm";
+import { EMAIL_SIGNATURE_DEFAULT } from "@/lib/email-brand";
 
 function Row({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
   return (
@@ -43,6 +45,10 @@ export default async function SettingsPage() {
           <li>Payments: SOLA_PAYMENTSITE_NAME{config.solaConfigured() ? ` (now ${process.env.SOLA_PAYMENTSITE_NAME})` : ""}; payment updates go to {base}/api/sola/webhook with SOLA_WEBHOOK_PIN.</li>
         </ul>
       </details>
+      <section className="card mb-6 p-5" id="email-signature">
+        <h2 className="mb-3 text-lg font-extrabold">Email signature</h2>
+        <EmailSignatureForm initial={settings.emailSignature} fallback={EMAIL_SIGNATURE_DEFAULT} />
+      </section>
       <section className="card mb-6 p-5" id="tax">
         <h2 className="mb-3 text-lg font-extrabold">Sales tax</h2>
         <SalesTaxForm initial={settings.salesTaxPercent} />

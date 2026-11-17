@@ -47,13 +47,19 @@ export async function sendEmail(to: string, subject: string, text: string, attac
     return { sent: true, dev: true };
   }
   try {
+    // Logo and signature on every email (Abraham, Nov 17, 2026): HTML with the hosted logo, plus a plain-text version
+    const { brandedEmail } = await import("@/lib/email-brand");
+    const { getSettings } = await import("@/lib/settings");
+    const signature = await getSettings().then((s) => s.emailSignature).catch(() => null);
+    const branded = brandedEmail(text, { baseUrl: config.baseUrl(), signature });
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         ...emailEnvelope(to),
         subject,
-        text,
+        text: branded.text,
+        html: branded.html,
         ...(attachments.length ? { attachments } : {}),
         ...(opts.headers ? { headers: opts.headers } : {}),
       }),
