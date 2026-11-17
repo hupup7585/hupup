@@ -92,6 +92,37 @@ describe("catalog photos and Garbage", () => {
     expect(page).toContain("data-garbage");
     expect(page).toContain("Put in Garbage");
   });
+  it("catalog PDF and text pictures are on their own page (Catalog email & text); Catalog keeps categories and items", () => {
+    const side = readFileSync("src/components/Sidebar.tsx", "utf8");
+    expect(side).toContain('"/admin/catalog-send", FileText, "Catalog email & text", O]');
+    const send = readFileSync("src/app/admin/(app)/catalog-send/page.tsx", "utf8");
+    expect(send).toContain("await requireOwner()");
+    expect(send).toContain("<CatalogPdf");
+    expect(send).toContain("data-catalog-text-pictures");
+    const cat = readFileSync("src/app/admin/(app)/catalog/page.tsx", "utf8");
+    expect(cat).not.toContain("<CatalogPdf");
+    expect(cat).not.toContain("data-catalog-text-pictures");
+  });
+  it("Offers is its own Owner page in the side menu, under Catalog", () => {
+    const side = readFileSync("src/components/Sidebar.tsx", "utf8");
+    expect(side.indexOf('"/admin/offers", Percent, "Offers", O]')).toBeGreaterThan(side.indexOf('"/admin/catalog", Package, "Catalog", O]'));
+    const page = readFileSync("src/app/admin/(app)/offers/page.tsx", "utf8");
+    expect(page).toContain("await requireOwner()");
+    expect(page).toContain("data-offers");
+    expect(readFileSync("src/app/admin/(app)/catalog/page.tsx", "utf8")).not.toContain("data-offers");
+    expect(readFileSync("src/app/admin/(app)/offers/actions.ts", "utf8")).toContain("settings.offers_updated");
+  });
+  it("a mini garbage can next to Active in every item's edit form, asking first", () => {
+    const page = readFileSync("src/app/admin/(app)/catalog/page.tsx", "utf8");
+    const form = page.slice(page.indexOf("function ProductForm"), page.indexOf("export default async function CatalogPage"));
+    expect(form).toContain("formAction={trashProductAction}");
+    expect(form).toContain("data-trash-in-form");
+    expect(form).toContain("Put \"${p.name}\" in Garbage?");
+    expect(form.indexOf("Active</label>")).toBeLessThan(form.indexOf("<Trash2"));
+    const btn = readFileSync("src/components/ConfirmSubmit.tsx", "utf8");
+    expect(btn).toContain("window.confirm(message)");
+    expect(btn).toContain("formAction={formAction}");
+  });
 });
 
 describe("catalog by text: two messages", () => {

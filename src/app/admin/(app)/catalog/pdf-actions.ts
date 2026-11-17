@@ -27,7 +27,7 @@ export async function catalogPdfChunkAction(form: FormData): Promise<R> {
     const r = await saveCatalogChunk(id, Number(form.get("idx")), Buffer.from(await blob.arrayBuffer()), form.get("last") === "1");
     if (!r.complete) return { ok: true, message: "" };
     await db.insert(schema.auditLog).values({ userId: s.userId, action: "catalog.pdf_uploaded", entityType: "catalog_file", entityId: String(id), after: {} });
-    revalidatePath("/admin/catalog");
+    revalidatePath("/admin/catalog-send");
     return { ok: true, message: "Uploaded. Catalog emails now send this PDF." };
   } catch (e) {
     return { ok: false, message: (e as Error).message };

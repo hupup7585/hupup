@@ -61,7 +61,7 @@ export async function blockers(env: Record<string, string | undefined> = process
       area: "Catalog auto-reply to info@ emails",
       active: false,
       reason: "Waiting for Abraham to approve the reply wording and the Cloudflare Email Worker DNS change.",
-      where: "/admin/catalog",
+      where: "/admin/catalog-send",
     },
     {
       key: "sms-catalog",

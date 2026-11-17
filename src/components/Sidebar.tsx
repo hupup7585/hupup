@@ -61,6 +61,8 @@ export const NAV_GROUPS: Group[] = [
       ["/admin/pos", PlusCircle, "New booking", OS],
       ["/admin/customers", Contact, "Customers", OS],
       ["/admin/catalog", Package, "Catalog", O],
+      ["/admin/catalog-send", FileText, "Catalog email & text", O], // Abraham, Nov 17, 2026: catalog PDF + text pictures
+      ["/admin/offers", Percent, "Offers", O], // Abraham, Nov 17, 2026: offers on their own page
       ["/admin/units", Boxes, "Equipment units", OS], // Abraham, Nov 15, 2026: Owner edits, Secretary views
     ],
   },

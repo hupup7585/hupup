@@ -122,18 +122,3 @@ export async function trashProductAction(fd: FormData) {
   done(restore ? "Item restored: it's back on the catalog list, website and phone menu." : "Item moved to Garbage. You can restore it from the Garbage list.");
 }
 
-/** Owner only: the three offers (Abraham, Nov 17, 2026), each on or off. They never combine. Audited. */
-export async function saveOffersAction(fd: FormData) {
-  const owner = await requireOwner();
-  const { getSettings, saveSetting } = await import("@/lib/settings");
-  const s = await getSettings();
-  const after = {
-    offerLaserThirdPackOn: fd.get("offerLaserThirdPackOn") === "on",
-    offerThuSunOn: fd.get("offerThuSunOn") === "on",
-    offerFourthSundayOn: fd.get("offerFourthSundayOn") === "on",
-  };
-  const before = { offerLaserThirdPackOn: s.offerLaserThirdPackOn, offerThuSunOn: s.offerThuSunOn, offerFourthSundayOn: s.offerFourthSundayOn };
-  for (const [k, v] of Object.entries(after)) await saveSetting(k as keyof typeof after, v, owner.userId);
-  await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.offers_updated", entityType: "settings", entityId: "offers", before, after });
-  done("Offers saved. They apply to new bookings.");
-}
