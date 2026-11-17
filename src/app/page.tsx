@@ -12,7 +12,6 @@ import { smsSignupNotActive, smsTermsV2Active, webConsentCopy } from "@/lib/sms-
 import { smsNumberDisplay } from "@/lib/sms-number";
 import { signUpsDisabledReason } from "@/app/text-alerts/actions";
 import { getSettings } from "@/lib/settings";
-import { dollars, LASER_LIST_COPY, laserListShown, laserPriceList } from "@/lib/site-laser";
 import { CallButton, ICON_STROKE, IconTile, SectionTitle, Wave, categoryIcon } from "@/components/site/parts";
 
 export const revalidate = 60; // hours and catalog come from Admin; saves also refresh right away
@@ -40,8 +39,6 @@ const INTRO_REST = INTRO.slice(INTRO.indexOf("!") + 1).trim();
 export default async function Home() {
   const c = await getSiteContent();
   const settings = await getSettings();
-  // Laser tag choices with prices: draft on preview only until Abraham approves the wording and screenshot
-  const laser = laserListShown() ? await laserPriceList() : null;
   const span = (v: string) => v.split("-").map((t) => t.trim());
   const [monOpen, monClose] = span(settings.hoursMonThu);
   const [sunOpen, sunClose] = span(settings.hoursSunday);
@@ -143,22 +140,6 @@ export default async function Home() {
                   <div>
                     <h3 className="text-2xl font-extrabold leading-tight sm:text-4xl">{cat.name}</h3>
                     <p className="mt-3 max-w-2xl text-lg leading-relaxed text-hu-deep/85">{cat.description}</p>
-                    {/laser/i.test(cat.name) && laser && (
-                      <div data-laser-prices className="mt-5 max-w-xl">
-                        <h4 className="text-sm font-extrabold uppercase tracking-[0.18em] opacity-75">{LASER_LIST_COPY.heading}</h4>
-                        <ul className="mt-2 divide-y-2 divide-hu-deep/10 border-y-2 border-hu-deep/10 text-lg">
-                          {laser.choices.map((p) => (
-                            <li key={p.name} className="flex items-baseline justify-between gap-4 py-2.5">
-                              <span className="font-semibold">{p.name}</span>
-                              <span className="shrink-0 font-extrabold">{dollars(p.priceCents)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        {laser.addOns.length >= 2 && (
-                          <p className="mt-3 text-base leading-relaxed text-hu-deep/85">{LASER_LIST_COPY.addOnsLine(dollars(laser.addOns[0].priceCents), dollars(laser.addOns[1].priceCents))}</p>
-                        )}
-                      </div>
-                    )}
                   </div>
                   <CallButton phone={c.phoneE164} className="w-full sm:col-start-2 sm:w-fit lg:col-start-auto" />
                 </article>
