@@ -65,7 +65,7 @@ export async function sendCatalogEmail(to: string) {
 export const catalogEmailSubject = (name: string) => `${name} - Hup Up Attractions`;
 /** The approved catalog email (the logo header and signature are added to every email). */
 export const catalogEmailBody = (name: string) =>
-  `Dear valued customer,\n\nFind our ${name} attached. To book with our automated system, call us at (845) 777-7585 Ext. 1\n\nThank you for choosing Hup Up Attractions!`;
+  `Dear valued customer,\n\nFind our ${name} attached. You can call us anytime to book with our automated system at (845) 777-7585 Ext. 1.\n\nThank you for choosing Hup Up Attractions!`;
 
 /** The catalog text (Abraham, word for word). */
 export const catalogText = () => `${BUSINESS_NAME}: Here is our catalog: hupupattractions.com/#rentals To book, call ${PUBLIC_PHONE_DISPLAY}.`;

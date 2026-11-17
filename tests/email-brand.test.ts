@@ -54,7 +54,7 @@ describe("the approved catalog email (Abraham, Nov 17, 2026)", () => {
   it("subject and text, word for word", async () => {
     const { catalogEmailBody, catalogEmailSubject } = await import("@/lib/catalog-send");
     expect(catalogEmailSubject("Chanukah Catalog 2026")).toBe("Chanukah Catalog 2026 - Hup Up Attractions");
-    expect(catalogEmailBody("Chanukah Catalog 2026")).toBe("Dear valued customer,\n\nFind our Chanukah Catalog 2026 attached. To book with our automated system, call us at (845) 777-7585 Ext. 1\n\nThank you for choosing Hup Up Attractions!");
+    expect(catalogEmailBody("Chanukah Catalog 2026")).toBe("Dear valued customer,\n\nFind our Chanukah Catalog 2026 attached. You can call us anytime to book with our automated system at (845) 777-7585 Ext. 1.\n\nThank you for choosing Hup Up Attractions!");
   });
 });
 
