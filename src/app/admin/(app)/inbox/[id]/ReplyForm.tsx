@@ -13,7 +13,7 @@ const MAX = 18 * 1024 * 1024; // same as INBOX_FILE_MAX_BYTES (18 MB in all per 
  * Reply from Hup Up Attractions <info@hupupattractions.com>, signed "Hup Up Attractions". Attachments up to 18 MB in all.
  * Without an emailId it is a new email (Abraham, Nov 13, 2026): To and Subject are typed in.
  */
-export default function ReplyForm(props: { emailId?: number; to?: string; active: boolean; draftId?: number; initialTo?: string; initialSubject?: string; initialBody?: string; forwardOf?: number; forwardFiles?: string[] }) {
+export default function ReplyForm(props: { emailId?: number; to?: string; active: boolean; draftId?: number; initialTo?: string; initialSubject?: string; initialBody?: string; forwardOf?: number; forwardFiles?: string[]; catalog?: { fileName: string; subject: string; body: string } | null }) {
   const isNew = props.emailId === undefined;
   const router = useRouter();
   const [to, setTo] = useState(props.initialTo ?? "");
@@ -38,6 +38,14 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [to, subject, body]);
   const [files, setFiles] = useState<File[]>([]);
+  // Compose > Add our catalog (Abraham, Nov 17, 2026): attaches the catalog PDF; an empty subject and message get the catalog wording
+  const [withCatalog, setWithCatalog] = useState(false);
+  function addCatalog() {
+    if (!props.catalog) return;
+    setWithCatalog(true);
+    if (!subject.trim()) setSubject(props.catalog.subject);
+    if (!body.trim()) setBody(props.catalog.body);
+  }
   const [msg, setMsg] = useState<{ ok: boolean; message: string } | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -68,7 +76,7 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
       ids.push(opened.id);
     }
     setProgress("Sending");
-    const r = isNew ? await sendNewEmailAction(to, subject, body, ids, draftId ?? null, props.forwardOf ?? null) : await sendReplyAction(props.emailId!, body, ids, draftId ?? null);
+    const r = isNew ? await sendNewEmailAction(to, subject, body, ids, draftId ?? null, props.forwardOf ?? null, withCatalog) : await sendReplyAction(props.emailId!, body, ids, draftId ?? null);
     setProgress(null);
     setMsg(r);
     if (r.ok) {
@@ -76,6 +84,7 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
       setTo("");
       setSubject("");
       setFiles([]);
+      setWithCatalog(false);
       setDraftId(undefined);
       setSaved("");
       first.current = true;
@@ -100,6 +109,26 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
         <button type="button" className="btn-ghost !py-1.5 text-sm" disabled={!props.active || pending} onClick={() => ref.current?.click()}>
           Attach files
         </button>
+        {isNew && (
+          <button
+            type="button"
+            className="btn-ghost !py-1.5 text-sm"
+            disabled={!props.active || pending || !props.catalog || withCatalog}
+            title={props.catalog ? "Attach our catalog PDF and fill in the catalog email" : "Upload the catalog PDF in Admin, Catalog email & text first"}
+            onClick={addCatalog}
+            data-add-catalog
+          >
+            Add our catalog
+          </button>
+        )}
+        {withCatalog && props.catalog && (
+          <span className="rounded-full bg-[#FFF3C4] px-2 py-0.5 text-xs" data-catalog-file>
+            {props.catalog.fileName} (our catalog){" "}
+            <button type="button" aria-label="Remove the catalog" onClick={() => setWithCatalog(false)}>
+              ×
+            </button>
+          </span>
+        )}
         {files.map((f, i) => (
           <span key={i} className="rounded-full bg-bg px-2 py-0.5 text-xs">
             {f.name}{" "}

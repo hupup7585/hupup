@@ -52,20 +52,34 @@ export async function sendCatalogEmail(to: string) {
   // The PDF goes along only while "attach automatically" is on; the catalog's name is added to the subject
   const { catalogPdfAttachment } = await import("@/lib/catalog-pdf");
   const pdf = s.catalogAutoAttach !== false ? await catalogPdfAttachment().catch(() => null) : null;
-  const name = String(s.catalogName ?? "").trim();
-  // Abraham, Nov 17, 2026 (approved, word for word): with the PDF attached, the catalog email reads exactly this
+  // With the PDF attached: the catalog email wording (approved by Abraham, Nov 17, 2026; the Owner can edit it in Admin)
   if (pdf) {
-    const n = name || "catalog";
-    return sendEmail(to, catalogEmailSubject(n), catalogEmailBody(n), [pdf]);
+    const t = catalogEmailTemplate(s);
+    return sendEmail(to, t.subject, t.body, [pdf]);
   }
   return sendEmail(to, subject, text, []);
 }
 
+export const CATALOG_NAME_TAG = "{Catalog Name}";
+export const CATALOG_EMAIL_SUBJECT_DEFAULT = `${CATALOG_NAME_TAG} - Hup Up Attractions`;
+export const CATALOG_EMAIL_BODY_DEFAULT = `Dear valued customer,\n\nFind our ${CATALOG_NAME_TAG} attached. You can call us anytime to book with our automated system at (845) 777-7585 Ext. 1.\n\nThank you for choosing Hup Up Attractions!`;
+const fillName = (t: string, name: string) => t.split(CATALOG_NAME_TAG).join(name);
+
 /** "{Catalog Name} - Hup Up Attractions" */
-export const catalogEmailSubject = (name: string) => `${name} - Hup Up Attractions`;
+export const catalogEmailSubject = (name: string) => fillName(CATALOG_EMAIL_SUBJECT_DEFAULT, name);
 /** The approved catalog email (the logo header and signature are added to every email). */
-export const catalogEmailBody = (name: string) =>
-  `Dear valued customer,\n\nFind our ${name} attached. You can call us anytime to book with our automated system at (845) 777-7585 Ext. 1.\n\nThank you for choosing Hup Up Attractions!`;
+export const catalogEmailBody = (name: string) => fillName(CATALOG_EMAIL_BODY_DEFAULT, name);
+
+/**
+ * The catalog email as it goes out (the automatic one and Compose > Add our catalog): the Owner's edited wording from
+ * Admin, Catalog email & text, or the approved wording when blank, with the catalog's name filled in.
+ */
+export function catalogEmailTemplate(s: Record<string, unknown>): { subject: string; body: string } {
+  const name = String(s.catalogName ?? "").trim() || "catalog";
+  const subject = String(s.catalogEmailSubjectText ?? "").trim() || CATALOG_EMAIL_SUBJECT_DEFAULT;
+  const body = String(s.catalogEmailBodyText ?? "").replace(/\r\n/g, "\n").trim() || CATALOG_EMAIL_BODY_DEFAULT;
+  return { subject: fillName(subject, name), body: fillName(body, name) };
+}
 
 /** The catalog text (Abraham, word for word). */
 export const catalogText = () => `${BUSINESS_NAME}: Here is our catalog: hupupattractions.com/#rentals To book, call ${PUBLIC_PHONE_DISPLAY}.`;

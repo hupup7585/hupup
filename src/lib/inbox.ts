@@ -211,7 +211,7 @@ export async function sendReply(input: { emailId: number; body: string; fileIds:
 export const validAddress = (a: string) => /^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]{2,}$/.test(a.trim());
 
 /** A new email written in Admin (Owner), from info@, signed "Hup Up Attractions", attachments up to 18 MB in all. */
-export async function sendNewEmail(input: { to: string; subject: string; body: string; fileIds: number[]; userId: number | null; forwardOf?: number | null }) {
+export async function sendNewEmail(input: { to: string; subject: string; body: string; fileIds: number[]; userId: number | null; forwardOf?: number | null; attachCatalog?: boolean }) {
   const to = input.to.trim();
   if (!validAddress(to)) throw new Error("Enter one email address to send to.");
   const subject = input.subject.trim();
@@ -232,6 +232,13 @@ export async function sendNewEmail(input: { to: string; subject: string; body: s
       const fb = await fileBytes(o.id);
       if (fb) forwarded.push({ filename: fb.file.fileName, content: fb.data.toString("base64") });
     }
+  }
+  // Compose > Add our catalog (Abraham, Nov 17, 2026): the current catalog PDF from Admin goes along
+  if (input.attachCatalog) {
+    const { catalogPdfAttachment } = await import("@/lib/catalog-pdf");
+    const pdf = await catalogPdfAttachment();
+    if (!pdf) throw new Error("No catalog PDF is uploaded yet. Upload it in Admin, Catalog email & text.");
+    forwarded.push(pdf);
   }
   if (files.reduce((n, f) => n + f.data.length, 0) > INBOX_FILE_MAX_BYTES) throw new Error(`Attachments can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
   if (files.reduce((n, f) => n + f.data.length, 0) + forwarded.reduce((n, f) => n + Buffer.byteLength(f.content, "base64"), 0) > INBOX_FILE_MAX_BYTES)

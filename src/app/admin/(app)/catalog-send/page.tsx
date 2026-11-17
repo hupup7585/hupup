@@ -5,7 +5,7 @@ import CatalogPdf from "../catalog/CatalogPdf";
 import PhotoUpload from "../catalog/PhotoUpload";
 import CatalogEmailForm from "./CatalogEmailForm";
 import CatalogTextItems from "./CatalogTextItems";
-import { parseCatalogTextItems } from "@/lib/catalog-send";
+import { CATALOG_EMAIL_BODY_DEFAULT, CATALOG_EMAIL_SUBJECT_DEFAULT, parseCatalogTextItems } from "@/lib/catalog-send";
 
 /**
  * What callers get when they ask for the catalog (Abraham, Nov 17, 2026): the PDF for email and the two pictures for
@@ -33,7 +33,12 @@ export default async function CatalogSendPage() {
       />
       <section className="card mb-5 p-5">
         <h2 className="text-xl font-black">Catalog email</h2>
-        <CatalogEmailForm name={String(settings.catalogName ?? "")} auto={settings.catalogAutoAttach !== false} />
+        <CatalogEmailForm
+          name={String(settings.catalogName ?? "")}
+          auto={settings.catalogAutoAttach !== false}
+          subject={String(settings.catalogEmailSubjectText ?? "").trim() || CATALOG_EMAIL_SUBJECT_DEFAULT}
+          body={String(settings.catalogEmailBodyText ?? "").trim() || CATALOG_EMAIL_BODY_DEFAULT}
+        />
       </section>
       <section className="card mb-5 p-5" data-catalog-text-pictures>
         <h2 className="text-xl font-black">Catalog by text (photos)</h2>

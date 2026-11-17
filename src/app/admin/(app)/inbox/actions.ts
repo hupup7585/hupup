@@ -53,13 +53,13 @@ export async function sendReplyAction(emailId: number, body: string, fileIds: nu
 }
 
 /** Owner: a new email from info@ (not a reply), with attachments. */
-export async function sendNewEmailAction(to: string, subject: string, body: string, fileIds: number[], draftId?: number | null, forwardOf?: number | null): Promise<R> {
+export async function sendNewEmailAction(to: string, subject: string, body: string, fileIds: number[], draftId?: number | null, forwardOf?: number | null, attachCatalog?: boolean): Promise<R> {
   const s = await requireOwner();
   if (!repliesActive()) return { ok: false, message: "Not active yet: email goes out from info@ once the sender is set up." };
   try {
-    const r = await sendNewEmail({ to, subject, body, fileIds, userId: s.userId, forwardOf: forwardOf ?? null });
+    const r = await sendNewEmail({ to, subject, body, fileIds, userId: s.userId, forwardOf: forwardOf ?? null, attachCatalog: Boolean(attachCatalog) });
     if (draftId && r.sent) await draftSent(draftId, r.id);
-    await db.insert(schema.auditLog).values({ userId: s.userId, action: r.sent ? "inbox.new_email_sent" : "inbox.new_email_failed", entityType: "inbox_reply", entityId: String(r.id), after: { to: r.toAddress, subject: r.subject, files: fileIds.length } });
+    await db.insert(schema.auditLog).values({ userId: s.userId, action: r.sent ? "inbox.new_email_sent" : "inbox.new_email_failed", entityType: "inbox_reply", entityId: String(r.id), after: { to: r.toAddress, subject: r.subject, files: fileIds.length, catalog: Boolean(attachCatalog) } });
     revalidatePath("/admin/inbox");
     return r.sent ? { ok: true, message: `Sent to ${r.toAddress} from info@hupupattractions.com.` } : { ok: false, message: `Not sent: ${r.error}. It's saved under Sent emails.` };
   } catch (e) {

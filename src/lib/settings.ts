@@ -44,6 +44,9 @@ export const SETTING_DEFAULTS = {
   // Catalog by text (Abraham, Nov 17, 2026, item 14): the photos in order, each with its own text (JSON list)
   catalogTextItems: "",
   catalogAutoAttach: true,
+  // Catalog email wording, edited by the Owner (Abraham, Nov 17, 2026). Blank = the approved wording. {Catalog Name} is filled in.
+  catalogEmailSubjectText: "",
+  catalogEmailBodyText: "",
   musicPayConnect: "",
   catalogTextPicture2: "",
   deliveryPromoStart: "",

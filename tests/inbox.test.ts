@@ -127,6 +127,18 @@ describe("Inbox", () => {
     // an attachment already used can't be sent again
     await expect(sendNewEmail({ to: "a@b.com", subject: "x", body: "y", fileIds: [f.id], userId: null })).rejects.toThrow("didn't upload");
   });
+  it("Compose > Add our catalog (Abraham, Nov 17, 2026): the current catalog PDF goes along; none uploaded = a clear message", async () => {
+    await expect(sendNewEmail({ to: "a@b.com", subject: "x", body: "y", fileIds: [], userId: null, attachCatalog: true })).rejects.toThrow("No catalog PDF is uploaded yet");
+    const { saveCatalogChunk, startCatalogUpload } = await import("@/lib/catalog-pdf");
+    const c = await startCatalogUpload("Hup Up Catalog.pdf", 9, null);
+    await saveCatalogChunk(c.id, 0, Buffer.from("%PDF-1.4y"), true);
+    h.emails.length = 0;
+    await sendNewEmail({ to: "a@b.com", subject: "Catalog - Hup Up Attractions", body: "Dear valued customer", fileIds: [], userId: null, attachCatalog: true });
+    expect(h.emails[0].attachments).toEqual([{ filename: "Hup Up Catalog.pdf", content: Buffer.from("%PDF-1.4y").toString("base64") }]);
+    h.emails.length = 0;
+    await sendNewEmail({ to: "a@b.com", subject: "x", body: "y", fileIds: [], userId: null });
+    expect(h.emails[0].attachments).toEqual([]);
+  });
   it("New email is Owner only", async () => {
     const { readFileSync } = await import("node:fs");
     const a = readFileSync("src/app/admin/(app)/inbox/actions.ts", "utf8");

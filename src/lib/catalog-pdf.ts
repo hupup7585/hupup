@@ -22,7 +22,7 @@ export async function saveCatalogChunk(fileId: number, idx: number, data: Buffer
   const total = chunks.reduce((n, c) => n + c.data.length, 0);
   if (!f || total !== f.sizeBytes) return { complete: false };
   const first = (await db.select().from(schema.catalogFileChunks).where(and(eq(schema.catalogFileChunks.fileId, fileId), eq(schema.catalogFileChunks.idx, 0))).limit(1))[0];
-  if (!first || first.data.subarray(0, 4).toString("latin1") !== "%PDF") throw new Error("That file isn't a PDF.");
+  if (!first || Buffer.from(first.data).subarray(0, 4).toString("latin1") !== "%PDF") throw new Error("That file isn't a PDF.");
   await db.update(schema.catalogFiles).set({ current: false }).where(eq(schema.catalogFiles.current, true));
   await db.update(schema.catalogFiles).set({ complete: true, current: true }).where(eq(schema.catalogFiles.id, fileId));
   return { complete: true };
@@ -35,7 +35,7 @@ export async function currentCatalog() {
 
 export async function catalogPdfBytes(fileId: number): Promise<Buffer | null> {
   const chunks = await db.select().from(schema.catalogFileChunks).where(eq(schema.catalogFileChunks.fileId, fileId)).orderBy(asc(schema.catalogFileChunks.idx));
-  return chunks.length ? Buffer.concat(chunks.map((c) => c.data)) : null;
+  return chunks.length ? Buffer.concat(chunks.map((c) => Buffer.from(c.data))) : null;
 }
 
 /** The current catalog as an email attachment, or null when none is uploaded. */

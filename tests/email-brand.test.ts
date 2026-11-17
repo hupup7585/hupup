@@ -45,7 +45,8 @@ describe("email items 7, 10 and 13 (Abraham, Nov 17, 2026)", () => {
   it("catalog email: the PDF attached while the switch is on, and the catalog's name in the subject", () => {
     const s = readFileSync("src/lib/catalog-send.ts", "utf8");
     expect(s).toContain('s.catalogAutoAttach !== false ? await catalogPdfAttachment()');
-    expect(s).toContain("catalogEmailSubject(n), catalogEmailBody(n), [pdf]");
+    expect(s).toContain("const t = catalogEmailTemplate(s);");
+    expect(s).toContain("sendEmail(to, t.subject, t.body, [pdf])");
     expect(readFileSync("src/app/admin/(app)/catalog-send/page.tsx", "utf8")).toContain("<CatalogEmailForm");
   });
 });
@@ -74,5 +75,32 @@ describe("promotional emails only: mailing address and Unsubscribe (Abraham, Nov
     const link = new URL(unsubscribeLink("Sara@Example.com", "https://x.com"));
     expect(verifyUnsubscribe(link.searchParams.get("e"), link.searchParams.get("s"))).toBe(true);
     expect(verifyUnsubscribe("other@example.com", link.searchParams.get("s"))).toBe(false);
+  });
+});
+
+describe("catalog email wording edited by the Owner (Abraham, Nov 17, 2026)", () => {
+  it("blank = the approved wording; edited wording is used, with {Catalog Name} filled in", async () => {
+    const { catalogEmailTemplate, catalogEmailBody, catalogEmailSubject } = await import("@/lib/catalog-send");
+    expect(catalogEmailTemplate({ catalogName: "Purim Catalog" })).toEqual({ subject: catalogEmailSubject("Purim Catalog"), body: catalogEmailBody("Purim Catalog") });
+    expect(catalogEmailTemplate({})).toEqual({ subject: catalogEmailSubject("catalog"), body: catalogEmailBody("catalog") });
+    expect(catalogEmailTemplate({ catalogName: "Purim Catalog", catalogEmailSubjectText: "Our {Catalog Name}", catalogEmailBodyText: "Hello,\r\n\r\nHere is the {Catalog Name}." })).toEqual({
+      subject: "Our Purim Catalog",
+      body: "Hello,\n\nHere is the Purim Catalog.",
+    });
+  });
+  it("the Owner edits subject and message on Catalog email & text, with a way back to the approved wording", () => {
+    const form = readFileSync("src/app/admin/(app)/catalog-send/CatalogEmailForm.tsx", "utf8");
+    expect(form).toContain('name="subject"');
+    expect(form).toContain('name="body"');
+    expect(form).toContain("data-catalog-email-reset");
+    const a = readFileSync("src/app/admin/(app)/catalog-send/actions.ts", "utf8");
+    expect(a).toContain('saveSetting("catalogEmailSubjectText", subject, owner.userId)');
+    expect(a).toContain('saveSetting("catalogEmailBodyText", body, owner.userId)');
+  });
+  it("Compose has Add our catalog (new emails only), sending the PDF from the server", () => {
+    const f = readFileSync("src/app/admin/(app)/inbox/[id]/ReplyForm.tsx", "utf8");
+    expect(f).toContain("data-add-catalog");
+    expect(f).toContain("sendNewEmailAction(to, subject, body, ids, draftId ?? null, props.forwardOf ?? null, withCatalog)");
+    expect(readFileSync("src/app/admin/(app)/inbox/new/page.tsx", "utf8")).toContain("catalogEmailTemplate(await getSettings())");
   });
 });

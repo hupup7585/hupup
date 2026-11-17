@@ -6,6 +6,9 @@ import { getInboxEmail, repliesActive } from "@/lib/inbox";
 import { forwardText, getDraft } from "@/lib/inbox-folders";
 import ReplyForm from "../[id]/ReplyForm";
 import MailShell from "../MailShell";
+import { currentCatalog } from "@/lib/catalog-pdf";
+import { catalogEmailTemplate } from "@/lib/catalog-send";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New email · Hup Up Attractions" };
@@ -34,9 +37,12 @@ export default async function NewEmailPage({ searchParams }: { searchParams: Pro
     const files = await db.select().from(schema.inboxFiles).where(eq(schema.inboxFiles.emailId, init.forwardOf));
     init.forwardFiles = files.filter((f) => f.complete && !f.tooBig).map((f) => f.fileName);
   }
+  // Add our catalog (Abraham, Nov 17, 2026): the current PDF and the catalog email wording from Admin
+  const pdf = await currentCatalog();
+  const catalog = pdf ? { fileName: pdf.fileName, ...catalogEmailTemplate(await getSettings()) } : null;
   return (
     <MailShell>
-      <ReplyForm active={repliesActive()} draftId={init.draftId} initialTo={init.to} initialSubject={init.subject} initialBody={init.body} forwardOf={init.forwardOf} forwardFiles={init.forwardFiles} />
+      <ReplyForm catalog={catalog} active={repliesActive()} draftId={init.draftId} initialTo={init.to} initialSubject={init.subject} initialBody={init.body} forwardOf={init.forwardOf} forwardFiles={init.forwardFiles} />
     </MailShell>
   );
 }

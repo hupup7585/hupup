@@ -10,10 +10,25 @@ export async function saveCatalogEmailAction(_prev: { ok?: boolean; message?: st
   const owner = await requireOwner();
   const name = String(form.get("name") ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
   const auto = form.get("auto") === "on";
+  const { CATALOG_EMAIL_BODY_DEFAULT, CATALOG_EMAIL_SUBJECT_DEFAULT } = await import("@/lib/catalog-send");
+  // Same as the approved wording = saved blank, so it keeps following the approved wording
+  let subject = String(form.get("subject") ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+  let body = String(form.get("body") ?? "").replace(/\r\n/g, "\n").trim().slice(0, 5000);
+  if (form.get("reset") === "1" || subject === CATALOG_EMAIL_SUBJECT_DEFAULT) subject = "";
+  if (form.get("reset") === "1" || body === CATALOG_EMAIL_BODY_DEFAULT) body = "";
   const s = await getSettings();
   await saveSetting("catalogName", name, owner.userId);
   await saveSetting("catalogAutoAttach", auto, owner.userId);
-  await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.catalog_email", entityType: "settings", entityId: "catalog", before: { name: s.catalogName, auto: s.catalogAutoAttach }, after: { name, auto } });
+  await saveSetting("catalogEmailSubjectText", subject, owner.userId);
+  await saveSetting("catalogEmailBodyText", body, owner.userId);
+  await db.insert(schema.auditLog).values({
+    userId: owner.userId,
+    action: "settings.catalog_email",
+    entityType: "settings",
+    entityId: "catalog",
+    before: { name: s.catalogName, auto: s.catalogAutoAttach, subject: s.catalogEmailSubjectText, body: s.catalogEmailBodyText },
+    after: { name, auto, subject, body },
+  });
   revalidatePath("/admin/catalog-send");
   return { ok: true, message: auto ? `Saved. Every catalog email carries the PDF${name ? ` and says "${name}" in the subject` : ""}.` : "Saved. Catalog emails go out without the PDF." };
 }
