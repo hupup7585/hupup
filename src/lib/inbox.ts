@@ -107,6 +107,8 @@ export async function fileEmail(bytes: Buffer, uploadId: string | null = null, n
       `New email to info@hupupattractions.com\nFrom: ${email.fromName ? `${email.fromName} <${email.fromAddress}>` : email.fromAddress}\nSubject: ${email.subject ?? "(no subject)"}\n\nOpen the Inbox: ${config.baseUrl()}/admin/inbox/${email.id}`,
     ).catch((e) => console.error("inbox alert failed", e));
   }
+  // Every info@ email texted to the Owner's cell with the sender, subject and message (Abraham, Nov 17, 2026)
+  await textOwnerAboutEmail(email).catch((e) => console.error("inbox text alert failed", e));
   // The info@ "Catalog" auto-reply (off until Abraham approves its wording)
   await handleCatalogEmail(email.fromAddress, email.subject).catch((e) => console.error("catalog check failed", e));
   return email;
@@ -256,3 +258,21 @@ export function repliesActive(env: Record<string, string | undefined> = process.
 
 export { EMAIL_REPLY_TO };
 
+
+/** The Owner's cell for info@ email texts: 845-777-7585. */
+export const INFO_ALERT_PHONE = "+18457777585";
+const TEXT_MAX = 1600;
+
+/** The text for one info@ email: sender, subject and message, cut to one text with a pointer to the Admin inbox. */
+export function infoEmailText(e: { fromName: string | null; fromAddress: string; subject: string | null; textBody: string | null }): string {
+  const head = `New email to info@hupupattractions.com\nFrom: ${e.fromName ? `${e.fromName} <${e.fromAddress}>` : e.fromAddress}\nSubject: ${e.subject ?? "(no subject)"}\n\n`;
+  const body = (e.textBody ?? "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim() || "(no text)";
+  const more = "... (more in the Admin inbox)";
+  const room = TEXT_MAX - head.length;
+  return head + (body.length <= room ? body : body.slice(0, Math.max(0, room - more.length)).trimEnd() + more);
+}
+
+async function textOwnerAboutEmail(e: { fromName: string | null; fromAddress: string; subject: string | null; textBody: string | null }) {
+  const { sendSms } = await import("@/lib/notify");
+  await sendSms(INFO_ALERT_PHONE, infoEmailText(e), { kind: "system", event: "info_email_alert" });
+}
