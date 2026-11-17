@@ -7,6 +7,7 @@ import { availabilityFor, createBookingAction, type PosResult , calendarFor, che
 import DualDate, { HebrewDay } from "@/components/DualDate";
 import { englishDate } from "@/lib/dual-date";
 import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
+import MonthCalendar from "./MonthCalendar";
 
 type P = { id: number; categoryId: number; name: string; priceCents: number; quantity: number };
 
@@ -23,6 +24,8 @@ export default function PosForm(props: {
   consent?: { transactionalText: string; marketingText: string; smsNumber: string };
   /** Thursday to Sunday offer is on (Owner switch) */
   offerThuSun?: boolean;
+  /** Month calendar date picker (preview only until Abraham approves the screenshot) */
+  monthCalendar?: boolean;
 }) {
   const [date, setDate] = useState(props.initialDate);
   const [avail, setAvail] = useState<Record<string, number>>({});
@@ -78,6 +81,9 @@ export default function PosForm(props: {
       <div className="card min-w-0 p-5">
         <label className="label">Event (delivery) date — pickup is the next open day</label>
         {/* Coming days with Hebrew dates; closed days (Shabbes, Yom Tov, other closed days) can't be chosen. */}
+        {props.monthCalendar ? (
+          <MonthCalendar today={props.today} value={date} onPick={setDate} />
+        ) : (
         <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1" data-pos-calendar>
           {days.map((d) => (
             <button
@@ -94,7 +100,8 @@ export default function PosForm(props: {
             </button>
           ))}
         </div>
-        <input type="date" min={props.today} value={date} onChange={(e) => setDate(e.target.value)} className="input mb-3 max-w-xs" />
+        )}
+        {!props.monthCalendar && <input type="date" min={props.today} value={date} onChange={(e) => setDate(e.target.value)} className="input mb-3 max-w-xs" />}
         {check && (
           <div data-date-check className={`mb-5 rounded-lg p-3 text-sm ${check.ok ? "bg-bg" : "bg-[#ffe6e4] font-semibold text-[#b3261e]"}`}>
             <div className="font-bold">

@@ -9,6 +9,9 @@ import { isValidISO, todayISO } from "@/lib/dates";
 import { termsActive } from "@/lib/rental-terms";
 import PosForm from "./PosForm";
 
+/** Month calendar date picker (Abraham, Nov 17, 2026): preview only until he approves the screenshot. */
+const MONTH_CALENDAR_LIVE_APPROVED = false;
+
 export default async function PosPage({ searchParams }: { searchParams: Promise<{ date?: string; product?: string }> }) {
   const sp = await searchParams;
   const [cats, prods] = await Promise.all([
@@ -33,6 +36,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
         products={prods.map((p) => ({ id: p.id, categoryId: p.categoryId, name: p.name, priceCents: p.priceCents, quantity: p.quantity }))}
         askTerms={termsActive()}
         offerThuSun={Boolean(settings.offerThuSunOn)}
+        monthCalendar={MONTH_CALENDAR_LIVE_APPROVED || process.env.VERCEL_ENV !== "production"}
         consent={{ transactionalText: webConsentCopy().transactional, marketingText: webConsentCopy().marketing, smsNumber: smsNumberDisplay() }}
       />
     </div>
