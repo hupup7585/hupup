@@ -48,7 +48,8 @@ function signatureHtml(signature: string): string {
       if (!line) return `<div style="height:12px;line-height:12px;font-size:12px">&nbsp;</div>`;
       if (/^hup up attractions( inc\.?)?$/i.test(line)) return `<div style="font-size:16px;font-weight:700;color:${NAVY};line-height:1.6">${esc(line)}</div>`;
       const linked = linkify(line);
-      if (linked !== esc(line)) return `<div style="font-size:14px;line-height:1.7;color:${NAVY}">${linked}</div>`;
+      // Contact line: a little room around each "|" (Abraham's mock-up)
+      if (linked !== esc(line)) return `<div style="font-size:14px;line-height:1.7;color:${NAVY}">${linked.replace(/ \| /g, " &nbsp;|&nbsp; ")}</div>`;
       if (/^thanks!?$/i.test(line)) return `<div style="font-size:16px;line-height:1.6;color:${TEXT}">${esc(line)}</div>`;
       return `<div style="font-size:14px;line-height:1.7;color:${GRAY}">${esc(line)}</div>`;
     })
