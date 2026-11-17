@@ -244,6 +244,29 @@ async function twilioAlerts(env: NodeJS.ProcessEnv) {
   }
 }
 
+/**
+ * Email delivery check (Abraham, Nov 17, 2026, item 8): is hupupattractions.com verified in Resend, and are SPF, DKIM
+ * and DMARC published? Reads only (DNS and Resend's domain list); never changes DNS. Never prints a key.
+ */
+async function emailDomainCheck(env: NodeJS.ProcessEnv) {
+  const { resolveTxt } = await import("node:dns/promises");
+  const txt = async (name: string) => (await resolveTxt(name).catch(() => [] as string[][])).map((r) => r.join(""));
+  const root = await txt("hupupattractions.com");
+  const sendSub = await txt("send.hupupattractions.com");
+  const spf = [...root, ...sendSub].find((r) => r.startsWith("v=spf1"));
+  log(`Email SPF: ${spf ? `found (${spf.includes("amazonses.com") || spf.includes("resend") ? "includes Resend" : "does not include Resend"})` : "not found"}.`);
+  const dkim = await txt("resend._domainkey.hupupattractions.com");
+  log(`Email DKIM (Resend): ${dkim.some((r) => r.includes("p=")) ? "found" : "not found"}.`);
+  const dmarc = (await txt("_dmarc.hupupattractions.com")).find((r) => r.startsWith("v=DMARC1"));
+  log(`Email DMARC: ${dmarc ? `found (${dmarc.slice(0, 80)})` : "not found"}.`);
+  if (!env.RESEND_API_KEY) return log("Email Resend: no key in this build.");
+  const r = await fetch("https://api.resend.com/domains", { headers: { Authorization: `Bearer ${env.RESEND_API_KEY}` } });
+  if (!r.ok) return log(`Email Resend: domain list not readable (${r.status}).`);
+  const body = (await r.json()) as { data?: { name: string; status: string }[] };
+  const d = body.data?.find((x) => x.name === "hupupattractions.com");
+  log(`Email Resend: hupupattractions.com ${d ? `status ${d.status}` : "not added"}.`);
+}
+
 async function main() {
   if (process.env.VERCEL_ENV !== "production") return log("Not a live build: payment line check and Cloudflare setup skipped.");
   for (const [name, step] of [
@@ -253,6 +276,7 @@ async function main() {
     ["Delivery map", deliveryMapCheck],
     ["Live line report", liveSettingsReport],
     ["Catalog report", catalogReport],
+    ["Email domain check", emailDomainCheck],
   ] as const) {
     try {
       await step(process.env);
