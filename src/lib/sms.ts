@@ -167,6 +167,7 @@ export const SYSTEM_EVENTS: Record<string, { afterStop: boolean }> = {
   login_code: { afterStop: false }, // staff sign-in codes
   owner_forward: { afterStop: false }, // copy of an incoming text to the owner
   owner_alert: { afterStop: false }, // "new paid order" to the owner
+  info_email_alert: { afterStop: false }, // every info@ email, texted to the owner (Abraham, Nov 17, 2026)
   compliance_alert: { afterStop: false }, // compliance report to the owner
   consent_confirmation: { afterStop: false }, // confirmation right after a customer opts in
   opt_out_confirmation: { afterStop: true }, // the single permitted confirmation of an opt-out
@@ -397,7 +398,7 @@ export const NO_TEXT_CONSENT = "No text consent; call or email.";
 /** SMS v3: the exact note on every texting screen until Twilio approves texting. */
 export const TEXTING_NOT_ACTIVE = "Not active yet: waiting for Twilio A2P approval";
 /** Texts to our own staff (not customers): allowed before A2P approval. */
-const STAFF_EVENTS = new Set(["owner_alert", "owner_forward", "compliance_alert", "login_code"]);
+const STAFF_EVENTS = new Set(["owner_alert", "owner_forward", "compliance_alert", "login_code", "info_email_alert"]);
 
 const BLOCK_REASON: Record<Blocked, string> = {
   opted_out: "Customer replied STOP. They must text START and reply YES to receive order texts again.",
