@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { gridStart, shiftMonth } from "@/app/admin/(app)/pos/MonthCalendar";
+import { gridStart, shiftMonth, weekParsha } from "@/app/admin/(app)/pos/MonthCalendar";
 
 /* New booking month calendar (Abraham, Nov 17, 2026): preview only until he approves the screenshot. */
 describe("New booking month calendar", () => {
@@ -8,6 +8,10 @@ describe("New booking month calendar", () => {
     expect(gridStart("2026-11")).toBe("2026-11-01"); // Nov 1, 2026 is a Sunday
     expect(gridStart("2026-12")).toBe("2026-11-29");
     expect(new Date(`${gridStart("2027-02")}T12:00:00Z`).getUTCDay()).toBe(0);
+  });
+  it("the week's parsha once above each row", () => {
+    expect(weekParsha("2026-12-05")).toBe("פרשת וישב");
+    expect(weekParsha("2026-12-12")).toBe("פרשת מקץ");
   });
   it("month arrows", () => {
     expect(shiftMonth("2026-12", 1)).toBe("2027-01");
