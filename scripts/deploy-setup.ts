@@ -253,15 +253,18 @@ async function emailDomainCheck(env: NodeJS.ProcessEnv) {
   const txt = async (name: string) => (await resolveTxt(name).catch(() => [] as string[][])).map((r) => r.join(""));
   const root = await txt("hupupattractions.com");
   const sendSub = await txt("send.hupupattractions.com");
-  const spf = [...root, ...sendSub].find((r) => r.startsWith("v=spf1"));
-  log(`Email SPF: ${spf ? `found (${spf.includes("amazonses.com") || spf.includes("resend") ? "includes Resend" : "does not include Resend"})` : "not found"}.`);
+  // Resend sends from the send. subdomain (its own SPF, pointing at Amazon SES); the main domain has its own SPF
+  const spfSend = sendSub.find((r) => r.startsWith("v=spf1"));
+  const spfRoot = root.find((r) => r.startsWith("v=spf1"));
+  log(`Email SPF for Resend (send.hupupattractions.com): ${spfSend ? (spfSend.includes("amazonses.com") ? "found, includes Resend" : `found (${spfSend.slice(0, 80)})`) : "not found"}.`);
+  log(`Email SPF on the main domain: ${spfRoot ? `found (${spfRoot.slice(0, 80)})` : "not found"}.`);
   const dkim = await txt("resend._domainkey.hupupattractions.com");
   log(`Email DKIM (Resend): ${dkim.some((r) => r.includes("p=")) ? "found" : "not found"}.`);
   const dmarc = (await txt("_dmarc.hupupattractions.com")).find((r) => r.startsWith("v=DMARC1"));
   log(`Email DMARC: ${dmarc ? `found (${dmarc.slice(0, 80)})` : "not found"}.`);
   if (!env.RESEND_API_KEY) return log("Email Resend: no key in this build.");
   const r = await fetch("https://api.resend.com/domains", { headers: { Authorization: `Bearer ${env.RESEND_API_KEY}` } });
-  if (!r.ok) return log(`Email Resend: domain list not readable (${r.status}).`);
+  if (!r.ok) return log(`Email Resend: domain list not readable with this key (${r.status}; a sending-only key). The preview sender check confirms the domain.`);
   const body = (await r.json()) as { data?: { name: string; status: string }[] };
   const d = body.data?.find((x) => x.name === "hupupattractions.com");
   log(`Email Resend: hupupattractions.com ${d ? `status ${d.status}` : "not added"}.`);
