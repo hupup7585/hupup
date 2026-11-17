@@ -227,6 +227,12 @@ export type CallData = {
   catPhone?: string;
   /** Shared text steps (boxes 142 to 144): what the number is for, and the order whose payment link it gets */
   txFor?: "cat" | "pay";
+  /** Delivery address in steps (Abraham, Nov 17, 2026) */
+  street?: string;
+  house?: string;
+  unit?: string;
+  zip?: string;
+  town?: string;
   /** The number a payment link is texted to */
   txPhone?: string;
   /** The email steps are for a payment link (not the catalog), and the order */

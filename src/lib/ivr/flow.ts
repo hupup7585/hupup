@@ -28,6 +28,7 @@ import { sendEmail, sendSms } from "@/lib/notify";
 import { getSettings } from "@/lib/settings";
 import { totalsWithFee } from "@/lib/pricing";
 import { deliveryQuote } from "@/lib/delivery-areas";
+import { DEFAULT_ZIP, townForZip } from "@/lib/orange-zips";
 import { deliveryFeeFor } from "@/lib/offer-delivery";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
 import { sendMessage } from "@/lib/sms";
@@ -61,7 +62,7 @@ import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staf
 import { calendarNow } from "@/lib/clock";
 import { bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
 import { matchBlock, parseBlockList } from "./caller-filter";
-import { PROMPTS, composeClips, googleLiveOn, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
+import { PROMPTS, composeClips, fill, googleLiveOn, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
@@ -151,10 +152,10 @@ function bookNoInput(vr: VR, ctx: Ctx, retryAction: string, retryParams: Record<
  * A line still waiting for Abraham's OK: plays on preview for his test, and on the live line only once approved
  * (unlike draftOk, which also plays on the live line in the Owner-only payment steps).
  */
-function spPreviewDraft(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptKey) {
+function spPreviewDraft(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptKey, vars?: Record<string, string | number>) {
   if (process.env.VERCEL_ENV === "production" && promptWaiting(ctx.prompts, key)) return;
-  if (promptWaiting(ctx.prompts, key)) say(target, promptText(ctx.prompts, key));
-  else sp(target, ctx, key);
+  if (promptWaiting(ctx.prompts, key)) say(target, promptText(ctx.prompts, key, vars));
+  else sp(target, ctx, key, vars);
 }
 
 /** Speech (plus optional keypad) gather tuned for phone audio. */
@@ -333,6 +334,12 @@ async function unfinishedCart(ctx: Ctx): Promise<{ productId: number; name: stri
 /** The directions step plays once Abraham approves its two lines; on preview it runs for his test. */
 function directionsActive(ctx: Ctx, env: Record<string, string | undefined> = process.env) {
   return env.VERCEL_ENV !== "production" || (!promptWaiting(ctx.prompts, "ask_directions") && !promptWaiting(ctx.prompts, "directions_saved"));
+}
+
+/** The address in steps (Abraham, Nov 17, 2026): on preview now; on the live line once every draft step is approved. */
+export const ADDRESS_STEP_DRAFTS: PromptKey[] = ["addr_house", "addr_unit", "addr_zip", "addr_zip_enter", "addr_zip_bad", "addr_outside", "addr_not_found", "addr_readback", "addr_price"];
+function addrStepsActive(ctx: Ctx, env: Record<string, string | undefined> = process.env) {
+  return env.VERCEL_ENV !== "production" || ADDRESS_STEP_DRAFTS.every((k) => !promptWaiting(ctx.prompts, k));
 }
 
 /** A line's wording with its changing parts still in braces (Admin edits included). */
@@ -1878,13 +1885,26 @@ const handlers: Record<string, Handler> = {
     const n = ctx.query.get("n") ?? undefined;
     const spec = FIELDS[f];
     const prompt: PromptKey = f === "email" && ctx.session?.data.emailRequired ? "ask_email_required" : spec.prompt;
+    // Abraham, Nov 17, 2026: not understood = only the retry line (the step's own line, with its thanks, never
+    // repeats); every spoken question is followed by the tone, then the caller speaks.
+    const retry = Number(n || 0) > 0;
+    const ownStar = f === "street" || f === "unit"; // these lines already say "press star to type it"
+    const question = (g: Gather) => {
+      if (retry) sp(g, ctx, "retry_spoken");
+      else {
+        spPreviewDraft(g, ctx, prompt);
+        if (!ownStar) {
+          sp(g, ctx, "type_hint");
+          spPreviewDraft(g, ctx, "press_pound_done");
+        }
+      }
+      g.play(`${config.baseUrl()}/audio/tone.wav`);
+    };
     if (sttActive()) {
       // Speech to text (preview only until Abraham approves the price): the question, a moment for star (type it) or
       // pound (skip email), then the answer is recorded and typed up by Google while a soft clip plays.
       const k = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 1, finishOnKey: "", action: url("heard", { f, n }), method: "POST" });
-      sp(k, ctx, prompt);
-      sp(k, ctx, "type_hint");
-      spPreviewDraft(k, ctx, "press_pound_done");
+      question(k);
       vr.record({ maxLength: 20, timeout: 3, playBeep: false, finishOnKey: "#*", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
       return vr;
     }
@@ -1893,9 +1913,7 @@ const handlers: Record<string, Handler> = {
     // saved as the caller speaks, because a key press alone would drop the words.
     await updateSession(ctx.callSid, { data: { speechPartial: undefined } }, ctx.session);
     const g = speech(vr, url("heard", { f, n }), spec.hints, { dtmf: true, numDigits: 1, finishOnKey: "", partial: url("speech-partial") });
-    sp(g, ctx, prompt);
-    sp(g, ctx, "type_hint");
-    spPreviewDraft(g, ctx, "press_pound_done");
+    question(g);
     return vr;
   },
 
@@ -1970,6 +1988,10 @@ const handlers: Record<string, Handler> = {
   async heard(ctx, vr) {
     const f = ctx.query.get("f") as Field;
     const spec = FIELDS[f];
+    if (f === "unit" && ctx.body.Digits === "#" && !(ctx.body.SpeechResult || "").trim()) {
+      await updateSession(ctx.callSid, { data: { unit: undefined } }, ctx.session); // no apartment or unit
+      return back(vr, "addr-zip");
+    }
     const required = f === "email" && Boolean(ctx.session?.data.emailRequired);
     if (ctx.query.get("skip")) return required ? back(vr, "ask", { f }) : back(vr, "phone"); // pound on the recording: skip email
     if (ctx.body.Digits === "*") return back(vr, "type", { f }); // switch to keypad typing
@@ -1996,10 +2018,15 @@ const handlers: Record<string, Handler> = {
         // Abraham, Nov 15, 2026: name and address can never be skipped. A person takes it, or the caller types it.
         return config.forwardPhone() ? back(vr, "operator") : back(vr, "type", { f });
       }
-      sp(vr, ctx, f === "email" ? "email_unclear" : "field_unclear");
+      if (f === "email") sp(vr, ctx, "email_unclear"); // other fields: the ask step plays only the retry line
       return back(vr, "ask", { f, n });
     }
     await track(ctx.callSid, "said", `Said ${f}: ${value}`, { field: f, value, raw, ...(viaStt ? { via: "speech to text" } : {}) });
+    if (f === "street" || f === "unit") {
+      // The address steps read the whole address back at step 6, not each part
+      await updateSession(ctx.callSid, { data: { [f]: value, heard: undefined } }, ctx.session);
+      return back(vr, spec.next);
+    }
     await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
     if (viaStt) {
       // Read back in the Google voice (never Twilio's Say); the draft wording plays on preview for Abraham's test
@@ -2021,12 +2048,14 @@ const handlers: Record<string, Handler> = {
    */
   directions(ctx, vr) {
     if (!directionsActive(ctx)) return back(vr, "finalize"); // no email in the booking (Abraham, Nov 17, 2026)
-    const g = vr.gather({ input: ["speech", "dtmf"], finishOnKey: "#", numDigits: 1, timeout: 6, speechTimeout: "auto", language: "en-US", speechModel: "phone_call", enhanced: true, action: url("directions-heard"), method: "POST", actionOnEmptyResult: true });
+    const g = vr.gather({ input: ["speech", "dtmf"], finishOnKey: "", numDigits: 1, timeout: 6, speechTimeout: "auto", language: "en-US", speechModel: "phone_call", enhanced: true, action: url("directions-heard"), method: "POST", actionOnEmptyResult: true });
     sp(g, ctx, "ask_directions", undefined, { draftOk: true });
+    g.play(`${config.baseUrl()}/audio/tone.wav`); // the tone, then the caller speaks (Abraham, Nov 17, 2026)
     return back(vr, "finalize"); // nothing said: skip
   },
 
   async "directions-heard"(ctx, vr) {
+    if (ctx.body.Digits === "*") return back(vr, "type", { f: "directions" }); // type it on the keypad
     const said = (ctx.body.SpeechResult || "").trim();
     if (said && ctx.body.Digits !== "#") {
       await updateSession(ctx.callSid, { data: { directions: said.slice(0, 500) } }, ctx.session);
@@ -2034,6 +2063,133 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "directions_saved", undefined, { draftOk: true });
     }
     return back(vr, "finalize");
+  },
+
+  /*
+   * Delivery address in steps (Abraham, Nov 17, 2026): street (spoken), house number (keypad), apartment or unit
+   * (spoken, pound skips), zip (10950 or another), the area check, the read-back, the delivery price, then the
+   * directions. Steps 2 to 7 are drafts: the whole flow runs on preview only until he approves them; the live line
+   * keeps the one address question until then.
+   */
+  addr(ctx, vr) {
+    if (!addrStepsActive(ctx)) return back(vr, "ask", { f: "address" });
+    return back(vr, "ask", { f: "street" });
+  },
+
+  "addr-house"(ctx, vr) {
+    const g = keypad(vr, url("addr-house-heard"), { numDigits: 7, timeout: 10, finishOnKey: "#" });
+    spPreviewDraft(g, ctx, "addr_house");
+    return repeatMenu(vr, ctx, "addr-house");
+  },
+
+  async "addr-house-heard"(ctx, vr) {
+    const digits = (ctx.body.Digits || "").replace(/\D/g, "");
+    if (!/^[0-9]{1,6}$/.test(digits) || /^0+$/.test(digits)) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "addr-house");
+    }
+    await updateSession(ctx.callSid, { data: { house: digits } }, ctx.session);
+    return back(vr, "ask", { f: "unit" });
+  },
+
+  "addr-zip"(ctx, vr) {
+    const g = keypad(vr, url("addr-zip-choice"));
+    spPreviewDraft(g, ctx, "addr_zip");
+    return repeatMenu(vr, ctx, "addr-zip");
+  },
+
+  async "addr-zip-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (d === "1") {
+      await updateSession(ctx.callSid, { data: { zip: DEFAULT_ZIP } }, ctx.session);
+      return back(vr, "addr-check");
+    }
+    if (d === "2") return back(vr, "addr-zip-enter");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "addr-zip");
+  },
+
+  "addr-zip-enter"(ctx, vr) {
+    const g = keypad(vr, url("addr-zip-heard"), { numDigits: 6, timeout: 10, finishOnKey: "#" });
+    spPreviewDraft(g, ctx, ctx.query.get("bad") ? "addr_zip_bad" : "addr_zip_enter");
+    return repeatMenu(vr, ctx, "addr-zip-enter", { bad: ctx.query.get("bad") ?? undefined });
+  },
+
+  async "addr-zip-heard"(ctx, vr) {
+    const zip = (ctx.body.Digits || "").replace(/\D/g, "");
+    if (!/^[0-9]{5}$/.test(zip)) return back(vr, "addr-zip-enter", { bad: 1 });
+    await updateSession(ctx.callSid, { data: { zip } }, ctx.session);
+    return back(vr, "addr-check");
+  },
+
+  /** Step 5: the town from the zip (Orange County only), then the delivery map (the street decides the price). */
+  async "addr-check"(ctx, vr) {
+    const data = ctx.session?.data ?? {};
+    if (!data.street || !data.house) return back(vr, "ask", { f: "street" });
+    const zip = data.zip ?? DEFAULT_ZIP;
+    const town = townForZip(zip);
+    if (!town) return back(vr, "addr-outside");
+    const address = `${data.house} ${data.street}${data.unit ? `, ${data.unit}` : ""}, ${town}, NY ${zip}`;
+    const firstDay = (await callOrders(ctx))[0]?.order.eventDate;
+    const quote = await deliveryQuote(address, await getSettings(), fetch, firstDay ?? new Date());
+    if (!quote.ok && quote.reason === "not_found") {
+      await updateSession(ctx.callSid, { data: { street: undefined, house: undefined, unit: undefined } }, ctx.session);
+      spPreviewDraft(vr, ctx, "addr_not_found");
+      return back(vr, "ask", { f: "street" });
+    }
+    if (!quote.ok) return back(vr, "addr-outside");
+    await updateSession(ctx.callSid, { data: { address, town, zip } }, ctx.session);
+    await track(ctx.callSid, "said", `Address: ${address} (${quote.zone}, ${money(quote.feeCents)})`, { field: "address", value: address });
+    return back(vr, "addr-readback");
+  },
+
+  "addr-outside"(ctx, vr) {
+    const g = keypad(vr, url("addr-outside-choice"));
+    spPreviewDraft(g, ctx, "addr_outside");
+    return repeatMenu(vr, ctx, "addr-outside");
+  },
+
+  "addr-outside-choice"(ctx, vr) {
+    if (ctx.body.Digits === "1") return back(vr, "addr-zip-enter");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "addr-outside");
+  },
+
+  /** Step 6: "Thanks! I have 1 2 Forest Road, Monroe, New York, 1 0 9 5 0. If that is correct, press 1..." */
+  "addr-readback"(ctx, vr) {
+    const d = ctx.session?.data ?? {};
+    if (!d.address || !d.house || !d.street || !d.zip || !d.town) return back(vr, "ask", { f: "street" });
+    const template = lineTemplate(ctx, "addr_readback");
+    const text = fill(d.unit ? template : template.replace(/,\s*\{unit\}/, ""), { house: spokenDigits(d.house), street: d.street, unit: d.unit ?? "", town: d.town, zip: spokenDigits(d.zip) });
+    const g = keypad(vr, url("addr-readback-choice"));
+    say(g, text);
+    return repeatMenu(vr, ctx, "addr-readback");
+  },
+
+  async "addr-readback-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (d === "1") return back(vr, "addr-price");
+    if (d === "2") {
+      await updateSession(ctx.callSid, { data: { address: undefined, street: undefined, house: undefined, unit: undefined, zip: undefined, town: undefined } }, ctx.session);
+      return back(vr, "ask", { f: "street" });
+    }
+    sp(vr, ctx, "not_valid");
+    return back(vr, "addr-readback");
+  },
+
+  /** Step 7: "Thanks! Delivery to Monroe, New York, is 10 dollars." Then the directions (box 34). */
+  async "addr-price"(ctx, vr) {
+    const d = ctx.session?.data ?? {};
+    if (!d.address || !d.town) return back(vr, "ask", { f: "street" });
+    const settings = await getSettings();
+    const first = (await callOrders(ctx))[0]?.order;
+    const quote = await deliveryQuote(d.address, settings, fetch, first?.eventDate ?? new Date());
+    if (quote.ok) {
+      const cents = quote.kind ? deliveryFeeFor(quote.kind, settings, first?.eventDate ?? todayISO(), first?.offerNote ?? null) : quote.feeCents;
+      const price = cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2);
+      spPreviewDraft(vr, ctx, "addr_price", { town: d.town, price });
+    }
+    return back(vr, "directions");
   },
 
   async confirm(ctx, vr) {
@@ -3178,7 +3334,7 @@ const handlers: Record<string, Handler> = {
 
 /* ------------------------------------------------------------------ checkout fields */
 
-type Field = "name" | "address" | "email";
+type Field = "name" | "address" | "email" | "street" | "unit" | "directions";
 const FIELDS: Record<
   Field,
   { prompt: PromptKey; hints: string; normalize: (s: string) => string | null; readBack: (v: string) => string; next: string }
@@ -3188,7 +3344,28 @@ const FIELDS: Record<
     hints: "Friedman, Weiss, Schwartz, Klein, Gross, Teitelbaum, Goldberger, Weinberger, Rosenberg, Stein",
     normalize: (s) => normalizeSpokenName(s) || null,
     readBack: (v) => v,
-    next: "ask?f=address",
+    next: "addr", // the address: in steps (Abraham, Nov 17, 2026) once approved, else the one question
+  },
+  street: {
+    prompt: "addr_street",
+    hints: "Forest Road, Garfield Road, Bakertown Road, Mountain Road, Acres Road, Quickway Road, Seven Springs Road, Schunnemunk Road, Larkin Drive, Satmar Drive, Van Buren Drive",
+    normalize: (s) => titleCase(s.replace(/[.,!?;:]+$/g, "").trim()) || null,
+    readBack: (v) => v,
+    next: "addr-house",
+  },
+  unit: {
+    prompt: "addr_unit",
+    hints: "apartment, unit, suite, A, B, C, 1, 2, 3",
+    normalize: (s) => s.replace(/[.,!?;:]+$/g, "").trim().toUpperCase() || null,
+    readBack: (v) => v,
+    next: "addr-zip",
+  },
+  directions: {
+    prompt: "ask_directions",
+    hints: "gate code, park, driveway, backyard, side door",
+    normalize: (s) => s.trim().slice(0, 500) || null,
+    readBack: (v) => v,
+    next: "finalize",
   },
   address: {
     prompt: "ask_address",

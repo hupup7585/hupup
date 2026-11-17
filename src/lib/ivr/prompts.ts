@@ -192,6 +192,19 @@ export const PROMPTS = {
   // Checkout
   ask_name: { group: "Checkout", label: "Ask for name", text: "Awesome, let us get you booked! Please say your first and last name." },
   ask_address: { group: "Checkout", label: "Ask for address", text: "Thanks! Now please say the delivery address, with the house number, street, and town." },
+  // Delivery address in steps (Abraham, Nov 17, 2026; replaces the single address question, box 32). Step 1 and the
+  // retry line are approved; steps 2 to 7 are drafts: the steps run on preview only until he approves them.
+  addr_street: { group: "Checkout", label: "Address step 1: street name (approved)", text: "Thanks! Please say the street name of the delivery address after the tone. Or press star to type it on your keypad." },
+  retry_spoken: { group: "Checkout", label: "Any spoken answer not understood (approved; the step's own line is not repeated)", text: "Sorry, we did not catch that. Please try again." },
+  addr_house: { group: "Checkout", label: "Address step 2: house number (draft)", text: "Now, with your keypad, please enter the house number. When you are finished, please press pound.", pending: true },
+  addr_unit: { group: "Checkout", label: "Address step 3: apartment or unit (draft)", text: "Thanks! Please say the apartment or unit number after the tone. Or press star to type it on your keypad. If there is no apartment or unit number, please press pound.", pending: true },
+  addr_zip: { group: "Checkout", label: "Address step 4: zip code (draft)", text: "Thanks! To continue with Monroe, New York, one zero nine five zero, press 1. To enter a different zip code, press 2.", pending: true },
+  addr_zip_enter: { group: "Checkout", label: "Address step 4: enter a zip code (draft)", text: "Please enter the 5-digit zip code. When you are finished, please press pound.", pending: true },
+  addr_zip_bad: { group: "Checkout", label: "Address step 4: not 5 digits (draft)", text: "We are sorry, that is not a valid zip code. Please enter the 5-digit zip code again. When you are finished, please press pound.", pending: true },
+  addr_outside: { group: "Checkout", label: "Address step 5: outside Orange County (draft)", text: "We are sorry, we do not serve this area. We deliver only in Orange County, New York. To enter a different zip code, press 1.", pending: true },
+  addr_not_found: { group: "Checkout", label: "Address step 5: not found on the map, back to step 1 (draft)", text: "We are sorry, we could not find that address. Let us try again.", pending: true },
+  addr_readback: { group: "Checkout", label: "Address step 6: read-back (draft; the unit part is left out when there is none)", text: "Thanks! I have {house} {street}, {unit}, {town}, New York, {zip}. If that is correct, press 1. To enter the address again, press 2.", vars: ["house", "street", "unit", "town", "zip"], pending: true },
+  addr_price: { group: "Checkout", label: "Address step 7: delivery price (draft)", text: "Thanks! Delivery to {town}, New York, is {price} dollars.", vars: ["town", "price"], pending: true },
   // Abraham, Nov 15, 2026: optional directions for the driver after the address (drafts for his OK)
   ask_directions: { group: "Checkout", label: "Ask for delivery directions (optional)", text: "Is there anything our delivery team should know, like a gate code, where to park, or where to set up? Please say it now. To skip, press pound.", pending: true },
   directions_saved: { group: "Checkout", label: "Delivery directions saved", text: "Thank you, we saved that for our delivery team.", pending: true },

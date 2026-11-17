@@ -49,7 +49,7 @@ describe("driver directions (optional)", () => {
   it("asks, saves what the caller says, then goes on to the order (no email in the booking)", async () => {
     const ask = await call("directions");
     expect(said(ask)).toContain("Is there anything our delivery team should know, like a gate code, where to park, or where to set up? Please say it now. To skip, press pound.");
-    expect(ask).toMatch(/<Gather [^>]*finishOnKey="#"/);
+    expect(ask).toContain("/audio/tone.wav</Play></Gather>"); // the tone after the question (Abraham, Nov 17, 2026)
     expect(redirect(ask)).toBe("finalize"); // nothing said: skipped
     const saved = await call("directions-heard", { SpeechResult: "The gate code is 1234, park in the back" });
     expect(h.session.data.directions).toBe("The gate code is 1234, park in the back");

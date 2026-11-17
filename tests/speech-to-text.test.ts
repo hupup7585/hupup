@@ -125,7 +125,7 @@ describe("speech to text: the call", () => {
     // Abraham, Nov 15: pound confirms; 1 records it again from the start of the step
     expect(again).toContain('action="https://hupup.example/api/voice/confirm?f=name&amp;k=pound"');
     expect(redirect(await call("confirm", { Digits: "1" }, "f=name&k=pound"))).toBe("ask?f=name");
-    expect(redirect(await call("confirm", { Digits: "#" }, "f=name&k=pound"))).toBe("ask?f=address");
+    expect(redirect(await call("confirm", { Digits: "#" }, "f=name&k=pound"))).toBe("addr");
     expect(h.session.data.name).toBe("Sara Klein");
   });
   it("another call's answer is never read back", async () => {
