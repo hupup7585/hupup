@@ -18,7 +18,7 @@ const on = (v: unknown) => v === true || v === "true";
 
 /** The three switches, read inside the same database transaction as the booking (all off when never set). */
 export async function offerSwitches(exec: Exec): Promise<OfferSettings> {
-  const r = await exec.execute(sql`SELECT key, value FROM app_settings WHERE key IN ('offerLaserThirdPackOn', 'offerThuSunOn', 'offerFourthSundayOn')`);
+  const r = await exec.execute(sql`SELECT key, value FROM app_settings WHERE key IN ('offerLaserThirdPackOn', 'offerThuSunOn', 'offerFourthSundayOn', 'holidayNoPromos')`);
   const out: Record<string, unknown> = {};
   for (const x of r.rows as { key: string; value: unknown }[]) out[x.key] = x.value;
   return out as OfferSettings;
@@ -93,6 +93,9 @@ export async function bestOffer(exec: Exec, orderId: number, s: OfferSettings): 
   const o = r.rows[0] as { id: number; customer_id: number | null; event_date: string; pickup_date: string } | undefined;
   if (!o) return { discountCents: 0, note: null };
   const ls = await lines(exec, orderId);
+  // Chanukah and Chol Hamoed (Abraham, Nov 18, 2026): no promos, discounts or offers those weeks
+  const { noPromosOn } = await import("@/lib/holiday-rentals");
+  if (noPromosOn(o.event_date, s as never)) return { discountCents: 0, note: null };
   // Thursday to Sunday is its own price (1.5 times), never combined with the others (a customer discount included)
   if (on(s.offerThuSunOn) && isThuSun({ eventDate: o.event_date, pickupDate: o.pickup_date })) return { discountCents: thuSunAdjustment(ls), note: OFFER_NOTES.thuSun };
   const options: { discountCents: number; note: string }[] = [];

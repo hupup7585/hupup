@@ -69,6 +69,16 @@ export const SETTING_DEFAULTS = {
   phonePayDeclinesPerDay: "5",
   // Abraham, Nov 18, 2026: up to 5 calls with card tries per caller number in 24 hours (replaces 5 declines)
   phonePayCallsPerDay: "5",
+  // Chanukah and Chol Hamoed rentals (Abraham, Nov 18, 2026, approved): one price per booking day, picked up the next
+  // morning; Friday is one full day, picked up 1 hour after Shabbes; no promos, discounts or offers those weeks.
+  holidayPerDayChanukah: true,
+  holidayPerDayCholHamoed: true,
+  holidayNoPromos: true,
+  holidayPickupAfterShabbesMin: "60",
+  holidayMutzeDeliveryAfterMin: "150",
+  holidaySundayPickup: "09:00",
+  holidayFridayMutzeDays: "1.5",
+  holidayMutzeAloneDays: "1",
   // After Sola shows a DECLINED charge: seconds to wait (Sola is saying the result) before hanging up the call to Sola,
   // so the caller never hears Sola cut off mid-sentence or its new-amount question (Abraham, Nov 18, 2026). Set from a test call.
   phonePayDeclineHangupSeconds: "6",

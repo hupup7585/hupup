@@ -107,8 +107,8 @@ describe("laser tag third pack 50% off (Owner switch)", () => {
 
 describe("Thursday to Sunday (Owner switch)", () => {
   it("delivered Thursday, picked up Monday: 1.5 times the rental; off = regular", async () => {
-    const thu = "2026-12-10";
-    const r = await reserveItem({ orderId: null, productId: balloon, qty: 1, eventDate: thu, pickupDate: "2026-12-14", channel: "POS", status: "CONFIRMED" });
+    const thu = "2026-12-17"; // not in Chanukah (no offers then, Abraham Nov 18, 2026)
+    const r = await reserveItem({ orderId: null, productId: balloon, qty: 1, eventDate: thu, pickupDate: "2026-12-21", channel: "POS", status: "CONFIRMED" });
     if (!r.ok) throw new Error("no order");
     let [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId));
     expect(o.subtotalCents).toBe(6500);

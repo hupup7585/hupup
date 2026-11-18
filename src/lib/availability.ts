@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { addDays } from "@/lib/dates";
 import { getSettings } from "@/lib/settings";
 import { calendarDefaults, nextOpenDay, type CalendarSettings } from "@/lib/jewish-calendar";
+import { holidayFridayPickup, type HolidaySettings } from "@/lib/holiday-rentals";
 
 /**
  * Inventory rule (Abraham, Nov 8, 2026): bookings are whole rental days. A rented unit is OUT from its delivery day
@@ -89,6 +90,9 @@ export function freeOnDay(quantity: number, usage: UsageMap, productId: number, 
  * day (Jewish calendar settings). The unit stays out until then, so it can't be double-booked in between.
  */
 export function pickupDateFor(eventDate: string, cal: CalendarSettings = calendarDefaults()): string {
+  // Chanukah and Chol Hamoed (Abraham, Nov 18, 2026): a Friday rental is picked up Saturday night, 1 hour after Shabbes
+  const holidayFriday = holidayFridayPickup(eventDate, cal as unknown as HolidaySettings);
+  if (holidayFriday) return holidayFriday;
   return nextOpenDay(addDays(eventDate, 1), cal);
 }
 
