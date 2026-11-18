@@ -84,6 +84,7 @@ export const NAV_GROUPS: Group[] = [
       ["/admin/phone/settings", PhoneForwarded, "Phone settings", O],
       ["/admin/phone/music", Music, "Music", O], // Abraham, Nov 17, 2026: songs for waiting and payment
       ["/admin/phone/phonepay", CreditCard, "Sola PhonePay", O], // card payments by phone (Abraham, Nov 14, 2026)
+      ["/admin/phone/card-blocks", CreditCard, "Card blocks", OS], // numbers blocked after too many declines (Nov 17, 2026)
     ],
   },
   { title: "Bookkeeping", items: BOOK_GROUPS.flatMap((g) => g.tabs.map(([tab, label]): Item => [bookTabHref(tab), BOOK_ICONS[tab] ?? List, label, O, g.label])) },

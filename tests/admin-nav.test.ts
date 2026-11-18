@@ -14,7 +14,7 @@ describe("grouped admin menu", () => {
       Inbox: ["Email", "SMS"], // Inbox: info@ (Abraham, Nov 12, 2026; Owner only)
       "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Catalog", "Catalog email & text", "Offers", "Equipment units"],
       Deliveries: ["Deliveries", "Delivery settings"],
-      "Phone system": ["Call log", "Voicemail", "Campaigns", "Hotline prompts", "Compliance", "Phone settings", "Music", "Sola PhonePay"],
+      "Phone system": ["Call log", "Voicemail", "Campaigns", "Hotline prompts", "Compliance", "Phone settings", "Music", "Sola PhonePay", "Card blocks"],
       Bookkeeping: ["Overview", "Income", "Invoices", "Expenses", "Bills I owe", "Sola fees", "Stripe fees", "Bank & card", "Sales tax", "Equipment", "Staff & 1099", "Mileage", "Reports", "All entries", "General ledger", "Settings"],
       Staff: ["Staff", "Tasks", "Activity"],
       Settings: ["Business hours & holidays", "General settings", "System status", "API keys", "Staff screens (preview)"],
@@ -27,7 +27,7 @@ describe("grouped admin menu", () => {
       Inbox: ["SMS"],
       "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Equipment units"],
       Deliveries: ["Deliveries"],
-      "Phone system": ["Call log", "Voicemail", "Campaigns", "Compliance"],
+      "Phone system": ["Call log", "Voicemail", "Campaigns", "Compliance", "Card blocks"],
       Staff: ["Tasks"],
     });
     expect(labels("delivery")).toEqual({ Deliveries: ["Deliveries"], Staff: ["Tasks"] });

@@ -270,7 +270,6 @@ export async function matchPhonePay(orderId: number, attemptId: number, dueCents
 
 /* ---- Card payment on the phone line, approved plan (Abraham, Nov 15, 2026) ---- */
 
-export const PHONEPAY_MAX_TRIES = 6;
 
 /**
  * Which Sola charge belongs to this card try? PhonePay sends no invoice number, and after an invalid card Sola asks for
@@ -283,7 +282,7 @@ export const PHONEPAY_MAX_TRIES = 6;
  */
 export function classifyTry(txns: SolaTxn[], want: { amountCents: number; from: Date; to: Date }, used: Set<string>): { kind: "paid" | "ambiguous" | "wrong_amount" | "none"; paid: SolaTxn | null; matches: SolaTxn[]; wrong: SolaTxn[] } {
   const mine = txns
-    .filter((t) => t.approved && t.refNum && !used.has(t.refNum) && !(t.invoice ?? "").replace(/\D/g, "") && t.at >= new Date(want.from.getTime() - 60_000) && t.at <= new Date(want.to.getTime() + 120_000))
+    .filter((t) => t.approved && t.refNum && !used.has(t.refNum) && isPhonePayInvoice(t.invoice) && t.at >= new Date(want.from.getTime() - 60_000) && t.at <= new Date(want.to.getTime() + 120_000))
     .sort((a, b) => a.at.getTime() - b.at.getTime());
   // Safer check (Abraham, Nov 15, 2026): the exact order total, and only one such charge
   const matches = mine.filter((t) => t.amountCents === want.amountCents);
@@ -291,6 +290,16 @@ export function classifyTry(txns: SolaTxn[], want: { amountCents: number; from: 
   if (matches.length > 1) return { kind: "ambiguous", paid: null, matches, wrong };
   if (matches.length === 1) return { kind: "paid", paid: matches[0], matches, wrong };
   return { kind: wrong.length ? "wrong_amount" : "none", paid: null, matches, wrong };
+}
+
+/**
+ * Is this a PhonePay charge by its Invoice field? Empty, or a phone number (Sola fills in the calling number; our call
+ * to Sola comes from the hotline). Never one of our order numbers (the website link and the staff POS send those).
+ * Abraham, Nov 17, 2026: Sola puts a phone number in Invoice, so "empty only" would miss every PhonePay payment.
+ */
+export function isPhonePayInvoice(invoice: string | null | undefined): boolean {
+  const d = (invoice ?? "").replace(/\D/g, "");
+  return d.length === 0 || d.length === 10 || (d.length === 11 && d.startsWith("1"));
 }
 
 /** Void a Sola charge (Sola gateway, cc:void). Only used for a PhonePay charge that is not the order total. */
@@ -388,7 +397,7 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
   if (voids.length) await mail(`Hup Up Attractions: wrong phone payment amount, order #${num}`, `A caller paying order #${num} by phone was charged an amount that is not the order total ($${(dueCents / 100).toFixed(2)}).\n\n${voids.join("\n")}\n\nThat charge does not count as payment.`);
   if (c?.kind === "paid" && c.paid) {
     await db.update(schema.phonepayAttempts).set({ result: "paid" }).where(eq(schema.phonepayAttempts.id, attemptId));
-    await finishAttempt(attemptId, { matched: true, solaRef: c.paid.refNum, last4: c.paid.last4, cardType: c.paid.cardType, note: voids.length ? "Paid; a second charge was voided" : "Paid" });
+    await finishAttempt(attemptId, { matched: true, solaRef: c.paid.refNum, last4: c.paid.last4, cardType: c.paid.cardType, note: `${voids.length ? "Paid; a second charge was voided" : "Paid"}${c.paid.invoice ? ` (Sola Invoice field: ${c.paid.invoice})` : ""}` });
     await markGroupPaid(orderId, c.paid.amountCents, PHONEPAY_METHOD, c.paid.refNum);
     await recordPaymentResult(ids, "approved", c.paid.last4, c.paid.refNum, c.paid.at);
     await paymentReceivedNotices(orderId, c.paid.amountCents);

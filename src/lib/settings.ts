@@ -62,6 +62,9 @@ export const SETTING_DEFAULTS = {
   /** The Owner's sign-in username (Abraham, Nov 14, 2026); staff usernames live on their accounts */
   ownerUsername: "",
   solaPhonePayOn: false,
+  // Card payment by phone limits (Abraham, Nov 17, 2026): tries per call, and declines per caller phone in 24 hours
+  phonePayTriesPerCall: "3",
+  phonePayDeclinesPerDay: "5",
   solaPhonePayOwnerOnly: true,
   solaPhonePayNumber: "+18334343354",
   solaPhonePayBackup: "+18444227356",

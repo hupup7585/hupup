@@ -48,7 +48,8 @@ import {
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { stripePhonePayMode, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
-import { PHONEPAY_MAX_TRIES, PHONEPAY_NOT_REACHED, amountParts, buildSendDigits, checkPhonePayTry, customChargeMadeBy, endMainPayLeg, endPayLeg, matchCustomCharge, parseCustomAmount, payQueueName, phonePayDirectDial, phonePayOffered, startPayLegWithMusic, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
+import { blockIfTooManyDeclines, isPhonePayBlocked, phonePayLimits, startPayWatch } from "@/lib/phonepay-watch";
+import { PHONEPAY_NOT_REACHED, amountParts, buildSendDigits, checkPhonePayTry, customChargeMadeBy, endMainPayLeg, endPayLeg, matchCustomCharge, parseCustomAmount, payQueueName, phonePayDirectDial, phonePayOffered, startPayLegWithMusic, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
@@ -2475,7 +2476,7 @@ const handlers: Record<string, Handler> = {
     if (payCfg.phoneCardProvider === "stripe") {
       if (keypadPayFor(caller, stripePhonePayMode(process.env, payCfg), process.env, payCfg.paymentTestNumbers) && PAY_PROMPTS.every((k) => stripePhonePayMode(process.env, payCfg) !== "live" || !promptWaiting(ctx.prompts, k)))
         return back(vr, "pay-keypad", { o: primary.id });
-    } else if (phonePayOffered(caller, payCfg) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k))))
+    } else if (phonePayOffered(caller, payCfg) && !(await isPhonePayBlocked(callerPhoneOf(ctx))) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k))))
       return back(vr, "phonepay-go", { o: primary.id, n: 1 });
     // Card on the phone not offered to this caller: the payment link, by text or email (box 141)
     return back(vr, "paylink", { o: primary.id });
@@ -2569,7 +2570,10 @@ const handlers: Record<string, Handler> = {
     }
     for (const a of earlier) await (a.payLegSid?.startsWith("CA") ? Promise.all([endPayLeg(a.payLegSid), endMainPayLeg(a.payLegSid)]) : null);
     const n = earlier.length + 1;
-    if (n > PHONEPAY_MAX_TRIES) return back(vr, "phonepay-done", { o, a: 0 });
+    const limits = phonePayLimits(await getSettings());
+    if (n > limits.triesPerCall) return back(vr, "phonepay-done", { o, a: 0 });
+    // A number blocked after too many declines gets the payment link instead (Abraham, Nov 17, 2026)
+    if (await isPhonePayBlocked(callerPhoneOf(ctx))) return back(vr, "paylink", { o });
     // The rentals stay held for the whole payment
     const waiting = group.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id);
     if (waiting.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES), updatedAt: new Date() }).where(inArray(orders.id, waiting));
@@ -2584,8 +2588,10 @@ const handlers: Record<string, Handler> = {
       }
     }
     const attempt = await startAttempt(o, ctx.callSid, group.due);
-    await db.update(schema.phonepayAttempts).set({ tryNumber: n }).where(eq(schema.phonepayAttempts.id, attempt.id));
-    await track(ctx.callSid, "step", `Card payment try ${n} of ${PHONEPAY_MAX_TRIES} started for order #${orderNumber(o)}`, { attempt: attempt.id });
+    await db.update(schema.phonepayAttempts).set({ tryNumber: n, callerPhone: callerPhoneOf(ctx) }).where(eq(schema.phonepayAttempts.id, attempt.id));
+    await track(ctx.callSid, "step", `Card payment try ${n} of ${limits.triesPerCall} started for order #${orderNumber(o)}`, { attempt: attempt.id });
+    // Watch Sola while the call to Sola is up: hang it up as soon as a charge shows, or after 4 minutes
+    await startPayWatch(attempt.id);
     // Box 140 already told the caller they are being connected; later tries keep the "please hold" line
     if (earlier.length) sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true });
     // Straight from the hotline to Sola PhonePay (Abraham, Nov 17, 2026): PIN, the order amount (from the order, never
@@ -2684,6 +2690,14 @@ const handlers: Record<string, Handler> = {
         return back(vr, "promo-consent");
       }
       n = attempt?.tryNumber ?? n;
+      // Too many declines from this phone in 24 hours: card payment by phone is blocked (Abraham, Nov 17, 2026). The
+      // new line for this is not approved yet, so the caller hears the approved "payment failed" line.
+      if (await blockIfTooManyDeclines(callerPhoneOf(ctx), phonePayLimits(await getSettings()).declinesPerDay, `order #${orderNumber(o)}`)) {
+        await track(ctx.callSid, "step", "Card payment by phone blocked for this number (too many declines in 24 hours)", { attempt: a });
+        sp(vr, ctx, "phonepay_failed", undefined, { draftOk: true });
+        vr.hangup();
+        return vr;
+      }
     }
     return back(vr, "phonepay-retry", { o, n });
   },
@@ -2699,14 +2713,15 @@ const handlers: Record<string, Handler> = {
       const to = config.adminEmail();
       if (to) await sendEmail(to, subject, `${text}\n\n${config.baseUrl()}/admin/orders/${o}`).catch(() => null);
     };
-    if (n >= PHONEPAY_MAX_TRIES) {
-      if (!asked) await tellOwner(`Hup Up Attractions: phone card payment failed 6 times, order #${num}`, `The caller tried to pay order #${num} ($${(due / 100).toFixed(2)}) by card 6 times on the phone and it did not go through. The call ended and the caller was asked to call back. The order is still Payment pending.`);
+    const max = phonePayLimits(await getSettings()).triesPerCall;
+    if (n >= max) {
+      if (!asked) await tellOwner(`Hup Up Attractions: phone card payment failed ${max} times, order #${num}`, `The caller tried to pay order #${num} ($${(due / 100).toFixed(2)}) by card ${max} times on the phone and it did not go through. The call ended and the caller was asked to call back. The order is still Payment pending.`);
       sp(vr, ctx, "phonepay_failed", undefined, { draftOk: true });
       vr.hangup();
       return vr;
     }
-    if (n === PHONEPAY_MAX_TRIES - 1 && !asked)
-      await tellOwner(`Hup Up Attractions: phone card payment failed 5 times, order #${num}`, `The caller tried to pay order #${num} ($${(due / 100).toFixed(2)}) by card 5 times on the phone and it did not go through. They have one more try.`);
+    if (n === max - 1 && max > 1 && !asked)
+      await tellOwner(`Hup Up Attractions: phone card payment failed ${max - 1} times, order #${num}`, `The caller tried to pay order #${num} ($${(due / 100).toFixed(2)}) by card ${max - 1} times on the phone and it did not go through. They have one more try.`);
     if (asked >= 2) {
       // No key after the menu twice: the call ends with the same line as the sixth try
       sp(vr, ctx, "phonepay_failed", undefined, { draftOk: true });
@@ -2714,7 +2729,7 @@ const handlers: Record<string, Handler> = {
       return vr;
     }
     const g = keypad(vr, url("phonepay-retry-answer", { o, n, r: asked }), { numDigits: 1, timeout: 8 });
-    sp(g, ctx, n === PHONEPAY_MAX_TRIES - 1 ? "phonepay_retry_last" : "phonepay_retry", undefined, { draftOk: true });
+    sp(g, ctx, n === max - 1 ? "phonepay_retry_last" : "phonepay_retry", undefined, { draftOk: true });
     return back(vr, "phonepay-retry", { o, n, r: asked + 1 });
   },
 
@@ -3445,6 +3460,11 @@ const FIELDS: Record<
 };
 
 /* ------------------------------------------------------------------ dispatcher */
+
+/** The caller's phone (E.164), for the card payment limits. */
+function callerPhoneOf(ctx: { session?: { fromNumber?: string | null } | null; from: string | null }): string | null {
+  return toE164(ctx.session?.fromNumber ?? ctx.from ?? "") || null;
+}
 
 const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music", "pay-leg", "pay-leg-status"]); // music: wait music pieces, not a step of the caller's journey
 

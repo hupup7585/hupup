@@ -111,15 +111,15 @@ describe("card payment on the phone line", () => {
     expect(redirect(x)).toBe(`phonepay-retry?o=${orderId}&n=2`);
   });
 
-  it("try 5 warns and emails; try 6 ends the call and emails; no payment link anywhere", async () => {
+  it("tries per call from Admin (3 to start, Abraham, Nov 17, 2026): try 2 warns and emails; try 3 ends the call and emails; no payment link anywhere", async () => {
     h.emails = [];
-    let x = await call("phonepay-retry", {}, `o=${orderId}&n=5`);
+    let x = await call("phonepay-retry", {}, `o=${orderId}&n=2`);
     expect(said(x)).toContain("Your card did not go through. You have one more chance to try. To try again, press 1.");
-    expect(h.emails.some((e) => e.includes("failed 5 times"))).toBe(true);
-    x = await call("phonepay-retry", {}, `o=${orderId}&n=6`);
+    expect(h.emails.some((e) => e.includes("failed 2 times"))).toBe(true);
+    x = await call("phonepay-retry", {}, `o=${orderId}&n=3`);
     expect(said(x)).toEqual(["Sorry, your card did not go through. Please call us back to try again. Goodbye."]);
     expect(x).toContain("<Hangup/>");
-    expect(h.emails.some((e) => e.includes("failed 6 times"))).toBe(true);
+    expect(h.emails.some((e) => e.includes("failed 3 times"))).toBe(true);
     expect(x).not.toMatch(/payment link/i);
   });
 

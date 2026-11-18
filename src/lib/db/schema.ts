@@ -1457,8 +1457,26 @@ export const phonepayAttempts = pgTable(
     result: text("result"),
     /** 1 to 6: which try this was on the call */
     tryNumber: integer("try_number").notNull().default(1),
+    /** The caller's phone (declines are counted per phone over 24 hours) */
+    callerPhone: text("caller_phone"),
+    /** What the watcher saw in Sola while the call to Sola was up: "approved" | "declined" | "timeout" (Nov 17, 2026) */
+    solaSeen: text("sola_seen"),
   },
   (t) => [index("phonepay_attempts_started_idx").on(t.startedAt)],
+);
+
+/** Numbers blocked from card payment by phone after too many declines in 24 hours; staff unlock them in Admin. */
+export const phonepayBlocks = pgTable(
+  "phonepay_blocks",
+  {
+    id: serial("id").primaryKey(),
+    phone: text("phone").notNull(),
+    blockedAt: timestamp("blocked_at", { withTimezone: true }).notNull().defaultNow(),
+    declines: integer("declines").notNull().default(0),
+    unlockedAt: timestamp("unlocked_at", { withTimezone: true }),
+    unlockedBy: integer("unlocked_by"),
+  },
+  (t) => [index("phonepay_blocks_phone_idx").on(t.phone)],
 );
 
 /** Delivery and pickup photos (Abraham, Nov 15, 2026): the files live in Cloudflare R2 (free tier); only the key here. */

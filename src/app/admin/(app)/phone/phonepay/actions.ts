@@ -29,7 +29,13 @@ export async function savePhonePayAction(form: FormData) {
   const testLines = String(form.get("testNumbers") ?? "").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
   const testNumbers = testLines.map((x) => toE164(x));
   if (testNumbers.some((x) => !x)) return back("Each payment test number must be a 10-digit phone number, one per line.");
+  // Limits (Abraham, Nov 17, 2026): tries per call, and declines per caller phone in 24 hours
+  const tries = Math.floor(Number(form.get("triesPerCall")));
+  const declines = Math.floor(Number(form.get("declinesPerDay")));
+  if (!(tries >= 1 && tries <= 20) || !(declines >= 1 && declines <= 20)) return back("Tries per call and declines per day must each be a number from 1 to 20.");
   const before = await getSettings();
+  await saveSetting("phonePayTriesPerCall", String(tries), owner.userId);
+  await saveSetting("phonePayDeclinesPerDay", String(declines), owner.userId);
   await saveSetting("solaPhonePayOn", on, owner.userId);
   await saveSetting("solaPhonePayOwnerOnly", ownerOnly, owner.userId);
   await saveSetting("solaPhonePayNumber", number, owner.userId);
@@ -46,7 +52,7 @@ export async function savePhonePayAction(form: FormData) {
     entityType: "settings",
     entityId: "sola_phonepay",
     before: { provider: before.phoneCardProvider, on: before.solaPhonePayOn, ownerOnly: before.solaPhonePayOwnerOnly, number: before.solaPhonePayNumber, backup: before.solaPhonePayBackup, digits: before.solaPhonePayDigits },
-    after: { on, ownerOnly, number, backup, digits, customDigits, customCap, testNumbers, provider },
+    after: { on, ownerOnly, number, backup, digits, customDigits, customCap, testNumbers, provider, tries, declines },
   });
   revalidatePath("/admin/phone/phonepay");
   return back("Saved.");
