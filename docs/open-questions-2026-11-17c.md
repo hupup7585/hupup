@@ -79,8 +79,4 @@ Answer:
 
 ## Calendar
 
-**13. Search a date and holiday names:**
-- Which calendar: the Admin Calendar page (bookings by day), the New booking calendar, or both?
-- Holiday names: in English ("Chanukah, day 3"), in Hebrew letters ("ג׳ דחנוכה"), or both?
-
-Answer:
+**13. Search a date and holiday names:** answered Nov 18, 2026: both calendars (Admin Calendar and New booking), names in English. Built.

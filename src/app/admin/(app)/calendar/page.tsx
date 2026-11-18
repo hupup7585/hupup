@@ -17,6 +17,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import DualDate, { HebrewDay } from "@/components/DualDate";
 import { dualDate } from "@/lib/dual-date";
 import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
+import { dayHolidayNames } from "@/lib/hup-calendar/day-names";
 
 export default async function CalendarPage({
   searchParams,
@@ -58,6 +59,12 @@ export default async function CalendarPage({
               {s === 7 ? "Week" : s === 14 ? "2 weeks" : "4 weeks"}
             </Link>
           ))}
+          {/* Search a date (Abraham, Nov 17, 2026): opens that date's week with the day chosen */}
+          <form action="/admin/calendar" className="flex items-center gap-1" data-date-search>
+            <input type="hidden" name="span" value={span} />
+            <input type="date" name="day" defaultValue={dayParam ?? ""} className="input !w-auto !py-1.5" aria-label="Search a date" required />
+            <button className="btn-ghost">Go</button>
+          </form>
           <Link className="btn" href={`/admin/pos?date=${selected}`}>+ New booking</Link>
         </div>
       </div>
@@ -74,6 +81,12 @@ export default async function CalendarPage({
                   <Link href={q({ day: d })} className={`block rounded-lg py-1 ${d === selected ? "bg-navy text-white" : ""}`}>
                     {weekdayShort(d)} {dayOfMonth(d)}
                     <HebrewDay yi dayOnly iso={d} className="block text-[10px] font-normal" />
+                    {/* Every Yom Tov / holiday name in English, with the day of Chanukah (Abraham, Nov 17, 2026) */}
+                    {dayHolidayNames(d).map((n) => (
+                      <span key={n} className={`block px-0.5 text-[10px] font-semibold leading-tight ${d === selected ? "text-white" : "text-[#6B3FA0]"}`} data-holiday-en>
+                        {n}
+                      </span>
+                    ))}
                   </Link>
                 </th>
               ))}
@@ -151,6 +164,7 @@ export default async function CalendarPage({
             <div key={kind}>
               <h2 className="mb-3 font-bold">
                 {kind === "delivery" ? "Deliveries" : "Pickups"} · <DualDate yi iso={selected} />
+                {dayHolidayNames(selected).length > 0 && <span className="ml-1 text-sm font-semibold text-[#6B3FA0]">· {dayHolidayNames(selected).join(" · ")}</span>}
               </h2>
               {list.length === 0 && <p className="text-sm text-muted">None.</p>}
               {list.map((r) => (

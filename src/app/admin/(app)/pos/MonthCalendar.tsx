@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { calendarFor, type CalendarDay } from "./actions";
 import { dualParts } from "@/lib/dual-date";
 import { DAY_YI, yiddishDay } from "@/lib/yiddish-day";
+import { dayHolidayNames } from "@/lib/hup-calendar/day-names";
 
 /**
  * New booking: month calendar (Abraham, Nov 17, 2026). Week rows Sunday to Saturday, one box per day with the English
@@ -51,6 +52,13 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
   const [month, setMonth] = useState(startMonth);
   const [days, setDays] = useState<CalendarDay[]>(initialDays ?? []);
   const firstMonth = today.slice(0, 7);
+  // Search a date (Abraham, Nov 17, 2026): jumps to its month and marks the day
+  const [found, setFound] = useState("");
+  function goTo(iso: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
+    setFound(iso);
+    setMonth(iso.slice(0, 7));
+  }
 
   useEffect(() => {
     if (initialDays && month === startMonth && days === initialDays) return;
@@ -83,6 +91,15 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
+      <label className="mb-2 flex flex-wrap items-center justify-center gap-2 text-sm" data-date-search>
+        <span className="font-semibold text-muted">Search a date</span>
+        <input type="date" className="input !w-auto !py-1.5" value={found} onChange={(e) => goTo(e.target.value)} aria-label="Search a date" />
+        {found && (
+          <button type="button" className="btn-ghost !px-2 !py-1 text-xs" onClick={() => { setFound(""); setMonth(startMonth); }}>
+            Clear
+          </button>
+        )}
+      </label>
       <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold uppercase text-muted">
         {WEEKDAYS.map((w) => (
           <div key={w}>{w}</div>
@@ -102,14 +119,18 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
               const chosen = d.date === value;
               const label = d.closed ? d.reason : d.closesAtLabel ? "Closes early" : d.names[0] ?? "";
               const he = dualParts(d.date, "short").he;
+              // Every Yom Tov / holiday name in English, with the day of Chanukah (Abraham, Nov 17, 2026)
+              const holidays = dayHolidayNames(d.date);
+              const isFound = d.date === found;
               return (
                 <button
                   key={d.date}
                   type="button"
                   disabled={off}
                   onClick={() => onPick(d.date)}
-                  title={[d.hebrew, d.closed ? `Closed: ${d.reason}` : d.names.join(", ")].filter(Boolean).join(" · ")}
+                  title={[d.hebrew, ...holidays, d.closed ? `Closed: ${d.reason}` : d.names.join(", ")].filter(Boolean).join(" · ")}
                   data-day={d.date}
+                  data-found={isFound || undefined}
                   data-closed={d.closed || undefined}
                   className={`min-h-[4.25rem] min-w-0 overflow-hidden rounded-lg border p-1 text-left text-[11px] leading-tight sm:p-1.5 sm:text-xs ${
                     chosen
@@ -119,7 +140,7 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
                         : past
                           ? "cursor-not-allowed border-line bg-bg text-muted"
                           : "border-line bg-white hover:border-navy"
-                  } ${other && !chosen ? "opacity-50" : ""}`}
+                  } ${other && !chosen ? "opacity-50" : ""} ${isFound ? "ring-2 ring-[#FFD84D] ring-offset-1" : ""}`}
                 >
                   {/* Day number with "Closed" next to it (Abraham, Nov 17, 2026: no crossed-out days) */}
                   <span className="flex flex-wrap items-center justify-between gap-1">
@@ -145,6 +166,11 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
                     </span>
                   ) : (
                     <span className="block truncate">{label}</span>
+                  )}
+                  {holidays.length > 0 && (
+                    <span className={`mt-0.5 block text-[10px] font-semibold leading-tight sm:text-[11px] ${chosen ? "text-white" : "text-[#6B3FA0]"}`} data-holiday-en>
+                      {holidays.join(" · ")}
+                    </span>
                   )}
                 </button>
               );
