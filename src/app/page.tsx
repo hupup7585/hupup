@@ -12,6 +12,8 @@ import { smsSignupNotActive, smsTermsV2Active, webConsentCopy } from "@/lib/sms-
 import { smsNumberDisplay } from "@/lib/sms-number";
 import { signUpsDisabledReason } from "@/app/text-alerts/actions";
 import { getSettings } from "@/lib/settings";
+import CatalogRequest from "@/components/site/CatalogRequest";
+import { websiteCatalogFormShown } from "@/lib/catalog-request";
 import { CallButton, ICON_STROKE, IconTile, SectionTitle, Wave, categoryIcon } from "@/components/site/parts";
 
 export const revalidate = 60; // hours and catalog come from Admin; saves also refresh right away
@@ -152,6 +154,8 @@ export default async function Home() {
               </a>
               {CATALOG_LINE.after}
             </p>
+            {/* Text CATALOG and Email me the catalog (Abraham, Nov 18, 2026): preview first, live after his OK */}
+            {websiteCatalogFormShown() && <CatalogRequest />}
           </div>
         </section>
 
