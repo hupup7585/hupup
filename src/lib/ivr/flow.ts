@@ -650,7 +650,7 @@ async function catalogSendText(ctx: Ctx, vr: VR, to: string) {
   // Two messages when the Owner has set the pictures: picture 1 with the words, then picture 2 alone (Nov 17, 2026)
   const { sendCatalogMessages } = await import("@/lib/catalog-send");
   const r = await sendCatalogMessages(promptText(ctx.prompts, "msg_catalog_text"), (body, media) => sendMessage({ to, body, ...(media.length ? { mediaUrls: media } : {}), kind: "system", event: "catalog_request", callSid: ctx.callSid }));
-  await logCatalogRequest(ctx, "text", to, r.sent);
+  await logCatalogRequest(ctx, "text", to, r.sent, r.reason);
   if (!r.sent) {
     sp(vr, ctx, "catalog_text_not_yet");
     return back(vr, "catalog-email", { p: "cat" });
@@ -661,9 +661,9 @@ async function catalogSendText(ctx: Ctx, vr: VR, to: string) {
 }
 
 /** Every catalog request on the caller's contact (channel, date with year); a failed send alerts Abraham. */
-async function logCatalogRequest(ctx: Ctx, channel: "text" | "email", to: string, sent: boolean) {
-  await track(ctx.callSid, "step", sent ? `Catalog sent by ${channel}` : `Catalog ${channel} failed`, { channel, to, sent });
-  await recordCatalogRequest({ callerPhone: toE164(ctx.from), channel, to, sent, source: "phone" });
+async function logCatalogRequest(ctx: Ctx, channel: "text" | "email", to: string, sent: boolean, reason?: string) {
+  await track(ctx.callSid, "step", sent ? `Catalog sent by ${channel}` : `Catalog ${channel} failed${reason ? `: ${reason}` : ""}`, { channel, to, sent });
+  await recordCatalogRequest({ callerPhone: toE164(ctx.from), channel, to, sent, source: "phone", reason });
 }
 
 /** Does this line ring now (office hours, after-hours switch, key 6 hours, Shabbes and Yom Tov)? */

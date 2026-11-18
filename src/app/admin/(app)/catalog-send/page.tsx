@@ -42,7 +42,12 @@ export default async function CatalogSendPage() {
       </section>
       <section className="card mb-5 p-5" data-catalog-text-pictures>
         <h2 className="text-xl font-black">Catalog by text (photos)</h2>
-        <p className="mb-3 mt-1 text-sm text-muted">A caller who asks for the catalog by text gets each photo in its own message, with its own text, in this order (up to 10). JPG, PNG or WebP, under 4 MB. No photos here: the catalog words are sent as before.</p>
+        {String(settings.catalogTextMissingAt ?? "") && !parseCatalogTextItems(settings.catalogTextItems).length && (
+          <p className="mt-2 rounded-xl bg-[#FFE6E4] p-3 text-sm font-semibold text-[#B3261E]" data-catalog-missing>
+            A customer asked for the catalog by text on {new Date(String(settings.catalogTextMissingAt)).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "full", timeStyle: "short" })}, but no catalog photos are uploaded, so nothing was sent. Add the photos below.
+          </p>
+        )}
+        <p className="mb-3 mt-1 text-sm text-muted">A caller who asks for the catalog by text gets each photo in its own message, with its own text, in this order (up to 10). JPG, PNG or WebP, under 4 MB. No photos here: the photo of each item in Catalog is sent instead, in the catalog order; with no photos at all, nothing is sent and a warning shows here.</p>
         <CatalogTextItems initial={parseCatalogTextItems(settings.catalogTextItems)} />
       </section>
     </div>

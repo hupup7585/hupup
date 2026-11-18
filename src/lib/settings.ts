@@ -43,6 +43,8 @@ export const SETTING_DEFAULTS = {
   emailMailingAddress: "",
   // Catalog by text (Abraham, Nov 17, 2026, item 14): the photos in order, each with its own text (JSON list)
   catalogTextItems: "",
+  // When a catalog by text was asked for but no catalog photos are in Admin (Nov 18, 2026): shown on Catalog email & text
+  catalogTextMissingAt: "",
   catalogAutoAttach: true,
   // Catalog email wording, edited by the Owner (Abraham, Nov 17, 2026). Blank = the approved wording. {Catalog Name} is filled in.
   catalogEmailSubjectText: "",

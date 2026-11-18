@@ -152,6 +152,9 @@ function senderParams(): { from?: string; messagingServiceSid?: string } {
 /** The texting test window (Abraham, Nov 16, 2026): until he opens it, only the test numbers get customer texts. */
 export async function testWindowBlocks(to: string, event: string | undefined): Promise<boolean> {
   if (process.env.VERCEL_ENV !== "production" || STAFF_EVENTS.has(event ?? "")) return false;
+  // A catalog the person asked for (key 8 or texting CATALOG) is not held by the test window (Abraham, Nov 18, 2026:
+  // a catalog request from (845) 395-5264 was held and never reached Twilio)
+  if (REQUESTED_EVENTS.has(event ?? "")) return false;
   const { getSettings } = await import("@/lib/settings");
   const s = await getSettings();
   if (!s.smsTestOnly) return false;
@@ -400,6 +403,7 @@ export const NO_TEXT_CONSENT = "No text consent; call or email.";
 export const TEXTING_NOT_ACTIVE = "Not active yet: waiting for Twilio A2P approval";
 /** Texts to our own staff (not customers): allowed before A2P approval. */
 const STAFF_EVENTS = new Set(["owner_alert", "owner_forward", "compliance_alert", "login_code", "info_email_alert"]);
+const REQUESTED_EVENTS = new Set(["catalog_request", "catalog_reply"]);
 
 const BLOCK_REASON: Record<Blocked, string> = {
   opted_out: "Customer replied STOP. They must text START and reply YES to receive order texts again.",

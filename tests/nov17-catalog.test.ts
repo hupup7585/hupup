@@ -126,8 +126,11 @@ describe("catalog photos and Garbage", () => {
 });
 
 describe("catalog by text: two messages", () => {
-  it("without pictures: the first text only", async () => {
-    expect(await catalogTextMessages("Words")).toEqual([{ body: "Words", mediaUrls: [] }]);
+  it("no catalog-by-text photos: the photo of each item in Catalog, in order, after the first text (Abraham, Nov 18, 2026)", async () => {
+    const msgs = await catalogTextMessages("Words");
+    expect(msgs[0]).toEqual({ body: "Words", mediaUrls: [] });
+    expect(msgs.slice(1).every((m) => m.body === "" && /\/api\/catalog-photo\/catalog\/products\//.test(m.mediaUrls[0]))).toBe(true);
+    expect(msgs.length).toBeGreaterThan(1);
   });
   it("the first text alone (catalog name filled in), then picture 1, then picture 2, each its own message", async () => {
     const one = new FormData();

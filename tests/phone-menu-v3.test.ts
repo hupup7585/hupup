@@ -279,6 +279,9 @@ describe("Nov 12 decisions: staff reject, caller ID, after hours, keypad pay, CA
     expect(SMS_CATALOG_REPLY_ON).toBe(true);
     for (const t of ["catalog", "CATALOG", "Catalogue", " catalog. "]) expect(isCatalogText(t), t).toBe(true);
     for (const t of ["send me a catalog", "cat", ""]) expect(isCatalogText(t), t).toBe(false);
+    // catalog photos in Admin (with none, nothing is sent: Abraham, Nov 18, 2026)
+    const { saveSetting } = await import("@/lib/settings");
+    await saveSetting("catalogTextItems", JSON.stringify([{ photo: "/api/catalog-photo/catalog/text/a.jpg", text: "" }]));
     const sent: string[] = [];
     const send = async (to: string, body: string) => {
       sent.push(body);
