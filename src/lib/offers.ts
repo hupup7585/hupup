@@ -93,9 +93,14 @@ export async function bestOffer(exec: Exec, orderId: number, s: OfferSettings): 
   const o = r.rows[0] as { id: number; customer_id: number | null; event_date: string; pickup_date: string } | undefined;
   if (!o) return { discountCents: 0, note: null };
   const ls = await lines(exec, orderId);
-  // Thursday to Sunday is its own price (1.5 times), never combined with the others
+  // Thursday to Sunday is its own price (1.5 times), never combined with the others (a customer discount included)
   if (on(s.offerThuSunOn) && isThuSun({ eventDate: o.event_date, pickupDate: o.pickup_date })) return { discountCents: thuSunAdjustment(ls), note: OFFER_NOTES.thuSun };
   const options: { discountCents: number; note: string }[] = [];
+  // A customer discount (Abraham, Nov 18, 2026) is one more choice: never combined, the bigger saving applies
+  const { discountForOrder, discountCents, discountNote } = await import("@/lib/customer-discounts");
+  const { todayISO } = await import("@/lib/dates");
+  const cd = await discountForOrder(exec as never, Number(o.id), todayISO());
+  if (cd) options.push({ discountCents: discountCents(cd, ls.reduce((t, l) => t + l.qty * l.unitPriceCents, 0)), note: discountNote(cd) });
   if (on(s.offerLaserThirdPackOn)) options.push({ discountCents: laserThirdPackDiscount(ls), note: OFFER_NOTES.laser });
   if (on(s.offerFourthSundayOn)) options.push({ discountCents: await fourthSundayDiscount(exec, { id: Number(o.id), customerId: o.customer_id ? Number(o.customer_id) : null, eventDate: o.event_date }, ls), note: OFFER_NOTES.fourthSunday });
   const best = options.filter((x) => x.discountCents > 0).sort((a, b) => b.discountCents - a.discountCents)[0];

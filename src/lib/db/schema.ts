@@ -1,6 +1,7 @@
 import {
   pgTable,
   doublePrecision,
+  numeric,
   serial,
   text,
   integer,
@@ -1542,3 +1543,27 @@ export const recordingSlots = pgTable("recording_slots", {
   recordedAt: timestamp("recorded_at", { withTimezone: true }),
   recordedBy: integer("recorded_by"),
 });
+
+/**
+ * A discount for a specific customer (Abraham, Nov 17-18, 2026): by phone number, dollars off or percent off the
+ * rentals, before sales tax. Website and Admin only (the phone reads the total with it, never mentions it). Stays on
+ * every booking until turned off, with an optional end date. Never combined with an offer: the bigger saving applies.
+ */
+export const customerDiscounts = pgTable(
+  "customer_discounts",
+  {
+    id: serial("id").primaryKey(),
+    phone: text("phone").notNull(),
+    kind: text("kind").notNull(), // "amount" | "percent"
+    amountCents: integer("amount_cents"),
+    percent: numeric("percent", { precision: 5, scale: 2 }),
+    endsOn: date("ends_on"),
+    note: text("note").notNull().default(""),
+    active: boolean("active").notNull().default(true),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    turnedOffAt: timestamp("turned_off_at", { withTimezone: true }),
+  },
+  (t) => [index("customer_discounts_phone_idx").on(t.phone)],
+);
+

@@ -12,7 +12,7 @@ describe("grouped admin menu", () => {
     expect(labels("owner")).toEqual({
       top: ["Dashboard", "Search"],
       Inbox: ["Email", "SMS"], // Inbox: info@ (Abraham, Nov 12, 2026; Owner only)
-      "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Catalog", "Catalog email & text", "Offers", "Equipment units"],
+      "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Catalog", "Catalog email & text", "Offers", "Discounts", "Equipment units"],
       Deliveries: ["Deliveries", "Delivery settings"],
       "Phone system": ["Call log", "Voicemail", "Campaigns", "Hotline prompts", "Compliance", "Phone settings", "Music", "Sola PhonePay", "Card blocks"],
       Bookkeeping: ["Overview", "Income", "Invoices", "Expenses", "Bills I owe", "Sola fees", "Stripe fees", "Bank & card", "Sales tax", "Equipment", "Staff & 1099", "Mileage", "Reports", "All entries", "General ledger", "Settings"],
