@@ -193,14 +193,13 @@ export async function catalogTextMessages(words: string): Promise<{ body: string
   const { config } = await import("@/lib/config");
   const s = await getSettings();
   const abs = (p: string) => (p ? new URL(p, config.baseUrl()).toString() : "");
-  // The photo catalog: each photo in its own message with its own text, in the Owner's order
+  // Abraham, Nov 18, 2026 (approved): the first text alone, "Hup Up Attractions: Here is our {Catalog Name}! ...",
+  // then each catalog photo as its own message (with its own text, in the Owner's order)
+  const first = { body: words.split(CATALOG_NAME_TAG).join(String(s.catalogName ?? "").trim() || "catalog"), mediaUrls: [] as string[] };
   const items = parseCatalogTextItems(s.catalogTextItems);
-  if (items.length) return items.map((i) => ({ body: i.text, mediaUrls: [abs(i.photo)] }));
-  const one = abs(s.catalogTextPicture1);
-  const two = abs(s.catalogTextPicture2);
-  const out = [{ body: words, mediaUrls: one ? [one] : [] }];
-  if (two) out.push({ body: "", mediaUrls: [two] });
-  return out;
+  if (items.length) return [first, ...items.map((i) => ({ body: i.text, mediaUrls: [abs(i.photo)] }))];
+  const pictures = [abs(s.catalogTextPicture1), abs(s.catalogTextPicture2)].filter(Boolean);
+  return [first, ...pictures.map((p) => ({ body: "", mediaUrls: [p] }))];
 }
 
 /** Send the catalog messages one after the other; the first decides whether it counts as sent. */

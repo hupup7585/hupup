@@ -288,7 +288,7 @@ describe("Nov 12 decisions: staff reject, caller ID, after hours, keypad pay, CA
     expect(await replyToCatalogText("+18455550188", { optedOut: false, on: false, send })).toEqual({ replied: false, reason: "not_active" });
     expect(sent).toHaveLength(0);
     expect((await replyToCatalogText("+18455550188", { optedOut: false, send })).replied).toBe(true); // on by default now
-    expect(sent[0]).toBe("Hup Up Attractions: Here is our catalog: hupupattractions.com/#rentals To book, call (845) 777-7585.");
+    expect(sent[0]).toBe("Hup Up Attractions: Here is our catalog! You can call us anytime to book with our automated system at (845) 777-7585 Ext. 1."); // approved Nov 18, 2026
     expect((await replyToCatalogText("+18455550188", { optedOut: false, on: true, send })).reason).toBe("already_today");
     expect((await replyToCatalogText("+18455550199", { optedOut: true, on: true, send })).reason).toBe("opted_out");
     expect((await db.select().from(schema.smsConsents)).filter((r) => r.scope === "marketing" && r.action === "opt_in")).toHaveLength(0);

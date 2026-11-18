@@ -126,10 +126,10 @@ describe("catalog photos and Garbage", () => {
 });
 
 describe("catalog by text: two messages", () => {
-  it("without pictures: the words only (as before)", async () => {
+  it("without pictures: the first text only", async () => {
     expect(await catalogTextMessages("Words")).toEqual([{ body: "Words", mediaUrls: [] }]);
   });
-  it("picture 1 with the words, then picture 2 alone, in that order", async () => {
+  it("the first text alone (catalog name filled in), then picture 1, then picture 2, each its own message", async () => {
     const one = new FormData();
     one.set("kind", "text");
     one.set("id", "1");
@@ -140,14 +140,15 @@ describe("catalog by text: two messages", () => {
     two.set("id", "2");
     two.set("photo", new File([jpeg], "p2.jpg"));
     expect((await uploadCatalogPhotoAction(two)).ok).toBe(true);
-    const msgs = await catalogTextMessages("Hup Up Attractions: Here is our catalog");
-    expect(msgs).toHaveLength(2);
-    expect(msgs[0].body).toBe("Hup Up Attractions: Here is our catalog");
-    expect(msgs[0].mediaUrls[0]).toMatch(/^https:\/\/hupup\.example\/api\/catalog-photo\/catalog\/text\/1-/);
-    expect(msgs[1]).toMatchObject({ body: "" });
-    expect(msgs[1].mediaUrls[0]).toMatch(/\/catalog\/text\/2-/);
+    await saveSetting("catalogName", "Chanukah Catalog 2026");
+    const msgs = await catalogTextMessages("Hup Up Attractions: Here is our {Catalog Name}! You can call us anytime to book with our automated system at (845) 777-7585 Ext. 1.");
+    expect(msgs).toHaveLength(3);
+    expect(msgs[0]).toEqual({ body: "Hup Up Attractions: Here is our Chanukah Catalog 2026! You can call us anytime to book with our automated system at (845) 777-7585 Ext. 1.", mediaUrls: [] });
+    expect(msgs[1].mediaUrls[0]).toMatch(/^https:\/\/hupup\.example\/api\/catalog-photo\/catalog\/text\/1-/);
+    expect(msgs[2].mediaUrls[0]).toMatch(/\/catalog\/text\/2-/);
     await saveSetting("catalogTextPicture2", "");
-    expect(await catalogTextMessages("W")).toHaveLength(1);
+    expect(await catalogTextMessages("W")).toHaveLength(2);
+    await saveSetting("catalogName", "");
   });
 });
 
@@ -174,6 +175,7 @@ describe("catalog by text: photos, each with its own text, in order (Abraham, No
     );
     const msgs = await catalogTextMessages("Hup Up Attractions: Here is our catalog");
     expect(msgs).toEqual([
+      { body: "Hup Up Attractions: Here is our catalog", mediaUrls: [] },
       { body: "Jumping balloons", mediaUrls: ["https://hupup.example/api/catalog-photo/catalog/text/aaa.jpg"] },
       { body: "Laser tag", mediaUrls: ["https://hupup.example/api/catalog-photo/catalog/text/bbb.png"] },
     ]);
