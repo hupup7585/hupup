@@ -63,14 +63,14 @@ export const SETTING_DEFAULTS = {
   /* Sola PhonePay (Abraham, Nov 14, 2026): card by phone through Sola's free PhonePay line. Off; Owner test first. */
   /** The Owner's sign-in username (Abraham, Nov 14, 2026); staff usernames live on their accounts */
   ownerUsername: "",
-  solaPhonePayOn: false,
+  solaPhonePayOn: true, // Abraham, Nov 18, 2026: passed the test; on for every caller
   // Card payment by phone limits (Abraham, Nov 17, 2026): tries per call, and declines per caller phone in 24 hours
   phonePayTriesPerCall: "3",
   phonePayDeclinesPerDay: "5",
   // After Sola shows a DECLINED charge: seconds to wait (Sola is saying the result) before hanging up the call to Sola,
   // so the caller never hears Sola cut off mid-sentence or its new-amount question (Abraham, Nov 18, 2026). Set from a test call.
   phonePayDeclineHangupSeconds: "6",
-  solaPhonePayOwnerOnly: true,
+  solaPhonePayOwnerOnly: false,
   solaPhonePayNumber: "+18334343354",
   solaPhonePayBackup: "+18444227356",
   /** Digits sent to PhonePay: w = half a second; {pin} {amount} {dollars} {order}. Matches Abraham's Nov 15 test call:

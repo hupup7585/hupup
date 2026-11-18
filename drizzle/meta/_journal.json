@@ -547,6 +547,13 @@
       "when": 1794973000000,
       "tag": "0077_customer_discounts",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1794976000000,
+      "tag": "0078_phonepay_everyone",
+      "breakpoints": true
     }
   ]
 }
