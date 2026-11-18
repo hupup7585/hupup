@@ -168,9 +168,15 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
                     <span className="block truncate">{label}</span>
                   )}
                   {holidays.length > 0 && (
-                    <span className={`mt-0.5 block text-[10px] font-semibold leading-tight sm:text-[11px] ${chosen ? "text-white" : "text-[#6B3FA0]"}`} data-holiday-en>
-                      {holidays.join(" · ")}
-                    </span>
+                    <>
+                      {/* Wider screens: the full names. A phone box is too narrow: a short mark, full names listed below the calendar */}
+                      <span className={`mt-0.5 hidden text-[11px] font-semibold leading-tight sm:block ${chosen ? "text-white" : "text-[#6B3FA0]"}`} data-holiday-en>
+                        {holidays.join(" · ")}
+                      </span>
+                      <span className={`mt-0.5 block text-[11px] font-bold leading-none sm:hidden ${chosen ? "text-white" : "text-[#6B3FA0]"}`} aria-hidden data-holiday-mark>
+                        {chanukahDay(holidays) ? `🕎${chanukahDay(holidays)}` : "●"}
+                      </span>
+                    </>
                   )}
                 </button>
               );
@@ -178,6 +184,30 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
           </div>
         </div>
       ))}
+      {/* Phone: this month's Yom Tov and holiday names in full */}
+      {(() => {
+        const list = days.filter((d) => d.date.slice(0, 7) === month).map((d) => ({ date: d.date, names: dayHolidayNames(d.date) })).filter((d) => d.names.length);
+        if (!list.length) return null;
+        return (
+          <ul className="mt-2 space-y-0.5 rounded-lg bg-bg p-2 text-xs sm:hidden" data-holiday-list>
+            {list.map((d) => (
+              <li key={d.date}>
+                <b>{new Date(`${d.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}:</b>{" "}
+                <span className="font-semibold text-[#6B3FA0]">{d.names.join(" · ")}</span>
+              </li>
+            ))}
+          </ul>
+        );
+      })()}
     </div>
   );
+}
+
+/** The day of Chanukah (1 to 8) from a day's names, or 0. */
+function chanukahDay(names: string[]): number {
+  for (const n of names) {
+    const m = /^Chanukah, day (\d)$/.exec(n);
+    if (m) return Number(m[1]);
+  }
+  return 0;
 }
