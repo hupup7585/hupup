@@ -15,3 +15,29 @@ describe("info@ email by text", () => {
     expect(t).toContain("Subject: (no subject)");
   });
 });
+
+/* Reply MORE 123 to get the full email by text (Abraham, Nov 18, 2026). */
+describe("MORE code for the full email", () => {
+  it("a cut email ends with its MORE code", () => {
+    const t = infoEmailText({ id: 123, fromName: null, fromAddress: "x@example.com", subject: "Long", textBody: "word ".repeat(1000) });
+    expect(t.length).toBeLessThanOrEqual(1600);
+    expect(t.endsWith("... Reply MORE 123 for the full email.")).toBe(true);
+    // a short email has no code
+    expect(infoEmailText({ id: 5, fromName: null, fromAddress: "x@example.com", subject: "Hi", textBody: "Short" })).not.toContain("MORE");
+  });
+  it("the full email in numbered parts, each one text, cut at a space; very long ones point to the Admin inbox", async () => {
+    const { fullEmailTexts, MORE_MAX_TEXTS } = await import("@/lib/inbox");
+    const parts = fullEmailTexts({ id: 123, fromName: "Sara", fromAddress: "s@example.com", subject: "Long", textBody: "word ".repeat(700) });
+    expect(parts.length).toBe(3);
+    parts.forEach((p, i) => {
+      expect(p.length).toBeLessThanOrEqual(1600);
+      expect(p.startsWith(`Email 123, part ${i + 1} of 3\n`)).toBe(true);
+    });
+    expect(parts[0]).toContain("From: Sara <s@example.com>\nSubject: Long");
+    expect(parts.map((p) => p.split("\n").slice(1).join("\n")).join(" ").match(/word/g)).toHaveLength(700);
+    const huge = fullEmailTexts({ id: 9, fromName: null, fromAddress: "s@example.com", subject: null, textBody: "word ".repeat(5000) });
+    expect(huge).toHaveLength(MORE_MAX_TEXTS);
+    expect(huge[MORE_MAX_TEXTS - 1].endsWith("... (the rest is in the Admin inbox)")).toBe(true);
+  });
+});
+

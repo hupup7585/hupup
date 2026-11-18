@@ -270,16 +270,71 @@ export { EMAIL_REPLY_TO };
 export const INFO_ALERT_PHONE = "+18457777585";
 const TEXT_MAX = 1600;
 
-/** The text for one info@ email: sender, subject and message, cut to one text with a pointer to the Admin inbox. */
-export function infoEmailText(e: { fromName: string | null; fromAddress: string; subject: string | null; textBody: string | null }): string {
+/** The text for one info@ email: sender, subject and message, cut to one text. A cut email ends with the code to get it all. */
+export function infoEmailText(e: { id?: number; fromName: string | null; fromAddress: string; subject: string | null; textBody: string | null }): string {
   const head = `New email to info@hupupattractions.com\nFrom: ${e.fromName ? `${e.fromName} <${e.fromAddress}>` : e.fromAddress}\nSubject: ${e.subject ?? "(no subject)"}\n\n`;
-  const body = (e.textBody ?? "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim() || "(no text)";
-  const more = "... (more in the Admin inbox)";
+  const body = cleanEmailBody(e.textBody);
+  // Abraham, Nov 18, 2026: reply a code to get the full email by text
+  const more = e.id ? `... Reply MORE ${e.id} for the full email.` : "... (more in the Admin inbox)";
   const room = TEXT_MAX - head.length;
   return head + (body.length <= room ? body : body.slice(0, Math.max(0, room - more.length)).trimEnd() + more);
 }
 
-async function textOwnerAboutEmail(e: { fromName: string | null; fromAddress: string; subject: string | null; textBody: string | null }) {
+const cleanEmailBody = (t: string | null) => (t ?? "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim() || "(no text)";
+
+/** The most texts one MORE reply sends; anything longer stays in the Admin inbox. */
+export const MORE_MAX_TEXTS = 6;
+
+/**
+ * The whole email as texts (Abraham, Nov 18, 2026): each starts "Email 123, part 1 of 3", cut at a space, up to
+ * MORE_MAX_TEXTS; a longer email ends with a pointer to the Admin inbox.
+ */
+export function fullEmailTexts(e: { id: number; fromName: string | null; fromAddress: string; subject: string | null; textBody: string | null }): string[] {
+  const all = `From: ${e.fromName ? `${e.fromName} <${e.fromAddress}>` : e.fromAddress}\nSubject: ${e.subject ?? "(no subject)"}\n\n${cleanEmailBody(e.textBody)}`;
+  const label = (i: number, n: number) => `Email ${e.id}, part ${i} of ${n}\n`;
+  const room = TEXT_MAX - label(MORE_MAX_TEXTS, MORE_MAX_TEXTS).length;
+  const parts: string[] = [];
+  let rest = all;
+  while (rest && parts.length < MORE_MAX_TEXTS) {
+    if (rest.length <= room) {
+      parts.push(rest);
+      rest = "";
+      break;
+    }
+    let cut = rest.lastIndexOf(" ", room);
+    if (cut < room / 2) cut = room;
+    parts.push(rest.slice(0, cut).trimEnd());
+    rest = rest.slice(cut).trimStart();
+  }
+  if (rest) {
+    const tail = "... (the rest is in the Admin inbox)";
+    const last = parts[parts.length - 1];
+    parts[parts.length - 1] = last.slice(0, room - tail.length).trimEnd() + tail;
+  }
+  return parts.map((p, i) => label(i + 1, parts.length) + p);
+}
+
+/**
+ * "MORE 123" texted from the Owner's cell (845-777-7585): the full email 123 comes back by text. "MORE" alone sends
+ * the newest email. Any other number is ignored here (handled as a normal incoming text).
+ */
+export async function handleMoreRequest(from: string, text: string): Promise<boolean> {
+  if (from !== INFO_ALERT_PHONE) return false;
+  const m = /^\s*more\s*(\d+)?\s*[.!]?\s*$/i.exec(text);
+  if (!m) return false;
+  const { sendSms } = await import("@/lib/notify");
+  const [e] = m[1]
+    ? await db.select().from(schema.inboxEmails).where(eq(schema.inboxEmails.id, Number(m[1]))).limit(1)
+    : await db.select().from(schema.inboxEmails).orderBy(desc(schema.inboxEmails.receivedAt)).limit(1);
+  if (!e) {
+    await sendSms(INFO_ALERT_PHONE, `No email ${m[1] ?? ""} was found in the Admin inbox.`.replace("  ", " "), { kind: "system", event: "info_email_alert" });
+    return true;
+  }
+  for (const part of fullEmailTexts(e)) await sendSms(INFO_ALERT_PHONE, part, { kind: "system", event: "info_email_alert" });
+  return true;
+}
+
+async function textOwnerAboutEmail(e: { id?: number; fromName: string | null; fromAddress: string; subject: string | null; textBody: string | null }) {
   const { sendSms } = await import("@/lib/notify");
   await sendSms(INFO_ALERT_PHONE, infoEmailText(e), { kind: "system", event: "info_email_alert" });
 }

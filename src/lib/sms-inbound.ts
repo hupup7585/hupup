@@ -132,6 +132,12 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
     await saveIncomingMedia({ messageId: row.id, from, customerId: customer?.id ?? null, media }).catch((e) => console.error("[incoming text file] failed:", (e as Error).message));
   }
 
+  // "MORE 123" from the Owner's cell: the full info@ email by text (Abraham, Nov 18, 2026)
+  const { handleMoreRequest } = await import("@/lib/inbox");
+  if (await handleMoreRequest(from, text).catch((e) => (console.error("[MORE] failed:", (e as Error).message), false))) {
+    return { messageId: row.id, keyword: null, reply: null, forwarded: false };
+  }
+
   const settings = await getSettings();
   let reply: string | null = null;
 
