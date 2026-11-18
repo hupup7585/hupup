@@ -1,4 +1,4 @@
-import { ADAR, ADAR2, AV, ELUL, IYAR, KISLEV, NISAN, SIVAN, TAMUZ, TEVES, TISHREI, daysInMonth, fromFixed, isLeapYear, newYear, toFixed, weekday, SHVAT } from "./hebrew-date";
+import { ADAR, ADAR2, AV, ELUL, IYAR, KISLEV, NISAN, SIVAN, TAMUZ, TEVES, TISHREI, fromFixed, isLeapYear, newYear, toFixed, weekday, SHVAT } from "./hebrew-date";
 
 /**
  * Diaspora holiday rules (two-day Yom Tov), written in-house.
@@ -19,6 +19,9 @@ export type Holiday = {
 };
 
 const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
+
+/** "א׳ דחנוכה" to "ח׳ דחנוכה": day 1 is 25 Kislev. */
+export const chanukahDayYi = (day: number) => `${"אבגדהוזח"[day - 1]}׳ דחנוכה`;
 
 /** Proposed English / Yiddish names for the days that matter to the business. */
 export const PROPOSED_NAMES = {
@@ -74,13 +77,13 @@ function yearHolidays(y: number): Placed[] {
 
   // Chanukah: first candle the evening of 24 Kislev, eight days from 25 Kislev
   const c1 = at(KISLEV, 24);
-  add(c1, { key: "Chanukah: 1 Candle", name: "Chanukah: 1 Candle", flags: ["MINOR_HOLIDAY", "EREV"], proposedEn: P.chanukah.en, proposedYi: P.chanukah.yi });
-  const chagHaBanot = daysInMonth(KISLEV, y) === 30 ? at(KISLEV, 30) : at(TEVES, 1);
+  // Staff screens show the day of Chanukah in Hebrew letters, "א׳ דחנוכה" (Abraham, Nov 18, 2026)
+  add(c1, { key: "Chanukah: 1 Candle", name: "Chanukah: 1 Candle", flags: ["MINOR_HOLIDAY", "EREV"], proposedEn: P.chanukah.en, proposedYi: "ערב חנוכה" });
+  // Chag HaBanot (a Sephardic custom) is left out (Abraham, Nov 18, 2026)
   for (let n = 2; n <= 8; n++) {
-    if (c1 + n - 1 === chagHaBanot) add(chagHaBanot, { key: "Chag HaBanot", name: "Chag HaBanot", flags: ["MINOR_HOLIDAY"] });
-    add(c1 + n - 1, { key: `Chanukah: ${n} Candles`, name: `Chanukah: ${n} Candles`, flags: ["MINOR_HOLIDAY"], proposedEn: P.chanukah.en, proposedYi: P.chanukah.yi });
+    add(c1 + n - 1, { key: `Chanukah: ${n} Candles`, name: `Chanukah: ${n} Candles`, flags: ["MINOR_HOLIDAY"], proposedEn: P.chanukah.en, proposedYi: chanukahDayYi(n - 1) });
   }
-  add(c1 + 8, { key: "Chanukah: 8th Day", name: "Chanukah: 8th Day", flags: ["MINOR_HOLIDAY"], proposedEn: P.chanukah.en, proposedYi: P.chanukah.yi });
+  add(c1 + 8, { key: "Chanukah: 8th Day", name: "Chanukah: 8th Day", flags: ["MINOR_HOLIDAY"], proposedEn: P.chanukah.en, proposedYi: chanukahDayYi(8) });
   add(at(TEVES, 10), { key: "Asara B'Tevet", name: "Asara B’Teves", flags: ["MINOR_FAST"] });
 
   // Shvat and Adar

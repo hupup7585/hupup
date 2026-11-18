@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { calendarFor, type CalendarDay } from "./actions";
 import { dualParts } from "@/lib/dual-date";
 import { DAY_YI, yiddishDay } from "@/lib/yiddish-day";
-import { dayHolidayNames } from "@/lib/hup-calendar/day-names";
+import { dayHolidayNames, dayHolidays } from "@/lib/hup-calendar/day-names";
 
 /**
  * New booking: month calendar (Abraham, Nov 17, 2026). Week rows Sunday to Saturday, one box per day with the English
@@ -165,7 +165,7 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
                       <span className="hidden sm:inline">Closes early</span>
                     </span>
                   ) : (
-                    <span className="block truncate">{label}</span>
+                    <span className="block break-words text-[10px] sm:truncate sm:text-xs">{label}</span>
                   )}
                   {holidays.length > 0 && (
                     <>
@@ -174,7 +174,7 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
                         {holidays.join(" · ")}
                       </span>
                       <span className={`mt-0.5 block text-[11px] font-bold leading-none sm:hidden ${chosen ? "text-white" : "text-[#6B3FA0]"}`} aria-hidden data-holiday-mark>
-                        {chanukahDay(holidays) ? `🕎${chanukahDay(holidays)}` : "●"}
+                        ●
                       </span>
                     </>
                   )}
@@ -186,14 +186,19 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
       ))}
       {/* Phone: this month's Yom Tov and holiday names in full */}
       {(() => {
-        const list = days.filter((d) => d.date.slice(0, 7) === month).map((d) => ({ date: d.date, names: dayHolidayNames(d.date) })).filter((d) => d.names.length);
+        const list = days.filter((d) => d.date.slice(0, 7) === month).map((d) => ({ date: d.date, names: dayHolidays(d.date) })).filter((d) => d.names.length);
         if (!list.length) return null;
         return (
           <ul className="mt-2 space-y-0.5 rounded-lg bg-bg p-2 text-xs sm:hidden" data-holiday-list>
             {list.map((d) => (
               <li key={d.date}>
                 <b>{new Date(`${d.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}:</b>{" "}
-                <span className="font-semibold text-[#6B3FA0]">{d.names.join(" · ")}</span>
+                {d.names.map((n, i) => (
+                  <span key={n.en} className="font-semibold text-[#6B3FA0]">
+                    {i > 0 && " · "}
+                    <bdi dir="rtl" lang="he">{n.he}</bdi> ({n.en})
+                  </span>
+                ))}
               </li>
             ))}
           </ul>
@@ -203,11 +208,3 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
   );
 }
 
-/** The day of Chanukah (1 to 8) from a day's names, or 0. */
-function chanukahDay(names: string[]): number {
-  for (const n of names) {
-    const m = /^Chanukah, day (\d)$/.exec(n);
-    if (m) return Number(m[1]);
-  }
-  return 0;
-}

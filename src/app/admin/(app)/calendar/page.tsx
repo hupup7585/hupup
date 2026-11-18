@@ -17,7 +17,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import DualDate, { HebrewDay } from "@/components/DualDate";
 import { dualDate } from "@/lib/dual-date";
 import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
-import { dayHolidayNames } from "@/lib/hup-calendar/day-names";
+import { dayHolidays } from "@/lib/hup-calendar/day-names";
 
 export default async function CalendarPage({
   searchParams,
@@ -82,9 +82,9 @@ export default async function CalendarPage({
                     {weekdayShort(d)} {dayOfMonth(d)}
                     <HebrewDay yi dayOnly iso={d} className="block text-[10px] font-normal" />
                     {/* Every Yom Tov / holiday name in English, with the day of Chanukah (Abraham, Nov 17, 2026) */}
-                    {dayHolidayNames(d).map((n) => (
-                      <span key={n} className={`block px-0.5 text-[10px] font-semibold leading-tight ${d === selected ? "text-white" : "text-[#6B3FA0]"}`} data-holiday-en>
-                        {n}
+                    {dayHolidays(d).map((n) => (
+                      <span key={n.en} className={`block px-0.5 text-[10px] font-semibold leading-tight ${d === selected ? "text-white" : "text-[#6B3FA0]"}`} data-holiday-en>
+                        <bdi dir="rtl" lang="he">{n.he}</bdi> ({n.en})
                       </span>
                     ))}
                   </Link>
@@ -164,7 +164,11 @@ export default async function CalendarPage({
             <div key={kind}>
               <h2 className="mb-3 font-bold">
                 {kind === "delivery" ? "Deliveries" : "Pickups"} · <DualDate yi iso={selected} />
-                {dayHolidayNames(selected).length > 0 && <span className="ml-1 text-sm font-semibold text-[#6B3FA0]">· {dayHolidayNames(selected).join(" · ")}</span>}
+                {dayHolidays(selected).map((n) => (
+                  <span key={n.en} className="ml-1 text-sm font-semibold text-[#6B3FA0]">
+                    · <bdi dir="rtl" lang="he">{n.he}</bdi> ({n.en})
+                  </span>
+                ))}
               </h2>
               {list.length === 0 && <p className="text-sm text-muted">None.</p>}
               {list.map((r) => (

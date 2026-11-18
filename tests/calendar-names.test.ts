@@ -5,7 +5,7 @@ import { dayHolidayNames } from "@/lib/hup-calendar/day-names";
 /* Calendar: search a date, and every Yom Tov name in English with the day of Chanukah (Abraham, Nov 17, 2026). */
 describe("holiday names on the calendars", () => {
   it("Chanukah 5787: first candle Friday night December 4, day 1 to day 8 = December 5 to 12, 2026", () => {
-    expect(dayHolidayNames("2026-12-04")).toEqual(["Erev Chanukah (first candle tonight)"]);
+    expect(dayHolidayNames("2026-12-04")).toEqual(["Erev Chanukah, first candle tonight"]);
     for (let n = 1; n <= 8; n++) expect(dayHolidayNames(`2026-12-${String(4 + n).padStart(2, "0")}`)).toContain(`Chanukah, day ${n}`);
     expect(dayHolidayNames("2026-12-13")).toEqual([]);
   });
@@ -32,8 +32,27 @@ describe("holiday names on the calendars", () => {
     expect(month).toContain("data-holiday-en");
     expect(month).toContain("data-date-search");
     const cal = readFileSync("src/app/admin/(app)/calendar/page.tsx", "utf8");
-    expect(cal).toContain("dayHolidayNames(d)");
+    expect(cal).toContain("dayHolidays(d)");
     expect(cal).toContain("data-holiday-en");
     expect(cal).toContain('name="day"');
   });
 });
+
+describe("Hebrew day of Chanukah and Chag HaBanot (Abraham, Nov 18, 2026)", () => {
+  it("staff screens: ערב חנוכה, then א׳ דחנוכה to ח׳ דחנוכה; calendars show Hebrew (English)", async () => {
+    const { dayInfo } = await import("@/lib/jewish-calendar");
+    expect(dayInfo("2026-12-04").namesYi).toEqual(["ערב חנוכה"]);
+    expect(dayInfo("2026-12-05").namesYi).toEqual(["שבת", "א׳ דחנוכה"]);
+    expect(dayInfo("2026-12-07").namesYi).toEqual(["ג׳ דחנוכה"]);
+    expect(dayInfo("2026-12-10").namesYi).toEqual(["ו׳ דחנוכה"]); // no Chag HaBanot (Sephardic custom)
+    expect(dayInfo("2026-12-12").namesYi).toEqual(["שבת", "ח׳ דחנוכה"]);
+    expect(dayHolidayNames("2026-12-10")).toEqual(["Chanukah, day 6"]);
+    const { dayHolidayLabels } = await import("@/lib/hup-calendar/day-names");
+    expect(dayHolidayLabels("2026-12-07")).toEqual(["ג׳ דחנוכה (Chanukah, day 3)"]);
+    expect(dayHolidayLabels("2026-12-04")).toEqual(["ערב חנוכה (Erev Chanukah, first candle tonight)"]);
+    expect(dayHolidayLabels("2026-09-12")).toEqual(["א׳ דראש השנה (Rosh Hashanah, day 1)"]);
+    expect(dayHolidayLabels("2027-04-28")).toEqual(["שביעי של פסח (Pesach, day 7)"]);
+    expect(dayHolidayLabels("2027-04-25")).toEqual(["חול המועד פסח (Chol Hamoed Pesach)"]);
+  });
+});
+
