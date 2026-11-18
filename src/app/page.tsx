@@ -150,11 +150,11 @@ export default async function Home() {
             {/* Text CATALOG and Email me the catalog (Abraham, Nov 18, 2026): preview first, live after his OK. On preview the
                 whole catalog part is one formal white card (Catalog Section Design, Nov 18, 2026); the wording is unchanged. */}
             {websiteCatalogFormShown() ? (
-              <div data-catalog-card className="mt-8 max-w-2xl rounded-lg border border-[#D9DEE5] bg-white p-5 text-hu-deep shadow-[0_1px_3px_rgba(18,61,115,0.08)] sm:p-6">
-                <span aria-hidden className="mb-4 block h-[3px] w-12 bg-hu-yellow" />
-                <p data-catalog-line className="text-base leading-relaxed text-hu-deep sm:text-lg">
+              <div data-catalog-card className="mt-8 max-w-3xl rounded-xl border border-[#BFE0FF] bg-[#EEF7FF] p-5 text-hu-deep shadow-[0_2px_8px_rgba(18,61,115,0.08)] sm:p-7">
+                <span aria-hidden className="mb-4 block h-1.5 w-20 rounded-full bg-hu-yellow" />
+                <p data-catalog-line className="text-[17px] leading-relaxed text-hu-deep sm:text-lg">
                   {CATALOG_LINE.before}
-                  <a href={`mailto:${CATALOG_LINE.email}?subject=Catalog`} className="font-bold text-hu-deep underline decoration-1 underline-offset-2 hover:decoration-2">
+                  <a href={`mailto:${CATALOG_LINE.email}?subject=Catalog`} className="font-bold text-hu-deep underline decoration-hu-yellow decoration-[3px] underline-offset-4 [text-decoration-skip-ink:none]">
                     {CATALOG_LINE.email}
                   </a>
                   {CATALOG_LINE.after}
