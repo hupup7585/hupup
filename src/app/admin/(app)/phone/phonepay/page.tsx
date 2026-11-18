@@ -70,8 +70,8 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
           <label className="block"><span className="label">Backup number (used if the first does not answer)</span><input name="backup" defaultValue={formatPhone(s.solaPhonePayBackup)} className="input" placeholder="(844) 422-7356" /></label>
           <label className="block" data-phonepay-limits><span className="label">Card tries per call</span><input name="triesPerCall" type="number" min={1} max={20} defaultValue={String(s.phonePayTriesPerCall)} className="input" /></label>
           <label className="block">
-            <span className="label">Declines per caller phone in 24 hours, then card by phone is blocked</span>
-            <input name="declinesPerDay" type="number" min={1} max={20} defaultValue={String(s.phonePayDeclinesPerDay)} className="input" />
+            <span className="label">Calls with card tries per caller number in 24 hours, then card by phone is blocked</span>
+            <input name="callsPerDay" type="number" min={1} max={20} defaultValue={String(s.phonePayCallsPerDay)} className="input" />
             <span className="mt-1 block text-xs text-muted">Blocked numbers are on <a className="underline" href="/admin/phone/card-blocks">Card blocks</a>, where staff can unlock them.</span>
           </label>
           <label className="block">

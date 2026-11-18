@@ -156,12 +156,12 @@ export async function startPayWatch(attemptId: number) {
 
 /* ---- Limits (Admin settings) ---- */
 
-export function phonePayLimits(s: Record<string, unknown>): { triesPerCall: number; declinesPerDay: number } {
+export function phonePayLimits(s: Record<string, unknown>): { triesPerCall: number; declinesPerDay: number; callsPerDay: number } {
   const n = (v: unknown, d: number) => {
     const x = Math.floor(Number(v));
     return Number.isFinite(x) && x >= 1 && x <= 20 ? x : d;
   };
-  return { triesPerCall: n(s.phonePayTriesPerCall, 3), declinesPerDay: n(s.phonePayDeclinesPerDay, 5) };
+  return { triesPerCall: n(s.phonePayTriesPerCall, 3), declinesPerDay: n(s.phonePayDeclinesPerDay, 5), callsPerDay: n(s.phonePayCallsPerDay, 5) };
 }
 
 const NOT_PAID = ["declined", "wrong_amount_voided", "wrong_amount_not_voided"];
@@ -173,6 +173,41 @@ export async function declinesLast24h(phone: string, now = new Date()): Promise<
     .from(schema.phonepayAttempts)
     .where(and(eq(schema.phonepayAttempts.callerPhone, phone), gte(schema.phonepayAttempts.startedAt, new Date(now.getTime() - 24 * 3600_000)), inArray(schema.phonepayAttempts.result, NOT_PAID)));
   return rows.length;
+}
+
+/**
+ * Calls with card tries from this phone in the last 24 hours, not counting this call (Abraham, Nov 18, 2026: up to 5
+ * calls with card tries per caller number in 24 hours, replacing 5 declines).
+ */
+export async function cardCallsLast24h(phone: string, exceptCallSid: string, now = new Date()): Promise<number> {
+  const rows = await db
+    .select({ callSid: schema.phonepayAttempts.callSid })
+    .from(schema.phonepayAttempts)
+    .where(and(eq(schema.phonepayAttempts.callerPhone, phone), gte(schema.phonepayAttempts.startedAt, new Date(now.getTime() - 24 * 3600_000))));
+  return new Set(rows.map((r) => r.callSid).filter((c) => c !== exceptCallSid)).size;
+}
+
+/** A new call's first card try: block the number once it already had the limit of calls with card tries. */
+export async function blockIfTooManyCalls(phone: string | null | undefined, callSid: string, limit: number, orderLabel: string, now = new Date()): Promise<boolean> {
+  if (!phone) return false;
+  if (await isPhonePayBlocked(phone)) return true;
+  const n = await cardCallsLast24h(phone, callSid, now);
+  if (n < limit) return false;
+  await db.insert(schema.phonepayBlocks).values({ phone, declines: n });
+  await emailBlocked(phone, `${n} calls with card payment tries in the last 24 hours (${orderLabel})`);
+  return true;
+}
+
+async function emailBlocked(phone: string, why: string) {
+  const to = config.adminEmail();
+  if (!to) return;
+  const { sendEmail } = await import("@/lib/notify");
+  const { formatPhone } = await import("@/lib/phone");
+  await sendEmail(
+    to,
+    `Hup Up Attractions: card payment by phone blocked for ${formatPhone(phone)}`,
+    `${formatPhone(phone)} had ${why}. Card payment by phone is now blocked for this number; the caller is offered the payment link instead.\n\nThe secretary can unlock it here: ${config.baseUrl()}/admin/phone/card-blocks`,
+  ).catch(() => null);
 }
 
 export async function isPhonePayBlocked(phone: string | null | undefined): Promise<boolean> {

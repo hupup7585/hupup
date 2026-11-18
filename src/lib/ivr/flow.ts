@@ -48,7 +48,7 @@ import {
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { stripePhonePayMode, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
-import { blockIfTooManyDeclines, isPhonePayBlocked, phonePayLimits, startPayWatch } from "@/lib/phonepay-watch";
+import { blockIfTooManyCalls, isPhonePayBlocked, phonePayLimits, startPayWatch } from "@/lib/phonepay-watch";
 import { PHONEPAY_NOT_REACHED, amountParts, buildSendDigits, checkPhonePayTry, customChargeMadeBy, endMainPayLeg, endPayLeg, matchCustomCharge, parseCustomAmount, payQueueName, phonePayDirectDial, phonePayOffered, startPayLegWithMusic, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
@@ -2571,8 +2571,13 @@ const handlers: Record<string, Handler> = {
     const n = earlier.length + 1;
     const limits = phonePayLimits(await getSettings());
     if (n > limits.triesPerCall) return back(vr, "phonepay-done", { o, a: 0 });
-    // A number blocked after too many declines gets the payment link instead (Abraham, Nov 17, 2026)
+    // A blocked number gets the payment link instead (Abraham, Nov 17-18, 2026). A new call's first card try checks the
+    // limit of calls with card tries per caller number in 24 hours (the line for a blocked number is not approved yet)
     if (await isPhonePayBlocked(callerPhoneOf(ctx))) return back(vr, "paylink", { o });
+    if (!earlier.length && (await blockIfTooManyCalls(callerPhoneOf(ctx), ctx.callSid, limits.callsPerDay, `order #${orderNumber(o)}`))) {
+      await track(ctx.callSid, "step", "Card payment by phone blocked for this number (too many calls with card tries in 24 hours)");
+      return back(vr, "paylink", { o });
+    }
     // The rentals stay held for the whole payment
     const waiting = group.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id);
     if (waiting.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES), updatedAt: new Date() }).where(inArray(orders.id, waiting));
@@ -2707,14 +2712,6 @@ const handlers: Record<string, Handler> = {
       // Box 147 (Abraham, Nov 18, 2026): not certain which charge is this caller's: "Sorry, we could not confirm your
       // payment. To try again, press 1."
       if (r.result === "unclear") return back(vr, "phonepay-retry", { o, n, u: 1 });
-      // Too many declines from this phone in 24 hours: card payment by phone is blocked (Abraham, Nov 17, 2026). The
-      // new line for this is not approved yet, so the caller hears the approved "payment failed" line.
-      if (await blockIfTooManyDeclines(callerPhoneOf(ctx), phonePayLimits(await getSettings()).declinesPerDay, `order #${orderNumber(o)}`)) {
-        await track(ctx.callSid, "step", "Card payment by phone blocked for this number (too many declines in 24 hours)", { attempt: a });
-        sp(vr, ctx, "phonepay_failed", undefined, { draftOk: true });
-        vr.hangup();
-        return vr;
-      }
     }
     return back(vr, "phonepay-retry", { o, n });
   },

@@ -31,11 +31,11 @@ export async function savePhonePayAction(form: FormData) {
   if (testNumbers.some((x) => !x)) return back("Each payment test number must be a 10-digit phone number, one per line.");
   // Limits (Abraham, Nov 17, 2026): tries per call, and declines per caller phone in 24 hours
   const tries = Math.floor(Number(form.get("triesPerCall")));
-  const declines = Math.floor(Number(form.get("declinesPerDay")));
-  if (!(tries >= 1 && tries <= 20) || !(declines >= 1 && declines <= 20)) return back("Tries per call and declines per day must each be a number from 1 to 20.");
+  const declines = Math.floor(Number(form.get("callsPerDay")));
+  if (!(tries >= 1 && tries <= 20) || !(declines >= 1 && declines <= 20)) return back("Tries per call and calls per day must each be a number from 1 to 20.");
   const before = await getSettings();
   await saveSetting("phonePayTriesPerCall", String(tries), owner.userId);
-  await saveSetting("phonePayDeclinesPerDay", String(declines), owner.userId);
+  await saveSetting("phonePayCallsPerDay", String(declines), owner.userId);
   const waitSec = Number(form.get("declineHangupSeconds"));
   if (Number.isFinite(waitSec) && waitSec >= 0 && waitSec <= 15) await saveSetting("phonePayDeclineHangupSeconds", String(waitSec), owner.userId);
   await saveSetting("solaPhonePayOn", on, owner.userId);

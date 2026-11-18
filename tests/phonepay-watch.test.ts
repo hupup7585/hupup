@@ -92,9 +92,9 @@ describe("watching Sola while the call to Sola is up", () => {
 
 describe("limits: tries per call and declines per phone in 24 hours (Admin settings)", () => {
   it("defaults 3 and 5; Admin values used when sensible", () => {
-    expect(phonePayLimits({})).toEqual({ triesPerCall: 3, declinesPerDay: 5 });
-    expect(phonePayLimits({ phonePayTriesPerCall: "4", phonePayDeclinesPerDay: "2" })).toEqual({ triesPerCall: 4, declinesPerDay: 2 });
-    expect(phonePayLimits({ phonePayTriesPerCall: "0", phonePayDeclinesPerDay: "x" })).toEqual({ triesPerCall: 3, declinesPerDay: 5 });
+    expect(phonePayLimits({})).toMatchObject({ triesPerCall: 3, callsPerDay: 5 });
+    expect(phonePayLimits({ phonePayTriesPerCall: "4", phonePayCallsPerDay: "2" })).toMatchObject({ triesPerCall: 4, callsPerDay: 2 });
+    expect(phonePayLimits({ phonePayTriesPerCall: "0", phonePayCallsPerDay: "x" })).toMatchObject({ triesPerCall: 3, callsPerDay: 5 });
   });
   it("the 5th decline in 24 hours blocks the number, emails the Owner; staff unlock it", async () => {
     const phone = "+18455550123";
@@ -114,7 +114,7 @@ describe("limits: tries per call and declines per phone in 24 hours (Admin setti
     expect(f).not.toContain("PHONEPAY_MAX_TRIES");
     expect(f).toContain("await startPayWatch(attempt.id);");
     expect(f).toContain('if (await isPhonePayBlocked(callerPhoneOf(ctx))) return back(vr, "paylink", { o });');
-    expect(f).toContain("blockIfTooManyDeclines(callerPhoneOf(ctx)");
+    expect(f).toContain("blockIfTooManyCalls(callerPhoneOf(ctx), ctx.callSid, limits.callsPerDay");
     expect(readFileSync("src/app/admin/(app)/phone/card-blocks/page.tsx", "utf8")).toContain("await requireAdmin()");
     expect(readFileSync("src/components/Sidebar.tsx", "utf8")).toContain('"/admin/phone/card-blocks", CreditCard, "Card blocks", OS]');
   });
@@ -140,6 +140,20 @@ describe("matching each charge to its own call (Abraham, Nov 18, 2026): never gu
     const f = readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(f).toContain('if (r.result === "unclear") return back(vr, "phonepay-retry", { o, n, u: 1 });');
     expect(f).toContain('unclear ? "phonepay_unclear"');
+  });
+});
+
+describe("calls with card tries per number in 24 hours (Abraham, Nov 18, 2026)", () => {
+  it("the 6th call with card tries is blocked (5 earlier calls); tries on the same call count once; the Owner is emailed", async () => {
+    const { blockIfTooManyCalls, cardCallsLast24h } = await import("@/lib/phonepay-watch");
+    const phone = "+18455550177";
+    for (let i = 0; i < 5; i++) for (let t = 0; t < 2; t++) await db.insert(schema.phonepayAttempts).values({ callSid: `CAcall${i}`, amountCents: 15000, callerPhone: phone });
+    expect(await cardCallsLast24h(phone, "CAnow")).toBe(5);
+    expect(await cardCallsLast24h(phone, "CAcall4")).toBe(4);
+    expect(await blockIfTooManyCalls(phone, "CAcall4", 5, "order #1042")).toBe(false);
+    h.emails.length = 0;
+    expect(await blockIfTooManyCalls(phone, "CAnow", 5, "order #1042")).toBe(true);
+    expect(h.emails[0]).toBe("Hup Up Attractions: card payment by phone blocked for (845) 555-0177");
   });
 });
 
