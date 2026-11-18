@@ -323,7 +323,7 @@ describe("key 7: our hours (Abraham, Nov 9, 2026)", () => {
     const { getSettings } = await import("@/lib/settings");
     const lines = hoursForSpeech(await getSettings());
     expect(lines).toContain("Monday - Thursday: 10:30 AM to 7:00 PM.".replace("Monday - Thursday", "Monday to Thursday"));
-    expect(lines).toContain("Motzei Shabbes: Winter: 2 hours after Shabbes to 11:00 PM.");
+    expect(lines).toContain("Mutze Shabbes: Winter: 2 hours after Shabbes to 11:00 PM."); // the phone spelling (Nov 18, 2026)
     expect(lines).toContain("Summer: 2 hours after Shabbes to 12:00 AM.");
     h.open = true;
     const xml = await call("hours", { CallSid: "CAhours1" });

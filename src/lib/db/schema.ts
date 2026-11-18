@@ -226,6 +226,10 @@ export type CallData = {
   day?: string;
   /** Key 1 booking: every held order on this call, one per rental day (paid together with one charge) */
   dayOrderIds?: number[];
+  /** Chanukah and Chol Hamoed (Nov 18, 2026): Fridays kept for Mutze Shabbes (picked up Sunday 9:00 AM), and a Friday
+   *  whose box 149 still needs its item price (the date came before the item) */
+  mutzeDays?: string[];
+  mutzeAnnounce?: string;
   /** Key 8 catalog: the number to text, the two parts of the email, and keys typed so far */
   catPhone?: string;
   /** Shared text steps (boxes 142 to 144): what the number is for, and the order whose payment link it gets */

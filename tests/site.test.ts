@@ -481,7 +481,12 @@ describe("website Hours (Abraham's simple list)", () => {
     const { WEBSITE_HOURS_NOTE } = await import("@/lib/site-copy");
     // Built from Admin Settings, the same hours the phone line uses (with the default settings: Abraham's lines)
     const { websiteHoursLines, hoursDefaults } = await import("@/lib/business-hours");
-    const WEBSITE_HOURS = websiteHoursLines(hoursDefaults());
+    // The live site keeps "Motzei Shabbes" until Abraham OKs the preview; preview shows "Mutze Shabbes" (Nov 18, 2026)
+    const WEBSITE_HOURS = websiteHoursLines(hoursDefaults(), false);
+    expect(websiteHoursLines(hoursDefaults(), true)[4].startsWith("Mutze Shabbes: Winter:")).toBe(true);
+    const { siteMutze } = await import("@/lib/business-hours");
+    expect(siteMutze({ VERCEL_ENV: "production" })).toBe(false);
+    expect(siteMutze({ VERCEL_ENV: "preview" })).toBe(true);
     expect(WEBSITE_HOURS).toEqual([
       "Sunday: 11:30 AM - 7:00 PM",
       "Monday - Thursday: 10:30 AM - 7:00 PM",
@@ -490,7 +495,7 @@ describe("website Hours (Abraham's simple list)", () => {
       "Motzei Shabbes: Winter: 2 hours after Shabbes - 11:00 PM\nSummer: 2 hours after Shabbes - 12:00 AM",
     ]);
     // A change in Admin Settings shows on the website too (the two can never differ)
-    expect(websiteHoursLines({ ...hoursDefaults(), hoursMonThu: "10:00-20:00", hoursSunday: "12:00-18:30", hoursFridayOpen: "9:30", hoursMotzeiOpen: "tzeis+90", hoursMotzeiCloseWinter: "23:30", hoursMotzeiCloseSummer: "01:00" })).toEqual([
+    expect(websiteHoursLines({ ...hoursDefaults(), hoursMonThu: "10:00-20:00", hoursSunday: "12:00-18:30", hoursFridayOpen: "9:30", hoursMotzeiOpen: "tzeis+90", hoursMotzeiCloseWinter: "23:30", hoursMotzeiCloseSummer: "01:00" }, false)).toEqual([
       "Sunday: 12:00 PM - 6:30 PM",
       "Monday - Thursday: 10:00 AM - 8:00 PM",
       "Friday: 9:30 AM - Chatzos",

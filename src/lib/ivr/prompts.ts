@@ -127,6 +127,13 @@ export const PROMPTS = {
   book_intro: { group: "Booking by item (key 1)", label: "Before the categories", text: "Let us find the right rental for your event." },
   book_category_list: { group: "Booking by item (key 1)", label: "Before the items in a category", text: "Here are our {category}.", vars: ["category"] },
   book_date_prompt: { group: "Booking by item (key 1)", label: "Ask for the event date (keypad)", text: "Please enter your event date: two digits for the month, then two digits for the day. For example, for March 5th, press 0, 3, 0, 5." },
+  // Chanukah and Chol Hamoed (Abraham, Nov 18, 2026). Box 150 and box 149 approved word for word.
+  fri_mutze_check: { group: "Booking by item (key 1)", label: "Box 150: Friday date check (Chanukah and Chol Hamoed only)", text: "You entered {date}. If that is correct, press pound. To keep your rental for Mutze Shabbes, press 1. To enter a different date, press 2.", vars: ["date"] },
+  fri_mutze_price: { group: "Booking by item (key 1)", label: "Box 149: Friday plus Mutze Shabbes", text: "For Friday and Mutze Shabbes, you will be charged for only one and a half days, a total of {price}. Your rental will be picked up on {date}, at 9:00 AM. Please make sure it is ready outside on time.", vars: ["price", "date"] },
+  fri_only: { group: "Booking by item (key 1)", label: "Friday only (after pound in box 150), NOT APPROVED yet", text: "Friday is one full rental day, for {price}. We will pick it up one hour after Shabbes.", vars: ["price"], pending: true },
+  // Laser tag and paddle boats only (Abraham, Nov 18, 2026): one more at a time while more are free. NOT APPROVED yet.
+  more_second: { group: "Booking by item (key 1)", label: "Laser tag and paddle boats: add a second one (NOT APPROVED yet)", text: "To add a second one, press 1. Otherwise, stay on the line.", pending: true },
+  more_one: { group: "Booking by item (key 1)", label: "Laser tag and paddle boats: add one more (NOT APPROVED yet)", text: "To add one more, press 1. Otherwise, stay on the line.", pending: true },
   book_date_entered: { group: "Booking by item (key 1)", label: "Confirm the date", text: "You entered {date}. If that is correct, press pound to continue. To enter a different date, press 1.", vars: ["date"] },
   // Abraham, Nov 15, 2026: unfinished cart from the last call (drafts for his OK)
   // Welcome back (Abraham, Nov 17, 2026), his wording: approved. {items} = "one Castle and one Laser tag set for Tuesday, December 22"

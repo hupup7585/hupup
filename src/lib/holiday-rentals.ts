@@ -55,3 +55,23 @@ export function holidayFridayPickup(eventDate: string, s: HolidaySettings): stri
 }
 
 export const pickupAfterShabbesMin = (s: HolidaySettings) => Math.max(0, Math.round(Number(s.holidayPickupAfterShabbesMin ?? 60)) || 60);
+
+/** Friday plus Mutze Shabbes is offered on this date (box 150): a Friday in a Chanukah or Chol Hamoed week with
+ *  per-day pricing on, before a plain Shabbes. */
+export function friMutzeOffered(iso: string, s: HolidaySettings): boolean {
+  return Boolean(holidayFridayPickup(iso, s));
+}
+
+/** Friday plus Mutze Shabbes: picked up Sunday (9:00 AM). */
+export const friMutzePickup = (friday: string) => addDays(friday, 2);
+
+/** Days charged for Friday plus Mutze Shabbes (Admin setting, 1 and a half to start). */
+export function friMutzeDays(s: HolidaySettings): number {
+  const x = Number(s.holidayFridayMutzeDays);
+  return x >= 1 && x <= 3 ? x : 1.5;
+}
+
+/** A booking that is Friday plus Mutze Shabbes: delivered on a holiday Friday and picked up that Sunday. */
+export function isFriMutze(o: { eventDate: string; pickupDate: string }, s: HolidaySettings): boolean {
+  return friMutzeOffered(o.eventDate, s) && o.pickupDate === friMutzePickup(o.eventDate);
+}

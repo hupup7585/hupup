@@ -153,7 +153,9 @@ describe("phone: extra laser gun packs after a maze or guns (approved Nov 17)", 
     const day = "2026-12-28";
     const add = await call("add", {}, `p=${guns6}&d=${day}&q=1`);
     expect(said(add)).toContain("This item is successfully added to your cart.");
-    expect(redirect(add)).toBe(`packs?d=${day}`);
+    // Nov 18, 2026: laser tag first offers one more of the same (preview only), then staying on the line goes to the packs
+    expect(redirect(add)).toBe(`more?p=${guns6}&d=${day}&n=1`);
+    expect(redirect(await call("more-done", {}, `p=${guns6}&d=${day}`))).toBe(`packs?d=${day}`);
     expect(said(await call("packs", {}, `d=${day}`))).toEqual(["Would you like to add more laser guns? To add a 6-pack of laser guns for $75, press 1. To add a 4-pack of laser guns for $50, press 2. To skip, press pound."]);
     const r = await call("packs-choice", { Digits: "1" }, `d=${day}`);
     expect(redirect(r)).toBe(`packs?d=${day}`);

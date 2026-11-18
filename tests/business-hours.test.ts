@@ -45,7 +45,7 @@ describe("office hours (Abraham 2026-11-06, Eastern time)", () => {
     expect(officeOpenNow(at("2026-11-09T14:30:00Z"), { ...S, hoursMonThu: "09:00-17:00" })).toBe(true); // 9:30 AM
   });
   it("website lines and Abraham's note", () => {
-    const l = hoursLines(S);
+    const l = hoursLines(S, false);
     expect(l[0]).toBe("Monday to Thursday: 10:30 AM to 7:00 PM");
     expect(l).toContain("Sunday: 11:30 AM to 7:00 PM");
     expect(l).toContain("Chol Hamoed: 10:30 AM to 10:30 PM");

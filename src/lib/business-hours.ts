@@ -138,8 +138,16 @@ export function defaultDayText(iso: string, s: HoursSettings = hoursDefaults()):
   return { open: true, hours: span24 ? span(span24) : `${ampm(start)} until chatzos` };
 }
 
+/**
+ * "Mutze Shabbes" on the website too (Abraham, Nov 18, 2026: same spelling as the phone). Preview first; the live site
+ * switches once Abraham OKs the preview screenshot (MUTZE_SITE_LIVE_APPROVED). The phone always says "Mutze Shabbes".
+ */
+export const MUTZE_SITE_LIVE_APPROVED = false;
+export const siteMutze = (env: Record<string, string | undefined> = process.env) => MUTZE_SITE_LIVE_APPROVED || env.VERCEL_ENV !== "production";
+const mutzeName = (mutze: boolean) => (mutze ? "Mutze Shabbes" : "Motzei Shabbes");
+
 /** Hours as lines for the website. */
-export function hoursLines(s: HoursSettings = hoursDefaults()): string[] {
+export function hoursLines(s: HoursSettings = hoursDefaults(), mutze: boolean = siteMutze()): string[] {
   const after = s.hoursMotzeiOpen.trim().match(/^tzeis(?:\+(\d+))?$/);
   const n = after ? Number(after[1] ?? 0) : 0;
   const motzeiOpen = after ? (n ? `from ${n % 60 === 0 ? `${n / 60} hour${n === 60 ? "" : "s"}` : `${n} minutes`} after Shabbes ends` : "when Shabbes ends") : `from ${ampm(s.hoursMotzeiOpen)}`;
@@ -147,7 +155,7 @@ export function hoursLines(s: HoursSettings = hoursDefaults()): string[] {
     `Monday to Thursday: ${span(s.hoursMonThu)}`,
     `Friday: from ${ampm(s.hoursFridayOpen)} until midday (chatzos)`,
     "Saturday (Shabbes): Closed",
-    `Saturday night (Motzei Shabbes): ${motzeiOpen} until ${ampm(s.hoursMotzeiCloseWinter)} in winter, ${ampm(s.hoursMotzeiCloseSummer)} in summer`,
+    `Saturday night (${mutzeName(mutze)}): ${motzeiOpen} until ${ampm(s.hoursMotzeiCloseWinter)} in winter, ${ampm(s.hoursMotzeiCloseSummer)} in summer`,
     `Sunday: ${span(s.hoursSunday)}`,
     `Chol Hamoed: ${span(s.hoursCholHamoed)}`,
     `Chanukah: ${span(s.hoursChanukah)}`,
@@ -159,7 +167,7 @@ export function hoursLines(s: HoursSettings = hoursDefaults()): string[] {
  * The website "Our Hours" card (Abraham): built from the same Admin Settings hours the phone line uses, so the two
  * can never differ. Same layout as Abraham's list: "Day: hours", with Motzei Shabbes on two lines.
  */
-export function websiteHoursLines(s: HoursSettings = hoursDefaults()): string[] {
+export function websiteHoursLines(s: HoursSettings = hoursDefaults(), mutze: boolean = siteMutze()): string[] {
   const dash = (r: string) => {
     const [a, b] = r.split("-");
     return `${ampm(a)} - ${ampm(b)}`;
@@ -176,7 +184,7 @@ export function websiteHoursLines(s: HoursSettings = hoursDefaults()): string[] 
     `Monday - Thursday: ${dash(s.hoursMonThu)}`,
     `Friday: ${ampm(s.hoursFridayOpen)} - Chatzos`,
     "Shabbes: Closed",
-    `Motzei Shabbes: Winter: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseWinter)}\nSummer: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseSummer)}`,
+    `${mutzeName(mutze)}: Winter: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseWinter)}\nSummer: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseSummer)}`,
   ];
 }
 

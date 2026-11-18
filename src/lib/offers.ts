@@ -18,7 +18,7 @@ const on = (v: unknown) => v === true || v === "true";
 
 /** The three switches, read inside the same database transaction as the booking (all off when never set). */
 export async function offerSwitches(exec: Exec): Promise<OfferSettings> {
-  const r = await exec.execute(sql`SELECT key, value FROM app_settings WHERE key IN ('offerLaserThirdPackOn', 'offerThuSunOn', 'offerFourthSundayOn', 'holidayNoPromos')`);
+  const r = await exec.execute(sql`SELECT key, value FROM app_settings WHERE key IN ('offerLaserThirdPackOn', 'offerThuSunOn', 'offerFourthSundayOn', 'holidayNoPromos', 'holidayPerDayChanukah', 'holidayPerDayCholHamoed', 'holidayFridayMutzeDays')`);
   const out: Record<string, unknown> = {};
   for (const x of r.rows as { key: string; value: unknown }[]) out[x.key] = x.value;
   return out as OfferSettings;
@@ -26,7 +26,7 @@ export async function offerSwitches(exec: Exec): Promise<OfferSettings> {
 
 /** Delivery on a free 4th Sunday (Abraham, Nov 17, 2026). */
 export const FOURTH_SUNDAY_DELIVERY_CENTS = { local: 2000, area: 3000, outside: 4000 } as const;
-export const OFFER_NOTES = { laser: "Laser tag: third pack 50% off", thuSun: "Thursday to Sunday: 1.5 times the rental", fourthSunday: "4th Sunday free" } as const;
+export const OFFER_NOTES = { laser: "Laser tag: third pack 50% off", thuSun: "Thursday to Sunday: 1.5 times the rental", fourthSunday: "4th Sunday free", friMutze: "Friday and Mutze Shabbes: one and a half days" } as const;
 
 const LASER = /laser/i;
 const RENTAL = /balloon|bounce|jump|inflatable|laser|paddle|boat/i;
@@ -94,7 +94,12 @@ export async function bestOffer(exec: Exec, orderId: number, s: OfferSettings): 
   if (!o) return { discountCents: 0, note: null };
   const ls = await lines(exec, orderId);
   // Chanukah and Chol Hamoed (Abraham, Nov 18, 2026): no promos, discounts or offers those weeks
-  const { noPromosOn } = await import("@/lib/holiday-rentals");
+  const { noPromosOn, isFriMutze, friMutzeDays } = await import("@/lib/holiday-rentals");
+  // Friday plus Mutze Shabbes (box 149, Abraham, Nov 18, 2026): one and a half days, its own price, never an offer
+  if (isFriMutze({ eventDate: o.event_date, pickupDate: o.pickup_date }, s as never)) {
+    const rentals = ls.filter(isRental).reduce((t, l) => t + l.qty * l.unitPriceCents, 0);
+    return { discountCents: -Math.round(rentals * (friMutzeDays(s as never) - 1)), note: OFFER_NOTES.friMutze };
+  }
   if (noPromosOn(o.event_date, s as never)) return { discountCents: 0, note: null };
   // Thursday to Sunday is its own price (1.5 times), never combined with the others (a customer discount included)
   if (on(s.offerThuSunOn) && isThuSun({ eventDate: o.event_date, pickupDate: o.pickup_date })) return { discountCents: thuSunAdjustment(ls), note: OFFER_NOTES.thuSun };

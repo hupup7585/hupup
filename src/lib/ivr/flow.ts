@@ -5,6 +5,7 @@ import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { addDays, spokenLongDate, todayISO } from "@/lib/dates";
 import { spokenMoney } from "@/lib/money";
+import { friMutzeDays, friMutzeOffered, friMutzePickup } from "@/lib/holiday-rentals";
 import { formatPhone, last4, spokenDigits, toE164 } from "@/lib/phone";
 import { logStamp, phonePromoMode, phonePromoOn, readBack, tenDigitNumber } from "@/lib/phone-promo";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
@@ -532,7 +533,7 @@ function halfPause(target: VR | Gather) {
 
 /** The website hours lines, as spoken: "11:30 AM - 7:00 PM" -> "11:30 AM to 7:00 PM", one sentence per line. */
 export function hoursForSpeech(s: Parameters<typeof websiteHoursLines>[0]): string[] {
-  return websiteHoursLines(s).flatMap((l) => l.split("\n")).map((l) => `${l.replace(/ - /g, " to ").trim()}.`);
+  return websiteHoursLines(s, true).flatMap((l) => l.split("\n")).map((l) => `${l.replace(/ - /g, " to ").trim()}.`);
 }
 
 /** The caller ID staff see on a forwarded call: the caller's own number, or the hotline when blocked or unknown. */
@@ -562,6 +563,48 @@ function dialTargets(vr: VR, list: ReturnType<typeof ringListFor>, k: RingKey, i
 async function chooseDay(ctx: Ctx, date: string) {
   const sameDay = (await callOrders(ctx)).find((o) => o.order.eventDate === date);
   await updateSession(ctx.callSid, { orderId: sameDay?.order.id ?? null, data: { day: date } }, ctx.session);
+}
+
+/** The pickup day kept for this rental day on the call: Sunday for Friday plus Mutze Shabbes, else the usual rule. */
+function keptPickup(ctx: Ctx, date: string): string | undefined {
+  return (ctx.session?.data.mutzeDays ?? []).includes(date) ? friMutzePickup(date) : undefined;
+}
+
+/** Box 149: "For Friday and Mutze Shabbes, you will be charged for only one and a half days, a total of {price}. ..." */
+async function sayFriMutzePrice(target: VR | Gather, ctx: Ctx, friday: string, priceCents: number) {
+  const days = friMutzeDays((await getSettings()) as never);
+  sp(target, ctx, "fri_mutze_price", { price: spokenMoney(Math.round(priceCents * days)), date: spokenDate(friMutzePickup(friday)) });
+}
+
+/**
+ * Box 150 keys (Abraham, Nov 18, 2026): pound = Friday only; 1 = keep the rental for Mutze Shabbes (picked up Sunday
+ * 9:00 AM), then box 149; 2 = a different date. The Friday only line is not approved yet (preview only).
+ */
+async function friMutzeChoice(ctx: Ctx, vr: VR, p: string | undefined, date: string, d: string | undefined) {
+  if (d === "2") return back(vr, "date", { p });
+  if (d !== "#" && d !== "1") {
+    if (d) sp(vr, ctx, "not_valid");
+    return back(vr, "date-ask", { p, d: date });
+  }
+  await chooseDay(ctx, date);
+  const kept = new Set(ctx.session?.data.mutzeDays ?? []);
+  const prod = p ? await getProduct(Number(p)) : null;
+  if (d === "1") {
+    kept.add(date);
+    await track(ctx.callSid, "step", `Friday ${spokenDate(date)} kept for Mutze Shabbes`, { date });
+    if (prod) await sayFriMutzePrice(vr, ctx, date, prod.priceCents);
+  } else {
+    kept.delete(date);
+    if (prod) spPreviewDraft(vr, ctx, "fri_only", { price: spokenMoney(prod.priceCents) });
+  }
+  await updateSession(ctx.callSid, { data: { mutzeDays: [...kept], mutzeAnnounce: d === "1" && !prod ? date : undefined } });
+  return p ? back(vr, "qty", { p, d: date }) : back(vr, "book");
+}
+
+/** Laser tag and paddle boats (Abraham, Nov 18, 2026): one more at a time while more are free. Never jumping balloons. */
+async function oneMoreItem(categoryId: number) {
+  const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, categoryId));
+  return Boolean(cat && /laser|paddle/i.test(cat.name) && cat.name !== LASER_ADDONS_CATEGORY && !ATTRACTIONS["1"].match.test(cat.name));
 }
 
 /** The voicemail box for a menu key: an extension's own box (named after it in Admin), otherwise Main. */
@@ -1537,6 +1580,12 @@ const handlers: Record<string, Handler> = {
   async "date-ask"(ctx, vr) {
     const p = ctx.query.get("p") ?? undefined;
     const date = ctx.query.get("d")!;
+    // Box 150 (Abraham, Nov 18, 2026): a Friday in Chanukah or Chol Hamoed can be kept for Mutze Shabbes
+    if (friMutzeOffered(date, (await getSettings()) as never)) {
+      const g = keypad(vr, url("date-confirm", { p, d: date, f: 1 }));
+      sp(g, ctx, "fri_mutze_check", { date: spokenDate(date) });
+      return bookNoInput(vr, ctx, "date-ask", { p, d: date });
+    }
     const g = keypad(vr, url("date-confirm", { p, d: date }));
     sp(g, ctx, "book_date_entered", { date: spokenDate(date) });
     return bookNoInput(vr, ctx, "date-ask", { p, d: date });
@@ -1546,6 +1595,7 @@ const handlers: Record<string, Handler> = {
     const p = ctx.query.get("p") ?? undefined;
     const date = ctx.query.get("d")!;
     const d = ctx.body.Digits;
+    if (ctx.query.get("f") === "1") return friMutzeChoice(ctx, vr, p, date, d);
     if (d === "1") return back(vr, "date", { p }); // a different date
     if (d !== "#") {
       if (d) sp(vr, ctx, "not_valid");
@@ -1680,16 +1730,14 @@ const handlers: Record<string, Handler> = {
     const p = await getProduct(Number(ctx.query.get("p")));
     const date = ctx.query.get("d")!;
     if (!p) return back(vr, "menu");
-    const free = await checkBookable(p.id, p.quantity, date);
+    const free = await checkBookable(p.id, p.quantity, date, db, keptPickup(ctx, date));
     if (free <= 0) {
       await track(ctx.callSid, "unavailable", `${p.name} not available on ${spokenDate(date)}`, { item: p.name, productId: p.id, date });
       return back(vr, "booked", { p: p.id, d: date });
     }
-    if (free === 1) return back(vr, "add", { p: p.id, d: date, q: 1 });
-    const max = Math.min(free, 9);
-    const g = keypad(vr, url("add", { p: p.id, d: date }));
-    sp(g, ctx, "qty_prompt", { count: free, date: spokenDate(date), max });
-    return noInput(vr, ctx, "qty", { p: p.id, d: date });
+    // Abraham, Nov 18, 2026: no "How many would you like?" question and never how many are in stock; every item goes
+    // into the cart as one (laser tag and paddle boats then offer one more at a time)
+    return back(vr, "add", { p: p.id, d: date, q: 1 });
   },
 
   async "soldout-choice"(ctx, vr) {
@@ -1728,6 +1776,7 @@ const handlers: Record<string, Handler> = {
       channel: "PHONE",
       holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES),
       callSid: ctx.callSid,
+      pickupDate: keptPickup(ctx, date),
     });
     if (!r.ok) {
       if (r.reason === "unavailable") {
@@ -1741,7 +1790,20 @@ const handlers: Record<string, Handler> = {
     }
     await track(ctx.callSid, "item_added", `Added ${itemPhrase(q, p.name)} for ${spokenDate(date)}`, { item: p.name, productId: p.id, qty: q, date, orderId: r.orderId });
     const ids = [...new Set([...(session.data?.dayOrderIds ?? []), r.orderId])];
-    await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted", data: { day: date, dayOrderIds: ids } }, session);
+    const announce = session.data?.mutzeAnnounce === date;
+    await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted", data: { day: date, dayOrderIds: ids, ...(announce ? { mutzeAnnounce: undefined } : {}) } }, session);
+    // Box 149 when the date came before the item: now the item's price is known
+    if (announce) await sayFriMutzePrice(vr, ctx, date, p.priceCents);
+    // Laser tag and paddle boats: "To add a second one, press 1. Otherwise, stay on the line." while more are free
+    // (not approved yet: preview only)
+    const n = Number(ctx.query.get("n") || 1);
+    if ((await oneMoreItem(p.categoryId)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "more_second"))) {
+      const left = await checkBookable(p.id, p.quantity, date, db, keptPickup(ctx, date));
+      if (left > 0) {
+        sp(vr, ctx, "item_added");
+        return back(vr, "more", { p: p.id, d: date, n });
+      }
+    }
     // Abraham (Nov 17, 2026): the item added line every time; ocean balls after a jumping balloon; then keep shopping
     if (await isBounceHouse(p.categoryId)) {
       sp(vr, ctx, "item_added");
@@ -1757,6 +1819,34 @@ const handlers: Record<string, Handler> = {
     sp(g, ctx, "keep_shopping");
     sp(g, ctx, "another_day");
     return noInput(vr, ctx, "cart");
+  },
+
+  /** Laser tag and paddle boats: one more of the same item (key 1); staying on the line goes on as usual. */
+  async more(ctx, vr) {
+    const p = ctx.query.get("p")!;
+    const date = ctx.query.get("d")!;
+    const n = Number(ctx.query.get("n") || 1);
+    const g = keypad(vr, url("more-choice", { p, d: date, n }));
+    spPreviewDraft(g, ctx, n <= 1 ? "more_second" : "more_one");
+    return back(vr, "more-done", { p, d: date });
+  },
+
+  async "more-choice"(ctx, vr) {
+    const p = ctx.query.get("p")!;
+    const date = ctx.query.get("d")!;
+    const n = Number(ctx.query.get("n") || 1);
+    if (ctx.body.Digits === "1") return back(vr, "add", { p, d: date, q: 1, n: n + 1 });
+    if (ctx.body.Digits === "*") return starToCategory(vr, Number(p));
+    if (ctx.body.Digits) sp(vr, ctx, "not_valid");
+    return back(vr, "more-done", { p, d: date });
+  },
+
+  /** After the one-more offer: laser guns go on to the extra gun packs; everything else to keep shopping or the cart. */
+  async "more-done"(ctx, vr) {
+    const prod = await getProduct(Number(ctx.query.get("p")));
+    const date = ctx.query.get("d")!;
+    if (prod && (await isLaserBase(prod.categoryId)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) return back(vr, "packs", { d: date });
+    return back(vr, "added-menu");
   },
 
   /** "To keep shopping, press 1. To go to your shopping cart, press 0." */
