@@ -131,9 +131,6 @@ export const PROMPTS = {
   // Abraham, Nov 15, 2026: unfinished cart from the last call (drafts for his OK)
   // Welcome back (Abraham, Nov 17, 2026), his wording: approved. {items} = "one Castle and one Laser tag set for Tuesday, December 22"
   resume_offer: { group: "Booking by item (key 1)", label: "Welcome back: last call's unfinished cart", text: "Welcome back! On your last call you had in your cart {items}. To check if they are still available, press 1. To start a new order, press 2.", vars: ["items"] },
-  resume_free_one: { group: "Booking by item (key 1)", label: "Unfinished cart, one item: free", text: "Good news! The {item} is free for {date}, as you chose. To add it to your cart and check out, press 1. To start a new order, press 2.", vars: ["item", "date"] },
-  resume_free: { group: "Booking by item (key 1)", label: "Unfinished cart, several items: one is free", text: "The {item} is free for {date}, as you chose. To add it to your cart, press {key}.", vars: ["item", "date", "key"] },
-  resume_taken: { group: "Booking by item (key 1)", label: "Unfinished cart, several items: one is taken", text: "The {item} is no longer available for {date}. For the nearest options, press {key}.", vars: ["item", "date", "key"] },
   // Item taken, whole phone system (Abraham, Nov 17, 2026), his wording
   item_taken: { group: "Booking by item (key 1)", label: "Item not available (whole phone system)", text: "The {item} is no longer available for {date}. For the nearest options, press {key}.", vars: ["item", "date", "key"] },
   taken_options: { group: "Booking by item (key 1)", label: "Item not available: same date or nearest date", text: "For the same date, press 1. For the nearest date this item is free, press 2." },

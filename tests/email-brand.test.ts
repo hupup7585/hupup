@@ -5,7 +5,8 @@ import { EMAIL_SIGNATURE_DEFAULT, brandedEmail } from "@/lib/email-brand";
 /* Logo and signature on every email (Abraham, Nov 17, 2026). */
 describe("branded email", () => {
   it("the signature, word for word", () => {
-    expect(EMAIL_SIGNATURE_DEFAULT).toBe("Thanks!\n\nHup Up Attractions\nJumping Balloons | Laser Tag | Inflatable Mazes | Paddle Boats\n(845) 777-7585 | info@hupupattractions.com | hupupattractions.com\nKiryas Joel and Orange County, NY.");
+    // Abraham, Nov 18, 2026: no "Thanks!", the tagline under the name
+    expect(EMAIL_SIGNATURE_DEFAULT).toBe("Hup Up Attractions\nBringing Something Special To Every Occasion\nJumping Balloons | Laser Tag | Inflatable Mazes | Paddle Boats\n(845) 777-7585 | info@hupupattractions.com | hupupattractions.com\nKiryas Joel and Orange County, NY.");
   });
   it("HTML: hosted logo (no attachment) with Hup Up Attractions Inc., the message, then the signature with links; plain text too", () => {
     const e = brandedEmail("Hi Sara,\n\nThank you for your booking! <b>no tags</b>", { baseUrl: "https://hupupattractions.com" });
@@ -15,7 +16,9 @@ describe("branded email", () => {
     expect(e.html).toContain('href="tel:+18457777585"');
     expect(e.html).toContain('href="mailto:info@hupupattractions.com"');
     expect(e.html).toContain('href="https://hupupattractions.com"');
-    expect(e.html.indexOf("Thank you for your booking")).toBeLessThan(e.html.indexOf("Thanks!"));
+    expect(e.html.indexOf("Thank you for your booking")).toBeLessThan(e.html.indexOf("Bringing Something Special To Every Occasion"));
+    expect(e.html).toContain('font-style:italic;line-height:1.5;color:#777777;margin-bottom:4px">Bringing Something Special To Every Occasion</div>');
+    expect(e.html).not.toContain("Thanks!");
     expect(e.text).toBe(`Hi Sara,\n\nThank you for your booking! <b>no tags</b>\n\n--\n${EMAIL_SIGNATURE_DEFAULT}\n`);
   });
   it("the Owner's own signature from Admin replaces the default", () => {
@@ -105,17 +108,14 @@ describe("catalog email wording edited by the Owner (Abraham, Nov 17, 2026)", ()
   });
 });
 
-describe("catalog emails: no Thanks! in the signature (Abraham, Nov 17, 2026)", () => {
-  it("the signature starts with Hup Up Attractions on catalog emails; every other email keeps Thanks!", async () => {
-    const { brandedEmail, withoutThanks, EMAIL_SIGNATURE_DEFAULT } = await import("@/lib/email-brand");
-    expect(withoutThanks(EMAIL_SIGNATURE_DEFAULT).startsWith("Hup Up Attractions\n")).toBe(true);
-    const cat = brandedEmail("Body", { baseUrl: "https://x", noThanks: true });
-    expect(cat.text).toBe(`Body\n\n--\n${withoutThanks(EMAIL_SIGNATURE_DEFAULT)}\n`);
-    expect(cat.html).not.toContain("Thanks!");
-    const other = brandedEmail("Body", { baseUrl: "https://x" });
-    expect(other.text).toContain("--\nThanks!");
-    expect(readFileSync("src/lib/catalog-send.ts", "utf8")).toContain("[pdf], { noThanks: true })");
-    expect(readFileSync("src/lib/inbox.ts", "utf8")).toContain("noThanks: Boolean(input.attachCatalog)");
+describe("no Thanks! on any email (Abraham, Nov 18, 2026; catalog emails first on Nov 17)", () => {
+  it("the signature starts with Hup Up Attractions everywhere, also when an older saved signature began with Thanks!", async () => {
+    const { brandedEmail, EMAIL_SIGNATURE_DEFAULT } = await import("@/lib/email-brand");
+    expect(EMAIL_SIGNATURE_DEFAULT.startsWith("Hup Up Attractions\n")).toBe(true);
+    for (const e of [brandedEmail("Body", { baseUrl: "https://x", noThanks: true }), brandedEmail("Body", { baseUrl: "https://x" })]) {
+      expect(e.text).toBe(`Body\n\n--\n${EMAIL_SIGNATURE_DEFAULT}\n`);
+      expect(e.html).not.toContain("Thanks!");
+    }
+    expect(brandedEmail("Body", { baseUrl: "https://x", signature: "Thanks!\n\nHup Up Attractions" }).text).toBe("Body\n\n--\nHup Up Attractions\n");
   });
 });
-

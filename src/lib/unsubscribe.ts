@@ -4,7 +4,7 @@ import { verifyUnsubscribe } from "@/lib/signed-link";
 /** Wording on the unsubscribe page: a draft until Abraham approves it (promo emails are not sent yet). */
 export const UNSUBSCRIBE_TEXT = {
   title: "Unsubscribe from promotional emails",
-  ask: "Press the button to stop promotional emails from Hup Up Attractions. Booking and payment emails still come to you.",
+  ask: "Press the button to stop promotional emails from Hup Up Attractions. Booking and payment emails will still reach you.", // approved Nov 18, 2026
   button: "Unsubscribe",
   done: "You are unsubscribed from Hup Up Attractions promotional emails.",
   bad: "This link is not valid.",

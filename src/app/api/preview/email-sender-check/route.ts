@@ -14,10 +14,13 @@ export async function GET(req: Request) {
   if (!process.env.RESEND_API_KEY) return Response.json({ verified: false, reason: "RESEND_API_KEY is not set on preview" });
   const owner = new URL(req.url).searchParams.get("send") === "owner";
   // Abraham, Nov 17, 2026: the test email with the logo and signature, to hupupattractions@gmail.com
+  // ?to=: one more test address the Owner names (Abraham, Nov 18, 2026: an Outlook inbox for the spam test)
+  const toParam = (new URL(req.url).searchParams.get("to") ?? "").trim();
+  const testTo = /^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]{2,}$/.test(toParam) ? toParam : "hupupattractions@gmail.com";
   if (new URL(req.url).searchParams.get("send") === "branded") {
     const { sendEmail } = await import("@/lib/notify");
     const r = await sendEmail(
-      "hupupattractions@gmail.com",
+      testTo,
       "Hup Up Attractions: test email with the logo and signature",
       "Hi Abraham,\n\nThis is the test email you asked for, with the logo at the top and the signature at the bottom. Email apps that block pictures show the same text without the logo.\n\nWe will see you soon.",
     );

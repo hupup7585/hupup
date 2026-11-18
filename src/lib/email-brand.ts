@@ -4,10 +4,11 @@
  * signature. A plain-text version goes along for email apps that block images. The Owner edits the signature in
  * Admin › Settings.
  */
+// Abraham, Nov 18, 2026: on every email, "Thanks!" removed everywhere; the tagline under the name (small gray italics)
+export const EMAIL_TAGLINE = "Bringing Something Special To Every Occasion";
 export const EMAIL_SIGNATURE_DEFAULT = [
-  "Thanks!",
-  "",
   "Hup Up Attractions",
+  EMAIL_TAGLINE,
   "Jumping Balloons | Laser Tag | Inflatable Mazes | Paddle Boats",
   "(845) 777-7585 | info@hupupattractions.com | hupupattractions.com",
   "Kiryas Joel and Orange County, NY.",
@@ -47,6 +48,7 @@ function signatureHtml(signature: string): string {
       const line = raw.trim();
       if (!line) return `<div style="height:12px;line-height:12px;font-size:12px">&nbsp;</div>`;
       if (/^hup up attractions( inc\.?)?$/i.test(line)) return `<div style="font-size:16px;font-weight:700;color:${NAVY};line-height:1.6">${esc(line)}</div>`;
+      if (line === EMAIL_TAGLINE) return `<div style="font-size:13px;font-style:italic;line-height:1.5;color:#777777;margin-bottom:4px">${esc(line)}</div>`;
       const linked = linkify(line);
       // Contact line: a little room around each "|" (Abraham's mock-up)
       if (linked !== esc(line)) return `<div style="font-size:14px;line-height:1.7;color:${NAVY}">${linked.replace(/ \| /g, " &nbsp;|&nbsp; ")}</div>`;
@@ -63,10 +65,8 @@ export function withoutThanks(signature: string): string {
 
 /** The email in both forms: HTML (logo header, message, signature) and plain text (message, then the signature). */
 export function brandedEmail(text: string, opts: { baseUrl: string; signature?: string | null; promo?: { address: string; unsubscribeUrl: string }; noThanks?: boolean }): { html: string; text: string } {
-  let signature = (opts.signature ?? "").trim() || EMAIL_SIGNATURE_DEFAULT;
-  // Catalog emails (Abraham, Nov 17, 2026): the message already ends "Thank you for choosing Hup Up Attractions!", so
-  // the signature starts directly with "Hup Up Attractions"
-  if (opts.noThanks) signature = withoutThanks(signature);
+  // No "Thanks!" on any email (Abraham, Nov 18, 2026), also when an older saved signature still starts with it
+  const signature = withoutThanks((opts.signature ?? "").trim() || EMAIL_SIGNATURE_DEFAULT);
   const body = text.trim();
   // Promotional emails only (the law requires them): the mailing address and an Unsubscribe link at the very bottom
   const promoText = opts.promo ? `\n${opts.promo.address.trim() ? `${opts.promo.address.trim()}\n` : ""}Unsubscribe: ${opts.promo.unsubscribeUrl}\n` : "";

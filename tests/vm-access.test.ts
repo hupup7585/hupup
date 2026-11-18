@@ -221,4 +221,16 @@ describe("on the live line (Abraham, Nov 16, 2026): calling out stays off until 
       process.env.VERCEL_ENV = prev;
     }
   });
+  it("custom charge (Abraham, Nov 18, 2026): no key after 'You entered ... Press 1 to confirm' reads the same amount again, never a new amount; 2 starts over", async () => {
+    h.session.data = { vmaOk: 1 };
+    const x = await call("vma-charge-amount", { Digits: "12550" });
+    expect(said(x)[0]).toBe("You entered 125 dollars and 50 cents. Press 1 to confirm, or 2 to enter it again.");
+    expect(redirect(x)).toBe("vma-charge-confirm?c=12550&t=0&r=1");
+    const again = await call("vma-charge-confirm", {}, "c=12550&t=0&r=1");
+    expect(said(again)).toEqual(["You entered 125 dollars and 50 cents. Press 1 to confirm, or 2 to enter it again."]);
+    expect(redirect(again)).toBe("vma-charge-confirm?c=12550&t=0&r=2");
+    expect(redirect(await call("vma-charge-confirm", {}, "c=12550&t=0&r=3"))).toBe("vma-box");
+    expect(redirect(await call("vma-charge-confirm", { Digits: "2" }, "c=12550&t=0"))).toBe("vma-charge?t=0");
+  });
 });
+

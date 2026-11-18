@@ -92,7 +92,7 @@ describe("payment link rule", () => {
     expect(LINK_TEXT.gone(1)).toBe("This item is no longer available for your date."); // Abraham's wording
     expect(LINK_TEXT.gone(2)).toBe("These items are no longer available for your date.");
     expect(LINK_TEXT.goneCall).toBe("Please call us at (845) 777-7585, to choose another option or another day.");
-    expect(LINK_TEXT.cardNote).toBe('After you tap "Agree and pay," you will have 10 minutes to enter your card details on our secure payment page. If your session expires, your rented items will be returned to stock, and you can check again availability to rebook at any time.');
+    expect(LINK_TEXT.cardNote).toBe("This link holds your booking for 10 minutes. Once you open it, you get 4 more minutes to pay.");
     expect(LINK_TEXT.heldAgain(10)).toBe("It's still available! We are holding it for you for the next 10 minutes."); // Abraham's exact wording
   });
 });

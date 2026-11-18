@@ -122,8 +122,8 @@ export const LINK_TEXT = {
   goneCall: "Please call us at (845) 777-7585, to choose another option or another day.",
   // The nearest options (same as the phone line offers). Abraham's wording, Nov 13, 2026 (approved)
   optionsIntro: "Here are the nearest options that are free for you right now. Tap one to hold it for you:",
-  // Abraham's wording, Nov 13, 2026 (approved)
-  cardNote: `After you tap "Agree and pay," you will have ${CARD_MINUTES} minutes to enter your card details on our secure payment page. If your session expires, your rented items will be returned to stock, and you can check again availability to rebook at any time.`,
+  // Abraham's wording, Nov 18, 2026 (approved; replaces the Nov 13 note): 10 minutes from the text, plus 4 once opened
+  cardNote: "This link holds your booking for 10 minutes. Once you open it, you get 4 more minutes to pay.",
 };
 
 
