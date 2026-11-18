@@ -8,9 +8,14 @@ vi.mock("@/lib/db", async () => {
   const m = await createMemoryDb();
   return { db: m.db, schema: m.schema };
 });
-vi.mock("@/lib/catalog-send", async (orig) => ({ ...(await orig<typeof import("@/lib/catalog-send")>()), sendCatalogEmail: async (to: string) => (h.sent.push(to), { sent: true }), recordCatalogRequest: async () => null }));
+vi.mock("@/lib/catalog-send", async (orig) => ({
+  ...(await orig<typeof import("@/lib/catalog-send")>()),
+  sendCatalogEmail: async (to: string) => (h.sent.push(to), { sent: true }),
+  recordCatalogRequest: async () => null,
+  replyToCatalogText: async (to: string, o: { optedOut: boolean }) => (o.optedOut ? { replied: false, reason: "opted_out" } : (h.sent.push(`text:${to}`), { replied: true, reason: null })),
+}));
 
-import { requestCatalogAction } from "@/app/catalog-actions";
+import { requestCatalogAction, textCatalogAction } from "@/app/catalog-actions";
 import { CATALOG_EMAIL_BUTTON, CATALOG_TEXT_LINE, websiteCatalogFormShown } from "@/lib/catalog-request";
 
 const form = (o: Record<string, string>) => {
@@ -36,4 +41,10 @@ describe("website catalog request", () => {
     await requestCatalogAction(null, form({ email: "bot@example.com", website: "x" }));
     expect(h.sent).toHaveLength(1);
   });
+  it("Text me the catalog: a 10-digit number gets the catalog texts (key 8's rules); bad numbers refused", async () => {
+    expect((await textCatalogAction(null, form({ phone: "12345" }))).ok).toBe(false);
+    expect((await textCatalogAction(null, form({ phone: "(845) 555-0144" }))).ok).toBe(true);
+    expect(h.sent).toContain("text:+18455550144");
+  });
 });
+

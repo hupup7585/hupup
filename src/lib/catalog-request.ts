@@ -8,7 +8,7 @@ import { db, schema } from "@/lib/db";
 export const WEBSITE_CATALOG_FORM_LIVE_APPROVED = false;
 export const websiteCatalogFormShown = (env: Record<string, string | undefined> = process.env) => WEBSITE_CATALOG_FORM_LIVE_APPROVED || env.VERCEL_ENV !== "production";
 
-export { CATALOG_TEXT_LINE, CATALOG_EMAIL_BUTTON, CATALOG_FORM_DRAFT } from "@/lib/catalog-request-copy";
+export { CATALOG_TEXT_LINE, CATALOG_EMAIL_BUTTON, CATALOG_TEXT_BUTTON, CATALOG_FORM_DRAFT } from "@/lib/catalog-request-copy";
 
 export const validCatalogEmail = (e: string) => /^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]{2,}$/.test(e.trim()) && e.trim().length <= 200;
 
