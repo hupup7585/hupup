@@ -1222,7 +1222,7 @@ const handlers: Record<string, Handler> = {
   },
 
   "catalog-done"(ctx, vr) {
-    if (ctx.body.Digits === "*") return back(vr, "menu");
+    if (ctx.body.Digits === "*") return back(vr, "catalog"); // star: one menu back (Abraham, Nov 18, 2026)
     vr.hangup();
     return vr;
   },
@@ -1578,7 +1578,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "booked-near", { p, d: date });
     if (d === "0") return back(vr, "cart");
-    if (d === "*") return back(vr, "menu");
+    if (d === "*") return starToCategory(vr, p); // star: one menu back, the item's list
     sp(vr, ctx, "not_valid");
     return back(vr, "booked", { p, d: date });
   },
@@ -1599,7 +1599,7 @@ const handlers: Record<string, Handler> = {
     if (d === "1") return back(vr, "booked-same", { p, d: date }); // the closest items free on the same date
     if (d === "2") return back(vr, "altdates", { p, d: date }); // the nearest dates this item is free
     if (d === "0") return back(vr, "cart");
-    if (d === "*") return back(vr, "menu");
+    if (d === "*") return back(vr, "booked", { p, d: date }); // star: one menu back
     sp(vr, ctx, "not_valid");
     return back(vr, "booked-near", { p, d: date });
   },
@@ -1628,7 +1628,7 @@ const handlers: Record<string, Handler> = {
     if (d === "1" && b) return back(vr, "qty", { p: b, d: date });
     if (d === "2" && sm) return back(vr, "qty", { p: sm, d: date });
     if (d === "3") return back(vr, "altdates", { p, d: date });
-    if (d === "*") return back(vr, "menu");
+    if (d === "*") return back(vr, "booked-near", { p, d: date }); // star: one menu back (same date or nearest date)
     if (d === "0") return back(vr, "cart");
     sp(vr, ctx, "not_valid");
     return back(vr, "booked-same", { p, d: date });
@@ -1673,7 +1673,7 @@ const handlers: Record<string, Handler> = {
       return back(vr, "qty", { p, d: pick });
     }
     if (d === "3") return back(vr, "date", { p });
-    if (d === "*") return back(vr, "menu");
+    if (d === "*") return back(vr, "booked-near", { p, d: date }); // star: one menu back
     if (d === "0") return back(vr, "cart");
     sp(vr, ctx, "not_valid");
     return back(vr, "altdates", { p, d: date });
@@ -1700,7 +1700,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     const order = await currentOrder(ctx);
     if (d === "9" || d === "0") return back(vr, "cart");
-    if (d === "*") return back(vr, "menu");
+    if (d === "*") return p ? back(vr, "category", { c: p.categoryId }) : back(vr, "book"); // star: one menu back
     if (d === "1" && !order && p) return back(vr, "date", { p: p.id });
     if ((d === "1" && order) || d === "2") return back(vr, p ? "category" : "menu", p ? { c: p.categoryId } : {});
     if (d && p) {
@@ -1772,7 +1772,7 @@ const handlers: Record<string, Handler> = {
 
   async "after-add"(ctx, vr) {
     const d = ctx.body.Digits;
-    if (d === "*") return back(vr, "menu"); // star always returns to the main menu (as in the other sub-menus)
+    if (d === "*") return back(vr, "book"); // star: one menu back, the bookings menu (Abraham, Nov 18, 2026)
     if (d === "1") return back(vr, "book"); // keep shopping (the same day; the date was already chosen)
     if (d === "2") return back(vr, "date"); // "To book another day, press 2." (Abraham, Nov 17, 2026)
     if (d === "0") return back(vr, "cart");
@@ -3483,6 +3483,12 @@ const FIELDS: Record<
 };
 
 /* ------------------------------------------------------------------ dispatcher */
+
+/** Star from an item's step: one menu back, the item's list (its category), else the bookings menu. */
+async function starToCategory(vr: VR, productId: number) {
+  const p = productId ? await getProduct(productId) : null;
+  return p ? back(vr, "category", { c: p.categoryId }) : back(vr, "book");
+}
 
 /** The caller's phone (E.164), for the card payment limits. */
 function callerPhoneOf(ctx: { session?: { fromNumber?: string | null } | null; from: string | null }): string | null {

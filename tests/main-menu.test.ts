@@ -210,7 +210,7 @@ describe("star returns to the main menu from the sub-menus", () => {
   it("rental list, cart and after-adding an item", async () => {
     expect(redirect(await call("book-choice", { Digits: "*" }))).toBe("menu");
     expect(redirect(await call("cart-choice", { Digits: "*" }))).toBe("menu");
-    expect(redirect(await call("after-add", { Digits: "*" }))).toBe("menu");
+    expect(redirect(await call("after-add", { Digits: "*" }))).toBe("book"); // one menu back (Abraham, Nov 18, 2026)
   });
 });
 
@@ -224,7 +224,8 @@ describe("# is never a menu key; star returns (Abraham, spec item 5)", () => {
       expect(redirect(xml), action).not.toBe("menu?first=1");
     }
     // star: main menu from the booking menus
-    for (const action of ["book-choice", "after-add", "cart-choice"]) expect(redirect(await call(action, { Digits: "*" })), action).toBe("menu");
+    for (const action of ["book-choice", "cart-choice"]) expect(redirect(await call(action, { Digits: "*" })), action).toBe("menu");
+    expect(redirect(await call("after-add", { Digits: "*" }))).toBe("book"); // star: one menu back (Abraham, Nov 18, 2026)
   });
 });
 
