@@ -53,7 +53,7 @@ import { PHONEPAY_NOT_REACHED, amountParts, buildSendDigits, checkPhonePayTry, c
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
-const PHONEPAY_PROMPTS = ["phonepay_intro", "phonepay_back", "phonepay_paid", "phonepay_retry", "phonepay_retry_last", "phonepay_failed"] as const;
+const PHONEPAY_PROMPTS = ["phonepay_intro", "phonepay_back", "phonepay_paid", "phonepay_retry", "phonepay_retry_last", "phonepay_failed", "phonepay_unclear"] as const;
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { liveVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
@@ -2684,12 +2684,15 @@ const handlers: Record<string, Handler> = {
       await endMainPayLeg(attempt?.payLegSid);
       sp(vr, ctx, "phonepay_back", undefined, { draftOk: true });
       const r = await checkPhonePayTry(o, a, attempt?.amountCents ?? group.due);
-      await track(ctx.callSid, "step", `Card payment try ${attempt?.tryNumber ?? n}: ${r.result === "paid" ? "paid" : r.result === "wrong_amount" ? "wrong amount, voided" : r.result === "check_failed" ? "Sola could not be checked" : "no charge"}`, { attempt: a });
+      await track(ctx.callSid, "step", `Card payment try ${attempt?.tryNumber ?? n}: ${r.result === "paid" ? "paid" : r.result === "wrong_amount" ? "wrong amount, voided" : r.result === "check_failed" ? "Sola could not be checked" : r.result === "unclear" ? "could not be confirmed (box 147)" : "no charge"}`, { attempt: a });
       if (r.result === "paid") {
         sp(vr, ctx, "phonepay_paid", undefined, { draftOk: true });
         return back(vr, "promo-consent");
       }
       n = attempt?.tryNumber ?? n;
+      // Box 147 (Abraham, Nov 18, 2026): not certain which charge is this caller's: "Sorry, we could not confirm your
+      // payment. To try again, press 1."
+      if (r.result === "unclear") return back(vr, "phonepay-retry", { o, n, u: 1 });
       // Too many declines from this phone in 24 hours: card payment by phone is blocked (Abraham, Nov 17, 2026). The
       // new line for this is not approved yet, so the caller hears the approved "payment failed" line.
       if (await blockIfTooManyDeclines(callerPhoneOf(ctx), phonePayLimits(await getSettings()).declinesPerDay, `order #${orderNumber(o)}`)) {
@@ -2728,9 +2731,10 @@ const handlers: Record<string, Handler> = {
       vr.hangup();
       return vr;
     }
-    const g = keypad(vr, url("phonepay-retry-answer", { o, n, r: asked }), { numDigits: 1, timeout: 8 });
-    sp(g, ctx, n === max - 1 ? "phonepay_retry_last" : "phonepay_retry", undefined, { draftOk: true });
-    return back(vr, "phonepay-retry", { o, n, r: asked + 1 });
+    const unclear = ctx.query.get("u") === "1";
+    const g = keypad(vr, url("phonepay-retry-answer", { o, n, r: asked, ...(unclear ? { u: 1 } : {}) }), { numDigits: 1, timeout: 8 });
+    sp(g, ctx, unclear ? "phonepay_unclear" : n === max - 1 ? "phonepay_retry_last" : "phonepay_retry", undefined, { draftOk: true });
+    return back(vr, "phonepay-retry", { o, n, r: asked + 1, ...(unclear ? { u: 1 } : {}) });
   },
 
   "phonepay-retry-answer"(ctx, vr) {
@@ -2738,7 +2742,7 @@ const handlers: Record<string, Handler> = {
     const n = Number(ctx.query.get("n") || 1);
     if (ctx.body.Digits === "1") return back(vr, "phonepay-go", { o });
     if (ctx.body.Digits) sp(vr, ctx, "not_valid"); // wrong key: the shared line, then the same question again
-    return back(vr, "phonepay-retry", { o, n, r: Number(ctx.query.get("r") || 0) + 1 });
+    return back(vr, "phonepay-retry", { o, n, r: Number(ctx.query.get("r") || 0) + 1, ...(ctx.query.get("u") === "1" ? { u: 1 } : {}) });
   },
 
   /** Hand the call to the payment subaccount (Twilio Pay + Stripe). The main account never collects card digits. */

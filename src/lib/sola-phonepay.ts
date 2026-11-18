@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { and, desc, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
@@ -280,16 +280,26 @@ export async function matchPhonePay(orderId: number, attemptId: number, dueCents
  * - none for the order total but some for other amounts: "wrong_amount" (they are voided)
  * - none: "none"
  */
-export function classifyTry(txns: SolaTxn[], want: { amountCents: number; from: Date; to: Date }, used: Set<string>): { kind: "paid" | "ambiguous" | "wrong_amount" | "none"; paid: SolaTxn | null; matches: SolaTxn[]; wrong: SolaTxn[] } {
-  const mine = txns
-    .filter((t) => t.approved && t.refNum && !used.has(t.refNum) && isPhonePayInvoice(t.invoice) && t.at >= new Date(want.from.getTime() - 60_000) && t.at <= new Date(want.to.getTime() + 120_000))
+export function classifyTry(
+  txns: SolaTxn[],
+  want: { amountCents: number; from: Date; to: Date; phone?: string | null },
+  used: Set<string>,
+): { kind: "paid" | "ambiguous" | "wrong_amount" | "none"; paid: SolaTxn | null; matches: SolaTxn[]; wrong: SolaTxn[]; byPhone: boolean } {
+  // This try's own window: from when its call to Sola started to now (Abraham, Nov 18, 2026: never guess)
+  let mine = txns
+    .filter((t) => t.approved && t.refNum && !used.has(t.refNum) && isPhonePayInvoice(t.invoice) && t.at >= new Date(want.from.getTime() - 30_000) && t.at <= new Date(want.to.getTime() + 60_000))
     .sort((a, b) => a.at.getTime() - b.at.getTime());
+  // The customer's phone in Sola's Invoice field: only charges with that phone are this caller's
+  const phone = (want.phone ?? "").replace(/\D/g, "").slice(-10);
+  const byPhone = Boolean(phone) && mine.some((t) => (t.invoice ?? "").replace(/\D/g, "").slice(-10) === phone);
+  if (byPhone) mine = mine.filter((t) => (t.invoice ?? "").replace(/\D/g, "").slice(-10) === phone);
+  const withPhone = <T extends object>(r: T) => ({ ...r, byPhone });
   // Safer check (Abraham, Nov 15, 2026): the exact order total, and only one such charge
   const matches = mine.filter((t) => t.amountCents === want.amountCents);
   const wrong = mine.filter((t) => t.amountCents !== want.amountCents);
-  if (matches.length > 1) return { kind: "ambiguous", paid: null, matches, wrong };
-  if (matches.length === 1) return { kind: "paid", paid: matches[0], matches, wrong };
-  return { kind: wrong.length ? "wrong_amount" : "none", paid: null, matches, wrong };
+  if (matches.length > 1) return withPhone({ kind: "ambiguous" as const, paid: null, matches, wrong });
+  if (matches.length === 1) return withPhone({ kind: "paid" as const, paid: matches[0], matches, wrong });
+  return withPhone({ kind: wrong.length ? ("wrong_amount" as const) : ("none" as const), paid: null, matches, wrong });
 }
 
 /**
@@ -343,7 +353,7 @@ export async function endPayLeg(paySid: string | null | undefined, fetcher: type
  * paid = the order is marked paid; wrong_amount = voided, not paid, the Owner is emailed; none = no charge.
  * Every try is logged on the order (time and result; never card numbers).
  */
-export async function checkPhonePayTry(orderId: number, attemptId: number, dueCents: number, deps: { fetcher?: typeof fetch; waitMs?: number; now?: () => Date } = {}): Promise<{ result: "paid" | "wrong_amount" | "none" | "check_failed" }> {
+export async function checkPhonePayTry(orderId: number, attemptId: number, dueCents: number, deps: { fetcher?: typeof fetch; waitMs?: number; now?: () => Date } = {}): Promise<{ result: "paid" | "wrong_amount" | "none" | "check_failed" | "unclear" }> {
   const { getPaymentGroup, markGroupPaid, orderNumber } = await import("@/lib/orders");
   const { recordPaymentResult, paymentReceivedNotices } = await import("@/lib/payment-result");
   const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
@@ -357,7 +367,7 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
     if (i) await new Promise((r) => setTimeout(r, deps.waitMs ?? 3000));
     try {
       const now = deps.now?.() ?? new Date();
-      c = classifyTry(await solaApprovedBetween(new Date(from.getTime() - 60_000), now, deps.fetcher), { amountCents: dueCents, from, to: now }, await usedSolaRefs());
+      c = classifyTry(await solaApprovedBetween(new Date(from.getTime() - 60_000), now, deps.fetcher), { amountCents: dueCents, from, to: now, phone: attempt?.callerPhone }, await usedSolaRefs());
       failed = "";
     } catch (e) {
       failed = (e as Error).message.slice(0, 200);
@@ -369,13 +379,24 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
     const { sendEmail } = await import("@/lib/notify");
     await sendEmail(to, subject, `${text}\n\n${config.baseUrl()}/admin/orders/${orderId}`).catch(() => null);
   };
-  // Two or more charges of exactly the order total (two callers paying at once, or a charge keyed in the Sola portal):
-  // nothing is marked paid and nothing is voided; the Owner checks Sola (Abraham, Nov 15, 2026)
-  if (c?.kind === "ambiguous") {
-    await db.update(schema.phonepayAttempts).set({ result: "check_failed" }).where(eq(schema.phonepayAttempts.id, attemptId));
-    await finishAttempt(attemptId, { matched: false, note: "More than one charge fits: check Sola" });
-    await mail(`Hup Up Attractions: please check a phone payment, order #${num}`, `A caller paid order #${num} ($${(dueCents / 100).toFixed(2)}) by phone, but Sola shows more than one charge of that amount with no invoice number at the same time:\n\n${c.matches.map((t) => `$${(t.amountCents / 100).toFixed(2)}, Sola reference ${t.refNum}, card ending ${t.last4 ?? "?"}`).join("\n")}\n\nNothing was marked paid and nothing was voided. Please check Sola, then mark the right order paid.`);
-    return { result: "check_failed" };
+  // Never guess (Abraham, Nov 18, 2026). Not certain = two or more charges of exactly this amount in this try's window,
+  // or one charge without this caller's phone in Invoice while another caller was paying the same amount at the same
+  // time. Then nothing is marked paid or voided now; the caller hears box 147 and may try again. The unclear charges
+  // are kept on this try and voided automatically once a later try goes through (paid branch below).
+  const sameTime = await db
+    .select({ callSid: schema.phonepayAttempts.callSid, amountCents: schema.phonepayAttempts.amountCents, startedAt: schema.phonepayAttempts.startedAt, endedAt: schema.phonepayAttempts.endedAt })
+    .from(schema.phonepayAttempts)
+    .where(gte(schema.phonepayAttempts.startedAt, new Date(from.getTime() - 15 * 60_000)));
+  const rivalSameAmount = sameTime.some((o) => o.callSid !== attempt?.callSid && o.amountCents === dueCents && (!o.endedAt || o.endedAt >= from));
+  if (c && (c.kind === "ambiguous" || (c.kind === "paid" && !c.byPhone && rivalSameAmount))) {
+    const refs = c.matches.map((t) => t.refNum);
+    await db.update(schema.phonepayAttempts).set({ result: "unclear", unclearRefs: refs.join(",") }).where(eq(schema.phonepayAttempts.id, attemptId));
+    await finishAttempt(attemptId, { matched: false, note: "Payment could not be confirmed (box 147)" });
+    await mail(
+      `Hup Up Attractions: phone payment could not be confirmed, order #${num}`,
+      `A caller paying order #${num} ($${(dueCents / 100).toFixed(2)}) by phone could not be matched for certain:\n\n${c.matches.map((t) => `$${(t.amountCents / 100).toFixed(2)}, Sola reference ${t.refNum}, card ending ${t.last4 ?? "?"}, Invoice ${t.invoice ?? "(empty)"}`).join("\n")}\n\nNothing was marked paid. The caller was asked to try again; if a later try goes through, these charges are voided automatically and you get another email.`,
+    );
+    return { result: "unclear" };
   }
   // A charge that is not the order total: voided automatically only when it is the only one in this try's window and
   // no other caller was paying by phone at the same time; otherwise left alone and the Owner is emailed
@@ -401,6 +422,7 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
     await markGroupPaid(orderId, c.paid.amountCents, PHONEPAY_METHOD, c.paid.refNum);
     await recordPaymentResult(ids, "approved", c.paid.last4, c.paid.refNum, c.paid.at);
     await paymentReceivedNotices(orderId, c.paid.amountCents);
+    await voidUnclearAfterPaid(orderId, c.paid.refNum, mail, deps.fetcher);
     return { result: "paid" };
   }
   const result = failed && !c ? "check_failed" : c?.kind === "wrong_amount" ? "wrong_amount" : "none";
@@ -410,6 +432,33 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
   await recordPaymentResult(ids, "declined", null, null);
   if (result === "check_failed") await mail(`Hup Up Attractions: phone payment could not be checked, order #${num}`, `A caller tried to pay order #${num} ($${(dueCents / 100).toFixed(2)}) by phone, but Sola could not be checked (${failed}). Please look in Sola before the caller tries again.`);
   return { result };
+}
+
+/**
+ * Box 147 follow-up (Abraham, Nov 18, 2026): once a later try for the same order goes through, the charges set aside
+ * as unclear on earlier tries are voided if Sola shows them approved, and the Owner gets an email.
+ */
+export async function voidUnclearAfterPaid(orderId: number, paidRef: string, mail: (subject: string, text: string) => Promise<void>, fetcher?: typeof fetch) {
+  const earlier = (await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.orderId, orderId))).filter((a) => a.unclearRefs);
+  const refs = [...new Set(earlier.flatMap((a) => (a.unclearRefs ?? "").split(",").filter(Boolean)))].filter((r) => r !== paidRef);
+  if (!refs.length) return;
+  const since = new Date(Math.min(...earlier.map((a) => a.startedAt.getTime())) - 60_000);
+  const approved = await solaApprovedBetween(since, new Date(Date.now() + 60_000), fetcher).catch(() => null);
+  const used = await usedSolaRefs();
+  const lines: string[] = [];
+  for (const ref of refs) {
+    const t = approved?.find((x) => x.refNum === ref);
+    if (!approved) lines.push(`Sola reference ${ref}: Sola could not be checked, please look at it in Sola`);
+    else if (!t) lines.push(`Sola reference ${ref}: not approved in Sola, nothing to void`);
+    else if (used.has(ref)) lines.push(`Sola reference ${ref}: it is another order's payment, so it was left alone`);
+    else {
+      const v = await solaVoid(ref, fetcher);
+      lines.push(`$${(t.amountCents / 100).toFixed(2)} (Sola reference ${ref}): ${v.ok ? "voided" : `could NOT be voided (${v.error}), please void or refund it in Sola`}`);
+    }
+  }
+  await db.update(schema.phonepayAttempts).set({ unclearRefs: null }).where(inArray(schema.phonepayAttempts.id, earlier.map((a) => a.id)));
+  const { orderNumber } = await import("@/lib/orders");
+  await mail(`Hup Up Attractions: unclear phone payment checked, order #${orderNumber(orderId)}`, `Order #${orderNumber(orderId)} is now paid (Sola reference ${paidRef}). The earlier charges that could not be confirmed:\n\n${lines.join("\n")}`);
 }
 
 /** How many card tries this call has made for this order (the next try number is this plus 1). */

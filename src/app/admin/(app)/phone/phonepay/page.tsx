@@ -74,6 +74,11 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
             <input name="declinesPerDay" type="number" min={1} max={20} defaultValue={String(s.phonePayDeclinesPerDay)} className="input" />
             <span className="mt-1 block text-xs text-muted">Blocked numbers are on <a className="underline" href="/admin/phone/card-blocks">Card blocks</a>, where staff can unlock them.</span>
           </label>
+          <label className="block">
+            <span className="label">After a decline, seconds before hanging up Sola</span>
+            <input name="declineHangupSeconds" type="number" min={0} max={15} step={0.5} defaultValue={String(s.phonePayDeclineHangupSeconds)} className="input" />
+            <span className="mt-1 block text-xs text-muted">Sola is saying the result during this time; we hang up right after, before Sola asks for a new amount. Set it from a test call.</span>
+          </label>
         </div>
         <label className="block">
           <span className="label">Digits sent to PhonePay</span>

@@ -9,19 +9,33 @@ export { isPhonePayInvoice };
  * Sola PhonePay safety (Abraham, Nov 17, 2026, Missing Items 4 and 5, Sola ticket 2026972).
  * Sola's line: PIN# > amount in cents# > 1 > card number# > expiration MMYY# > ZIP# > approved or declined, the ref
  * number, then Sola hangs up. After a decline Sola asks for a NEW amount, so a caller could key any amount. To stop that:
- *  - while the call to Sola is up, Sola's reporting API is checked every 2 seconds for a charge of this try's amount
+ *  - while the call to Sola is up, Sola's reporting API is checked every second for a charge of this try's amount
  *    (approved or declined) made since the try started; as soon as one shows, the call to Sola is hung up (Twilio REST),
  *    so the caller is back on our line before Sola's amount question;
  *  - the call to Sola is also hung up after 4 minutes with no charge;
  *  - a charge that is not the order total is voided and the Owner emailed (checkPhonePayTry, as before);
  *  - tries per call and declines per caller phone in 24 hours are Admin settings (3 and 5 to start); past the second,
  *    card payment by phone is blocked for that number, the Owner is emailed, and staff can unlock it in Admin.
- * Free: Vercel functions of under a minute each (one 45-second chunk starts the next), Sola's reporting API, Twilio REST.
+ * Free: Vercel functions of under a minute each (one 40-second chunk starts the next), Sola's reporting API, Twilio REST.
  */
 
-export const WATCH_INTERVAL_MS = 2000;
+// Every second (Abraham, Nov 18, 2026)
+export const WATCH_INTERVAL_MS = 1000;
+export const WATCH_CHUNK_BUDGET_MS = 40_000;
+
+/**
+ * Hang-up timing (Abraham, Nov 18, 2026: never cut Sola off mid-sentence). The charge shows in Sola's report about when
+ * Sola starts saying the result, so hanging up at once would cut it off.
+ *  - Approved: Sola reads the reference number and hangs up by itself; we never hang up (the 4-minute cap aside).
+ *  - Declined: we wait while Sola says the result (Admin setting, seconds, measured on a test call), then hang up
+ *    before Sola asks for a new amount.
+ */
+export function declineHangupMs(s: Record<string, unknown>): number {
+  const x = Number(s.phonePayDeclineHangupSeconds);
+  return Number.isFinite(x) && x >= 0 && x <= 15 ? Math.round(x * 1000) : 6000;
+}
 export const WATCH_LIMIT_MS = 4 * 60_000;
-export const WATCH_CHUNK_MS = 45_000;
+
 
 /** Approved and declined Sola charges between two times (two read-only reports; SOLA_API_KEY stays on the server). */
 export async function solaTransactionsBetween(from: Date, to: Date, fetcher: typeof fetch = fetch, env: Record<string, string | undefined> = process.env): Promise<SolaTxn[]> {
@@ -82,11 +96,17 @@ export async function endSolaLeg(a: { callSid: string; payLegSid: string | null 
 }
 
 /** Watch one try for up to `budgetMs`; true = still watching (start the next chunk). */
-export async function runWatchChunk(attemptId: number, budgetMs = WATCH_CHUNK_MS, deps: { fetcher?: typeof fetch; now?: () => Date; sleep?: (ms: number) => Promise<void>; end?: typeof endSolaLeg } = {}): Promise<boolean> {
+export async function runWatchChunk(
+  attemptId: number,
+  budgetMs = WATCH_CHUNK_BUDGET_MS,
+  deps: { fetcher?: typeof fetch; now?: () => Date; sleep?: (ms: number) => Promise<void>; end?: typeof endSolaLeg; declineWaitMs?: number } = {},
+): Promise<boolean> {
   const now = deps.now ?? (() => new Date());
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const until = now().getTime() + budgetMs;
   const { usedSolaRefs } = await import("@/lib/sola-phonepay");
+  const { getSettings } = await import("@/lib/settings");
+  const declineWait = deps.declineWaitMs ?? declineHangupMs(await getSettings());
   while (now().getTime() < until) {
     const [a] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
     if (!a) return false;
@@ -100,6 +120,10 @@ export async function runWatchChunk(attemptId: number, budgetMs = WATCH_CHUNK_MS
     if (d === "stop") return false;
     if (d !== "wait") {
       await db.update(schema.phonepayAttempts).set({ solaSeen: d }).where(eq(schema.phonepayAttempts.id, attemptId));
+      // Approved: Sola reads the reference number and hangs up by itself, so it is never cut off
+      if (d === "approved") return false;
+      // Declined: let Sola finish saying the result, then hang up before it asks for a new amount
+      if (d === "declined") await sleep(declineWait);
       await (deps.end ?? endSolaLeg)({ callSid: a.callSid, payLegSid: a.payLegSid });
       return false;
     }

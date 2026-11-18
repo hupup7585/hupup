@@ -65,6 +65,9 @@ export const SETTING_DEFAULTS = {
   // Card payment by phone limits (Abraham, Nov 17, 2026): tries per call, and declines per caller phone in 24 hours
   phonePayTriesPerCall: "3",
   phonePayDeclinesPerDay: "5",
+  // After Sola shows a DECLINED charge: seconds to wait (Sola is saying the result) before hanging up the call to Sola,
+  // so the caller never hears Sola cut off mid-sentence or its new-amount question (Abraham, Nov 18, 2026). Set from a test call.
+  phonePayDeclineHangupSeconds: "6",
   solaPhonePayOwnerOnly: true,
   solaPhonePayNumber: "+18334343354",
   solaPhonePayBackup: "+18444227356",

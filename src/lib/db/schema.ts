@@ -1461,6 +1461,8 @@ export const phonepayAttempts = pgTable(
     callerPhone: text("caller_phone"),
     /** What the watcher saw in Sola while the call to Sola was up: "approved" | "declined" | "timeout" (Nov 17, 2026) */
     solaSeen: text("sola_seen"),
+    /** Box 147 (Nov 18, 2026): Sola refs that could belong to this try but were not certain; voided once a later try pays */
+    unclearRefs: text("unclear_refs"),
   },
   (t) => [index("phonepay_attempts_started_idx").on(t.startedAt)],
 );

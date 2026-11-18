@@ -133,4 +133,30 @@ describe("card payment on the phone line", () => {
     expect(o.paidCents).toBe(80000);
     expect(all.at(-1)!.tryNumber).toBe(3);
   });
+
+  it("box 147 (Abraham, Nov 18, 2026): not certain = no guess; a later try with the caller's phone in Invoice pays, and the unclear charge is voided and emailed", async () => {
+    const [o2] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2026-11-22", pickupDate: "2026-11-22", subtotalCents: 80000, totalCents: 80000 }).returning();
+    // another caller paying the same amount at the same time
+    await db.insert(schema.phonepayAttempts).values({ callSid: "CAother", amountCents: 80000 });
+    h.sola = [{ xRefNum: "UNC1", xAmount: "800.00", xEnteredDate: nowEastern(), xInvoice: "8454157585" }];
+    await call("phonepay-go", {}, `o=${o2.id}&c=1`);
+    let all = await db.select().from(schema.phonepayAttempts).orderBy(schema.phonepayAttempts.id);
+    let x = await call("phonepay-done", {}, `o=${o2.id}&a=${all.at(-1)!.id}`);
+    expect(redirect(x)).toContain("phonepay-retry");
+    expect(redirect(x)).toContain("u=1");
+    x = await call("phonepay-retry", {}, redirect(x)!.split("?")[1]);
+    expect(said(x)).toContain("Sorry, we could not confirm your payment. To try again, press 1.");
+    all = await db.select().from(schema.phonepayAttempts).orderBy(schema.phonepayAttempts.id);
+    expect(all.at(-1)!.unclearRefs).toBe("UNC1");
+    // try again: this time Sola shows the caller's own phone in Invoice
+    h.sola = [{ xRefNum: "UNC1", xAmount: "800.00", xEnteredDate: nowEastern(), xInvoice: "8454157585" }, { xRefNum: "MINE2", xAmount: "800.00", xEnteredDate: nowEastern(), xInvoice: "8457990925" }];
+    h.voided = [];
+    h.emails = [];
+    await call("phonepay-go", {}, `o=${o2.id}`);
+    all = await db.select().from(schema.phonepayAttempts).orderBy(schema.phonepayAttempts.id);
+    x = await call("phonepay-done", {}, `o=${o2.id}&a=${all.at(-1)!.id}`);
+    expect(said(x)).toContain("Your payment was received. You are all set!");
+    expect(h.voided).toEqual(["UNC1"]);
+    expect(h.emails.some((e) => e.includes("unclear phone payment checked"))).toBe(true);
+  });
 });

@@ -61,11 +61,26 @@ describe("watching Sola while the call to Sola is up", () => {
     process.env.SOLA_API_KEY = "test";
     let t = start.getTime() + 10_000;
     const ended: string[] = [];
-    const more = await runWatchChunk(att.id, 30_000, { fetcher, now: () => new Date(t), sleep: async (ms) => void (t += ms), end: async (x) => void ended.push(x.payLegSid ?? "") });
+    const waits: number[] = [];
+    const more = await runWatchChunk(att.id, 30_000, { fetcher, declineWaitMs: 6000, now: () => new Date(t), sleep: async (ms) => void (waits.push(ms), (t += ms)), end: async (x) => void ended.push(x.payLegSid ?? "") });
     expect(more).toBe(false);
     expect(ended).toEqual(["CAleg"]);
+    // checked every second, then waited while Sola said the result, then hung up (Abraham, Nov 18, 2026)
+    expect(waits.slice(0, -1).every((w) => w === 1000)).toBe(true);
+    expect(waits.at(-1)).toBe(6000);
     const [after] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, att.id));
     expect(after.solaSeen).toBe("declined");
+  });
+  it("approved: Sola reads the reference and hangs up by itself; we never cut it off", async () => {
+    const [att] = await db.insert(schema.phonepayAttempts).values({ callSid: "CAok", amountCents: 15000, startedAt: start, payLegSid: "CAleg2" }).returning();
+    const fetcher = (async (_u: string, init: { body: string }) =>
+      new Response(JSON.stringify({ xResult: "S", xReportData: JSON.parse(init.body).xCommand === "Report:Approved" ? [{ xRefNum: "OK7", xAmount: "150.00", xEnteredDate: "2026-11-18 10:00:20", xInvoice: "8455550100" }] : [] }))) as unknown as typeof fetch;
+    let t = start.getTime() + 10_000;
+    const ended: string[] = [];
+    expect(await runWatchChunk(att.id, 30_000, { fetcher, declineWaitMs: 6000, now: () => new Date(t), sleep: async (ms) => void (t += ms), end: async (x) => void ended.push(x.payLegSid ?? "") })).toBe(false);
+    expect(ended).toEqual([]);
+    const [after] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, att.id));
+    expect(after.solaSeen).toBe("approved");
   });
   it("the watcher address is signed", () => {
     const s = new URL(watchUrl(7)).searchParams.get("s");
@@ -104,3 +119,27 @@ describe("limits: tries per call and declines per phone in 24 hours (Admin setti
     expect(readFileSync("src/components/Sidebar.tsx", "utf8")).toContain('"/admin/phone/card-blocks", CreditCard, "Card blocks", OS]');
   });
 });
+
+describe("matching each charge to its own call (Abraham, Nov 18, 2026): never guess", () => {
+  const want = { amountCents: 15000, from: start, to: new Date(start.getTime() + 90_000) };
+  it("the customer's phone in Invoice picks this caller's charge even when another caller paid the same amount", () => {
+    const mine = txn({ refNum: "A", invoice: "8455550100" });
+    const theirs = txn({ refNum: "B", invoice: "8455550199" });
+    const c = classifyTry([mine, theirs], { ...want, phone: "+18455550100" }, new Set());
+    expect(c.kind).toBe("paid");
+    expect(c.paid?.refNum).toBe("A");
+    expect(c.byPhone).toBe(true);
+  });
+  it("two charges of the amount with no phone to tell them apart = not certain", () => {
+    const c = classifyTry([txn({ refNum: "A", invoice: "8454157585" }), txn({ refNum: "B", invoice: "8454157585" })], { ...want, phone: "+18455550100" }, new Set());
+    expect(c.kind).toBe("ambiguous");
+  });
+  it("box 147 is the approved wording, and the flow plays it with press 1 to try again", async () => {
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    expect(PROMPTS.phonepay_unclear.text).toBe("Sorry, we could not confirm your payment. To try again, press 1.");
+    const f = readFileSync("src/lib/ivr/flow.ts", "utf8");
+    expect(f).toContain('if (r.result === "unclear") return back(vr, "phonepay-retry", { o, n, u: 1 });');
+    expect(f).toContain('unclear ? "phonepay_unclear"');
+  });
+});
+

@@ -36,6 +36,8 @@ export async function savePhonePayAction(form: FormData) {
   const before = await getSettings();
   await saveSetting("phonePayTriesPerCall", String(tries), owner.userId);
   await saveSetting("phonePayDeclinesPerDay", String(declines), owner.userId);
+  const waitSec = Number(form.get("declineHangupSeconds"));
+  if (Number.isFinite(waitSec) && waitSec >= 0 && waitSec <= 15) await saveSetting("phonePayDeclineHangupSeconds", String(waitSec), owner.userId);
   await saveSetting("solaPhonePayOn", on, owner.userId);
   await saveSetting("solaPhonePayOwnerOnly", ownerOnly, owner.userId);
   await saveSetting("solaPhonePayNumber", number, owner.userId);

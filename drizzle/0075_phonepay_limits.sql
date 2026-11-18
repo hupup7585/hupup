@@ -4,6 +4,8 @@ ALTER TABLE "phonepay_attempts" ADD COLUMN IF NOT EXISTS "caller_phone" text;
 --> statement-breakpoint
 ALTER TABLE "phonepay_attempts" ADD COLUMN IF NOT EXISTS "sola_seen" text;
 --> statement-breakpoint
+ALTER TABLE "phonepay_attempts" ADD COLUMN IF NOT EXISTS "unclear_refs" text;
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "phonepay_blocks" (
   "id" serial PRIMARY KEY,
   "phone" text NOT NULL,
