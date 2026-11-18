@@ -177,6 +177,7 @@ export const SYSTEM_EVENTS: Record<string, { afterStop: boolean }> = {
   reenroll_request: { afterStop: true }, // the START confirmation asking the customer to reply YES
   promo_confirm_request: { afterStop: false }, // SMS Terms v2: asks for a YES reply (written promotional consent)
   catalog_request: { afterStop: false }, // key 8: the caller asked for our catalog by text (one text, never a promo sign-up)
+  confirmation_resend: { afterStop: false }, // box 148, press 1: the payment confirmation to the number the caller entered
   catalog_reply: { afterStop: false }, // texting CATALOG: the reply with the catalog (Nov 18, 2026: was refused as an order text)
   join_invite: { afterStop: false }, // JOIN invitation: once per customer, separate text, only while JOIN_INVITE_ON (off until Abraham picks the wording)
 };

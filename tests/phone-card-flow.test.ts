@@ -128,7 +128,8 @@ describe("card payment on the phone line", () => {
     await call("phonepay-go", {}, `o=${orderId}`);
     const all = await db.select().from(schema.phonepayAttempts).orderBy(schema.phonepayAttempts.id);
     const x = await call("phonepay-done", {}, `o=${orderId}&a=${all.at(-1)!.id}`);
-    expect(said(x)).toContain("Your payment was received. You are all set!");
+    // Box 148 only after Sola approves (Abraham, Nov 18, 2026)
+    expect(redirect(x)).toBe(`pay-approved?o=${orderId}`);
     const [o] = await db.select().from(schema.orders).where((await import("drizzle-orm")).eq(schema.orders.id, orderId));
     expect(o.paidCents).toBe(80000);
     expect(all.at(-1)!.tryNumber).toBe(3);
@@ -155,8 +156,24 @@ describe("card payment on the phone line", () => {
     await call("phonepay-go", {}, `o=${o2.id}`);
     all = await db.select().from(schema.phonepayAttempts).orderBy(schema.phonepayAttempts.id);
     x = await call("phonepay-done", {}, `o=${o2.id}&a=${all.at(-1)!.id}`);
-    expect(said(x)).toContain("Your payment was received. You are all set!");
+    // Box 148 only after Sola approves (Abraham, Nov 18, 2026)
+    expect(redirect(x)).toBe(`pay-approved?o=${o2.id}`);
     expect(h.voided).toEqual(["UNC1"]);
     expect(h.emails.some((e) => e.includes("unclear phone payment checked"))).toBe(true);
   });
+  it("box 148 (Abraham, Nov 18, 2026): You are all set and the order number only after payment; 1 sends the confirmation to another number", async () => {
+    const [cu] = await db.insert(schema.customers).values({ name: "Sara Klein", phone: "+18457990925" }).returning();
+    await db.update(schema.orders).set({ customerId: cu.id }).where((await import("drizzle-orm")).eq(schema.orders.id, orderId));
+    const x = await call("pay-approved", {}, `o=${orderId}`);
+    expect(said(x)).toEqual([`You are all set, Sara! Your payment was approved, and your booking is confirmed. Your order number is ${(1000 + orderId).toString().split("").join(" ")}. We will text your confirmation to the number you are calling from. To send it to a different number, press 1. Thank you for choosing Hup Up Attractions!`]);
+    expect(redirect(await call("pay-approved-choice", { Digits: "1" }, `o=${orderId}`))).toBe(`tx-enter?p=conf&o=${orderId}`);
+    expect(said(await call("tx-enter", {}, `p=conf&o=${orderId}`))).toEqual(["Please enter the 10-digit phone number. When you are finished, please press pound."]);
+    expect(redirect(await call("pay-approved-choice", {}, `o=${orderId}`))).toBe("promo-consent");
+  });
+  it("nothing before payment sounds finished: the order number is not read at checkout", async () => {
+    const { readFileSync } = await import("node:fs");
+    const f = readFileSync("src/lib/ivr/flow.ts", "utf8");
+    expect(f).not.toContain('sp(vr, ctx, "thanks_order"');
+  });
 });
+

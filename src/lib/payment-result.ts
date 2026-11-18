@@ -30,6 +30,19 @@ export function paymentResultLabel(o: { paymentResult: string | null; paymentRes
 }
 
 /** After a payment (Sola on the website, Stripe on the phone): the customer's confirmation, the owner's alerts. */
+/** The customer's payment confirmation text for an order (the same words as the automatic one), or null. */
+export async function confirmationText(orderId: number): Promise<string | null> {
+  const group = await getPaymentGroup(orderId);
+  if (!group) return null;
+  const num = orderNumber(orderId);
+  const { messageText } = await import("@/lib/ivr/prompts");
+  const days = group.orders;
+  const before = group.primary;
+  return days.length > 1
+    ? messageText("msg_payment_received_days", { number: num, dates: days.map((d) => messageDate(d.order.eventDate)).join(" and ") })
+    : messageText("msg_payment_received", { number: num, date: messageDate(before.order.eventDate), pickup: messageDate(before.order.pickupDate) });
+}
+
 export async function paymentReceivedNotices(orderId: number, cents: number, opts: { skipCustomerEmail?: boolean } = {}) {
   const group = await getPaymentGroup(orderId);
   if (!group) return;

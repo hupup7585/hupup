@@ -724,13 +724,25 @@ async function deliverPayLink(ctx: Ctx, orderId: number, via: { phone?: string; 
 }
 
 /** What the shared text steps are for (boxes 142 to 144). */
-function txPurpose(ctx: Ctx): "cat" | "pay" {
-  return ctx.query.get("p") === "pay" ? "pay" : "cat";
+function txPurpose(ctx: Ctx): "cat" | "pay" | "conf" {
+  const p = ctx.query.get("p");
+  return p === "pay" ? "pay" : p === "conf" ? "conf" : "cat";
 }
 
 /** The number is chosen: the catalog, or the payment link (after the caller's OK for order texts). */
-async function txSend(ctx: Ctx, vr: VR, p: "cat" | "pay", to: string) {
+async function txSend(ctx: Ctx, vr: VR, p: "cat" | "pay" | "conf", to: string) {
   if (p === "cat") return catalogSendText(ctx, vr, to);
+  if (p === "conf") {
+    // Box 148, press 1: the payment confirmation text to the number the caller entered (they asked for it)
+    const o = Number(ctx.query.get("o"));
+    if (o) {
+      const { confirmationText } = await import("@/lib/payment-result");
+      const body = await confirmationText(o);
+      if (body) await sendMessage({ to, body, kind: "system", event: "confirmation_resend", orderId: o, callSid: ctx.callSid });
+      await track(ctx.callSid, "step", `Payment confirmation texted to the number the caller entered`, { to });
+    }
+    return back(vr, "promo-consent");
+  }
   const o = Number(ctx.query.get("o"));
   if (!o) return back(vr, "goodbye");
   return payTextTo(ctx, vr, o, to);
@@ -975,7 +987,7 @@ const handlers: Record<string, Handler> = {
     const p = txPurpose(ctx);
     const o = ctx.query.get("o") ?? undefined;
     const d = ctx.body.Digits;
-    if (d === "*") return p === "pay" ? back(vr, "paylink", { o }) : back(vr, "catalog");
+    if (d === "*") return p === "pay" ? back(vr, "paylink", { o }) : p === "conf" ? back(vr, "pay-approved", { o }) : back(vr, "catalog");
     if (d === "1") {
       const to = toE164(ctx.from);
       return to ? txSend(ctx, vr, p, to) : back(vr, "tx-enter", { p, o });
@@ -2451,9 +2463,8 @@ const handlers: Record<string, Handler> = {
     const sum = (k: "subtotalCents" | "deliveryFeeCents" | "taxCents" | "totalCents") => perDay.reduce((n, x) => n + x.t![k], 0);
     const totals = { subtotalCents: sum("subtotalCents"), deliveryFeeCents: sum("deliveryFeeCents"), taxCents: sum("taxCents"), totalCents: sum("totalCents") };
 
-    const num = orderNumber(primary.id);
-    const first = data.name.split(" ")[0];
-    sp(vr, ctx, "thanks_order", { name: first, number: spokenDigits(num) });
+    // Abraham, Nov 18, 2026: nothing before payment may sound finished. Only the total here; "You are all set" and the
+    // order number come after Sola approves the payment (box 148). Payment-link callers get the number by text.
     sp(vr, ctx, "checkout_total", { total: spokenMoney(totals.totalCents), items: spokenMoney(totals.subtotalCents), delivery: spokenMoney(totals.deliveryFeeCents), tax: spokenMoney(totals.taxCents) });
     await updateSession(ctx.callSid, { data: { placedOrderId: primary.id } }, ctx.session);
     // Pay by card through Sola PhonePay (Abraham, Nov 14, 2026), the main phone payment. Off until he switches it on in
@@ -2630,6 +2641,27 @@ const handlers: Record<string, Handler> = {
     return vr;
   },
 
+  /**
+   * Box 148 (Abraham, Nov 18, 2026), only after Sola shows the payment approved: "You are all set, {name}! ... Your order
+   * number is {number}. ... To send it to a different number, press 1. ..." No key: on with the call.
+   */
+  async "pay-approved"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    const group = o ? await getPaymentGroup(o) : null;
+    if (!group) return back(vr, "promo-consent");
+    const first = (group.primary.customer?.name ?? "").trim().split(/\s+/)[0] ?? "";
+    const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: 6 });
+    sp(g, ctx, "phonepay_approved", { name: first, number: spokenDigits(orderNumber(o)) });
+    return back(vr, "promo-consent");
+  },
+
+  "pay-approved-choice"(ctx, vr) {
+    const o = ctx.query.get("o") ?? undefined;
+    if (ctx.body.Digits === "1") return back(vr, "tx-enter", { p: "conf", o }); // box 143, then the read-back
+    if (ctx.body.Digits) sp(vr, ctx, "not_valid");
+    return back(vr, "promo-consent");
+  },
+
   /** Before the first card try: 0 = a payment link (box 141) instead; any other key = the shared line, then box 140 again. */
   async "phonepay-option"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
@@ -2652,10 +2684,7 @@ const handlers: Record<string, Handler> = {
     if (ctx.session?.data.recording) await resumeRecording(ctx.callSid).catch(() => null);
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "goodbye");
-    if (group.due <= 0) {
-      sp(vr, ctx, "phonepay_paid", undefined, { draftOk: true });
-      return back(vr, "promo-consent");
-    }
+    if (group.due <= 0) return back(vr, "pay-approved", { o });
     let n = await triesSoFar(ctx.callSid, o);
     // PhonePay never answered: the backup number once, on the same card try (no "try" is used up)
     const status = ctx.body.DialCallStatus ?? "";
@@ -2673,10 +2702,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "phonepay_back", undefined, { draftOk: true });
       const r = await checkPhonePayTry(o, a, attempt?.amountCents ?? group.due);
       await track(ctx.callSid, "step", `Card payment try ${attempt?.tryNumber ?? n}: ${r.result === "paid" ? "paid" : r.result === "wrong_amount" ? "wrong amount, voided" : r.result === "check_failed" ? "Sola could not be checked" : r.result === "unclear" ? "could not be confirmed (box 147)" : "no charge"}`, { attempt: a });
-      if (r.result === "paid") {
-        sp(vr, ctx, "phonepay_paid", undefined, { draftOk: true });
-        return back(vr, "promo-consent");
-      }
+      if (r.result === "paid") return back(vr, "pay-approved", { o });
       n = attempt?.tryNumber ?? n;
       // Box 147 (Abraham, Nov 18, 2026): not certain which charge is this caller's: "Sorry, we could not confirm your
       // payment. To try again, press 1."
