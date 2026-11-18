@@ -51,9 +51,9 @@ describe("no short forms in any phone prompt", () => {
 });
 
 describe("dates: week day, month, day in month", () => {
-  it("Sunday, November 22 (no 22nd)", () => {
-    expect(spokenDate("2026-11-22")).toBe("Sunday, November 22");
-    expect(spokenDate("2026-12-01")).toBe("Tuesday, December 1");
+  it("Sunday, November twenty-second (no 22nd)", () => {
+    expect(spokenDate("2026-11-22")).toBe("Sunday, November twenty-second");
+    expect(spokenDate("2026-12-01")).toBe("Tuesday, December first");
   });
 });
 

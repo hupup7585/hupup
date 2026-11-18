@@ -61,7 +61,7 @@ describe("unfinished phone order", () => {
     void callOrdersFor;
     expect(redirect(await call("book"))).toBe("resume");
     const offer = await call("resume");
-    expect(said(offer).join(" ")).toContain("Welcome back! On your last call you had in your cart one Castle and one Laser tag set for Tuesday, December 22. To check if they are still available, press 1. To start a new order, press 2.");
+    expect(said(offer).join(" ")).toContain("Welcome back! On your last call you had in your cart one Castle and one Laser tag set for Tuesday, December twenty-second. To check if they are still available, press 1. To start a new order, press 2.");
     expect(redirect(await call("resume-choice", { Digits: "1" }))).toBe("resume-items");
     // nothing in the cart yet
     expect(h.session.data.dayOrderIds ?? []).toEqual([]);

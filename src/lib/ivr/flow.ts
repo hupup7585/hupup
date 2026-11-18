@@ -3,7 +3,7 @@ import twilio from "twilio";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
-import { addDays, longDate, todayISO } from "@/lib/dates";
+import { addDays, spokenLongDate, todayISO } from "@/lib/dates";
 import { spokenMoney } from "@/lib/money";
 import { formatPhone, last4, spokenDigits, toE164 } from "@/lib/phone";
 import { logStamp, phonePromoMode, phonePromoOn, readBack, tenDigitNumber } from "@/lib/phone-promo";
@@ -136,12 +136,9 @@ function keypad(vr: VR, action: string, opts: { numDigits?: number; timeout?: nu
   });
 }
 
-/** "Sunday, November 22": week day, month, day in month. Every date the phone reads (Abraham, Nov 17, 2026). */
+/** "Sunday, November twenty-second": every date the phone reads (Abraham, Nov 18, 2026: the day as an ordinal). */
 export function spokenDate(iso: string): string {
-  const d = new Date(`${iso}T12:00:00Z`);
-  const wd = d.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long" });
-  const mo = d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long" });
-  return `${wd}, ${mo} ${d.getUTCDate()}`;
+  return spokenLongDate(iso);
 }
 
 /** Booking steps (Abraham, Nov 11): no key pressed -> the same step again; 9 minutes idle the warning, 10 minutes end. */
@@ -631,7 +628,7 @@ async function vmaMessages(boxId: number) {
 function vmaWhen(d: Date) {
   const tz = process.env.BUSINESS_TIMEZONE || "America/New_York";
   return {
-    date: d.toLocaleDateString("en-US", { timeZone: tz, weekday: "long", month: "long", day: "numeric" }),
+    date: spokenLongDate(d.toLocaleDateString("en-CA", { timeZone: tz })), // "Sunday, November twenty-second"
     time: d.toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }),
   };
 }
@@ -1343,7 +1340,7 @@ const handlers: Record<string, Handler> = {
     if (!lines.length) return back(vr, "book");
     const g = keypad(vr, url("resume-choice"));
     // grouped by day: "one Castle and one Laser tag set for Tuesday, December 22"
-    const byDay = [...new Set(lines.map((l) => l.date))].map((d) => `${lines.filter((l) => l.date === d).map((l) => itemPhrase(l.qty, l.name)).join(" and ")} for ${longDate(d)}`);
+    const byDay = [...new Set(lines.map((l) => l.date))].map((d) => `${lines.filter((l) => l.date === d).map((l) => itemPhrase(l.qty, l.name)).join(" and ")} for ${spokenDate(d)}`);
     sp(g, ctx, "resume_offer", { items: byDay.join(", and ") });
     return idleNoKey(vr, ctx, "book");
   },
@@ -1394,7 +1391,7 @@ const handlers: Record<string, Handler> = {
       lines[i] = { ...l, state: "added" };
       const ids = [...new Set([...(session.data?.dayOrderIds ?? []), cartOrder])];
       await updateSession(ctx.callSid, { orderId: cartOrder, outcome: "carted", data: { day: l.d, dayOrderIds: ids, resumeLines: lines } }, session);
-      await track(ctx.callSid, "item_added", `Added ${itemPhrase(l.qty, l.name)} for ${longDate(l.d)} from the last call`, { item: l.name, productId: l.p, qty: l.qty, date: l.d, orderId: cartOrder });
+      await track(ctx.callSid, "item_added", `Added ${itemPhrase(l.qty, l.name)} for ${spokenDate(l.d)} from the last call`, { item: l.name, productId: l.p, qty: l.qty, date: l.d, orderId: cartOrder });
       sp(vr, ctx, "item_added");
       const prod = await getProduct(l.p);
       if (prod && (await isBounceHouse(prod.categoryId))) return back(vr, "ocean", { d: l.d, n: "resume" });
@@ -1528,11 +1525,11 @@ const handlers: Record<string, Handler> = {
     const cal = await getSettings();
     const chk = checkEventDate(r.date, cal);
     if (!chk.ok) {
-      await track(ctx.callSid, "date_closed", `Asked for ${longDate(r.date)}: closed`, { date: r.date, reason: chk.day.reasonEn ?? chk.day.reason ?? null });
+      await track(ctx.callSid, "date_closed", `Asked for ${spokenDate(r.date)}: closed`, { date: r.date, reason: chk.day.reasonEn ?? chk.day.reason ?? null });
       sp(vr, ctx, "date_closed", { date: spokenDate(r.date), reason: chk.day.reasonEn ?? chk.day.reason ?? "a holiday" }); // Ashkenazi English names (Abraham)
       return back(vr, "date", { p });
     }
-    await track(ctx.callSid, "date_asked", `Asked about ${longDate(r.date)}`, { date: r.date, key: digits });
+    await track(ctx.callSid, "date_asked", `Asked about ${spokenDate(r.date)}`, { date: r.date, key: digits });
     return back(vr, "date-ask", { p, d: r.date });
   },
 
@@ -1567,7 +1564,7 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     if (!p) return back(vr, "menu");
     const g = keypad(vr, url("taken-choice", { p: p.id, d: date }));
-    sp(g, ctx, "item_taken", { item: p.name, date: longDate(date), key: 1 });
+    sp(g, ctx, "item_taken", { item: p.name, date: spokenDate(date), key: 1 });
     sp(g, ctx, "cart_key");
     return bookNoInput(vr, ctx, "booked", { p: p.id, d: date });
   },
@@ -1685,13 +1682,13 @@ const handlers: Record<string, Handler> = {
     if (!p) return back(vr, "menu");
     const free = await checkBookable(p.id, p.quantity, date);
     if (free <= 0) {
-      await track(ctx.callSid, "unavailable", `${p.name} not available on ${longDate(date)}`, { item: p.name, productId: p.id, date });
+      await track(ctx.callSid, "unavailable", `${p.name} not available on ${spokenDate(date)}`, { item: p.name, productId: p.id, date });
       return back(vr, "booked", { p: p.id, d: date });
     }
     if (free === 1) return back(vr, "add", { p: p.id, d: date, q: 1 });
     const max = Math.min(free, 9);
     const g = keypad(vr, url("add", { p: p.id, d: date }));
-    sp(g, ctx, "qty_prompt", { count: free, date: longDate(date), max });
+    sp(g, ctx, "qty_prompt", { count: free, date: spokenDate(date), max });
     return noInput(vr, ctx, "qty", { p: p.id, d: date });
   },
 
@@ -1734,7 +1731,7 @@ const handlers: Record<string, Handler> = {
     });
     if (!r.ok) {
       if (r.reason === "unavailable") {
-        await track(ctx.callSid, "unavailable", r.free > 0 ? `Only ${r.free} ${p.name} left on ${longDate(date)} (asked for ${q})` : `${p.name} was just booked for ${longDate(date)}`, { item: p.name, productId: p.id, date, asked: q, free: r.free });
+        await track(ctx.callSid, "unavailable", r.free > 0 ? `Only ${r.free} ${p.name} left on ${spokenDate(date)} (asked for ${q})` : `${p.name} was just booked for ${spokenDate(date)}`, { item: p.name, productId: p.id, date, asked: q, free: r.free });
         if (r.free > 0) sp(vr, ctx, "only_some_left", { count: r.free });
         else sp(vr, ctx, "just_booked", { item: p.name });
         return back(vr, r.free > 0 ? "qty" : "menu", r.free > 0 ? { p: p.id, d: date } : {});
@@ -1742,7 +1739,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "went_wrong");
       return back(vr, "menu");
     }
-    await track(ctx.callSid, "item_added", `Added ${itemPhrase(q, p.name)} for ${longDate(date)}`, { item: p.name, productId: p.id, qty: q, date, orderId: r.orderId });
+    await track(ctx.callSid, "item_added", `Added ${itemPhrase(q, p.name)} for ${spokenDate(date)}`, { item: p.name, productId: p.id, qty: q, date, orderId: r.orderId });
     const ids = [...new Set([...(session.data?.dayOrderIds ?? []), r.orderId])];
     await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted", data: { day: date, dayOrderIds: ids } }, session);
     // Abraham (Nov 17, 2026): the item added line every time; ocean balls after a jumping balloon; then keep shopping
@@ -1805,7 +1802,7 @@ const handlers: Record<string, Handler> = {
     const day = (await callOrders(ctx)).find((o) => o.order.eventDate === date) ?? null;
     const r = await reserveItem({ orderId: day?.order.id ?? null, productId: pick.id, qty: 1, eventDate: date, channel: "PHONE", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid });
     if (r.ok) {
-      await track(ctx.callSid, "item_added", `Added ${pick.name} for ${longDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
+      await track(ctx.callSid, "item_added", `Added ${pick.name} for ${spokenDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
       const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), r.orderId])];
       await updateSession(ctx.callSid, { data: { dayOrderIds: ids } }, ctx.session);
       sp(vr, ctx, "item_added");
@@ -1840,7 +1837,7 @@ const handlers: Record<string, Handler> = {
     const day = (await callOrders(ctx)).find((o) => o.order.eventDate === date) ?? null;
     const r = await reserveItem({ orderId: day?.order.id ?? null, productId: pick.id, qty: 1, eventDate: date, channel: "PHONE", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid });
     if (r.ok) {
-      await track(ctx.callSid, "item_added", `Added ${pick.name} for ${longDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
+      await track(ctx.callSid, "item_added", `Added ${pick.name} for ${spokenDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
       const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), r.orderId])];
       await updateSession(ctx.callSid, { data: { dayOrderIds: ids } }, ctx.session);
       sp(vr, ctx, "item_added");
@@ -1858,7 +1855,7 @@ const handlers: Record<string, Handler> = {
     }
     const g = keypad(vr, url("cart-choice", { c }));
     sp(g, ctx, "cart_intro");
-    for (const o of days) sp(g, ctx, "cart_day", { date: longDate(o.order.eventDate), items: o.items.map((i) => itemPhrase(i.qty, i.name)).join(", ") });
+    for (const o of days) sp(g, ctx, "cart_day", { date: spokenDate(o.order.eventDate), items: o.items.map((i) => itemPhrase(i.qty, i.name)).join(", ") });
     sp(g, ctx, "cart_total", { total: spokenMoney(days.reduce((t, o) => t + o.order.subtotalCents, 0)) });
     sp(g, ctx, "cart_options");
     // From an item list: once the cart has been read, the same item list plays again (Abraham, Phone Menu v3)
@@ -2883,7 +2880,7 @@ const handlers: Record<string, Handler> = {
     const full = id ? await getOrderWithItems(id) : null;
     const several = full?.order.paymentGroupId ? (await db.select({ id: orders.id }).from(orders).where(eq(orders.paymentGroupId, full.order.paymentGroupId))).length > 1 : false;
     if (full && several) sp(vr, ctx, "goodbye_order_days");
-    else if (full) sp(vr, ctx, "goodbye_order", { date: longDate(full.order.eventDate), pickup: longDate(full.order.pickupDate) });
+    else if (full) sp(vr, ctx, "goodbye_order", { date: spokenDate(full.order.eventDate), pickup: spokenDate(full.order.pickupDate) });
     vr.hangup();
     return vr;
   },

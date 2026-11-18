@@ -136,7 +136,7 @@ describe("after the PIN", () => {
     expect(redirect(chose)).toBe(`vma-play?b=${box.id}&i=0`);
 
     const first = await call("vma-play", {}, `b=${box.id}&i=0`);
-    expect(said(first)[0]).toBe("Message 1, from 8 4 5, 5 5 5, 0 1 2 2, on Thursday, November 12 at 8:00 PM.");
+    expect(said(first)[0]).toBe("Message 1, from 8 4 5, 5 5 5, 0 1 2 2, on Thursday, November twelfth at 8:00 PM.");
     expect(first).toContain(`/api/voicemail/play/${newer.id}?`);
     expect(redirect(first)).toBe(`vma-options?b=${box.id}&i=0&v=${newer.id}`);
     expect(said(await call("vma-options", {}, `b=${box.id}&i=0&v=${newer.id}`))).toContain("To replay this message, press 1. For the next message, press 2. To mark it as heard, press 3. To call this person back, press 4. To choose another box, press star.");

@@ -78,3 +78,24 @@ export function endOfMonth(iso: string): string {
   const [y, m] = iso.split("-").map(Number);
   return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 }
+
+const ORDINALS = [
+  "", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth",
+  "eleventh", "twelfth", "thirteenth", "fourteenth", "fifteenth", "sixteenth", "seventeenth", "eighteenth", "nineteenth", "twentieth",
+  "twenty-first", "twenty-second", "twenty-third", "twenty-fourth", "twenty-fifth", "twenty-sixth", "twenty-seventh", "twenty-eighth", "twenty-ninth", "thirtieth",
+  "thirty-first",
+];
+
+/** The day of the month as a spoken ordinal: 22 -> "twenty-second". */
+export const ordinalWord = (n: number) => ORDINALS[n] ?? String(n);
+
+/**
+ * Every date the phone reads (Abraham, Nov 18, 2026): week day, month name, and the day as an ordinal, e.g.
+ * "Sunday, November twenty-second", "Friday, December twenty-fifth".
+ */
+export function spokenLongDate(iso: string): string {
+  const d = asUTC(iso);
+  const wd = d.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long" });
+  const mo = d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long" });
+  return `${wd}, ${mo} ${ordinalWord(d.getUTCDate())}`;
+}
