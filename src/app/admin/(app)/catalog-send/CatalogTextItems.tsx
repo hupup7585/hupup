@@ -5,6 +5,26 @@ import { saveCatalogTextItemsAction, uploadCatalogTextPhotoAction } from "./acti
 
 type Item = { photo: string; text: string };
 
+/**
+ * Make a photo small enough to upload and to text: at most 1600 pixels on the long side, JPEG. Photos the browser
+ * can't read (some HEIC) go as they are; the server then says if they can't be used.
+ */
+async function shrinkPhoto(file: File): Promise<File> {
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    if (scale === 1 && file.size <= 1_500_000 && /jpe?g|png|webp/i.test(file.type)) return file;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/jpeg", 0.85));
+    return blob ? new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : file;
+  } catch {
+    return file;
+  }
+}
+
 /** The photo catalog for texts: each photo with its own text box, in order; Save replaces the old catalog. */
 export default function CatalogTextItems({ initial }: { initial: Item[] }) {
   const [items, setItems] = useState<Item[]>(initial);
@@ -21,14 +41,22 @@ export default function CatalogTextItems({ initial }: { initial: Item[] }) {
     });
   async function addPhoto(file: File, at?: number) {
     setBusy(true);
-    const fd = new FormData();
-    fd.set("photo", file);
-    const r = await uploadCatalogTextPhotoAction(fd);
+    setMsg({ ok: true, text: "Uploading the photo..." });
+    let r: { ok: boolean; message: string; url?: string };
+    try {
+      // Phone photos are often over the 4.5 MB the site accepts in one upload: shrink it here first (Nov 18, 2026)
+      const small = await shrinkPhoto(file);
+      const fd = new FormData();
+      fd.set("photo", small);
+      r = await uploadCatalogTextPhotoAction(fd);
+    } catch {
+      r = { ok: false, message: "The photo didn't upload. Please try again, or choose a JPG or PNG photo." };
+    }
     setBusy(false);
     if (!r.ok || !r.url) return setMsg({ ok: false, text: r.message });
     if (at === undefined) setItems((list) => [...list, { photo: r.url!, text: "" }]);
     else update(at, { photo: r.url });
-    setMsg(null);
+    setMsg({ ok: true, text: "Photo added. Press Save to keep the catalog." });
   }
   async function save() {
     setBusy(true);
@@ -52,20 +80,37 @@ export default function CatalogTextItems({ initial }: { initial: Item[] }) {
           <div className="flex flex-row gap-1 sm:flex-col">
             <button type="button" className="btn-ghost px-2 py-1 text-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">Up</button>
             <button type="button" className="btn-ghost px-2 py-1 text-sm" onClick={() => move(i, 1)} disabled={i === items.length - 1} aria-label="Move down">Down</button>
-            <label className="btn-ghost cursor-pointer px-2 py-1 text-center text-sm">
+            {/* A real button; the file box is visually hidden but still there (Abraham, Nov 18, 2026: Hark's browser can use it) */}
+            <button type="button" className="btn-ghost px-2 py-1 text-sm" disabled={busy} onClick={(e) => (e.currentTarget.nextElementSibling as HTMLInputElement | null)?.click()}>
               Replace
-              <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && addPhoto(e.target.files[0], i)} />
-            </label>
+            </button>
+            <input type="file" accept="image/*" className="sr-only" aria-label={`Replace photo ${i + 1}`} data-replace-photo={i} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void addPhoto(f, i); }} />
             <button type="button" className="btn-ghost px-2 py-1 text-sm text-coral" onClick={() => setItems((list) => list.filter((_, j) => j !== i))}>Remove</button>
           </div>
         </div>
       ))}
       <div className="flex flex-wrap items-center gap-3">
         {items.length < 10 && (
-          <label className="btn-ghost cursor-pointer">
-            {busy ? "Working..." : "Add a photo"}
-            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={busy} onChange={(e) => e.target.files?.[0] && addPhoto(e.target.files[0])} />
-          </label>
+          <>
+            <button type="button" className="btn-ghost" disabled={busy} onClick={(e) => (e.currentTarget.nextElementSibling as HTMLInputElement | null)?.click()} data-add-photo>
+              {busy ? "Working..." : "Add photos"}
+            </button>
+            {/* Several photos at once, added one after another, in the order chosen */}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="sr-only"
+              aria-label="Add photos"
+              data-add-photo-input
+              disabled={busy}
+              onChange={async (e) => {
+                const files = Array.from(e.target.files ?? []);
+                e.target.value = "";
+                for (const f of files.slice(0, 10 - items.length)) await addPhoto(f);
+              }}
+            />
+          </>
         )}
         {items.length > 0 && (
           <button type="button" className="btn-ghost text-coral" onClick={() => window.confirm("Start a new catalog? The rows below are cleared; the old catalog keeps sending until you press Save.") && setItems([])}>
