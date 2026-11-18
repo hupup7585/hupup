@@ -56,9 +56,17 @@ function signatureHtml(signature: string): string {
     .join("");
 }
 
+/** The signature without its opening "Thanks!" line (and the blank line after it). */
+export function withoutThanks(signature: string): string {
+  return signature.replace(/^\s*thanks!?\s*\n(\s*\n)*/i, "").trim();
+}
+
 /** The email in both forms: HTML (logo header, message, signature) and plain text (message, then the signature). */
-export function brandedEmail(text: string, opts: { baseUrl: string; signature?: string | null; promo?: { address: string; unsubscribeUrl: string } }): { html: string; text: string } {
-  const signature = (opts.signature ?? "").trim() || EMAIL_SIGNATURE_DEFAULT;
+export function brandedEmail(text: string, opts: { baseUrl: string; signature?: string | null; promo?: { address: string; unsubscribeUrl: string }; noThanks?: boolean }): { html: string; text: string } {
+  let signature = (opts.signature ?? "").trim() || EMAIL_SIGNATURE_DEFAULT;
+  // Catalog emails (Abraham, Nov 17, 2026): the message already ends "Thank you for choosing Hup Up Attractions!", so
+  // the signature starts directly with "Hup Up Attractions"
+  if (opts.noThanks) signature = withoutThanks(signature);
   const body = text.trim();
   // Promotional emails only (the law requires them): the mailing address and an Unsubscribe link at the very bottom
   const promoText = opts.promo ? `\n${opts.promo.address.trim() ? `${opts.promo.address.trim()}\n` : ""}Unsubscribe: ${opts.promo.unsubscribeUrl}\n` : "";

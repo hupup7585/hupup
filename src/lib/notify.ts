@@ -40,7 +40,7 @@ export function emailEnvelope(to: string, env: Record<string, string | undefined
 
 export type EmailAttachment = { filename: string; content: string /* base64 */ };
 
-export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string>; record?: boolean; promo?: boolean } = {}): Promise<SendResult> {
+export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string>; record?: boolean; promo?: boolean; noThanks?: boolean } = {}): Promise<SendResult> {
   if (!config.resendConfigured()) {
     if (config.isProd()) return { sent: false, error: "Email (Resend) is not configured" };
     console.log(`[dev EMAIL to ${to}] ${subject}\n${text}${attachments.length ? `\n[attachments: ${attachments.map((a) => a.filename).join(", ")}]` : ""}`);
@@ -62,7 +62,7 @@ export async function sendEmail(to: string, subject: string, text: string, attac
       promo = { address: String(s?.emailMailingAddress ?? ""), unsubscribeUrl: unsubscribeLink(to.trim(), config.baseUrl()) };
       opts = { ...opts, headers: { ...(opts.headers ?? {}), "List-Unsubscribe": `<${promo.unsubscribeUrl.replace("/unsubscribe?", "/api/unsubscribe?")}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } };
     }
-    const branded = brandedEmail(text, { baseUrl: config.baseUrl(), signature: s?.emailSignature ?? null, promo });
+    const branded = brandedEmail(text, { baseUrl: config.baseUrl(), signature: s?.emailSignature ?? null, promo, noThanks: opts.noThanks });
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },

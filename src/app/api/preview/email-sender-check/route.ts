@@ -23,6 +23,12 @@ export async function GET(req: Request) {
     );
     return Response.json({ sent: r.sent, error: r.error ?? null });
   }
+  // Abraham, Nov 18, 2026: a test catalog email (the real one: PDF attached, no "Thanks!" in the signature)
+  if (new URL(req.url).searchParams.get("send") === "catalog") {
+    const { sendCatalogEmail } = await import("@/lib/catalog-send");
+    const r = await sendCatalogEmail("hupupattractions@gmail.com");
+    return Response.json({ sent: r.sent, error: r.error ?? null });
+  }
   const to = owner ? process.env.ADMIN_EMAIL || "hupupattractions@gmail.com" : "delivered@resend.dev";
   const env = owner ? process.env : { EMAIL_FROM: "Hup Up Attractions <info@hupupattractions.com>" };
   const envelope = emailEnvelope(to, env);

@@ -46,7 +46,7 @@ describe("email items 7, 10 and 13 (Abraham, Nov 17, 2026)", () => {
     const s = readFileSync("src/lib/catalog-send.ts", "utf8");
     expect(s).toContain('s.catalogAutoAttach !== false ? await catalogPdfAttachment()');
     expect(s).toContain("const t = catalogEmailTemplate(s);");
-    expect(s).toContain("sendEmail(to, t.subject, t.body, [pdf])");
+    expect(s).toContain("sendEmail(to, t.subject, t.body, [pdf], { noThanks: true })");
     expect(readFileSync("src/app/admin/(app)/catalog-send/page.tsx", "utf8")).toContain("<CatalogEmailForm");
   });
 });
@@ -104,3 +104,18 @@ describe("catalog email wording edited by the Owner (Abraham, Nov 17, 2026)", ()
     expect(readFileSync("src/app/admin/(app)/inbox/new/page.tsx", "utf8")).toContain("catalogEmailTemplate(await getSettings())");
   });
 });
+
+describe("catalog emails: no Thanks! in the signature (Abraham, Nov 17, 2026)", () => {
+  it("the signature starts with Hup Up Attractions on catalog emails; every other email keeps Thanks!", async () => {
+    const { brandedEmail, withoutThanks, EMAIL_SIGNATURE_DEFAULT } = await import("@/lib/email-brand");
+    expect(withoutThanks(EMAIL_SIGNATURE_DEFAULT).startsWith("Hup Up Attractions\n")).toBe(true);
+    const cat = brandedEmail("Body", { baseUrl: "https://x", noThanks: true });
+    expect(cat.text).toBe(`Body\n\n--\n${withoutThanks(EMAIL_SIGNATURE_DEFAULT)}\n`);
+    expect(cat.html).not.toContain("Thanks!");
+    const other = brandedEmail("Body", { baseUrl: "https://x" });
+    expect(other.text).toContain("--\nThanks!");
+    expect(readFileSync("src/lib/catalog-send.ts", "utf8")).toContain("[pdf], { noThanks: true })");
+    expect(readFileSync("src/lib/inbox.ts", "utf8")).toContain("noThanks: Boolean(input.attachCatalog)");
+  });
+});
+
