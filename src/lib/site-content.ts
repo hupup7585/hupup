@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config, publicEmail } from "@/lib/config";
 import { SERVICE_AREA } from "@/lib/site-copy";
@@ -20,8 +20,28 @@ export type SiteContent = {
   email: string;
   phoneDisplay: string;
   phoneE164: string;
-  categories: { id: number; name: string; description: string; slug: string }[];
+  categories: { id: number; name: string; description: string; slug: string; items: SiteItem[] }[];
 };
+
+/** One rental on the website (Abraham, Nov 18, 2026): name, description, "Size: 15 x 15 ft" and price. */
+export type SiteItem = { id: number; name: string; description: string; size: string; price: string };
+
+/**
+ * The items under each category show on the preview site first; on the live site once Abraham approves the screenshot
+ * (Abraham, Nov 18, 2026: name, description, dimensions and price, label "Size: 15 x 15 ft").
+ */
+export const WEBSITE_ITEMS_LIVE_APPROVED = false;
+export const websiteItemsShown = (env: Record<string, string | undefined> = process.env) => WEBSITE_ITEMS_LIVE_APPROVED || env.VERCEL_ENV !== "production";
+
+/** "15 by 15 feet" -> "15 x 15 ft" (the label Abraham chose); anything else as typed in Admin. */
+export function sizeLabel(dimensions: string): string {
+  const d = dimensions.trim();
+  if (!d) return "";
+  return d.replace(/\s*(?:by|x|×)\s*/gi, " x ").replace(/\bfeet\b|\bfoot\b|\bft\.?(?=\s|$)/gi, "ft").replace(/\s+/g, " ");
+}
+
+/** "$150" for whole dollars, "$62.50" otherwise. */
+export const sitePrice = (cents: number) => `$${cents % 100 === 0 ? (cents / 100).toLocaleString("en-US") : (cents / 100).toFixed(2)}`;
 
 /** Website content keys in app_settings (edited from /admin/website). */
 export const SITE_KEYS = {
@@ -50,7 +70,7 @@ function str(v: unknown): string | null {
 
 export async function getSiteContent(): Promise<SiteContent> {
   let settings = new Map<string, unknown>();
-  let cats: SiteContent["categories"] = DEFAULT_CATEGORIES.map((c) => ({ ...c, slug: slugify(c.name) }));
+  let cats: SiteContent["categories"] = DEFAULT_CATEGORIES.map((c) => ({ ...c, slug: slugify(c.name), items: [] }));
   try {
     const rows = await db.select().from(schema.appSettings);
     settings = new Map(rows.map((r) => [r.key, r.value]));
@@ -60,7 +80,20 @@ export async function getSiteContent(): Promise<SiteContent> {
       .where(and(eq(schema.categories.active, true)))
       .orderBy(asc(schema.categories.sortOrder), asc(schema.categories.id));
     if (dbCats.length) {
-      cats = dbCats.map((c) => ({ id: c.id, name: c.name, description: c.description, slug: slugify(c.name) }));
+      const prods = websiteItemsShown()
+        ? await db
+            .select()
+            .from(schema.products)
+            .where(and(eq(schema.products.active, true), isNull(schema.products.trashedAt)))
+            .orderBy(asc(schema.products.sortOrder), asc(schema.products.id))
+        : [];
+      cats = dbCats.map((c) => ({
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        slug: slugify(c.name),
+        items: prods.filter((p) => p.categoryId === c.id).map((p) => ({ id: p.id, name: p.name, description: p.description, size: sizeLabel(p.dimensions), price: sitePrice(p.priceCents) })),
+      }));
     }
   } catch (e) {
     console.error("site content: using defaults", e);

@@ -140,6 +140,21 @@ export default async function Home() {
                   <div>
                     <h3 className="text-2xl font-extrabold leading-tight sm:text-4xl">{cat.name}</h3>
                     <p className="mt-3 max-w-2xl text-lg leading-relaxed text-hu-deep/85">{cat.description}</p>
+                    {/* The items (Abraham, Nov 18, 2026): name, description, size and price; preview first */}
+                    {cat.items.length > 0 && (
+                      <ul className="mt-5 grid gap-3 sm:grid-cols-2" data-site-items>
+                        {cat.items.map((it) => (
+                          <li key={it.id} className="rounded-2xl border-2 border-hu-deep/10 bg-hu-tint/40 p-4">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <h4 className="text-lg font-extrabold leading-snug">{it.name}</h4>
+                              <span className="shrink-0 text-lg font-extrabold">{it.price}</span>
+                            </div>
+                            {it.description && <p className="mt-1 leading-relaxed text-hu-deep/85">{it.description}</p>}
+                            {it.size && <p className="mt-1 text-sm font-semibold text-hu-deep/70">Size: {it.size}</p>}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                   <CallButton phone={c.phoneE164} className="w-full sm:col-start-2 sm:w-fit lg:col-start-auto" />
                 </article>
