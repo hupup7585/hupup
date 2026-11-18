@@ -149,6 +149,30 @@ export async function setRead(id: number, read: boolean) {
   await db.update(schema.inboxEmails).set({ readAt: read ? new Date() : null }).where(eq(schema.inboxEmails.id, id));
 }
 
+/**
+ * The files for an outgoing email: up to 18 MB attached as before; larger ones (in R2) become the approved line with a
+ * 30-day download link (Abraham, Nov 18, 2026), one line per file.
+ */
+async function outgoingFiles(ids: number[]) {
+  const { fileLink, tooBigLine } = await import("@/lib/file-links");
+  const files: NonNullable<Awaited<ReturnType<typeof fileBytes>>>[] = [];
+  const linked: number[] = [];
+  const lines: string[] = [];
+  for (const id of ids) {
+    const [row] = await db.select().from(schema.inboxFiles).where(eq(schema.inboxFiles.id, id)).limit(1);
+    if (!row || !row.complete || row.emailId || row.replyId) throw new Error("An attachment didn't upload. Please attach it again.");
+    if (row.inR2) {
+      linked.push(id);
+      lines.push(tooBigLine(fileLink(id)));
+      continue;
+    }
+    const f = await fileBytes(id);
+    if (!f) throw new Error("An attachment didn't upload. Please attach it again.");
+    files.push(f);
+  }
+  return { files, linked, linkText: lines.length ? `\n\n${lines.join("\n\n")}` : "" };
+}
+
 export async function fileBytes(id: number) {
   const [f] = await db.select().from(schema.inboxFiles).where(eq(schema.inboxFiles.id, id)).limit(1);
   if (!f || !f.complete) return null;
@@ -158,7 +182,16 @@ export async function fileBytes(id: number) {
 
 /** Reply attachments are uploaded first (in pieces), then attached when the reply is sent. */
 export async function startReplyFile(fileName: string, contentType: string, size: number, userId: number | null) {
-  if (size <= 0 || size > INBOX_FILE_MAX_BYTES) throw new Error(`Attachments can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
+  const { LINK_FILE_MAX_BYTES, LINK_FILE_MAX_LABEL } = await import("@/lib/file-links");
+  if (size <= 0 || size > LINK_FILE_MAX_BYTES) throw new Error(`A file can be up to ${LINK_FILE_MAX_LABEL}.`);
+  // Over 18 MB (Abraham, Nov 18, 2026): kept in R2 and sent as a 30-day download link instead of attached
+  if (size > INBOX_FILE_MAX_BYTES) {
+    const { r2Ready, r2Used, R2_STOP_BYTES } = await import("@/lib/r2");
+    if (!r2Ready()) throw new Error(`Files over ${INBOX_FILE_MAX_LABEL} are sent as a link, which needs the R2 storage (not set up here).`);
+    if ((await r2Used()) + size > R2_STOP_BYTES) throw new Error("The file storage is nearly full. Please send a smaller file.");
+    const [f] = await db.insert(schema.inboxFiles).values({ fileName: fileName.slice(0, 200), contentType: contentType || "application/octet-stream", sizeBytes: size, createdBy: userId, inR2: true }).returning();
+    return f;
+  }
   if ((await databaseBytes()) + size > ATTACHMENT_STORAGE_STOP_BYTES)
     throw new Error("The storage for attachments is nearly full. Send the file as a link instead, or ask Claude to move files to R2.");
   const [f] = await db.insert(schema.inboxFiles).values({ fileName: fileName.slice(0, 200), contentType: contentType || "application/octet-stream", sizeBytes: size, createdBy: userId }).returning();
@@ -167,6 +200,21 @@ export async function startReplyFile(fileName: string, contentType: string, size
 
 export async function saveReplyFileChunk(fileId: number, idx: number, data: Buffer, last: boolean) {
   if (!data.length || data.length > INBOX_CHUNK_BYTES) throw new Error("That piece of the file didn't arrive.");
+  const [big] = await db.select().from(schema.inboxFiles).where(eq(schema.inboxFiles.id, fileId)).limit(1);
+  if (big?.inR2) {
+    // A large file: each 3 MB piece is its own R2 object; done when every byte has arrived
+    const { r2Put } = await import("@/lib/r2");
+    const { linkPieceKey } = await import("@/lib/file-links");
+    await r2Put(linkPieceKey(fileId, idx), data, "application/octet-stream");
+    const [u] = await db
+      .update(schema.inboxFiles)
+      .set({ receivedBytes: sql`${schema.inboxFiles.receivedBytes} + ${data.length}` })
+      .where(eq(schema.inboxFiles.id, fileId))
+      .returning({ got: schema.inboxFiles.receivedBytes, size: schema.inboxFiles.sizeBytes });
+    if (!last || !u || u.got !== u.size) return false;
+    await db.update(schema.inboxFiles).set({ complete: true }).where(eq(schema.inboxFiles.id, fileId));
+    return true;
+  }
   await db.insert(schema.inboxFileChunks).values({ fileId, idx, data }).onConflictDoNothing();
   if (!last) return false;
   const [f] = await db.select().from(schema.inboxFiles).where(eq(schema.inboxFiles.id, fileId)).limit(1);
@@ -187,23 +235,18 @@ export async function sendReply(input: { emailId: number; body: string; fileIds:
   if (!found) throw new Error("Email not found.");
   const body = input.body.trim();
   if (!body) throw new Error("Write a reply first.");
-  const files = [];
-  for (const id of input.fileIds) {
-    const f = await fileBytes(id);
-    if (!f || f.file.emailId || f.file.replyId) throw new Error("An attachment didn't upload. Please attach it again.");
-    files.push(f);
-  }
+  const { files, linked, linkText } = await outgoingFiles(input.fileIds);
   if (files.reduce((n, f) => n + f.data.length, 0) > INBOX_FILE_MAX_BYTES) throw new Error(`Attachments can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
   const e = found.email;
   const subject = /^re:/i.test(e.subject ?? "") ? e.subject! : `Re: ${e.subject ?? ""}`.trim();
-  const text = body; // the logo and signature are added to every email (src/lib/email-brand.ts)
+  const text = body + linkText; // the logo and signature are added to every email (src/lib/email-brand.ts)
   const headers = e.messageId ? { "In-Reply-To": e.messageId, References: e.messageId } : undefined;
   const res = await sendEmail(e.fromAddress, subject, text, files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), { headers, record: false });
   const [reply] = await db
     .insert(schema.inboxReplies)
     .values({ emailId: e.id, toAddress: e.fromAddress, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })
     .returning();
-  for (const f of files) await db.update(schema.inboxFiles).set({ replyId: reply.id }).where(eq(schema.inboxFiles.id, f.file.id));
+  for (const id of [...files.map((f) => f.file.id), ...linked]) await db.update(schema.inboxFiles).set({ replyId: reply.id }).where(eq(schema.inboxFiles.id, id));
   if (!e.readAt) await setRead(e.id, true);
   return reply;
 }
@@ -218,12 +261,7 @@ export async function sendNewEmail(input: { to: string; subject: string; body: s
   if (!subject) throw new Error("Write a subject first.");
   const body = input.body.trim();
   if (!body) throw new Error("Write your email first.");
-  const files = [];
-  for (const id of input.fileIds) {
-    const f = await fileBytes(id);
-    if (!f || f.file.emailId || f.file.replyId) throw new Error("An attachment didn't upload. Please attach it again.");
-    files.push(f);
-  }
+  const { files, linked, linkText } = await outgoingFiles(input.fileIds);
   // Forward (Gmail-style Inbox): the original email's attachments go along
   const forwarded: { filename: string; content: string }[] = [];
   if (input.forwardOf) {
@@ -243,13 +281,13 @@ export async function sendNewEmail(input: { to: string; subject: string; body: s
   if (files.reduce((n, f) => n + f.data.length, 0) > INBOX_FILE_MAX_BYTES) throw new Error(`Attachments can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
   if (files.reduce((n, f) => n + f.data.length, 0) + forwarded.reduce((n, f) => n + Buffer.byteLength(f.content, "base64"), 0) > INBOX_FILE_MAX_BYTES)
     throw new Error(`Attachments, with the forwarded ones, can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
-  const text = body; // the logo and signature are added to every email (src/lib/email-brand.ts)
+  const text = body + linkText; // the logo and signature are added to every email (src/lib/email-brand.ts)
   const res = await sendEmail(to, subject, text, [...files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), ...forwarded], { record: false, noThanks: Boolean(input.attachCatalog) });
   const [sent] = await db
     .insert(schema.inboxReplies)
     .values({ emailId: null, toAddress: to, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })
     .returning();
-  for (const f of files) await db.update(schema.inboxFiles).set({ replyId: sent.id }).where(eq(schema.inboxFiles.id, f.file.id));
+  for (const id of [...files.map((f) => f.file.id), ...linked]) await db.update(schema.inboxFiles).set({ replyId: sent.id }).where(eq(schema.inboxFiles.id, id));
   return sent;
 }
 

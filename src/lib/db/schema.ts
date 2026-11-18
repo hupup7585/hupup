@@ -1159,6 +1159,9 @@ export const inboxFiles = pgTable("inbox_files", {
   sizeBytes: integer("size_bytes").notNull(),
   complete: boolean("complete").notNull().default(false),
   tooBig: boolean("too_big").notNull().default(false),
+  /** Over 18 MB (Abraham, Nov 18, 2026): kept in R2 (inbox-files/<id>/<piece>) and sent as a download link */
+  inR2: boolean("in_r2").notNull().default(false),
+  receivedBytes: integer("received_bytes").notNull().default(0),
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

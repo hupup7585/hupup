@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { discardDraftAction, replyFileChunkAction, saveDraftAction, sendNewEmailAction, sendReplyAction, startReplyFileAction } from "../actions";
 
 const CHUNK = 3 * 1024 * 1024;
-const MAX = 18 * 1024 * 1024; // same as INBOX_FILE_MAX_BYTES (18 MB in all per email)
+const MAX = 18 * 1024 * 1024; // same as INBOX_FILE_MAX_BYTES (18 MB attached in all per email)
+const LINK_MAX = 100 * 1024 * 1024; // a single file over 18 MB, up to 100 MB, goes as a 30-day download link (Nov 18, 2026)
 
 /**
  * Reply from Hup Up Attractions <info@hupupattractions.com>, signed "Hup Up Attractions". Attachments up to 18 MB in all.
@@ -50,11 +51,13 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
   const [progress, setProgress] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const ref = useRef<HTMLInputElement>(null);
-  const total = files.reduce((n, f) => n + f.size, 0);
+  // Files over 18 MB are sent as a download link, so only the smaller ones count toward the 18 MB attached
+  const attached = files.filter((f) => f.size <= MAX).reduce((n, f) => n + f.size, 0);
 
   async function send() {
     setMsg(null);
-    if (total > MAX) return setMsg({ ok: false, message: "Attachments can be up to 18 MB in all." });
+    if (files.some((f) => f.size > LINK_MAX)) return setMsg({ ok: false, message: "A file can be up to 100 MB." });
+    if (attached > MAX) return setMsg({ ok: false, message: "Attachments can be up to 18 MB in all. Files over 18 MB each go as a download link." });
     const ids: number[] = [];
     for (const f of files) {
       const opened = await startReplyFileAction(f.name, f.type, f.size);
@@ -138,7 +141,10 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
           </span>
         ))}
         {props.forwardFiles?.map((n) => <span key={n} className="rounded-full bg-[#D3E7F8] px-2 py-0.5 text-xs" data-forward-file>{n} (from the original)</span>)}
-        <span className={`text-xs ${total > MAX ? "font-bold text-coral-dark" : "text-muted"}`}>{files.length ? `${(total / 1024 / 1024).toFixed(1)} MB of 18 MB` : "Up to 18 MB in all"}</span>
+        <span className={`text-xs ${attached > MAX ? "font-bold text-coral-dark" : "text-muted"}`}>
+          {files.length ? `${(attached / 1024 / 1024).toFixed(1)} MB of 18 MB attached` : "Up to 18 MB attached"}
+          {files.some((f) => f.size > MAX) ? `; ${files.filter((f) => f.size > MAX).length} sent as a download link` : "; larger files up to 100 MB go as a download link"}
+        </span>
       </div>
       <div className="mt-3 flex items-center gap-3">
         <button className="btn-dark" disabled={!props.active || pending || !body.trim() || (isNew && (!to.trim() || !subject.trim()))} onClick={() => start(send)}>

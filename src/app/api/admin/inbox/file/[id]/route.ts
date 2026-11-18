@@ -7,7 +7,16 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const s = await currentStaff();
   if (!s || s.role !== "owner") return new Response("Unauthorized", { status: 401 });
-  const f = await fileBytes(Number((await ctx.params).id));
+  const id = Number((await ctx.params).id);
+  // A large file kept in R2 (Abraham, Nov 18, 2026): the same download link the customer got, fresh for 30 days
+  const { db, schema } = await import("@/lib/db");
+  const { eq } = await import("drizzle-orm");
+  const [row] = await db.select({ inR2: schema.inboxFiles.inR2 }).from(schema.inboxFiles).where(eq(schema.inboxFiles.id, id)).limit(1);
+  if (row?.inR2) {
+    const { fileLink } = await import("@/lib/file-links");
+    return Response.redirect(fileLink(id), 302);
+  }
+  const f = await fileBytes(id);
   if (!f) return new Response("Not found", { status: 404 });
   const name = f.file.fileName.replace(/[^\w.\- ]/g, "_");
   const download = new URL(req.url).searchParams.get("download") === "1";
