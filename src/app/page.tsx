@@ -147,7 +147,7 @@ export default async function Home() {
             </div>
             <p data-catalog-line className="mt-8 text-lg leading-relaxed text-hu-deep/85">
               {CATALOG_LINE.before}
-              <a href={`mailto:${CATALOG_LINE.email}?subject=Catalog`} className="font-bold underline decoration-hu-yellow decoration-[3px] underline-offset-4">
+              <a href={`mailto:${CATALOG_LINE.email}?subject=Catalog`} className="font-bold underline decoration-hu-yellow decoration-[3px] underline-offset-4 [text-decoration-skip-ink:none]">
                 {CATALOG_LINE.email}
               </a>
               {CATALOG_LINE.after}

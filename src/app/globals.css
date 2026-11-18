@@ -84,3 +84,9 @@ html {
   @apply inline-block rounded-full border-2 border-hu-deep bg-hu-yellow px-4 py-1.5 text-sm font-extrabold uppercase tracking-wide text-hu-deep;
 }
 }
+
+/* Underlines are one solid, unbroken line, never gapped under letters like @ or p (Abraham, Nov 18, 2026) */
+html {
+  text-decoration-skip-ink: none;
+}
+

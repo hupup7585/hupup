@@ -63,7 +63,7 @@ export const NAV_GROUPS: Group[] = [
       ["/admin/catalog", Package, "Catalog", O],
       ["/admin/catalog-send", FileText, "Catalog email & text", O], // Abraham, Nov 17, 2026: catalog PDF + text pictures
       ["/admin/offers", Percent, "Offers", O], // Abraham, Nov 17, 2026: offers on their own page
-      ["/admin/discounts", Percent, "Discounts", O], // a discount for one customer (Abraham, Nov 17-18, 2026)
+      ["/admin/discounts", BadgePercent, "Discounts", O], // a discount for one customer (Abraham, Nov 17-18, 2026)
       ["/admin/units", Boxes, "Equipment units", OS], // Abraham, Nov 15, 2026: Owner edits, Secretary views
     ],
   },
