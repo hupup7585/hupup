@@ -1468,10 +1468,12 @@ export const phonepayAttempts = pgTable(
     tryNumber: integer("try_number").notNull().default(1),
     /** The caller's phone (declines are counted per phone over 24 hours) */
     callerPhone: text("caller_phone"),
-    /** What the watcher saw in Sola while the call to Sola was up: "approved" | "declined" | "timeout" (Nov 17, 2026) */
+    /** What the watcher saw in Sola while the call to Sola was up: "approved" | "declined" | "silence" (Nov 18, 2026) */
     solaSeen: text("sola_seen"),
     /** Box 147 (Nov 18, 2026): Sola refs that could belong to this try but were not certain; voided once a later try pays */
     unclearRefs: text("unclear_refs"),
+    /** Sola hang-up helper (Nov 18, 2026): when it hung up the call to Sola at the end of Sola's sentence */
+    helperEndedAt: timestamp("helper_ended_at", { withTimezone: true }),
   },
   (t) => [index("phonepay_attempts_started_idx").on(t.startedAt)],
 );

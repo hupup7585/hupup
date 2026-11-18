@@ -66,8 +66,9 @@ export async function blockers(env: Record<string, string | undefined> = process
     {
       key: "sms-catalog",
       area: "Text CATALOG to the hotline for an automatic reply",
-      active: false,
-      reason: "Waiting for Twilio to approve texting (A2P 10DLC).",
+      // On whenever texting is on (Twilio approved texting on Nov 15, 2026; Abraham, Nov 18, 2026)
+      active: twilio && Boolean(env.TWILIO_MESSAGING_SERVICE_SID),
+      reason: "On once texting is on: needs TWILIO_MESSAGING_SERVICE_SID in Vercel.",
       where: "/admin/messages",
     },
     {

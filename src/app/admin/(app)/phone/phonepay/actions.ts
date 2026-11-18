@@ -38,6 +38,11 @@ export async function savePhonePayAction(form: FormData) {
   await saveSetting("phonePayCallsPerDay", String(declines), owner.userId);
   const waitSec = Number(form.get("declineHangupSeconds"));
   if (Number.isFinite(waitSec) && waitSec >= 0 && waitSec <= 15) await saveSetting("phonePayDeclineHangupSeconds", String(waitSec), owner.userId);
+  // Sola hang-up helper (Abraham, Nov 18, 2026, option a): on/off and the silence check seconds
+  const silence = Math.floor(Number(form.get("silenceSeconds")));
+  if (!(silence >= 5 && silence <= 120)) return back("The silence check must be a number of seconds from 5 to 120.");
+  await saveSetting("phonePaySilenceSeconds", String(silence), owner.userId);
+  await saveSetting("solaListenOn", form.get("listenOn") === "on", owner.userId);
   await saveSetting("solaPhonePayOn", on, owner.userId);
   await saveSetting("solaPhonePayOwnerOnly", ownerOnly, owner.userId);
   await saveSetting("solaPhonePayNumber", number, owner.userId);
@@ -54,7 +59,7 @@ export async function savePhonePayAction(form: FormData) {
     entityType: "settings",
     entityId: "sola_phonepay",
     before: { provider: before.phoneCardProvider, on: before.solaPhonePayOn, ownerOnly: before.solaPhonePayOwnerOnly, number: before.solaPhonePayNumber, backup: before.solaPhonePayBackup, digits: before.solaPhonePayDigits },
-    after: { on, ownerOnly, number, backup, digits, customDigits, customCap, testNumbers, provider, tries, declines },
+    after: { on, ownerOnly, number, backup, digits, customDigits, customCap, testNumbers, provider, tries, declines, listenOn: form.get("listenOn") === "on", silence },
   });
   revalidatePath("/admin/phone/phonepay");
   return back("Saved.");

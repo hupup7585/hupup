@@ -53,7 +53,13 @@ export async function r2Used(): Promise<number> {
 
 export async function r2Put(key: string, data: Uint8Array, contentType: string) {
   const { client, base } = await r2();
-  const r = await client.fetch(`${base}/${key}`, { method: "PUT", body: new Uint8Array(data), headers: { "content-type": contentType } });
+  const body = new Uint8Array(data);
+  // Sign first, then send the bytes themselves: a signed Request turns the body into a stream with no size, and R2
+  // refuses that with 411 (Length Required) — the music upload error of Nov 18, 2026.
+  const signed = await client.sign(`${base}/${key}`, { method: "PUT", body, headers: { "content-type": contentType } });
+  const headers = new Headers(signed.headers);
+  headers.set("content-length", String(body.byteLength));
+  const r = await fetch(signed.url, { method: "PUT", headers, body });
   if (!r.ok) throw new Error(`Photo storage refused the file (${r.status}).`);
 }
 

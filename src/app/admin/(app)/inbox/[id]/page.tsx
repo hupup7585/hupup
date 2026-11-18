@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOwner } from "@/lib/auth";
 import { getInboxEmail, repliesActive, setRead } from "@/lib/inbox";
-import { inboxWhen, sizeLabel } from "@/lib/inbox-format";
+import { htmlToText, inboxWhen, sizeLabel } from "@/lib/inbox-format";
+import EmailHtml from "@/components/admin/EmailHtml";
 import ReplyForm from "./ReplyForm";
 import MailShell from "../MailShell";
 import StarButton from "./StarButton";
@@ -83,11 +84,11 @@ export default async function InboxEmailPage({ params }: { params: Promise<{ id:
           )}
         </div>
         <div className="mt-4 border-t border-line pt-4">
-          {email.textBody?.trim() ? (
+          {email.textBody?.trim() && !email.htmlBody?.trim() ? (
             <pre className="whitespace-pre-wrap break-words font-sans text-[15px] leading-relaxed">{email.textBody}</pre>
-          ) : email.htmlBody ? (
+          ) : email.htmlBody?.trim() ? (
             // HTML-only email: shown in a locked frame (no scripts, no forms, no outside requests run)
-            <iframe title="Email" sandbox="" srcDoc={email.htmlBody} className="h-[60vh] w-full rounded-lg border border-line bg-white" />
+            <EmailHtml html={email.htmlBody} text={email.textBody?.trim() || htmlToText(email.htmlBody)} />
           ) : (
             <p className="text-muted">(no text)</p>
           )}

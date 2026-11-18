@@ -48,7 +48,7 @@ import {
 } from "@/lib/sms-consent";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { stripePhonePayMode, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
-import { blockIfTooManyCalls, isPhonePayBlocked, phonePayLimits, startPayWatch } from "@/lib/phonepay-watch";
+import { blockIfTooManyCalls, isPhonePayBlocked, phonePayLimits, startPayWatch, startSolaListen } from "@/lib/phonepay-watch";
 import { PHONEPAY_NOT_REACHED, amountParts, buildSendDigits, checkPhonePayTry, customChargeMadeBy, endMainPayLeg, endPayLeg, matchCustomCharge, parseCustomAmount, payQueueName, phonePayDirectDial, phonePayOffered, startPayLegWithMusic, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
@@ -2594,7 +2594,7 @@ const handlers: Record<string, Handler> = {
     const attempt = await startAttempt(o, ctx.callSid, group.due);
     await db.update(schema.phonepayAttempts).set({ tryNumber: n, callerPhone: callerPhoneOf(ctx) }).where(eq(schema.phonepayAttempts.id, attempt.id));
     await track(ctx.callSid, "step", `Card payment try ${n} of ${limits.triesPerCall} started for order #${orderNumber(o)}`, { attempt: attempt.id });
-    // Watch Sola while the call to Sola is up: hang it up as soon as a charge shows, or after 4 minutes
+    // Watch Sola every second while the call to Sola is up (no time limit, Abraham, Nov 18, 2026)
     await startPayWatch(attempt.id);
     // Box 140 already told the caller they are being connected; later tries keep the "please hold" line
     if (earlier.length) sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true });
@@ -2608,7 +2608,10 @@ const handlers: Record<string, Handler> = {
       vr.enqueue({ waitUrl: url("music", { place: "pay" }), waitUrlMethod: "POST", action: url("phonepay-done", { o, a: attempt.id }), method: "POST" }, payQueueName(ctx.callSid));
       return vr;
     }
-    phonePayDirectDial(vr, { number: s.solaPhonePayNumber, digits, action: url("phonepay-done", { o, a: attempt.id }), hangupOnStar: true });
+    // Sola hang-up helper (option a, once the Owner turns it on after the real test call): Sola's voice is what we send
+    // to the caller on this call
+    if (s.solaListenOn) startSolaListen(vr, attempt.id, "outbound", s);
+    phonePayDirectDial(vr, { number: s.solaPhonePayNumber, digits, action: url("phonepay-done", { o, a: attempt.id, ...(s.solaListenOn ? { ls: 1 } : {}) }), hangupOnStar: true });
     return vr;
   },
 
@@ -2622,6 +2625,8 @@ const handlers: Record<string, Handler> = {
     }
     const s = await getSettings();
     const digits = buildSendDigits(s.solaPhonePayDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: attempt.amountCents, orderNumber: orderNumber(attempt.orderId) });
+    // Sola hang-up helper (option a): on this call Sola is who answered, so Sola's voice is the incoming audio
+    if (s.solaListenOn) startSolaListen(vr, a, "inbound", s);
     vr.play({ digits }); // the key tones go to Sola only; the caller is still on hold with the music
     const dial = vr.dial({ record: "do-not-record", timeLimit: 900 });
     dial.queue(payQueueName(attempt.callSid));
@@ -2687,6 +2692,9 @@ const handlers: Record<string, Handler> = {
     const o = Number(ctx.query.get("o"));
     const a = Number(ctx.query.get("a"));
     if (ctx.session?.data.recording) await resumeRecording(ctx.callSid).catch(() => null);
+    // The helper stops listening once the caller is back on our line (it never hears our own prompts)
+    const listening = ctx.query.get("ls") === "1";
+    if (a && listening) vr.stop().stream({ name: `sola-${a}` });
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "goodbye");
     if (group.due <= 0) return back(vr, "pay-approved", { o });
@@ -2697,7 +2705,8 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "step", `Payment line did not answer (${status}); trying the backup number`, { attempt: a });
       const s = await getSettings();
       const digits = buildSendDigits(s.solaPhonePayDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: group.due, orderNumber: orderNumber(o) });
-      phonePayDirectDial(vr, { number: s.solaPhonePayBackup, digits, action: url("phonepay-done", { o, a, b: 1 }), hangupOnStar: true });
+      if (s.solaListenOn) startSolaListen(vr, a, "outbound", s); // a new stream for the backup number
+      phonePayDirectDial(vr, { number: s.solaPhonePayBackup, digits, action: url("phonepay-done", { o, a, b: 1, ...(s.solaListenOn ? { ls: 1 } : {}) }), hangupOnStar: true });
       return vr;
     }
     if (a) {
@@ -2712,6 +2721,9 @@ const handlers: Record<string, Handler> = {
       // Box 147 (Abraham, Nov 18, 2026): not certain which charge is this caller's: "Sorry, we could not confirm your
       // payment. To try again, press 1."
       if (r.result === "unclear") return back(vr, "phonepay-retry", { o, n, u: 1 });
+      // Silence check (Abraham, Nov 18, 2026): 20 seconds with no Sola voice, no keys and no result in Sola's record, and
+      // still none on the last look = the same box 147 line
+      if (attempt?.solaSeen === "silence") return back(vr, "phonepay-retry", { o, n, u: 1 });
     }
     return back(vr, "phonepay-retry", { o, n });
   },

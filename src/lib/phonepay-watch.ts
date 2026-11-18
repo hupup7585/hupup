@@ -12,7 +12,8 @@ export { isPhonePayInvoice };
  *  - while the call to Sola is up, Sola's reporting API is checked every second for a charge of this try's amount
  *    (approved or declined) made since the try started; as soon as one shows, the call to Sola is hung up (Twilio REST),
  *    so the caller is back on our line before Sola's amount question;
- *  - the call to Sola is also hung up after 4 minutes with no charge;
+ *  - no time limit (Abraham, Nov 18, 2026: the 4-minute timer is removed); the Sola hang-up helper (option a) times the
+ *    hang-up at the end of Sola's sentence and runs the silence check; if the helper fails, the old timing is used;
  *  - a charge that is not the order total is voided and the Owner emailed (checkPhonePayTry, as before);
  *  - tries per call and declines per caller phone in 24 hours are Admin settings (3 and 5 to start); past the second,
  *    card payment by phone is blocked for that number, the Owner is emailed, and staff can unlock it in Admin.
@@ -26,7 +27,7 @@ export const WATCH_CHUNK_BUDGET_MS = 40_000;
 /**
  * Hang-up timing (Abraham, Nov 18, 2026: never cut Sola off mid-sentence). The charge shows in Sola's report about when
  * Sola starts saying the result, so hanging up at once would cut it off.
- *  - Approved: Sola reads the reference number and hangs up by itself; we never hang up (the 4-minute cap aside).
+ *  - Approved: Sola reads the reference number and hangs up by itself; we never hang up.
  *  - Declined: we wait while Sola says the result (Admin setting, seconds, measured on a test call), then hang up
  *    before Sola asks for a new amount.
  */
@@ -34,7 +35,8 @@ export function declineHangupMs(s: Record<string, unknown>): number {
   const x = Number(s.phonePayDeclineHangupSeconds);
   return Number.isFinite(x) && x >= 0 && x <= 15 ? Math.round(x * 1000) : 6000;
 }
-export const WATCH_LIMIT_MS = 4 * 60_000;
+/** Not a hang-up timer: the watcher only stops looking after the longest possible call to Sola (15 minutes) has passed. */
+export const WATCH_STOP_MS = 16 * 60_000;
 
 
 /** Approved and declined Sola charges between two times (two read-only reports; SOLA_API_KEY stays on the server). */
@@ -66,18 +68,19 @@ export async function solaTransactionsBetween(from: Date, to: Date, fetcher: typ
   return [...ok, ...no];
 }
 
-export type WatchAttempt = { startedAt: Date; endedAt: Date | null; amountCents: number; result: string | null };
+export type WatchAttempt = { startedAt: Date; endedAt: Date | null; amountCents: number; result: string | null; solaSeen?: string | null };
 
 /**
- * One look while the call to Sola is up: "stop" (the caller is already back), "timeout" (4 minutes, no charge),
- * "approved" / "declined" (a charge of this try's amount since the try started: hang up now), or "wait".
+ * One look while the call to Sola is up: "stop" (the caller is already back, the silence check hung up, or the call to
+ * Sola cannot still be up), "approved" / "declined" (a charge of this try's amount since the try started), or "wait".
+ * Never a time limit on the call itself (Abraham, Nov 18, 2026).
  */
-export function watchDecision(a: WatchAttempt, txns: SolaTxn[], now: Date, used: Set<string> = new Set()): "stop" | "timeout" | "approved" | "declined" | "wait" {
-  if (a.endedAt || a.result) return "stop";
+export function watchDecision(a: WatchAttempt, txns: SolaTxn[], now: Date, used: Set<string> = new Set()): "stop" | "approved" | "declined" | "wait" {
+  if (a.endedAt || a.result || a.solaSeen === "silence") return "stop";
   const mine = txns.filter((t) => t.refNum && !used.has(t.refNum) && t.amountCents === a.amountCents && isPhonePayInvoice(t.invoice) && t.at >= new Date(a.startedAt.getTime() - 60_000));
   if (mine.some((t) => t.approved)) return "approved";
   if (mine.length) return "declined";
-  if (now.getTime() - a.startedAt.getTime() >= WATCH_LIMIT_MS) return "timeout";
+  if (now.getTime() - a.startedAt.getTime() >= WATCH_STOP_MS) return "stop";
   return "wait";
 }
 
@@ -99,14 +102,16 @@ export async function endSolaLeg(a: { callSid: string; payLegSid: string | null 
 export async function runWatchChunk(
   attemptId: number,
   budgetMs = WATCH_CHUNK_BUDGET_MS,
-  deps: { fetcher?: typeof fetch; now?: () => Date; sleep?: (ms: number) => Promise<void>; end?: typeof endSolaLeg; declineWaitMs?: number } = {},
+  deps: { fetcher?: typeof fetch; now?: () => Date; sleep?: (ms: number) => Promise<void>; end?: typeof endSolaLeg; declineWaitMs?: number; helper?: (attemptId: number) => Promise<boolean>; helperOn?: boolean } = {},
 ): Promise<boolean> {
   const now = deps.now ?? (() => new Date());
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const until = now().getTime() + budgetMs;
   const { usedSolaRefs } = await import("@/lib/sola-phonepay");
   const { getSettings } = await import("@/lib/settings");
-  const declineWait = deps.declineWaitMs ?? declineHangupMs(await getSettings());
+  const settings = await getSettings();
+  const declineWait = deps.declineWaitMs ?? declineHangupMs(settings);
+  const helperOn = deps.helperOn ?? settings.solaListenOn === true;
   while (now().getTime() < until) {
     const [a] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
     if (!a) return false;
@@ -120,7 +125,15 @@ export async function runWatchChunk(
     if (d === "stop") return false;
     if (d !== "wait") {
       await db.update(schema.phonepayAttempts).set({ solaSeen: d }).where(eq(schema.phonepayAttempts.id, attemptId));
-      // Approved: Sola reads the reference number and hangs up by itself, so it is never cut off
+      // Option a: the helper hangs up about half a second after Sola stops talking (approved or declined)
+      if (helperOn && (await (deps.helper ?? tellHelper)(attemptId))) {
+        if (await helperHungUpWithin(attemptId, HELPER_GRACE_MS, now, sleep)) return false;
+        console.error("[phonepay watch] the helper did not hang up in time; using the set seconds instead");
+        if (d === "approved") return false; // Sola hangs up by itself after reading the reference number
+        await (deps.end ?? endSolaLeg)({ callSid: a.callSid, payLegSid: a.payLegSid });
+        return false;
+      }
+      // Option c (no helper, or it failed): Approved: Sola reads the reference number and hangs up by itself, so it is never cut off
       if (d === "approved") return false;
       // Declined: let Sola finish saying the result, then hang up before it asks for a new amount
       if (d === "declined") await sleep(declineWait);
@@ -130,6 +143,97 @@ export async function runWatchChunk(
     await sleep(WATCH_INTERVAL_MS);
   }
   return true;
+}
+
+/* ---- Sola hang-up helper (Abraham, Nov 18, 2026, option a) ---- */
+
+/** The helper on our free Cloudflare account (workers.dev address; no DNS). */
+export const LISTEN_HOST = "hupup-sola-listen.hupup-attractions.workers.dev";
+/** How long the watcher waits for the helper's hang-up before falling back to option c. */
+export const HELPER_GRACE_MS = 15_000;
+/** "About half a second" of no Sola voice = the end of Sola's sentence. */
+export const HELPER_PAUSE_MS = 500;
+
+export function silenceSeconds(s: Record<string, unknown>): number {
+  const x = Math.floor(Number(s.phonePaySilenceSeconds));
+  return x >= 5 && x <= 120 ? x : 20;
+}
+
+const signFor = (scope: string, attemptId: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`${scope}:${attemptId}`).digest("hex").slice(0, 32);
+const same = (a: string, b: string | null) => Boolean(b) && a.length === (b ?? "").length && timingSafeEqual(Buffer.from(a), Buffer.from(b ?? ""));
+/** Our signed addresses the helper calls: "hangup" (the result is in and Sola stopped talking) or "silence". */
+export const helperUrl = (attemptId: number, what: "hangup" | "silence") => `${config.baseUrl()}/api/voice-watch/sola-listen?a=${attemptId}&do=${what}&s=${signFor(`sola-listen-${what}`, attemptId)}`;
+export const verifyHelper = (attemptId: number, what: string, s: string | null) => (what === "hangup" || what === "silence") && attemptId > 0 && same(signFor(`sola-listen-${what}`, attemptId), s);
+
+/**
+ * TwiML: send the audio of the call to Sola to the helper (Twilio Media Streams, about 1 cent per payment call,
+ * approved by Abraham). `solaTrack`: "inbound" on our separate call to Sola (Sola is who answered), "outbound" on the
+ * caller's own call (Sola's voice is what we send to the caller). Never recorded; the helper only measures loudness.
+ */
+export function startSolaListen(vr: { start: () => { stream: (a: Record<string, unknown>) => { parameter: (p: { name: string; value: string }) => unknown } } }, attemptId: number, solaTrack: "inbound" | "outbound", s: Record<string, unknown>) {
+  const stream = vr.start().stream({ url: `wss://${LISTEN_HOST}/stream/${attemptId}`, track: "both_tracks", name: `sola-${attemptId}` });
+  stream.parameter({ name: "hangup", value: helperUrl(attemptId, "hangup") });
+  stream.parameter({ name: "silence", value: helperUrl(attemptId, "silence") });
+  stream.parameter({ name: "solaTrack", value: solaTrack });
+  stream.parameter({ name: "pauseMs", value: String(HELPER_PAUSE_MS) });
+  stream.parameter({ name: "silenceSec", value: String(silenceSeconds(s)) });
+}
+
+/** Tell the helper Sola's record shows the result; true = it is listening to this call and will hang up. */
+export async function tellHelper(attemptId: number, fetcher: typeof fetch = fetch): Promise<boolean> {
+  try {
+    const r = await fetcher(`https://${LISTEN_HOST}/result/${attemptId}`, { method: "POST", signal: AbortSignal.timeout(3000) });
+    const j = (await r.json().catch(() => ({}))) as { listening?: boolean };
+    return r.ok && j.listening === true;
+  } catch {
+    return false;
+  }
+}
+
+async function helperHungUpWithin(attemptId: number, ms: number, now: () => Date, sleep: (ms: number) => Promise<void>): Promise<boolean> {
+  const until = now().getTime() + ms;
+  while (now().getTime() < until) {
+    const [a] = await db.select({ h: schema.phonepayAttempts.helperEndedAt, e: schema.phonepayAttempts.endedAt }).from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
+    if (!a || a.h || a.e) return true;
+    await sleep(500);
+  }
+  return false;
+}
+
+/** The helper says: the result is in and Sola has stopped talking. Hang up only if Sola's record really shows a result. */
+export async function helperHangup(attemptId: number, end: typeof endSolaLeg = endSolaLeg): Promise<{ hungUp: boolean }> {
+  const [a] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
+  if (!a || a.endedAt || a.helperEndedAt || !["approved", "declined"].includes(a.solaSeen ?? "")) return { hungUp: false };
+  await db.update(schema.phonepayAttempts).set({ helperEndedAt: new Date() }).where(eq(schema.phonepayAttempts.id, attemptId));
+  await end({ callSid: a.callSid, payLegSid: a.payLegSid });
+  return { hungUp: true };
+}
+
+/**
+ * Silence check (Abraham, Nov 18, 2026): no Sola voice, no key tones and no result for the set seconds. Check Sola's
+ * record one more time: a result is used (the helper then hangs up at the end of Sola's sentence); still nothing = hang
+ * up the call to Sola, and the caller hears box 147 ("Sorry, we could not confirm your payment. To try again, press 1.").
+ */
+export async function helperSilence(attemptId: number, deps: { fetcher?: typeof fetch; end?: typeof endSolaLeg; now?: Date } = {}): Promise<{ result: "approved" | "declined" | null }> {
+  const [a] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
+  if (!a || a.endedAt || a.result || a.helperEndedAt) return { result: null };
+  if (a.solaSeen === "approved" || a.solaSeen === "declined") return { result: a.solaSeen };
+  const now = deps.now ?? new Date();
+  let txns: SolaTxn[] = [];
+  try {
+    txns = await solaTransactionsBetween(new Date(a.startedAt.getTime() - 60_000), new Date(now.getTime() + 60_000), deps.fetcher);
+  } catch {
+    /* Sola could not be checked: no result (the payment check on our line looks again) */
+  }
+  const { usedSolaRefs } = await import("@/lib/sola-phonepay");
+  const d = watchDecision(a, txns, now, await usedSolaRefs());
+  if (d === "approved" || d === "declined") {
+    await db.update(schema.phonepayAttempts).set({ solaSeen: d }).where(eq(schema.phonepayAttempts.id, attemptId));
+    return { result: d };
+  }
+  await db.update(schema.phonepayAttempts).set({ solaSeen: "silence", helperEndedAt: new Date() }).where(eq(schema.phonepayAttempts.id, attemptId));
+  await (deps.end ?? endSolaLeg)({ callSid: a.callSid, payLegSid: a.payLegSid });
+  return { result: null };
 }
 
 /** The signed address of the watcher for one try (only our server can start it). */

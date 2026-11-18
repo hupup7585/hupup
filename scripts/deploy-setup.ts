@@ -117,6 +117,35 @@ async function cloudflareSetup(env: NodeJS.ProcessEnv) {
     }
   }
 
+  // Sola hang-up helper (Abraham, Nov 18, 2026, option a): a Worker with a Durable Object (free plan, SQLite-backed)
+  // on the free workers.dev address. No secrets: our signed addresses reach it with each call's audio.
+  {
+    const code = readFileSync(join(process.cwd(), "cloudflare/sola-listen-worker.js"), "utf8");
+    const name = "hupup-sola-listen";
+    const upload = async (withMigration: boolean) => {
+      const form = new FormData();
+      form.append(
+        "metadata",
+        JSON.stringify({
+          main_module: "sola-listen-worker.js",
+          compatibility_date: "2026-11-01",
+          bindings: [{ type: "durable_object_namespace", name: "LISTEN", class_name: "SolaListen" }],
+          ...(withMigration ? { migrations: { new_tag: "v1", new_sqlite_classes: ["SolaListen"] } } : {}),
+        }),
+      );
+      form.append("sola-listen-worker.js", new Blob([code], { type: "application/javascript+module" }), "sola-listen-worker.js");
+      return cf("PUT", `/accounts/${account}/workers/scripts/${name}`, form);
+    };
+    let up = await upload(true);
+    // Already set up once: Cloudflare refuses the same migration again, so upload the code alone
+    if (!up.ok && /migration/i.test(up.errors)) up = await upload(false);
+    log(`Cloudflare: Sola hang-up helper (${name}) upload ${up.ok ? "done" : `failed (${up.status} ${up.errors})`} (code ${createHash("sha256").update(code).digest("hex").slice(0, 8)}).`);
+    if (up.ok) {
+      const sub = await cf("POST", `/accounts/${account}/workers/scripts/${name}/subdomain`, JSON.stringify({ enabled: true }), "application/json");
+      log(`Cloudflare: Sola hang-up helper address ${sub.ok ? "on" : `not on (${sub.status} ${sub.errors})`}.`);
+    }
+  }
+
   // Delivery photos bucket (R2 free tier: 10 GB stored a month)
   const b = await cf("GET", `/accounts/${account}/r2/buckets/${R2_PHOTOS_BUCKET}`);
   if (b.ok) log(`Cloudflare: R2 bucket ${R2_PHOTOS_BUCKET} is there.`);

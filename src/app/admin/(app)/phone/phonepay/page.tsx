@@ -77,7 +77,21 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
           <label className="block">
             <span className="label">After a decline, seconds before hanging up Sola</span>
             <input name="declineHangupSeconds" type="number" min={0} max={15} step={0.5} defaultValue={String(s.phonePayDeclineHangupSeconds)} className="input" />
-            <span className="mt-1 block text-xs text-muted">Sola is saying the result during this time; we hang up right after, before Sola asks for a new amount. Set it from a test call.</span>
+            <span className="mt-1 block text-xs text-muted">Sola is saying the result during this time; we hang up right after, before Sola asks for a new amount. Used when the hang-up helper is off or does not answer.</span>
+          </label>
+        </div>
+        <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2" data-sola-listen>
+          <label className="flex items-start gap-2 sm:col-span-2">
+            <input type="checkbox" name="listenOn" defaultChecked={s.solaListenOn} className="mt-1" />
+            <span>
+              <b>Sola hang-up helper.</b>{" "}
+              <span className="text-sm text-muted">The sound of the call to Sola goes to our free Cloudflare helper (about 1 cent per payment call, Twilio). Once Sola&rsquo;s record shows approved or declined, it hangs up about half a second after Sola stops talking. Nothing is recorded or kept; it only listens for when Sola is talking. Turn on after the real test call. When off, or if the helper does not answer, the seconds above are used.</span>
+            </span>
+          </label>
+          <label className="block">
+            <span className="label">Silence check, in seconds</span>
+            <input name="silenceSeconds" type="number" min={5} max={120} defaultValue={String(s.phonePaySilenceSeconds)} className="input" />
+            <span className="mt-1 block text-xs text-muted">With the helper on: no Sola voice, no key tones and no result in Sola&rsquo;s record for this long = check Sola once more. Still nothing: hang up the call to Sola and play box 147 (&ldquo;Sorry, we could not confirm your payment. To try again, press 1.&rdquo;).</span>
           </label>
         </div>
         <label className="block">

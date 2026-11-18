@@ -117,7 +117,7 @@ export const PROMPTS = {
   // Browsing
   category_intro: { group: "Browsing", label: "Category intro", text: "Awesome, {category}!", vars: ["category"] },
   category_item: { group: "Browsing", label: "Item option in a category", text: "For the {item}, press {key}.", vars: ["item", "key"] },
-  back_to_menu: { group: "Browsing", label: "Go back option", text: "To go back to the main menu, press star." },
+  back_to_menu: { group: "Browsing", label: "Go back option", text: "To go back, press star." }, // approved Nov 18, 2026
   category_empty: { group: "Browsing", label: "Category has no items", text: "Sorry, nothing is available in that section right now. Let us head back to the main menu." },
   product_intro: { group: "Browsing", label: "Item intro", text: "Great choice! The {item} is {price}. Delivery is available for an additional fee, and our team will give you the delivery price.", vars: ["item", "price"] },
   product_options: { group: "Browsing", label: "Item options", text: "To hear more about it, press 1. To add it to your cart, press 2. To go back, press star." },
@@ -154,8 +154,8 @@ export const PROMPTS = {
   date_unclear: { group: "Date & quantity", label: "Didn't understand the date", text: "Sorry, I did not quite get that date. Let us try that again." },
   date_confirm_day: { group: "Date & quantity", label: "Confirm the date (whole rental day, delivery and pickup times)", text: "Got it, {date}! We will deliver that day between 9 AM and noon, and pick up on {pickup}. Please have the rental outside your door by 9 AM that morning. If that is right, press pound to continue. To pick a different date, press 1.", vars: ["date", "pickup"] },
   sold_out: { group: "Date & quantity", label: "Item booked up", text: "Oh no, the {item} is all booked up on {date}.", vars: ["item", "date"] },
-  sold_out_options_cart: { group: "Date & quantity", label: "Booked-up options (has cart)", text: "To look at other rentals, press 1. To hear your cart, press 9. For the main menu, press star." },
-  sold_out_options: { group: "Date & quantity", label: "Booked-up options (no cart)", text: "To try a different date, press 1. To look at other rentals, press 2. For the main menu, press star." },
+  sold_out_options_cart: { group: "Date & quantity", label: "Booked-up options (has cart)", text: "To look at other rentals, press 1. To hear your cart, press 9. To go back, press star." }, // star line approved Nov 18, 2026
+  sold_out_options: { group: "Date & quantity", label: "Booked-up options (no cart)", text: "To try a different date, press 1. To look at other rentals, press 2. To go back, press star." }, // star line approved Nov 18, 2026
   qty_prompt: { group: "Date & quantity", label: "Ask how many", text: "Good news, we have {count} available on {date}! How many would you like? Press a number from 1 to {max}.", vars: ["count", "date", "max"] },
   qty_invalid: { group: "Date & quantity", label: "Bad quantity", text: "Let us try that again. Please press a number from 1 to 9." },
   only_some_left: { group: "Date & quantity", label: "Fewer left than asked", text: "Oh, only {count} are left for that date.", vars: ["count"] },

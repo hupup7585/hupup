@@ -82,6 +82,12 @@ export const SETTING_DEFAULTS = {
   // After Sola shows a DECLINED charge: seconds to wait (Sola is saying the result) before hanging up the call to Sola,
   // so the caller never hears Sola cut off mid-sentence or its new-amount question (Abraham, Nov 18, 2026). Set from a test call.
   phonePayDeclineHangupSeconds: "6",
+  // Sola hang-up helper (Abraham, Nov 18, 2026, option a): Twilio sends the Sola call audio to our free Cloudflare
+  // helper, which hangs up about half a second after Sola stops talking once Sola's record shows the result. Off until
+  // the real test call passes (then the Owner ticks it in Admin > Phone > Sola PhonePay).
+  solaListenOn: false,
+  // Silence check: no Sola voice, no key tones and no result for this many seconds = check Sola once more, then box 147
+  phonePaySilenceSeconds: "20",
   solaPhonePayOwnerOnly: false,
   solaPhonePayNumber: "+18334343354",
   solaPhonePayBackup: "+18444227356",
