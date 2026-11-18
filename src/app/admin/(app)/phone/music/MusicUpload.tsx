@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { finishTrackAction, savePieceAction, startTrackAction } from "./actions";
+import { finishOriginalAction, finishTrackAction, saveOriginalPieceAction, savePieceAction, startTrackAction } from "./actions";
 
 const RATE = 8000; // phone quality
 const PIECE_SECONDS = 8;
+const ORIGINAL_PIECE = 3 * 1024 * 1024; // the original file goes up in 3 MB pieces (under the 4.5 MB upload limit)
+const ORIGINAL_MAX = 200 * 1024 * 1024;
 
 /** 16-bit mono WAV for one piece of samples (-1..1). */
 function wav(samples: Float32Array): Blob {
@@ -35,8 +37,7 @@ export default function MusicUpload() {
   const [busy, setBusy] = useState(false);
   const router = useRouter();
 
-  async function upload(file: File) {
-    setBusy(true);
+  async function upload(file: File): Promise<boolean> {
     try {
       setStatus(`Reading ${file.name}...`);
       const ctx = new AudioContext();
@@ -60,22 +61,59 @@ export default function MusicUpload() {
         const r = await savePieceAction(fd);
         if (!r.ok) throw new Error("A piece could not be saved.");
       }
+      // The original file, full quality, for Download and full playback (Abraham, Nov 18, 2026)
+      if (file.size <= ORIGINAL_MAX) {
+        const parts = Math.ceil(file.size / ORIGINAL_PIECE);
+        for (let n = 0; n < parts; n++) {
+          setStatus(`Keeping the original of ${file.name}: ${Math.round(((n + 1) / parts) * 100)}%`);
+          const fd = new FormData();
+          fd.set("id", String(id));
+          fd.set("n", String(n));
+          fd.set("piece", new File([file.slice(n * ORIGINAL_PIECE, (n + 1) * ORIGINAL_PIECE)], `${n}`, { type: "application/octet-stream" }));
+          const r = await saveOriginalPieceAction(fd);
+          if (!r.ok) throw new Error("The original file could not be saved.");
+        }
+        await finishOriginalAction(id, { name: file.name, type: file.type, bytes: file.size, pieces: parts });
+      }
       await finishTrackAction(id, count, decoded.duration);
       setStatus(`${file.name} is ready.`);
-      router.refresh();
+      return true;
     } catch (e) {
-      setStatus(`Could not use that file: ${(e as Error).message || "unknown problem"}. Try an MP3 or WAV file.`);
-    } finally {
-      setBusy(false);
+      setStatus(`Could not use ${file.name}: ${(e as Error).message || "unknown problem"}. Try an MP3 or WAV file.`);
+      return false;
     }
+  }
+
+  /** Several songs at once, one after another, in the order chosen. */
+  async function uploadAll(files: File[]) {
+    setBusy(true);
+    let ok = 0;
+    for (const f of files) if (await upload(f)) ok++;
+    setBusy(false);
+    if (files.length > 1) setStatus(`${ok} of ${files.length} songs are ready.`);
+    router.refresh();
   }
 
   return (
     <div data-music-upload>
-      <label className="btn-dark inline-block cursor-pointer">
-        {busy ? "Working..." : "Upload a song"}
-        <input type="file" accept="audio/*" className="hidden" disabled={busy} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
-      </label>
+      {/* A real button, like "Upload recording" on Hotline prompts; the file box is visually hidden but reachable */}
+      <button type="button" className="btn-dark" disabled={busy} onClick={(e) => (e.currentTarget.nextElementSibling as HTMLInputElement | null)?.click()} data-music-upload-button>
+        {busy ? "Working..." : "Upload songs"}
+      </button>
+      <input
+        type="file"
+        accept="audio/*"
+        multiple
+        className="sr-only"
+        aria-label="Upload songs"
+        data-music-file
+        disabled={busy}
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (files.length) void uploadAll(files);
+        }}
+      />
       {status && <p className="mt-2 text-sm text-muted">{status}</p>}
     </div>
   );

@@ -2,7 +2,7 @@ import { asc, isNull } from "drizzle-orm";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
-import { MUSIC_PLACES, pieceUrl, type MusicPlace } from "@/lib/music";
+import { MUSIC_PLACES, type MusicPlace } from "@/lib/music";
 import ConfirmSubmit from "@/components/ConfirmSubmit";
 import MusicUpload from "./MusicUpload";
 import { savePlacesAction, trashTrackAction } from "./actions";
@@ -29,7 +29,13 @@ export default async function MusicPage() {
             <li key={t.id} className="flex flex-wrap items-center gap-3 py-3">
               <span className="flex-1 font-bold">{t.name}</span>
               <span className="text-sm text-muted">{t.complete ? mins(t.durationSec) : "Not finished"}</span>
-              {t.complete && <audio controls preload="none" src={pieceUrl(t.id, 0)} className="h-8" />}
+              {/* The whole song (Abraham, Nov 18, 2026), and Download of the original file the Owner uploaded */}
+              {t.complete && <audio controls preload="none" src={`/api/admin/music/${t.id}`} className="h-8" data-music-play={t.id} />}
+              {t.complete && (
+                <a className="btn-ghost px-3 py-1 text-sm" href={`/api/admin/music/${t.id}?download=1`} download={t.originalName ?? `${t.name} (phone quality).wav`} data-music-download={t.id}>
+                  Download
+                </a>
+              )}
               <form action={trashTrackAction}>
                 <input type="hidden" name="id" value={t.id} />
                 <ConfirmSubmit message={`Remove "${t.name}"? It stops playing everywhere.`} className="btn-ghost px-3 py-1 text-sm text-coral">Remove</ConfirmSubmit>

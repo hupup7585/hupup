@@ -6,7 +6,7 @@ import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { r2Put } from "@/lib/r2";
 import { saveSetting } from "@/lib/settings";
-import { MUSIC_PLACES, PIECE_SECONDS, pieceKey, type MusicPlace } from "@/lib/music";
+import { MUSIC_PLACES, ORIGINAL_MAX_BYTES, ORIGINAL_PIECE_BYTES, PIECE_SECONDS, originalKey, pieceKey, type MusicPlace } from "@/lib/music";
 
 /* Music in Admin (Abraham, Nov 17, 2026): Owner only. The browser turns each song into phone-quality pieces. */
 
@@ -30,6 +30,31 @@ export async function savePieceAction(fd: FormData): Promise<{ ok: boolean }> {
   const head = new TextDecoder().decode(bytes.slice(0, 12));
   if (bytes.length > MAX_PIECE_BYTES || !head.startsWith("RIFF") || head.slice(8) !== "WAVE") return { ok: false };
   await r2Put(pieceKey(id, n), bytes, "audio/wav");
+  return { ok: true };
+}
+
+/** One 3 MB piece of the Owner's original file (kept for Download and full playback). */
+export async function saveOriginalPieceAction(fd: FormData): Promise<{ ok: boolean }> {
+  await requireOwner();
+  const id = Number(fd.get("id"));
+  const n = Number(fd.get("n"));
+  const file = fd.get("piece");
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(n) || n < 0 || n > ORIGINAL_MAX_BYTES / ORIGINAL_PIECE_BYTES || !(file instanceof File)) return { ok: false };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!bytes.length || bytes.length > ORIGINAL_PIECE_BYTES) return { ok: false };
+  await r2Put(originalKey(id, n), bytes, "application/octet-stream");
+  return { ok: true };
+}
+
+/** The original file is all in: its name, type, size and number of pieces. */
+export async function finishOriginalAction(id: number, info: { name: string; type: string; bytes: number; pieces: number }): Promise<{ ok: boolean }> {
+  await requireOwner();
+  if (!(info.bytes > 0 && info.bytes <= ORIGINAL_MAX_BYTES) || info.pieces !== Math.ceil(info.bytes / ORIGINAL_PIECE_BYTES)) return { ok: false };
+  await db
+    .update(schema.musicTracks)
+    .set({ originalName: info.name.slice(0, 200), originalType: (info.type || "audio/mpeg").slice(0, 80), originalBytes: info.bytes, originalPieces: info.pieces })
+    .where(eq(schema.musicTracks.id, id));
+  revalidatePath("/admin/phone/music");
   return { ok: true };
 }
 

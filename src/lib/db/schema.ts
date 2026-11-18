@@ -468,6 +468,11 @@ export const musicTracks = pgTable("music_tracks", {
   pieceSeconds: integer("piece_seconds").notNull().default(8),
   durationSec: integer("duration_sec").notNull().default(0),
   complete: boolean("complete").notNull().default(false),
+  /** The Owner's original file (Nov 18, 2026), in R2 as music/<id>/original/<n>, 3 MB pieces */
+  originalName: text("original_name"),
+  originalType: text("original_type"),
+  originalBytes: integer("original_bytes").notNull().default(0),
+  originalPieces: integer("original_pieces").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   trashedAt: timestamp("trashed_at", { withTimezone: true }),
 });

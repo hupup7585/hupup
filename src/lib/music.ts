@@ -23,6 +23,10 @@ export const PIECE_SECONDS = 8;
 type Exec = { execute: typeof db.execute };
 
 export const pieceKey = (trackId: number, piece: number) => `music/${trackId}/${piece}.wav`;
+/** The Owner's original file, in 3 MB pieces (Abraham, Nov 18, 2026: Download and full-song playback). */
+export const ORIGINAL_PIECE_BYTES = 3 * 1024 * 1024;
+export const ORIGINAL_MAX_BYTES = 200 * 1024 * 1024;
+export const originalKey = (trackId: number, n: number) => `music/${trackId}/original/${n}`;
 export const pieceUrl = (trackId: number, piece: number) => `${config.baseUrl()}/api/music/${pieceKey(trackId, piece)}`;
 
 /** The songs chosen for a place, in order (only complete, not in Garbage). */
@@ -73,3 +77,24 @@ export async function nextPiece(place: MusicPlace, now = new Date()): Promise<{ 
     return { trackId: tracks[pos].id, piece, url: pieceUrl(tracks[pos].id, piece) };
   });
 }
+
+/** One 8 kHz, 16-bit, mono WAV from the sound data of the pieces. */
+export function joinWav(parts: Uint8Array[]): Buffer {
+  const len = parts.reduce((n, p) => n + p.length, 0);
+  const head = Buffer.alloc(44);
+  head.write("RIFF", 0);
+  head.writeUInt32LE(36 + len, 4);
+  head.write("WAVE", 8);
+  head.write("fmt ", 12);
+  head.writeUInt32LE(16, 16);
+  head.writeUInt16LE(1, 20);
+  head.writeUInt16LE(1, 22);
+  head.writeUInt32LE(8000, 24);
+  head.writeUInt32LE(16000, 28);
+  head.writeUInt16LE(2, 32);
+  head.writeUInt16LE(16, 34);
+  head.write("data", 36);
+  head.writeUInt32LE(len, 40);
+  return Buffer.concat([head, ...parts]);
+}
+
