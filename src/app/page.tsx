@@ -13,6 +13,10 @@ import { smsNumberDisplay } from "@/lib/sms-number";
 import { signUpsDisabledReason } from "@/app/text-alerts/actions";
 import { getSettings } from "@/lib/settings";
 import CatalogRequest from "@/components/site/CatalogRequest";
+
+/** Rental icon tiles all light blue (preview first; live after Abraham OKs the screenshot). */
+const RENTAL_TILES_LIVE_APPROVED = false;
+const rentalTilesOneColor = () => RENTAL_TILES_LIVE_APPROVED || process.env.VERCEL_ENV !== "production";
 import { websiteCatalogFormShown } from "@/lib/catalog-request";
 import { CallButton, ICON_STROKE, IconTile, SectionTitle, Wave, categoryIcon } from "@/components/site/parts";
 
@@ -137,7 +141,10 @@ export default async function Home() {
                   className="grid scroll-mt-24 gap-5 border-b-2 border-hu-deep/15 py-8 sm:grid-cols-[auto_1fr] sm:gap-8 lg:grid-cols-[auto_1fr_auto] lg:items-center lg:py-10"
                 >
                   <div className="sm:self-start lg:self-center">
-                    <IconTile icon={categoryIcon(cat.name)} tone={i % 2 === 0 ? "yellow" : "sky"} size="lg" />
+                    {/* Abraham, Nov 19, 2026 ("something is fishy"): the tiles alternated yellow, blue, yellow by row position, so two
+                        rows were all yellow next to their yellow button and the middle one was blue. On preview every tile is
+                        light blue and every button yellow: two colors with one job each. Live keeps the old look until his OK. */}
+                    <IconTile icon={categoryIcon(cat.name)} tone={rentalTilesOneColor() ? "sky" : i % 2 === 0 ? "yellow" : "sky"} size="lg" />
                   </div>
                   <div>
                     <h3 className="text-2xl font-extrabold leading-tight sm:text-4xl">{cat.name}</h3>
