@@ -71,7 +71,7 @@ describe("checking files before they go", () => {
     expect(fileKind(pdf)).toBe("application/pdf");
     expect(fileKind(new TextEncoder().encode("<html><script>"))).toBeNull();
     const bad = checkOutgoingFiles([{ name: "page.html", data: new TextEncoder().encode("<html>") }]);
-    expect(bad).toEqual({ ok: false, error: '"page.html" can\'t be sent. Attach a photo (JPG, PNG or GIF) or a PDF.' });
+    expect(bad).toEqual({ ok: false, error: '"page.html" can\'t be sent. Attach a photo (JPG, PNG or GIF), a PDF, or a voice note (MP3 or WAV).' });
   });
   it("Twilio's limits: up to 10 files, 5 MB in all; a plain reason when not", () => {
     expect(checkOutgoingFiles(Array.from({ length: 11 }, (_, i) => ({ name: `${i}.jpg`, data: jpeg }))).ok).toBe(false);
@@ -109,7 +109,7 @@ describe("sending", () => {
   });
   it("a wrong type or a file over 4 MB is refused before anything is sent", async () => {
     const html = await upload(new TextEncoder().encode("<html>"), "x.html");
-    expect(html).toEqual({ ok: false, error: '"x.html" can\'t be sent. Attach a photo (JPG, PNG or GIF) or a PDF.' });
+    expect(html).toEqual({ ok: false, error: '"x.html" can\'t be sent. Attach a photo (JPG, PNG or GIF), a PDF, or a voice note (MP3 or WAV).' });
     const big = new Uint8Array(4 * 1024 * 1024 + 10);
     big.set(jpeg.subarray(0, 4));
     const r = await upload(big, "huge.jpg");

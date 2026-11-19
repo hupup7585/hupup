@@ -9,7 +9,15 @@ export default function MessageFiles({ files, dark = false }: { files: F[]; dark
     <ul className="mt-2 flex flex-wrap gap-2" data-message-files>
       {files.map((f) => {
         const href = `/api/admin/message-files/${f.id}`;
-        const name = f.fileName || (f.contentType === "application/pdf" ? "PDF" : "File");
+        const name = f.fileName || (f.contentType === "application/pdf" ? "PDF" : f.contentType.startsWith("audio/") ? "Voice note" : "File");
+        // Voice notes (Abraham, Nov 19, 2026): play right here, with the file to download
+        if (f.contentType.startsWith("audio/"))
+          return (
+            <li key={f.id} className={`flex flex-col gap-1 rounded-lg p-2 ${dark ? "bg-white/15" : "bg-white"}`} data-voice-note>
+              <audio controls preload="none" src={href} className="h-9 w-64 max-w-full" aria-label={`Voice note ${name}`} />
+              <a href={href} download className={`text-xs underline ${dark ? "text-white" : "text-navy"}`}>{name} ({(f.sizeBytes / 1024).toFixed(0)} KB)</a>
+            </li>
+          );
         return (
           <li key={f.id}>
             <a href={href} target="_blank" rel="noopener noreferrer" title={`${name} (${(f.sizeBytes / 1024).toFixed(0)} KB)`}>

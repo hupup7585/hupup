@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { FileText, Paperclip, X } from "lucide-react";
+import { FileText, Mic, Paperclip, X } from "lucide-react";
 import { sendReplyAction, uploadTextFileAction } from "./actions";
 
 /** Twilio's picture-text limits: up to 10 files, 5 MB in all. Each file goes up on its own (up to 4 MB). */
 const MAX_FILES = 10;
 const MAX_TOTAL = 5 * 1024 * 1024;
 const MAX_ONE = 4 * 1024 * 1024;
-const OK_TYPES = ["image/jpeg", "image/png", "image/gif", "application/pdf"];
+// Voice notes too (Abraham, Nov 19, 2026): MP3 and WAV
+const OK_TYPES = ["image/jpeg", "image/png", "image/gif", "application/pdf", "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave"];
 const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 
 type Picked = { key: string; file: File | Blob; name: string; type: string; size: number; preview: string | null };
@@ -31,7 +32,7 @@ async function shrink(file: File): Promise<{ blob: Blob; type: string; name: str
   return { blob: file, type: file.type, name: file.name };
 }
 
-/** Reply box under a conversation (Owner). Attach photos (JPG, PNG, GIF) or PDFs; shows why a text was blocked. */
+/** Reply box under a conversation (Owner). Attach photos (JPG, PNG, GIF), PDFs or voice notes (MP3, WAV); shows why a text was blocked. */
 export default function ReplyForm({ phone }: { phone: string }) {
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<Picked[]>([]);
@@ -49,7 +50,7 @@ export default function ReplyForm({ phone }: { phone: string }) {
     if (!list?.length) return;
     const next = [...files];
     for (const f of Array.from(list)) {
-      if (!OK_TYPES.includes(f.type)) return setError(`"${f.name}" can't be sent. Attach a photo (JPG, PNG or GIF) or a PDF.`);
+      if (!OK_TYPES.includes(f.type) && !/\.(mp3|wav)$/i.test(f.name)) return setError(`"${f.name}" can't be sent. Attach a photo (JPG, PNG or GIF), a PDF, or a voice note (MP3 or WAV).`);
       if (next.length >= MAX_FILES) return setError(`You can attach up to ${MAX_FILES} files to one text.`);
       const s = await shrink(f);
       if (s.blob.size > MAX_ONE) return setError(`"${f.name}" is ${mb(s.blob.size)}. Each file can be up to 4 MB.`);
@@ -103,7 +104,7 @@ export default function ReplyForm({ phone }: { phone: string }) {
                 <img src={f.preview} alt={f.name} className="h-full w-full object-cover" />
               ) : (
                 <span className="flex h-full w-full flex-col items-center justify-center gap-1 p-1 text-center text-[10px] font-semibold text-navy">
-                  <FileText className="h-6 w-6" aria-hidden />
+                  {f.type.startsWith("audio/") || /\.(mp3|wav)$/i.test(f.name) ? <Mic className="h-6 w-6" aria-hidden /> : <FileText className="h-6 w-6" aria-hidden />}
                   <span className="line-clamp-2 break-all">{f.name}</span>
                 </span>
               )}
@@ -115,7 +116,7 @@ export default function ReplyForm({ phone }: { phone: string }) {
         </ul>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <input ref={input} type="file" multiple accept="image/jpeg,image/png,image/gif,application/pdf" className="hidden" onChange={(e) => pick(e.target.files)} data-file-input />
+        <input ref={input} type="file" multiple accept="image/jpeg,image/png,image/gif,application/pdf,audio/mpeg,audio/wav,.mp3,.wav" className="hidden" onChange={(e) => pick(e.target.files)} data-file-input />
         <button type="button" className="btn-ghost" disabled={pending || files.length >= MAX_FILES} onClick={() => input.current?.click()} data-attach>
           <Paperclip className="mr-1 inline h-4 w-4" aria-hidden /> Attach
         </button>
@@ -124,7 +125,7 @@ export default function ReplyForm({ phone }: { phone: string }) {
         {sent && <span className="text-sm font-semibold text-[#13895C]">Sent.</span>}
         {error && <span role="alert" className="text-sm font-semibold text-[#C83A2F]">{error}</span>}
       </div>
-      <p className="text-xs text-muted">Sent from the hotline number. Photos (JPG, PNG, GIF) and PDFs go as a picture text, up to 10 files and 5 MB. Customers who replied STOP, or never agreed to order texts, won&rsquo;t receive it.</p>
+      <p className="text-xs text-muted">Sent from the hotline number. Photos (JPG, PNG, GIF), PDFs and voice notes (MP3, WAV) go as a picture text, up to 10 files and 5 MB. Some phone companies only deliver voice notes up to about 600 KB. Customers who replied STOP, or never agreed to order texts, won&rsquo;t receive it.</p>
     </form>
   );
 }

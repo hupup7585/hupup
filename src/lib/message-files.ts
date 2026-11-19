@@ -13,10 +13,17 @@ import { R2_STOP_BYTES, r2Put, r2Used } from "@/lib/r2";
 export const MMS_MAX_FILES = 10;
 export const MMS_MAX_TOTAL_BYTES = 5 * 1024 * 1024;
 
-export type OutgoingKind = "image/jpeg" | "image/png" | "image/gif" | "application/pdf";
-const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp", "application/pdf": "pdf" };
-/** Types we show in the browser; anything else a customer sends is offered as a download only. */
-export const INLINE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"]);
+export type OutgoingKind = "image/jpeg" | "image/png" | "image/gif" | "application/pdf" | "audio/mpeg" | "audio/wav";
+const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp", "application/pdf": "pdf", "audio/mpeg": "mp3", "audio/wav": "wav", "audio/mp4": "m4a", "audio/amr": "amr", "audio/ogg": "ogg", "audio/3gpp": "3gp" };
+/**
+ * Types we show or play in the browser; anything else a customer sends is offered as a download only. Voice notes
+ * (Abraham, Nov 19, 2026): MP3 and WAV are sent and received; other voice-note kinds phones send (M4A, AMR, OGG, 3GP)
+ * are kept and play where the browser can.
+ */
+export const INLINE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf", "audio/mpeg", "audio/wav", "audio/mp4", "audio/amr", "audio/ogg", "audio/3gpp"]);
+export const isAudio = (t: string) => t.startsWith("audio/");
+/** The usual name for a voice-note kind ("audio/x-wav" is "audio/wav", "audio/mp3" is "audio/mpeg", ...). */
+export const audioType = (t: string) => ({ "audio/x-wav": "audio/wav", "audio/wave": "audio/wav", "audio/vnd.wave": "audio/wav", "audio/mp3": "audio/mpeg", "audio/x-m4a": "audio/mp4", "audio/m4a": "audio/mp4", "audio/aac": "audio/mp4" })[t] ?? t;
 
 /** What the file really is, from its first bytes (never from its name or what the browser says). */
 export function fileKind(head: Uint8Array): OutgoingKind | "image/webp" | null {
@@ -25,12 +32,15 @@ export function fileKind(head: Uint8Array): OutgoingKind | "image/webp" | null {
   if (String.fromCharCode(...head.slice(0, 4)) === "GIF8") return "image/gif";
   if (String.fromCharCode(...head.slice(0, 5)) === "%PDF-") return "application/pdf";
   if (head.length >= 12 && String.fromCharCode(...head.slice(0, 4)) === "RIFF" && String.fromCharCode(...head.slice(8, 12)) === "WEBP") return "image/webp";
+  // Voice notes: WAV (RIFF....WAVE) and MP3 (an ID3 tag, or an MPEG audio frame)
+  if (head.length >= 12 && String.fromCharCode(...head.slice(0, 4)) === "RIFF" && String.fromCharCode(...head.slice(8, 12)) === "WAVE") return "audio/wav";
+  if (String.fromCharCode(...head.slice(0, 3)) === "ID3" || (head[0] === 0xff && (head[1] & 0xe6) === 0xe2)) return "audio/mpeg";
   return null;
 }
 
 const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 
-/** Staff attachments: photos (JPG, PNG, GIF) or PDF, up to 10 files and 5 MB in all. A plain reason when not. */
+/** Staff attachments: photos (JPG, PNG, GIF), PDF, or voice notes (MP3, WAV), up to 10 files and 5 MB in all. */
 export function checkOutgoingFiles(files: { name: string; data: Uint8Array }[]): { ok: true; kinds: OutgoingKind[] } | { ok: false; error: string } {
   if (files.length > MMS_MAX_FILES) return { ok: false, error: `You can attach up to ${MMS_MAX_FILES} files to one text.` };
   const kinds: OutgoingKind[] = [];
@@ -38,7 +48,7 @@ export function checkOutgoingFiles(files: { name: string; data: Uint8Array }[]):
   for (const f of files) {
     if (!f.data.length) return { ok: false, error: `"${f.name}" is empty.` };
     const k = fileKind(f.data.subarray(0, 16));
-    if (!k || k === "image/webp") return { ok: false, error: `"${f.name}" can't be sent. Attach a photo (JPG, PNG or GIF) or a PDF.` };
+    if (!k || k === "image/webp") return { ok: false, error: `"${f.name}" can't be sent. Attach a photo (JPG, PNG or GIF), a PDF, or a voice note (MP3 or WAV).` };
     if (f.data.length > MMS_MAX_TOTAL_BYTES) return { ok: false, error: `"${f.name}" is ${mb(f.data.length)}. Each text can carry 5 MB in all.` };
     total += f.data.length;
     kinds.push(k);
@@ -121,8 +131,9 @@ export async function saveIncomingMedia(
       const data = new Uint8Array(await r.arrayBuffer());
       if (!data.length || data.length > MMS_MAX_TOTAL_BYTES) throw new Error("empty or too big");
       const sniffed = fileKind(data.subarray(0, 16));
-      const said = (m.contentType || r.headers.get("content-type") || "application/octet-stream").split(";")[0].trim().toLowerCase();
-      await saveMessageFile({ data, contentType: sniffed ?? (INLINE_TYPES.has(said) ? "application/octet-stream" : said.slice(0, 100)), direction: "in", contactPhone: input.from, customerId: input.customerId, orderId, messageId: input.messageId, sourceUrl: m.url });
+      const said = audioType((m.contentType || r.headers.get("content-type") || "application/octet-stream").split(";")[0].trim().toLowerCase());
+      // A voice note from a phone (M4A, AMR, 3GP, OGG) is kept with its own kind so it plays in Admin (Nov 19, 2026)
+      await saveMessageFile({ data, contentType: sniffed ?? (isAudio(said) ? said.slice(0, 100) : INLINE_TYPES.has(said) ? "application/octet-stream" : said.slice(0, 100)), direction: "in", contactPhone: input.from, customerId: input.customerId, orderId, messageId: input.messageId, sourceUrl: m.url });
       saved++;
     } catch (e) {
       console.error(`[incoming text file] message ${input.messageId}: could not save a file (${(e as Error).message})`);
