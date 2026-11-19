@@ -88,6 +88,8 @@ export const SETTING_DEFAULTS = {
   solaListenOn: false,
   // Silence check: no Sola voice, no key tones and no result for this many seconds = check Sola once more, then box 147
   phonePaySilenceSeconds: "20",
+  /** Menus made of several recordings: the Owner's order (JSON, src/lib/ivr/menu-order.ts). Empty = the default order. */
+  menuOrders: "",
   solaPhonePayOwnerOnly: false,
   solaPhonePayNumber: "+18334343354",
   solaPhonePayBackup: "+18444227356",

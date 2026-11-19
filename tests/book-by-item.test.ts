@@ -52,11 +52,11 @@ beforeAll(async () => {
 describe("key 1: booking by item", () => {
   it("categories from Admin, then the items, then the date (keys only), confirmed with the day name and day number", async () => {
     expect(said(await call("book"))).toEqual([
-      "Please note, orders can be placed only through our automated system. For information or questions, press 0 for customer service.",
-      "For bounce houses, press 1.",
-      "For schools, corporate events, and organizational bookings, press 9.",
+      "To receive our catalog by text or email, press 8. Please note, orders can be placed only through our automated system.",
+      "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.",
+      "For information or questions, press 0 for customer service. For schools, corporate events, and organizational bookings, press 9.",
       "To go back, press star.",
-    ]); // Abraham, Nov 11, 2026: rental first, then the date
+    ]); // Nov 19, 2026: three recordings, then the shared star line
     // Jumping balloons now play box 153 (Abraham, Nov 19, 2026)
     expect(redirect(await call("category", {}, `c=${catId}`))).toBe(`balloons?c=${catId}`);
     h.session.data = {};
@@ -75,29 +75,21 @@ describe("key 1: booking by item", () => {
     expect(redirect(xml)).toBe(`add?p=${medium}&d=${TUE}&q=1`);
   });
 
-  it("item taken (Abraham, Nov 17): the taken line with key 1, then same date (1) or nearest date (2); same date offers the next size up and down", async () => {
+  it("item booked (Nov 19, 2026): one line with the closest item of the kind (1) or the nearest date (2); 1 offers the next size up, else down", async () => {
     await book(medium, TUE);
     expect(redirect(await call("qty", {}, `p=${medium}&d=${TUE}`))).toBe(`booked?p=${medium}&d=${TUE}`);
     const taken = await call("booked", {}, `p=${medium}&d=${TUE}`);
-    expect(said(taken)[0]).toMatch(/^The Medium Castle is no longer available for Tuesday, December first(st)?\. For the nearest options, press 1\.$/);
-    expect(redirect(await call("taken-choice", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`booked-near?p=${medium}&d=${TUE}`);
-    expect(said(await call("booked-near", {}, `p=${medium}&d=${TUE}`))).toEqual(["For the same date, press 1. For the nearest date this item is free, press 2."]);
-    expect(redirect(await call("near-choice", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`booked-same?p=${medium}&d=${TUE}`);
-    expect(redirect(await call("near-choice", { Digits: "2" }, `p=${medium}&d=${TUE}`))).toBe(`altdates?p=${medium}&d=${TUE}`);
-    const both = await call("booked-same", {}, `p=${medium}&d=${TUE}`);
-    expect(said(both)).toEqual([
-      "Here are the closest options for that day.",
-      "For the next size up, the Large Castle, press 1.",
-      "For the next size down, the Small Castle, press 2.",
-      "To keep the Medium Castle and choose a different date, press 3.",
+    expect(said(taken)).toEqual([
+      "I am sorry, the Medium Castle is already booked on Tuesday, December first. For the closest jumping balloon on the same date, press 1. For the nearest date this item is free, press 2.",
+      "To go back, press star.",
     ]);
-    expect(redirect(await call("booked-choice", { Digits: "1" }, action(both)!.split("?")[1]))).toBe(`qty?p=${large}&d=${TUE}`);
-    expect(redirect(await call("booked-choice", { Digits: "2" }, action(both)!.split("?")[1]))).toBe(`qty?p=${small}&d=${TUE}`);
+    expect(redirect(await call("taken-choice", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`booked-closest?p=${medium}&d=${TUE}`);
+    expect(redirect(await call("taken-choice", { Digits: "2" }, `p=${medium}&d=${TUE}`))).toBe(`altdates?p=${medium}&d=${TUE}`);
+    expect(redirect(await call("booked-closest", {}, `p=${medium}&d=${TUE}`))).toBe(`balloon?p=${large}`);
     await book(large, TUE);
-    const onlySmall = said(await call("booked-same", {}, `p=${medium}&d=${TUE}`));
-    expect(onlySmall).not.toContain("For the next size up, the Large Castle, press 1.");
-    expect(onlySmall).toContain("For the next size down, the Small Castle, press 2.");
-    expect(redirect(await call("booked-choice", { Digits: "3" }, `p=${medium}&d=${TUE}&s=${small}`))).toBe(`altdates?p=${medium}&d=${TUE}`);
+    expect(redirect(await call("booked-closest", {}, `p=${medium}&d=${TUE}`))).toBe(`balloon?p=${small}`);
+    await book(small, TUE);
+    expect(redirect(await call("booked-closest", {}, `p=${medium}&d=${TUE}`))).toBe(`altdates?p=${medium}&d=${TUE}`);
   });
 
   it("another date: only days that work with the whole-rental-day rule are offered", async () => {

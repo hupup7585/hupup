@@ -91,6 +91,6 @@ describe("phone line holiday schedule (Abraham, phone system and admin only)", (
   });
   it("phone booking stays available 24/7 (the closed message still offers booking)", async () => {
     const { PROMPTS } = await import("@/lib/ivr/prompts");
-    expect(PROMPTS.office_closed.text).toBe("Our office is closed right now, but you can book anytime using our automated system.");
+    expect(PROMPTS.office_closed.text).toBe("Our office is closed right now, but you can still book anytime using our automated system.");
   });
 });

@@ -56,9 +56,9 @@ describe("main menu: every key goes through", () => {
     ["1", "book"],
     ["2", "instructions"],
     ["3", "ring?k=4"],
-    ["4", "learn"],
-    ["5", "ring?k=5"],
-    ["6", "ring?k=6"],
+    ["4", "ring?k=5"], // issues during your rental (Nov 19, 2026)
+    ["5", "ring?k=6"], // delivery and pickup (Nov 19, 2026)
+    ["6", "learn"],
     ["7", "hours"],
     ["8", "catalog"],
     ["9", "voicemail?x=9"],
@@ -102,7 +102,8 @@ describe("main menu: every key goes through", () => {
 describe("key 2: instructions", () => {
   it("Abraham's key 2 menu (Phone Menu v3), word for word; star goes back", async () => {
     const xml = text(await call("instructions"));
-    expect(xml).toContain("For jumping balloon instructions, press 1. For laser tag, press 2. For paddle boats, press 3. To go back, press star.");
+    expect(xml).toContain("For jumping balloon instructions, press 1. For laser tag, press 2. For paddle boats, press 3.");
+    expect(xml).toContain("To go back, press star.");
     expect(gatherTo(xml)).toBe("attraction-choice?m=i");
     expect(redirect(await call("attraction-choice", { Digits: "*" }, { m: "i" }))).toBe("menu");
   });
@@ -181,7 +182,7 @@ describe("key 4: learn about our rentals (was key 3)", () => {
   it("2 and 3 work when the office is closed too (recorded information, no one needs to answer)", async () => {
     h.open = false;
     expect(redirect(await press("2"))).toBe("instructions");
-    expect(redirect(await press("4"))).toBe("learn");
+    expect(redirect(await press("6"))).toBe("learn");
     h.open = true;
   });
 });

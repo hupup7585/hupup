@@ -45,16 +45,16 @@ beforeEach(async () => {
 
 // Abraham's start of the call and main menu (Nov 16, 2026), word for word
 const GREETING = "Hi, thank you for calling Hup Up Attractions! Bringing something special to every occasion!";
-const CLOSED = "Our office is closed right now, but you can book anytime using our automated system.";
+const CLOSED = "Our office is closed right now, but you can still book anytime using our automated system.";
 const CATALOG = "To receive our catalog by text or email, press 8.";
 const MAIN = [
   "If you know your desired extension, you may press it at any time.",
   "For reservations and bookings, press 1.",
   "For instructions and guidance on using our rental equipment, press 2.",
   "For customer service and general inquiries, press 3.",
-  "To learn more about our rental attractions and the services we offer, press 4.",
-  "For questions or assistance with any issues during your rental, press 5.",
-  "For delivery and pickup information, press 6.",
+  "For questions or assistance with any issues during your rental, press 4.",
+  "For delivery and pickup information, press 5.",
+  "To learn more about our rental attractions and the services we offer, press 6.",
   "To hear our hours of operation, press 7.",
   "To receive our catalog by text or email, press 8.",
   "For feedback and comments, press 9.",
@@ -63,7 +63,8 @@ const MAIN = [
   "Thank you for choosing Hup Up Attractions!",
 ];
 // The greeting is one prompt; spoken from the text, its two sentences are one Say
-const FULL = [GREETING, CATALOG, ...MAIN];
+// Nov 19, 2026 (Hark for Abraham): the catalog offer is no longer in the greeting; the catalog line is key 8 in the menu
+const FULL = [GREETING, ...MAIN];
 const gatherOf = (xml: string) => xml.slice(xml.indexOf("<Gather"), xml.indexOf("</Gather>"));
 const saidIn = (xml: string) => [...gatherOf(xml).matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&amp;/g, "&"));
 
@@ -73,7 +74,7 @@ describe("Abraham's start of the call and main menu (Nov 16, 2026)", () => {
     expect(redirect(incoming)).toBe("menu?first=1");
     expect(incoming).not.toContain("<Say"); // nothing plays before the keypad listens
     const xml = await call("menu", {}, "first=1");
-    expect(saidIn(xml)).toEqual(FULL); // greeting, catalog offer, main menu: word for word, in order, one Gather
+    expect(saidIn(xml)).toEqual(FULL); // greeting, main menu: word for word, in order, one Gather
     expect(gatherOf(xml)).toMatch(/<Gather [^>]*input="dtmf"[^>]*numDigits="1"/); // keys only
     expect(gatherOf(xml).split("pause-500ms.wav").length - 1).toBe(FULL.length - 1); // half a second between lines
     expect(gatherOf(xml)).not.toContain("pause-750ms.wav");
@@ -108,9 +109,9 @@ describe("Abraham's start of the call and main menu (Nov 16, 2026)", () => {
     // a key press always works
     expect(redirect(await call("menu-choice", { Digits: "1" }, `np=2&t0=${t0}`))).toBe("book");
   });
-  it("office closed: the closed line plays after the greeting and before the catalog offer, inside the menu", async () => {
+  it("office closed: the closed line plays after the greeting and before the main menu, inside the menu", async () => {
     h.open = false;
-    expect(saidIn(await call("menu", {}, "first=1"))).toEqual([GREETING, CLOSED, CATALOG, ...MAIN]);
+    expect(saidIn(await call("menu", {}, "first=1"))).toEqual([GREETING, CLOSED, ...MAIN]);
   });
   it("the Chol Hamoed and Chanukah lines, the Shabbes key 1 lines and the separate menu lines are gone", async () => {
     const { PROMPTS } = await import("@/lib/ivr/prompts");
@@ -119,15 +120,17 @@ describe("Abraham's start of the call and main menu (Nov 16, 2026)", () => {
 });
 
 describe("every key, office open", () => {
-  it("1 opens the bookings menu; 2 instructions; 4 learn about our rentals (was 3); 8 the catalog", async () => {
+  it("1 opens the bookings menu; 2 instructions; 6 learn about our rentals (Nov 19, 2026); 8 the catalog", async () => {
     expect(redirect(await press("1"))).toBe("book");
     expect(redirect(await press("2"))).toBe("instructions");
-    expect(redirect(await press("4"))).toBe("learn");
+    expect(redirect(await press("6"))).toBe("learn");
     expect(redirect(await press("8"))).toBe("catalog");
   });
-  it("3 rings customer service (the line, ring list and voicemail that were key 4); 5, 6 and 0 ring their own; 7 plays our hours", async () => {
+  it("3 rings customer service; 4 issues (ring list 5), 5 delivery (ring list 6), 0 the operator; 7 plays our hours", async () => {
     expect(redirect(await press("3"))).toBe("ring?k=4");
-    for (const k of ["5", "6", "0"]) expect(redirect(await press(k))).toBe(`ring?k=${k}`);
+    expect(redirect(await press("4"))).toBe("ring?k=5"); // issues during your rental (Nov 19, 2026: was key 5)
+    expect(redirect(await press("5"))).toBe("ring?k=6"); // delivery and pickup (Nov 19, 2026: was key 6)
+    expect(redirect(await press("0"))).toBe("ring?k=0");
     expect(redirect(await press("7"))).toBe("hours");
   });
   it("8 rings the corporate list key 2 used to ring; 2 (equipment, empty), 4, 5 and 6 fall back to the operator list", async () => {
@@ -174,29 +177,28 @@ describe("every key, office open", () => {
   it("# or a wrong key: only Abraham's line, then the main menu prompt again; star repeats the main menu", async () => {
     for (const k of ["#"]) {
       const hash = await press(k);
-      expect([...hash.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1])).toEqual(["Sorry, that is not a valid selection. Please try again."]);
+      expect([...hash.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1])).toEqual(["Sorry, that is not a valid selection."]);
       expect(redirect(hash)).toBe("menu");
     }
     expect(saidIn(await call("menu"))).toEqual(MAIN);
     expect(redirect(await press("*"))).toBe("menu");
   });
-  it("key 1: Abraham's bookings menu word for word; categories from Admin numbered in order; 0 customer service, 9 corporate, star back", async () => {
+  it("key 1: the bookings menu, three recordings then the star line (Nov 19, 2026); 8 catalog, 0 customer service, 9 corporate, star back", async () => {
     h.session.data = {};
     await db.insert(schema.categories).values({ name: "Jumping Balloons", spokenName: "bounce houses and jumping balloons", ivrDigit: 1, sortOrder: 1, active: true });
     const book = await call("book");
     expect(saidIn(book)).toEqual([
-      "Please note, orders can be placed only through our automated system. For information or questions, press 0 for customer service.",
-      "For bounce houses and jumping balloons, press 1.",
-      "For schools, corporate events, and organizational bookings, press 9.",
+      "To receive our catalog by text or email, press 8. Please note, orders can be placed only through our automated system.",
+      "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.",
+      "For information or questions, press 0 for customer service. For schools, corporate events, and organizational bookings, press 9.",
       "To go back, press star.",
     ]);
+    expect(redirect(await call("book-choice", { Digits: "8" }))).toBe("catalog");
     expect(gatherOf(book)).not.toContain("pause-750ms.wav");
     expect(redirect(await call("book-choice", { Digits: "0" }))).toBe("ring?k=4");
     expect(redirect(await call("book-choice", { Digits: "9" }))).toBe("ring?k=8");
     expect(redirect(await call("book-choice", { Digits: "*" }))).toBe("menu");
-    // a new category in Admin is read out with the next number
     await db.insert(schema.categories).values({ name: "Laser Tag", spokenName: "laser tag and inflatable mazes", ivrDigit: 4, sortOrder: 4, active: true });
-    expect(saidIn(await call("book"))).toContain("For laser tag and inflatable mazes, press 2.");
     // star goes back one step in every booking menu (Abraham)
     const [cat] = await db.select().from(schema.categories).limit(1);
     const [prod] = await db.insert(schema.products).values({ categoryId: cat.id, name: "Castle", priceCents: 1000, quantity: 1, active: true, sortOrder: 1 }).returning();
@@ -219,7 +221,7 @@ describe("# is never a menu key; star returns (Abraham, spec item 5)", () => {
     h.session.data = { day: "2026-12-01" };
     for (const [action, back] of [["menu-choice", "menu"], ["book-choice", "book"], ["after-add", undefined], ["cart-choice", "cart"]] as const) {
       const xml = await call(action, { Digits: "#" });
-      expect(xml, action).toContain("Sorry, that is not a valid selection. Please try again.");
+      expect(xml, action).toContain("Sorry, that is not a valid selection.");
       if (back) expect(redirect(xml), action).toBe(back);
       expect(redirect(xml), action).not.toBe("menu?first=1");
     }
@@ -231,7 +233,7 @@ describe("# is never a menu key; star returns (Abraham, spec item 5)", () => {
 
 describe("menus are keys only (Abraham): no speech in any menu", () => {
   const OLD_OOPS = "Oops, that is not one of the choices. No problem, let us try again.";
-  const NOT_VALID = "Sorry, that is not a valid selection. Please try again.";
+  const NOT_VALID = "Sorry, that is not a valid selection.";
   it("the main menu and the key 1 rental list listen for keys only, and # comes in as a key", async () => {
     h.session.data = { day: "2026-12-01" };
     for (const xml of [await call("menu", {}, "first=1"), await call("book")]) {
@@ -274,11 +276,11 @@ describe("menus are keys only (Abraham): no speech in any menu", () => {
 });
 
 describe("every key, office closed", () => {
-  it("1 books and 2 and 4 play their information 24/7; after hours every extension goes to voicemail (Abraham, Nov 12); 9 is voicemail", async () => {
+  it("1 books and 2 and 6 play their information 24/7; after hours every extension goes to voicemail (Abraham, Nov 12); 9 is voicemail", async () => {
     h.open = false;
     expect(redirect(await press("1"))).toBe("book");
     expect(redirect(await press("2"))).toBe("instructions");
-    expect(redirect(await press("4"))).toBe("learn");
+    expect(redirect(await press("6"))).toBe("learn");
     expect(redirect(await press("3"))).toBe("ring?k=4");
     await saveSetting("ringAfterHours6", false); // key 6 is switched on live (Nov 14); here: the rule with every switch off
     for (const k of ["2", "4", "5", "6", "8", "0"]) {
@@ -338,7 +340,7 @@ describe("key 7: our hours (Abraham, Nov 9, 2026)", () => {
 });
 
 describe("wrong key everywhere (Abraham, Nov 16, 2026): the one shared line, then the same menu again", () => {
-  const NOT_VALID = "Sorry, that is not a valid selection. Please try again.";
+  const NOT_VALID = "Sorry, that is not a valid selection.";
   const says = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&amp;/g, "&").replace(/&apos;/g, "'"));
   const cases: [string, string, string, string][] = [
     // step, query, key, where the caller goes back to
@@ -347,7 +349,7 @@ describe("wrong key everywhere (Abraham, Nov 16, 2026): the one shared line, the
     ["attraction-choice", "m=l", "7", "learn?again=1"], // key 4
     ["attraction-choice", "m=i", "7", "instructions?again=1"], // key 2
     ["attraction-after", "m=l&t=1", "9", "attraction-options?m=l&t=1"],
-    ["book-choice", "", "8", "book"],
+    ["book-choice", "", "7", "book"], // 8 is the catalog (Nov 19, 2026)
     ["resume-choice", "", "5", "resume"],
     ["phone-choice", "", "7", "phone"],
     ["promo-which-answer", "", "5", "promo-which"],

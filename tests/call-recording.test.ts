@@ -35,7 +35,7 @@ import { saveRecordingAction } from "@/app/admin/(app)/settings/recording-action
 const call = (action: string, body: Record<string, string> = {}, query = "") =>
   handleVoice({ action, query: new URLSearchParams(query), body: { CallSid: "CArec", ...body }, callSid: "CArec", from: "+18455550155" });
 const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/Redirect>/)?.[1].replace("https://hupup.example/api/voice/", "").replace(/&amp;/g, "&");
-const NOTICE = "This call may be monitored and recorded for quality and training purposes.";
+const NOTICE = "This call may be monitored or recorded for quality and training purposes.";
 
 beforeEach(() => {
   process.env.PUBLIC_BASE_URL = "https://hupup.example";

@@ -64,7 +64,7 @@ describe("ocean balls after a jumping balloon", () => {
   });
   it("any other key: the shared wrong-key line, then the same question", async () => {
     const r = await call("ocean-choice", { Digits: "7" }, `d=${DAY}`);
-    expect(said(r)).toEqual(["Sorry, that is not a valid selection. Please try again."]);
+    expect(said(r)).toEqual(["Sorry, that is not a valid selection."]);
     expect(redirect(r)).toBe(`ocean?d=${DAY}`);
   });
   it("the ocean balls are hidden: not in the phone menus (their group has no key and is off)", async () => {

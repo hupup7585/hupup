@@ -45,11 +45,27 @@ beforeAll(async () => {
 });
 
 describe("box 153: the jumping balloons menu (approved Nov 19, 2026)", () => {
-  it("plays the approved text, word for word, from the jumping balloons category", async () => {
+  it("Nov 19, 2026 (replaces box 153): the opening, then per balloon the recorded name piece, the last two digits and the key live, the cart line, the star line", async () => {
     expect(redirect(await call("category", {}, `c=${cat}`))).toBe(`balloons?c=${cat}`);
-    expect(said(await call("balloons", {}, `c=${cat}`))).toEqual([
-      "For Soft Hop, item seven two zero one, press 1. For Sunlight Spot, item seven two zero two, press 2. For Blue Bounce, item seven two zero three, press 3. For Ball Buster, item seven two zero four, press 4. For Rising Joy, item seven two zero five, press 5. For Family Fun, item seven two zero six, press 6. For Adventure Zone, item seven two zero seven, press 7. For Wide Slide, item seven two zero eight, press 8. For Amusing Obstacle, item seven two zero nine, press 9. For Mega Mountain, item seven two one zero, press 1 0. For Bounce Blast, item seven two one one, press 1 1. For Wheel Thrill, item seven two one two, press 1 2. To go back, press star.",
-    ]);
+    const lines = said(await call("balloons", {}, `c=${cat}`));
+    expect(lines[0]).toBe("Here are our jumping balloons. Please note, our jumping balloons are not for water use.");
+    expect(lines.slice(1, 5)).toEqual(["For the Soft Hop, item seven two,", "zero one", "press,", "1"]);
+    expect(lines.slice(37, 41)).toEqual(["For the Mega Mountain, item seven two,", "one zero", "press,", "one zero"]);
+    expect(lines.slice(-2)).toEqual(["To go to your shopping cart, press 0.", "To go back, press star."]);
+    expect(lines).toHaveLength(1 + 12 * 4 + 2);
+    expect(redirect(await call("balloon-key", { Digits: "0" }, `c=${cat}`))).toBe(`cart?c=${cat}`);
+  });
+  it("the Owner's order of the recordings (Admin, Menu order) is the order they play", async () => {
+    const { saveSetting } = await import("@/lib/settings");
+    const { setMenuOrder } = await import("@/lib/ivr/menu-order");
+    await saveSetting("menuOrders", setMenuOrder("balloons", ["balloons_open", "list_cart", "balloon_items", "book_back"], ""));
+    try {
+      const lines = said(await call("balloons", {}, `c=${cat}`));
+      expect(lines[1]).toBe("To go to your shopping cart, press 0.");
+      expect(lines[2]).toBe("For the Soft Hop, item seven two,");
+    } finally {
+      await saveSetting("menuOrders", "");
+    }
   });
   it("keys 2 to 9 pick at once; after 1 the line waits 2 seconds for 0, 1 or 2; nothing or pound = Soft Hop", async () => {
     expect(redirect(await call("balloon-key", { Digits: "4" }, `c=${cat}`))).toBe(`balloon-pick?c=${cat}&k=4`);
@@ -70,7 +86,7 @@ describe("box 153: the jumping balloons menu (approved Nov 19, 2026)", () => {
 describe("box 154 and box 155", () => {
   it("box 154: name, item number digit by digit, real price; 1 adds, star goes back to box 153", async () => {
     const p = ids["Blue Bounce"];
-    expect(said(await call("balloon", {}, `p=${p}`))).toEqual(["Blue Bounce, item seven two zero three, 170 dollars. To add it to your shopping cart, press 1. For description and dimensions, press 2. To go back, press star."]);
+    expect(said(await call("balloon", {}, `p=${p}`))).toEqual(["Blue Bounce, item seven two zero three, 170 dollars. To add it to your shopping cart, press 1. For description and dimensions, press 2.", "To go back, press star."]);
     h.session.data = {};
     expect(redirect(await call("balloon-choice", { Digits: "1" }, `p=${p}`))).toBe(`date?p=${p}`);
     expect(redirect(await call("balloon-choice", { Digits: "*" }, `p=${p}`))).toBe(`balloons?c=${cat}`);
@@ -78,7 +94,8 @@ describe("box 154 and box 155", () => {
   it("box 155 (not approved): on preview the draft with the Admin sizes; on the live line the description as before", async () => {
     const p = ids["Blue Bounce"];
     expect(said(await call("balloon-choice", { Digits: "2" }, `p=${p}`))).toEqual([
-      "The Blue Bounce is a bright castle with a slide. The dimensions are as follows: 15 feet long, 20 feet wide, and 12 feet tall. To add it to your shopping cart, press 1. To go back, press star.",
+      "The Blue Bounce is a bright castle with a slide. The dimensions are as follows: 15 feet long, 20 feet wide, and 12 feet tall. To add it to your shopping cart, press 1.",
+      "To go back, press star.",
     ]);
     process.env.VERCEL_ENV = "production";
     try {

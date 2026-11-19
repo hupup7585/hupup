@@ -6,7 +6,7 @@ import { BUSINESS_NAME, config } from "@/lib/config";
 import { addDays, spokenLongDate, todayISO } from "@/lib/dates";
 import { spokenMoney } from "@/lib/money";
 import { friMutzeDays, friMutzeOffered, friMutzePickup } from "@/lib/holiday-rentals";
-import { BALLOON_SECOND_DIGIT_SECONDS, balloonEntry, balloonForKey, balloonSizes, digitWords } from "@/lib/ivr/balloon-menu";
+import { BALLOON_MENU, BALLOON_SECOND_DIGIT_SECONDS, balloonEntry, balloonForKey, balloonSizes, balloonKeyWords, digitWords } from "@/lib/ivr/balloon-menu";
 import { formatPhone, last4, spokenDigits, toE164 } from "@/lib/phone";
 import { logStamp, phonePromoMode, phonePromoOn, readBack, tenDigitNumber } from "@/lib/phone-promo";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
@@ -59,6 +59,7 @@ const PHONEPAY_PROMPTS = ["phonepay_intro", "phonepay_back", "phonepay_paid", "p
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { liveVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
+import { menuOrder, type MenuId } from "./menu-order";
 import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
 import { CATALOG_ENDINGS, decodeCatalogKeys, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
 import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState, textingActive } from "@/lib/voicemail";
@@ -66,7 +67,7 @@ import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staf
 import { calendarNow } from "@/lib/clock";
 import { bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
 import { matchBlock, parseBlockList } from "./caller-filter";
-import { PROMPTS, composeClips, fill, googleLiveOn, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
+import { PROMPTS, composeClips, fill, googleLiveOn, liveClips, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
@@ -120,6 +121,22 @@ function sp(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptK
   // Option B (Owner switch, off): Google speaks the line in Achird; otherwise the live voice (Puck)
   if (vars && googleLiveOn(ctx.prompts)) return void target.play(liveVoiceLink(promptText(ctx.prompts, key, vars)));
   say(target, promptText(ctx.prompts, key, vars));
+}
+
+/** A part said live between recordings (digits, a key): Hark's word clips, else Google Achird, else the live voice. */
+function sayLive(target: VR | Gather, ctx: { prompts: PromptOverrides }, text: string) {
+  const clips = liveClips(ctx.prompts, text);
+  if (clips) return void clips.forEach((u) => target.play(u));
+  if (googleLiveOn(ctx.prompts)) return void target.play(liveVoiceLink(text));
+  say(target, text);
+}
+
+/** A menu made of several recordings, in the order the Owner set in Admin (src/lib/ivr/menu-order.ts). */
+async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) => void | Promise<void>) {
+  for (const part of menuOrder(menu, (await getSettings()).menuOrders)) {
+    if (part === "balloon_items") await items?.(g);
+    else sp(g, ctx, part);
+  }
 }
 
 function pause(target: VR | Gather, seconds = 1) {
@@ -258,16 +275,20 @@ function spLines(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: Pr
  * and time we open again, then the tone; the message goes to the general voicemail (key 9's box). Draft wording: on
  * preview now, on the live line once Abraham approves it. Returns null when the hotline is open (or the greeting waits).
  */
-async function hotlineClosed(ctx: Ctx, vr: VR): Promise<VR | null> {
+async function hotlineClosed(ctx: Ctx, vr: VR, n = 0): Promise<VR | null> {
   const lock = bookingLock(calendarNow(), await getSettings());
   const closedKey = lock.reason === "Yom Tov" ? "closed_yomtov_greeting" : "closed_shabbos_greeting";
   if (!lock.locked || (process.env.VERCEL_ENV === "production" && promptWaiting(ctx.prompts, closedKey))) return null;
   const opens = lock.opensAt ?? new Date();
-  sp(vr, ctx, closedKey, {
+  const vars = {
     day: opens.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/New_York" }),
     time: opens.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }),
-  }, { draftOk: true });
+  };
   await updateSession(ctx.callSid, { outcome: "voicemail", data: { missed: "closed" } }, ctx.session);
+  // Shabbes (candle lighting until 2 minutes after Rabbeinu Tam) and Yom Tov: the closed message, the tone, the general
+  // voicemail; no key works (pound skips the message to the tone, as in every voicemail greeting)
+  const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 1, finishOnKey: "#", actionOnEmptyResult: true, action: url("closed-key", { n: n || undefined }), method: "POST" });
+  sp(g, ctx, closedKey, vars, { draftOk: true });
   return vmRecord(vr, await vmBox("9"), "closed");
 }
 
@@ -425,6 +446,7 @@ function attractionMenu(ctx: Ctx, vr: VR, m: "i" | "l") {
   const g = keypad(vr, url("attraction-choice", { m }));
   if (m === "i") {
     sp(g, ctx, "instr_menu"); // Abraham, Phone Menu v3, word for word (recorded information, day and night)
+    sp(g, ctx, "book_back"); // the shared star line (Nov 19, 2026)
     return repeatMenu(vr, ctx, "instructions", { again: 1 });
   }
   if (!ctx.query.get("again")) sp(g, ctx, "learn_intro");
@@ -440,6 +462,16 @@ async function attractionCategory(t: "1" | "2" | "3") {
 }
 
 /** Is this item in the bounce house (jumping balloons) category? */
+/** The kind of item, singular, for "the closest {category}" (Abraham, Nov 19, 2026). */
+async function singularCategory(categoryId: number) {
+  const [cat] = await db.select({ name: categories.name, spoken: categories.spokenName }).from(categories).where(eq(categories.id, categoryId));
+  const n = cat?.name ?? "";
+  if (ATTRACTIONS["1"].match.test(n)) return "jumping balloon";
+  if (/laser/i.test(n)) return "laser tag set";
+  if (/paddle|boat/i.test(n)) return "paddle boat";
+  return (cat?.spoken || n).toLowerCase().replace(/s$/, "");
+}
+
 async function isBounceHouse(categoryId: number) {
   const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, categoryId));
   return Boolean(cat && ATTRACTIONS["1"].match.test(cat.name));
@@ -455,9 +487,9 @@ const MAIN_KEY_LABELS: Record<string, string> = {
   "1": "book a rental",
   "2": "instructions",
   "3": "customer service",
-  "4": "learn about our rentals",
-  "5": "questions or problems during a rental",
-  "6": "delivery and pickup",
+  "4": "questions or problems during a rental",
+  "5": "delivery and pickup",
+  "6": "learn about our rentals",
   "7": "hours of operation",
   "8": "catalog by text or email",
   "9": "general voicemail",
@@ -657,6 +689,28 @@ function vmRecord(vr: VR, box: { id: number; maxLengthSec: number; transcribe: b
   });
   // Reached only if the caller stayed silent and nothing was recorded.
   return vr;
+}
+
+/** Times a voicemail greeting starts over after a key that is not pound (then the tone). */
+const VM_GREETING_REPLAYS = 3;
+
+/**
+ * Every voicemail greeting (Nov 19, 2026): pound skips to the tone; other keys are not choices (the greeting starts
+ * over, see vm-greeting-key). The greeting ends with no key: the tone. On the general voicemail, star 7 4 is staff access.
+ */
+function vmGreetingThenTone(vr: VR, ctx: Ctx, box: { id: number; maxLengthSec: number; transcribe: boolean }, x: string | null, greeting: PromptKey, n = 0, vars?: Record<string, string | number>, opts?: { draftOk?: boolean }) {
+  const staff = vmAccessActive() && x === "9";
+  const g = vr.gather({
+    input: ["dtmf"],
+    numDigits: staff ? VM_ACCESS_KEYS.length : 1,
+    timeout: staff ? VM_ACCESS_KEY_GAP : 1,
+    finishOnKey: "#",
+    actionOnEmptyResult: true,
+    action: url("vm-greeting-key", { x: x ?? undefined, n: n || undefined, g: greeting }),
+    method: "POST",
+  });
+  sp(g, ctx, greeting, vars, opts);
+  return vmRecord(vr, box, x);
 }
 
 /** Staff voicemail access: signed in with the PIN on THIS call. */
@@ -921,8 +975,6 @@ const handlers: Record<string, Handler> = {
         sp(g, ctx, "office_closed");
         halfPause(g);
       }
-      sp(g, ctx, "catalog_offer");
-      halfPause(g);
     }
     spLines(g, ctx, "main_menu");
     return menuNoChoice(vr, ctx);
@@ -945,10 +997,14 @@ const handlers: Record<string, Handler> = {
         return back(vr, "instructions");
       case "3": // customer service: the line (ring list, voicemail, alerts) that was key 4
         return back(vr, "ring", { k: "4" });
-      case "4": // learn about our rentals (was key 3)
-        return back(vr, "learn");
+      // Nov 19, 2026 (Hark for Abraham): 4 = issues during your rental, 5 = delivery and pickup, 6 = learn about our
+      // rentals. The lines keep their ring lists, voicemail boxes and names (stored as lines 5 and 6).
+      case "4":
+        return back(vr, "ring", { k: "5" });
       case "5":
+        return back(vr, "ring", { k: "6" });
       case "6":
+        return back(vr, "learn");
       case "0":
         return back(vr, "ring", { k: d });
       case "8": // catalog by text or email
@@ -1005,6 +1061,7 @@ const handlers: Record<string, Handler> = {
   catalog(ctx, vr) {
     const g = keypad(vr, url("catalog-choice"));
     sp(g, ctx, "catalog_menu");
+    sp(g, ctx, "book_back"); // the shared star line (Nov 19, 2026)
     return repeatMenu(vr, ctx, "catalog");
   },
 
@@ -1374,19 +1431,9 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("book-choice")); // keys only (Abraham); # is an invalid choice
     // Abraham (Nov 11, 2026), word for word. Categories, their names and order come from Admin; numbered 1, 2, 3...
     // Abraham, Nov 18, 2026: the "Please note" line plays the first time only, not when the caller comes back to add more
-    const adding = (await callOrders(ctx)).length > 0;
-    if (!adding) {
-      sp(g, ctx, "book_note");
-      halfPause(g);
-    }
-    if (!cats.length) sp(g, ctx, "menu_empty");
-    cats.forEach((c, i) => {
-      sp(g, ctx, "menu_category", { category: c.spokenName || c.name, key: i + 1 });
-      halfPause(g);
-    });
-    sp(g, ctx, "book_corporate");
-    halfPause(g);
-    sp(g, ctx, "book_back");
+    // Nov 19, 2026 (Hark for Abraham): three recordings, then the one shared star line, in the order set in Admin
+    void cats;
+    await playMenu(g, ctx, "book");
     // Before a booking starts this is a menu (3 plays and 20 seconds); with something held it follows the idle rule
     return (await callOrders(ctx)).length ? idleNoKey(vr, ctx, "book") : repeatMenu(vr, ctx, "book");
   },
@@ -1398,8 +1445,13 @@ const handlers: Record<string, Handler> = {
     if (!lines.length) return back(vr, "book");
     const g = keypad(vr, url("resume-choice"));
     // grouped by day: "one Castle and one Laser tag set for Tuesday, December 22"
-    const byDay = [...new Set(lines.map((l) => l.date))].map((d) => `${lines.filter((l) => l.date === d).map((l) => itemPhrase(l.qty, l.name)).join(" and ")} for ${spokenDate(d)}`);
-    sp(g, ctx, "resume_offer", { items: byDay.join(", and ") });
+    // Nov 19, 2026: "... you had in your cart {items} for {date}." Several days: each day's items with their date, the
+    // last day's date in {date}
+    const days = [...new Set(lines.map((l) => l.date))];
+    const dayItems = (d: string) => lines.filter((l) => l.date === d).map((l) => itemPhrase(l.qty, l.name)).join(" and ");
+    const last = days[days.length - 1];
+    const items = [...days.slice(0, -1).map((d) => `${dayItems(d)} for ${spokenDate(d)}`), dayItems(last)].join(", and ");
+    sp(g, ctx, "resume_offer", { items, date: spokenDate(last) });
     return idleNoKey(vr, ctx, "book");
   },
 
@@ -1450,10 +1502,10 @@ const handlers: Record<string, Handler> = {
       const ids = [...new Set([...(session.data?.dayOrderIds ?? []), cartOrder])];
       await updateSession(ctx.callSid, { orderId: cartOrder, outcome: "carted", data: { day: l.d, dayOrderIds: ids, resumeLines: lines } }, session);
       await track(ctx.callSid, "item_added", `Added ${itemPhrase(l.qty, l.name)} for ${spokenDate(l.d)} from the last call`, { item: l.name, productId: l.p, qty: l.qty, date: l.d, orderId: cartOrder });
-      sp(vr, ctx, "item_added");
+      // Nov 19, 2026: a jumping balloon gets the ocean balls question first, then the old-cart added line
       const prod = await getProduct(l.p);
       if (prod && (await isBounceHouse(prod.categoryId))) return back(vr, "ocean", { d: l.d, n: "resume" });
-      return back(vr, "resume-items");
+      return back(vr, "resume-added", { d: l.d });
     }
     const t = lines.findIndex((l) => l.state === "taken");
     if (t >= 0) {
@@ -1463,6 +1515,29 @@ const handlers: Record<string, Handler> = {
       return back(vr, "booked-near", { p: l.p, d: l.d }); // box 11a: same date, or the nearest date it is free
     }
     return back(vr, (await callOrders(ctx)).length ? "cart" : "book");
+  },
+
+  /**
+   * Old cart, an item added (Nov 19, 2026): "This item was successfully added to your cart. To go to your shopping
+   * cart, press 0. To keep shopping, for same day, press 1. For another day, press 2." No key: the next old item.
+   */
+  "resume-added"(ctx, vr) {
+    const d = ctx.query.get("d") ?? undefined;
+    const g = keypad(vr, url("resume-added-choice", { d }));
+    sp(g, ctx, "resume_added");
+    return back(vr, "resume-items");
+  },
+
+  async "resume-added-choice"(ctx, vr) {
+    const k = ctx.body.Digits;
+    if (k === "0") return back(vr, "cart");
+    if (k === "1") return back(vr, "book"); // keep shopping, the same day
+    if (k === "2") return back(vr, "date"); // another day
+    if (k) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "resume-added", { d: ctx.query.get("d") ?? undefined });
+    }
+    return back(vr, "resume-items");
   },
 
   /** Old menu (boxes 9 and 10, deleted): a call already in it goes on with the new way. */
@@ -1476,8 +1551,9 @@ const handlers: Record<string, Handler> = {
     if (d === "*") return back(vr, "menu"); // star goes back one step
     if (d === "0") return back(vr, "ring", { k: "4" }); // customer service (main menu key 3's line)
     if (d === "9") return back(vr, "ring", { k: "8" }); // schools, corporate events and organizations
+    if (d === "8") return back(vr, "catalog"); // the catalog, also from the bookings menu (Nov 19, 2026)
     const cat = (await phoneCategories())[Number(d) - 1];
-    if (!cat || !/^[1-8]$/.test(d)) {
+    if (!cat || !/^[1-7]$/.test(d)) {
       sp(vr, ctx, "not_valid");
       return back(vr, "book");
     }
@@ -1505,11 +1581,24 @@ const handlers: Record<string, Handler> = {
     return bookNoInput(vr, ctx, "category", { c });
   },
 
-  /** Box 153: the jumping balloons menu (approved word for word). One key; after 1, a short wait for 0, 1 or 2. */
-  balloons(ctx, vr) {
+  /**
+   * The jumping balloons list (Abraham, Nov 19, 2026, replaces box 153): the opening, then per balloon the recorded
+   * "For the {name}, item seven two," + the last two digits live + recorded "press," + the key live; then once the
+   * cart line and the shared star line. Keys 10 to 12: after 1 the line waits 2 seconds for a second digit.
+   */
+  async balloons(ctx, vr) {
     const c = ctx.query.get("c")!;
+    const items = await phoneProducts(Number(c));
     const g = keypad(vr, url("balloon-key", { c }), { numDigits: 1 });
-    sp(g, ctx, "box153");
+    await playMenu(g, ctx, "balloons", (g) => {
+      for (const b of BALLOON_MENU) {
+        if (!items.some((p) => balloonEntry(p.name)?.key === b.key)) continue; // not active in Admin: not read
+        sp(g, ctx, `balloon_${b.number}` as PromptKey);
+        sayLive(g, ctx, digitWords(b.number.slice(2)));
+        sp(g, ctx, "balloon_press");
+        sayLive(g, ctx, balloonKeyWords(b.key));
+      }
+    });
     return bookNoInput(vr, ctx, "balloons", { c });
   },
 
@@ -1518,6 +1607,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (!d) return bookNoInput(vr, ctx, "balloons", { c });
     if (d === "*") return back(vr, "book"); // star: one menu back
+    if (d === "0") return back(vr, "cart", { c }); // "To go to your shopping cart, press 0."
     // 1: wait 2 seconds for a second digit (10, 11, 12); pound skips the wait; nothing = Soft Hop
     if (d === "1") {
       vr.gather({ input: ["dtmf"], numDigits: 1, timeout: BALLOON_SECOND_DIGIT_SECONDS, finishOnKey: "#", action: url("balloon-key2", { c }), method: "POST", actionOnEmptyResult: true });
@@ -1551,6 +1641,7 @@ const handlers: Record<string, Handler> = {
     if (!p) return back(vr, "book");
     const g = keypad(vr, url("balloon-choice", { p: p.id }));
     sp(g, ctx, "box154", { item: p.name, number: digitWords(balloonEntry(p.name)?.number ?? ""), price: spokenMoney(p.priceCents) });
+    sp(g, ctx, "book_back"); // the shared star line (Nov 19, 2026)
     return bookNoInput(vr, ctx, "balloon", { p: p.id });
   },
 
@@ -1572,6 +1663,7 @@ const handlers: Record<string, Handler> = {
       if (process.env.VERCEL_ENV !== "production" && sizes && description) {
         const g = keypad(vr, url("balloon-choice", { p: p.id }));
         spPreviewDraft(g, ctx, "box155", { item: p.name, description, ...sizes });
+        sp(g, ctx, "book_back"); // the shared star line (Nov 19, 2026)
         return bookNoInput(vr, ctx, "balloon", { p: p.id });
       }
       if (p.spokenDescription || p.description) say(vr, p.spokenDescription || p.description);
@@ -1611,6 +1703,7 @@ const handlers: Record<string, Handler> = {
     }
     sp(g, ctx, "product_options");
     sp(g, ctx, "cart_key");
+    sp(g, ctx, "book_back"); // the shared star line (Nov 19, 2026)
     return noInput(vr, ctx, "product", { p: p.id, again: 1 });
   },
 
@@ -1708,9 +1801,11 @@ const handlers: Record<string, Handler> = {
     const p = await getProduct(Number(ctx.query.get("p")));
     const date = ctx.query.get("d")!;
     if (!p) return back(vr, "menu");
+    // Hark for Abraham, Nov 19, 2026: "I am sorry, the {item} is already booked on {date}. For the closest {category}
+    // on the same date, press 1. For the nearest date this item is free, press 2." Replaces the size up/down screen.
     const g = keypad(vr, url("taken-choice", { p: p.id, d: date }));
-    sp(g, ctx, "item_taken", { item: p.name, date: spokenDate(date), key: 1 });
-    sp(g, ctx, "cart_key");
+    sp(g, ctx, "item_booked", { item: p.name, date: spokenDate(date), category: await singularCategory(p.categoryId) });
+    sp(g, ctx, "book_back");
     return bookNoInput(vr, ctx, "booked", { p: p.id, d: date });
   },
 
@@ -1718,11 +1813,27 @@ const handlers: Record<string, Handler> = {
     const p = Number(ctx.query.get("p"));
     const date = ctx.query.get("d")!;
     const d = ctx.body.Digits;
-    if (d === "1") return back(vr, "booked-near", { p, d: date });
-    if (d === "0") return back(vr, "cart");
+    if (d === "1") return back(vr, "booked-closest", { p, d: date }); // the closest item of the same kind, same date
+    if (d === "2") return back(vr, "altdates", { p, d: date }); // the nearest date this item is free
     if (d === "*") return starToCategory(vr, p); // star: one menu back, the item's list
     sp(vr, ctx, "not_valid");
     return back(vr, "booked", { p, d: date });
+  },
+
+  /**
+   * Key 1 on "already booked": the closest item of the same kind free on that date (the next size up, else down), read
+   * like any item of its list (name, price, press 1 to add). None free: the nearest dates for the item instead.
+   */
+  async "booked-closest"(ctx, vr) {
+    const p = await getProduct(Number(ctx.query.get("p")));
+    const date = ctx.query.get("d")!;
+    if (!p) return back(vr, "menu");
+    const cal = await getSettings();
+    const near = (await nearestSize(p, date, 1, cal)) ?? (await nearestSize(p, date, -1, cal));
+    if (!near) return back(vr, "altdates", { p: p.id, d: date });
+    await chooseDay(ctx, date);
+    if (await isBounceHouse(near.categoryId)) return back(vr, "balloon", { p: near.id });
+    return back(vr, "product", { p: near.id });
   },
 
   /** "For the same date, press 1. For the nearest date this item is free, press 2." */
@@ -1738,7 +1849,7 @@ const handlers: Record<string, Handler> = {
     const p = ctx.query.get("p")!;
     const date = ctx.query.get("d")!;
     const d = ctx.body.Digits;
-    if (d === "1") return back(vr, "booked-same", { p, d: date }); // the closest items free on the same date
+    if (d === "1") return back(vr, "booked-closest", { p, d: date }); // the closest item free on the same date (Nov 19, 2026)
     if (d === "2") return back(vr, "altdates", { p, d: date }); // the nearest dates this item is free
     if (d === "0") return back(vr, "cart");
     if (d === "*") return back(vr, "booked", { p, d: date }); // star: one menu back
@@ -1859,7 +1970,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "qty_invalid");
       return back(vr, "qty", { p: p.id, d: date });
     }
-    if (await isBounceHouse(p.categoryId)) sp(vr, ctx, "bounce_water_note"); // Abraham (Phone Menu v3): before a bounce house is added
+    // Nov 19, 2026: the water line moved to the opening of the jumping balloons list; it no longer plays here
     const session = ctx.session ?? (await ensureSession(ctx.callSid, ctx.from));
     // The held order for this day (one per rental day on the call)
     const existing = (await callOrders(ctx)).find((o) => o.order.eventDate === date) ?? null;
@@ -2012,7 +2123,7 @@ const handlers: Record<string, Handler> = {
   async "ocean-choice"(ctx, vr) {
     const date = ctx.query.get("d")!;
     const n = ctx.query.get("n") ?? undefined;
-    const next = () => (n === "resume" ? back(vr, "resume-items") : back(vr, "added-menu"));
+    const next = () => (n === "resume" ? back(vr, "resume-added", { d: date }) : back(vr, "added-menu"));
     const k = ctx.body.Digits ?? "";
     if (k === "#") return next();
     const sets = await oceanBallProducts();
@@ -3188,25 +3299,36 @@ const handlers: Record<string, Handler> = {
       return back(vr, "menu");
     }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail", data: { vmEntry: x ?? undefined } }, ctx.session);
-    if (vmAccessActive() && x === "9") {
-      // Staff access, general voicemail only (Abraham, Nov 15, 2026): star 7 4 while the greeting plays, no pause of
-      // 3 seconds or more between keys. Never announced; any other key just records.
-      const g = vr.gather({ input: ["dtmf"], numDigits: VM_ACCESS_KEYS.length, timeout: VM_ACCESS_KEY_GAP, finishOnKey: "", action: url("vm-greeting-key", { x: x ?? undefined }), method: "POST" });
-      sp(g, ctx, await vmGreeting(x, ctx.prompts));
-      return vmRecord(vr, box, x);
-    }
-    sp(vr, ctx, await vmGreeting(x, ctx.prompts));
-    return vmRecord(vr, box, x);
+    return vmGreetingThenTone(vr, ctx, box, x, await vmGreeting(x, ctx.prompts));
   },
 
-  /** A key during the greeting: 7 4 = staff access; anything else goes straight to the tone (as if the greeting ended). */
+  /** A key during the Shabbes / Yom Tov closed message: pound or the end = the tone; any other key = the message again. */
+  async "closed-key"(ctx, vr) {
+    const d = ctx.body.Digits ?? "";
+    const n = Number(ctx.query.get("n") || 0);
+    if (d && n < VM_GREETING_REPLAYS) {
+      const again = await hotlineClosed(ctx, vr, n + 1);
+      if (again) return again;
+    }
+    return vmRecord(vr, await vmBox("9"), "closed");
+  },
+
+  /**
+   * A key during a voicemail greeting (Hark for Abraham, Nov 19, 2026): pound skips to the tone (the only skip). The
+   * greeting has no keys, so any other key is not acted on: the greeting starts over. Staff access (star 7 4, general
+   * voicemail only, never announced) stays as before.
+   */
   async "vm-greeting-key"(ctx, vr) {
     const x = ctx.query.get("x");
     const d = ctx.body.Digits ?? "";
     if (d === VM_ACCESS_KEYS && x === "9" && vmAccessActive()) return back(vr, "vma-pin");
-    // Star and then the wrong keys (Abraham, Nov 16, 2026): the shared wrong-key line, then the voicemail as usual
-    if (d.startsWith("*")) sp(vr, ctx, "not_valid");
-    return vmRecord(vr, await vmBox(x), x);
+    const box = await vmBox(x);
+    const n = Number(ctx.query.get("n") || 0);
+    // pound (no other key) or the greeting ended: the tone. Another key: the greeting again (at most 3 times).
+    if (!d || n >= VM_GREETING_REPLAYS) return vmRecord(vr, box, x);
+    const gq = ctx.query.get("g");
+    const greet = gq && gq in PROMPTS ? (gq as PromptKey) : await vmGreeting(x, ctx.prompts);
+    return vmGreetingThenTone(vr, ctx, box, x, greet, n + 1);
   },
 
   /* ---- Staff voicemail access by phone (Abraham, Nov 13, 2026; preview only; every line a draft) ---- */

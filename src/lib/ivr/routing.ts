@@ -73,13 +73,14 @@ export const RING_KEYS = ["2", "4", "5", "6", "8", "0"] as const;
 export type RingKey = (typeof RING_KEYS)[number];
 
 /** The extension number callers press (and staff hear) for each line, plus key 9's voicemail-only box. */
-export const EXTENSION_NUMBER: Record<RingKey | "9", string> = { "2": "2", "4": "3", "5": "5", "6": "6", "8": "", "0": "0", "9": "9" };
+// Nov 19, 2026 (Hark for Abraham): rental issues is key 4, delivery and pickup is key 5 (each line keeps its ring list)
+export const EXTENSION_NUMBER: Record<RingKey | "9", string> = { "2": "2", "4": "3", "5": "4", "6": "5", "8": "", "0": "0", "9": "9" };
 
 export const RING_KEY_LABELS: Record<RingKey, string> = {
   "2": "Extension 2: Equipment instructions and guidance",
   "4": "Extension 3: Customer service",
-  "5": "Extension 5: Questions or problems during a rental",
-  "6": "Extension 6: Delivery and pickup information",
+  "5": "Extension 4: Questions or problems during a rental",
+  "6": "Extension 5: Delivery and pickup information",
   "8": "Bookings menu 9: Schools and Corporate Orders (no extension number)",
   "0": "Extension 0: Operator",
 };

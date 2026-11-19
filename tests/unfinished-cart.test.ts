@@ -70,10 +70,17 @@ describe("unfinished phone order", () => {
     const held = (await db.select().from(schema.orders)).find((o) => o.id === lines[1].holdId)!;
     expect(held.status).toBe("HOLD");
     // Box 8, press 1 (Abraham, Nov 18, 2026; boxes 9 and 10 deleted): the free Laser tag set goes straight into the cart
+    // Nov 19, 2026 (Part 8): the old-cart added line with its own keys; laser tag: no ocean balls
     const added = await call("resume-items");
-    expect(said(added)).toEqual(["This item is successfully added to your cart."]); // box 11; laser tag: no ocean balls
     expect((h.session.data.dayOrderIds as number[]).length).toBe(1);
-    expect(redirect(added)).toBe("resume-items");
+    expect(redirect(added)).toBe("resume-added?d=2026-12-22");
+    const menu = await call("resume-added", {}, "d=2026-12-22");
+    expect(said(menu)).toEqual(["This item was successfully added to your cart. To go to your shopping cart, press 0. To keep shopping, for same day, press 1. For another day, press 2."]);
+    expect(redirect(menu)).toBe("resume-items"); // no key: the next old item
+    expect(redirect(await call("resume-added-choice", { Digits: "0" }))).toBe("cart");
+    expect(redirect(await call("resume-added-choice", { Digits: "1" }))).toBe("book");
+    expect(redirect(await call("resume-added-choice", { Digits: "2" }))).toBe("date");
+    expect(redirect(await call("resume-added-choice", { Digits: "7" }, "d=2026-12-22"))).toBe("resume-added?d=2026-12-22");
     // then the taken Castle: box 11a, same date or nearest date
     expect(redirect(await call("resume-items"))).toBe(`booked-near?p=${castle}&d=2026-12-22`);
     // then the cart
@@ -81,8 +88,8 @@ describe("unfinished phone order", () => {
     // asked once only
     const again = await call("book");
     expect(redirect(again)).not.toBe("resume");
-    // back to add more items: no "Please note" line (Abraham, Nov 18, 2026; it still plays the first time)
-    expect(said(again).join(" ")).not.toContain("Please note");
+    // Nov 19, 2026: "Please note" is now inside recording 1 of the bookings menu, which plays every time
+    expect(said(again)[0]).toBe("To receive our catalog by text or email, press 8. Please note, orders can be placed only through our automated system.");
     void laser;
   });
   it("one item free: straight into the cart, then the cart for checkout (no box 9)", async () => {
@@ -90,18 +97,18 @@ describe("unfinished phone order", () => {
     await db.insert(schema.orderItems).values({ orderId: hold.id, productId: laser, qty: 1, unitPriceCents: 30000 });
     h.session.data = { resumeAsked: 1, resumeLines: [{ p: laser, name: "Laser tag set", qty: 1, d: "2026-12-29", holdId: hold.id, state: "free" }] };
     const r = await call("resume-items");
-    expect(said(r)).toEqual(["This item is successfully added to your cart."]);
+    expect(redirect(r)).toBe("resume-added?d=2026-12-29");
     expect(h.session.data.dayOrderIds).toEqual([hold.id]);
     expect(redirect(await call("resume-items"))).toBe("cart");
   });
-  it("a jumping balloon added back: the item added line, then ocean balls, then the next item", async () => {
+  it("a jumping balloon added back: the ocean balls question first, then the old-cart added line, then the next item", async () => {
     const [hold] = await db.insert(schema.orders).values({ status: "HOLD", channel: "PHONE", eventDate: "2027-01-05", pickupDate: "2027-01-06", holdExpiresAt: new Date(Date.now() + 600_000), callSid: "CAnew" }).returning();
     await db.insert(schema.orderItems).values({ orderId: hold.id, productId: castle, qty: 1, unitPriceCents: 20000 });
     h.session.data = { resumeAsked: 1, resumeLines: [{ p: castle, name: "Castle", qty: 1, d: "2027-01-05", holdId: hold.id, state: "free" }, { p: laser, name: "Laser tag set", qty: 1, d: "2027-01-05", holdId: null, state: "taken" }] };
     const r = await call("resume-items");
-    expect(said(r)).toEqual(["This item is successfully added to your cart."]);
+    expect(said(r)).toEqual([]);
     expect(redirect(r)).toBe("ocean?d=2027-01-05&n=resume");
-    expect(redirect(await call("ocean-choice", { Digits: "#" }, "d=2027-01-05&n=resume"))).toBe("resume-items");
+    expect(redirect(await call("ocean-choice", { Digits: "#" }, "d=2027-01-05&n=resume"))).toBe("resume-added?d=2027-01-05");
   });
   it("press 2 starts a new order", async () => {
     h.session.data = { resumeAsked: undefined };

@@ -28,7 +28,8 @@ export const PROMPTS = {
   // Start of the call (Abraham, Nov 16, 2026): separate prompts, in this order. Greeting (always), call recording
   // notice (only when call recording is on), office closed (only when closed), catalog offer (always), main menu.
   greeting: { group: "Welcome & main menu", label: "Greeting (start of every call)", text: "Hi, thank you for calling Hup Up Attractions! Bringing something special to every occasion!" },
-  catalog_offer: { group: "Welcome & main menu", label: "Catalog offer (start of every call, before the main menu)", text: "To receive our catalog by text or email, press 8." },
+  // The greeting's catalog offer was removed (Hark for Abraham, Nov 19, 2026): key 8 is in the main menu and the bookings menu
+  catalog_offer: { group: "Welcome & main menu", label: "Catalog offer (no longer played: key 8 is in the main menu)", text: "To receive our catalog by text or email, press 8." },
   // Main menu (Abraham, Nov 16, 2026): one prompt, word for word, one line per sentence (a half-second pause between
   // lines when spoken from the text). The same prompt plays every time the menu plays again, without the greeting.
   main_menu: {
@@ -40,9 +41,9 @@ export const PROMPTS = {
       "For reservations and bookings, press 1.",
       "For instructions and guidance on using our rental equipment, press 2.",
       "For customer service and general inquiries, press 3.",
-      "To learn more about our rental attractions and the services we offer, press 4.",
-      "For questions or assistance with any issues during your rental, press 5.",
-      "For delivery and pickup information, press 6.",
+      "For questions or assistance with any issues during your rental, press 4.",
+      "For delivery and pickup information, press 5.",
+      "To learn more about our rental attractions and the services we offer, press 6.",
       "To hear our hours of operation, press 7.",
       "To receive our catalog by text or email, press 8.",
       "For feedback and comments, press 9.",
@@ -52,13 +53,18 @@ export const PROMPTS = {
     ].join("\n"),
   },
   // Bookings menu after pressing 1 (Abraham, Nov 11, 2026), approved word for word; categories come from Admin.
-  book_note: { group: "Booking by item (key 1)", label: "Bookings menu: first line (Abraham)", text: "Please note, orders can be placed only through our automated system. For information or questions, press 0 for customer service." },
-  book_corporate: { group: "Booking by item (key 1)", label: "Bookings menu key 9 (Abraham)", text: "For schools, corporate events, and organizational bookings, press 9." },
-  book_back: { group: "Booking by item (key 1)", label: "Bookings menu: go back (Abraham)", text: "To go back, press star." },
-  not_valid: { group: "Welcome & main menu", label: "Any menu: a key that is not a choice (Abraham)", text: "Sorry, that is not a valid selection. Please try again." },
+  // Bookings menu (Hark for Abraham, Nov 19, 2026): three recordings, then the shared star line
+  book_r1: { group: "Booking by item (key 1)", label: "Bookings menu, recording 1", text: "To receive our catalog by text or email, press 8. Please note, orders can be placed only through our automated system." },
+  book_r2: { group: "Booking by item (key 1)", label: "Bookings menu, recording 2", text: "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3." },
+  book_r3: { group: "Booking by item (key 1)", label: "Bookings menu, recording 3", text: "For information or questions, press 0 for customer service. For schools, corporate events, and organizational bookings, press 9." },
+  book_note: { group: "Booking by item (key 1)", label: "Bookings menu: first line (replaced by recording 1, Nov 19)", text: "Please note, orders can be placed only through our automated system. For information or questions, press 0 for customer service." },
+  book_corporate: { group: "Booking by item (key 1)", label: "Bookings menu key 9 (replaced by recording 3, Nov 19)", text: "For schools, corporate events, and organizational bookings, press 9." },
+  // The one shared star line (Nov 19, 2026): taken out of every menu line; played once after every menu with a way back
+  book_back: { group: "Welcome & main menu", label: "Shared: go back (plays after every menu with a way back)", text: "To go back, press star." },
+  not_valid: { group: "Welcome & main menu", label: "Any menu: a key that is not a choice (Abraham)", text: "Sorry, that is not a valid selection." }, // Nov 19, 2026: then the same recording starts over
   // Main menu key 2 (Abraham W): instructions for each type of attraction. Editable here like every other prompt.
   attraction_choice: { group: "Key 2: Instructions", label: "Which attraction (keys 2 and 3, Abraham)", text: "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3." },
-  instr_menu: { group: "Key 2: Instructions", label: "Key 2 menu (Abraham, Phone Menu v3)", text: "For jumping balloon instructions, press 1. For laser tag, press 2. For paddle boats, press 3. To go back, press star." },
+  instr_menu: { group: "Key 2: Instructions", label: "Key 2 menu (Abraham, Phone Menu v3)", text: "For jumping balloon instructions, press 1. For laser tag, press 2. For paddle boats, press 3." },
   attraction_menu_back: { group: "Key 2: Instructions", label: "Which attraction: star for the main menu", text: "To go back to the main menu, press the star key." },
   instr_intro: { group: "Key 2: Instructions", label: "Key 2 opening line", text: "We are happy to help you get the most out of your rental." },
   instr_balloons: {
@@ -117,10 +123,10 @@ export const PROMPTS = {
   // Browsing
   category_intro: { group: "Browsing", label: "Category intro", text: "Awesome, {category}!", vars: ["category"] },
   category_item: { group: "Browsing", label: "Item option in a category", text: "For the {item}, press {key}.", vars: ["item", "key"] },
-  back_to_menu: { group: "Browsing", label: "Go back option", text: "To go back, press star." }, // approved Nov 18, 2026
+  back_to_menu: { group: "Browsing", label: "Go back option (replaced by the one shared star line, Nov 19)", text: "To go back, press star." },
   category_empty: { group: "Browsing", label: "Category has no items", text: "Sorry, nothing is available in that section right now. Let us head back to the main menu." },
   product_intro: { group: "Browsing", label: "Item intro", text: "Great choice! The {item} is {price}. Delivery is available for an additional fee, and our team will give you the delivery price.", vars: ["item", "price"] },
-  product_options: { group: "Browsing", label: "Item options", text: "To hear more about it, press 1. To add it to your cart, press 2. To go back, press star." },
+  product_options: { group: "Browsing", label: "Item options", text: "To hear more about it, press 1. To add it to your cart, press 2." },
   product_default_desc: { group: "Browsing", label: "Description when an item has none", text: "The {item} is one of our most popular rentals. Kids love it!", vars: ["item"] },
 
   // Booking by item (Abraham, Nov 9, 2026): category, item, date; if booked, the nearest options
@@ -137,16 +143,39 @@ export const PROMPTS = {
   box151_none: { group: "Booking by item (key 1)", label: "Box 151 when none are left that date (the same approved words, without the press 1 sentence)", text: "The {item} has been successfully added to your cart. To choose a different rental, press 2. To choose a different date, press 3. To go to your shopping cart, press 0.", vars: ["item"] },
   box152: { group: "Booking by item (key 1)", label: "Box 152: another one added (then box 151 again)", text: "Another {item} has been successfully added to your cart.", vars: ["item"] },
   // Jumping balloons (Abraham, Nov 19, 2026, approved): box 153 menu, box 154 when a balloon is chosen
-  box153: { group: "Booking by item (key 1)", label: "Box 153: jumping balloons menu", text: "For Soft Hop, item seven two zero one, press 1. For Sunlight Spot, item seven two zero two, press 2. For Blue Bounce, item seven two zero three, press 3. For Ball Buster, item seven two zero four, press 4. For Rising Joy, item seven two zero five, press 5. For Family Fun, item seven two zero six, press 6. For Adventure Zone, item seven two zero seven, press 7. For Wide Slide, item seven two zero eight, press 8. For Amusing Obstacle, item seven two zero nine, press 9. For Mega Mountain, item seven two one zero, press 1 0. For Bounce Blast, item seven two one one, press 1 1. For Wheel Thrill, item seven two one two, press 1 2. To go back, press star." },
-  box154: { group: "Booking by item (key 1)", label: "Box 154: jumping balloon chosen", text: "{item}, item {number}, {price}. To add it to your shopping cart, press 1. For description and dimensions, press 2. To go back, press star.", vars: ["item", "number", "price"] },
-  box155: { group: "Booking by item (key 1)", label: "Box 155: balloon description and dimensions (NOT APPROVED yet)", text: "The {item} is {description}. The dimensions are as follows: {length} feet long, {width} feet wide, and {height} feet tall. To add it to your shopping cart, press 1. To go back, press star.", vars: ["item", "description", "length", "width", "height"], pending: true },
+  // Old-cart item added (Nov 19, 2026)
+  resume_added: { group: "Booking by item (key 1)", label: "Old cart: item added", text: "This item was successfully added to your cart. To go to your shopping cart, press 0. To keep shopping, for same day, press 1. For another day, press 2." },
+  // Jumping balloons list (Nov 19, 2026, replaces box 153): the opening, then one line per balloon, then the cart line
+  balloons_open: { group: "Booking by item (key 1)", label: "Jumping balloons list: opening", text: "Here are our jumping balloons. Please note, our jumping balloons are not for water use." },
+  balloon_press: { group: "Booking by item (key 1)", label: "Jumping balloons list: the word \"press\" (between the item number and the key)", text: "press," },
+  balloon_7201: { group: "Booking by item (key 1)", label: "Jumping balloons list: Soft Hop (then the last two digits and the key are said live)", text: "For the Soft Hop, item seven two," },
+  balloon_7202: { group: "Booking by item (key 1)", label: "Jumping balloons list: Sunlight Spot (then the last two digits and the key are said live)", text: "For the Sunlight Spot, item seven two," },
+  balloon_7203: { group: "Booking by item (key 1)", label: "Jumping balloons list: Blue Bounce (then the last two digits and the key are said live)", text: "For the Blue Bounce, item seven two," },
+  balloon_7204: { group: "Booking by item (key 1)", label: "Jumping balloons list: Ball Buster (then the last two digits and the key are said live)", text: "For the Ball Buster, item seven two," },
+  balloon_7205: { group: "Booking by item (key 1)", label: "Jumping balloons list: Rising Joy (then the last two digits and the key are said live)", text: "For the Rising Joy, item seven two," },
+  balloon_7206: { group: "Booking by item (key 1)", label: "Jumping balloons list: Family Fun (then the last two digits and the key are said live)", text: "For the Family Fun, item seven two," },
+  balloon_7207: { group: "Booking by item (key 1)", label: "Jumping balloons list: Adventure Zone (then the last two digits and the key are said live)", text: "For the Adventure Zone, item seven two," },
+  balloon_7208: { group: "Booking by item (key 1)", label: "Jumping balloons list: Wide Slide (then the last two digits and the key are said live)", text: "For the Wide Slide, item seven two," },
+  balloon_7209: { group: "Booking by item (key 1)", label: "Jumping balloons list: Amusing Obstacle (then the last two digits and the key are said live)", text: "For the Amusing Obstacle, item seven two," },
+  balloon_7210: { group: "Booking by item (key 1)", label: "Jumping balloons list: Mega Mountain (then the last two digits and the key are said live)", text: "For the Mega Mountain, item seven two," },
+  balloon_7211: { group: "Booking by item (key 1)", label: "Jumping balloons list: Bounce Blast (then the last two digits and the key are said live)", text: "For the Bounce Blast, item seven two," },
+  balloon_7212: { group: "Booking by item (key 1)", label: "Jumping balloons list: Wheel Thrill (then the last two digits and the key are said live)", text: "For the Wheel Thrill, item seven two," },
+  list_cart: { group: "Booking by item (key 1)", label: "Item lists: the cart line (once, after the items)", text: "To go to your shopping cart, press 0." },
+  // Laser tag and paddle boats lists (Nov 19, 2026): openings not final; slots only, not on the live line yet
+  laser_open: { group: "Booking by item (key 1)", label: "Laser tag list: opening (not final)", text: "Here are our laser tag sets.", pending: true },
+  paddle_open: { group: "Booking by item (key 1)", label: "Paddle boats list: opening (not final)", text: "Here are our paddle boat packages.", pending: true },
+  box153: { group: "Booking by item (key 1)", label: "Box 153: jumping balloons menu (replaced by the new list, Nov 19)", text: "For Soft Hop, item seven two zero one, press 1. For Sunlight Spot, item seven two zero two, press 2. For Blue Bounce, item seven two zero three, press 3. For Ball Buster, item seven two zero four, press 4. For Rising Joy, item seven two zero five, press 5. For Family Fun, item seven two zero six, press 6. For Adventure Zone, item seven two zero seven, press 7. For Wide Slide, item seven two zero eight, press 8. For Amusing Obstacle, item seven two zero nine, press 9. For Mega Mountain, item seven two one zero, press 1 0. For Bounce Blast, item seven two one one, press 1 1. For Wheel Thrill, item seven two one two, press 1 2. To go back, press star." },
+  box154: { group: "Booking by item (key 1)", label: "Box 154: jumping balloon chosen", text: "{item}, item {number}, {price}. To add it to your shopping cart, press 1. For description and dimensions, press 2.", vars: ["item", "number", "price"] },
+  box155: { group: "Booking by item (key 1)", label: "Box 155: balloon description and dimensions (NOT APPROVED yet)", text: "The {item} is {description}. The dimensions are as follows: {length} feet long, {width} feet wide, and {height} feet tall. To add it to your shopping cart, press 1.", vars: ["item", "description", "length", "width", "height"], pending: true },
   // Box 156 (Abraham, Nov 19, 2026, approved): before payment, only when the customer has a discount from the Owner
   box156: { group: "Checkout", label: "Box 156: discount applied (only when the customer has a discount)", text: "The total of your order is {amount}. We are happy to let you know that a discount of {discount} has been applied to your order. Your new total is {newtotal}.", vars: ["amount", "discount", "newtotal"] },
   book_date_entered: { group: "Booking by item (key 1)", label: "Confirm the date", text: "You entered {date}. If that is correct, press pound to continue. To enter a different date, press 1.", vars: ["date"] },
   // Abraham, Nov 15, 2026: unfinished cart from the last call (drafts for his OK)
   // Welcome back (Abraham, Nov 17, 2026), his wording: approved. {items} = "one Castle and one Laser tag set for Tuesday, December 22"
-  resume_offer: { group: "Booking by item (key 1)", label: "Welcome back: last call's unfinished cart", text: "Welcome back! On your last call you had in your cart {items}. To check if they are still available, press 1. To start a new order, press 2.", vars: ["items"] },
+  resume_offer: { group: "Booking by item (key 1)", label: "Welcome back: last call's unfinished cart", text: "Welcome back! On your last call you had in your cart {items} for {date}. To check if they are still available, press 1. To start a new order, press 2.", vars: ["items", "date"] },
   // Item taken, whole phone system (Abraham, Nov 17, 2026), his wording
+  // Item booked, whole system (Nov 19, 2026): replaces the bigger and smaller size screen
+  item_booked: { group: "Booking by item (key 1)", label: "Item booked (whole phone system)", text: "I am sorry, the {item} is already booked on {date}. For the closest {category} on the same date, press 1. For the nearest date this item is free, press 2.", vars: ["item", "date", "category"] },
   item_taken: { group: "Booking by item (key 1)", label: "Item not available (whole phone system)", text: "The {item} is no longer available for {date}. For the nearest options, press {key}.", vars: ["item", "date", "key"] },
   taken_options: { group: "Booking by item (key 1)", label: "Item not available: same date or nearest date", text: "For the same date, press 1. For the nearest date this item is free, press 2." },
   booked_intro: { group: "Booking by item (key 1)", label: "Item booked that day", text: "I am sorry, the {item} is already booked on {date}.", vars: ["item", "date"] },
@@ -169,8 +198,8 @@ export const PROMPTS = {
   date_unclear: { group: "Date & quantity", label: "Didn't understand the date", text: "Sorry, I did not quite get that date. Let us try that again." },
   date_confirm_day: { group: "Date & quantity", label: "Confirm the date (whole rental day, delivery and pickup times)", text: "Got it, {date}! We will deliver that day between 9 AM and noon, and pick up on {pickup}. Please have the rental outside your door by 9 AM that morning. If that is right, press pound to continue. To pick a different date, press 1.", vars: ["date", "pickup"] },
   sold_out: { group: "Date & quantity", label: "Item booked up", text: "Oh no, the {item} is all booked up on {date}.", vars: ["item", "date"] },
-  sold_out_options_cart: { group: "Date & quantity", label: "Booked-up options (has cart)", text: "To look at other rentals, press 1. To hear your cart, press 9. To go back, press star." }, // star line approved Nov 18, 2026
-  sold_out_options: { group: "Date & quantity", label: "Booked-up options (no cart)", text: "To try a different date, press 1. To look at other rentals, press 2. To go back, press star." }, // star line approved Nov 18, 2026
+  sold_out_options_cart: { group: "Date & quantity", label: "Booked-up options (has cart)", text: "To look at other rentals, press 1. To hear your cart, press 9." }, // star line approved Nov 18, 2026
+  sold_out_options: { group: "Date & quantity", label: "Booked-up options (no cart)", text: "To try a different date, press 1. To look at other rentals, press 2." }, // star line approved Nov 18, 2026
   qty_prompt: { group: "Date & quantity", label: "Ask how many", text: "Good news, we have {count} available on {date}! How many would you like? Press a number from 1 to {max}.", vars: ["count", "date", "max"] },
   qty_invalid: { group: "Date & quantity", label: "Bad quantity", text: "Let us try that again. Please press a number from 1 to 9." },
   only_some_left: { group: "Date & quantity", label: "Fewer left than asked", text: "Oh, only {count} are left for that date.", vars: ["count"] },
@@ -224,7 +253,7 @@ export const PROMPTS = {
   ask_email_required: { group: "Checkout", label: "Ask for email (required: no texts)", text: "To send your secure payment link, we need your email address. Please say your email address, like john at gmail dot com." },
   ask_email: { group: "Checkout", label: "Ask for email", text: "Almost done! Please say your email address for your receipt, like john at gmail dot com. Or press pound to skip." },
   // Call recording notice (Abraham O): PROPOSED wording, not approved yet; plays only if the Owner turns recording on.
-  recording_notice: { group: "Welcome & main menu", label: "Call recording notice (after the greeting; plays only when call recording is on)", text: "This call may be monitored and recorded for quality and training purposes." },
+  recording_notice: { group: "Welcome & main menu", label: "Call recording notice (after the greeting; plays only when call recording is on)", text: "This call may be monitored or recorded for quality and training purposes." },
   // Keypad typing (Abraham L; proposed wording approved under P, Nov 8, 2026)
   // Abraham, Nov 17, 2026: every question that asks for information ends with this; pound ends the answer. Approved
   // with "please" added.
@@ -288,7 +317,7 @@ export const PROMPTS = {
   // The whole hotline on Shabbes and Yom Tov (Abraham, Nov 14, 2026, choice A): drafts for his OK; then the tone, general voicemail
   closed_shabbos_greeting: { group: "Welcome & main menu", label: "Whole hotline on Shabbes: closed greeting (approved Nov 16)", text: "Thank you for calling Hup Up Attractions. We are closed now for Shabbes, and we will be open again on {day} at {time}. Please leave your name, phone number, and a short message after the tone, and we will call you back after Shabbes. Good Shabbes!", vars: ["day", "time"] },
   closed_yomtov_greeting: { group: "Welcome & main menu", label: "Whole hotline on Yom Tov: closed greeting (approved Nov 16)", text: "Thank you for calling Hup Up Attractions. We are closed now for Yom Tov, and we will be open again on {day} at {time}. Please leave your name, phone number, and a short message after the tone, and we will call you back after Yom Tov. Good Yom Tov!", vars: ["day", "time"] },
-  office_closed: { group: "Welcome & main menu", label: "Office closed (after the greeting, only when the office is closed; also key 7)", text: "Our office is closed right now, but you can book anytime using our automated system." },
+  office_closed: { group: "Welcome & main menu", label: "Office closed (after the greeting, only when the office is closed; also key 7)", text: "Our office is closed right now, but you can still book anytime using our automated system." },
   date_closed: { group: "Date & quantity", label: "Chosen date is a closed day", text: "Sorry, we are closed on {date} for {reason}. Let us pick another date.", vars: ["date", "reason"] },
   address_outside_area: { group: "Checkout", label: "Address outside the delivery area", text: "Sorry, we only deliver in Kiryas Joel and nearby Orange County towns. Please say a delivery address in our area." },
   address_not_found: { group: "Checkout", label: "Address not found on the map", text: "Sorry, we could not find that address. Please say the full address again: the house number, the street, and the town.", pending: true },
@@ -383,7 +412,7 @@ export const PROMPTS = {
   vma_no_number: { group: "Voicemail", label: "Staff access: no number to call", text: "Sorry, there is no number we can call back for this message." },
   // Key 9 (Abraham, Nov 11, 2026, word for word): feedback and comments only.
   // Key 8 catalog (Abraham, Phone Menu v3), approved word for word.
-  catalog_menu: { group: "Catalog (key 8)", label: "Text or email", text: "To receive our catalog by text, press 1. To get it by email, press 2. To go back, press star." },
+  catalog_menu: { group: "Catalog (key 8)", label: "Text or email", text: "To receive our catalog by text, press 1. To get it by email, press 2." },
   // Every phone flow that texts the caller (payment link, key 8 catalog, promo texts): boxes 142 to 144 (Abraham,
   // Nov 17, 2026), approved word for word. They replace the old key 8 lines. The caller's number is never read out.
   text_which: { group: "Texts to the caller (every flow)", label: "Box 142: which number", text: "To text it to the number you are calling from, press 1. To enter a different number, press 2." },
@@ -558,6 +587,21 @@ export function composeClips(overrides: PromptOverrides, key: PromptKey, vars: R
       if (!id) return null;
       urls.push(promptRecordingLink(id));
     }
+  }
+  return urls;
+}
+
+/** Words said live (numbers, a key) from Hark's word recordings, when the Owner's Achird switch is on and all are recorded. */
+export function liveClips(overrides: PromptOverrides, text: string): string[] | null {
+  const x = EXTRAS.get(overrides);
+  if (!x?.achird) return null;
+  const words = wordSlotsFor(text, x.items);
+  if (!words) return null;
+  const urls: string[] = [];
+  for (const w of words) {
+    const id = x.clips[w];
+    if (!id) return null;
+    urls.push(promptRecordingLink(id));
   }
   return urls;
 }

@@ -63,23 +63,27 @@ describe("where it runs, and the wording", () => {
 });
 
 describe("getting in", () => {
-  it("only the general voicemail (key 9): star 7 4 within 3 seconds per key asks for the password; any other key just records; never mentioned", async () => {
+  it("only the general voicemail (key 9): star 7 4 within 3 seconds per key asks for the password; never mentioned", async () => {
     const vm = await call("voicemail", {}, "x=9");
-    expect(vm).toMatch(/<Gather [^>]*numDigits="3"[^>]*action="https:\/\/hupup\.example\/api\/voice\/vm-greeting-key\?x=9"/);
+    expect(vm).toMatch(/<Gather [^>]*numDigits="3"[^>]*action="https:\/\/hupup\.example\/api\/voice\/vm-greeting-key\?x=9/);
     expect(vm).toMatch(/<Gather [^>]*timeout="3"/);
+    expect(vm).toMatch(/<Gather [^>]*finishOnKey="#"/);
     expect(said(vm).join(" ")).not.toMatch(/PIN|password|7|seven/i);
     expect(redirect(await call("vm-greeting-key", { Digits: "*74" }, "x=9"))).toBe("vma-pin");
-    expect(await call("vm-greeting-key", { Digits: "74" }, "x=9")).toContain("<Record");
     // other boxes: no staff access at all
-    expect(await call("voicemail", {}, "x=5")).not.toContain("vm-greeting-key");
-    expect(await call("vm-greeting-key", { Digits: "*74" }, "x=5")).toContain("<Record");
-    expect(await call("vm-greeting-key", { Digits: "5" }, "x=9")).toContain("<Record");
+    expect(await call("vm-greeting-key", { Digits: "*74" }, "x=5")).not.toContain("vma-pin");
   });
-  it("star and then the wrong keys: the shared wrong-key line, then the voicemail as usual", async () => {
-    for (const d of ["*", "*7", "*75", "*12"]) {
-      const xml = await call("vm-greeting-key", { Digits: d }, "x=9");
-      expect(said(xml)[0], d).toBe("Sorry, that is not a valid selection. Please try again.");
-      expect(xml, d).toContain("<Record");
+  it("Nov 19, 2026: pound (or the greeting ending) goes to the tone; any other key is not a choice: the greeting starts over, no wrong-key line", async () => {
+    for (const x of ["9", "5"]) {
+      expect(await call("vm-greeting-key", { Digits: "" }, `x=${x}`)).toContain("<Record");
+      for (const d of ["*", "*7", "5", "74"]) {
+        const xml = await call("vm-greeting-key", { Digits: d }, `x=${x}`);
+        expect(said(xml).join(" "), d).not.toContain("not a valid selection");
+        expect(xml, d).toMatch(/<Gather [^>]*vm-greeting-key\?x=\d&amp;n=1/);
+        expect(xml, d).toContain("<Record"); // the tone follows when the greeting ends
+      }
+      // after 3 replays: the tone
+      expect(await call("vm-greeting-key", { Digits: "5" }, `x=${x}&n=3`)).not.toContain("<Gather");
     }
   });
   it("no password set yet: the default 1234 signs in from the first call", async () => {
@@ -203,7 +207,7 @@ describe("on the live line (Abraham, Nov 16, 2026): calling out stays off until 
       expect(menu).not.toContain("press 0");
       expect(menu).toContain("To change your password, press star.");
       const zero = await call("vma-box-choice", { Digits: "0" });
-      expect(said(zero)).toEqual(["Sorry, that is not a valid selection. Please try again."]);
+      expect(said(zero)).toEqual(["Sorry, that is not a valid selection."]);
       expect(redirect(zero)).toBe("vma-box");
       expect(redirect(await call("vma-out"))).toBe("vma-box");
       expect(await call("vma-out-dial", { Digits: "8455550123" })).not.toContain("<Dial");
@@ -214,7 +218,7 @@ describe("on the live line (Abraham, Nov 16, 2026): calling out stays off until 
       expect(opts).toContain("To choose another box, press star.");
       const four = await call("vma-choice", { Digits: "4" }, `b=${box.id}&i=0&v=${v.id}`);
       expect(four).not.toContain("<Dial");
-      expect(said(four)).toEqual(["Sorry, that is not a valid selection. Please try again."]);
+      expect(said(four)).toEqual(["Sorry, that is not a valid selection."]);
       // changing the password works on the live line
       expect(redirect(await call("vma-box-choice", { Digits: "*" }))).toBe("vma-newpin");
     } finally {

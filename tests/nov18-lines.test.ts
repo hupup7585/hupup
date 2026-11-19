@@ -23,8 +23,9 @@ describe("approved lines", () => {
   });
   it("star lines: 'To go back, press star.' wherever star goes back one menu", () => {
     expect(PROMPTS.back_to_menu.text).toBe("To go back, press star.");
-    expect(PROMPTS.sold_out_options.text.endsWith("To go back, press star.")).toBe(true);
-    expect(PROMPTS.sold_out_options_cart.text.endsWith("To go back, press star.")).toBe(true);
+    // Nov 19, 2026: the star line is one shared recording, played after each menu; no menu line holds it any more
+    expect(PROMPTS.book_back.text).toBe("To go back, press star.");
+    for (const p of Object.entries(PROMPTS)) if (p[0] !== "book_back" && p[0] !== "back_to_menu" && p[0] !== "box153") expect(p[1].text, p[0]).not.toContain("To go back, press star.");
     const all = Object.values(PROMPTS).map((p) => p.text).join("\n");
     expect(all).not.toContain("For the main menu, press star.");
     expect(all).not.toContain("To go back to the main menu, press star.");

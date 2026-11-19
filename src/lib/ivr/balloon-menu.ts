@@ -44,3 +44,9 @@ export function balloonSizes(dimensions: string): { length: string; width: strin
   const n = (dimensions ?? "").match(/\d+(?:\.\d+)?/g);
   return n && n.length >= 3 ? { length: n[0], width: n[1], height: n[2] } : null;
 }
+
+/**
+ * How the key is said after "press," (live). Keys 10 to 12 for now as "one zero", "one one", "one two", the way box 153
+ * read them; Abraham will say how they are spoken (Nov 19, 2026).
+ */
+export const balloonKeyWords = (key: string) => (key.length > 1 ? digitWords(key) : key);

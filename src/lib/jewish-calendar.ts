@@ -292,6 +292,9 @@ export function checkEventDate(iso: string, s: CalendarSettings = calendarDefaul
  * Admin (Rabbeinu Tam, 72 minutes after sunset). Working days (Chol Hamoed, Chanukah, Purim, Tisha B'Av, Lag BaOmer)
  * are never locked by this. Nobody has to switch it on or off.
  */
+/** Minutes after Rabbeinu Tam (Monroe) the hotline stays closed after Shabbes (Abraham, Nov 19, 2026). */
+export const SHABBES_EXTRA_MINUTES = 2;
+
 export function bookingLock(at: Date = new Date(), s: CalendarSettings = calendarDefaults()): { locked: boolean; reason: "Shabbes" | "Yom Tov" | null; opensAt: Date | null } {
   const iso = localISO(at);
   const reasonFor = (d: string): "Shabbes" | "Yom Tov" => (kinds(d).kinds.has("yomtov") ? "Yom Tov" : "Shabbes");
@@ -300,7 +303,9 @@ export function bookingLock(at: Date = new Date(), s: CalendarSettings = calenda
     let last = d;
     while (shabbosOrYomTov(addDaysISO(last, 1))) last = addDaysISO(last, 1);
     const z = zmanim(last, s);
-    return /^\d+$/.test(String(s.reopenAfter).trim()) ? new Date(z.sunset().getTime() + Number(s.reopenAfter) * 60_000) : z.tzeit(8.5);
+    const opens = /^\d+$/.test(String(s.reopenAfter).trim()) ? new Date(z.sunset().getTime() + Number(s.reopenAfter) * 60_000) : z.tzeit(8.5);
+    // Hark for Abraham, Nov 19, 2026: after Shabbes the hotline stays closed until 2 minutes after Rabbeinu Tam
+    return opens && weekday(last) === 6 ? new Date(opens.getTime() + SHABBES_EXTRA_MINUTES * 60_000) : opens;
   };
   if (shabbosOrYomTov(iso)) {
     const opensAt = reopenFrom(iso);

@@ -111,10 +111,10 @@ describe("section 8: bookings reminders", () => {
     expect(said(empty)).toContain("Your cart is empty. Let us start shopping!");
     expect(redirect(empty)).toBe(`category?c=${balloons}`);
   });
-  it("before a bounce house is added: the water note; after the cart is read, the same item list; before checkout: the tax note", async () => {
+  it("adding a bounce house: no water note any more (Nov 19, 2026, it opens the balloons list); after the cart is read, the same item list; before checkout: the tax note", async () => {
     const date = new Date(Date.now() + 40 * 86_400_000).toISOString().slice(0, 10);
     const added = said(await call("add", { Digits: "1" }, `p=${castle}&d=${date}`));
-    expect(added[0]).toBe("Please note, our bounce houses are not for water use.");
+    expect(added.join(" ")).not.toContain("not for water use");
     const cart = await call("cart", {}, `c=${balloons}`);
     expect(said(cart).join(" ")).toContain("Royal Castle");
     expect(redirect(cart)).toBe(`category?c=${balloons}`);

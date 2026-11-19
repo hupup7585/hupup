@@ -51,7 +51,8 @@ beforeEach(() => {
 describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
   it("live for every caller: 1 text, 2 email, star back", async () => {
     const xml = plain(await call("catalog", {}, "", "+18455550100"));
-    expect(xml).toContain("To receive our catalog by text, press 1. To get it by email, press 2. To go back, press star.");
+    expect(xml).toContain("To receive our catalog by text, press 1. To get it by email, press 2.");
+    expect(xml).toContain("To go back, press star."); // the shared star line, its own recording (Nov 19, 2026)
     expect(redirect(await call("catalog-choice", { Digits: "*" }))).toBe("menu");
     expect(redirect(await call("catalog-choice", { Digits: "2" }))).toBe("catalog-email?p=cat");
   });
