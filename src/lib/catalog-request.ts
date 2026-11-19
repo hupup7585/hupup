@@ -5,7 +5,7 @@ import { db, schema } from "@/lib/db";
  * Website catalog request (Abraham, Nov 18, 2026, approved): "Or text CATALOG to (845) 415-7585." and an
  * "Email me the catalog" box. Shown on the preview site until Abraham approves the screenshot.
  */
-export const WEBSITE_CATALOG_FORM_LIVE_APPROVED = false;
+export const WEBSITE_CATALOG_FORM_LIVE_APPROVED = true; // Abraham approved the card, Nov 19, 2026
 export const websiteCatalogFormShown = (env: Record<string, string | undefined> = process.env) => WEBSITE_CATALOG_FORM_LIVE_APPROVED || env.VERCEL_ENV !== "production";
 
 export { CATALOG_TEXT_LINE, CATALOG_EMAIL_BUTTON, CATALOG_TEXT_BUTTON, CATALOG_FORM_DRAFT } from "@/lib/catalog-request-copy";

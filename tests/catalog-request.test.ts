@@ -25,10 +25,10 @@ const form = (o: Record<string, string>) => {
 };
 
 describe("website catalog request", () => {
-  it("approved wording; preview only until Abraham approves the screenshot", () => {
+  it("approved wording; live since Abraham approved the card (Nov 19, 2026)", () => {
     expect(`${CATALOG_TEXT_LINE.before}${CATALOG_TEXT_LINE.phone}${CATALOG_TEXT_LINE.after}`).toBe("Or text CATALOG to (845) 415-7585.");
     expect(CATALOG_EMAIL_BUTTON).toBe("Email me the catalog");
-    expect(websiteCatalogFormShown({ VERCEL_ENV: "production" })).toBe(false);
+    expect(websiteCatalogFormShown({ VERCEL_ENV: "production" })).toBe(true);
     expect(websiteCatalogFormShown({ VERCEL_ENV: "preview" })).toBe(true);
     expect(readFileSync("src/components/site/CatalogRequest.tsx", "utf8")).not.toContain("@/lib/db");
   });
