@@ -120,7 +120,23 @@ function sp(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptK
   if (clips) return void clips.forEach((u) => target.play(u));
   // Option B (Owner switch, off): Google speaks the line in Achird; otherwise the live voice (Puck)
   if (vars && googleLiveOn(ctx.prompts)) return void target.play(liveVoiceLink(promptText(ctx.prompts, key, vars)));
+  // Abraham, Nov 19, 2026: in a menu, a plain half-second pause after each option (Hark's recordings have it)
+  if (isGather(target) && process.env.IVR_OPTION_PAUSES !== "off") return sayOptions(target, promptText(ctx.prompts, key, vars));
   say(target, promptText(ctx.prompts, key, vars));
+}
+
+const isGather = (t: VR | Gather): t is Gather => t.constructor?.name === "Gather";
+
+/** Splits a menu line after each "press ..." option and puts a half-second pause between them (computer voice). */
+export function optionParts(text: string): string[] {
+  return text.split(/(?<=\bpress (?:\d+(?: \d)?|star|pound|the star key|the pound key)[.!])\s+/i).map((x) => x.trim()).filter(Boolean);
+}
+
+function sayOptions(g: Gather, text: string) {
+  optionParts(text).forEach((part, i) => {
+    if (i) halfPause(g);
+    say(g, part);
+  });
 }
 
 /** A part said live between recordings (digits, a key): Hark's word clips, else Google Achird, else the live voice. */
@@ -463,14 +479,14 @@ async function attractionCategory(t: "1" | "2" | "3") {
 }
 
 /** Is this item in the bounce house (jumping balloons) category? */
-/** The kind of item, singular, for "the closest {category}" (Abraham, Nov 19, 2026). */
-async function singularCategory(categoryId: number) {
-  const [cat] = await db.select({ name: categories.name, spoken: categories.spokenName }).from(categories).where(eq(categories.id, categoryId));
+/** "Item already booked": the category's own key 1 recording (Abraham, Nov 19, 2026). */
+async function closestLine(categoryId: number): Promise<PromptKey | null> {
+  const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, categoryId));
   const n = cat?.name ?? "";
-  if (ATTRACTIONS["1"].match.test(n)) return "jumping balloon";
-  if (/laser/i.test(n)) return "laser tag set";
-  if (/paddle|boat/i.test(n)) return "paddle boat";
-  return (cat?.spoken || n).toLowerCase().replace(/s$/, "");
+  if (ATTRACTIONS["1"].match.test(n)) return "booked_closest_balloon";
+  if (/laser/i.test(n)) return "booked_closest_laser";
+  if (/paddle|boat/i.test(n)) return "booked_closest_paddle";
+  return null;
 }
 
 async function isBounceHouse(categoryId: number) {
@@ -1806,7 +1822,10 @@ const handlers: Record<string, Handler> = {
     // Hark for Abraham, Nov 19, 2026: "I am sorry, the {item} is already booked on {date}. For the closest {category}
     // on the same date, press 1. For the nearest date this item is free, press 2." Replaces the size up/down screen.
     const g = keypad(vr, url("taken-choice", { p: p.id, d: date }));
-    sp(g, ctx, "item_booked", { item: p.name, date: spokenDate(date), category: await singularCategory(p.categoryId) });
+    sp(g, ctx, "item_booked", { item: p.name, date: spokenDate(date) });
+    const closest = await closestLine(p.categoryId);
+    if (closest) sp(g, ctx, closest);
+    sp(g, ctx, "booked_nearest");
     sp(g, ctx, "book_back");
     return bookNoInput(vr, ctx, "booked", { p: p.id, d: date });
   },
@@ -1859,19 +1878,9 @@ const handlers: Record<string, Handler> = {
     return back(vr, "booked-near", { p, d: date });
   },
 
-  /** Same date: the next size up / down that's free, or keep the item and pick another date. */
-  async "booked-same"(ctx, vr) {
-    const p = await getProduct(Number(ctx.query.get("p")));
-    const date = ctx.query.get("d")!;
-    if (!p) return back(vr, "menu");
-    const cal = await getSettings();
-    const [big, small] = await Promise.all([nearestSize(p, date, 1, cal), nearestSize(p, date, -1, cal)]);
-    const g = keypad(vr, url("booked-choice", { p: p.id, d: date, b: big?.id, s: small?.id }));
-    if (big || small) sp(g, ctx, "booked_closest");
-    if (big) sp(g, ctx, "booked_bigger", { item: big.name });
-    if (small) sp(g, ctx, "booked_smaller", { item: small.name });
-    sp(g, ctx, "booked_keep", { item: p.name });
-    return bookNoInput(vr, ctx, "booked-same", { p: p.id, d: date });
+  /** Box 22 (size up/down) is removed (Abraham, Nov 19, 2026): a call still in it gets the closest item. */
+  "booked-same"(ctx, vr) {
+    return back(vr, "booked-closest", { p: ctx.query.get("p")!, d: ctx.query.get("d")! });
   },
 
   async "booked-choice"(ctx, vr) {

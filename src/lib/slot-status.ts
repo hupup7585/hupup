@@ -18,8 +18,13 @@ export async function catalogItems() {
     .filter((p) => p.name);
 }
 
+/** The Admin text of each edited line (Hotline prompts), so the list shows what plays. */
+async function editedTexts(): Promise<Record<string, string | null>> {
+  return Object.fromEntries((await db.select({ key: schema.voicePrompts.key, text: schema.voicePrompts.text }).from(schema.voicePrompts)).map((r) => [r.key, r.text]));
+}
+
 export async function slotsWithStatus(): Promise<(Slot & { status: SlotStatus; uploads: number; playing: boolean })[]> {
-  const slots = allSlots(await catalogItems());
+  const slots = allSlots(await catalogItems(), await editedTexts());
   const rows = new Map((await db.select().from(schema.recordingSlots)).map((r) => [r.key, r]));
   const recs = await db.select({ key: schema.promptRecordings.promptKey, source: schema.promptRecordings.source, complete: schema.promptRecordings.complete }).from(schema.promptRecordings);
   const playing = new Set((await db.select({ key: schema.voicePrompts.key, rec: schema.voicePrompts.recordingId }).from(schema.voicePrompts)).filter((v) => v.rec).map((v) => v.key));
@@ -33,7 +38,7 @@ export async function slotsWithStatus(): Promise<(Slot & { status: SlotStatus; u
 }
 
 export async function findSlot(key: string): Promise<Slot | null> {
-  return allSlots(await catalogItems()).find((s) => s.key === key) ?? null;
+  return allSlots(await catalogItems(), await editedTexts()).find((s) => s.key === key) ?? null;
 }
 
 /** Abraham confirms the exact text (with every comma, period and exclamation mark). Owner only (checked by the caller). */
@@ -44,6 +49,11 @@ export async function confirmSlot(key: string, userId: number | null) {
     .insert(schema.recordingSlots)
     .values({ key, confirmedText: s.text, confirmedAt: new Date(), confirmedBy: userId, recordedAt: null })
     .onConflictDoUpdate({ target: schema.recordingSlots.key, set: { confirmedText: s.text, confirmedAt: new Date(), confirmedBy: userId, recordedAt: null } });
+}
+
+/** Undo a confirm made by mistake: the slot goes back to Waiting for Abraham. Owner only (checked by the caller). */
+export async function unconfirmSlot(key: string) {
+  await db.delete(schema.recordingSlots).where(eq(schema.recordingSlots.key, key));
 }
 
 export async function markRecorded(key: string, userId: number | null) {

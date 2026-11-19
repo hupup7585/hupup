@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { saveSetting } from "@/lib/settings";
-import { confirmSlot, markRecorded, slotsWithStatus } from "@/lib/slot-status";
+import { confirmSlot, markRecorded, slotsWithStatus, unconfirmSlot } from "@/lib/slot-status";
 
 type R = { ok: boolean; message: string };
 const done = (message: string): R => (revalidatePath("/admin/phone/prompts/slots"), { ok: true, message });
@@ -19,6 +19,14 @@ export async function confirmSlotAction(key: string): Promise<R> {
   }
   await db.insert(schema.auditLog).values({ userId: s.userId, action: "recording_slot.confirmed", entityType: "recording_slot", entityId: key });
   return done("Confirmed. Hark can record this exact text now.");
+}
+
+/** Undo a confirm made by mistake (Abraham, Nov 19, 2026). Owner only. Audited. */
+export async function unconfirmSlotAction(key: string): Promise<R> {
+  const s = await requireOwner();
+  await unconfirmSlot(key);
+  await db.insert(schema.auditLog).values({ userId: s.userId, action: "recording_slot.unconfirmed", entityType: "recording_slot", entityId: key });
+  return done("Confirm undone. This text is waiting for Abraham again.");
 }
 
 export async function markRecordedAction(key: string): Promise<R> {

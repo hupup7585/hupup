@@ -108,7 +108,7 @@ describe("section 8: bookings reminders", () => {
     const xml = await call("category-choice", { Digits: "0" }, `c=${balloons}`);
     expect(redirect(xml)).toBe(`cart?c=${balloons}`);
     const empty = await call("cart", {}, `c=${balloons}`);
-    expect(said(empty)).toContain("Your cart is empty. Let us start shopping!");
+    expect(said(empty)).toContain("Your shopping cart is empty right now. Let us start shopping!");
     expect(redirect(empty)).toBe(`category?c=${balloons}`);
   });
   it("adding a bounce house: no water note any more (Nov 19, 2026, it opens the balloons list); after the cart is read, the same item list; before checkout: the tax note", async () => {

@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { recordingChunkAction, selectRecordingAction, startRecordingAction } from "../actions";
-import { confirmSlotAction, markRecordedAction } from "./actions";
+import { confirmSlotAction, markRecordedAction, unconfirmSlotAction } from "./actions";
 
 const CHUNK = 3 * 1024 * 1024;
 const STYLE: Record<string, string> = {
@@ -60,6 +60,11 @@ export default function SlotRow(props: { slotKey: string; label: string; text: s
           {props.status === "confirmed" && (
             <button className="btn-ghost !py-1 text-xs" disabled={pending} onClick={() => run(() => markRecordedAction(props.slotKey))}>
               Mark recorded
+            </button>
+          )}
+          {(props.status === "confirmed" || props.status === "recorded") && (
+            <button className="btn-ghost !py-1 text-xs" disabled={pending} onClick={() => run(() => unconfirmSlotAction(props.slotKey))} data-unconfirm>
+              Undo confirm
             </button>
           )}
           {props.status !== "waiting" && (

@@ -81,7 +81,9 @@ describe("key 1: booking by item", () => {
     expect(redirect(await call("qty", {}, `p=${medium}&d=${TUE}`))).toBe(`booked?p=${medium}&d=${TUE}`);
     const taken = await call("booked", {}, `p=${medium}&d=${TUE}`);
     expect(said(taken)).toEqual([
-      "I am sorry, the Medium Castle is already booked on Tuesday, December first. For the closest jumping balloon on the same date, press 1. For the nearest date this item is free, press 2.",
+      "I am sorry, the Medium Castle is already booked on Tuesday, December first.",
+      "For the closest jumping balloon on the same date, press 1.",
+      "For the nearest date this item is free, press 2.",
       "To go back, press star.",
     ]);
     expect(redirect(await call("taken-choice", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`booked-closest?p=${medium}&d=${TUE}`);
