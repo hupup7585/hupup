@@ -11,6 +11,8 @@ export const FOLDERS = [
   { key: "snoozed", label: "Snoozed" },
   { key: "sent", label: "Sent" },
   { key: "drafts", label: "Drafts" },
+  // Emails that only ask for the catalog (Abraham, Nov 19, 2026): their own folder, not in the Inbox
+  { key: "catalog", label: "Catalog requests" },
   // Under "More", like Gmail (Abraham, Nov 19, 2026)
   { key: "important", label: "Important", more: true },
   { key: "scheduled", label: "Scheduled", more: true },
@@ -26,13 +28,20 @@ export const isFolder = (f: string | undefined): f is Folder => FOLDERS.some((x)
 
 const e = schema.inboxEmails;
 
+/** An email that only asks for the catalog: the same rule as the catalog auto-reply (isCatalogSubject). */
+export const CATALOG_SUBJECT_SQL = "^\\s*((re|fwd?)\\s*:\\s*)*catalog(ue)?\\s*[.!]?\\s*$";
+const isCatalogEmail = sql`coalesce(${e.subject}, '') ~* ${CATALOG_SUBJECT_SQL}`;
+const notCatalogEmail = sql`NOT (coalesce(${e.subject}, '') ~* ${CATALOG_SUBJECT_SQL})`;
+
 /** Snoozed emails come back to the Inbox by themselves when their time comes (checked on every look; no job needed). */
 const notSnoozed = (now: Date) => or(isNull(e.snoozedUntil), lte(e.snoozedUntil, now));
 
 export function folderWhere(folder: Folder, now = new Date()): SQL | undefined {
   switch (folder) {
     case "inbox":
-      return and(isNull(e.archivedAt), isNull(e.trashedAt), isNull(e.spamAt), notSnoozed(now));
+      return and(isNull(e.archivedAt), isNull(e.trashedAt), isNull(e.spamAt), notSnoozed(now), notCatalogEmail);
+    case "catalog":
+      return and(isNull(e.trashedAt), isNull(e.spamAt), isCatalogEmail);
     case "starred":
       return and(eq(e.starred, true), isNull(e.trashedAt), isNull(e.spamAt));
     case "snoozed":
@@ -129,14 +138,15 @@ export async function listScheduled() {
 export async function folderCounts(now = new Date()) {
   const d = schema.inboxDrafts;
   const n = sql<number>`count(*)::int`;
-  const [[unread], [drafts], [scheduled], [spam], [snoozed]] = await Promise.all([
+  const [[unread], [drafts], [scheduled], [spam], [snoozed], [catalog]] = await Promise.all([
     db.select({ n }).from(e).where(and(isNull(e.readAt), folderWhere("inbox", now))),
     db.select({ n }).from(d).where(and(isNull(d.discardedAt), isNull(d.sentReplyId), isNull(d.sendAt))),
     db.select({ n }).from(d).where(and(isNull(d.discardedAt), isNull(d.sentReplyId), isNotNull(d.sendAt))),
     db.select({ n }).from(e).where(and(isNull(e.readAt), folderWhere("spam", now))),
     db.select({ n }).from(e).where(folderWhere("snoozed", now)),
+    db.select({ n }).from(e).where(and(isNull(e.readAt), folderWhere("catalog", now))),
   ]);
-  return { inbox: unread?.n ?? 0, drafts: drafts?.n ?? 0, scheduled: scheduled?.n ?? 0, spam: spam?.n ?? 0, snoozed: snoozed?.n ?? 0 };
+  return { inbox: unread?.n ?? 0, drafts: drafts?.n ?? 0, scheduled: scheduled?.n ?? 0, spam: spam?.n ?? 0, snoozed: snoozed?.n ?? 0, catalog: catalog?.n ?? 0 };
 }
 
 /**

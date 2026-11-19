@@ -117,11 +117,11 @@ export async function fileEmail(bytes: Buffer, uploadId: string | null = null, n
 
 export async function inboxUnreadCount(): Promise<number> {
   try {
-    // Like Gmail: unread emails in the Inbox folder (not archived, not in Trash)
+    // Like Gmail: unread emails in the Inbox folder (not archived, Trash, Spam, snoozed or a catalog request)
     const [r] = await db
       .select({ n: sql<number>`count(*)::int` })
       .from(schema.inboxEmails)
-      .where(and(isNull(schema.inboxEmails.readAt), isNull(schema.inboxEmails.archivedAt), isNull(schema.inboxEmails.trashedAt)));
+      .where(and(isNull(schema.inboxEmails.readAt), (await import("@/lib/inbox-folders")).folderWhere("inbox")));
     return r?.n ?? 0;
   } catch {
     return 0;

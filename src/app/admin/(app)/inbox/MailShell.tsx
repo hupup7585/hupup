@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { AlarmClock, Archive, Bookmark, ChevronDown, ChevronUp, Clock, File, Inbox, Mail, OctagonAlert, Pencil, Send, SlidersHorizontal, Star, Tag, Tags, Trash2 } from "lucide-react";
+import { AlarmClock, Archive, BookOpen, Bookmark, ChevronDown, ChevronUp, Clock, File, Inbox, Mail, OctagonAlert, Pencil, Send, SlidersHorizontal, Star, Tag, Tags, Trash2 } from "lucide-react";
 import { FOLDERS, LABEL_COLORS, WITHIN, folderCounts, listLabels, type Folder, type MailFilters } from "@/lib/inbox-folders";
 import { createLabelAction, removeLabelAction } from "./actions";
 
-const ICON: Record<Folder, typeof Inbox> = { inbox: Inbox, starred: Star, snoozed: AlarmClock, sent: Send, drafts: File, important: Bookmark, scheduled: Clock, all: Mail, archive: Archive, spam: OctagonAlert, trash: Trash2 };
+const ICON: Record<Folder, typeof Inbox> = { catalog: BookOpen, inbox: Inbox, starred: Star, snoozed: AlarmClock, sent: Send, drafts: File, important: Bookmark, scheduled: Clock, all: Mail, archive: Archive, spam: OctagonAlert, trash: Trash2 };
 
 /** Filter chips under the search bar, like Gmail (Abraham, Nov 19, 2026). Each chip is a link that keeps the others. */
 function Chips({ base, f }: { base: Record<string, string>; f: MailFilters }) {
@@ -85,7 +85,7 @@ export default async function MailShell({ folder, label, q, filters, children }:
   if (folder && folder !== "inbox") base.f = folder;
   if (label) base.label = label;
   for (const [k, v] of Object.entries({ q: f.q, from: f.from, to: f.to, subject: f.subject, has: f.has, not: f.not, within: f.within, attach: f.attach ? "1" : "", unread: f.unread ? "1" : "", sort: f.sort })) if (v) base[k] = String(v);
-  const count: Partial<Record<Folder, number>> = { inbox: counts.inbox, drafts: counts.drafts, scheduled: counts.scheduled, spam: counts.spam, snoozed: counts.snoozed };
+  const count: Partial<Record<Folder, number>> = { catalog: counts.catalog, inbox: counts.inbox, drafts: counts.drafts, scheduled: counts.scheduled, spam: counts.spam, snoozed: counts.snoozed };
   const moreOpen = FOLDERS.some((x) => "more" in x && x.key === folder);
   const link = (k: Folder) => (k === "inbox" ? "/admin/inbox" : `/admin/inbox?f=${k}`);
   const item = (x: (typeof FOLDERS)[number]) => {

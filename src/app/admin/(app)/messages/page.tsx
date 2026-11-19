@@ -2,7 +2,7 @@ import Link from "next/link";
 import NotActive from "@/components/NotActive";
 import { requireStaff } from "@/lib/auth";
 import { formatPhone, toE164 } from "@/lib/phone";
-import { listThreads, markThreadRead, threadMessages } from "@/lib/messages";
+import { listThreads, markThreadRead, threadCounts, threadMessages, type ThreadView } from "@/lib/messages";
 import ReplyForm from "./ReplyForm";
 import MessageFiles from "@/components/staff/MessageFiles";
 import { filesForMessages } from "@/lib/message-files";
@@ -14,10 +14,17 @@ const TZ = process.env.BUSINESS_TIMEZONE || "America/New_York";
 const when = (d: Date | string) => dualDateTime(d);
 
 /** Text conversations with customers (Owner and Secretary). Owner can reply free-form. */
-export default async function MessagesPage({ searchParams }: { searchParams: Promise<{ p?: string; q?: string }> }) {
+export default async function MessagesPage({ searchParams }: { searchParams: Promise<{ p?: string; q?: string; v?: string }> }) {
   const staff = await requireStaff(["owner", "secretary"]);
   const sp = await searchParams;
-  const threads = await listThreads(sp.q);
+  // Abraham, Nov 19, 2026: real conversations by default; numbers that only texted CATALOG on their own tab; All too
+  const view: ThreadView = sp.v === "catalog" || sp.v === "all" ? sp.v : "conversations";
+  const [threads, counts] = await Promise.all([listThreads(sp.q, 200, view), threadCounts()]);
+  const tab = (v: ThreadView, label: string, n = 0) => (
+    <Link href={`/admin/messages${v === "conversations" ? "" : `?v=${v}`}`} className={`rounded-full px-3 py-1 text-sm ${view === v ? "bg-navy font-bold text-white" : "hover:bg-bg"}`} data-thread-tab={v}>
+      {label}{n > 0 ? ` (${n})` : ""}
+    </Link>
+  );
   const phone = sp.p ? toE164(sp.p) : null;
   const msgs = phone ? await threadMessages(phone) : [];
   if (phone) await markThreadRead(phone);
@@ -30,15 +37,21 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
       <NotActive k="sms" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
         <div className={`card p-3 ${phone ? "hidden lg:block" : ""}`}>
+          <nav className="mb-3 flex flex-wrap gap-1" aria-label="Which texts">
+            {tab("conversations", "Conversations", counts.conversations)}
+            {tab("catalog", "Catalog requests", counts.catalog)}
+            {tab("all", "All")}
+          </nav>
           <form className="mb-3 flex gap-2">
+            {view !== "conversations" && <input type="hidden" name="v" value={view} />}
             <input name="q" defaultValue={sp.q} placeholder="Search name, number or text" className="input" />
             <button className="btn-ghost">Search</button>
           </form>
-          {!threads.length && <p className="p-3 text-muted">No conversations yet.</p>}
+          {!threads.length && <p className="p-3 text-muted">{view === "catalog" ? "No catalog requests yet." : "No conversations yet."}</p>}
           <ul className="divide-y divide-line">
             {threads.map((t) => (
               <li key={t.contact_phone}>
-                <Link href={`/admin/messages?p=${encodeURIComponent(t.contact_phone)}`} className={`block rounded-lg px-3 py-3 hover:bg-bg ${t.contact_phone === phone ? "bg-bg" : ""}`}>
+                <Link href={`/admin/messages?${view !== "conversations" ? `v=${view}&` : ""}p=${encodeURIComponent(t.contact_phone)}`} className={`block rounded-lg px-3 py-3 hover:bg-bg ${t.contact_phone === phone ? "bg-bg" : ""}`}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate font-bold">{t.customer_name || formatPhone(t.contact_phone)}</span>
                     <span className="shrink-0 text-xs text-muted">{when(t.last_at)}</span>
