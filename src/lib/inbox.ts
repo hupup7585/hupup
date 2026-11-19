@@ -231,7 +231,7 @@ export const REPLY_SIGNATURE = "Hup Up Attractions";
  * Reply from info@ (Resend; hupupattractions.com is verified there). Signed "Hup Up Attractions". Kept with its
  * attachments whether it was sent or not.
  */
-export async function sendReply(input: { emailId: number; body: string; fileIds: number[]; userId: number | null }) {
+export async function sendReply(input: { emailId: number; body: string; fileIds: number[]; userId: number | null; bodyHtml?: string | null }) {
   const found = await getInboxEmail(input.emailId);
   if (!found) throw new Error("Email not found.");
   const body = input.body.trim();
@@ -242,7 +242,7 @@ export async function sendReply(input: { emailId: number; body: string; fileIds:
   const subject = /^re:/i.test(e.subject ?? "") ? e.subject! : `Re: ${e.subject ?? ""}`.trim();
   const text = body + linkText; // the logo and signature are added to every email (src/lib/email-brand.ts)
   const headers = e.messageId ? { "In-Reply-To": e.messageId, References: e.messageId } : undefined;
-  const res = await sendEmail(e.fromAddress, subject, text, files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), { headers, record: false });
+  const res = await sendEmail(e.fromAddress, subject, text, files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), { headers, record: false, bodyHtml: htmlWithLinks(input.bodyHtml, linkText) });
   const [reply] = await db
     .insert(schema.inboxReplies)
     .values({ emailId: e.id, toAddress: e.fromAddress, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })
@@ -255,7 +255,7 @@ export async function sendReply(input: { emailId: number; body: string; fileIds:
 export const validAddress = (a: string) => /^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]{2,}$/.test(a.trim());
 
 /** A new email written in Admin (Owner), from info@, signed "Hup Up Attractions", attachments up to 18 MB in all. */
-export async function sendNewEmail(input: { to: string; subject: string; body: string; fileIds: number[]; userId: number | null; forwardOf?: number | null; attachCatalog?: boolean }) {
+export async function sendNewEmail(input: { to: string; subject: string; body: string; fileIds: number[]; userId: number | null; forwardOf?: number | null; attachCatalog?: boolean; bodyHtml?: string | null }) {
   const to = input.to.trim();
   if (!validAddress(to)) throw new Error("Enter one email address to send to.");
   const subject = input.subject.trim();
@@ -283,7 +283,7 @@ export async function sendNewEmail(input: { to: string; subject: string; body: s
   if (files.reduce((n, f) => n + f.data.length, 0) + forwarded.reduce((n, f) => n + Buffer.byteLength(f.content, "base64"), 0) > INBOX_FILE_MAX_BYTES)
     throw new Error(`Attachments, with the forwarded ones, can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
   const text = body + linkText; // the logo and signature are added to every email (src/lib/email-brand.ts)
-  const res = await sendEmail(to, subject, text, [...files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), ...forwarded], { record: false, noThanks: Boolean(input.attachCatalog) });
+  const res = await sendEmail(to, subject, text, [...files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), ...forwarded], { record: false, noThanks: Boolean(input.attachCatalog), bodyHtml: htmlWithLinks(input.bodyHtml, linkText) });
   const [sent] = await db
     .insert(schema.inboxReplies)
     .values({ emailId: null, toAddress: to, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })
@@ -406,7 +406,7 @@ export async function sendScheduledEmails(now = new Date()) {
   let sent = 0;
   for (const x of due) {
     try {
-      const r = await sendNewEmail({ to: x.toAddress, subject: x.subject, body: x.body, fileIds: x.fileIds ?? [], userId: x.userId, forwardOf: x.forwardOfEmailId, attachCatalog: x.attachCatalog });
+      const r = await sendNewEmail({ to: x.toAddress, subject: x.subject, body: x.body, fileIds: x.fileIds ?? [], userId: x.userId, forwardOf: x.forwardOfEmailId, attachCatalog: x.attachCatalog, bodyHtml: x.bodyHtml });
       if (r.sent) {
         await db.update(d).set({ sentReplyId: r.id, sendError: null }).where(eq(d.id, x.id));
         sent++;
@@ -416,4 +416,11 @@ export async function sendScheduledEmails(now = new Date()) {
     }
   }
   return { due: due.length, sent };
+}
+
+/** Formatted text from Compose, with the download-link lines for large files added under it. */
+function htmlWithLinks(html: string | null | undefined, linkText: string): string | null {
+  if (!html?.trim()) return null;
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return linkText.trim() ? `${html}<br><br>${esc(linkText.trim()).replace(/\n/g, "<br>")}` : html;
 }

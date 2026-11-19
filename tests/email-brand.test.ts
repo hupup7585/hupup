@@ -103,7 +103,7 @@ describe("catalog email wording edited by the Owner (Abraham, Nov 17, 2026)", ()
   it("Compose has Add our catalog (new emails only), sending the PDF from the server", () => {
     const f = readFileSync("src/app/admin/(app)/inbox/[id]/ReplyForm.tsx", "utf8");
     expect(f).toContain("data-add-catalog");
-    expect(f).toContain("sendNewEmailAction(to, subject, body, ids, draftId ?? null, props.forwardOf ?? null, withCatalog)");
+    expect(f).toContain("sendNewEmailAction(to, subject, body, ids, draftId ?? null, props.forwardOf ?? null, withCatalog, html)");
     expect(readFileSync("src/app/admin/(app)/inbox/new/page.tsx", "utf8")).toContain("catalogEmailTemplate(await getSettings())");
   });
 });

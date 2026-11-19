@@ -8,7 +8,7 @@ import ReplyForm from "./ReplyForm";
 import MailShell from "../MailShell";
 import StarButton from "./StarButton";
 import { bulkAction } from "../actions";
-import { listDrafts, listLabels } from "@/lib/inbox-folders";
+import { listDrafts, listLabels, threadEmails } from "@/lib/inbox-folders";
 import { AlarmClock, Archive, Bookmark, Forward, Inbox, Mail, OctagonAlert, Reply, Trash2, Undo2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +21,22 @@ export default async function InboxEmailPage({ params }: { params: Promise<{ id:
   if (!found) notFound();
   const { email, files, replies, replyFiles, contact } = found;
   if (!email.readAt) await setRead(email.id, true); // opening it marks it read
+  // The whole conversation, like Gmail (Abraham, Nov 19, 2026): the other emails in it, oldest first, folded
+  const thread = (await threadEmails(email)).filter((x) => x.id !== email.id);
+  for (const x of thread) if (!x.readAt) await setRead(x.id, true);
+  const older = thread.filter((x) => x.receivedAt <= email.receivedAt);
+  const newer = thread.filter((x) => x.receivedAt > email.receivedAt);
+  const folded = (x: (typeof thread)[number]) => (
+    <details key={x.id} className="card mb-2 px-5 py-3" data-thread-email={x.id}>
+      <summary className="flex cursor-pointer list-none flex-wrap items-baseline justify-between gap-2">
+        <span className="font-semibold">{x.fromName || x.fromAddress}</span>
+        <span className="min-w-0 flex-1 truncate text-sm text-muted">{(x.textBody?.trim() ? x.textBody : htmlToText(x.htmlBody ?? "")).replace(/\s+/g, " ").slice(0, 140)}</span>
+        <span className="text-xs text-muted">{inboxWhen(x.receivedAt)}</span>
+      </summary>
+      <pre className="mt-3 whitespace-pre-wrap break-words border-t border-line pt-3 font-sans text-[15px] leading-relaxed">{x.textBody?.trim() ? x.textBody : htmlToText(x.htmlBody ?? "")}</pre>
+      <Link href={`/admin/inbox/${x.id}`} className="mt-2 inline-block text-sm font-semibold text-navy underline">Open this email</Link>
+    </details>
+  );
   const labels = await listLabels();
   const replyDraft = (await listDrafts()).find((d) => d.replyToEmailId === email.id);
   const folder = email.trashedAt ? "trash" : email.spamAt ? "spam" : email.snoozedUntil && email.snoozedUntil > new Date() ? "snoozed" : email.archivedAt ? "archive" : "inbox";
@@ -80,6 +96,8 @@ export default async function InboxEmailPage({ params }: { params: Promise<{ id:
         <a href="#reply" className="ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm hover:bg-bg"><Reply className={ic} aria-hidden /> Reply</a>
         <Link href={`/admin/inbox/new?forward=${email.id}`} className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm hover:bg-bg" data-forward><Forward className={ic} aria-hidden /> Forward</Link>
       </div>
+      {thread.length > 0 && <p className="mb-2 text-sm text-muted" data-thread-count>{thread.length + 1} emails in this conversation</p>}
+      {older.map(folded)}
       <div className="card p-5" data-inbox-email>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
@@ -150,6 +168,7 @@ export default async function InboxEmailPage({ params }: { params: Promise<{ id:
           ))}
         </div>
       ))}
+      {newer.length > 0 && <div className="mt-3">{newer.map(folded)}</div>}
       <div id="reply">
         <ReplyForm emailId={email.id} to={email.fromAddress} active={repliesActive()} draftId={replyDraft?.id} initialBody={replyDraft?.body} />
       </div>

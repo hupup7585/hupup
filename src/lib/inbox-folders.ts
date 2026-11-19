@@ -88,6 +88,53 @@ export function filterWhere(f: MailFilters, now = new Date()): SQL | undefined {
   return parts.length ? and(...parts) : undefined;
 }
 
+/**
+ * Conversations, like Gmail (Abraham, Nov 19, 2026): emails from the same person with the same subject (without "Re:" or
+ * "Fwd:") are one conversation. The list shows each conversation once, by its newest email, with how many messages it
+ * has (emails and our replies).
+ */
+export const threadSubject = (subject: string | null | undefined) => (subject ?? "").replace(/^\s*((re|fwd?|fw)\s*:\s*)+/i, "").trim().toLowerCase();
+export const threadKey = (x: { subject: string | null; fromAddress: string }) => `${threadSubject(x.subject)}|${x.fromAddress.trim().toLowerCase()}`;
+
+/** The emails of one conversation (oldest first), not in Trash. */
+export async function threadEmails(x: { subject: string | null; fromAddress: string }) {
+  const rows = await db.select().from(e).where(and(eq(sql`lower(${e.fromAddress})`, x.fromAddress.trim().toLowerCase()), isNull(e.trashedAt))).orderBy(asc(e.receivedAt), asc(e.id));
+  return rows.filter((r) => threadKey(r) === threadKey(x));
+}
+
+/** One row per conversation: the newest email of each, how many messages, and whether we have a draft reply. */
+export async function listThreads(opts: { folder: Folder; label?: string; page?: number; filters?: MailFilters; now?: Date }) {
+  const f: MailFilters = opts.filters ?? {};
+  const now = opts.now ?? new Date();
+  const where = and(
+    hasFilters(f) && opts.folder === "inbox" ? folderWhere("all", now) : folderWhere(opts.folder, now),
+    opts.label ? arrayContains(e.labels, [opts.label]) : undefined,
+    filterWhere(f, now),
+  );
+  const light = await db.select({ id: e.id, subject: e.subject, fromAddress: e.fromAddress, receivedAt: e.receivedAt, readAt: e.readAt }).from(e).where(where).orderBy(desc(e.receivedAt), desc(e.id));
+  const groups = new Map<string, number[]>();
+  const unread = new Set(light.filter((r) => !r.readAt).map((r) => r.id));
+  for (const r of light) groups.set(threadKey(r), [...(groups.get(threadKey(r)) ?? []), r.id]);
+  const heads = [...groups.values()].map((ids) => ({ id: ids[0], ids }));
+  const page = Math.max(1, opts.page ?? 1);
+  const slice = heads.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const allIds = slice.flatMap((h) => h.ids);
+  const [rows, replies, drafts] = allIds.length
+    ? await Promise.all([
+        db.select().from(e).where(sql`${e.id} IN (${sql.join(slice.map((h) => sql`${h.id}`), sql`, `)})`),
+        db.select({ emailId: schema.inboxReplies.emailId }).from(schema.inboxReplies).where(sql`${schema.inboxReplies.emailId} IN (${sql.join(allIds.map((i) => sql`${i}`), sql`, `)})`),
+        db.select({ emailId: schema.inboxDrafts.replyToEmailId }).from(schema.inboxDrafts).where(and(isNull(schema.inboxDrafts.discardedAt), isNull(schema.inboxDrafts.sentReplyId), sql`${schema.inboxDrafts.replyToEmailId} IN (${sql.join(allIds.map((i) => sql`${i}`), sql`, `)})`)),
+      ])
+    : [[], [], []];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const threads = slice.map((h) => {
+    const head = byId.get(h.id)!;
+    const sent = replies.filter((r) => r.emailId && h.ids.includes(r.emailId)).length;
+    return { ...head, count: h.ids.length + sent, hasDraft: drafts.some((d) => d.emailId && h.ids.includes(d.emailId)), sentByUs: sent > 0, unreadAny: h.ids.some((i) => unread.has(i)), ids: h.ids };
+  });
+  return { rows: threads, total: heads.length, page };
+}
+
 /** Received emails in a folder (optionally one label and a search), newest first, one page at a time. */
 export async function listEmails(opts: { folder: Folder; q?: string; label?: string; page?: number; filters?: MailFilters; now?: Date }) {
   const f: MailFilters = { ...(opts.filters ?? {}), q: opts.filters?.q ?? opts.q };
@@ -287,10 +334,10 @@ export async function editLabel(oldName: string, name: string, color: string) {
 }
 
 /** Schedule send: the draft (with its files and the catalog) waits for its time. */
-export async function scheduleDraft(input: { id?: number | null; to: string; subject: string; body: string; fileIds: number[]; attachCatalog: boolean; forwardOf?: number | null; sendAt: Date; userId: number | null }) {
+export async function scheduleDraft(input: { id?: number | null; to: string; subject: string; body: string; fileIds: number[]; attachCatalog: boolean; forwardOf?: number | null; sendAt: Date; userId: number | null; bodyHtml?: string | null }) {
   if (!(input.sendAt.getTime() > Date.now())) throw new Error("Choose a time in the future.");
   const id = await saveDraft({ id: input.id ?? null, to: input.to, subject: input.subject, body: input.body, forwardOf: input.forwardOf ?? null, userId: input.userId });
-  await db.update(schema.inboxDrafts).set({ sendAt: input.sendAt, fileIds: input.fileIds, attachCatalog: input.attachCatalog, sendError: null }).where(eq(schema.inboxDrafts.id, id));
+  await db.update(schema.inboxDrafts).set({ sendAt: input.sendAt, fileIds: input.fileIds, attachCatalog: input.attachCatalog, sendError: null, bodyHtml: input.bodyHtml ?? null }).where(eq(schema.inboxDrafts.id, id));
   return id;
 }
 

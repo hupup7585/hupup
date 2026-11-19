@@ -18,6 +18,11 @@ export type MailRow = {
   snoozedUntil: string | null;
   labels: { name: string; color: string }[];
   files: string[];
+  /** The conversation (Gmail-style): every email in it, how many messages, a draft reply, our replies */
+  ids?: number[];
+  count?: number;
+  hasDraft?: boolean;
+  sentByUs?: boolean;
 };
 
 /** Search words in yellow, like Gmail. */
@@ -48,7 +53,8 @@ export default function MailList({ rows, folder, label, back, labels, highlight 
       <input type="hidden" name="back" value={back} />
       <input type="hidden" name="folder" value={folder} />
       {label && <input type="hidden" name="labelFilter" value={label} />}
-      {picked.map((id) => <input key={id} type="hidden" name="id" value={id} />)}
+      {/* A picked conversation: the action goes to every email in it, like Gmail */}
+      {rows.filter((r) => picked.includes(r.id)).flatMap((r) => r.ids ?? [r.id]).map((id) => <input key={id} type="hidden" name="id" value={id} />)}
       <div className="flex flex-wrap items-center gap-1 border-b border-line px-2 py-1.5" data-mail-toolbar>
         <span className="inline-flex items-center rounded p-1 hover:bg-bg">
           <input type="checkbox" className="mx-1 h-4 w-4" checked={all} ref={(el) => void (el && (el.indeterminate = !none && !all))} onChange={() => setPicked(all || !none ? [] : rows.map((r) => r.id))} aria-label="Select all" />
@@ -162,7 +168,12 @@ export default function MailList({ rows, folder, label, back, labels, highlight 
                 </button>
                 <Bookmark className={`h-4 w-4 shrink-0 ${r.important ? "fill-[#F4B400] text-[#F4B400]" : "text-transparent"}`} aria-label={r.important ? "Important" : undefined} />
                 <Link href={`/admin/inbox/${r.id}`} className={`flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 sm:flex-nowrap ${r.unread ? "font-bold" : ""}`}>
-                  <span className="w-full truncate sm:w-52 sm:shrink-0"><Hl text={r.from} words={highlight} /></span>
+                  <span className="w-full truncate sm:w-52 sm:shrink-0">
+                    <Hl text={r.from} words={highlight} />
+                    {r.sentByUs && <span className="font-normal">, me</span>}
+                    {r.hasDraft && <span className="font-normal text-[#D93025]">, Draft</span>}
+                    {(r.count ?? 1) > 1 && <span className="ml-1 text-xs font-normal text-muted">{r.count}</span>}
+                  </span>
                   <span className="min-w-0 flex-1 truncate">
                     {r.inbox && <span className="mr-1 rounded bg-[#DDE3EA] px-1.5 py-0.5 text-[11px] font-normal text-ink">Inbox</span>}
                     {r.labels.map((l) => (
@@ -182,7 +193,7 @@ export default function MailList({ rows, folder, label, back, labels, highlight 
                   data-row-trash={r.id}
                   onClick={() => {
                     setGone([...gone, r.id]);
-                    start(async () => void (await trashOneAction(r.id, folder === "trash")));
+                    start(async () => { for (const id of r.ids ?? [r.id]) await trashOneAction(id, folder === "trash"); });
                   }}
                 >
                   {folder === "trash" ? <Undo2 className="h-4 w-4" aria-hidden /> : <Trash2 className="h-4 w-4" aria-hidden />}

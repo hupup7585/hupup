@@ -38,11 +38,11 @@ export async function replyFileChunkAction(form: FormData): Promise<R> {
   }
 }
 
-export async function sendReplyAction(emailId: number, body: string, fileIds: number[], draftId?: number | null): Promise<R> {
+export async function sendReplyAction(emailId: number, body: string, fileIds: number[], draftId?: number | null, bodyHtml?: string | null): Promise<R> {
   const s = await requireOwner();
   if (!repliesActive()) return { ok: false, message: "Not active yet: replies go out from info@ once the sender is set up." };
   try {
-    const r = await sendReply({ emailId, body, fileIds, userId: s.userId });
+    const r = await sendReply({ emailId, body, fileIds, userId: s.userId, bodyHtml: bodyHtml ?? null });
     if (draftId && r.sent) await draftSent(draftId, r.id);
     await db.insert(schema.auditLog).values({ userId: s.userId, action: r.sent ? "inbox.reply_sent" : "inbox.reply_failed", entityType: "inbox_email", entityId: String(emailId), after: { to: r.toAddress, subject: r.subject, files: fileIds.length } });
     revalidatePath(`/admin/inbox/${emailId}`);
@@ -53,11 +53,11 @@ export async function sendReplyAction(emailId: number, body: string, fileIds: nu
 }
 
 /** Owner: a new email from info@ (not a reply), with attachments. */
-export async function sendNewEmailAction(to: string, subject: string, body: string, fileIds: number[], draftId?: number | null, forwardOf?: number | null, attachCatalog?: boolean): Promise<R> {
+export async function sendNewEmailAction(to: string, subject: string, body: string, fileIds: number[], draftId?: number | null, forwardOf?: number | null, attachCatalog?: boolean, bodyHtml?: string | null): Promise<R> {
   const s = await requireOwner();
   if (!repliesActive()) return { ok: false, message: "Not active yet: email goes out from info@ once the sender is set up." };
   try {
-    const r = await sendNewEmail({ to, subject, body, fileIds, userId: s.userId, forwardOf: forwardOf ?? null, attachCatalog: Boolean(attachCatalog) });
+    const r = await sendNewEmail({ to, subject, body, fileIds, userId: s.userId, forwardOf: forwardOf ?? null, attachCatalog: Boolean(attachCatalog), bodyHtml: bodyHtml ?? null });
     if (draftId && r.sent) await draftSent(draftId, r.id);
     await db.insert(schema.auditLog).values({ userId: s.userId, action: r.sent ? "inbox.new_email_sent" : "inbox.new_email_failed", entityType: "inbox_reply", entityId: String(r.id), after: { to: r.toAddress, subject: r.subject, files: fileIds.length, catalog: Boolean(attachCatalog) } });
     revalidatePath("/admin/inbox");
@@ -177,7 +177,7 @@ export async function editLabelAction(form: FormData) {
  * it at its time, with its files and the catalog. `when` is a preset ("tomorrow-am", "tomorrow-pm", "monday-am") or a
  * date and time typed in Eastern time.
  */
-export async function scheduleSendAction(input: { draftId?: number | null; to: string; subject: string; body: string; fileIds: number[]; attachCatalog: boolean; forwardOf?: number | null; when: string }): Promise<R> {
+export async function scheduleSendAction(input: { draftId?: number | null; to: string; subject: string; body: string; fileIds: number[]; attachCatalog: boolean; forwardOf?: number | null; when: string; bodyHtml?: string | null }): Promise<R> {
   const s = await requireOwner();
   if (!repliesActive()) return { ok: false, message: "Not active yet: email goes out from info@ once the sender is set up." };
   const to = input.to.trim();
@@ -186,7 +186,7 @@ export async function scheduleSendAction(input: { draftId?: number | null; to: s
   const sendAt = schedulePreset(input.when) ?? easternInput(input.when);
   if (!sendAt || sendAt.getTime() <= Date.now()) return { ok: false, message: "Choose a time in the future." };
   try {
-    const id = await scheduleDraft({ id: input.draftId ?? null, to, subject: input.subject, body: input.body, fileIds: input.fileIds, attachCatalog: input.attachCatalog, forwardOf: input.forwardOf ?? null, sendAt, userId: s.userId });
+    const id = await scheduleDraft({ id: input.draftId ?? null, to, subject: input.subject, body: input.body, fileIds: input.fileIds, attachCatalog: input.attachCatalog, forwardOf: input.forwardOf ?? null, sendAt, userId: s.userId, bodyHtml: input.bodyHtml ?? null });
     revalidatePath("/admin", "layout");
     return { ok: true, message: `Scheduled for ${sendAt.toLocaleString("en-US", { timeZone: "America/New_York", weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}.`, id };
   } catch (e) {

@@ -1165,6 +1165,8 @@ export const inboxDrafts = pgTable("inbox_drafts", {
   fileIds: integer("file_ids").array().notNull().default(sql`'{}'::integer[]`),
   attachCatalog: boolean("attach_catalog").notNull().default(false),
   sendError: text("send_error"),
+  /** The formatted version from the Compose bar (Nov 19, 2026) */
+  bodyHtml: text("body_html"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

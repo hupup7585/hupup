@@ -575,6 +575,13 @@
       "when": 1795000000000,
       "tag": "0081_inbox_gmail",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1795001000000,
+      "tag": "0082_draft_html",
+      "breakpoints": true
     }
   ]
 }

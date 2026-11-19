@@ -1,6 +1,8 @@
 "use client";
 
-import { ChevronDown, Clock, Link2, Paperclip, Trash2 } from "lucide-react";
+import { ChevronDown, Clock, Paperclip, Trash2 } from "lucide-react";
+import RichEditor from "./RichEditor";
+import { textToHtml } from "@/lib/email-format";
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -20,6 +22,14 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
   const [to, setTo] = useState(props.initialTo ?? "");
   const [subject, setSubject] = useState(props.initialSubject ?? "");
   const [body, setBody] = useState(props.initialBody ?? "");
+  // Formatting (Gmail-style bar, Nov 19, 2026): the formatted version; `seed` refills the box when text is set from outside
+  const [html, setHtml] = useState(textToHtml(props.initialBody ?? ""));
+  const [seed, setSeed] = useState(textToHtml(props.initialBody ?? ""));
+  const fill = (t: string) => {
+    setBody(t);
+    setHtml(textToHtml(t));
+    setSeed(textToHtml(t));
+  };
   // Drafts save by themselves 2 seconds after typing stops (Gmail-style, Abraham, Nov 15, 2026)
   const [draftId, setDraftId] = useState<number | undefined>(props.draftId);
   const [saved, setSaved] = useState<string>("");
@@ -45,7 +55,7 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
     if (!props.catalog) return;
     setWithCatalog(true);
     if (!subject.trim()) setSubject(props.catalog.subject);
-    if (!body.trim()) setBody(props.catalog.body);
+    if (!body.trim()) fill(props.catalog.body);
   }
   const [msg, setMsg] = useState<{ ok: boolean; message: string } | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
@@ -53,22 +63,6 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
   const ref = useRef<HTMLInputElement>(null);
   // Files over 18 MB are sent as a download link, so only the smaller ones count toward the 18 MB attached
   const attached = files.filter((f) => f.size <= MAX).reduce((n, f) => n + f.size, 0);
-
-  // Insert at the cursor (a link), like Gmail's Compose toolbar
-  const text = useRef<HTMLTextAreaElement>(null);
-  function insert(s: string) {
-    const el = text.current;
-    const at = el ? el.selectionStart : body.length;
-    const end = el ? el.selectionEnd : body.length;
-    setBody(body.slice(0, at) + s + body.slice(end));
-    setTimeout(() => el?.focus(), 0);
-  }
-  function insertLink() {
-    const url = window.prompt("Web address (for example https://hupupattractions.com)");
-    if (!url) return;
-    const label = window.prompt("Text to show (leave empty to show the address)") ?? "";
-    insert(label ? `${label} (${url})` : url);
-  }
 
   /** Uploads the attached files; their ids, or null after showing the problem. */
   async function uploadAll(): Promise<number[] | null> {
@@ -98,7 +92,7 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
   }
 
   function reset() {
-    setBody("");
+    fill("");
     setTo("");
     setSubject("");
     setFiles([]);
@@ -116,7 +110,7 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
     const ids = await uploadAll();
     if (!ids) return;
     setProgress("Scheduling");
-    const r = await scheduleSendAction({ draftId: draftId ?? null, to, subject, body, fileIds: ids, attachCatalog: withCatalog, forwardOf: props.forwardOf ?? null, when: w });
+    const r = await scheduleSendAction({ draftId: draftId ?? null, to, subject, body, fileIds: ids, attachCatalog: withCatalog, forwardOf: props.forwardOf ?? null, when: w, bodyHtml: html });
     setProgress(null);
     setMsg(r);
     if (r.ok) {
@@ -130,7 +124,7 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
     const ids = await uploadAll();
     if (!ids) return;
     setProgress("Sending");
-    const r = isNew ? await sendNewEmailAction(to, subject, body, ids, draftId ?? null, props.forwardOf ?? null, withCatalog) : await sendReplyAction(props.emailId!, body, ids, draftId ?? null);
+    const r = isNew ? await sendNewEmailAction(to, subject, body, ids, draftId ?? null, props.forwardOf ?? null, withCatalog, html) : await sendReplyAction(props.emailId!, body, ids, draftId ?? null, html);
     setProgress(null);
     setMsg(r);
     if (r.ok) reset();
@@ -147,14 +141,11 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
           <label className="mt-2 block"><span className="label">Subject</span><input className="input" value={subject} onChange={(e) => setSubject(e.target.value)} disabled={!props.active} data-new-subject /></label>
         </>
       )}
-      <textarea ref={text} className="input mt-3" rows={isNew ? 10 : 6} value={body} onChange={(e) => setBody(e.target.value)} placeholder={isNew ? "Write your email" : "Write your reply"} aria-label={isNew ? "Email" : "Reply"} disabled={!props.active} />
+      <RichEditor initialHtml={seed} rows={isNew ? 10 : 6} disabled={!props.active} placeholder={isNew ? "Write your email" : "Write your reply"} onChange={(t, h) => { setBody(t); setHtml(h); }} />
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <input ref={ref} type="file" multiple className="hidden" onChange={(e) => { setFiles([...files, ...Array.from(e.target.files ?? [])]); e.target.value = ""; }} />
         <button type="button" className="btn-ghost inline-flex items-center gap-1 !py-1.5 text-sm" disabled={!props.active || pending} onClick={() => ref.current?.click()} title="Attach files">
           <Paperclip className="h-4 w-4" aria-hidden /> Attach files
-        </button>
-        <button type="button" className="btn-ghost inline-flex items-center gap-1 !py-1.5 text-sm" disabled={!props.active || pending} onClick={insertLink} title="Insert link" data-insert-link>
-          <Link2 className="h-4 w-4" aria-hidden /> Link
         </button>
         {isNew && (
           <button
@@ -222,7 +213,7 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
             start(async () => {
               if (draftId) await discardDraftAction(draftId);
               setDraftId(undefined);
-              setBody("");
+              fill("");
               setSubject(isNew ? "" : subject);
               setTo("");
               setSaved("Discarded");

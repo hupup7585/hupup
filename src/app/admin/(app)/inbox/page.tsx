@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { htmlToText, inboxWhen } from "@/lib/inbox-format";
-import { FOLDERS, PAGE_SIZE, folderWhere, hasFilters, isFolder, listDrafts, listEmails, listLabels, listScheduled, listSent, type Folder, type MailFilters } from "@/lib/inbox-folders";
+import { FOLDERS, PAGE_SIZE, folderWhere, hasFilters, isFolder, listDrafts, listLabels, listScheduled, listSent, listThreads, type Folder, type MailFilters } from "@/lib/inbox-folders";
 import MailShell from "./MailShell";
 import RefreshMail from "./RefreshMail";
 import { discardDraftRowAction, unscheduleAction } from "./actions";
@@ -100,10 +100,11 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       </div>
     );
   } else {
-    const [r, labels] = await Promise.all([listEmails({ folder, label: sp.label, page, filters }), listLabels()]);
+    // One row per conversation, like Gmail (Nov 19, 2026)
+    const [r, labels] = await Promise.all([listThreads({ folder, label: sp.label, page, filters }), listLabels()]);
     total = r.total;
     const color = Object.fromEntries(labels.map((l) => [l.name, l.color]));
-    const files = await filesFor(r.rows.map((x) => x.id));
+    const files = await filesFor(r.rows.flatMap((x) => x.ids));
     // "Inbox" chip on rows that are in the Inbox, when the list is a search, All mail or a label (like Gmail)
     const inInbox = searching || folder !== "inbox" || sp.label
       ? new Set((await db.select({ id: schema.inboxEmails.id }).from(schema.inboxEmails).where(and(folderWhere("inbox"), r.rows.length ? inArray(schema.inboxEmails.id, r.rows.map((x) => x.id)) : sql`false`))).map((x) => x.id))
@@ -114,13 +115,17 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       subject: x.subject || "(no subject)",
       snippet: snippet(x.textBody?.trim() ? x.textBody : htmlToText(x.htmlBody ?? "")),
       when: inboxWhen(x.receivedAt),
-      unread: !x.readAt,
+      unread: x.unreadAny,
+      ids: x.ids,
+      count: x.count,
+      hasDraft: x.hasDraft,
+      sentByUs: x.sentByUs,
       starred: x.starred,
       important: x.important,
       inbox: inInbox.has(x.id) && folder !== "inbox",
       snoozedUntil: x.snoozedUntil && x.snoozedUntil > new Date() ? inboxWhen(x.snoozedUntil) : null,
       labels: x.labels.map((n) => ({ name: n, color: color[n] ?? "#2585D8" })),
-      files: files.get(x.id) ?? [],
+      files: x.ids.flatMap((i) => files.get(i) ?? []),
     }));
     const words = [filters.q, filters.has, filters.from, filters.subject].filter(Boolean).join(" ").split(/\s+/).filter((w) => w.length > 1);
     body = <MailList rows={rows} folder={folder} label={sp.label} back={qs(page)} labels={labels.map((l) => ({ name: l.name, color: l.color }))} highlight={words} />;

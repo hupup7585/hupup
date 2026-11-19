@@ -64,7 +64,7 @@ export function withoutThanks(signature: string): string {
 }
 
 /** The email in both forms: HTML (logo header, message, signature) and plain text (message, then the signature). */
-export function brandedEmail(text: string, opts: { baseUrl: string; signature?: string | null; promo?: { address: string; unsubscribeUrl: string }; noThanks?: boolean }): { html: string; text: string } {
+export function brandedEmail(text: string, opts: { baseUrl: string; signature?: string | null; promo?: { address: string; unsubscribeUrl: string }; noThanks?: boolean; bodyHtml?: string | null }): { html: string; text: string } {
   // No "Thanks!" on any email (Abraham, Nov 18, 2026), also when an older saved signature still starts with it
   const signature = withoutThanks((opts.signature ?? "").trim() || EMAIL_SIGNATURE_DEFAULT);
   const body = text.trim();
@@ -74,7 +74,8 @@ export function brandedEmail(text: string, opts: { baseUrl: string; signature?: 
     ? `<tr><td class="hu-pad" style="padding:0 32px 24px 32px;font-family:${FONT};font-size:12px;line-height:1.6;color:#888888">${opts.promo.address.trim() ? `<div>${esc(opts.promo.address.trim())}</div>` : ""}<div><a href="${esc(opts.promo.unsubscribeUrl)}" style="color:#888888">Unsubscribe</a></div></td></tr>`
     : "";
   const plain = `${body}\n\n--\n${signature}\n${promoText}`;
-  const bodyHtml = esc(body)
+  // Formatted in Compose (Nov 19, 2026): the cleaned formatting is used as it is; otherwise the typed text
+  const bodyHtml = opts.bodyHtml ? `<div style="margin:0 0 18px 0">${opts.bodyHtml}</div>` : esc(body)
     .split(/\n{2,}/)
     .map((p) => `<p style="margin:0 0 18px 0">${p.replace(/\n/g, "<br>").replace(/(https?:\/\/[^\s<]+)/g, `<a href="$1" style="color:${NAVY}">$1</a>`)}</p>`)
     .join("");

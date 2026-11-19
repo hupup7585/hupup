@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlarmClock, Archive, BookOpen, Bookmark, ChevronDown, ChevronUp, Clock, File, Inbox, Mail, OctagonAlert, Pencil, Send, SlidersHorizontal, Star, Tag, Tags, Trash2 } from "lucide-react";
+import { AlarmClock, Archive, BookOpen, Bookmark, ChevronDown, Menu, ChevronUp, Clock, File, Inbox, Mail, OctagonAlert, Pencil, Send, SlidersHorizontal, Star, Tag, Tags, Trash2 } from "lucide-react";
 import { FOLDERS, LABEL_COLORS, WITHIN, folderCounts, listLabels, type Folder, type MailFilters } from "@/lib/inbox-folders";
 import { createLabelAction, removeLabelAction } from "./actions";
 
@@ -108,6 +108,24 @@ export default async function MailShell({ folder, label, q, filters, children }:
   };
   return (
     <div className="w-full" data-mail-shell>
+      {/* Phone (like the Gmail app): a menu button opens the folders; Compose is a round button at the bottom */}
+      <details className="relative mb-2 lg:hidden" data-mail-menu>
+        <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold hover:bg-bg" aria-label="Folders">
+          <Menu className="h-5 w-5" aria-hidden /> {FOLDERS.find((x) => x.key === folder)?.label ?? label ?? "Inbox"}
+        </summary>
+        <nav className="absolute left-0 z-40 mt-1 w-72 rounded-2xl border border-line bg-white py-2 shadow-xl" aria-label="Mail folders">
+          {FOLDERS.map(item)}
+          <Link href="/admin/inbox/labels" className="flex items-center gap-3 rounded-r-full px-4 py-1.5 text-sm hover:bg-bg"><Tags className="h-4 w-4" aria-hidden /> Manage labels</Link>
+          {labels.map((l) => (
+            <Link key={l.id} href={`/admin/inbox?f=all&label=${encodeURIComponent(l.name)}`} className="flex items-center gap-3 rounded-r-full px-4 py-1.5 text-sm hover:bg-bg">
+              <Tag className="h-4 w-4" style={{ color: l.color }} aria-hidden /> {l.name}
+            </Link>
+          ))}
+        </nav>
+      </details>
+      <Link href="/admin/inbox/new" className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-2xl bg-[#C2E7FF] px-5 py-4 font-bold text-navy shadow-lg lg:hidden" data-compose-phone>
+        <Pencil className="h-5 w-5" aria-hidden /> Compose
+      </Link>
       <form action="/admin/inbox" className="mb-2 flex items-center gap-2" role="search">
         {folder && folder !== "inbox" && <input type="hidden" name="f" value={folder} />}
         {label && <input type="hidden" name="label" value={label} />}
@@ -120,7 +138,7 @@ export default async function MailShell({ folder, label, q, filters, children }:
       </form>
       <Chips base={base} f={f} />
       <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-        <aside className="min-w-0">
+        <aside className="hidden min-w-0 lg:block">
           <Link href="/admin/inbox/new" className="mb-3 inline-flex items-center gap-3 rounded-2xl bg-[#C2E7FF] px-6 py-4 font-bold text-navy shadow-sm hover:shadow" data-compose>
             <Pencil className="h-5 w-5" aria-hidden /> Compose
           </Link>
