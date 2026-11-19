@@ -533,7 +533,7 @@ function halfPause(target: VR | Gather) {
 
 /** The website hours lines, as spoken: "11:30 AM - 7:00 PM" -> "11:30 AM to 7:00 PM", one sentence per line. */
 export function hoursForSpeech(s: Parameters<typeof websiteHoursLines>[0]): string[] {
-  return websiteHoursLines(s, true).flatMap((l) => l.split("\n")).map((l) => `${l.replace(/ - /g, " to ").trim()}.`);
+  return websiteHoursLines(s, true, true).flatMap((l) => l.split("\n")).map((l) => `${l.replace(/ - /g, " to ").trim()}.`);
 }
 
 /** The caller ID staff see on a forwarded call: the caller's own number, or the hotline when blocked or unknown. */

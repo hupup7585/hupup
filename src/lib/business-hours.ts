@@ -167,7 +167,7 @@ export function hoursLines(s: HoursSettings = hoursDefaults(), mutze: boolean = 
  * The website "Our Hours" card (Abraham): built from the same Admin Settings hours the phone line uses, so the two
  * can never differ. Same layout as Abraham's list: "Day: hours", with Motzei Shabbes on two lines.
  */
-export function websiteHoursLines(s: HoursSettings = hoursDefaults(), mutze: boolean = siteMutze()): string[] {
+export function websiteHoursLines(s: HoursSettings = hoursDefaults(), mutze: boolean = siteMutze(), shabbesLine = false): string[] {
   const dash = (r: string) => {
     const [a, b] = r.split("-");
     return `${ampm(a)} - ${ampm(b)}`;
@@ -183,7 +183,8 @@ export function websiteHoursLines(s: HoursSettings = hoursDefaults(), mutze: boo
     `Sunday: ${dash(s.hoursSunday)}`,
     `Monday - Thursday: ${dash(s.hoursMonThu)}`,
     `Friday: ${ampm(s.hoursFridayOpen)} - Chatzos`,
-    "Shabbes: Closed",
+    // Abraham, Nov 19, 2026: "Take off the line, Shabbes closed" on the website (the phone's key 7 still says it)
+    ...(shabbesLine ? ["Shabbes: Closed"] : []),
     `${mutzeName(mutze)}: Winter: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseWinter)}\nSummer: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseSummer)}`,
   ];
 }

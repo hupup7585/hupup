@@ -28,7 +28,7 @@ export default function CatalogRequest() {
         <input id="catalog-email" name="email" type="email" required autoComplete="email" placeholder={CATALOG_FORM_DRAFT.placeholder} className={INPUT} />
         {/* left empty by people; robots fill it */}
         <input name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden />
-        <button disabled={pending} className={`${BUTTON} bg-hu-yellow hover:bg-[#FFCF1F]`}>
+        <button disabled={pending} className={`${BUTTON} bg-[#8CCBFF] hover:bg-[#74BEF9]`}>
           {CATALOG_EMAIL_BUTTON}
         </button>
       </form>
