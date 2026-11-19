@@ -173,10 +173,12 @@ export function websiteHoursLines(s: HoursSettings = hoursDefaults(), mutze: boo
   };
   const after = s.hoursMotzeiOpen.trim().match(/^tzeis(?:\+(\d+))?$/);
   const n = after ? Number(after[1] ?? 0) : 0;
+  // Website: "Shabbos" (standard spelling, Abraham, Nov 19, 2026); the hotline reads "Shabbes"
+  const shab = mutze ? "Shabbes" : "Shabbos";
   const motzeiOpen = after
     ? n === 0
-      ? "When Shabbes ends"
-      : `${n % 60 === 0 ? `${n / 60} hour${n === 60 ? "" : "s"}` : `${n} minutes`} after Shabbes`
+      ? `When ${shab} ends`
+      : `${n % 60 === 0 ? `${n / 60} hour${n === 60 ? "" : "s"}` : `${n} minutes`} after ${shab}`
     : ampm(s.hoursMotzeiOpen);
   return [
     `Sunday: ${dash(s.hoursSunday)}`,

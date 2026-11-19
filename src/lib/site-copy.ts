@@ -20,7 +20,8 @@ export const DELIVERY_FEE_NOTE = "Delivery available. Call for pricing.";
 /** Website Hours (Abraham's exact lines). No holidays on the website: holiday rules live in the phone system and admin. */
 /* The hours themselves come from Admin Settings (websiteHoursLines in src/lib/business-hours.ts), the same hours the
    phone line uses, so the website and the phone can never differ. */
-export const WEBSITE_HOURS_NOTE = "Book by phone anytime, 24/7.";
+// Abraham, Nov 19, 2026: "24 hours" (not 24/7: closed on Shabbos)
+export const WEBSITE_HOURS_NOTE = "Book by phone 24 hours.";
 
 /**
  * Display only (the words never change): keep "11:00 PM" and "Shabbes - 11:00 PM" from breaking across lines on
