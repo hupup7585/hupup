@@ -6,6 +6,7 @@ import { BUSINESS_NAME, config } from "@/lib/config";
 import { addDays, spokenLongDate, todayISO } from "@/lib/dates";
 import { spokenMoney } from "@/lib/money";
 import { friMutzeDays, friMutzeOffered, friMutzePickup } from "@/lib/holiday-rentals";
+import { BALLOON_SECOND_DIGIT_SECONDS, balloonEntry, balloonForKey, balloonSizes, digitWords } from "@/lib/ivr/balloon-menu";
 import { formatPhone, last4, spokenDigits, toE164 } from "@/lib/phone";
 import { logStamp, phonePromoMode, phonePromoOn, readBack, tenDigitNumber } from "@/lib/phone-promo";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
@@ -599,6 +600,20 @@ async function friMutzeChoice(ctx: Ctx, vr: VR, p: string | undefined, date: str
   }
   await updateSession(ctx.callSid, { data: { mutzeDays: [...kept], mutzeAnnounce: d === "1" && !prod ? date : undefined } });
   return p ? back(vr, "qty", { p, d: date }) : back(vr, "book");
+}
+
+/**
+ * Box 156: the Owner's customer discount on this booking ("ten percent" / "twenty five dollars"), and the total before
+ * it (rentals without the discount, with their own delivery and tax). Null when there is no customer discount.
+ */
+export function customerDiscountLine(days: { note: string | null; discountCents: number; zone: string; feeCents: number; subtotalCents: number }[], s: Parameters<typeof totalsWithFee>[3]): { spoken: string; beforeCents: number } | null {
+  const used = days.filter((d) => d.discountCents > 0 && /^Customer discount: /.test(d.note ?? ""));
+  if (!used.length) return null;
+  const note = used[0].note ?? "";
+  const pct = note.match(/(\d+(?:\.\d+)?)% off/);
+  const spoken = pct ? `${pct[1]} percent` : spokenMoney(used.reduce((t, d) => t + d.discountCents, 0));
+  const beforeCents = days.reduce((t, d) => t + totalsWithFee(d.subtotalCents + (/^Customer discount: /.test(d.note ?? "") ? d.discountCents : 0), d.zone, d.feeCents, s).totalCents, 0);
+  return { spoken, beforeCents };
 }
 
 /** Laser tag and paddle boats (Abraham, Nov 18, 2026): one more at a time while more are free. Never jumping balloons. */
@@ -1478,6 +1493,8 @@ const handlers: Record<string, Handler> = {
       return back(vr, "menu");
     }
     await track(ctx.callSid, "category_heard", `Listened to ${cat.name}`, { category: cat.name, items: items.map((p) => p.name) });
+    // Jumping balloons: box 153 (Abraham, Nov 19, 2026)
+    if (await isBounceHouse(c)) return back(vr, "balloons", { c });
     // 10 or more items (Abraham, Nov 17, 2026): two-key choices (10, 11, 12) work; a single key acts after a short wait
     const g = keypad(vr, url("category-choice", { c }), items.length > 9 ? { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS } : {});
     sp(g, ctx, "book_category_list", { category: cat.spokenName || cat.name });
@@ -1486,6 +1503,84 @@ const handlers: Record<string, Handler> = {
     sp(g, ctx, "cart_key");
     sp(g, ctx, "book_back"); // star goes back one step (to the bookings menu)
     return bookNoInput(vr, ctx, "category", { c });
+  },
+
+  /** Box 153: the jumping balloons menu (approved word for word). One key; after 1, a short wait for 0, 1 or 2. */
+  balloons(ctx, vr) {
+    const c = ctx.query.get("c")!;
+    const g = keypad(vr, url("balloon-key", { c }), { numDigits: 1 });
+    sp(g, ctx, "box153");
+    return bookNoInput(vr, ctx, "balloons", { c });
+  },
+
+  async "balloon-key"(ctx, vr) {
+    const c = ctx.query.get("c")!;
+    const d = ctx.body.Digits;
+    if (!d) return bookNoInput(vr, ctx, "balloons", { c });
+    if (d === "*") return back(vr, "book"); // star: one menu back
+    // 1: wait 2 seconds for a second digit (10, 11, 12); pound skips the wait; nothing = Soft Hop
+    if (d === "1") {
+      vr.gather({ input: ["dtmf"], numDigits: 1, timeout: BALLOON_SECOND_DIGIT_SECONDS, finishOnKey: "#", action: url("balloon-key2", { c }), method: "POST", actionOnEmptyResult: true });
+      return back(vr, "balloon-pick", { c, k: "1" });
+    }
+    return back(vr, "balloon-pick", { c, k: d });
+  },
+
+  "balloon-key2"(ctx, vr) {
+    const c = ctx.query.get("c")!;
+    const d = ctx.body.Digits ?? "";
+    if (!d) return back(vr, "balloon-pick", { c, k: "1" }); // pound or no second digit: Soft Hop
+    return back(vr, "balloon-pick", { c, k: `1${d}` });
+  },
+
+  async "balloon-pick"(ctx, vr) {
+    const c = Number(ctx.query.get("c"));
+    const k = ctx.query.get("k") ?? "";
+    const p = balloonForKey(k, await phoneProducts(c));
+    if (!p) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "balloons", { c });
+    }
+    await track(ctx.callSid, "item_heard", `Chose ${p.name}`, { item: p.name, productId: p.id });
+    return back(vr, "balloon", { p: p.id });
+  },
+
+  /** Box 154: "{Item}, item {item number}, {price}. To add it to your shopping cart, press 1. ..." */
+  async balloon(ctx, vr) {
+    const p = await getProduct(Number(ctx.query.get("p")));
+    if (!p) return back(vr, "book");
+    const g = keypad(vr, url("balloon-choice", { p: p.id }));
+    sp(g, ctx, "box154", { item: p.name, number: digitWords(balloonEntry(p.name)?.number ?? ""), price: spokenMoney(p.priceCents) });
+    return bookNoInput(vr, ctx, "balloon", { p: p.id });
+  },
+
+  async "balloon-choice"(ctx, vr) {
+    const p = await getProduct(Number(ctx.query.get("p")));
+    if (!p) return back(vr, "book");
+    const d = ctx.body.Digits;
+    if (!d) return bookNoInput(vr, ctx, "balloon", { p: p.id });
+    if (d === "*") return back(vr, "balloons", { c: p.categoryId });
+    if (d === "1") {
+      const day = ctx.session?.data.day;
+      return day ? back(vr, "qty", { p: p.id, d: day }) : back(vr, "date", { p: p.id });
+    }
+    if (d === "2") {
+      await track(ctx.callSid, "item_details", `Heard the details of ${p.name}`, { item: p.name, productId: p.id });
+      const sizes = balloonSizes(p.dimensions);
+      const description = (p.spokenDescription || p.description).trim().replace(/[.!\s]+$/, "");
+      // Box 155 is not approved yet: preview only. The live line reads the item's description, as before.
+      if (process.env.VERCEL_ENV !== "production" && sizes && description) {
+        const g = keypad(vr, url("balloon-choice", { p: p.id }));
+        spPreviewDraft(g, ctx, "box155", { item: p.name, description, ...sizes });
+        return bookNoInput(vr, ctx, "balloon", { p: p.id });
+      }
+      if (p.spokenDescription || p.description) say(vr, p.spokenDescription || p.description);
+      else sp(vr, ctx, "product_default_desc", { item: p.name });
+      pause(vr);
+      return back(vr, "balloon", { p: p.id });
+    }
+    sp(vr, ctx, "not_valid");
+    return back(vr, "balloon", { p: p.id });
   },
 
   async "category-choice"(ctx, vr) {
@@ -1794,15 +1889,10 @@ const handlers: Record<string, Handler> = {
     await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted", data: { day: date, dayOrderIds: ids, ...(announce ? { mutzeAnnounce: undefined } : {}) } }, session);
     // Box 149 when the date came before the item: now the item's price is known
     if (announce) await sayFriMutzePrice(vr, ctx, date, p.priceCents);
-    // Laser tag and paddle boats: "To add a second one, press 1. Otherwise, stay on the line." while more are free
-    // (not approved yet: preview only)
-    const n = Number(ctx.query.get("n") || 1);
-    if ((await oneMoreItem(p.categoryId)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "more_second"))) {
-      const left = await checkBookable(p.id, p.quantity, date, db, keptPickup(ctx, date));
-      if (left > 0) {
-        sp(vr, ctx, "item_added");
-        return back(vr, "more", { p: p.id, d: date, n });
-      }
+    // Laser tag and paddle boats (Abraham, Nov 19, 2026): box 151 after each one added; box 152 after another
+    if (await oneMoreItem(p.categoryId)) {
+      if (ctx.query.get("a") === "1") sp(vr, ctx, "box152", { item: p.name });
+      return back(vr, "another", { p: p.id, d: date });
     }
     // Abraham (Nov 17, 2026): the item added line every time; ocean balls after a jumping balloon; then keep shopping
     if (await isBounceHouse(p.categoryId)) {
@@ -1821,32 +1911,40 @@ const handlers: Record<string, Handler> = {
     return noInput(vr, ctx, "cart");
   },
 
-  /** Laser tag and paddle boats: one more of the same item (key 1); staying on the line goes on as usual. */
-  async more(ctx, vr) {
-    const p = ctx.query.get("p")!;
+  /**
+   * Box 151 (approved): "The {item} has been successfully added to your cart. To add another {item} for the same date,
+   * for {price}, press 1. ..." Press 1 is offered only while another is free that date; never how many are left.
+   */
+  async another(ctx, vr) {
+    const p = await getProduct(Number(ctx.query.get("p")));
     const date = ctx.query.get("d")!;
-    const n = Number(ctx.query.get("n") || 1);
-    const g = keypad(vr, url("more-choice", { p, d: date, n }));
-    spPreviewDraft(g, ctx, n <= 1 ? "more_second" : "more_one");
-    return back(vr, "more-done", { p, d: date });
+    if (!p) return back(vr, "book");
+    const left = await checkBookable(p.id, p.quantity, date, db, keptPickup(ctx, date));
+    const g = keypad(vr, url("another-choice", { p: p.id, d: date, m: left > 0 ? 1 : 0 }));
+    if (left > 0) sp(g, ctx, "box151", { item: p.name, price: spokenMoney(p.priceCents) });
+    else sp(g, ctx, "box151_none", { item: p.name });
+    // No key: a maze or laser guns go on to the extra gun packs; everything else to the cart (as after any item)
+    return back(vr, "another-done", { p: p.id, d: date });
   },
 
-  async "more-choice"(ctx, vr) {
+  async "another-choice"(ctx, vr) {
     const p = ctx.query.get("p")!;
     const date = ctx.query.get("d")!;
-    const n = Number(ctx.query.get("n") || 1);
-    if (ctx.body.Digits === "1") return back(vr, "add", { p, d: date, q: 1, n: n + 1 });
-    if (ctx.body.Digits === "*") return starToCategory(vr, Number(p));
-    if (ctx.body.Digits) sp(vr, ctx, "not_valid");
-    return back(vr, "more-done", { p, d: date });
+    const d = ctx.body.Digits;
+    if (d === "1" && ctx.query.get("m") === "1") return back(vr, "add", { p, d: date, q: 1, a: 1 });
+    if (d === "2") return back(vr, "book"); // a different rental
+    if (d === "3") return back(vr, "date"); // a different date
+    if (d === "0") return back(vr, "cart");
+    if (d === "*") return starToCategory(vr, Number(p));
+    if (d) sp(vr, ctx, "not_valid");
+    return back(vr, "another", { p, d: date });
   },
 
-  /** After the one-more offer: laser guns go on to the extra gun packs; everything else to keep shopping or the cart. */
-  async "more-done"(ctx, vr) {
+  async "another-done"(ctx, vr) {
     const prod = await getProduct(Number(ctx.query.get("p")));
     const date = ctx.query.get("d")!;
     if (prod && (await isLaserBase(prod.categoryId)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) return back(vr, "packs", { d: date });
-    return back(vr, "added-menu");
+    return noInput(vr, ctx, "cart");
   },
 
   /** "To keep shopping, press 1. To go to your shopping cart, press 0." */
@@ -2517,10 +2615,10 @@ const handlers: Record<string, Handler> = {
       await db.update(orders).set({ customerId }).where(and(eq(orders.id, o.order.id), eq(orders.status, "HOLD")));
       await refreshOrderTotals(o.order.id);
     }
-    const fresh = await db.select({ id: orders.id, subtotalCents: orders.subtotalCents, offerNote: orders.offerNote }).from(orders).where(inArray(orders.id, days.map((d) => d.order.id)));
+    const fresh = await db.select({ id: orders.id, subtotalCents: orders.subtotalCents, offerNote: orders.offerNote, offerDiscountCents: orders.offerDiscountCents }).from(orders).where(inArray(orders.id, days.map((d) => d.order.id)));
     for (const o of days) {
       const f = fresh.find((x) => x.id === o.order.id);
-      if (f) Object.assign(o.order, { subtotalCents: f.subtotalCents, offerNote: f.offerNote });
+      if (f) Object.assign(o.order, { subtotalCents: f.subtotalCents, offerNote: f.offerNote, offerDiscountCents: f.offerDiscountCents });
     }
     // Each rental day is its own delivery: its own delivery fee and tax. One charge pays for all of them.
     // The free delivery promo counts by each day's delivery date; a free 4th Sunday has its own delivery (Nov 17, 2026)
@@ -2553,6 +2651,9 @@ const handlers: Record<string, Handler> = {
     // Abraham, Nov 18, 2026: nothing before payment may sound finished. Only the total here; "You are all set" and the
     // order number come after Sola approves the payment (box 148). Payment-link callers get the number by text.
     sp(vr, ctx, "checkout_total", { total: spokenMoney(totals.totalCents), items: spokenMoney(totals.subtotalCents), delivery: spokenMoney(totals.deliveryFeeCents), tax: spokenMoney(totals.taxCents) });
+    // Box 156 (Abraham, Nov 19, 2026): the customer is always told when the Owner's discount was used
+    const disc = customerDiscountLine(perDay.map(({ o, t }) => ({ note: o.order.offerNote, discountCents: o.order.offerDiscountCents ?? 0, zone: t!.zone, feeCents: t!.deliveryFeeCents, subtotalCents: t!.subtotalCents })), settings);
+    if (disc) sp(vr, ctx, "box156", { amount: spokenMoney(disc.beforeCents), discount: disc.spoken, newtotal: spokenMoney(totals.totalCents) });
     await updateSession(ctx.callSid, { data: { placedOrderId: primary.id } }, ctx.session);
     // Pay by card through Sola PhonePay (Abraham, Nov 14, 2026), the main phone payment. Off until he switches it on in
     // Admin, and then only on his own test calls until he opens it to everyone and approves its lines.

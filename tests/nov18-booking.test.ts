@@ -69,18 +69,18 @@ describe("box 150 and box 149 (approved Nov 18, 2026)", () => {
     h.session.orderId = null;
     h.session.data = {};
     const xml = await call("date-confirm", { Digits: "#" }, `p=${boat}&d=${CHANUKAH_FRIDAY}&f=1`);
-    expect(said(xml)).toContain("Friday is one full rental day, for 100 dollars. We will pick it up one hour after Shabbes.");
+    expect(said(xml)).toContain("For Friday, you will be charged for one full day, a total of 100 dollars. Your rental will be picked up one hour after Shabbes. Please make sure it is ready outside on time.");
     expect((h.session.data.mutzeDays as string[]).includes(CHANUKAH_FRIDAY)).toBe(false);
     process.env.VERCEL_ENV = "production";
     try {
-      expect(said(await call("date-confirm", { Digits: "#" }, `p=${boat}&d=${CHANUKAH_FRIDAY}&f=1`)).join(" ")).not.toContain("one full rental day");
+      expect(said(await call("date-confirm", { Digits: "#" }, `p=${boat}&d=${CHANUKAH_FRIDAY}&f=1`)).join(" ")).not.toContain("one full day");
     } finally {
       delete process.env.VERCEL_ENV;
     }
   });
 });
 
-describe("one item at a time (Nov 18, 2026)", () => {
+describe("one item at a time (Nov 18, 2026); box 151 and box 152 (approved Nov 19)", () => {
   it("no quantity question anywhere; never how many are in stock", async () => {
     const { PROMPTS } = await import("@/lib/ivr/prompts");
     const { readFileSync } = await import("node:fs");
@@ -88,33 +88,28 @@ describe("one item at a time (Nov 18, 2026)", () => {
     expect(f).not.toContain('"qty_prompt"');
     expect(PROMPTS.qty_prompt.text).toContain("How many");
   });
-  it("paddle boats: 'add a second one' while another is free, then 'add one more'; none left = go on", async () => {
+  it("paddle boats: box 151 with press 1 while another is free; 1 adds one more and plays box 152, then box 151 again; none left = no press 1", async () => {
     h.session.orderId = null;
     h.session.data = {};
     const day = "2026-12-21";
-    const first = await call("add", {}, `p=${boat}&d=${day}&q=1`);
-    expect(redirect(first)).toBe(`more?p=${boat}&d=${day}&n=1`);
-    expect(said(await call("more", {}, `p=${boat}&d=${day}&n=1`))).toEqual(["To add a second one, press 1. Otherwise, stay on the line."]);
-    expect(redirect(await call("more-choice", { Digits: "1" }, `p=${boat}&d=${day}&n=1`))).toBe(`add?p=${boat}&d=${day}&q=1&n=2`);
-    // the second (and last) boat: nothing left, so no more offers
-    const second = await call("add", {}, `p=${boat}&d=${day}&q=1&n=2`);
-    expect(redirect(second)).not.toContain("more?");
-    // staying on the line keeps the choice
-    expect(redirect(await call("more-done", {}, `p=${boat}&d=${day}`))).toBe("added-menu");
+    expect(redirect(await call("add", {}, `p=${boat}&d=${day}&q=1`))).toBe(`another?p=${boat}&d=${day}`);
+    expect(said(await call("another", {}, `p=${boat}&d=${day}`))).toEqual([
+      "The Paddle boat has been successfully added to your cart. To add another Paddle boat for the same date, for 100 dollars, press 1. To choose a different rental, press 2. To choose a different date, press 3. To go to your shopping cart, press 0.",
+    ]);
+    expect(redirect(await call("another-choice", { Digits: "1" }, `p=${boat}&d=${day}&m=1`))).toBe(`add?p=${boat}&d=${day}&q=1&a=1`);
+    const second = await call("add", {}, `p=${boat}&d=${day}&q=1&a=1`);
+    expect(said(second)).toEqual(["Another Paddle boat has been successfully added to your cart."]);
+    expect(redirect(second)).toBe(`another?p=${boat}&d=${day}`);
+    // both boats are now in the cart: box 151 without the press 1 sentence, and 1 does nothing
+    expect(said(await call("another", {}, `p=${boat}&d=${day}`))).toEqual(["The Paddle boat has been successfully added to your cart. To choose a different rental, press 2. To choose a different date, press 3. To go to your shopping cart, press 0."]);
+    expect(redirect(await call("another-choice", { Digits: "1" }, `p=${boat}&d=${day}&m=0`))).toBe(`another?p=${boat}&d=${day}`);
+    expect(redirect(await call("another-choice", { Digits: "2" }, `p=${boat}&d=${day}&m=0`))).toBe("book");
+    expect(redirect(await call("another-choice", { Digits: "3" }, `p=${boat}&d=${day}&m=0`))).toBe("date");
+    expect(redirect(await call("another-choice", { Digits: "0" }, `p=${boat}&d=${day}&m=0`))).toBe("cart");
   });
   it("jumping balloons never offer a second one", async () => {
     h.session.orderId = null;
     h.session.data = {};
     expect(redirect(await call("add", {}, `p=${castle}&d=2026-12-22&q=1`))).toBe("ocean?d=2026-12-22");
-  });
-  it("on the live line the not-approved lines never play", async () => {
-    h.session.orderId = null;
-    h.session.data = {};
-    process.env.VERCEL_ENV = "production";
-    try {
-      expect(redirect(await call("add", {}, `p=${boat}&d=2026-12-23&q=1`))).not.toContain("more?");
-    } finally {
-      delete process.env.VERCEL_ENV;
-    }
   });
 });

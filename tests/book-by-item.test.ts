@@ -57,8 +57,8 @@ describe("key 1: booking by item", () => {
       "For schools, corporate events, and organizational bookings, press 9.",
       "To go back, press star.",
     ]); // Abraham, Nov 11, 2026: rental first, then the date
-    const items = said(await call("category", {}, `c=${catId}`));
-    expect(items.slice(0, 5)).toEqual(["Here are our bounce houses.", "To go to your shopping cart, press 0.", "For the Small Castle, press 1.", "For the Medium Castle, press 2.", "For the Large Castle, press 3."]); // cart line before and after the items (Phone Menu v3)
+    // Jumping balloons now play box 153 (Abraham, Nov 19, 2026)
+    expect(redirect(await call("category", {}, `c=${catId}`))).toBe(`balloons?c=${catId}`);
     h.session.data = {};
     expect(redirect(await call("category-choice", { Digits: "2" }, `c=${catId}`))).toBe(`date?p=${medium}`);
     const date = await call("date", {}, `p=${medium}`);

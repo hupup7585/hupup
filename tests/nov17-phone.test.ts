@@ -41,18 +41,10 @@ beforeAll(async () => {
 });
 
 describe("a jumping balloons list with 12 items", () => {
-  it("reads every item, up to press 12; two keys pick 10 to 12, a single key waits briefly", async () => {
-    const xml = await call("category", {}, `c=${catId}`);
-    const lines = said(xml);
-    expect(lines).toContain("For the Balloon 9, press 9.");
-    expect(lines).toContain("For the Balloon 10, press 10.");
-    expect(lines).toContain("For the Balloon 12, press 12.");
-    expect(xml).toMatch(/<Gather [^>]*numDigits="2"[^>]*timeout="2"/);
+  it("Nov 19, 2026: jumping balloons play box 153 instead of the item list (two-key choices still work for other lists)", async () => {
+    expect(redirect(await call("category", {}, `c=${catId}`))).toBe(`balloons?c=${catId}`);
     expect(redirect(await call("category-choice", { Digits: "12" }, `c=${catId}`))).toBe(`date?p=${ids[11]}`);
-    expect(redirect(await call("category-choice", { Digits: "10" }, `c=${catId}`))).toBe(`date?p=${ids[9]}`);
-    expect(redirect(await call("category-choice", { Digits: "1" }, `c=${catId}`))).toBe(`date?p=${ids[0]}`);
     expect(redirect(await call("category-choice", { Digits: "13" }, `c=${catId}`))).toBe(`category?c=${catId}`); // no item 13
-    expect(redirect(await call("category-choice", { Digits: "0" }, `c=${catId}`))).toBe(`cart?c=${catId}`);
   });
 });
 

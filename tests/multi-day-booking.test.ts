@@ -62,7 +62,7 @@ describe("key 1: date first, several days, one charge", () => {
     expect(said(await call("date", {}, `p=${productId}`))[0]).toMatch(/^Please enter your event date: two digits for the month/);
     expect(redirect(await call("date-confirm", { Digits: "#" }, `d=${DAY1}`))).toBe("book");
     expect(h.session.data.day).toBe(DAY1);
-    expect(said(await call("category", {}, `c=${catId}`))).toContain("To go to your shopping cart, press 0."); // the bookings menu's 0 is customer service now
+    expect(redirect(await call("category", {}, `c=${catId}`))).toBe(`balloons?c=${catId}`); // jumping balloons: box 153 (Nov 19, 2026)
   });
 
   it("after a jumping balloon (Abraham, Nov 17): the item added line, ocean balls, then keep shopping (1) or the cart (0); 2 still books another day", async () => {

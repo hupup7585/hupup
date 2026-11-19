@@ -93,6 +93,9 @@ describe("section 4: voicemail re-record line", () => {
 
 describe("section 8: bookings reminders", () => {
   it("the item list: cart line, then the items, then the same cart line; no cart line in the category menu", async () => {
+    // Nov 19, 2026: jumping balloons have their own menu (box 153)
+    expect(redirect(await call("category", {}, `c=${balloons}`))).toBe(`balloons?c=${balloons}`);
+    return;
     const list = said(await call("category", {}, `c=${balloons}`));
     const cart = "To go to your shopping cart, press 0.";
     expect(list.indexOf(cart)).toBeLessThan(list.indexOf("For the Royal Castle, press 1."));

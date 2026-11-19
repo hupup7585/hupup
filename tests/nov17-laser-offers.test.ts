@@ -152,10 +152,11 @@ describe("phone: extra laser gun packs after a maze or guns (approved Nov 17)", 
   it("after the guns: the item added line, then the packs question; 1 adds a 6-pack to the same day", async () => {
     const day = "2026-12-28";
     const add = await call("add", {}, `p=${guns6}&d=${day}&q=1`);
-    expect(said(add)).toContain("This item is successfully added to your cart.");
-    // Nov 18, 2026: laser tag first offers one more of the same (preview only), then staying on the line goes to the packs
-    expect(redirect(add)).toBe(`more?p=${guns6}&d=${day}&n=1`);
-    expect(redirect(await call("more-done", {}, `p=${guns6}&d=${day}`))).toBe(`packs?d=${day}`);
+    // Box 151 says the item was added (Nov 19, 2026)
+    expect(said(await call("another", {}, `p=${guns6}&d=${day}`))[0]).toMatch(/has been successfully added to your cart\./);
+    // Nov 19, 2026: laser tag plays box 151 first; staying on the line goes on to the packs
+    expect(redirect(add)).toBe(`another?p=${guns6}&d=${day}`);
+    expect(redirect(await call("another-done", {}, `p=${guns6}&d=${day}`))).toBe(`packs?d=${day}`);
     expect(said(await call("packs", {}, `d=${day}`))).toEqual(["Would you like to add more laser guns? To add a 6-pack of laser guns for $75, press 1. To add a 4-pack of laser guns for $50, press 2. To skip, press pound."]);
     const r = await call("packs-choice", { Digits: "1" }, `d=${day}`);
     expect(redirect(r)).toBe(`packs?d=${day}`);
@@ -167,6 +168,12 @@ describe("phone: extra laser gun packs after a maze or guns (approved Nov 17)", 
     process.env.VERCEL_ENV = "production";
     const add = await call("add", {}, `p=${guns6}&d=2026-12-29&q=1`);
     delete process.env.VERCEL_ENV;
-    expect(redirect(add)).toBe("packs?d=2026-12-29");
+    expect(redirect(add)).toBe(`another?p=${guns6}&d=2026-12-29`); // box 151 is approved: live too
+    process.env.VERCEL_ENV = "production";
+    try {
+      expect(redirect(await call("another-done", {}, `p=${guns6}&d=2026-12-29`))).toBe("packs?d=2026-12-29");
+    } finally {
+      delete process.env.VERCEL_ENV;
+    }
   });
 });

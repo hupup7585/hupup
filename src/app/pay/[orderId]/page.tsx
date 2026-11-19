@@ -85,6 +85,13 @@ export default async function PayPage({ params, searchParams }: { params: Promis
                   <span>{money(i.qty * i.unitPriceCents)}</span>
                 </li>
               ))}
+              {/* The Owner's customer discount is always shown to the customer (Abraham, Nov 19, 2026) */}
+              {day.order.offerDiscountCents > 0 && /^Customer discount: /.test(day.order.offerNote ?? "") && (
+                <li className="flex justify-between font-semibold" data-pay-discount>
+                  <span>Discount ({(day.order.offerNote ?? "").replace(/^Customer discount: /, "")})</span>
+                  <span>-{money(day.order.offerDiscountCents)}</span>
+                </li>
+              )}
               {day.order.totalCents !== null && (
                 <>
                   <li className="flex justify-between"><span>Delivery</span><span>{money(day.order.deliveryFeeCents)}</span></li>

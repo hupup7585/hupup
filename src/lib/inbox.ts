@@ -1,3 +1,4 @@
+import { htmlToText } from "@/lib/inbox-format";
 import PostalMime from "postal-mime";
 import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -309,15 +310,17 @@ export const INFO_ALERT_PHONE = "+18457777585";
 const TEXT_MAX = 1600;
 
 /** The text for one info@ email: sender, subject and message, cut to one text. A cut email ends with the code to get it all. */
-export function infoEmailText(e: { id?: number; fromName: string | null; fromAddress: string; subject: string | null; textBody: string | null }): string {
+export function infoEmailText(e: { id?: number; fromName: string | null; fromAddress: string; subject: string | null; textBody: string | null; htmlBody?: string | null }): string {
   const head = `New email to info@hupupattractions.com\nFrom: ${e.fromName ? `${e.fromName} <${e.fromAddress}>` : e.fromAddress}\nSubject: ${e.subject ?? "(no subject)"}\n\n`;
-  const body = cleanEmailBody(e.textBody);
+  const body = cleanEmailBody(emailPlainText(e));
   // Abraham, Nov 18, 2026: reply a code to get the full email by text
   const more = e.id ? `... Reply MORE ${e.id} for the full email.` : "... (more in the Admin inbox)";
   const room = TEXT_MAX - head.length;
   return head + (body.length <= room ? body : body.slice(0, Math.max(0, room - more.length)).trimEnd() + more);
 }
 
+/** The email's text; an HTML-only email is turned into text first (Nov 19, 2026: it was "(no text)"). */
+const emailPlainText = (e: { textBody: string | null; htmlBody?: string | null }) => (e.textBody?.trim() ? e.textBody : e.htmlBody ? htmlToText(e.htmlBody) : e.textBody);
 const cleanEmailBody = (t: string | null) => (t ?? "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim() || "(no text)";
 
 /** The most texts one MORE reply sends; anything longer stays in the Admin inbox. */
@@ -327,8 +330,8 @@ export const MORE_MAX_TEXTS = 6;
  * The whole email as texts (Abraham, Nov 18, 2026): each starts "Email 123, part 1 of 3", cut at a space, up to
  * MORE_MAX_TEXTS; a longer email ends with a pointer to the Admin inbox.
  */
-export function fullEmailTexts(e: { id: number; fromName: string | null; fromAddress: string; subject: string | null; textBody: string | null }): string[] {
-  const all = `From: ${e.fromName ? `${e.fromName} <${e.fromAddress}>` : e.fromAddress}\nSubject: ${e.subject ?? "(no subject)"}\n\n${cleanEmailBody(e.textBody)}`;
+export function fullEmailTexts(e: { id: number; fromName: string | null; fromAddress: string; subject: string | null; textBody: string | null; htmlBody?: string | null }): string[] {
+  const all = `From: ${e.fromName ? `${e.fromName} <${e.fromAddress}>` : e.fromAddress}\nSubject: ${e.subject ?? "(no subject)"}\n\n${cleanEmailBody(emailPlainText(e))}`;
   const label = (i: number, n: number) => `Email ${e.id}, part ${i} of ${n}\n`;
   const room = TEXT_MAX - label(MORE_MAX_TEXTS, MORE_MAX_TEXTS).length;
   const parts: string[] = [];
