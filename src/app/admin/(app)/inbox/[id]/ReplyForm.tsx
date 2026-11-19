@@ -1,10 +1,10 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { ChevronDown, Clock, Link2, Paperclip, Trash2 } from "lucide-react";
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { discardDraftAction, replyFileChunkAction, saveDraftAction, sendNewEmailAction, sendReplyAction, startReplyFileAction } from "../actions";
+import { discardDraftAction, replyFileChunkAction, saveDraftAction, scheduleSendAction, sendNewEmailAction, sendReplyAction, startReplyFileAction } from "../actions";
 
 const CHUNK = 3 * 1024 * 1024;
 const MAX = 18 * 1024 * 1024; // same as INBOX_FILE_MAX_BYTES (18 MB attached in all per email)
@@ -54,14 +54,30 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
   // Files over 18 MB are sent as a download link, so only the smaller ones count toward the 18 MB attached
   const attached = files.filter((f) => f.size <= MAX).reduce((n, f) => n + f.size, 0);
 
-  async function send() {
-    setMsg(null);
-    if (files.some((f) => f.size > LINK_MAX)) return setMsg({ ok: false, message: "A file can be up to 100 MB." });
-    if (attached > MAX) return setMsg({ ok: false, message: "Attachments can be up to 18 MB in all. Files over 18 MB each go as a download link." });
+  // Insert at the cursor (a link), like Gmail's Compose toolbar
+  const text = useRef<HTMLTextAreaElement>(null);
+  function insert(s: string) {
+    const el = text.current;
+    const at = el ? el.selectionStart : body.length;
+    const end = el ? el.selectionEnd : body.length;
+    setBody(body.slice(0, at) + s + body.slice(end));
+    setTimeout(() => el?.focus(), 0);
+  }
+  function insertLink() {
+    const url = window.prompt("Web address (for example https://hupupattractions.com)");
+    if (!url) return;
+    const label = window.prompt("Text to show (leave empty to show the address)") ?? "";
+    insert(label ? `${label} (${url})` : url);
+  }
+
+  /** Uploads the attached files; their ids, or null after showing the problem. */
+  async function uploadAll(): Promise<number[] | null> {
+    if (files.some((f) => f.size > LINK_MAX)) return setMsg({ ok: false, message: "A file can be up to 100 MB." }), null;
+    if (attached > MAX) return setMsg({ ok: false, message: "Attachments can be up to 18 MB in all. Files over 18 MB each go as a download link." }), null;
     const ids: number[] = [];
     for (const f of files) {
       const opened = await startReplyFileAction(f.name, f.type, f.size);
-      if (!opened.ok || !opened.id) return setMsg(opened);
+      if (!opened.ok || !opened.id) return setMsg(opened), null;
       const parts = Math.ceil(f.size / CHUNK);
       for (let i = 0; i < parts; i++) {
         setProgress(`Uploading ${f.name}`);
@@ -73,26 +89,51 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
         const r = await replyFileChunkAction(fd);
         if (!r.ok) {
           setProgress(null);
-          return setMsg(r);
+          return setMsg(r), null;
         }
       }
       ids.push(opened.id);
     }
+    return ids;
+  }
+
+  function reset() {
+    setBody("");
+    setTo("");
+    setSubject("");
+    setFiles([]);
+    setWithCatalog(false);
+    setDraftId(undefined);
+    setSaved("");
+    first.current = true;
+    router.refresh();
+  }
+
+  /** Schedule send (Abraham, Nov 19, 2026): new emails wait under Scheduled and go out at their time. */
+  const [when, setWhen] = useState("");
+  async function schedule(w: string) {
+    setMsg(null);
+    const ids = await uploadAll();
+    if (!ids) return;
+    setProgress("Scheduling");
+    const r = await scheduleSendAction({ draftId: draftId ?? null, to, subject, body, fileIds: ids, attachCatalog: withCatalog, forwardOf: props.forwardOf ?? null, when: w });
+    setProgress(null);
+    setMsg(r);
+    if (r.ok) {
+      reset();
+      router.push("/admin/inbox?f=scheduled");
+    }
+  }
+
+  async function send() {
+    setMsg(null);
+    const ids = await uploadAll();
+    if (!ids) return;
     setProgress("Sending");
     const r = isNew ? await sendNewEmailAction(to, subject, body, ids, draftId ?? null, props.forwardOf ?? null, withCatalog) : await sendReplyAction(props.emailId!, body, ids, draftId ?? null);
     setProgress(null);
     setMsg(r);
-    if (r.ok) {
-      setBody("");
-      setTo("");
-      setSubject("");
-      setFiles([]);
-      setWithCatalog(false);
-      setDraftId(undefined);
-      setSaved("");
-      first.current = true;
-      router.refresh();
-    }
+    if (r.ok) reset();
   }
 
   return (
@@ -106,11 +147,14 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
           <label className="mt-2 block"><span className="label">Subject</span><input className="input" value={subject} onChange={(e) => setSubject(e.target.value)} disabled={!props.active} data-new-subject /></label>
         </>
       )}
-      <textarea className="input mt-3" rows={isNew ? 10 : 6} value={body} onChange={(e) => setBody(e.target.value)} placeholder={isNew ? "Write your email" : "Write your reply"} aria-label={isNew ? "Email" : "Reply"} disabled={!props.active} />
+      <textarea ref={text} className="input mt-3" rows={isNew ? 10 : 6} value={body} onChange={(e) => setBody(e.target.value)} placeholder={isNew ? "Write your email" : "Write your reply"} aria-label={isNew ? "Email" : "Reply"} disabled={!props.active} />
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <input ref={ref} type="file" multiple className="hidden" onChange={(e) => { setFiles([...files, ...Array.from(e.target.files ?? [])]); e.target.value = ""; }} />
-        <button type="button" className="btn-ghost !py-1.5 text-sm" disabled={!props.active || pending} onClick={() => ref.current?.click()}>
-          Attach files
+        <button type="button" className="btn-ghost inline-flex items-center gap-1 !py-1.5 text-sm" disabled={!props.active || pending} onClick={() => ref.current?.click()} title="Attach files">
+          <Paperclip className="h-4 w-4" aria-hidden /> Attach files
+        </button>
+        <button type="button" className="btn-ghost inline-flex items-center gap-1 !py-1.5 text-sm" disabled={!props.active || pending} onClick={insertLink} title="Insert link" data-insert-link>
+          <Link2 className="h-4 w-4" aria-hidden /> Link
         </button>
         {isNew && (
           <button
@@ -147,9 +191,27 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
         </span>
       </div>
       <div className="mt-3 flex items-center gap-3">
-        <button className="btn-dark" disabled={!props.active || pending || !body.trim() || (isNew && (!to.trim() || !subject.trim()))} onClick={() => start(send)}>
-          {isNew ? "Send email" : "Send reply"}
-        </button>
+        <span className="inline-flex">
+          <button className={`btn-dark ${isNew ? "!rounded-r-none" : ""}`} disabled={!props.active || pending || !body.trim() || (isNew && (!to.trim() || !subject.trim()))} onClick={() => start(send)}>
+            {isNew ? "Send email" : "Send reply"}
+          </button>
+          {isNew && (
+            <details className="relative" data-schedule-send>
+              <summary className={`btn-dark !rounded-l-none !border-l !border-white/30 !px-2 cursor-pointer list-none ${!props.active || pending || !body.trim() || !to.trim() || !subject.trim() ? "pointer-events-none opacity-50" : ""}`} aria-label="Schedule send" title="Schedule send"><ChevronDown className="h-4 w-4" /></summary>
+              <div className="absolute bottom-full left-0 z-30 mb-1 w-64 rounded-xl border border-line bg-white p-2 text-sm shadow-lg">
+                <div className="flex items-center gap-1 px-2 pb-1 text-xs font-bold text-muted"><Clock className="h-3.5 w-3.5" aria-hidden /> Schedule send</div>
+                {[["tomorrow-am", "Tomorrow morning, 8:00 AM"], ["tomorrow-pm", "Tomorrow afternoon, 1:00 PM"], ["monday-am", "Monday morning, 8:00 AM"]].map(([k, t]) => (
+                  <button key={k} type="button" className="block w-full rounded px-2 py-1.5 text-left hover:bg-bg" onClick={() => start(() => schedule(k))}>{t}</button>
+                ))}
+                <label className="mt-1 block border-t border-line px-2 pt-2 text-xs text-muted">Pick date and time</label>
+                <div className="flex gap-1 px-2">
+                  <input type="datetime-local" className="input !py-1 text-xs" value={when} onChange={(e) => setWhen(e.target.value)} />
+                  <button type="button" className="btn-dark !px-2 !py-1 text-xs" disabled={!when} onClick={() => start(() => schedule(when))}>Schedule</button>
+                </div>
+              </div>
+            </details>
+          )}
+        </span>
         {/* A trash can that is always there (Abraham, Nov 16, 2026): throws away what was typed, and the saved draft if any */}
         <button
           type="button"

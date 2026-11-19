@@ -395,3 +395,25 @@ export async function recordSentEmail(input: { to: string; subject: string; body
   }
   return row;
 }
+
+/**
+ * Schedule send (Abraham, Nov 19, 2026): every 5 minutes (the free Cloudflare scheduler), scheduled emails whose time
+ * has come are sent with their files and the catalog. One that cannot be sent goes back to Drafts with the reason.
+ */
+export async function sendScheduledEmails(now = new Date()) {
+  const d = schema.inboxDrafts;
+  const due = await db.select().from(d).where(and(isNull(d.discardedAt), isNull(d.sentReplyId), sql`${d.sendAt} IS NOT NULL AND ${d.sendAt} <= ${now}`));
+  let sent = 0;
+  for (const x of due) {
+    try {
+      const r = await sendNewEmail({ to: x.toAddress, subject: x.subject, body: x.body, fileIds: x.fileIds ?? [], userId: x.userId, forwardOf: x.forwardOfEmailId, attachCatalog: x.attachCatalog });
+      if (r.sent) {
+        await db.update(d).set({ sentReplyId: r.id, sendError: null }).where(eq(d.id, x.id));
+        sent++;
+      } else await db.update(d).set({ sendAt: null, sendError: r.error ?? "not sent" }).where(eq(d.id, x.id));
+    } catch (e) {
+      await db.update(d).set({ sendAt: null, sendError: (e as Error).message }).where(eq(d.id, x.id));
+    }
+  }
+  return { due: due.length, sent };
+}

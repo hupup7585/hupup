@@ -9,7 +9,7 @@ import MailShell from "../MailShell";
 import StarButton from "./StarButton";
 import { bulkAction } from "../actions";
 import { listDrafts, listLabels } from "@/lib/inbox-folders";
-import { Archive, Forward, Inbox, Mail, Reply, Trash2, Undo2 } from "lucide-react";
+import { AlarmClock, Archive, Bookmark, Forward, Inbox, Mail, OctagonAlert, Reply, Trash2, Undo2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Email · Inbox · Hup Up Attractions" };
@@ -23,7 +23,7 @@ export default async function InboxEmailPage({ params }: { params: Promise<{ id:
   if (!email.readAt) await setRead(email.id, true); // opening it marks it read
   const labels = await listLabels();
   const replyDraft = (await listDrafts()).find((d) => d.replyToEmailId === email.id);
-  const folder = email.trashedAt ? "trash" : email.archivedAt ? "archive" : "inbox";
+  const folder = email.trashedAt ? "trash" : email.spamAt ? "spam" : email.snoozedUntil && email.snoozedUntil > new Date() ? "snoozed" : email.archivedAt ? "archive" : "inbox";
   const back = folder === "inbox" ? "/admin/inbox" : `/admin/inbox?f=${folder}`;
   const act = (action: string, icon: React.ReactNode, text: string, to = back) => (
     <form action={bulkAction}>
@@ -42,10 +42,31 @@ export default async function InboxEmailPage({ params }: { params: Promise<{ id:
           : (
             <>
               {folder === "archive" ? act("inbox", <Inbox className={ic} aria-hidden />, "Move to Inbox", `/admin/inbox/${email.id}`) : act("archive", <Archive className={ic} aria-hidden />, "Archive")}
+              {folder === "spam" ? act("notspam", <Inbox className={ic} aria-hidden />, "Not spam", `/admin/inbox/${email.id}`) : act("spam", <OctagonAlert className={ic} aria-hidden />, "Report spam")}
               {act("trash", <Trash2 className={ic} aria-hidden />, "Trash")}
             </>
           )}
         {act("unread", <Mail className={ic} aria-hidden />, "Mark as unread")}
+        {/* Snooze (Abraham, Nov 19, 2026): back in the Inbox at the chosen time */}
+        <details className="relative">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-full px-3 py-1.5 text-sm hover:bg-bg"><AlarmClock className={ic} aria-hidden /> {folder === "snoozed" ? "Snoozed" : "Snooze"}</summary>
+          <form action={bulkAction} className="absolute left-0 z-30 mt-1 w-60 rounded-xl border border-line bg-white p-2 text-sm shadow-lg">
+            <input type="hidden" name="id" value={email.id} />
+            <input type="hidden" name="back" value={back} />
+            <div className="px-2 pb-1 text-xs font-bold text-muted">Snooze until...</div>
+            {[["later", "Later today"], ["tomorrow", "Tomorrow"], ["weekend", "This weekend (Sunday)"], ["nextweek", "Next week"]].map(([k, t]) => (
+              <button key={k} name="snooze" value={k} className="block w-full rounded px-2 py-1.5 text-left hover:bg-bg">{t}</button>
+            ))}
+            <input type="hidden" name="action" value="snooze" />
+            <label className="mt-1 block border-t border-line px-2 pt-2 text-xs text-muted">Pick date and time</label>
+            <div className="flex gap-1 px-2">
+              <input type="datetime-local" name="snoozeAt" className="input !py-1 text-xs" />
+              <button className="btn-dark !px-2 !py-1 text-xs">Save</button>
+            </div>
+          </form>
+        </details>
+        {folder === "snoozed" && act("unsnooze", <Inbox className={ic} aria-hidden />, "Unsnooze", `/admin/inbox/${email.id}`)}
+        {act(email.important ? "unimportant" : "important", <Bookmark className={`${ic} ${email.important ? "fill-[#F4B400] text-[#F4B400]" : ""}`} aria-hidden />, email.important ? "Not important" : "Important", `/admin/inbox/${email.id}`)}
         <StarButton id={email.id} starred={email.starred} />
         {labels.length > 0 && (
           <form action={bulkAction} className="inline-flex items-center gap-1">

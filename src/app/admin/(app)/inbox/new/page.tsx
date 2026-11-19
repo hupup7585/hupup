@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "New email · Hup Up Attractions" };
 
 /** Compose from info@hupupattractions.com (Abraham, Nov 13 and 15, 2026): new, a saved draft, or a forward. Owner only. */
-export default async function NewEmailPage({ searchParams }: { searchParams: Promise<{ draft?: string; forward?: string }> }) {
+export default async function NewEmailPage({ searchParams }: { searchParams: Promise<{ draft?: string; forward?: string; sentReply?: string; sentForward?: string }> }) {
   await requireOwner();
   const sp = await searchParams;
   let init: { to?: string; subject?: string; body?: string; draftId?: number; forwardOf?: number; forwardFiles?: string[]; replyTo?: number } = {};
@@ -32,6 +32,15 @@ export default async function NewEmailPage({ searchParams }: { searchParams: Pro
     if (!found) notFound();
     const fw = forwardText(found.email);
     init = { subject: fw.subject, body: fw.body, forwardOf: found.email.id };
+  }
+  // Reply to or forward an email we sent (Abraham, Nov 19, 2026: every email opens and can be answered)
+  if (sp.sentReply || sp.sentForward) {
+    const [r] = await db.select().from(schema.inboxReplies).where(eq(schema.inboxReplies.id, Number(sp.sentReply ?? sp.sentForward))).limit(1);
+    if (!r) notFound();
+    const when = r.createdAt.toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "full", timeStyle: "short" });
+    init = sp.sentReply
+      ? { to: r.toAddress, subject: /^re:/i.test(r.subject) ? r.subject : `Re: ${r.subject}`, body: `\n\nOn ${when}, Hup Up Attractions <info@hupupattractions.com> wrote:\n${r.body.split("\n").map((l) => `> ${l}`).join("\n")}` }
+      : { subject: /^fwd?:/i.test(r.subject) ? r.subject : `Fwd: ${r.subject}`, body: `\n\n---------- Forwarded message ----------\nFrom: Hup Up Attractions <info@hupupattractions.com>\nDate: ${when}\nSubject: ${r.subject}\nTo: ${r.toAddress}\n\n${r.body}` };
   }
   if (init.forwardOf) {
     const files = await db.select().from(schema.inboxFiles).where(eq(schema.inboxFiles.emailId, init.forwardOf));

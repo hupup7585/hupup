@@ -1135,6 +1135,10 @@ export const inboxEmails = pgTable("inbox_emails", {
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   trashedAt: timestamp("trashed_at", { withTimezone: true }),
   labels: text("labels").array().notNull().default(sql`'{}'::text[]`),
+  /** Gmail-style (Abraham, Nov 19, 2026): hidden from the Inbox until this time; Important; Spam (hidden only) */
+  snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
+  important: boolean("important").notNull().default(false),
+  spamAt: timestamp("spam_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -1156,6 +1160,11 @@ export const inboxDrafts = pgTable("inbox_drafts", {
   userId: integer("user_id"),
   sentReplyId: integer("sent_reply_id"),
   discardedAt: timestamp("discarded_at", { withTimezone: true }),
+  /** Schedule send (Nov 19, 2026): sent by the every-5-minutes job at this time, with its files and the catalog */
+  sendAt: timestamp("send_at", { withTimezone: true }),
+  fileIds: integer("file_ids").array().notNull().default(sql`'{}'::integer[]`),
+  attachCatalog: boolean("attach_catalog").notNull().default(false),
+  sendError: text("send_error"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

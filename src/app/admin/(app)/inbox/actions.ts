@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { repliesActive, saveReplyFileChunk, sendNewEmail, sendReply, setRead, startReplyFile } from "@/lib/inbox";
-import { BULK_ACTIONS, bulkEmails, createLabel, discardDraft, draftSent, removeLabel, saveDraft, type BulkAction } from "@/lib/inbox-folders";
+import { BULK_ACTIONS, bulkEmails, createLabel, discardDraft, draftSent, editLabel, removeLabel, saveDraft, scheduleDraft, snoozeOptions, unscheduleDraft, type BulkAction } from "@/lib/inbox-folders";
 import { redirect } from "next/navigation";
 
 type R = { ok: boolean; message: string; id?: number };
@@ -75,7 +75,24 @@ export async function bulkAction(form: FormData) {
   const action = String(form.get("action") ?? "") as BulkAction;
   const ids = form.getAll("id").map(Number);
   const back = String(form.get("back") || "/admin/inbox");
-  if (BULK_ACTIONS.includes(action)) await bulkEmails(ids, action, String(form.get("label") ?? ""));
+  // Snooze: a preset (later today, tomorrow, weekend, next week) or a date and time picked (Eastern)
+  let until: Date | null = null;
+  if (action === "snooze") {
+    const pick = String(form.get("snooze") ?? "");
+    const preset = snoozeOptions().find((x) => x.key === pick);
+    until = preset ? preset.at : easternInput(String(form.get("snoozeAt") ?? ""));
+  }
+  if (action === ("markall" as BulkAction)) {
+    const { markAllRead, isFolder } = await import("@/lib/inbox-folders");
+    const f = String(form.get("folder") ?? "inbox");
+    await markAllRead(isFolder(f) ? f : "inbox", String(form.get("labelFilter") ?? "") || undefined);
+  } else if (BULK_ACTIONS.includes(action)) {
+    try {
+      await bulkEmails(ids, action, String(form.get("label") ?? ""), until);
+    } catch {
+      /* no label chosen, or a snooze time in the past: nothing changes */
+    }
+  }
   revalidatePath("/admin", "layout");
   redirect(back.startsWith("/admin/inbox") ? back : "/admin/inbox");
 }
@@ -132,4 +149,64 @@ export async function discardDraftRowAction(id: number) {
   const { discardDraft } = await import("@/lib/inbox-folders");
   await discardDraft(id);
   revalidatePath("/admin", "layout");
+}
+
+/** A date and time typed in the Eastern time zone ("2026-11-20T09:30") to a moment; null when empty or not valid. */
+function easternInput(v: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v)) return null;
+  const guess = new Date(`${v}:00Z`);
+  const local = new Date(guess.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const utc = new Date(guess.toLocaleString("en-US", { timeZone: "UTC" }));
+  return new Date(guess.getTime() - (local.getTime() - utc.getTime()));
+}
+
+/** Manage labels: rename or change the color (every email keeps the label under its new name). */
+export async function editLabelAction(form: FormData) {
+  await requireOwner();
+  try {
+    await editLabel(String(form.get("old") ?? ""), String(form.get("name") ?? ""), String(form.get("color") ?? ""));
+  } catch {
+    /* empty name: nothing changes */
+  }
+  revalidatePath("/admin", "layout");
+  redirect("/admin/inbox/labels");
+}
+
+/**
+ * Schedule send (Gmail-style, Abraham, Nov 19, 2026): the email waits under Scheduled and the every-5-minutes job sends
+ * it at its time, with its files and the catalog. `when` is a preset ("tomorrow-am", "tomorrow-pm", "monday-am") or a
+ * date and time typed in Eastern time.
+ */
+export async function scheduleSendAction(input: { draftId?: number | null; to: string; subject: string; body: string; fileIds: number[]; attachCatalog: boolean; forwardOf?: number | null; when: string }): Promise<R> {
+  const s = await requireOwner();
+  if (!repliesActive()) return { ok: false, message: "Not active yet: email goes out from info@ once the sender is set up." };
+  const to = input.to.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return { ok: false, message: "Enter one email address to send to." };
+  if (!input.subject.trim() || !input.body.trim()) return { ok: false, message: "Write a subject and your email first." };
+  const sendAt = schedulePreset(input.when) ?? easternInput(input.when);
+  if (!sendAt || sendAt.getTime() <= Date.now()) return { ok: false, message: "Choose a time in the future." };
+  try {
+    const id = await scheduleDraft({ id: input.draftId ?? null, to, subject: input.subject, body: input.body, fileIds: input.fileIds, attachCatalog: input.attachCatalog, forwardOf: input.forwardOf ?? null, sendAt, userId: s.userId });
+    revalidatePath("/admin", "layout");
+    return { ok: true, message: `Scheduled for ${sendAt.toLocaleString("en-US", { timeZone: "America/New_York", weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}.`, id };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+}
+
+function schedulePreset(key: string): Date | null {
+  const opts = snoozeOptions();
+  const tomorrow = opts.find((x) => x.key === "tomorrow")!.at; // tomorrow 8:00 AM Eastern
+  if (key === "tomorrow-am") return tomorrow;
+  if (key === "tomorrow-pm") return new Date(tomorrow.getTime() + 5 * 3600_000); // 1:00 PM
+  if (key === "monday-am") return opts.find((x) => x.key === "nextweek")!.at;
+  return null;
+}
+
+/** Cancel a scheduled send: back to Drafts. */
+export async function unscheduleAction(form: FormData) {
+  await requireOwner();
+  await unscheduleDraft(Number(form.get("id")));
+  revalidatePath("/admin", "layout");
+  redirect("/admin/inbox?f=drafts");
 }
