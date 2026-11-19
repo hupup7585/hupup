@@ -139,12 +139,11 @@ export function defaultDayText(iso: string, s: HoursSettings = hoursDefaults()):
 }
 
 /**
- * "Mutze Shabbes" on the website too (Abraham, Nov 18, 2026: same spelling as the phone). Preview first; the live site
- * switches once Abraham OKs the preview screenshot (MUTZE_SITE_LIVE_APPROVED). The phone always says "Mutze Shabbes".
+ * Spelling (Abraham, Nov 19, 2026): the website uses the standard spelling "Motzei Shabbos"; the hotline reads
+ * "Mutze Shabbes", the way people say it in this community. `mutze` = true only for the phone.
  */
-export const MUTZE_SITE_LIVE_APPROVED = false;
-export const siteMutze = (env: Record<string, string | undefined> = process.env) => MUTZE_SITE_LIVE_APPROVED || env.VERCEL_ENV !== "production";
-const mutzeName = (mutze: boolean) => (mutze ? "Mutze Shabbes" : "Motzei Shabbes");
+export const siteMutze = (_env: Record<string, string | undefined> = process.env) => false;
+const mutzeName = (mutze: boolean) => (mutze ? "Mutze Shabbes" : "Motzei Shabbos");
 
 /** Hours as lines for the website. */
 export function hoursLines(s: HoursSettings = hoursDefaults(), mutze: boolean = siteMutze()): string[] {

@@ -49,7 +49,7 @@ describe("office hours (Abraham 2026-11-06, Eastern time)", () => {
     expect(l[0]).toBe("Monday to Thursday: 10:30 AM to 7:00 PM");
     expect(l).toContain("Sunday: 11:30 AM to 7:00 PM");
     expect(l).toContain("Chol Hamoed: 10:30 AM to 10:30 PM");
-    expect(l).toContain("Saturday night (Motzei Shabbes): from 2 hours after Shabbes ends until 11:00 PM in winter, 12:00 AM in summer");
+    expect(l).toContain("Saturday night (Motzei Shabbos): from 2 hours after Shabbes ends until 11:00 PM in winter, 12:00 AM in summer");
     expect(S.hoursWebsiteNote).toBe("Please note that you can book at any time using our automated phone system.");
   });
   it("the hotline never hangs up for closed hours: booking stays 24/7, live person only in hours", () => {
