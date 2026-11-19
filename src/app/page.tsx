@@ -15,7 +15,7 @@ import { getSettings } from "@/lib/settings";
 import CatalogRequest from "@/components/site/CatalogRequest";
 
 /** Rental icon tiles all light blue (preview first; live after Abraham OKs the screenshot). */
-const RENTAL_TILES_LIVE_APPROVED = false;
+const RENTAL_TILES_LIVE_APPROVED = true; // Abraham approved, Nov 19, 2026
 const rentalTilesOneColor = () => RENTAL_TILES_LIVE_APPROVED || process.env.VERCEL_ENV !== "production";
 import { websiteCatalogFormShown } from "@/lib/catalog-request";
 import { CallButton, ICON_STROKE, IconTile, SectionTitle, Wave, categoryIcon } from "@/components/site/parts";
