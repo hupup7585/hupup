@@ -66,7 +66,7 @@ describe("key 1: booking by item", () => {
     expect(said(date)).toEqual(["Please enter your event date: two digits for the month, then two digits for the day. For example, for March 5th, press 0, 3, 0, 5."]);
     expect(date).not.toContain('input="dtmf speech"');
     expect(redirect(await call("date-heard", { Digits: "1201" }, `p=${medium}`))).toBe(`date-ask?p=${medium}&d=${TUE}`);
-    expect(said(await call("date-ask", {}, `p=${medium}&d=${TUE}`))).toEqual(["You entered Tuesday, December first. If that is correct, press pound to continue. To enter a different date, press 1."]);
+    expect(said(await call("date-ask", {}, `p=${medium}&d=${TUE}`))).toEqual(["You entered Tuesday, December first. If that is correct, press pound to continue. To enter a different date, press 1.", "To go to your shopping cart, press 0."]);
     expect(redirect(await call("date-confirm", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`date?p=${medium}`);
     expect(redirect(await call("date-confirm", { Digits: "#" }, `p=${medium}&d=${TUE}`))).toBe(`qty?p=${medium}&d=${TUE}`);
   });
@@ -84,6 +84,7 @@ describe("key 1: booking by item", () => {
       "I am sorry, the Medium Castle is already booked on Tuesday, December first.",
       "For the closest jumping balloon on the same date, press 1.",
       "For the nearest date this item is free, press 2.",
+      "To go to your shopping cart, press 0.",
       "To go back, press star.",
     ]);
     expect(redirect(await call("taken-choice", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`booked-closest?p=${medium}&d=${TUE}`);
@@ -101,6 +102,8 @@ describe("key 1: booking by item", () => {
     expect(said(xml)).toEqual([
       "The Medium Castle is available on Wednesday, December second, the day after. To choose that day, press 2.",
       "To try a different date, press 3.",
+      "To go to your shopping cart, press 0.",
+      "To go back, press star.",
     ]);
     // An item free on both sides gets both offers
     const both = said(await call("altdates", {}, `p=${large}&d=2026-12-16`));
@@ -108,6 +111,8 @@ describe("key 1: booking by item", () => {
       "The Large Castle is available on Tuesday, December fifteenth, the day before. To choose that day, press 1.",
       "It is also available on Thursday, December seventeenth, the day after. To choose that day, press 2.",
       "To try a different date, press 3.",
+      "To go to your shopping cart, press 0.",
+      "To go back, press star.",
     ]);
     expect(redirect(await call("altdate-choice", { Digits: "2" }, action(xml)!.split("?")[1]))).toBe(`qty?p=${medium}&d=2026-12-02`);
     expect(h.session.data.day).toBe("2026-12-02");
@@ -126,6 +131,8 @@ describe("key 1: booking by item", () => {
       "The nearest date before your date is Monday, December seventh. To choose it, press 1.",
       "The nearest date after your date is Sunday, December thirteenth. To choose it, press 2.",
       "To try a different date, press 3.",
+      "To go to your shopping cart, press 0.",
+      "To go back, press star.",
     ]);
   });
 

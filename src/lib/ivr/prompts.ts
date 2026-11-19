@@ -146,7 +146,7 @@ export const PROMPTS = {
   box152: { group: "Booking by item (key 1)", label: "Box 152: another one added (then box 151 again)", text: "Another {item} has been successfully added to your cart.", vars: ["item"] },
   // Jumping balloons (Abraham, Nov 19, 2026, approved): box 153 menu, box 154 when a balloon is chosen
   // Old-cart item added (Nov 19, 2026)
-  resume_added: { group: "Booking by item (key 1)", label: "Old cart: item added", text: "This item was successfully added to your cart. To go to your shopping cart, press 0. To keep shopping, for same day, press 1. For another day, press 2." },
+  resume_added: { group: "Booking by item (key 1)", label: "Row 11: item added (every time an item is added; no cart line after it)", text: "This item was successfully added to your cart. To go to your shopping cart, press 0. To keep shopping, for same day, press 1. For another day, press 2." },
   // Jumping balloons list (Nov 19, 2026, replaces box 153): the opening, then one line per balloon, then the cart line
   balloons_open: { group: "Booking by item (key 1)", label: "Jumping balloons list: opening", text: "Here are our jumping balloons. Please note, our jumping balloons are not for water use." },
   balloon_press: { group: "Booking by item (key 1)", label: "Jumping balloons list: the word \"press\" (between the item number and the key)", text: "press" },
@@ -162,7 +162,6 @@ export const PROMPTS = {
   balloon_7210: { group: "Booking by item (key 1)", label: "Jumping balloons list: Mega Mountain (then the last two digits and the key are said live)", text: "For the Mega Mountain, item seven two" },
   balloon_7211: { group: "Booking by item (key 1)", label: "Jumping balloons list: Bounce Blast (then the last two digits and the key are said live)", text: "For the Bounce Blast, item seven two" },
   balloon_7212: { group: "Booking by item (key 1)", label: "Jumping balloons list: Wheel Thrill (then the last two digits and the key are said live)", text: "For the Wheel Thrill, item seven two" },
-  list_cart: { group: "Booking by item (key 1)", label: "Item lists: the cart line (once, after the items)", text: "To go to your shopping cart, press 0." },
   // Laser tag and paddle boats lists (Nov 19, 2026): openings not final; slots only, not on the live line yet
   laser_open: { group: "Booking by item (key 1)", label: "Laser tag list: opening (not final)", text: "Here are our laser tag sets.", pending: true },
   paddle_open: { group: "Booking by item (key 1)", label: "Paddle boats list: opening (not final)", text: "Here are our paddle boat packages.", pending: true },
@@ -229,7 +228,7 @@ export const PROMPTS = {
   cart_summary: { group: "Cart", label: "Cart summary", text: "Here is your cart: {items}, for {date}. Your rental total is {total}, plus delivery and sales tax.", vars: ["items", "date", "total"] },
   // Key 1 booking, several days on one call (Abraham, Nov 8, 2026). day_choice and cart_key are Abraham's exact lines.
   day_choice: { group: "Cart", label: "After an item: same day or another day (Abraham)", text: "For the same day, press 1. For another day, press 2." },
-  cart_key: { group: "Cart", label: "Booking menus: go to the cart (Abraham)", text: "To go to your shopping cart, press 0." },
+  cart_key: { group: "Cart", label: "Shared cart line: every booking step before the cart or checkout (not after row 11)", text: "To go to your shopping cart, press 0." },
   cart_intro: { group: "Cart", label: "Cart: opening line", text: "Here is your cart." },
   cart_day: { group: "Cart", label: "Cart: one rental day", text: "For {date}: {items}.", vars: ["date", "items"] },
   cart_total: { group: "Cart", label: "Cart: rental total", text: "Your rental total is {total}, plus delivery and sales tax.", vars: ["total"] },

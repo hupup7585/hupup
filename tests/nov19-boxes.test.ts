@@ -58,7 +58,7 @@ describe("box 153: the jumping balloons menu (approved Nov 19, 2026)", () => {
   it("the Owner's order of the recordings (Admin, Menu order) is the order they play", async () => {
     const { saveSetting } = await import("@/lib/settings");
     const { setMenuOrder } = await import("@/lib/ivr/menu-order");
-    await saveSetting("menuOrders", setMenuOrder("balloons", ["balloons_open", "list_cart", "balloon_items", "book_back"], ""));
+    await saveSetting("menuOrders", setMenuOrder("balloons", ["balloons_open", "cart_key", "balloon_items", "book_back"], ""));
     try {
       const lines = said(await call("balloons", {}, `c=${cat}`));
       expect(lines[1]).toBe("To go to your shopping cart, press 0.");
@@ -86,7 +86,7 @@ describe("box 153: the jumping balloons menu (approved Nov 19, 2026)", () => {
 describe("box 154 and box 155", () => {
   it("box 154: name, item number digit by digit, real price; 1 adds, star goes back to box 153", async () => {
     const p = ids["Blue Bounce"];
-    expect(said(await call("balloon", {}, `p=${p}`))).toEqual(["Blue Bounce, item seven two zero three, 170 dollars. To add it to your shopping cart, press 1. For description and dimensions, press 2.", "To go back, press star."]);
+    expect(said(await call("balloon", {}, `p=${p}`))).toEqual(["Blue Bounce, item seven two zero three, 170 dollars. To add it to your shopping cart, press 1. For description and dimensions, press 2.", "To go to your shopping cart, press 0.", "To go back, press star."]);
     h.session.data = {};
     expect(redirect(await call("balloon-choice", { Digits: "1" }, `p=${p}`))).toBe(`date?p=${p}`);
     expect(redirect(await call("balloon-choice", { Digits: "*" }, `p=${p}`))).toBe(`balloons?c=${cat}`);
@@ -95,6 +95,7 @@ describe("box 154 and box 155", () => {
     const p = ids["Blue Bounce"];
     expect(said(await call("balloon-choice", { Digits: "2" }, `p=${p}`))).toEqual([
       "The Blue Bounce is a bright castle with a slide. The dimensions are as follows: 15 feet long, 20 feet wide, and 12 feet tall. To add it to your shopping cart, press 1.",
+      "To go to your shopping cart, press 0.",
       "To go back, press star.",
     ]);
     process.env.VERCEL_ENV = "production";

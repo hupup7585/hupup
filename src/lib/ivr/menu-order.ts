@@ -7,7 +7,7 @@ import type { PromptKey } from "@/lib/ivr/prompts";
  */
 export const MENU_RECORDINGS = {
   book: { label: "Bookings menu (main menu key 1)", keys: ["book_r1", "book_orders_only", "book_r2", "book_r3", "book_back"] },
-  balloons: { label: "Jumping balloons list", keys: ["balloons_open", "balloon_items", "list_cart", "book_back"] },
+  balloons: { label: "Jumping balloons list", keys: ["balloons_open", "balloon_items", "cart_key", "book_back"] },
 } as const satisfies Record<string, { label: string; keys: readonly string[] }>;
 
 export type MenuId = keyof typeof MENU_RECORDINGS;

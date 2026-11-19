@@ -1659,6 +1659,7 @@ const handlers: Record<string, Handler> = {
     if (!p) return back(vr, "book");
     const g = keypad(vr, url("balloon-choice", { p: p.id }));
     sp(g, ctx, "box154", { item: p.name, number: digitWords(balloonEntry(p.name)?.number ?? ""), price: spokenMoney(p.priceCents) });
+    sp(g, ctx, "cart_key");
     sp(g, ctx, "book_back"); // the shared star line (Nov 19, 2026)
     return bookNoInput(vr, ctx, "balloon", { p: p.id });
   },
@@ -1669,6 +1670,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (!d) return bookNoInput(vr, ctx, "balloon", { p: p.id });
     if (d === "*") return back(vr, "balloons", { c: p.categoryId });
+    if (d === "0") return back(vr, "cart");
     if (d === "1") {
       const day = ctx.session?.data.day;
       return day ? back(vr, "qty", { p: p.id, d: day }) : back(vr, "date", { p: p.id });
@@ -1681,6 +1683,7 @@ const handlers: Record<string, Handler> = {
       if (process.env.VERCEL_ENV !== "production" && sizes && description) {
         const g = keypad(vr, url("balloon-choice", { p: p.id }));
         spPreviewDraft(g, ctx, "box155", { item: p.name, description, ...sizes });
+        sp(g, ctx, "cart_key");
         sp(g, ctx, "book_back"); // the shared star line (Nov 19, 2026)
         return bookNoInput(vr, ctx, "balloon", { p: p.id });
       }
@@ -1794,6 +1797,7 @@ const handlers: Record<string, Handler> = {
     }
     const g = keypad(vr, url("date-confirm", { p, d: date }));
     sp(g, ctx, "book_date_entered", { date: spokenDate(date) });
+    sp(g, ctx, "cart_key");
     return bookNoInput(vr, ctx, "date-ask", { p, d: date });
   },
 
@@ -1803,6 +1807,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (ctx.query.get("f") === "1") return friMutzeChoice(ctx, vr, p, date, d);
     if (d === "1") return back(vr, "date", { p }); // a different date
+    if (d === "0") return back(vr, "cart");
     if (d !== "#") {
       if (d) sp(vr, ctx, "not_valid");
       return back(vr, "date-ask", { p, d: date });
@@ -1826,6 +1831,7 @@ const handlers: Record<string, Handler> = {
     const closest = await closestLine(p.categoryId);
     if (closest) sp(g, ctx, closest);
     sp(g, ctx, "booked_nearest");
+    sp(g, ctx, "cart_key");
     sp(g, ctx, "book_back");
     return bookNoInput(vr, ctx, "booked", { p: p.id, d: date });
   },
@@ -1836,6 +1842,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "booked-closest", { p, d: date }); // the closest item of the same kind, same date
     if (d === "2") return back(vr, "altdates", { p, d: date }); // the nearest date this item is free
+    if (d === "0") return back(vr, "cart");
     if (d === "*") return starToCategory(vr, p); // star: one menu back, the item's list
     sp(vr, ctx, "not_valid");
     return back(vr, "booked", { p, d: date });
@@ -1863,6 +1870,8 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     const g = keypad(vr, url("near-choice", { p, d: date }));
     sp(g, ctx, "taken_options");
+    sp(g, ctx, "cart_key");
+    sp(g, ctx, "book_back");
     return bookNoInput(vr, ctx, "booked-near", { p, d: date });
   },
 
@@ -1921,6 +1930,8 @@ const handlers: Record<string, Handler> = {
       if (two) sp(g, ctx, "altdate_nearest_after", { date: spokenDate(two) });
     }
     sp(g, ctx, "altdate_other");
+    sp(g, ctx, "cart_key");
+    sp(g, ctx, "book_back");
     await track(ctx.callSid, "step", `Other dates offered for ${p.name}`, { item: p.name, date, before: one, after: two });
     return bookNoInput(vr, ctx, "altdates", { p: p.id, d: date });
   },
@@ -2016,21 +2027,11 @@ const handlers: Record<string, Handler> = {
       if (ctx.query.get("a") === "1") sp(vr, ctx, "box152", { item: p.name });
       return back(vr, "another", { p: p.id, d: date });
     }
-    // Abraham (Nov 17, 2026): the item added line every time; ocean balls after a jumping balloon; then keep shopping
-    if (await isBounceHouse(p.categoryId)) {
-      sp(vr, ctx, "item_added");
-      return back(vr, "ocean", { d: date });
-    }
-    // A maze or laser guns: the extra gun packs (once the wording is approved; on preview it plays for his test)
-    if ((await isLaserBase(p.categoryId)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) {
-      sp(vr, ctx, "item_added");
-      return back(vr, "packs", { d: date });
-    }
-    const g = keypad(vr, url("after-add"));
-    sp(g, ctx, "item_added");
-    sp(g, ctx, "keep_shopping");
-    sp(g, ctx, "another_day");
-    return noInput(vr, ctx, "cart");
+    // Abraham, Nov 19, 2026: row 11 every time an item is added (no shared cart line after it); a jumping balloon gets
+    // the ocean balls question first, a maze or laser guns the extra gun packs first
+    if (await isBounceHouse(p.categoryId)) return back(vr, "ocean", { d: date });
+    if ((await isLaserBase(p.categoryId)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) return back(vr, "packs", { d: date });
+    return back(vr, "added-menu");
   },
 
   /**
@@ -2069,11 +2070,13 @@ const handlers: Record<string, Handler> = {
     return noInput(vr, ctx, "cart");
   },
 
-  /** "To keep shopping, press 1. To go to your shopping cart, press 0." */
+  /**
+   * Row 11, every time an item is added (Abraham, Nov 19, 2026): "This item was successfully added to your cart. To go
+   * to your shopping cart, press 0. To keep shopping, for same day, press 1. For another day, press 2."
+   */
   "added-menu"(ctx, vr) {
     const g = keypad(vr, url("after-add"));
-    sp(g, ctx, "keep_shopping");
-    sp(g, ctx, "another_day");
+    sp(g, ctx, "resume_added");
     return noInput(vr, ctx, "cart");
   },
 
@@ -2096,6 +2099,7 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("packs-choice", { d }));
     if (promptWaiting(ctx.prompts, "laser_packs")) say(g, promptText(ctx.prompts, "laser_packs"));
     else sp(g, ctx, "laser_packs");
+    sp(g, ctx, "cart_key"); // the shared cart line in every booking step before the cart (Nov 19, 2026)
     return bookNoInput(vr, ctx, "packs", { d });
   },
 
@@ -2103,6 +2107,8 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     const k = ctx.body.Digits ?? "";
     if (k === "#") return back(vr, "added-menu");
+    if (k === "0") return back(vr, "cart");
+    if (k === "*") return back(vr, "added-menu");
     const packs = await addOnProducts(LASER_ADDONS_CATEGORY);
     const pick = /^[12]$/.test(k) ? packs[Number(k) - 1] : undefined;
     if (!pick) {
@@ -2115,8 +2121,7 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "item_added", `Added ${pick.name} for ${spokenDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
       const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), r.orderId])];
       await updateSession(ctx.callSid, { data: { dayOrderIds: ids } }, ctx.session);
-      sp(vr, ctx, "item_added");
-      return back(vr, "packs", { d: date }); // more packs, or pound to go on
+      return back(vr, "added-menu"); // row 11 (Nov 19, 2026)
     }
     sp(vr, ctx, r.reason === "unavailable" ? "just_booked" : "went_wrong", { item: pick.name });
     return back(vr, "added-menu");
@@ -2128,6 +2133,7 @@ const handlers: Record<string, Handler> = {
     const n = ctx.query.get("n") ?? undefined;
     const g = keypad(vr, url("ocean-choice", { d, n }));
     sp(g, ctx, "ocean_balls");
+    sp(g, ctx, "cart_key");
     return bookNoInput(vr, ctx, "ocean", { d, n });
   },
 
@@ -2137,6 +2143,7 @@ const handlers: Record<string, Handler> = {
     const next = () => (n === "resume" ? back(vr, "resume-added", { d: date }) : back(vr, "added-menu"));
     const k = ctx.body.Digits ?? "";
     if (k === "#") return next();
+    if (k === "0") return back(vr, "cart");
     const sets = await oceanBallProducts();
     const pick = /^[1-3]$/.test(k) ? sets[Number(k) - 1] : undefined;
     if (!pick) {
@@ -2150,9 +2157,8 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "item_added", `Added ${pick.name} for ${spokenDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
       const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), r.orderId])];
       await updateSession(ctx.callSid, { data: { dayOrderIds: ids } }, ctx.session);
-      sp(vr, ctx, "item_added");
     } else sp(vr, ctx, "went_wrong");
-    return next();
+    return next(); // row 11 follows (Nov 19, 2026)
   },
 
   /** The whole cart: every day on this call, then one total. */
