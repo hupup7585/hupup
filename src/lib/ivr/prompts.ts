@@ -54,7 +54,9 @@ export const PROMPTS = {
   },
   // Bookings menu after pressing 1 (Abraham, Nov 11, 2026), approved word for word; categories come from Admin.
   // Bookings menu (Hark for Abraham, Nov 19, 2026): three recordings, then the shared star line
-  book_r1: { group: "Booking by item (key 1)", label: "Bookings menu, recording 1", text: "To receive our catalog by text or email, press 8. Please note, orders can be placed only through our automated system." },
+  book_r1: { group: "Booking by item (key 1)", label: "Bookings menu, recording 1", text: "To receive our catalog by text or email, press 8." },
+  // Abraham, Nov 19, 2026: its own recording, played only the first time the caller reaches the bookings menu
+  book_orders_only: { group: "Booking by item (key 1)", label: "Bookings menu: orders-only line (first time only)", text: "Please note, orders can be placed only through our automated system." },
   book_r2: { group: "Booking by item (key 1)", label: "Bookings menu, recording 2", text: "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3." },
   book_r3: { group: "Booking by item (key 1)", label: "Bookings menu, recording 3", text: "For information or questions, press 0 for customer service. For schools, corporate events, and organizational bookings, press 9." },
   book_note: { group: "Booking by item (key 1)", label: "Bookings menu: first line (replaced by recording 1, Nov 19)", text: "Please note, orders can be placed only through our automated system. For information or questions, press 0 for customer service." },

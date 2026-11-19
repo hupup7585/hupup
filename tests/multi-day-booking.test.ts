@@ -57,7 +57,7 @@ beforeAll(async () => {
 describe("key 1: date first, several days, one charge", () => {
   it("item first, then the date (Abraham, Nov 9); the chosen day is kept for more items", async () => {
     expect(redirect(await call("menu-choice", { Digits: "1" }))).toBe("book");
-    expect(said(await call("book"))[0]).toBe("To receive our catalog by text or email, press 8. Please note, orders can be placed only through our automated system.");
+    expect(said(await call("book"))[0]).toBe("To receive our catalog by text or email, press 8.");
     expect(redirect(await call("category-choice", { Digits: "1" }, `c=${catId}`))).toBe(`date?p=${productId}`);
     expect(said(await call("date", {}, `p=${productId}`))[0]).toMatch(/^Please enter your event date: two digits for the month/);
     expect(redirect(await call("date-confirm", { Digits: "#" }, `d=${DAY1}`))).toBe("book");

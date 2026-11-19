@@ -88,8 +88,9 @@ describe("unfinished phone order", () => {
     // asked once only
     const again = await call("book");
     expect(redirect(again)).not.toBe("resume");
-    // Nov 19, 2026: "Please note" is now inside recording 1 of the bookings menu, which plays every time
-    expect(said(again)[0]).toBe("To receive our catalog by text or email, press 8. Please note, orders can be placed only through our automated system.");
+    // back to add more items: no orders-only line (Abraham, Nov 19, 2026: its own recording, first time only)
+    expect(said(again)[0]).toBe("To receive our catalog by text or email, press 8.");
+    expect(said(again).join(" ")).not.toContain("Please note");
     void laser;
   });
   it("one item free: straight into the cart, then the cart for checkout (no box 9)", async () => {

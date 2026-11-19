@@ -188,7 +188,8 @@ describe("every key, office open", () => {
     await db.insert(schema.categories).values({ name: "Jumping Balloons", spokenName: "bounce houses and jumping balloons", ivrDigit: 1, sortOrder: 1, active: true });
     const book = await call("book");
     expect(saidIn(book)).toEqual([
-      "To receive our catalog by text or email, press 8. Please note, orders can be placed only through our automated system.",
+      "To receive our catalog by text or email, press 8.",
+      "Please note, orders can be placed only through our automated system.",
       "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.",
       "For information or questions, press 0 for customer service. For schools, corporate events, and organizational bookings, press 9.",
       "To go back, press star.",

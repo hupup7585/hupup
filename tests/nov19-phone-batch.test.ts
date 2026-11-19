@@ -23,13 +23,14 @@ describe("Shabbes: closed until 2 minutes after Rabbeinu Tam", () => {
 
 describe("menu order (Admin)", () => {
   it("default orders; the Owner's order is used only when it holds every recording once", () => {
-    expect(menuOrder("book", "")).toEqual(["book_r1", "book_r2", "book_r3", "book_back"]);
-    const stored = setMenuOrder("book", ["book_r2", "book_r1", "book_r3", "book_back"], "");
-    expect(menuOrder("book", stored)).toEqual(["book_r2", "book_r1", "book_r3", "book_back"]);
+    const DEF = ["book_r1", "book_orders_only", "book_r2", "book_r3", "book_back"];
+    expect(menuOrder("book", "")).toEqual(DEF);
+    const stored = setMenuOrder("book", ["book_r2", "book_r1", "book_orders_only", "book_r3", "book_back"], "");
+    expect(menuOrder("book", stored)).toEqual(["book_r2", "book_r1", "book_orders_only", "book_r3", "book_back"]);
     expect(menuOrder("balloons", stored)).toEqual([...MENU_RECORDINGS.balloons.keys]);
     expect(() => setMenuOrder("book", ["book_r1"], "")).toThrow();
-    expect(menuOrder("book", '{"book":["book_r1","x","book_r3","book_back"]}')).toEqual(["book_r1", "book_r2", "book_r3", "book_back"]);
-    expect(menuOrder("book", "not json")).toEqual(["book_r1", "book_r2", "book_r3", "book_back"]);
+    expect(menuOrder("book", '{"book":["book_r1","x","book_orders_only","book_r3","book_back"]}')).toEqual(DEF);
+    expect(menuOrder("book", "not json")).toEqual(DEF);
   });
 });
 
@@ -46,6 +47,8 @@ describe("approved wording", () => {
   it("bookings menu, welcome back, old cart, item booked, balloons", () => {
     expect(PROMPTS.resume_offer.text).toBe("Welcome back! On your last call you had in your cart {items} for {date}. To check if they are still available, press 1. To start a new order, press 2.");
     expect(PROMPTS.item_booked.text).toBe("I am sorry, the {item} is already booked on {date}. For the closest {category} on the same date, press 1. For the nearest date this item is free, press 2.");
+    expect(PROMPTS.book_r1.text).toBe("To receive our catalog by text or email, press 8.");
+    expect(PROMPTS.book_orders_only.text).toBe("Please note, orders can be placed only through our automated system.");
     expect(PROMPTS.not_valid.text).toBe("Sorry, that is not a valid selection.");
     expect(PROMPTS.balloon_7212.text).toBe("For the Wheel Thrill, item seven two,");
     expect(balloonKeyWords("4")).toBe("4");

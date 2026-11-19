@@ -59,7 +59,7 @@ const PHONEPAY_PROMPTS = ["phonepay_intro", "phonepay_back", "phonepay_paid", "p
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
 import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { liveVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
-import { menuOrder, type MenuId } from "./menu-order";
+import { FIRST_TIME_ONLY, menuOrder, type MenuId } from "./menu-order";
 import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
 import { CATALOG_ENDINGS, decodeCatalogKeys, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
 import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState, textingActive } from "@/lib/voicemail";
@@ -132,8 +132,9 @@ function sayLive(target: VR | Gather, ctx: { prompts: PromptOverrides }, text: s
 }
 
 /** A menu made of several recordings, in the order the Owner set in Admin (src/lib/ivr/menu-order.ts). */
-async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) => void | Promise<void>) {
+async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) => void | Promise<void>, opts: { firstTime?: boolean } = {}) {
   for (const part of menuOrder(menu, (await getSettings()).menuOrders)) {
+    if (FIRST_TIME_ONLY.has(part) && opts.firstTime === false) continue;
     if (part === "balloon_items") await items?.(g);
     else sp(g, ctx, part);
   }
@@ -1432,8 +1433,9 @@ const handlers: Record<string, Handler> = {
     // Abraham (Nov 11, 2026), word for word. Categories, their names and order come from Admin; numbered 1, 2, 3...
     // Abraham, Nov 18, 2026: the "Please note" line plays the first time only, not when the caller comes back to add more
     // Nov 19, 2026 (Hark for Abraham): three recordings, then the one shared star line, in the order set in Admin
+    // Abraham, Nov 19, 2026: the orders-only line plays the first time only, not when the caller comes back to add more
     void cats;
-    await playMenu(g, ctx, "book");
+    await playMenu(g, ctx, "book", undefined, { firstTime: !(await callOrders(ctx)).length });
     // Before a booking starts this is a menu (3 plays and 20 seconds); with something held it follows the idle rule
     return (await callOrders(ctx)).length ? idleNoKey(vr, ctx, "book") : repeatMenu(vr, ctx, "book");
   },
