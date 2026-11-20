@@ -29,7 +29,7 @@ describe("phone dates", () => {
     expect(PROMPTS).not.toHaveProperty("qty_prompt");
     expect(PROMPTS).not.toHaveProperty("qty_invalid");
     for (const k of ["box151", "box151_none", "keep_shopping"] as const) expect(PROMPTS[k].text).not.toContain("shopping cart, press 0");
-    expect(PROMPTS.resume_added.text).toContain("To go to your shopping cart, press 0.");
+    expect(PROMPTS.resume_added.text).toBe("This item was successfully added to your cart. To keep shopping, for same day, press 1. For another day, press 2.");
     const all = Object.values(PROMPTS).map((p) => p.text).join(" ");
     expect(all).not.toMatch(/\b(?:don't|can't|won't|we're|you're|it's|let's|isn't|didn't|we'll|you'll)\b/i);
   });

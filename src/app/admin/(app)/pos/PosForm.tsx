@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import TextConsentBoxes from "@/components/TextConsentBoxes";
 import { availabilityFor, createBookingAction, type PosResult , calendarFor, checkDateFor, type CalendarDay, type DateCheck } from "./actions";
 import DualDate, { HebrewDay } from "@/components/DualDate";
@@ -10,6 +10,10 @@ import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
 import MonthCalendar from "./MonthCalendar";
 
 type P = { id: number; categoryId: number; name: string; priceCents: number; quantity: number };
+
+/** Jumping balloon categories (the phone's rule) and the ocean balls group (Abraham, Nov 19, 2026). */
+const BALLOON = /balloon|bounce|jump|inflatable(?!.*maze)/i;
+const OCEAN = /^ocean balls$/i;
 
 const money = (c: number) => (c / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 
@@ -39,6 +43,11 @@ export default function PosForm(props: {
   const [days, setDays] = useState<CalendarDay[]>([]);
   const [check, setCheck] = useState<DateCheck | null>(null);
   const [pending, start] = useTransition();
+  // Ocean balls right after a jumping balloon is added (Abraham, Nov 19, 2026): asked under that balloon
+  const [oceanFor, setOceanFor] = useState<number | null>(null);
+  const oceanCat = props.categories.find((c) => OCEAN.test(c.name.trim()));
+  const oceanItems = oceanCat ? props.products.filter((p) => p.categoryId === oceanCat.id) : [];
+  const balloonCats = new Set(props.categories.filter((c) => BALLOON.test(c.name) && !OCEAN.test(c.name.trim())).map((c) => c.id));
 
   useEffect(() => {
     calendarFor(props.today, 14).then(setDays);
@@ -131,7 +140,8 @@ export default function PosForm(props: {
                   const free = avail[p.id] ?? 0;
                   const q = qty[p.id] || 0;
                   return (
-                    <div key={p.id} className="flex items-center gap-3 border-b border-line py-2.5">
+                    <Fragment key={p.id}>
+                    <div className="flex items-center gap-3 border-b border-line py-2.5">
                       <div className="min-w-0 flex-1">
                         <div className="font-bold">{p.name}</div>
                         <div className="text-sm text-muted">
@@ -144,9 +154,44 @@ export default function PosForm(props: {
                       <div className="flex items-center gap-2">
                         <button type="button" className="btn-ghost h-9 w-9 !p-0" disabled={!q} onClick={() => setQty({ ...qty, [p.id]: q - 1 })}>−</button>
                         <span className="w-6 text-center font-bold">{q}</span>
-                        <button type="button" className="btn-ghost h-9 w-9 !p-0" disabled={q >= free} onClick={() => setQty({ ...qty, [p.id]: q + 1 })}>+</button>
+                        <button
+                          type="button"
+                          className="btn-ghost h-9 w-9 !p-0"
+                          disabled={q >= free}
+                          onClick={() => {
+                            setQty({ ...qty, [p.id]: q + 1 });
+                            if (balloonCats.has(p.categoryId) && oceanItems.length) setOceanFor(p.id);
+                          }}
+                        >
+                          +
+                        </button>
                       </div>
                     </div>
+                    {oceanFor === p.id && (
+                      <div className="mb-2 rounded-lg border border-navy/20 bg-bg p-3" data-ocean-offer>
+                        <div className="mb-2 text-sm font-bold">Would you like to add ocean balls?</div>
+                        <div className="flex flex-wrap gap-2">
+                          {oceanItems.map((o) => (
+                            <button
+                              key={o.id}
+                              type="button"
+                              className="btn-ghost !min-h-9 !py-1 text-sm"
+                              disabled={(qty[o.id] || 0) >= (avail[o.id] ?? 0)}
+                              onClick={() => {
+                                setQty((cur) => ({ ...cur, [o.id]: (cur[o.id] || 0) + 1 }));
+                                setOceanFor(null);
+                              }}
+                            >
+                              {o.name}, {money(o.priceCents)}
+                            </button>
+                          ))}
+                          <button type="button" className="btn-ghost !min-h-9 !py-1 text-sm text-muted" onClick={() => setOceanFor(null)}>
+                            Skip
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    </Fragment>
                   );
                 })}
               </div>

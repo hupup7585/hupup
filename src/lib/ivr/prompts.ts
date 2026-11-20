@@ -146,7 +146,7 @@ export const PROMPTS = {
   box152: { group: "Booking by item (key 1)", label: "Box 152: another one added (then box 151 again)", text: "Another {item} has been successfully added to your cart.", vars: ["item"] },
   // Jumping balloons (Abraham, Nov 19, 2026, approved): box 153 menu, box 154 when a balloon is chosen
   // Old-cart item added (Nov 19, 2026)
-  resume_added: { group: "Booking by item (key 1)", label: "Row 11: item added (every time an item is added; no cart line after it)", text: "This item was successfully added to your cart. To go to your shopping cart, press 0. To keep shopping, for same day, press 1. For another day, press 2." },
+  resume_added: { group: "Booking by item (key 1)", label: "Item added (every booking; then the shared cart line and the star line)", text: "This item was successfully added to your cart. To keep shopping, for same day, press 1. For another day, press 2." },
   // Jumping balloons list (Nov 19, 2026, replaces box 153): the opening, then one line per balloon, then the cart line
   balloons_open: { group: "Booking by item (key 1)", label: "Jumping balloons list: opening", text: "Here are our jumping balloons. Please note, our jumping balloons are not for water use." },
   balloon_press: { group: "Booking by item (key 1)", label: "Jumping balloons list: the word \"press\" (between the item number and the key)", text: "press" },
@@ -200,7 +200,9 @@ export const PROMPTS = {
   keep_shopping: { group: "Cart", label: "After an item is added: keep shopping or the cart", text: "To keep shopping, press 1." },
   another_day: { group: "Cart", label: "After an item is added: book another day (Abraham)", text: "To book another day, press 2." },
   // Ocean balls after every jumping balloon (Abraham, Nov 17, 2026), his wording ("#" is said as pound)
-  ocean_balls: { group: "Cart", label: "Ocean balls (after every jumping balloon)", text: "Would you like to add ocean balls? To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3. To skip, press pound." },
+  ocean_balls: { group: "Cart", label: "Ocean balls (after every jumping balloon)", text: "Would you like to add ocean balls? To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3." }, // then the shared skip line (Nov 19, 2026)
+  // The one shared skip recording (Abraham, Nov 19, 2026): after every add-on offer with a skip
+  skip_pound: { group: "Cart", label: "Shared: skip (after ocean balls, laser guns, delivery directions, promo texts)", text: "To skip, press pound." },
   // Laser tag extra packs (Abraham, Nov 17, 2026): offered after a maze or guns, like ocean balls. Approved word for word.
   laser_packs: { group: "Cart", label: "Extra laser gun packs (after a maze or guns; sheet box 25b, approved)", text: "Would you like to add more laser guns? To add a 6-pack of laser guns for $75, press 1. To add a 4-pack of laser guns for $50, press 2. To skip, press pound." },
   added: { group: "Cart", label: "Item added to cart", text: "Woohoo! I added {items} to your cart for {date}. It is saved just for you while we are on the phone.", vars: ["items", "date"] },
@@ -236,7 +238,7 @@ export const PROMPTS = {
   addr_readback: { group: "Checkout", label: "Address step 6: read-back (draft; the unit part is left out when there is none)", text: "Thanks! I have {house} {street}, {unit}, {town}, New York, {zip}. If that is correct, press 1. To enter the address again, press 2.", vars: ["house", "street", "unit", "town", "zip"], pending: true },
   addr_price: { group: "Checkout", label: "Address step 7: delivery price (draft)", text: "Thanks! Delivery to {town}, New York, is {price} dollars.", vars: ["town", "price"], pending: true },
   // Abraham, Nov 15, 2026: optional directions for the driver after the address (drafts for his OK)
-  ask_directions: { group: "Checkout", label: "Ask for delivery directions (optional)", text: "Is there anything our delivery team should know, like a gate code, where to park, or where to set up? Please say it now. To skip, press pound.", pending: true },
+  ask_directions: { group: "Checkout", label: "Ask for delivery directions (optional)", text: "Is there anything our delivery team should know, like a gate code, where to park, or where to set up? Please say it now.", pending: true },
   directions_saved: { group: "Checkout", label: "Delivery directions saved", text: "Thank you, we saved that for our delivery team.", pending: true },
   // Abraham, Nov 15, 2026: payment can never be skipped; no texts and no email means the email is required
   ask_email_required: { group: "Checkout", label: "Ask for email (required: no texts)", text: "To send your secure payment link, we need your email address. Please say your email address, like john at gmail dot com." },
@@ -291,7 +293,7 @@ export const PROMPTS = {
     text: "Thank you. We just texted you a confirmation. Reply YES to that text within 24 hours to sign up for promotional texts.",
   },
   // Promo texts by phone, keys only (Abraham, Nov 10, 2026): replaces consent_marketing_v2, which is no longer played.
-  promo_ask: { group: "Promo texts by phone (keys only)", label: "Step 1: after the order", text: "To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1. To skip, press pound." },
+  promo_ask: { group: "Promo texts by phone (keys only)", label: "Step 1: after the order", text: "To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1." },
   promo_which: { group: "Promo texts by phone (keys only)", label: "Step 2: which number", text: "To get texts at the number you are calling from, press 1. To use a different phone number, press 2." },
   promo_enter: { group: "Promo texts by phone (keys only)", label: "Step 3: enter a number", text: "Please enter the 10-digit mobile number. When you are finished, please press pound." },
   promo_heard: { group: "Promo texts by phone (keys only)", label: "Step 3: read the number back", text: "You entered {number}. If that is right, press pound to continue. To enter it again, press 1.", vars: ["number"] },

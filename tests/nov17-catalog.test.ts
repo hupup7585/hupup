@@ -51,7 +51,8 @@ describe("item added: book another day", () => {
   it("the line is there, after keep shopping", async () => {
     const { PROMPTS } = await import("@/lib/ivr/prompts");
     expect(PROMPTS.another_day.text).toBe("To book another day, press 2.");
-    expect(PROMPTS.ocean_balls.text.endsWith("To skip, press pound.")).toBe(true);
+    expect(PROMPTS.ocean_balls.text.endsWith("To add 700 balls for $20, press 3.")).toBe(true);
+    expect(PROMPTS.skip_pound.text).toBe("To skip, press pound."); // one shared skip line (Nov 19, 2026)
   });
 });
 

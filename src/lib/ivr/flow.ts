@@ -567,7 +567,7 @@ async function promoSend(ctx: Ctx, vr: VR, to: string, chosen: "caller" | "enter
   const how =
     `phone (keys only): pressed 1 for promo texts, then ${chosen === "caller" ? "1 for the number calling" : `2 and entered ${to}, confirmed with 1`}; ` +
     `number chosen: ${chosen === "caller" ? "caller's number" : "entered number"} ${to}; caller ID ${caller ?? "withheld"}; call ${ctx.callSid}; ${logStamp()}; ` +
-    `heard: "${promptText(ctx.prompts, "promo_ask")}"`;
+    `heard: "${promptText(ctx.prompts, "promo_ask")} ${promptText(ctx.prompts, "skip_pound")}"`;
   const r = await db.transaction(async (tx) => {
     const [c] = await tx.select().from(schema.customers).where(eq(schema.customers.phone, to)).limit(1).for("update");
     return requestPromoConfirmation(tx, c ?? null, to, how);
@@ -1571,6 +1571,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.query.get("d") ?? undefined;
     const g = keypad(vr, url("resume-added-choice", { d }));
     sp(g, ctx, "resume_added");
+    sp(g, ctx, "cart_key");
     backLine(g, ctx);
     return back(vr, "resume-items");
   },
@@ -2114,6 +2115,7 @@ const handlers: Record<string, Handler> = {
   "added-menu"(ctx, vr) {
     const g = keypad(vr, url("after-add"));
     sp(g, ctx, "resume_added");
+    sp(g, ctx, "cart_key");
     backLine(g, ctx);
     return noInput(vr, ctx, "cart");
   },
@@ -2172,7 +2174,8 @@ const handlers: Record<string, Handler> = {
     const n = ctx.query.get("n") ?? undefined;
     const g = keypad(vr, url("ocean-choice", { d, n }));
     sp(g, ctx, "ocean_balls");
-    sp(g, ctx, "cart_key");
+    halfPause(g);
+    sp(g, ctx, "skip_pound"); // the shared skip line (Nov 19, 2026)
     backLine(g, ctx);
     return bookNoInput(vr, ctx, "ocean", { d, n });
   },
@@ -2418,6 +2421,8 @@ const handlers: Record<string, Handler> = {
     if (!directionsActive(ctx)) return back(vr, "finalize"); // no email in the booking (Abraham, Nov 17, 2026)
     const g = vr.gather({ input: ["speech", "dtmf"], finishOnKey: "", numDigits: 1, timeout: 6, speechTimeout: "auto", language: "en-US", speechModel: "phone_call", enhanced: true, action: url("directions-heard"), method: "POST", actionOnEmptyResult: true });
     sp(g, ctx, "ask_directions", undefined, { draftOk: true });
+    halfPause(g);
+    sp(g, ctx, "skip_pound", undefined, { draftOk: true });
     g.play(`${config.baseUrl()}/audio/tone.wav`); // the tone, then the caller speaks (Abraham, Nov 17, 2026)
     return back(vr, "finalize"); // nothing said: skip
   },
@@ -3174,6 +3179,8 @@ const handlers: Record<string, Handler> = {
     }
     const g = keypad(vr, url("promo-consent-answer"), { numDigits: 1, timeout: 6 });
     sp(g, ctx, "promo_ask");
+    halfPause(g);
+    sp(g, ctx, "skip_pound");
     return back(vr, "promo-consent-answer"); // nothing pressed = skip
   },
 
