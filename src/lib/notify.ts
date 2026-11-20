@@ -39,8 +39,10 @@ export function emailEnvelope(to: string, env: Record<string, string | undefined
 }
 
 export type EmailAttachment = { filename: string; content: string /* base64 */ };
+/** Where a sent email is kept in the Admin inbox (Abraham, Nov 20, 2026): code, catalog, or auto (the default). */
+export type SentKind = "code" | "catalog" | "auto";
 
-export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string>; record?: boolean; promo?: boolean; noThanks?: boolean; bodyHtml?: string | null } = {}): Promise<SendResult> {
+export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string>; record?: boolean; promo?: boolean; noThanks?: boolean; bodyHtml?: string | null; kind?: SentKind } = {}): Promise<SendResult> {
   if (!config.resendConfigured()) {
     if (config.isProd()) return { sent: false, error: "Email (Resend) is not configured" };
     console.log(`[dev EMAIL to ${to}] ${subject}\n${text}${attachments.length ? `\n[attachments: ${attachments.map((a) => a.filename).join(", ")}]` : ""}`);
@@ -81,7 +83,7 @@ export async function sendEmail(to: string, subject: string, text: string, attac
     // The Admin inbox's own replies and new emails save themselves (record: false).
     if (opts.record !== false) {
       const { recordSentEmail } = await import("@/lib/inbox");
-      await recordSentEmail({ to, subject, body: text, attachments, sent: result.sent, error: result.error ?? null }).catch((e) => console.error("could not keep the sent copy", e));
+      await recordSentEmail({ to, subject, body: text, attachments, sent: result.sent, error: result.error ?? null, kind: opts.kind }).catch((e) => console.error("could not keep the sent copy", e));
     }
     return result;
   } catch (e) {

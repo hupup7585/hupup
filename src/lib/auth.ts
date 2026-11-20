@@ -141,7 +141,7 @@ export async function sendLoginEmailCode(rawPhone: string): Promise<{ ok: boolea
   const recent = await db.execute(sql`SELECT COUNT(*)::int AS n FROM login_codes WHERE channel = ${channel} AND created_at > now() - interval '10 minutes'`);
   if ((recent.rows[0] as { n: number }).n >= MAX_SENDS_PER_10_MIN) return { ok: false, message: "Too many codes requested. Please wait a few minutes." };
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
-  const res = await sendEmail(to, `${BUSINESS_NAME} sign-in code: ${code}`, `${BUSINESS_NAME} staff sign-in code: ${code}\n\nIt expires in ${CODE_TTL_MIN} minutes. If you didn't request it, ignore this email.`);
+  const res = await sendEmail(to, `${BUSINESS_NAME} sign-in code: ${code}`, `${BUSINESS_NAME} staff sign-in code: ${code}\n\nIt expires in ${CODE_TTL_MIN} minutes. If you didn't request it, ignore this email.`, undefined, { kind: "code" });
   await audit("login.email_code_sent", staff.userId, { role: staff.role, sent: res.sent });
   if (!res.sent) return { ok: false, message: EMAIL_NOT_SET_UP };
   await db.insert(loginCodes).values({ userId: staff.userId, channel, codeHash: hmac(code), expiresAt: new Date(Date.now() + CODE_TTL_MIN * 60_000) });
@@ -197,6 +197,8 @@ async function startSession(staffIn: StaffUser, method: "sms_code" | "email_code
   const expiresAt = new Date(Date.now() + ms);
   const ua = (await headers()).get("user-agent")?.slice(0, 300) ?? null;
   await db.insert(adminSessions).values({ userId: staff.userId, method, tokenHash: hmac(token), expiresAt, userAgent: ua });
+  // The sign-in log (Abraham, Nov 20, 2026): kept after sign-out, with the sign-out time
+  await db.insert(schema.signIns).values({ userId: staff.userId, method, tokenHash: hmac(token), expiresAt, userAgent: ua }).catch((e) => console.error("could not log the sign-in", e));
   if (staff.userId) await db.update(adminUsers).set({ lastLoginAt: new Date(), failedLogins: 0, lockedUntil: null }).where(eq(adminUsers.id, staff.userId));
   (await cookies()).set(SESSION_COOKIE, token, { httpOnly: true, secure: config.isProd(), sameSite: "lax", path: "/", expires: expiresAt });
   await audit("login.success", staff.userId, { role: staff.role, method });
@@ -309,13 +311,17 @@ export async function requireStaff(roles: Role[]) {
 export async function logout() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) await db.delete(adminSessions).where(eq(adminSessions.tokenHash, hmac(token)));
+  if (token) {
+    await db.delete(adminSessions).where(eq(adminSessions.tokenHash, hmac(token)));
+    await db.update(schema.signIns).set({ signedOutAt: new Date(), endReason: "signed_out" }).where(and(eq(schema.signIns.tokenHash, hmac(token)), isNull(schema.signIns.signedOutAt)));
+  }
   jar.delete(SESSION_COOKIE);
 }
 
 /** Revoke every session for a staff member (deactivation, password reset). */
 export async function revokeSessions(userId: number) {
   await db.delete(adminSessions).where(eq(adminSessions.userId, userId));
+  await db.update(schema.signIns).set({ signedOutAt: new Date(), endReason: "revoked" }).where(and(eq(schema.signIns.userId, userId), isNull(schema.signIns.signedOutAt), gt(schema.signIns.expiresAt, new Date())));
 }
 
 /**

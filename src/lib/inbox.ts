@@ -381,10 +381,10 @@ async function textOwnerAboutEmail(e: { id?: number; fromName: string | null; fr
 }
 
 /** A sent email (booking, payment, catalog, alerts...) kept under Sent in the Admin inbox, with its files. */
-export async function recordSentEmail(input: { to: string; subject: string; body: string; attachments: { filename: string; content: string }[]; sent: boolean; error: string | null }) {
+export async function recordSentEmail(input: { to: string; subject: string; body: string; attachments: { filename: string; content: string }[]; sent: boolean; error: string | null; kind?: "code" | "catalog" | "auto" }) {
   const [row] = await db
     .insert(schema.inboxReplies)
-    .values({ emailId: null, toAddress: input.to, subject: input.subject, body: input.body, sent: input.sent, error: input.sent ? null : (input.error ?? "not sent"), userId: null })
+    .values({ emailId: null, toAddress: input.to, subject: input.subject, body: input.body, sent: input.sent, error: input.sent ? null : (input.error ?? "not sent"), userId: null, kind: input.kind ?? "auto" })
     .returning();
   for (const a of input.attachments) {
     const data = Buffer.from(a.content, "base64");

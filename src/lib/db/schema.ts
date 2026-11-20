@@ -1207,7 +1207,24 @@ export const inboxReplies = pgTable("inbox_replies", {
   sent: boolean("sent").notNull().default(false),
   error: text("error"),
   userId: integer("user_id"),
+  /** sent (written by a person) | code (sign-in code) | catalog (a catalog we sent) | auto (automatic email) */
+  kind: text("kind").notNull().default("sent"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Every staff sign-in, kept with its sign-out time (Abraham, Nov 20, 2026). No codes or passwords here. */
+export const signIns = pgTable("sign_ins", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id"),
+  /** password | sms_code | email_code | google */
+  method: text("method").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  userAgent: text("user_agent"),
+  signedInAt: timestamp("signed_in_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  signedOutAt: timestamp("signed_out_at", { withTimezone: true }),
+  /** signed_out | revoked (deactivated or password reset) */
+  endReason: text("end_reason"),
 });
 
 /* Stripe refunds, disputes, fees and payouts (Abraham, Nov 12, 2026). Nothing is ever deleted. */

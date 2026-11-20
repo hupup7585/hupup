@@ -8,6 +8,8 @@ import { FOLDERS, PAGE_SIZE, folderWhere, hasFilters, isFolder, listDrafts, list
 import MailShell from "./MailShell";
 import RefreshMail from "./RefreshMail";
 import { discardDraftRowAction, unscheduleAction } from "./actions";
+import { codesSent, signInLog } from "@/lib/sign-in-log";
+import { dualDateTime } from "@/lib/dual-date";
 import MailList, { type MailRow } from "./MailList";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -57,21 +59,72 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   let body: React.ReactNode;
   let total = 0;
-  if (folder === "sent") {
-    const r = await listSent({ q: filters.q, page });
-    total = r.total;
+  const sentRows = (rows: Awaited<ReturnType<typeof listSent>>["rows"], empty: string) => (
+    <div className="card divide-y divide-line" data-mail-sent>
+      {rows.map((x) => (
+        <Link key={x.id} href={`/admin/inbox/sent/${x.id}`} className="flex flex-wrap items-baseline gap-x-3 px-4 py-2 hover:bg-bg hover:shadow-[inset_0_-1px_0_#cfd8e3] sm:flex-nowrap" data-sent-row={x.id}>
+          <span className="w-full truncate sm:w-56 sm:shrink-0">To: {x.toAddress}</span>
+          <span className="min-w-0 flex-1 truncate">{x.subject}<span className="text-muted"> - {snippet(x.body)}</span></span>
+          <span className={`shrink-0 text-xs ${x.sent ? "text-muted" : "font-bold text-coral-dark"}`}>{x.sent ? inboxWhen(x.createdAt) : "Not sent"}</span>
+        </Link>
+      ))}
+      {!rows.length && <p className="px-4 py-10 text-center text-muted">{empty}</p>}
+    </div>
+  );
+  if (folder === "codes") {
+    // Sign-in codes (Abraham, Nov 20, 2026): who asked for a code, by text or email, and every sign-in and sign-out
+    const [codes, ins] = await Promise.all([codesSent(), signInLog()]);
+    const when = (d: Date) => dualDateTime(d);
+    total = codes.length;
     body = (
-      <div className="card divide-y divide-line" data-mail-sent>
-        {r.rows.map((x) => (
-          <Link key={x.id} href={`/admin/inbox/sent/${x.id}`} className="flex flex-wrap items-baseline gap-x-3 px-4 py-2 hover:bg-bg hover:shadow-[inset_0_-1px_0_#cfd8e3] sm:flex-nowrap" data-sent-row={x.id}>
-            <span className="w-full truncate sm:w-56 sm:shrink-0">To: {x.toAddress}</span>
-            <span className="min-w-0 flex-1 truncate">{x.subject}<span className="text-muted"> - {snippet(x.body)}</span></span>
-            <span className={`shrink-0 text-xs ${x.sent ? "text-muted" : "font-bold text-coral-dark"}`}>{x.sent ? inboxWhen(x.createdAt) : "Not sent"}</span>
-          </Link>
-        ))}
-        {!r.rows.length && <p className="px-4 py-10 text-center text-muted">Nothing sent yet.</p>}
+      <div className="space-y-5" data-mail-codes>
+        <section className="card overflow-x-auto p-0" data-sign-ins>
+          <h2 className="px-4 pt-3 text-base font-bold">Sign-ins and sign-outs</h2>
+          <table className="w-full text-sm">
+            <thead><tr><th className="th">Staff</th><th className="th">Signed in with</th><th className="th">Signed in</th><th className="th">Signed out</th><th className="th">Device</th></tr></thead>
+            <tbody>
+              {ins.map((r) => (
+                <tr key={r.id} data-sign-in={r.id}>
+                  <td className="td font-semibold">{r.name}{r.role ? <span className="ml-1 text-xs font-normal capitalize text-muted">{r.role}</span> : null}</td>
+                  <td className="td">{r.how}</td>
+                  <td className="td whitespace-nowrap">{when(r.signedInAt)}</td>
+                  <td className="td whitespace-nowrap">{r.out.at ? `${when(r.out.at)} (${r.out.words})` : <span className="font-semibold text-[#13895C]">{r.out.words}</span>}</td>
+                  <td className="td text-muted">{r.device}</td>
+                </tr>
+              ))}
+              {!ins.length && <tr><td className="td text-center text-muted" colSpan={5}>No sign-ins recorded yet. Sign-ins are kept from Nov 20, 2026.</td></tr>}
+            </tbody>
+          </table>
+        </section>
+        <section className="card overflow-x-auto p-0" data-codes-sent>
+          <h2 className="px-4 pt-3 text-base font-bold">Codes sent</h2>
+          <table className="w-full text-sm">
+            <thead><tr><th className="th">Requested by</th><th className="th">Sent by</th><th className="th">Time</th><th className="th">What happened</th></tr></thead>
+            <tbody>
+              {codes.map((c) => (
+                <tr key={c.id} data-code-row={c.id}>
+                  <td className="td font-semibold">{c.name}{c.role ? <span className="ml-1 text-xs font-normal capitalize text-muted">{c.role}</span> : null}</td>
+                  <td className="td">{c.by}</td>
+                  <td className="td whitespace-nowrap">{when(c.createdAt)}</td>
+                  <td className="td">{c.status}{c.usedAt ? `, ${when(c.usedAt)}` : ""}{!c.usedAt && c.attempts ? ` (${c.attempts} wrong ${c.attempts === 1 ? "try" : "tries"})` : ""}</td>
+                </tr>
+              ))}
+              {!codes.length && <tr><td className="td text-center text-muted" colSpan={4}>No codes sent yet.</td></tr>}
+            </tbody>
+          </table>
+        </section>
+        <p className="text-xs text-muted">The codes themselves are never shown here. Signed in with a password or Google: no code is sent.</p>
       </div>
     );
+  } else if (folder === "auto") {
+    // Automatic emails (bookings, payments, alerts...) (Abraham, Nov 20, 2026)
+    const r = await listSent({ q: filters.q, page, kind: "auto" });
+    total = r.total;
+    body = sentRows(r.rows, "No automatic emails yet.");
+  } else if (folder === "sent") {
+    const r = await listSent({ q: filters.q, page });
+    total = r.total;
+    body = sentRows(r.rows, "Nothing sent yet.");
   } else if (folder === "drafts" || folder === "scheduled") {
     const drafts = folder === "drafts" ? await listDrafts() : await listScheduled();
     total = drafts.length;
@@ -128,7 +181,17 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       files: x.ids.flatMap((i) => files.get(i) ?? []),
     }));
     const words = [filters.q, filters.has, filters.from, filters.subject].filter(Boolean).join(" ").split(/\s+/).filter((w) => w.length > 1);
-    body = <MailList rows={rows} folder={folder} label={sp.label} back={qs(page)} labels={labels.map((l) => ({ name: l.name, color: l.color }))} highlight={words} />;
+    const list = <MailList rows={rows} folder={folder} label={sp.label} back={qs(page)} labels={labels.map((l) => ({ name: l.name, color: l.color }))} highlight={words} />;
+    if (folder === "catalog") {
+      // Catalog requests (Abraham, Nov 20, 2026): the requests, and the catalogs we sent back
+      const sentCat = await listSent({ q: filters.q, kind: "catalog" });
+      body = (
+        <div className="space-y-5">
+          <section><h2 className="mb-2 text-base font-bold">Requests</h2>{list}</section>
+          <section data-catalogs-sent><h2 className="mb-2 text-base font-bold">Catalogs we sent ({sentCat.total})</h2>{sentRows(sentCat.rows, "No catalogs sent yet.")}</section>
+        </div>
+      );
+    } else body = list;
   }
 
   const from = total ? (page - 1) * PAGE_SIZE + 1 : 0;

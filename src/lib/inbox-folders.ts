@@ -13,6 +13,9 @@ export const FOLDERS = [
   { key: "drafts", label: "Drafts" },
   // Emails that only ask for the catalog (Abraham, Nov 19, 2026): their own folder, not in the Inbox
   { key: "catalog", label: "Catalog requests" },
+  // Abraham, Nov 20, 2026: Sent holds only emails people wrote; codes and automatic emails have their own folders
+  { key: "codes", label: "Sign-in codes" },
+  { key: "auto", label: "Automatic emails" },
   // Under "More", like Gmail (Abraham, Nov 19, 2026)
   { key: "important", label: "Important", more: true },
   { key: "scheduled", label: "Scheduled", more: true },
@@ -158,10 +161,14 @@ export async function listEmails(opts: { folder: Folder; q?: string; label?: str
 }
 
 /** Everything sent from Admin: replies and new emails. */
-export async function listSent(opts: { q?: string; page?: number }) {
+/**
+ * Sent emails of one kind (Abraham, Nov 20, 2026): "sent" = written by a person (Sent), "auto" = automatic emails,
+ * "catalog" = catalogs we sent (shown in Catalog requests), "code" = sign-in codes.
+ */
+export async function listSent(opts: { q?: string; page?: number; kind?: "sent" | "auto" | "catalog" | "code" }) {
   const r = schema.inboxReplies;
   const term = opts.q?.trim();
-  const where = term ? or(ilike(r.toAddress, `%${term}%`), ilike(r.subject, `%${term}%`), ilike(r.body, `%${term}%`)) : undefined;
+  const where = and(eq(r.kind, opts.kind ?? "sent"), term ? or(ilike(r.toAddress, `%${term}%`), ilike(r.subject, `%${term}%`), ilike(r.body, `%${term}%`)) : undefined);
   const page = Math.max(1, opts.page ?? 1);
   const [rows, [count]] = await Promise.all([
     db.select().from(r).where(where).orderBy(desc(r.createdAt), desc(r.id)).limit(PAGE_SIZE).offset((page - 1) * PAGE_SIZE),

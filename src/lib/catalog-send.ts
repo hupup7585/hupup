@@ -55,9 +55,9 @@ export async function sendCatalogEmail(to: string) {
   // With the PDF attached: the catalog email wording (approved by Abraham, Nov 17, 2026; the Owner can edit it in Admin)
   if (pdf) {
     const t = catalogEmailTemplate(s);
-    return sendEmail(to, t.subject, t.body, [pdf], { noThanks: true });
+    return sendEmail(to, t.subject, t.body, [pdf], { noThanks: true, kind: "catalog" });
   }
-  return sendEmail(to, subject, text, []);
+  return sendEmail(to, subject, text, [], { kind: "catalog" });
 }
 
 export const CATALOG_NAME_TAG = "{Catalog Name}";

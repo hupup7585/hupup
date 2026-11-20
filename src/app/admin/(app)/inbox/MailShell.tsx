@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { AlarmClock, Archive, BookOpen, Bookmark, ChevronDown, Menu, ChevronUp, Clock, File, Inbox, Mail, OctagonAlert, Pencil, Send, SlidersHorizontal, Star, Tag, Tags, Trash2 } from "lucide-react";
+import { AlarmClock, Archive, BookOpen, Bookmark, Bot, KeyRound, ChevronDown, Menu, ChevronUp, Clock, File, Inbox, Mail, OctagonAlert, Pencil, Send, SlidersHorizontal, Star, Tag, Tags, Trash2 } from "lucide-react";
 import { FOLDERS, LABEL_COLORS, WITHIN, folderCounts, listLabels, type Folder, type MailFilters } from "@/lib/inbox-folders";
 import { createLabelAction, removeLabelAction } from "./actions";
 
-const ICON: Record<Folder, typeof Inbox> = { catalog: BookOpen, inbox: Inbox, starred: Star, snoozed: AlarmClock, sent: Send, drafts: File, important: Bookmark, scheduled: Clock, all: Mail, archive: Archive, spam: OctagonAlert, trash: Trash2 };
+const ICON: Record<Folder, typeof Inbox> = { codes: KeyRound, auto: Bot, catalog: BookOpen, inbox: Inbox, starred: Star, snoozed: AlarmClock, sent: Send, drafts: File, important: Bookmark, scheduled: Clock, all: Mail, archive: Archive, spam: OctagonAlert, trash: Trash2 };
 
 /** Filter chips under the search bar, like Gmail (Abraham, Nov 19, 2026). Each chip is a link that keeps the others. */
 function Chips({ base, f }: { base: Record<string, string>; f: MailFilters }) {
