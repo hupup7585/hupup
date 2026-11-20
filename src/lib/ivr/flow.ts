@@ -57,7 +57,7 @@ import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
 const PHONEPAY_PROMPTS = ["phonepay_intro", "phonepay_back", "phonepay_paid", "phonepay_retry", "phonepay_retry_last", "phonepay_failed", "phonepay_unclear"] as const;
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
-import { normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
+import { lastPhoneDate, normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { liveVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
 import { FIRST_TIME_ONLY, menuOrder, type MenuId } from "./menu-order";
 import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
@@ -71,7 +71,7 @@ import { PROMPTS, composeClips, fill, googleLiveOn, liveClips, loadPromptOverrid
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
-import { categoryProducts, itemFreeOn, nearestFreeDay, nearestSize } from "@/lib/alternatives";
+import { categoryProducts, itemFreeOn, nearestFreeDay } from "@/lib/alternatives";
 import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_ACCESS_KEY_GAP, VM_PIN_TRIES, callOutActive, callOutNumber, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinChangedByPhone, validPin } from "@/lib/vm-access";
 import { STT_HOLD_FILE, STT_MAX_WAITS, googleReadback, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
 
@@ -490,14 +490,23 @@ async function attractionCategory(t: "1" | "2" | "3") {
 }
 
 /** Is this item in the bounce house (jumping balloons) category? */
-/** "Item already booked": the category's own key 1 recording (Abraham, Nov 19, 2026). */
-async function closestLine(categoryId: number): Promise<PromptKey | null> {
-  const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, categoryId));
+/** A category's phone items; with a date (item taken, key 1), only the items free on that date (Nov 20, 2026). */
+async function listItems(c: number, f: string | null) {
+  const items = await phoneProducts(c);
+  if (!f) return items;
+  const cal = await getSettings();
+  const free = await Promise.all(items.map((p) => itemFreeOn(p, f, cal)));
+  return items.filter((_, i) => free[i]);
+}
+
+/** The kind of item, singular, for "the closest available {category}" (Abraham, Nov 19, 2026). */
+async function singularCategory(categoryId: number) {
+  const [cat] = await db.select({ name: categories.name, spoken: categories.spokenName }).from(categories).where(eq(categories.id, categoryId));
   const n = cat?.name ?? "";
-  if (ATTRACTIONS["1"].match.test(n)) return "booked_closest_balloon";
-  if (/laser/i.test(n)) return "booked_closest_laser";
-  if (/paddle|boat/i.test(n)) return "booked_closest_paddle";
-  return null;
+  if (ATTRACTIONS["1"].match.test(n)) return "jumping balloon";
+  if (/laser/i.test(n)) return "laser tag set";
+  if (/paddle|boat/i.test(n)) return "paddle boat";
+  return (cat?.spoken || n).toLowerCase().replace(/s$/, "");
 }
 
 async function isBounceHouse(categoryId: number) {
@@ -1549,7 +1558,7 @@ const handlers: Record<string, Handler> = {
       const l = lines[t];
       lines[t] = { ...l, state: "done" };
       await updateSession(ctx.callSid, { data: { resumeLines: lines } }, ctx.session);
-      return back(vr, "booked-near", { p: l.p, d: l.d }); // box 11a: same date, or the nearest date it is free
+      return back(vr, "booked", { p: l.p, d: l.d }); // the one item taken prompt (Nov 20, 2026)
     }
     return back(vr, (await callOrders(ctx)).length ? "cart" : "book");
   },
@@ -1601,23 +1610,24 @@ const handlers: Record<string, Handler> = {
 
   async category(ctx, vr) {
     const c = Number(ctx.query.get("c"));
+    const f = ctx.query.get("f"); // item taken, key 1: only what is free on that date
     const [cat] = await db.select().from(categories).where(eq(categories.id, c));
-    const items = cat ? await phoneProducts(c) : [];
+    const items = cat ? await listItems(c, f) : [];
     if (!cat || !items.length) {
       sp(vr, ctx, "category_empty");
       return back(vr, "book"); // Abraham, Nov 20, 2026: straight back to the bookings menu
     }
     await track(ctx.callSid, "category_heard", `Listened to ${cat.name}`, { category: cat.name, items: items.map((p) => p.name) });
     // Jumping balloons: box 153 (Abraham, Nov 19, 2026)
-    if (await isBounceHouse(c)) return back(vr, "balloons", { c });
+    if (await isBounceHouse(c)) return back(vr, "balloons", { c, f: f ?? undefined });
     // 10 or more items (Abraham, Nov 17, 2026): two-key choices (10, 11, 12) work; a single key acts after a short wait
-    const g = keypad(vr, url("category-choice", { c }), items.length > 9 ? { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS } : {});
+    const g = keypad(vr, url("category-choice", { c, f: f ?? undefined }), items.length > 9 ? { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS } : {});
     sp(g, ctx, "book_category_list", { category: cat.spokenName || cat.name });
     sp(g, ctx, "cart_key"); // Abraham (Phone Menu v3): the cart line before the items and again after them
     items.forEach((p, i) => sp(g, ctx, "category_item", { item: p.name, key: i + 1 }));
     sp(g, ctx, "cart_key");
     backLine(g, ctx); // star goes back one step (to the bookings menu)
-    return bookNoInput(vr, ctx, "category", { c });
+    return bookNoInput(vr, ctx, "category", { c, f: f ?? undefined });
   },
 
   /**
@@ -1627,8 +1637,9 @@ const handlers: Record<string, Handler> = {
    */
   async balloons(ctx, vr) {
     const c = ctx.query.get("c")!;
-    const items = await phoneProducts(Number(c));
-    const g = keypad(vr, url("balloon-key", { c }), { numDigits: 1 });
+    const f = ctx.query.get("f") ?? undefined;
+    const items = await listItems(Number(c), f ?? null);
+    const g = keypad(vr, url("balloon-key", { c, f }), { numDigits: 1 });
     await playMenu(g, ctx, "balloons", (g) => {
       for (const b of BALLOON_MENU) {
         if (!items.some((p) => balloonEntry(p.name)?.key === b.key)) continue; // not active in Admin: not read
@@ -1638,37 +1649,40 @@ const handlers: Record<string, Handler> = {
         sayLive(g, ctx, balloonKeyWords(b.key));
       }
     });
-    return bookNoInput(vr, ctx, "balloons", { c });
+    return bookNoInput(vr, ctx, "balloons", { c, f });
   },
 
   async "balloon-key"(ctx, vr) {
     const c = ctx.query.get("c")!;
+    const f = ctx.query.get("f") ?? undefined;
     const d = ctx.body.Digits;
-    if (!d) return bookNoInput(vr, ctx, "balloons", { c });
+    if (!d) return bookNoInput(vr, ctx, "balloons", { c, f });
     if (d === "*") return back(vr, "book"); // star: one menu back
-    if (d === "0") return back(vr, "cart", { c }); // "To go to your shopping cart, press 0."
+    if (d === "0") return back(vr, "cart", { c, f }); // "To go to your shopping cart, press 0."
     // 1: wait 2 seconds for a second digit (10, 11, 12); pound skips the wait; nothing = Soft Hop
     if (d === "1") {
-      vr.gather({ input: ["dtmf"], numDigits: 1, timeout: BALLOON_SECOND_DIGIT_SECONDS, finishOnKey: "#", action: url("balloon-key2", { c }), method: "POST", actionOnEmptyResult: true });
-      return back(vr, "balloon-pick", { c, k: "1" });
+      vr.gather({ input: ["dtmf"], numDigits: 1, timeout: BALLOON_SECOND_DIGIT_SECONDS, finishOnKey: "#", action: url("balloon-key2", { c, f }), method: "POST", actionOnEmptyResult: true });
+      return back(vr, "balloon-pick", { c, f, k: "1" });
     }
-    return back(vr, "balloon-pick", { c, k: d });
+    return back(vr, "balloon-pick", { c, f, k: d });
   },
 
   "balloon-key2"(ctx, vr) {
     const c = ctx.query.get("c")!;
+    const f = ctx.query.get("f") ?? undefined;
     const d = ctx.body.Digits ?? "";
-    if (!d) return back(vr, "balloon-pick", { c, k: "1" }); // pound or no second digit: Soft Hop
-    return back(vr, "balloon-pick", { c, k: `1${d}` });
+    if (!d) return back(vr, "balloon-pick", { c, f, k: "1" }); // pound or no second digit: Soft Hop
+    return back(vr, "balloon-pick", { c, f, k: `1${d}` });
   },
 
   async "balloon-pick"(ctx, vr) {
     const c = Number(ctx.query.get("c"));
+    const f = ctx.query.get("f") ?? undefined;
     const k = ctx.query.get("k") ?? "";
-    const p = balloonForKey(k, await phoneProducts(c));
+    const p = balloonForKey(k, await listItems(c, f ?? null));
     if (!p) {
       sp(vr, ctx, "not_valid");
-      return back(vr, "balloons", { c });
+      return back(vr, "balloons", { c, f });
     }
     await track(ctx.callSid, "item_heard", `Chose ${p.name}`, { item: p.name, productId: p.id });
     return back(vr, "balloon", { p: p.id });
@@ -1723,7 +1737,7 @@ const handlers: Record<string, Handler> = {
     if (!d) return bookNoInput(vr, ctx, "category", { c });
     if (d === "*") return back(vr, "book"); // one step back: the bookings menu
     if (d === "0") return back(vr, "cart", { c }); // after the cart, the same item list plays again
-    const items = await phoneProducts(c);
+    const items = await listItems(c, ctx.query.get("f"));
     const p = /^\d{1,2}$/.test(d) && !d.startsWith("0") ? items[Number(d) - 1] : undefined;
     if (!p) {
       sp(vr, ctx, "not_valid");
@@ -1885,20 +1899,17 @@ const handlers: Record<string, Handler> = {
   },
 
   /**
-   * The item is not available (Abraham, Nov 17, 2026, whole phone system): "The {item} is no longer available for
-   * {date}. For the nearest options, press 1." Then the same date (the closest items) or the nearest date it is free.
+   * Item taken (Abraham, Nov 19, 2026, 10:25 PM, whole phone system, welcome back and every booking, also when someone
+   * just booked the last one): "We are sorry, the {item} is no longer available for {date}. To check the closest
+   * available {category} on the same date, press 1. For the nearest available date, press 2." Then the shared cart line
+   * and the shared star line. The old size up / down and "other dates" screens are gone.
    */
   async booked(ctx, vr) {
     const p = await getProduct(Number(ctx.query.get("p")));
     const date = ctx.query.get("d")!;
     if (!p) return back(vr, "menu");
-    // Hark for Abraham, Nov 19, 2026: "I am sorry, the {item} is already booked on {date}. For the closest {category}
-    // on the same date, press 1. For the nearest date this item is free, press 2." Replaces the size up/down screen.
     const g = keypad(vr, url("taken-choice", { p: p.id, d: date }));
-    sp(g, ctx, "item_booked", { item: p.name, date: spokenDate(date) });
-    const closest = await closestLine(p.categoryId);
-    if (closest) sp(g, ctx, closest);
-    sp(g, ctx, "booked_nearest");
+    sp(g, ctx, "item_taken", { item: p.name, date: spokenDate(date), category: await singularCategory(p.categoryId) });
     sp(g, ctx, "cart_key");
     backLine(g, ctx);
     return bookNoInput(vr, ctx, "booked", { p: p.id, d: date });
@@ -1908,8 +1919,14 @@ const handlers: Record<string, Handler> = {
     const p = Number(ctx.query.get("p"));
     const date = ctx.query.get("d")!;
     const d = ctx.body.Digits;
-    if (d === "1") return back(vr, "booked-closest", { p, d: date }); // the closest item of the same kind, same date
-    if (d === "2") return back(vr, "altdates", { p, d: date }); // the nearest date this item is free
+    if (d === "1") {
+      // the closest available items: the same category, only what is free on that date
+      const prod = await getProduct(p);
+      if (!prod) return back(vr, "book");
+      await chooseDay(ctx, date);
+      return back(vr, "category", { c: prod.categoryId, f: date });
+    }
+    if (d === "2") return back(vr, "nearest-date", { p, d: date });
     if (d === "0") return back(vr, "cart");
     if (d === "*") return starToCategory(vr, p); // star: one menu back, the item's list
     sp(vr, ctx, "not_valid");
@@ -1917,109 +1934,55 @@ const handlers: Record<string, Handler> = {
   },
 
   /**
-   * Key 1 on "already booked": the closest item of the same kind free on that date (the next size up, else down), read
-   * like any item of its list (name, price, press 1 to add). None free: the nearest dates for the item instead.
+   * Key 2 on item taken: the nearest available date for this item (before or after, the closer one; today to three
+   * months ahead). The line for it waits for Abraham's wording (preview only); until then, the date prompt.
    */
-  async "booked-closest"(ctx, vr) {
+  async "nearest-date"(ctx, vr) {
     const p = await getProduct(Number(ctx.query.get("p")));
     const date = ctx.query.get("d")!;
-    if (!p) return back(vr, "menu");
+    if (!p) return back(vr, "book");
     const cal = await getSettings();
-    const near = (await nearestSize(p, date, 1, cal)) ?? (await nearestSize(p, date, -1, cal));
-    if (!near) return back(vr, "altdates", { p: p.id, d: date });
-    await chooseDay(ctx, date);
-    if (await isBounceHouse(near.categoryId)) return back(vr, "balloon", { p: near.id });
-    return back(vr, "product", { p: near.id });
+    const today = todayISO();
+    const last = lastPhoneDate(today);
+    const ok = (x: string | null) => (x && x >= today && x <= last ? x : null);
+    const [after, before] = await Promise.all([nearestFreeDay(p, date, 1, cal, 1), nearestFreeDay(p, date, -1, cal, 1)]);
+    const a = ok(after);
+    const b = ok(before);
+    const dist = (x: string) => Math.abs(Date.parse(x) - Date.parse(date));
+    const near = a && b ? (dist(b) < dist(a) ? b : a) : (a ?? b);
+    const showDraft = near && !(process.env.VERCEL_ENV === "production" && promptWaiting(ctx.prompts, "nearest_date"));
+    const g = keypad(vr, url("nearest-choice", { p: p.id, n: showDraft ? near : undefined }), { numDigits: 4, timeout: showDraft ? 4 : 8 });
+    if (showDraft) spPreviewDraft(g, ctx, "nearest_date", { item: p.name, date: spokenDate(near) });
+    sp(g, ctx, "book_date_prompt");
+    backLine(g, ctx);
+    return bookNoInput(vr, ctx, "nearest-date", { p: p.id, d: date });
   },
 
-  /** "For the same date, press 1. For the nearest date this item is free, press 2." */
+  async "nearest-choice"(ctx, vr) {
+    const p = ctx.query.get("p")!;
+    const near = ctx.query.get("n");
+    const d = ctx.body.Digits ?? "";
+    if (d === "1" && near) {
+      await chooseDay(ctx, near);
+      return back(vr, "qty", { p, d: near });
+    }
+    if (d === "*") return starToCategory(vr, Number(p));
+    ctx.query.set("p", p);
+    return handlers["date-heard"](ctx, vr); // a new date
+  },
+
+  // Old screens (removed Nov 20, 2026): a call already in one of them goes to the item taken prompt
   "booked-near"(ctx, vr) {
-    const p = ctx.query.get("p")!;
-    const date = ctx.query.get("d")!;
-    const g = keypad(vr, url("near-choice", { p, d: date }));
-    sp(g, ctx, "taken_options");
-    sp(g, ctx, "cart_key");
-    backLine(g, ctx);
-    return bookNoInput(vr, ctx, "booked-near", { p, d: date });
+    return back(vr, "booked", { p: ctx.query.get("p")!, d: ctx.query.get("d")! });
   },
-
-  async "near-choice"(ctx, vr) {
-    const p = ctx.query.get("p")!;
-    const date = ctx.query.get("d")!;
-    const d = ctx.body.Digits;
-    if (d === "1") return back(vr, "booked-closest", { p, d: date }); // the closest item free on the same date (Nov 19, 2026)
-    if (d === "2") return back(vr, "altdates", { p, d: date }); // the nearest dates this item is free
-    if (d === "0") return back(vr, "cart");
-    if (d === "*") return back(vr, "booked", { p, d: date }); // star: one menu back
-    sp(vr, ctx, "not_valid");
-    return back(vr, "booked-near", { p, d: date });
-  },
-
-  /** Box 22 (size up/down) is removed (Abraham, Nov 19, 2026): a call still in it gets the closest item. */
   "booked-same"(ctx, vr) {
-    return back(vr, "booked-closest", { p: ctx.query.get("p")!, d: ctx.query.get("d")! });
+    return back(vr, "booked", { p: ctx.query.get("p")!, d: ctx.query.get("d")! });
   },
-
-  async "booked-choice"(ctx, vr) {
-    const p = Number(ctx.query.get("p"));
-    const date = ctx.query.get("d")!;
-    const b = ctx.query.get("b");
-    const sm = ctx.query.get("s");
-    const d = ctx.body.Digits;
-    if (d === "1" && b) return back(vr, "qty", { p: b, d: date });
-    if (d === "2" && sm) return back(vr, "qty", { p: sm, d: date });
-    if (d === "3") return back(vr, "altdates", { p, d: date });
-    if (d === "*") return back(vr, "booked-near", { p, d: date }); // star: one menu back (same date or nearest date)
-    if (d === "0") return back(vr, "cart");
-    sp(vr, ctx, "not_valid");
-    return back(vr, "booked-same", { p, d: date });
+  "booked-closest"(ctx, vr) {
+    return back(vr, "booked", { p: ctx.query.get("p")!, d: ctx.query.get("d")! });
   },
-
-  /** Same item, another date: the day before / after, else the nearest open dates before and after. */
-  async altdates(ctx, vr) {
-    const p = await getProduct(Number(ctx.query.get("p")));
-    const date = ctx.query.get("d")!;
-    if (!p) return back(vr, "menu");
-    const cal = await getSettings();
-    const before = addDays(date, -1);
-    const after = addDays(date, 1);
-    const [okBefore, okAfter] = await Promise.all([itemFreeOn(p, before, cal), itemFreeOn(p, after, cal)]);
-    const near = okBefore || okAfter;
-    const [one, two] = near
-      ? [okBefore ? before : null, okAfter ? after : null]
-      : await Promise.all([nearestFreeDay(p, date, -1, cal), nearestFreeDay(p, date, 1, cal)]);
-    const g = keypad(vr, url("altdate-choice", { p: p.id, d: date, one: one ?? undefined, two: two ?? undefined }));
-    if (near) {
-      if (one) sp(g, ctx, "altdate_before", { item: p.name, date: spokenDate(one) });
-      if (two) sp(g, ctx, one ? "altdate_after_also" : "altdate_after", { item: p.name, date: spokenDate(two) });
-    } else {
-      sp(g, ctx, "altdate_not_near", { item: p.name });
-      if (one) sp(g, ctx, "altdate_nearest_before", { date: spokenDate(one) });
-      if (two) sp(g, ctx, "altdate_nearest_after", { date: spokenDate(two) });
-    }
-    sp(g, ctx, "altdate_other");
-    sp(g, ctx, "cart_key");
-    backLine(g, ctx);
-    await track(ctx.callSid, "step", `Other dates offered for ${p.name}`, { item: p.name, date, before: one, after: two });
-    return bookNoInput(vr, ctx, "altdates", { p: p.id, d: date });
-  },
-
-  async "altdate-choice"(ctx, vr) {
-    const p = ctx.query.get("p")!;
-    const date = ctx.query.get("d")!;
-    const one = ctx.query.get("one");
-    const two = ctx.query.get("two");
-    const d = ctx.body.Digits;
-    const pick = d === "1" && one ? one : d === "2" && two ? two : null;
-    if (pick) {
-      await chooseDay(ctx, pick);
-      return back(vr, "qty", { p, d: pick });
-    }
-    if (d === "3") return back(vr, "date", { p });
-    if (d === "*") return back(vr, "booked-near", { p, d: date }); // star: one menu back
-    if (d === "0") return back(vr, "cart");
-    sp(vr, ctx, "not_valid");
-    return back(vr, "altdates", { p, d: date });
+  altdates(ctx, vr) {
+    return back(vr, "booked", { p: ctx.query.get("p")!, d: ctx.query.get("d")! });
   },
 
   async qty(ctx, vr) {
@@ -2075,9 +2038,8 @@ const handlers: Record<string, Handler> = {
     if (!r.ok) {
       if (r.reason === "unavailable") {
         await track(ctx.callSid, "unavailable", r.free > 0 ? `Only ${r.free} ${p.name} left on ${spokenDate(date)} (asked for ${q})` : `${p.name} was just booked for ${spokenDate(date)}`, { item: p.name, productId: p.id, date, asked: q, free: r.free });
-        if (r.free > 0) sp(vr, ctx, "only_some_left", { count: r.free });
-        else sp(vr, ctx, "just_booked", { item: p.name });
-        return back(vr, r.free > 0 ? "qty" : "menu", r.free > 0 ? { p: p.id, d: date } : {});
+        // Abraham, Nov 20, 2026: someone just booked the last one: the same item taken prompt
+        return back(vr, "booked", { p: p.id, d: date });
       }
       sp(vr, ctx, "went_wrong");
       return back(vr, "menu");

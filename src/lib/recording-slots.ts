@@ -17,7 +17,7 @@ export type SlotKind = "line" | "piece" | "word" | "letter" | "item";
 export type Slot = { key: string; kind: SlotKind; group: string; label: string; text: string };
 
 /** Lines no step leads to any more (Abraham, Nov 16, 2026): dropped from the recording list. */
-export const NOT_RECORDED: readonly string[] = ["product_intro", "product_options", "product_default_desc", "phonepay_choice", "phonepay_not_found", "catalog_offer", "box153", "book_note", "book_corporate", "booked_closest", "booked_bigger", "booked_smaller", "booked_keep", "item_taken", "bounce_water_note", "item_added", "keep_shopping", "another_day"];
+export const NOT_RECORDED: readonly string[] = ["product_intro", "product_options", "product_default_desc", "phonepay_choice", "phonepay_not_found", "catalog_offer", "box153", "book_note", "book_corporate", "booked_closest", "booked_bigger", "booked_smaller", "booked_keep", "bounce_water_note", "item_added", "keep_shopping", "another_day"];
 
 /**
  * Hark's 33 number clips (Nov 19, 2026): live numbers, item digits and prices, each its own row, in his order.

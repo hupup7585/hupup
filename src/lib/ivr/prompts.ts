@@ -176,26 +176,11 @@ export const PROMPTS = {
   resume_offer: { group: "Booking by item (key 1)", label: "Welcome back: last call's unfinished cart", text: "Welcome back! On your last call you had in your cart {items} for {date}. To check if they are still available, press 1. To start a new order, press 2.", vars: ["items", "date"] },
   // Item taken, whole phone system (Abraham, Nov 17, 2026), his wording
   // Item booked, whole system (Nov 19, 2026): replaces the bigger and smaller size screen
-  // Item already booked (Abraham, Nov 19, 2026): the first line, then one recording per category, then the nearest date
-  item_booked: { group: "Booking by item (key 1)", label: "Item booked (whole phone system)", text: "I am sorry, the {item} is already booked on {date}.", vars: ["item", "date"] },
-  booked_closest_balloon: { group: "Booking by item (key 1)", label: "Item booked: closest, jumping balloons", text: "For the closest jumping balloon on the same date, press 1." },
-  booked_closest_laser: { group: "Booking by item (key 1)", label: "Item booked: closest, laser tag", text: "For the closest set on the same date, press 1." },
-  booked_closest_paddle: { group: "Booking by item (key 1)", label: "Item booked: closest, paddle boats", text: "For the closest package on the same date, press 1." },
-  booked_nearest: { group: "Booking by item (key 1)", label: "Item booked: the nearest date", text: "For the nearest date this item is free, press 2." },
-  item_taken: { group: "Booking by item (key 1)", label: "Item not available (whole phone system)", text: "The {item} is no longer available for {date}. For the nearest options, press {key}.", vars: ["item", "date", "key"] },
-  taken_options: { group: "Booking by item (key 1)", label: "Item not available: same date or nearest date", text: "For the same date, press 1. For the nearest date this item is free, press 2." },
-  booked_intro: { group: "Booking by item (key 1)", label: "Item booked that day", text: "I am sorry, the {item} is already booked on {date}.", vars: ["item", "date"] },
-  booked_closest: { group: "Booking by item (key 1)", label: "Closest options intro", text: "Here are the closest options for that day." },
-  booked_bigger: { group: "Booking by item (key 1)", label: "Next size up", text: "For the next size up, the {item}, press 1.", vars: ["item"] },
-  booked_smaller: { group: "Booking by item (key 1)", label: "Next size down", text: "For the next size down, the {item}, press 2.", vars: ["item"] },
-  booked_keep: { group: "Booking by item (key 1)", label: "Keep the item, choose another date", text: "To keep the {item} and choose a different date, press 3.", vars: ["item"] },
-  altdate_before: { group: "Booking by item (key 1)", label: "Available the day before", text: "The {item} is available on {date}, the day before. To choose that day, press 1.", vars: ["item", "date"] },
-  altdate_after_also: { group: "Booking by item (key 1)", label: "Also available the day after", text: "It is also available on {date}, the day after. To choose that day, press 2.", vars: ["date"] },
-  altdate_after: { group: "Booking by item (key 1)", label: "Available the day after (only)", text: "The {item} is available on {date}, the day after. To choose that day, press 2.", vars: ["item", "date"] },
-  altdate_not_near: { group: "Booking by item (key 1)", label: "Not available the day before or after", text: "The {item} is not available the day before or after.", vars: ["item"] },
-  altdate_nearest_before: { group: "Booking by item (key 1)", label: "Nearest date before", text: "The nearest date before your date is {date}. To choose it, press 1.", vars: ["date"] },
-  altdate_nearest_after: { group: "Booking by item (key 1)", label: "Nearest date after", text: "The nearest date after your date is {date}. To choose it, press 2.", vars: ["date"] },
-  altdate_other: { group: "Booking by item (key 1)", label: "Try a different date", text: "To try a different date, press 3." },
+  // Item taken (Abraham, Nov 19, 2026, 10:25 PM): ONE prompt for the whole phone system, also when someone just booked the
+  // last one while the caller was choosing. Then the shared cart line and the shared star line.
+  item_taken: { group: "Booking by item (key 1)", label: "Item taken (whole phone system)", text: "We are sorry, the {item} is no longer available for {date}. To check the closest available {category} on the same date, press 1. For the nearest available date, press 2.", vars: ["item", "date", "category"] },
+  // Key 2 on item taken: NOT APPROVED yet (draft for Abraham), on preview only; the live line goes to the date prompt
+  nearest_date: { group: "Booking by item (key 1)", label: "Item taken, key 2: the nearest available date (NOT APPROVED yet)", text: "The {item} is available on {date}. To book it for that date, press 1. Otherwise, please pick another date.", vars: ["item", "date"], pending: true },
 
   // Date & quantity
   date_prompt: { group: "Date & quantity", label: "Ask for the party date", text: "What day is your party? Just say the date, like November 8th. Or type the month and day on your keypad. For November 8th, that is 1, 1, 0, 8." },

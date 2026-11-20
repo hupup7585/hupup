@@ -76,66 +76,25 @@ describe("key 1: booking by item", () => {
     expect(redirect(xml)).toBe(`add?p=${medium}&d=${TUE}&q=1`);
   });
 
-  it("item booked (Nov 19, 2026): one line with the closest item of the kind (1) or the nearest date (2); 1 offers the next size up, else down", async () => {
+  it("item taken (Nov 20, 2026): one prompt; 1 = the free items of that category on that date; 2 = the nearest available date", async () => {
     await book(medium, TUE);
     expect(redirect(await call("qty", {}, `p=${medium}&d=${TUE}`))).toBe(`booked?p=${medium}&d=${TUE}`);
     const taken = await call("booked", {}, `p=${medium}&d=${TUE}`);
     expect(said(taken)).toEqual([
-      "I am sorry, the Medium Castle is already booked on Tuesday, December first.",
-      "For the closest jumping balloon on the same date, press 1.",
-      "For the nearest date this item is free, press 2.",
+      "We are sorry, the Medium Castle is no longer available for Tuesday, December first. To check the closest available jumping balloon on the same date, press 1. For the nearest available date, press 2.",
       "To go to your shopping cart, press 0.",
       "To go back, press star.",
     ]);
-    expect(redirect(await call("taken-choice", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`booked-closest?p=${medium}&d=${TUE}`);
-    expect(redirect(await call("taken-choice", { Digits: "2" }, `p=${medium}&d=${TUE}`))).toBe(`altdates?p=${medium}&d=${TUE}`);
-    expect(redirect(await call("booked-closest", {}, `p=${medium}&d=${TUE}`))).toBe(`balloon?p=${large}`);
-    await book(large, TUE);
-    expect(redirect(await call("booked-closest", {}, `p=${medium}&d=${TUE}`))).toBe(`balloon?p=${small}`);
-    await book(small, TUE);
-    expect(redirect(await call("booked-closest", {}, `p=${medium}&d=${TUE}`))).toBe(`altdates?p=${medium}&d=${TUE}`);
+    h.session.data = {};
+    expect(redirect(await call("taken-choice", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`category?c=${catId}&f=${TUE}`);
+    expect(h.session.data.day).toBe(TUE);
+    // only the free items: the Medium Castle is not in the list for that date
+    expect(redirect(await call("category-choice", { Digits: "2" }, `c=${catId}&f=${TUE}`))).toBe(`qty?p=${large}&d=${TUE}`);
+    expect(redirect(await call("taken-choice", { Digits: "2" }, `p=${medium}&d=${TUE}`))).toBe(`nearest-date?p=${medium}&d=${TUE}`);
+    expect(redirect(await call("taken-choice", { Digits: "0" }, `p=${medium}&d=${TUE}`))).toBe("cart");
+    // old screens send a call still in them to the one prompt
+    for (const old of ["booked-near", "booked-same", "booked-closest", "altdates"]) expect(redirect(await call(old, {}, `p=${medium}&d=${TUE}`))).toBe(`booked?p=${medium}&d=${TUE}`);
   });
-
-  it("another date: only days that work with the whole-rental-day rule are offered", async () => {
-    // The day before (Monday) would be picked up Tuesday morning, while the castle is out on Tuesday: not offered.
-    const xml = await call("altdates", {}, `p=${medium}&d=${TUE}`);
-    expect(said(xml)).toEqual([
-      "The Medium Castle is available on Wednesday, December second, the day after. To choose that day, press 2.",
-      "To try a different date, press 3.",
-      "To go to your shopping cart, press 0.",
-      "To go back, press star.",
-    ]);
-    // An item free on both sides gets both offers
-    const both = said(await call("altdates", {}, `p=${large}&d=2026-12-16`));
-    expect(both).toEqual([
-      "The Large Castle is available on Tuesday, December fifteenth, the day before. To choose that day, press 1.",
-      "It is also available on Thursday, December seventeenth, the day after. To choose that day, press 2.",
-      "To try a different date, press 3.",
-      "To go to your shopping cart, press 0.",
-      "To go back, press star.",
-    ]);
-    expect(redirect(await call("altdate-choice", { Digits: "2" }, action(xml)!.split("?")[1]))).toBe(`qty?p=${medium}&d=2026-12-02`);
-    expect(h.session.data.day).toBe("2026-12-02");
-    expect(redirect(await call("altdate-choice", { Digits: "3" }, action(xml)!.split("?")[1]))).toBe(`date?p=${medium}`);
-  });
-
-  it("neither day open: the nearest open dates before and after (Shabbes skipped)", async () => {
-    // Small Castle: Thursday Dec 10 asked; booked Wed 9 and Fri 11; Shabbes 12 closed -> nearest after is Sunday 13;
-    // before: Tuesday 8 would be picked up Wednesday morning while it's out on the 9th, so Monday 7
-    await book(small, "2026-12-10");
-    await book(small, "2026-12-09");
-    await book(small, "2026-12-11");
-    const xml = await call("altdates", {}, `p=${small}&d=2026-12-10`);
-    expect(said(xml)).toEqual([
-      "The Small Castle is not available the day before or after.",
-      "The nearest date before your date is Monday, December seventh. To choose it, press 1.",
-      "The nearest date after your date is Sunday, December thirteenth. To choose it, press 2.",
-      "To try a different date, press 3.",
-      "To go to your shopping cart, press 0.",
-      "To go back, press star.",
-    ]);
-  });
-
   it("inside a booking, no key (Abraham, Nov 11): the same step again; 9 minutes the warning; 10 minutes the call ends", async () => {
     const q = `p=${medium}&d=${TUE}`;
     const fall = redirect(await call("booked", {}, q))!;
@@ -180,6 +139,27 @@ describe("a closed day (Abraham, Nov 20, 2026)", () => {
       expect(h.session.data.spanDays).toEqual({ "2026-11-27": { after: "2026-11-29", days: 1.5 } });
       expect(redirect(await call("closed-offer-choice", { Digits: "1201" }, `p=${medium}&d=2026-11-28`))).toBe(`date-ask?p=${medium}&d=2026-12-01`);
     } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("item taken, key 2 (Nov 20, 2026)", () => {
+  it("the nearest available date: the draft line on preview (1 books it), then the date prompt and the back line; live: the date prompt only", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-20T15:00:00Z"));
+    try {
+      const xml = await call("nearest-date", {}, `p=${medium}&d=2026-12-01`);
+      const lines = said(xml);
+      expect(lines[0]).toMatch(/^The Medium Castle is available on .+\. To book it for that date, press 1\. Otherwise, please pick another date\.$/);
+      expect(lines.slice(-2)[1]).toBe("To go back, press star.");
+      const near = xml.match(/nearest-choice\?p=\d+&amp;n=([0-9-]+)/)![1];
+      expect(redirect(await call("nearest-choice", { Digits: "1" }, `p=${medium}&n=${near}`))).toBe(`qty?p=${medium}&d=${near}`);
+      process.env.VERCEL_ENV = "production";
+      const live = said(await call("nearest-date", {}, `p=${medium}&d=2026-12-01`));
+      expect(live[0]).toMatch(/^Using your keypad, please enter your event date/);
+    } finally {
+      delete process.env.VERCEL_ENV;
       vi.useRealTimers();
     }
   });

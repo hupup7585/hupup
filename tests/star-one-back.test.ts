@@ -6,9 +6,7 @@ describe("star key", () => {
   const f = readFileSync("src/lib/ivr/flow.ts", "utf8");
   const step = (name: string) => f.slice(f.indexOf(`"${name}"(ctx`), f.indexOf("\n  },", f.indexOf(`"${name}"(ctx`)));
   it("the closest options go back to same date or nearest date; near-choice back to booked", () => {
-    expect(step("booked-choice")).toContain('if (d === "*") return back(vr, "booked-near", { p, d: date });');
-    expect(step("altdate-choice")).toContain('if (d === "*") return back(vr, "booked-near", { p, d: date });');
-    expect(step("near-choice")).toContain('if (d === "*") return back(vr, "booked", { p, d: date });');
+    expect(step("nearest-choice")).toContain('if (d === "*") return starToCategory(vr, Number(p));');
     expect(step("taken-choice")).toContain('if (d === "*") return starToCategory(vr, p);');
     expect(step("after-add")).toContain('if (d === "*") return back(vr, "book");');
     expect(step("catalog-done")).toContain('return back(vr, "catalog");');

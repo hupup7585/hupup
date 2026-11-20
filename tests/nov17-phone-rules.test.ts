@@ -34,7 +34,6 @@ describe("no short forms in any phone prompt", () => {
       .map(([k, d]) => [k, shortForm(d.text)] as const)
       .filter(([, s]) => s);
     expect(found).toEqual([]);
-    expect(PROMPTS.altdate_after_also.text.startsWith("It is also available")).toBe(true);
   });
   it("Admin refuses a short form in a spoken line (possessives are fine)", () => {
     expect(shortForm("It's also available")).toBe("It's");

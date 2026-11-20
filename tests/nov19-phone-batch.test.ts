@@ -48,11 +48,7 @@ describe("approved wording", () => {
   });
   it("bookings menu, welcome back, old cart, item booked, balloons", () => {
     expect(PROMPTS.resume_offer.text).toBe("Welcome back! On your last call you had in your cart {items} for {date}. To check if they are still available, press 1. To start a new order, press 2.");
-    expect(PROMPTS.item_booked.text).toBe("I am sorry, the {item} is already booked on {date}.");
-    expect(PROMPTS.booked_closest_balloon.text).toBe("For the closest jumping balloon on the same date, press 1.");
-    expect(PROMPTS.booked_closest_laser.text).toBe("For the closest set on the same date, press 1.");
-    expect(PROMPTS.booked_closest_paddle.text).toBe("For the closest package on the same date, press 1.");
-    expect(PROMPTS.booked_nearest.text).toBe("For the nearest date this item is free, press 2.");
+    expect(PROMPTS.item_taken.text).toBe("We are sorry, the {item} is no longer available for {date}. To check the closest available {category} on the same date, press 1. For the nearest available date, press 2.");
     expect(PROMPTS.cart_empty.text).toBe("Your shopping cart is empty right now. Let us start shopping!");
     expect(PROMPTS.box156.text).toBe("The total of your order is {amount}. We are happy to let you know that a discount of {discount} has been applied to your order. Your new total is {newtotal}.");
     expect(PROMPTS.book_r1.text).toBe("To receive our catalog by text or email, press 8.");
