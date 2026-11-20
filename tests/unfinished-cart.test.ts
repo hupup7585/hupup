@@ -75,7 +75,7 @@ describe("unfinished phone order", () => {
     expect((h.session.data.dayOrderIds as number[]).length).toBe(1);
     expect(redirect(added)).toBe("resume-added?d=2026-12-22");
     const menu = await call("resume-added", {}, "d=2026-12-22");
-    expect(said(menu)).toEqual(["This item was successfully added to your cart. To go to your shopping cart, press 0. To keep shopping, for same day, press 1. For another day, press 2."]);
+    expect(said(menu)).toEqual(["This item was successfully added to your cart. To go to your shopping cart, press 0. To keep shopping, for same day, press 1. For another day, press 2.", "To go back, press star."]);
     expect(redirect(menu)).toBe("resume-items"); // no key: the next old item
     expect(redirect(await call("resume-added-choice", { Digits: "0" }))).toBe("cart");
     expect(redirect(await call("resume-added-choice", { Digits: "1" }))).toBe("book");

@@ -19,11 +19,24 @@ const ORDINAL_WORDS: Record<string, number> = {
   eighteen: 18, nineteen: 19, twenty: 20, thirty: 30,
 };
 
-export const MAX_DAYS_AHEAD = 366;
+/** Phone bookings: up to the next three months (Abraham, Nov 20, 2026; was a year). Staff in Admin have no limit. */
+export const PHONE_MONTHS_AHEAD = 3;
+
+/** The last date the phone books: the same day three months from today (the month's last day when it is shorter). */
+export function lastPhoneDate(todayISO: string, months = PHONE_MONTHS_AHEAD): string {
+  const [y, m, d] = todayISO.split("-").map(Number);
+  const mm = m - 1 + months;
+  const year = y + Math.floor(mm / 12);
+  const month = (mm % 12) + 1;
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${year}-${pad(month)}-${pad(Math.min(d, last))}`;
+}
 
 export type DateParse =
   | { ok: true; date: string }
   | { ok: false; reason: "unparsed" | "past" | "too_far" | "invalid" };
+
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000);
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -42,7 +55,7 @@ function nextOccurrence(month: number, day: number, todayISO: string): string | 
 function checkRange(iso: string, todayISO: string): DateParse {
   if (!isValidISO(iso)) return { ok: false, reason: "invalid" };
   if (iso < todayISO) return { ok: false, reason: "past" };
-  if (iso > addDays(todayISO, MAX_DAYS_AHEAD)) return { ok: false, reason: "too_far" };
+  if (iso > lastPhoneDate(todayISO)) return { ok: false, reason: "too_far" };
   return { ok: true, date: iso };
 }
 
@@ -54,7 +67,12 @@ export function parseDigitsDate(digits: string, todayISO: string): DateParse {
     const day = Number(d.slice(2));
     if (m < 1 || m > 12 || day < 1 || day > 31) return { ok: false, reason: "invalid" };
     const iso = nextOccurrence(m, day, todayISO);
-    return iso ? checkRange(iso, todayISO) : { ok: false, reason: "invalid" };
+    if (!iso) return { ok: false, reason: "invalid" };
+    const r = checkRange(iso, todayISO);
+    // Nov 20, 2026: a date earlier this year that is closer behind than ahead "has already passed" (not "too far")
+    const thisYear = `${todayISO.slice(0, 4)}-${pad(m)}-${pad(day)}`;
+    if (!r.ok && r.reason === "too_far" && isValidISO(thisYear) && thisYear < todayISO && daysBetween(thisYear, todayISO) < daysBetween(todayISO, iso)) return { ok: false, reason: "past" };
+    return r;
   }
   if (d.length === 8) {
     return checkRange(`${d.slice(4)}-${d.slice(0, 2)}-${d.slice(2, 4)}`, todayISO);

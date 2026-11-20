@@ -589,6 +589,13 @@
       "when": 1795090000000,
       "tag": "0083_sent_kinds",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1795091000000,
+      "tag": "0084_closed_day_span",
+      "breakpoints": true
     }
   ]
 }

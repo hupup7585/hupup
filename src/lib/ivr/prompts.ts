@@ -126,7 +126,7 @@ export const PROMPTS = {
   category_intro: { group: "Browsing", label: "Category intro", text: "Awesome, {category}!", vars: ["category"] },
   category_item: { group: "Browsing", label: "Item option in a category", text: "For the {item}, press {key}.", vars: ["item", "key"] },
   back_to_menu: { group: "Browsing", label: "Go back option (replaced by the one shared star line, Nov 19)", text: "To go back, press star." },
-  category_empty: { group: "Browsing", label: "Category has no items", text: "Sorry, nothing is available in that section right now. Let us head back to the main menu." },
+  category_empty: { group: "Browsing", label: "Category has no items", text: "Sorry, nothing is available in that section right now." }, // Abraham, Nov 20, 2026: then the bookings menu
   product_intro: { group: "Browsing", label: "Item intro", text: "Great choice! The {item} is {price}. Delivery is available for an additional fee, and our team will give you the delivery price.", vars: ["item", "price"] },
   product_options: { group: "Browsing", label: "Item options", text: "To hear more about it, press 1. To add it to your cart, press 2." },
   product_default_desc: { group: "Browsing", label: "Description when an item has none", text: "The {item} is one of our most popular rentals. Kids love it!", vars: ["item"] },
@@ -134,15 +134,15 @@ export const PROMPTS = {
   // Booking by item (Abraham, Nov 9, 2026): category, item, date; if booked, the nearest options
   book_intro: { group: "Booking by item (key 1)", label: "Before the categories", text: "Let us find the right rental for your event." },
   book_category_list: { group: "Booking by item (key 1)", label: "Before the items in a category", text: "Here are our {category}.", vars: ["category"] },
-  book_date_prompt: { group: "Booking by item (key 1)", label: "Ask for the event date (keypad)", text: "Please enter your event date: two digits for the month, then two digits for the day. For example, for March 5th, press 0, 3, 0, 5." },
+  book_date_prompt: { group: "Booking by item (key 1)", label: "Ask for the event date (keypad)", text: "Using your keypad, please enter your event date: two digits for the month, then two digits for the day. For example, for March fifth, press 0, 3, 0, 5." },
   // Chanukah and Chol Hamoed (Abraham, Nov 18, 2026). Box 150 and box 149 approved word for word.
   fri_mutze_check: { group: "Booking by item (key 1)", label: "Box 150: Friday date check (Chanukah and Chol Hamoed only)", text: "You entered {date}. If that is correct, press pound. To keep your rental for Mutze Shabbes, press 1. To enter a different date, press 2.", vars: ["date"] },
   fri_mutze_price: { group: "Booking by item (key 1)", label: "Box 149: Friday plus Mutze Shabbes", text: "For Friday and Mutze Shabbes, you will be charged for only one and a half days, a total of {price}. Your rental will be picked up on {date}, at 9:00 AM. Please make sure it is ready outside on time.", vars: ["price", "date"] },
   fri_only: { group: "Booking by item (key 1)", label: "Friday only (after pound in box 150), NOT APPROVED yet (Abraham's draft, Nov 19)", text: "For Friday, you will be charged for one full day, a total of {price}. Your rental will be picked up one hour after Shabbes. Please make sure it is ready outside on time.", vars: ["price"], pending: true },
   // Laser tag and paddle boats only (Abraham, Nov 19, 2026, approved): box 151 after each one added; press 1 only while
   // another is free that date (box 151 without that sentence when none are left); box 152 after each press of 1.
-  box151: { group: "Booking by item (key 1)", label: "Box 151: laser tag and paddle boats, item added (another one is free)", text: "The {item} has been successfully added to your cart. To add another {item} for the same date, for {price}, press 1. To choose a different rental, press 2. To choose a different date, press 3. To go to your shopping cart, press 0.", vars: ["item", "item", "price"] },
-  box151_none: { group: "Booking by item (key 1)", label: "Box 151 when none are left that date (the same approved words, without the press 1 sentence)", text: "The {item} has been successfully added to your cart. To choose a different rental, press 2. To choose a different date, press 3. To go to your shopping cart, press 0.", vars: ["item"] },
+  box151: { group: "Booking by item (key 1)", label: "Box 151: laser tag and paddle boats, item added (another one is free)", text: "The {item} has been successfully added to your cart. To add another {item} for the same date, for {price}, press 1. To choose a different rental, press 2. To choose a different date, press 3.", vars: ["item", "item", "price"] },
+  box151_none: { group: "Booking by item (key 1)", label: "Box 151 when none are left that date (the same approved words, without the press 1 sentence)", text: "The {item} has been successfully added to your cart. To choose a different rental, press 2. To choose a different date, press 3.", vars: ["item"] },
   box152: { group: "Booking by item (key 1)", label: "Box 152: another one added (then box 151 again)", text: "Another {item} has been successfully added to your cart.", vars: ["item"] },
   // Jumping balloons (Abraham, Nov 19, 2026, approved): box 153 menu, box 154 when a balloon is chosen
   // Old-cart item added (Nov 19, 2026)
@@ -199,22 +199,20 @@ export const PROMPTS = {
 
   // Date & quantity
   date_prompt: { group: "Date & quantity", label: "Ask for the party date", text: "What day is your party? Just say the date, like November 8th. Or type the month and day on your keypad. For November 8th, that is 1, 1, 0, 8." },
-  date_past: { group: "Date & quantity", label: "Date already passed", text: "Hmm, that date has already passed. Let us pick another one." },
-  date_too_far: { group: "Date & quantity", label: "Date too far ahead", text: "We can book up to one year ahead. Let us pick a date a little sooner." },
-  date_unclear: { group: "Date & quantity", label: "Didn't understand the date", text: "Sorry, I did not quite get that date. Let us try that again." },
+  date_past: { group: "Date & quantity", label: "Date already passed", text: "The date you picked has already passed, please pick another date." },
+  date_too_far: { group: "Date & quantity", label: "Date too far ahead", text: "We can book up to the next three months, please pick another date." },
+  date_unclear: { group: "Date & quantity", label: "Did not understand the date", text: "Sorry, I did not get that date. Please try that again." },
   date_confirm_day: { group: "Date & quantity", label: "Confirm the date (whole rental day, delivery and pickup times)", text: "Got it, {date}! We will deliver that day between 9 AM and noon, and pick up on {pickup}. Please have the rental outside your door by 9 AM that morning. If that is right, press pound to continue. To pick a different date, press 1.", vars: ["date", "pickup"] },
   sold_out: { group: "Date & quantity", label: "Item booked up", text: "Oh no, the {item} is all booked up on {date}.", vars: ["item", "date"] },
   sold_out_options_cart: { group: "Date & quantity", label: "Booked-up options (has cart)", text: "To look at other rentals, press 1. To hear your cart, press 9." }, // star line approved Nov 18, 2026
   sold_out_options: { group: "Date & quantity", label: "Booked-up options (no cart)", text: "To try a different date, press 1. To look at other rentals, press 2." }, // star line approved Nov 18, 2026
-  qty_prompt: { group: "Date & quantity", label: "Ask how many", text: "Good news, we have {count} available on {date}! How many would you like? Press a number from 1 to {max}.", vars: ["count", "date", "max"] },
-  qty_invalid: { group: "Date & quantity", label: "Bad quantity", text: "Let us try that again. Please press a number from 1 to 9." },
   only_some_left: { group: "Date & quantity", label: "Fewer left than asked", text: "Oh, only {count} are left for that date.", vars: ["count"] },
   just_booked: { group: "Date & quantity", label: "Someone just booked it", text: "Oh no, someone just grabbed the last {item} for that date.", vars: ["item"] },
 
   // Cart
   // Item added, whole phone system (Abraham, Nov 17, 2026), his wording
   item_added: { group: "Cart", label: "Item added to cart (every time)", text: "This item is successfully added to your cart." },
-  keep_shopping: { group: "Cart", label: "After an item is added: keep shopping or the cart", text: "To keep shopping, press 1. To go to your shopping cart, press 0." },
+  keep_shopping: { group: "Cart", label: "After an item is added: keep shopping or the cart", text: "To keep shopping, press 1." },
   another_day: { group: "Cart", label: "After an item is added: book another day (Abraham)", text: "To book another day, press 2." },
   // Ocean balls after every jumping balloon (Abraham, Nov 17, 2026), his wording ("#" is said as pound)
   ocean_balls: { group: "Cart", label: "Ocean balls (after every jumping balloon)", text: "Would you like to add ocean balls? To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3. To skip, press pound." },
@@ -324,7 +322,9 @@ export const PROMPTS = {
   closed_shabbos_greeting: { group: "Welcome & main menu", label: "Whole hotline on Shabbes: closed greeting (approved Nov 16)", text: "Thank you for calling Hup Up Attractions. We are closed now for Shabbes, and we will be open again on {day} at {time}. Please leave your name, phone number, and a short message after the tone, and we will call you back after Shabbes. Good Shabbes!", vars: ["day", "time"] },
   closed_yomtov_greeting: { group: "Welcome & main menu", label: "Whole hotline on Yom Tov: closed greeting (approved Nov 16)", text: "Thank you for calling Hup Up Attractions. We are closed now for Yom Tov, and we will be open again on {day} at {time}. Please leave your name, phone number, and a short message after the tone, and we will call you back after Yom Tov. Good Yom Tov!", vars: ["day", "time"] },
   office_closed: { group: "Welcome & main menu", label: "Office closed (after the greeting, only when the office is closed; also key 7)", text: "Our office is closed right now, but you can still book anytime using our automated system." },
-  date_closed: { group: "Date & quantity", label: "Chosen date is a closed day", text: "Sorry, we are closed on {date} for {reason}. Let us pick another date.", vars: ["date", "reason"] },
+  date_closed: { group: "Date & quantity", label: "Chosen date is a closed day (no offer: the day before or after is closed too)", text: "Sorry, we are closed on {date} for {reason}. Let us pick another date.", vars: ["date", "reason"] },
+  // Abraham, Nov 20, 2026: a closed day with the day before and the day after both open (then the date prompt and back line)
+  closed_day_offer: { group: "Date & quantity", label: "Closed day: get it the day before (1 books it)", text: "We are closed on {date} for {reason}. You can get it the day before, on {before}, in the morning before 12:00 PM, and keep it until {after}, at 9:00 AM, for a total of {price}. To book it, press 1. Otherwise, please pick another date.", vars: ["date", "reason", "before", "after", "price"] },
   address_outside_area: { group: "Checkout", label: "Address outside the delivery area", text: "Sorry, we only deliver in Kiryas Joel and nearby Orange County towns. Please say a delivery address in our area." },
   address_not_found: { group: "Checkout", label: "Address not found on the map", text: "Sorry, we could not find that address. Please say the full address again: the house number, the street, and the town.", pending: true },
   checkout_total: { group: "Checkout", label: "Order total read-back", text: "Your total is {total}. That is {items} for the rentals, {delivery} for delivery, and {tax} sales tax.", vars: ["total", "items", "delivery", "tax"] },

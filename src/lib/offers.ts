@@ -100,6 +100,13 @@ export async function bestOffer(exec: Exec, orderId: number, s: OfferSettings): 
     const rentals = ls.filter(isRental).reduce((t, l) => t + l.qty * l.unitPriceCents, 0);
     return { discountCents: -Math.round(rentals * (friMutzeDays(s as never) - 1)), note: OFFER_NOTES.friMutze };
   }
+  // A closed day booked from the day before to the day after (Abraham, Nov 20, 2026): its own price, never an offer
+  const sd = await exec.execute(sql`SELECT span_days FROM orders WHERE id = ${orderId}`);
+  const span = Number((sd.rows[0] as { span_days: number | null } | undefined)?.span_days ?? 0);
+  if (span > 1) {
+    const rentals = ls.filter(isRental).reduce((t, l) => t + l.qty * l.unitPriceCents, 0);
+    return { discountCents: -Math.round(rentals * (span - 1)), note: `Closed day: ${span === 1.5 ? "one and a half" : span} days` };
+  }
   if (noPromosOn(o.event_date, s as never)) return { discountCents: 0, note: null };
   // Thursday to Sunday is its own price (1.5 times), never combined with the others (a customer discount included)
   if (on(s.offerThuSunOn) && isThuSun({ eventDate: o.event_date, pickupDate: o.pickup_date })) return { discountCents: thuSunAdjustment(ls), note: OFFER_NOTES.thuSun };

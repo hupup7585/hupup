@@ -83,6 +83,7 @@ export async function recordingChunkAction(form: FormData): Promise<R> {
       const rec = await getRecording(id);
       await log(s.userId, "voice_prompt.recording_uploaded", rec?.promptKey ?? "", { recordingId: id, fileName: rec?.fileName, sizeBytes: rec?.sizeBytes });
       revalidatePath("/admin/phone/prompts");
+      revalidatePath("/admin/phone/prompts/slots"); // the Recording text list shows it too, with Use this one (Nov 20, 2026)
       return { ok: true, message: "Uploaded. It is waiting for you: listen to it below, then press Use this one to put it on the line." };
     }
     return { ok: true, message: "" };
@@ -100,6 +101,7 @@ export async function selectRecordingAction(key: string, id: number): Promise<R>
   }
   await log(s.userId, "voice_prompt.recording_used", key, { recordingId: id });
   revalidatePath("/admin/phone/prompts");
+  revalidatePath("/admin/phone/prompts/slots");
   return { ok: true, message: "Callers hear this recording now." };
 }
 

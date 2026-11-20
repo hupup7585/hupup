@@ -5,7 +5,8 @@ const TODAY = "2026-11-01"; // a Sunday
 
 describe("keypad dates", () => {
   it("MMDD this year", () => expect(parseDigitsDate("1108", TODAY)).toEqual({ ok: true, date: "2026-11-08" }));
-  it("MMDD rolls to next year when passed", () => expect(parseDigitsDate("0615", TODAY)).toEqual({ ok: true, date: "2027-06-15" }));
+  it("MMDD rolls to next year when passed", () => expect(parseDigitsDate("0115", TODAY)).toEqual({ ok: true, date: "2027-01-15" }));
+  it("phone: up to three months ahead (Nov 20, 2026)", () => expect(parseDigitsDate("0615", TODAY)).toEqual({ ok: false, reason: "past" }));
   it("today is allowed", () => expect(parseDigitsDate("1101", TODAY)).toEqual({ ok: true, date: "2026-11-01" }));
   it("rejects bad month", () => expect(parseDigitsDate("1308", TODAY).ok).toBe(false));
   it("rejects Feb 30", () => expect(parseDigitsDate("0230", TODAY).ok).toBe(false));
@@ -25,7 +26,7 @@ describe("spoken dates", () => {
     ["today", "2026-11-01"],
     ["this Friday", "2026-11-06"],
     ["next Sunday", "2026-11-08"],
-    ["June 15", "2027-06-15"],
+    ["January 15", "2027-01-15"],
     ["the 20th", "2026-11-20"],
   ];
   for (const [input, want] of cases) {

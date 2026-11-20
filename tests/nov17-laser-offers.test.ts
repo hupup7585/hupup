@@ -157,7 +157,7 @@ describe("phone: extra laser gun packs after a maze or guns (approved Nov 17)", 
     // Nov 19, 2026: laser tag plays box 151 first; staying on the line goes on to the packs
     expect(redirect(add)).toBe(`another?p=${guns6}&d=${day}`);
     expect(redirect(await call("another-done", {}, `p=${guns6}&d=${day}`))).toBe(`packs?d=${day}`);
-    expect(said(await call("packs", {}, `d=${day}`))).toEqual(["Would you like to add more laser guns? To add a 6-pack of laser guns for $75, press 1. To add a 4-pack of laser guns for $50, press 2. To skip, press pound.", "To go to your shopping cart, press 0."]);
+    expect(said(await call("packs", {}, `d=${day}`))).toEqual(["Would you like to add more laser guns? To add a 6-pack of laser guns for $75, press 1. To add a 4-pack of laser guns for $50, press 2. To skip, press pound.", "To go to your shopping cart, press 0.", "To go back, press star."]);
     const r = await call("packs-choice", { Digits: "1" }, `d=${day}`);
     expect(redirect(r)).toBe("added-menu"); // row 11 after a pack is added (Nov 19, 2026)
     const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, h.session.orderId!));

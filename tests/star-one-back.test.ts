@@ -15,6 +15,6 @@ describe("star key", () => {
   });
   it("only the main menu's own sub-menus send star to the main menu", () => {
     const lines = f.split("\n").filter((l) => /"\*"\) return back\(vr, "menu"\)/.test(l));
-    expect(lines).toHaveLength(3); // catalog (key 8), keys 2 and 3, bookings (key 1)
+    expect(lines).toHaveLength(4); // catalog (key 8), keys 2 and 3, bookings (key 1), welcome back (Nov 20, 2026)
   });
 });

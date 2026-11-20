@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * then kept so the same words are never made twice. Only works while the Owner's switch is on and
  * GOOGLE_TTS_API_KEY is in Vercel (both off today). Signed links only: no one else can make audio here.
  */
-const LIVE_VOICE = "en-US-Chirp3-HD-Achird";
+const LIVE_VOICE = "en-US-Chirp3-HD-Puck"; // Abraham, Nov 20, 2026: the hotline voice stays Puck
 
 export async function GET(req: Request) {
   const u = new URL(req.url);

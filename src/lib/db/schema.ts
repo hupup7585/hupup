@@ -138,6 +138,8 @@ export const orders = pgTable(
     /** Offers (Abraham, Nov 17, 2026): the discount already taken off subtotal_cents, and which offer */
     offerDiscountCents: integer("offer_discount_cents").notNull().default(0),
     offerNote: text("offer_note"),
+    /** A closed day booked from the day before to the day after (Nov 20, 2026): charged as this many days */
+    spanDays: real("span_days"),
     /** When the customer first opened the payment link (Abraham, Nov 17, 2026: then 4 more minutes, once) */
     linkOpenedAt: timestamp("link_opened_at", { withTimezone: true }),
     /** sola | cash | check | other */
@@ -230,6 +232,8 @@ export type CallData = {
    *  whose box 149 still needs its item price (the date came before the item) */
   mutzeDays?: string[];
   mutzeAnnounce?: string;
+  /** Closed-day offers taken (Nov 20, 2026): the day before -> its pickup (the day after) and the days charged */
+  spanDays?: Record<string, { after: string; days: number | null }>;
   /** Key 8 catalog: the number to text, the two parts of the email, and keys typed so far */
   catPhone?: string;
   /** Shared text steps (boxes 142 to 144): what the number is for, and the order whose payment link it gets */

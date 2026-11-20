@@ -63,10 +63,10 @@ describe("key 1: booking by item", () => {
     h.session.data = {};
     expect(redirect(await call("category-choice", { Digits: "2" }, `c=${catId}`))).toBe(`date?p=${medium}`);
     const date = await call("date", {}, `p=${medium}`);
-    expect(said(date)).toEqual(["Please enter your event date: two digits for the month, then two digits for the day. For example, for March 5th, press 0, 3, 0, 5."]);
+    expect(said(date)).toEqual(["Using your keypad, please enter your event date: two digits for the month, then two digits for the day. For example, for March fifth, press 0, 3, 0, 5.", "To go back, press star."]);
     expect(date).not.toContain('input="dtmf speech"');
     expect(redirect(await call("date-heard", { Digits: "1201" }, `p=${medium}`))).toBe(`date-ask?p=${medium}&d=${TUE}`);
-    expect(said(await call("date-ask", {}, `p=${medium}&d=${TUE}`))).toEqual(["You entered Tuesday, December first. If that is correct, press pound to continue. To enter a different date, press 1.", "To go to your shopping cart, press 0."]);
+    expect(said(await call("date-ask", {}, `p=${medium}&d=${TUE}`))).toEqual(["You entered Tuesday, December first. If that is correct, press pound to continue. To enter a different date, press 1.", "To go back, press star."]); // Nov 20, 2026: no cart option here
     expect(redirect(await call("date-confirm", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`date?p=${medium}`);
     expect(redirect(await call("date-confirm", { Digits: "#" }, `p=${medium}&d=${TUE}`))).toBe(`qty?p=${medium}&d=${TUE}`);
   });
@@ -161,5 +161,26 @@ describe("key 1: booking by item", () => {
     expect(spokenDate("2026-03-03")).toBe("Tuesday, March third");
     expect(spokenDate("2026-03-11")).toBe("Wednesday, March eleventh");
     expect(spokenDate("2026-03-22")).toBe("Sunday, March twenty-second");
+  });
+});
+
+describe("a closed day (Abraham, Nov 20, 2026)", () => {
+  it("Shabbes with Friday and Sunday open: get it Friday, keep it until Sunday 9:00 AM, 1.5 times; 1 books it; digits are a new date", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-20T15:00:00Z"));
+    try {
+      h.session.data = {};
+      expect(redirect(await call("date-heard", { Digits: "1128" }, `p=${medium}`))).toBe(`closed-offer?p=${medium}&d=2026-11-28`);
+      const offer = await call("closed-offer", {}, `p=${medium}&d=2026-11-28`);
+      const lines = said(offer);
+      expect(lines[0]).toMatch(/^We are closed on Saturday, November twenty-eighth for .+\. You can get it the day before, on Friday, November twenty-seventh, in the morning before 12:00 PM, and keep it until Sunday, November twenty-ninth, at 9:00 AM, for a total of 225 dollars\. To book it, press 1\. Otherwise, please pick another date\.$/);
+      expect(lines[1]).toMatch(/^Using your keypad, please enter your event date/);
+      expect(lines[2]).toBe("To go back, press star.");
+      expect(redirect(await call("closed-offer-choice", { Digits: "1" }, `p=${medium}&d=2026-11-28`))).toBe(`qty?p=${medium}&d=2026-11-27`);
+      expect(h.session.data.spanDays).toEqual({ "2026-11-27": { after: "2026-11-29", days: 1.5 } });
+      expect(redirect(await call("closed-offer-choice", { Digits: "1201" }, `p=${medium}&d=2026-11-28`))).toBe(`date-ask?p=${medium}&d=2026-12-01`);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

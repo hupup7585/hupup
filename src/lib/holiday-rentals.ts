@@ -75,3 +75,23 @@ export function friMutzeDays(s: HolidaySettings): number {
 export function isFriMutze(o: { eventDate: string; pickupDate: string }, s: HolidaySettings): boolean {
   return friMutzeOffered(o.eventDate, s) && o.pickupDate === friMutzePickup(o.eventDate);
 }
+
+/**
+ * A closed day (Abraham, Nov 20, 2026): "You can get it the day before ... and keep it until {the day after}, at
+ * 9:00 AM". Offered only when the day before and the day after are both open (and the day before is not past).
+ * Price: 1.5 times the rental; Chanukah and Chol Hamoed: 2 full day prices; a Friday with Mutze Shabbes: the Friday
+ * plus Mutze Shabbes days (box 149's rule; that booking is priced by it, so days = null here).
+ */
+export function closedDayOffer(
+  closed: string,
+  today: string,
+  s: HolidaySettings & Record<string, unknown>,
+  isClosed: (iso: string) => boolean,
+): { before: string; after: string; days: number; spanDays: number | null } | null {
+  const before = addDays(closed, -1);
+  const after = addDays(closed, 1);
+  if (before < today || isClosed(before) || isClosed(after)) return null;
+  if (friMutzeOffered(before, s) && after === friMutzePickup(before)) return { before, after, days: friMutzeDays(s), spanDays: null };
+  const days = perDayRules(before, s) || perDayRules(after, s) ? 2 : 1.5;
+  return { before, after, days, spanDays: days };
+}

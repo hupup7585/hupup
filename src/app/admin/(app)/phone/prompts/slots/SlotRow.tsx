@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { recordingChunkAction, selectRecordingAction, startRecordingAction } from "../actions";
 import { confirmSlotAction, markRecordedAction, unconfirmSlotAction } from "./actions";
 
@@ -18,7 +19,13 @@ export default function SlotRow(props: { slotKey: string; label: string; text: s
   const [pending, start] = useTransition();
   const [progress, setProgress] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const run = (fn: () => Promise<{ ok: boolean; message: string }>) => start(async () => setMsg(await fn()));
+  const router = useRouter();
+  // Nov 20, 2026: after every step the list reloads, so a new upload shows its player and the Use this one button
+  const run = (fn: () => Promise<{ ok: boolean; message: string }>) =>
+    start(async () => {
+      setMsg(await fn());
+      router.refresh();
+    });
 
   async function upload(file: File) {
     setMsg(null);
@@ -40,6 +47,7 @@ export default function SlotRow(props: { slotKey: string; label: string; text: s
       if (i === parts - 1) setMsg(r);
     }
     setProgress(null);
+    router.refresh();
   }
 
   return (
@@ -79,7 +87,7 @@ export default function SlotRow(props: { slotKey: string; label: string; text: s
             <>
               <audio controls preload="none" src={props.latestUpload.url} className="h-8 max-w-[14rem]" />
               {!props.playing && (
-                <button className="btn-dark !py-1 text-xs" disabled={pending} onClick={() => run(() => selectRecordingAction(props.slotKey, props.latestUpload!.id))}>
+                <button type="button" className="btn-dark !min-h-8 !py-1 text-xs" disabled={pending} onClick={() => run(() => selectRecordingAction(props.slotKey, props.latestUpload!.id))} data-use-recording>
                   Use this one
                 </button>
               )}
