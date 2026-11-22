@@ -90,26 +90,15 @@ describe("one item at a time (Nov 18, 2026); box 151 and box 152 (approved Nov 1
     expect(PROMPTS).not.toHaveProperty("qty_prompt"); // removed (Nov 20, 2026)
     expect(PROMPTS).not.toHaveProperty("qty_invalid");
   });
-  it("paddle boats: box 151 with press 1 while another is free; 1 adds one more and plays box 152, then box 151 again; none left = no press 1", async () => {
+  it("Nov 22, 2026: paddle boats and laser tag get box 25 like every item; box 151 and box 152 are dropped", async () => {
     h.session.orderId = null;
     h.session.data = {};
     const day = "2026-12-21";
-    expect(redirect(await call("add", {}, `p=${boat}&d=${day}&q=1`))).toBe(`another?p=${boat}&d=${day}`);
-    expect(said(await call("another", {}, `p=${boat}&d=${day}`))).toEqual([
-      "The Paddle boat has been successfully added to your cart. To add another Paddle boat for the same date, for 100 dollars, press 1. To choose a different rental, press 2. To choose a different date, press 3.",
-      "To go to your shopping cart, press 0.",
-      "To go back, press star.",
-    ]);
-    expect(redirect(await call("another-choice", { Digits: "1" }, `p=${boat}&d=${day}&m=1`))).toBe(`add?p=${boat}&d=${day}&q=1&a=1`);
-    const second = await call("add", {}, `p=${boat}&d=${day}&q=1&a=1`);
-    expect(said(second)).toEqual(["Another Paddle boat has been successfully added to your cart."]);
-    expect(redirect(second)).toBe(`another?p=${boat}&d=${day}`);
-    // both boats are now in the cart: box 151 without the press 1 sentence, and 1 does nothing
-    expect(said(await call("another", {}, `p=${boat}&d=${day}`))).toEqual(["The Paddle boat has been successfully added to your cart. To choose a different rental, press 2. To choose a different date, press 3.", "To go to your shopping cart, press 0.", "To go back, press star."]);
-    expect(redirect(await call("another-choice", { Digits: "1" }, `p=${boat}&d=${day}&m=0`))).toBe(`another?p=${boat}&d=${day}`);
-    expect(redirect(await call("another-choice", { Digits: "2" }, `p=${boat}&d=${day}&m=0`))).toBe("book");
-    expect(redirect(await call("another-choice", { Digits: "3" }, `p=${boat}&d=${day}&m=0`))).toBe("date");
-    expect(redirect(await call("another-choice", { Digits: "0" }, `p=${boat}&d=${day}&m=0`))).toBe("cart");
+    expect(redirect(await call("add", {}, `p=${boat}&d=${day}&q=1`))).toBe("added-menu");
+    expect(said(await call("added-menu"))).toEqual(["This item was successfully added to your cart. To keep shopping, for same day, press 1. For another day, press 2.", "To go to your shopping cart, press 0.", "To go back, press star."]);
+    expect(redirect(await call("another", {}, `p=${boat}&d=${day}`))).toBe("added-menu"); // a call still on the old step
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    for (const k of ["box151", "box151_none", "box152"]) expect(PROMPTS).not.toHaveProperty(k);
   });
   it("jumping balloons never offer a second one", async () => {
     h.session.orderId = null;

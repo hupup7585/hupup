@@ -154,10 +154,8 @@ describe("phone: laser guns add-on ONLY right after an inflatable maze (Abraham,
     const day = "2026-12-28";
     h.session.orderId = null;
     h.session.data = {};
-    await call("add", {}, `p=${guns6}&d=${day}&q=1`);
-    expect(redirect(await call("another-done", {}, `p=${guns6}&d=${day}`))).not.toBe(`packs?d=${day}`);
-    await call("add", {}, `p=${maze6}&d=${day}&q=1`);
-    expect(redirect(await call("another-done", {}, `p=${maze6}&d=${day}`))).toBe(`packs?d=${day}`);
+    expect(redirect(await call("add", {}, `p=${guns6}&d=${day}&q=1`))).toBe("added-menu"); // box 25 (Nov 22, 2026)
+    expect(redirect(await call("add", {}, `p=${maze6}&d=${day}&q=1`))).toBe(`packs?d=${day}`);
     expect(said(await call("packs", {}, `d=${day}`))).toEqual([
       "Would you like to add more laser guns? To add a six-pack laser tag for $75, press 1. To add a four-pack laser tag for $50, press 2.",
       "To skip, press pound.",

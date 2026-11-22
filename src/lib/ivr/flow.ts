@@ -759,12 +759,6 @@ export function customerDiscountLine(days: { note: string | null; discountCents:
   return { spoken, beforeCents };
 }
 
-/** Laser tag and paddle boats (Abraham, Nov 18, 2026): one more at a time while more are free. Never jumping balloons. */
-async function oneMoreItem(categoryId: number) {
-  const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, categoryId));
-  return Boolean(cat && /laser|paddle/i.test(cat.name) && cat.name !== LASER_ADDONS_CATEGORY && !ATTRACTIONS["1"].match.test(cat.name));
-}
-
 /** The voicemail box for a menu key: an extension's own box (named after it in Admin), otherwise Main. */
 async function vmBox(x: string | null | undefined) {
   if (x && ((RING_KEYS as readonly string[]).includes(x) || x === "9") && x !== "0") return boxForKey(x, extensionName(await getSettings(), x as RingKey | "9"));
@@ -2169,11 +2163,7 @@ const handlers: Record<string, Handler> = {
     await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted", data: { day: date, dayOrderIds: ids, ...(announce ? { mutzeAnnounce: undefined } : {}) } }, session);
     // Box 149 when the date came before the item: now the item's price is known
     if (announce) await sayFriMutzePrice(vr, ctx, date, p.priceCents);
-    // Laser tag and paddle boats (Abraham, Nov 19, 2026): box 151 after each one added; box 152 after another
-    if (await oneMoreItem(p.categoryId)) {
-      if (ctx.query.get("a") === "1") sp(vr, ctx, "box152", { item: p.name });
-      return back(vr, "another", { p: p.id, d: date });
-    }
+    // Abraham, Nov 22, 2026: box 25 after every item added, laser tag and paddle boats too (box 151 and box 152 dropped)
     // Abraham, Nov 19, 2026: row 11 every time an item is added (no shared cart line after it); a jumping balloon gets
     // the ocean balls question first, a maze or laser guns the extra gun packs first
     if (await isBounceHouse(p.categoryId)) return back(vr, "ocean", { d: date });
@@ -2181,42 +2171,9 @@ const handlers: Record<string, Handler> = {
     return back(vr, "added-menu");
   },
 
-  /**
-   * Box 151 (approved): "The {item} has been successfully added to your cart. To add another {item} for the same date,
-   * for {price}, press 1. ..." Press 1 is offered only while another is free that date; never how many are left.
-   */
-  async another(ctx, vr) {
-    const p = await getProduct(Number(ctx.query.get("p")));
-    const date = ctx.query.get("d")!;
-    if (!p) return back(vr, "book");
-    const left = await checkBookable(p.id, p.quantity, date, db, keptPickup(ctx, date));
-    const g = keypad(vr, url("another-choice", { p: p.id, d: date, m: left > 0 ? 1 : 0 }));
-    if (left > 0) sp(g, ctx, "box151", { item: p.name, price: spokenMoney(p.priceCents) });
-    else sp(g, ctx, "box151_none", { item: p.name });
-    sp(g, ctx, "cart_key"); // Nov 20, 2026: the shared cart line, no longer inside box 151
-    backLine(g, ctx);
-    // No key: a maze or laser guns go on to the extra gun packs; everything else to the cart (as after any item)
-    return back(vr, "another-done", { p: p.id, d: date });
-  },
-
-  async "another-choice"(ctx, vr) {
-    const p = ctx.query.get("p")!;
-    const date = ctx.query.get("d")!;
-    const d = ctx.body.Digits;
-    if (d === "1" && ctx.query.get("m") === "1") return back(vr, "add", { p, d: date, q: 1, a: 1 });
-    if (d === "2") return back(vr, "book"); // a different rental
-    if (d === "3") return back(vr, "date"); // a different date
-    if (d === "0") return back(vr, "cart");
-    if (d === "*") return starToCategory(vr, Number(p));
-    if (d) sp(vr, ctx, "not_valid");
-    return back(vr, "another", { p, d: date });
-  },
-
-  async "another-done"(ctx, vr) {
-    const prod = await getProduct(Number(ctx.query.get("p")));
-    const date = ctx.query.get("d")!;
-    if (prod && (await isMaze(prod)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) return back(vr, "packs", { d: date });
-    return noInput(vr, ctx, "cart");
+  /** Box 151 dropped (Nov 22, 2026): a call still on the old step goes on to box 25. */
+  another(_ctx, vr) {
+    return back(vr, "added-menu");
   },
 
   /**
@@ -2472,10 +2429,11 @@ const handlers: Record<string, Handler> = {
   type(ctx, vr) {
     const f = ctx.query.get("f") as Field;
     const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 15, action: url("typed", { f }), method: "POST" });
-    if (!ctx.query.get("again")) {
-      if (f === "email") sp(g, ctx, "type_email_symbols");
-      sp(g, ctx, "type_instructions"); // ends with "When you are finished, please press pound."
-    }
+    // Box 103 (Nov 22, 2026): the same recording every time an email is typed, in every flow (pound line inside it);
+    // the address gets the same how-to with the space line
+    if (f === "email") sp(g, ctx, "catalog_keypad_help");
+    else if (f === "address" || f === "street") sp(g, ctx, "address_keypad_help");
+    else if (!ctx.query.get("again")) sp(g, ctx, "type_instructions"); // ends with "When you are finished, please press pound."
     return back(vr, "typed", { f });
   },
 

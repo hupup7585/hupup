@@ -83,7 +83,7 @@ describe("typing in the call", () => {
     const back = await call("typed", { Digits: encode("yossi friedman") }, "f=name");
     expect(said(back)).toContain("You typed: Yossi Friedman. If that is right, press pound to continue. To try again, press 1.");
     expect(h.session.data.heard).toBe("Yossi Friedman");
-    expect(said(await call("type", {}, "f=email"))).toContain("For a dot, press 1 once. For the at sign, press 1 twice.");
+    expect(said(await call("type", {}, "f=email"))[0]).toMatch(/^Press a key once for the first letter/); // box 103 for every email (Nov 22, 2026)
   });
   it("nothing usable typed: try again (instructions not repeated)", async () => {
     const xml = await call("typed", { Digits: "" }, "f=address");

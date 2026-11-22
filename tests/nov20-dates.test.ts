@@ -28,7 +28,8 @@ describe("phone dates", () => {
     expect(PROMPTS.closed_day_offer.text).toBe("We are closed on {date} for {reason}. You can get it the day before, on {before}, in the morning before 12:00 PM, and keep it until {after}, at 9:00 AM, for a total of {price}. To book it, press 1. Otherwise, please pick another date.");
     expect(PROMPTS).not.toHaveProperty("qty_prompt");
     expect(PROMPTS).not.toHaveProperty("qty_invalid");
-    for (const k of ["box151", "box151_none", "keep_shopping"] as const) expect(PROMPTS[k].text).not.toContain("shopping cart, press 0");
+    expect(PROMPTS).not.toHaveProperty("box151"); // dropped for box 25 (Nov 22, 2026)
+    for (const k of ["keep_shopping"] as const) expect(PROMPTS[k].text).not.toContain("shopping cart, press 0");
     expect(PROMPTS.resume_added.text).toBe("This item was successfully added to your cart. To keep shopping, for same day, press 1. For another day, press 2.");
     const all = Object.entries(PROMPTS).filter(([k]) => k !== "cart_empty" && k !== "field_unclear").map(([, p]) => p.text).join(" "); // "Let's": the one exception
     expect(all).not.toMatch(/\b(?:don't|can't|won't|we're|you're|it's|let's|isn't|didn't|we'll|you'll)\b/i);

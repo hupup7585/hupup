@@ -64,7 +64,7 @@ describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
     expect(part.indexOf("tone.wav")).toBeGreaterThan(part.indexOf("first part"));
     // 9 9 9 = y, 6 6 6 = o, 7 7 7 7 = s, star, 7 7 7 7 = s, 4 4 4 = i (the first 9 came in the first step)
     const typing = plain(await call("catalog-key", { Digits: "9" }, "part=local"));
-    expect(typing).toContain("To type, press each key once, twice, or three times for its letter.");
+    expect(typing).toContain("Press a key once for the first letter, twice for the second letter, and three times for the third letter."); // box 103 (Nov 22, 2026)
     expect(redirect(await call("catalog-typed", { Digits: "996667777*7777444" }, "part=local"))).toBe("catalog-got?part=local");
     expect(plain(await call("catalog-got", {}, "part=local"))).toContain("We got y o s s i. To continue, press pound. To start over, press 1. To add more, press 2.");
     expect(redirect(await call("catalog-got-choice", { Digits: "#" }, "part=local"))).toBe("catalog-ending");
