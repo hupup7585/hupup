@@ -343,6 +343,11 @@ async function isLaserBase(categoryId: number) {
   return Boolean(cat && /laser/i.test(cat.name) && cat.name !== LASER_ADDONS_CATEGORY);
 }
 
+/** An inflatable maze (Abraham, Nov 19, 2026: the laser guns add-on plays ONLY right after a maze is added). */
+async function isMaze(p: { name: string; categoryId: number }) {
+  return /maze/i.test(p.name) && (await isLaserBase(p.categoryId));
+}
+
 type ResumeLine = NonNullable<CallSession["data"]["resumeLines"]>[number];
 
 const RESUME_PROMPTS = ["resume_offer"] as const;
@@ -2066,7 +2071,7 @@ const handlers: Record<string, Handler> = {
     // Abraham, Nov 19, 2026: row 11 every time an item is added (no shared cart line after it); a jumping balloon gets
     // the ocean balls question first, a maze or laser guns the extra gun packs first
     if (await isBounceHouse(p.categoryId)) return back(vr, "ocean", { d: date });
-    if ((await isLaserBase(p.categoryId)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) return back(vr, "packs", { d: date });
+    if ((await isMaze(p)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) return back(vr, "packs", { d: date });
     return back(vr, "added-menu");
   },
 
@@ -2104,7 +2109,7 @@ const handlers: Record<string, Handler> = {
   async "another-done"(ctx, vr) {
     const prod = await getProduct(Number(ctx.query.get("p")));
     const date = ctx.query.get("d")!;
-    if (prod && (await isLaserBase(prod.categoryId)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) return back(vr, "packs", { d: date });
+    if (prod && (await isMaze(prod)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) return back(vr, "packs", { d: date });
     return noInput(vr, ctx, "cart");
   },
 
@@ -2139,7 +2144,8 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("packs-choice", { d }));
     if (promptWaiting(ctx.prompts, "laser_packs")) say(g, promptText(ctx.prompts, "laser_packs"));
     else sp(g, ctx, "laser_packs");
-    sp(g, ctx, "cart_key"); // the shared cart line in every booking step before the cart (Nov 19, 2026)
+    halfPause(g);
+    sp(g, ctx, "skip_pound"); // the shared skip line (Nov 19, 2026)
     backLine(g, ctx);
     return bookNoInput(vr, ctx, "packs", { d });
   },

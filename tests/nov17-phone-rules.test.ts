@@ -9,7 +9,7 @@ import { IDLE_MINUTES } from "@/lib/late-payment";
 /* Payment flow and phone rules (Abraham, Nov 17, 2026): his exact wording, word for word. */
 describe("the approved lines, word for word", () => {
   it("laser packs (box 25b) is live", () => {
-    expect(PROMPTS.laser_packs.text).toBe("Would you like to add more laser guns? To add a 6-pack of laser guns for $75, press 1. To add a 4-pack of laser guns for $50, press 2. To skip, press pound.");
+    expect(PROMPTS.laser_packs.text).toBe("Would you like to add more laser guns? To add a six-pack laser tag for $75, press 1. To add a four-pack laser tag for $50, press 2."); // Nov 19, 2026; then the shared skip line
     expect((PROMPTS.laser_packs as PromptDef).pending).toBeUndefined();
   });
   it("payment flow, boxes 140 to 146", () => {

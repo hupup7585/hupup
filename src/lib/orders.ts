@@ -102,7 +102,40 @@ async function reserveInTx(
   return { ok: true, orderId };
 }
 
+/**
+ * Laser guns add-on price (Abraham, Nov 19, 2026): the add-on prices ($75 six-pack, $50 four-pack) apply only while an
+ * inflatable maze is on the same booking. Without a maze, the guns are charged the regular price of the same guns
+ * (the "6 Laser Guns" / "4 Laser Guns" item); with a maze again, the add-on price comes back. Nothing else changes.
+ */
+export const LASER_ADDONS_GROUP = "Laser tag add-ons";
+async function repriceLaserAddOns(tx: Tx | typeof db, orderId: number) {
+  const r = await tx.execute(sql`
+    SELECT oi.id, oi.unit_price_cents, p.name, p.price_cents, c.name AS cat
+    FROM order_items oi JOIN products p ON p.id = oi.product_id JOIN categories c ON c.id = p.category_id
+    WHERE oi.order_id = ${orderId}`);
+  const rows = r.rows as { id: number; unit_price_cents: number; name: string; price_cents: number; cat: string }[];
+  const addons = rows.filter((x) => x.cat === LASER_ADDONS_GROUP);
+  if (!addons.length) return;
+  const hasMaze = rows.some((x) => x.cat !== LASER_ADDONS_GROUP && /laser/i.test(x.cat) && /maze/i.test(x.name));
+  for (const a of addons) {
+    let target = a.price_cents;
+    if (!hasMaze) {
+      const n = /(\d+)\s*-?\s*pack/i.exec(a.name)?.[1];
+      if (n) {
+        const reg = await tx.execute(sql`
+          SELECT p.price_cents FROM products p JOIN categories c ON c.id = p.category_id
+          WHERE c.name <> ${LASER_ADDONS_GROUP} AND c.name ~* 'laser' AND p.name !~* 'maze' AND p.name ~* ${`^[[:space:]]*${n}[[:space:]]+laser guns`}
+          ORDER BY p.active DESC, p.id LIMIT 1`);
+        const price = (reg.rows[0] as { price_cents: number } | undefined)?.price_cents;
+        if (price) target = price;
+      }
+    }
+    if (target !== a.unit_price_cents) await tx.execute(sql`UPDATE order_items SET unit_price_cents = ${target} WHERE id = ${a.id}`);
+  }
+}
+
 async function recalcSubtotal(tx: Tx | typeof db, orderId: number) {
+  await repriceLaserAddOns(tx, orderId);
   // Offers (Abraham, Nov 17, 2026; Owner switches, all off by default): the rentals total after the one offer
   const { bestOffer, offerSwitches } = await import("@/lib/offers");
   const offer = await bestOffer(tx, orderId, await offerSwitches(tx));

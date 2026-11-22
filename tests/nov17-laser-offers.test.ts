@@ -94,13 +94,14 @@ describe("laser tag third pack 50% off (Owner switch)", () => {
     expect(o.subtotalCents).toBe(31250 + 5000);
     await saveSetting("offerLaserThirdPackOn", false);
   });
-  it("guns only count too: 6 guns + two 6-packs, the 3rd pack half off", async () => {
+  it("guns only count too: 6 guns + two 6-packs (regular price without a maze), the 3rd pack half off", async () => {
     await saveSetting("offerLaserThirdPackOn", true);
     const r = await reserveItem({ orderId: null, productId: guns6, qty: 1, eventDate: "2026-12-21", channel: "POS", status: "CONFIRMED" });
     if (!r.ok) throw new Error("no order");
     await reserveItem({ orderId: r.orderId, productId: ids.pack6, qty: 2, eventDate: "2026-12-21", channel: "POS", status: "CONFIRMED" });
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId));
-    expect(o.subtotalCents).toBe(11000 + 7500 + 3750);
+    // Nov 19, 2026: no maze on this booking, so the packs are the regular 6 guns price ($110), the 3rd one half off
+    expect(o.subtotalCents).toBe(11000 + 11000 + 5500);
     await saveSetting("offerLaserThirdPackOn", false);
   });
 });
@@ -148,32 +149,37 @@ describe("4th Sunday free (Owner switch)", () => {
   });
 });
 
-describe("phone: extra laser gun packs after a maze or guns (approved Nov 17)", () => {
-  it("after the guns: the item added line, then the packs question; 1 adds a 6-pack to the same day", async () => {
+describe("phone: laser guns add-on ONLY right after an inflatable maze (Abraham, Nov 19, 2026)", () => {
+  it("after plain laser guns: no add-on question; after a maze: the question, the shared skip line, the back line", async () => {
     const day = "2026-12-28";
-    const add = await call("add", {}, `p=${guns6}&d=${day}&q=1`);
-    // Box 151 says the item was added (Nov 19, 2026)
-    expect(said(await call("another", {}, `p=${guns6}&d=${day}`))[0]).toMatch(/has been successfully added to your cart\./);
-    // Nov 19, 2026: laser tag plays box 151 first; staying on the line goes on to the packs
-    expect(redirect(add)).toBe(`another?p=${guns6}&d=${day}`);
-    expect(redirect(await call("another-done", {}, `p=${guns6}&d=${day}`))).toBe(`packs?d=${day}`);
-    expect(said(await call("packs", {}, `d=${day}`))).toEqual(["Would you like to add more laser guns? To add a 6-pack of laser guns for $75, press 1. To add a 4-pack of laser guns for $50, press 2. To skip, press pound.", "To go to your shopping cart, press 0.", "To go back, press star."]);
+    h.session.orderId = null;
+    h.session.data = {};
+    await call("add", {}, `p=${guns6}&d=${day}&q=1`);
+    expect(redirect(await call("another-done", {}, `p=${guns6}&d=${day}`))).not.toBe(`packs?d=${day}`);
+    await call("add", {}, `p=${maze6}&d=${day}&q=1`);
+    expect(redirect(await call("another-done", {}, `p=${maze6}&d=${day}`))).toBe(`packs?d=${day}`);
+    expect(said(await call("packs", {}, `d=${day}`))).toEqual([
+      "Would you like to add more laser guns? To add a six-pack laser tag for $75, press 1. To add a four-pack laser tag for $50, press 2.",
+      "To skip, press pound.",
+      "To go back, press star.",
+    ]);
     const r = await call("packs-choice", { Digits: "1" }, `d=${day}`);
-    expect(redirect(r)).toBe("added-menu"); // row 11 after a pack is added (Nov 19, 2026)
+    expect(redirect(r)).toBe("added-menu");
     const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, h.session.orderId!));
-    expect(items.map((i) => i.productId)).toContain(ids.pack6);
+    expect(items.find((i) => i.productId === ids.pack6)?.unitPriceCents).toBe(7500);
     expect(redirect(await call("packs-choice", { Digits: "#" }, `d=${day}`))).toBe("added-menu");
   });
-  it("approved (box 25b): the packs question plays on the live line too", async () => {
-    process.env.VERCEL_ENV = "production";
-    const add = await call("add", {}, `p=${guns6}&d=2026-12-29&q=1`);
-    delete process.env.VERCEL_ENV;
-    expect(redirect(add)).toBe(`another?p=${guns6}&d=2026-12-29`); // box 151 is approved: live too
-    process.env.VERCEL_ENV = "production";
-    try {
-      expect(redirect(await call("another-done", {}, `p=${guns6}&d=2026-12-29`))).toBe("packs?d=2026-12-29");
-    } finally {
-      delete process.env.VERCEL_ENV;
-    }
+  it("the add-on price holds only while the maze is in the cart: without the maze the six-pack is the regular 6 guns price", async () => {
+    const r1 = await reserveItem({ orderId: null, productId: maze6, qty: 1, eventDate: "2027-01-11", channel: "POS", status: "CONFIRMED" });
+    if (!r1.ok) throw new Error("no maze");
+    await reserveItem({ orderId: r1.orderId, productId: ids.pack6, qty: 1, eventDate: "2027-01-11", channel: "POS", status: "CONFIRMED" });
+    const price = async () => (await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, r1.orderId))).find((i) => i.productId === ids.pack6)!.unitPriceCents;
+    expect(await price()).toBe(7500);
+    await db.delete(schema.orderItems).where(eq(schema.orderItems.productId, maze6));
+    await refreshOrderTotals(r1.orderId);
+    expect(await price()).toBe(11000); // "6 Laser Guns", the regular price
+    await db.insert(schema.orderItems).values({ orderId: r1.orderId, productId: maze6, qty: 1, unitPriceCents: 20000 });
+    await refreshOrderTotals(r1.orderId);
+    expect(await price()).toBe(7500);
   });
 });

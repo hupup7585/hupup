@@ -204,7 +204,7 @@ export const PROMPTS = {
   // The one shared skip recording (Abraham, Nov 19, 2026): after every add-on offer with a skip
   skip_pound: { group: "Cart", label: "Shared: skip (after ocean balls, laser guns, delivery directions, promo texts)", text: "To skip, press pound." },
   // Laser tag extra packs (Abraham, Nov 17, 2026): offered after a maze or guns, like ocean balls. Approved word for word.
-  laser_packs: { group: "Cart", label: "Extra laser gun packs (after a maze or guns; sheet box 25b, approved)", text: "Would you like to add more laser guns? To add a 6-pack of laser guns for $75, press 1. To add a 4-pack of laser guns for $50, press 2. To skip, press pound." },
+  laser_packs: { group: "Cart", label: "Laser guns add-on (only right after an inflatable maze is added)", text: "Would you like to add more laser guns? To add a six-pack laser tag for $75, press 1. To add a four-pack laser tag for $50, press 2." }, // Nov 19, 2026: only after an inflatable maze; then the shared skip line
   added: { group: "Cart", label: "Item added to cart", text: "Woohoo! I added {items} to your cart for {date}. It is saved just for you while we are on the phone.", vars: ["items", "date"] },
   after_add: { group: "Cart", label: "After adding", text: "To keep shopping, press 1. To check out, press 9." },
   cart_empty: { group: "Cart", label: "Cart is empty (0 in an item list; then the same list again)", text: "Your shopping cart is empty right now. Let us start shopping!" },
