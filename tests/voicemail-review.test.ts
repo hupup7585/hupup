@@ -163,22 +163,22 @@ describe("every path", () => {
     const line = plain(await call("vm-none", {}, `b=${b}`));
     expect(line).toContain("We did not receive a message. To try again, press 3. Otherwise, you may hang up.");
     expect(line).not.toContain(PROMPTS.vm_sent.text);
-    expect(line).toContain("/api/voice/no-key?to=vm-none"); // repeats (3 plays and 20 seconds rule)
+    expect(line).toContain("/api/voice/idle?to=vm-none"); // Nov 22, 2026: the system-wide no-key rule
     expect(plain(await call("vm-none-choice", { Digits: "3" }, `b=${b}`))).toMatch(/<Record [^>]*finishOnKey="#"/);
     expect(plain(await call("vm-none-choice", { Digits: "5" }, `b=${b}`))).toContain("/api/voice/vm-none");
     expect(await call("vm-option", { Digits: "1" })).not.toContain("Your message has been sent");
     expect(PROMPTS.vm_none_retry.text).toBe("We did not receive a message. To try again, press 3. Otherwise, you may hang up.");
   });
 
-  it("no key: the options repeat; after 3 plays AND 20 seconds the call ends and the message is kept (Abraham, Nov 11)", async () => {
+  it("no key: the options repeat; after 1 full minute with no key the call ends and the message is kept (Nov 22, 2026)", async () => {
     const b = (await mainBox()).id;
     await call("vm-recorded", rec("RE6", { Digits: "#" }), `b=${b}`);
     await ready("RE6", b);
     expect(plain(await call("vm-option", { Digits: "7" }))).toContain("/api/voice/vm-options"); // wrong key: the options again
-    const t0 = Date.now();
-    expect(plain(await call("vm-options", {}, `np=1&t0=${t0}`))).toContain(`/api/voice/no-key?to=vm-options&np=2&t0=${t0}`);
-    expect(plain(await call("no-key", {}, `to=vm-options&np=3&t0=${t0}`))).toContain("/api/voice/vm-options?np=3"); // under 20 seconds: again
-    const end = plain(await call("no-key", {}, `to=vm-options&np=3&t0=${t0 - 21_000}`));
+    // Nov 22, 2026: the system-wide no-key rule; the call ends after 1 full minute with no key
+    expect(plain(await call("vm-options", {}))).toContain("/api/voice/idle?to=vm-options");
+    expect(plain(await call("idle", {}, `to=vm-options`))).toContain("/api/voice/vm-options?nk=");
+    const end = plain(await call("idle", {}, `to=vm-options&nk=${Date.now() - 61_000}`));
     expect(end).toContain("<Hangup/>");
     expect((await row("RE6")).state).toBe("reviewing");
     await handleCallStatus(h.session.callSid, "completed"); // the call ended: the message is kept

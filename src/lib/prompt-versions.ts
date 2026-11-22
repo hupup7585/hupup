@@ -19,6 +19,9 @@ export function shortForm(text: string): string | null {
   return m ? m[1] : null;
 }
 
+/** Lines where Abraham approved "Let's" (Nov 22, 2026): the empty cart and the shared did-not-catch line. */
+export const LETS_ALLOWED = new Set(["cart_empty", "field_unclear"]);
+
 export function validateWording(key: string, text: string): string {
   if (!(key in PROMPTS)) throw new PromptError("Unknown line.");
   const def = PROMPTS[key as PromptKey] as PromptDef;
@@ -30,7 +33,8 @@ export function validateWording(key: string, text: string): string {
   if (!def.message && !def.lines && clean.includes("\n")) throw new PromptError("A spoken line is one paragraph (no new lines).");
   // No short forms in any phone prompt (Abraham, Nov 17, 2026): "it is", never "it's"
   // Abraham's one approved exception (Nov 22, 2026): "Let's start shopping!" in the empty cart line
-  const short = def.message ? null : shortForm(key === "cart_empty" ? clean.replace(/\bLet['’]s\b/g, "Let us") : clean);
+  // "Let's" is allowed only in Abraham's approved lines (Nov 22, 2026)
+  const short = def.message ? null : shortForm(LETS_ALLOWED.has(key) ? clean.replace(/\bLet['’]s\b/g, "Let us") : clean);
   if (short) throw new PromptError(`Please spell it out: no short forms on the phone (found "${short}"). For example "it is", "that is", "we will", "do not".`);
   const missing = (def.vars ?? []).filter((v) => !clean.includes(`{${v}}`));
   if (missing.length) throw new PromptError(`Keep these changing parts in the wording: ${missing.map((m) => `{${m}}`).join(", ")}`);

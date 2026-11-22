@@ -118,7 +118,9 @@ export const PROMPTS = {
 
   // Errors & retries
   idle_warning: { group: "Errors & retries", label: "Inside a booking: 9 minutes with no key (Abraham)", text: "Are you still there? Please press any key to continue. Otherwise, this call will end in one minute." },
-  no_input: { group: "Errors & retries", label: "Didn't hear anything", text: "Sorry, I did not catch that. No problem, let us try that again." },
+  no_input: { group: "Errors & retries", label: "Old no-key line (replaced by the no-choice line, Nov 22, 2026)", text: "Sorry, I did not catch that. No problem, let us try that again." },
+  // System-wide no key (Abraham, Nov 22, 2026): after 5 seconds, then the same screen again
+  no_choice: { group: "Errors & retries", label: "No key pressed (every key menu, after 5 seconds; then the same screen)", text: "We did not get your choice. Please try again." },
   no_input_final: { group: "Errors & retries", label: "Disconnect line (no key after 3 plays of a menu, or 10 minutes idle in a booking)", text: "It sounds like we got disconnected, but you can call us back at any time. Thank you for calling Hup Up Attractions. Bye for now!" },
   tech_error: { group: "Errors & retries", label: "Technical problem", text: "Oops, something went wrong on our end. Please call back in a few minutes. Sorry about that!" },
   went_wrong: { group: "Errors & retries", label: "Something went wrong, back to menu", text: "Sorry, something went wrong. Let us head back to the main menu." },
@@ -255,7 +257,8 @@ export const PROMPTS = {
   type_email_symbols: { group: "Checkout", label: "Typing: email symbols", text: "For a dot, press 1 once. For the at sign, press 1 twice." },
   typed_back: { group: "Checkout", label: "Typing: read back", text: "You typed: {value}. If that is right, press pound to continue. To try again, press 1.", vars: ["value"] },
   heard: { group: "Checkout", label: "Read back what we heard", text: "I heard: {value}. If that is right, press pound to continue. To try again, press 1.", vars: ["value"] },
-  field_unclear: { group: "Checkout", label: "Didn't catch it", text: "Sorry, I did not catch that. No problem, let us try that again." },
+  // ONE shared did-not-catch line (Abraham, Nov 22, 2026): name, address, email, keypad typing, catalog email part
+  field_unclear: { group: "Checkout", label: "Shared: did not catch it (name, address, email, typing, catalog email)", text: "Sorry, I did not catch that. Let's try again." },
   email_unclear: { group: "Checkout", label: "Didn't catch the email", text: "Sorry, I could not quite catch that email. Let us try that again." },
   email_skip: { group: "Checkout", label: "Skipping email", text: "No problem, we will skip the email." },
   field_trouble: { group: "Checkout", label: "Having trouble hearing", text: "I am having a little trouble hearing you." },

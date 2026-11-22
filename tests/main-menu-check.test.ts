@@ -141,7 +141,7 @@ describe("key 2: instructions", () => {
       expect(xml).toContain(P("not_valid"));
       expect(redirect(xml)).toBe("instructions?again=1");
     }
-    expect(redirect(await call("attraction-choice", {}, { m: "i" }))).toMatch(/^no-key\?to=instructions&q=again%3D1&np=1&t0=\d+$/); // information menus: the same 3 plays and 20 seconds rule
+    expect(redirect(await call("attraction-choice", {}, { m: "i" }))).toBe("idle?to=instructions&q=again%3D1"); // Nov 22, 2026: the system-wide no-key rule
     const after = text(await call("attraction-after", { Digits: "#" }, { m: "i", t: "1" }));
     expect(after).toContain(P("not_valid"));
     expect(redirect(after)).toBe("attraction-options?m=i&t=1");

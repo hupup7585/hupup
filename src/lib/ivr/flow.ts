@@ -178,7 +178,7 @@ function keypad(vr: VR, action: string, opts: { numDigits?: number; timeout?: nu
   return vr.gather({
     input: ["dtmf"],
     numDigits: opts.numDigits ?? 1,
-    timeout: opts.timeout ?? 6,
+    timeout: opts.timeout ?? NO_KEY_SECONDS,
     finishOnKey: opts.finishOnKey ?? "",
     action,
     method: "POST",
@@ -228,7 +228,6 @@ function speech(vr: VR, action: string, hints: string, opts: { dtmf?: boolean; n
 
 /** Inside a booking (Abraham, Nov 11): no key -> "Sorry, I didn't catch that..." and the same step again (idle rule). */
 function noInput(vr: VR, ctx: Ctx, retryAction: string, retryParams: Record<string, string | number | undefined> = {}) {
-  sp(vr, ctx, "no_input");
   return idleNoKey(vr, ctx, retryAction, retryParams);
 }
 
@@ -240,6 +239,10 @@ function noInput(vr: VR, ctx: Ctx, retryAction: string, retryParams: Record<stri
  * warning plays; after 10 minutes the call ends. Hanging up in voicemail still keeps the message.
  */
 export const MENU_PLAYS_BEFORE_END = 3;
+/** System-wide no key (Abraham, Nov 22, 2026): 5 seconds, then the no-choice line and the same screen again. */
+export const NO_KEY_SECONDS = 5;
+/** The call ends only after 1 full minute with no key, counted from when the screen finished playing. */
+export const NO_KEY_END_MS = 60_000;
 export const MENU_MIN_SECONDS = 20;
 export const IDLE_WARN_MS = 9 * 60_000;
 export const IDLE_END_MS = 10 * 60_000;
@@ -252,6 +255,7 @@ const encodeTo = (action: string, params: Record<string, string | number | undef
 
 /** Menus: the fallthrough after a play with no key. np = plays finished, t0 = when the first play started. */
 function repeatMenu(vr: VR, ctx: Ctx, action: string, params: Record<string, string | number | undefined> = {}) {
+  if (action !== "menu") return idleNoKey(vr, ctx, action, params); // Nov 22, 2026: only the main menu keeps its 3 plays
   const np = Number(ctx.query.get("np") || 0) + 1;
   const t0 = Number(ctx.query.get("t0")) || Date.now();
   vr.redirect({ method: "POST" }, url("no-key", { ...encodeTo(action, params), np, t0 }));
@@ -260,7 +264,8 @@ function repeatMenu(vr: VR, ctx: Ctx, action: string, params: Record<string, str
 
 /** Inside a booking: the fallthrough after a step with no key (the idle clock decides). */
 function idleNoKey(vr: VR, ctx: Ctx, action: string, params: Record<string, string | number | undefined> = {}) {
-  vr.redirect({ method: "POST" }, url("idle", encodeTo(action, params)));
+  // nk = when the screen first finished with no key (kept while the caller keeps not pressing; a key press drops it)
+  vr.redirect({ method: "POST" }, url("idle", { ...encodeTo(action, params), nk: ctx.query.get("nk") ?? undefined }));
   return vr;
 }
 
@@ -1079,26 +1084,23 @@ const handlers: Record<string, Handler> = {
     return toStep(vr, ctx, { np, t0 });
   },
 
-  /** Inside a booking with no key: the same step; at 9 minutes the warning, at 10 minutes the call ends. */
+  /**
+   * No key (Abraham, Nov 22, 2026, every key menu but the main menu): "We did not get your choice. Please try again."
+   * and the same screen again. The call ends only after 1 full minute with no key, counted from when the screen first
+   * finished playing (never mid-play), with the goodbye line.
+   */
   idle(ctx, vr) {
-    const idle = idleMs(ctx);
-    if (idle >= IDLE_END_MS) {
+    const nk = Number(ctx.query.get("nk")) || Date.now() - NO_KEY_SECONDS * 1000;
+    if (Date.now() - nk >= NO_KEY_END_MS) {
       sp(vr, ctx, "no_input_final");
       vr.hangup();
       return vr;
     }
-    if (idle >= IDLE_WARN_MS) {
-      const to = ctx.query.get("to") ?? undefined;
-      const q = ctx.query.get("q") ?? undefined;
-      const g = vr.gather({ input: ["dtmf"], numDigits: 1, finishOnKey: "", timeout: Math.max(5, Math.ceil((IDLE_END_MS - idle) / 1000)), action: url("idle-key", { to, q }), method: "POST" });
-      sp(g, ctx, "idle_warning");
-      vr.redirect({ method: "POST" }, url("idle", { to, q }));
-      return vr;
-    }
-    return toStep(vr, ctx);
+    sp(vr, ctx, "no_choice");
+    return toStep(vr, ctx, { nk });
   },
 
-  /** Any key after the warning: back to the same step. */
+  /** Old links (the 9-minute warning is gone): back to the same step. */
   "idle-key"(ctx, vr) {
     return toStep(vr, ctx);
   },
@@ -1297,7 +1299,7 @@ const handlers: Record<string, Handler> = {
     const part = ctx.query.get("part") === "domain" ? "domain" : "local";
     const value = catPart(ctx, part);
     if (!value) {
-      sp(vr, ctx, "email_unclear");
+      sp(vr, ctx, "field_unclear");
       return back(vr, "catalog-part", { part });
     }
     const g = keypad(vr, url("catalog-got-choice", { part }));
@@ -1315,7 +1317,7 @@ const handlers: Record<string, Handler> = {
     if (d === "#") {
       const ok = part === "domain" ? validDomain(value) : validLocal(value);
       if (!ok) {
-        sp(vr, ctx, "email_unclear");
+        sp(vr, ctx, "field_unclear");
         return back(vr, "catalog-part", { part });
       }
       return back(vr, part === "domain" ? "catalog-final" : "catalog-ending");
@@ -2174,13 +2176,13 @@ const handlers: Record<string, Handler> = {
   /** Extra laser gun packs after a maze or guns (Abraham, Nov 17, 2026): 1 = 6-pack $75, 2 = 4-pack $50, # skips. */
   packs(ctx, vr) {
     const d = ctx.query.get("d")!;
-    const g = keypad(vr, url("packs-choice", { d }));
+    const g = keypad(vr, url("packs-choice", { d }), { timeout: 4 });
     if (promptWaiting(ctx.prompts, "laser_packs")) say(g, promptText(ctx.prompts, "laser_packs"));
     else sp(g, ctx, "laser_packs");
     halfPause(g);
     sp(g, ctx, "skip_pound"); // the shared skip line (Nov 19, 2026)
     backLine(g, ctx);
-    return bookNoInput(vr, ctx, "packs", { d });
+    return back(vr, "added-menu"); // no key for 4 seconds: nothing added (Nov 22, 2026)
   },
 
   async "packs-choice"(ctx, vr) {
@@ -2211,12 +2213,13 @@ const handlers: Record<string, Handler> = {
   ocean(ctx, vr) {
     const d = ctx.query.get("d")!;
     const n = ctx.query.get("n") ?? undefined;
-    const g = keypad(vr, url("ocean-choice", { d, n }));
+    const g = keypad(vr, url("ocean-choice", { d, n }), { timeout: 4 });
     sp(g, ctx, "ocean_balls");
     halfPause(g);
     sp(g, ctx, "skip_pound"); // the shared skip line (Nov 19, 2026)
     backLine(g, ctx);
-    return bookNoInput(vr, ctx, "ocean", { d, n });
+    // an add-on offer with no key for 4 seconds: nothing added, straight on (Nov 22, 2026)
+    return n === "resume" ? back(vr, "resume-added", { d }) : back(vr, "added-menu");
   },
 
   async "ocean-choice"(ctx, vr) {
@@ -2300,7 +2303,7 @@ const handlers: Record<string, Handler> = {
     const retry = Number(n || 0) > 0;
     const ownStar = f === "street" || f === "unit"; // these lines already say "press star to type it"
     const question = (g: Gather) => {
-      if (retry) sp(g, ctx, "retry_spoken");
+      if (retry) sp(g, ctx, "field_unclear"); // the one shared did-not-catch line (Nov 22, 2026)
       else {
         spPreviewDraft(g, ctx, prompt);
         if (!ownStar) {
@@ -2428,7 +2431,7 @@ const handlers: Record<string, Handler> = {
         // Abraham, Nov 15, 2026: name and address can never be skipped. A person takes it, or the caller types it.
         return config.forwardPhone() ? back(vr, "operator") : back(vr, "type", { f });
       }
-      if (f === "email") sp(vr, ctx, "email_unclear"); // other fields: the ask step plays only the retry line
+      // the ask step plays the shared did-not-catch line itself (Nov 22, 2026)
       return back(vr, "ask", { f, n });
     }
     await track(ctx.callSid, "said", `Said ${f}: ${value}`, { field: f, value, raw, ...(viaStt ? { via: "speech to text" } : {}) });
@@ -2787,7 +2790,9 @@ const handlers: Record<string, Handler> = {
     }
     // Abraham, Nov 15, 2026: yes or no questions are answered by key only (1 yes, 2 no), never by speech
     const g = keypad(vr, url("sms-consent-answer", { n: ctx.query.get("n") ?? undefined }), { timeout: 8 });
-    sp(g, ctx, retry && ctx.query.get("k") !== "1" ? "consent_unclear" : "consent_transactional");
+    // Nov 22, 2026: no answer = the system-wide no-choice line, then the same question
+    if (retry && ctx.query.get("k") !== "1") sp(g, ctx, "no_choice");
+    sp(g, ctx, "consent_transactional");
     backLine(g, ctx);
     return vr;
   },
@@ -2920,7 +2925,8 @@ const handlers: Record<string, Handler> = {
   "pay-consent"(ctx, vr) {
     const o = ctx.query.get("o") ?? undefined;
     const g = keypad(vr, url("pay-consent-answer", { o, n: ctx.query.get("n") ?? undefined }), { timeout: 8 });
-    sp(g, ctx, Number(ctx.query.get("n") || 0) > 0 ? "consent_unclear" : "consent_transactional");
+    if (Number(ctx.query.get("n") || 0) > 0) sp(g, ctx, "no_choice"); // Nov 22, 2026: the system-wide no-choice line
+    sp(g, ctx, "consent_transactional");
     return back(vr, "pay-consent-answer", { o, n: ctx.query.get("n") ?? undefined });
   },
 

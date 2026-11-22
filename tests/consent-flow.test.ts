@@ -168,7 +168,8 @@ describe("transactional consent step (before the payment link)", () => {
     expect(h.recorded).toHaveLength(0);
     expect(xml).toContain("/api/voice/sms-consent?n=1");
     xml = await call("sms-consent", {}, "n=1");
-    expect(xml).toContain(PROMPTS.consent_unclear.text);
+    expect(xml).toContain(PROMPTS.no_choice.text); // Nov 22, 2026: the system-wide no-choice line, then the same question
+    expect(xml).toContain(PROMPTS.consent_transactional.text.slice(0, 40));
     xml = await call("sms-consent-answer", {}, "n=1");
     expect(h.recorded[0]).toMatchObject({ action: "declined", response: "no answer" });
     expect(h.session.data.smsConsent).toBe("no");

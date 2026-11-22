@@ -58,7 +58,7 @@ describe("address in steps (preview)", () => {
     expect(ask).toContain("/audio/tone.wav</Play></Gather>");
     expect(redirect(await call("heard", { SpeechResult: "" }, "f=street"))).toBe("ask?f=street&n=1");
     const again = await call("ask", {}, "f=street&n=1");
-    expect(said(again)).toEqual(["Sorry, we did not catch that. Please try again."]);
+    expect(said(again)).toEqual(["Sorry, I did not catch that. Let's try again."]); // the one shared did-not-catch line (Nov 22, 2026)
     expect(again).toContain("/audio/tone.wav");
     expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("type?f=street");
   });
