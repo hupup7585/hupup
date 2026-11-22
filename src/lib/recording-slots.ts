@@ -1,4 +1,4 @@
-import { PROMPTS, promptRecordable, type PromptDef, type PromptKey } from "@/lib/ivr/prompts";
+import { PIECE_ALIAS, PROMPTS, SHARED_PIECES, promptRecordable, type PromptDef, type PromptKey } from "@/lib/ivr/prompts";
 import { LETTERS, WORDS, pluralName } from "@/lib/spoken-words";
 export { LETTERS, WORDS, numberWords, ordinalWords, wordSlotsFor } from "@/lib/spoken-words";
 
@@ -43,11 +43,15 @@ export function pieces(text: string): string[] {
 export function allSlots(items: { id: number; name: string }[] = [], texts: Record<string, string | null | undefined> = {}): Slot[] {
   const out: Slot[] = [];
   for (const [k, d] of Object.entries(PROMPTS) as [PromptKey, PromptDef][]) {
-    if ((d as { textOnly?: boolean }).textOnly || NOT_RECORDED.includes(k)) continue;
+    if ((d as { textOnly?: boolean }).textOnly || (d as PromptDef).parts || NOT_RECORDED.includes(k)) continue;
     const text = texts[k]?.trim() || d.text;
     if (promptRecordable(k)) out.push({ key: k, kind: "line", group: d.group, label: d.label, text });
-    else pieces(text).forEach((p, i) => out.push({ key: `${k}#${i + 1}`, kind: "piece", group: d.group, label: `${d.label}, piece ${i + 1}`, text: p }));
+    else pieces(text).forEach((p, i) => {
+      if (!PIECE_ALIAS[`${k}#${i + 1}`]) out.push({ key: `${k}#${i + 1}`, kind: "piece", group: d.group, label: `${d.label}, piece ${i + 1}`, text: p });
+    });
   }
+  // Shared pieces (Nov 22, 2026): one recording each, used inside several lines
+  for (const x of SHARED_PIECES) out.push({ key: x.key, kind: "piece", group: x.group, label: x.label, text: x.text });
   const clips = new Set(NUMBER_CLIPS.map((w) => w.toLowerCase()));
   for (const w of NUMBER_CLIPS) out.push({ key: `word:${w.toLowerCase()}`, kind: "word", group: "Number clips (live numbers, item digits, prices)", label: w, text: w });
   for (const w of WORDS) if (!clips.has(w.toLowerCase())) out.push({ key: `word:${w.toLowerCase()}`, kind: "word", group: "Dates and times", label: w, text: w });

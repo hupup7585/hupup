@@ -25,7 +25,7 @@ describe("phone dates", () => {
     expect(PROMPTS.date_unclear.text).toBe("Sorry, I did not get that date. Please try that again.");
     expect(PROMPTS.book_date_entered.text).toBe("You entered {date}. If that is correct, press pound to continue. To enter a different date, press 1.");
     expect(PROMPTS.category_empty.text).toBe("Sorry, nothing is available in that section right now. Please check again later.");
-    expect(PROMPTS.closed_day_offer.text).toBe("We are closed on {date} for {reason}. You can get it the day before, on {before}, in the morning before 12:00 PM, and keep it until {after}, at 9:00 AM, for a total of {price}. To book it, press 1. Otherwise, please pick another date.");
+    expect(PROMPTS.closed_day_intro.text).toBe("We are closed on {date} for {reason}."); // box 17 in pieces (Nov 22, 2026)
     expect(PROMPTS).not.toHaveProperty("qty_prompt");
     expect(PROMPTS).not.toHaveProperty("qty_invalid");
     expect(PROMPTS).not.toHaveProperty("box151"); // dropped for box 25 (Nov 22, 2026)

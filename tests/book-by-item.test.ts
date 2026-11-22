@@ -135,12 +135,12 @@ describe("a closed day (Abraham, Nov 20, 2026)", () => {
       expect(redirect(await call("date-heard", { Digits: "1128" }, `p=${medium}`))).toBe(`closed-offer?p=${medium}&d=2026-11-28`);
       const offer = await call("closed-offer", {}, `p=${medium}&d=2026-11-28`);
       const lines = said(offer);
-      expect(lines[0]).toMatch(/^We are closed on Saturday, November twenty-eighth for .+\. You can get it the day before, on Friday, November twenty-seventh, in the morning before 12:00 PM, and keep it until Sunday, November twenty-ninth, at 9:00 AM, for a total of 225 dollars\. To book it, press 1\. Otherwise, please pick another date\.$/);
-      expect(lines[1]).toMatch(/^Using your keypad, please enter your event date/);
-      expect(lines[2]).toBe("To go back, press star.");
+      // Box 17 in pieces (Abraham, Nov 22, 2026): 1 books it, 2 another date, star back
+      expect(lines[0]).toMatch(/^We are closed on Saturday, November twenty-eighth for .+\.$/);
+      expect(lines.slice(1)).toEqual(["You can get it the day before, on Friday, November twenty-seventh and keep it until Sunday, November twenty-ninth at 9:00 AM, for a total of 225 dollars.", "To book it, press 1.", "To pick another date, press 2.", "To go back, press star."]);
       expect(redirect(await call("closed-offer-choice", { Digits: "1" }, `p=${medium}&d=2026-11-28`))).toBe(`qty?p=${medium}&d=2026-11-27`);
       expect(h.session.data.spanDays).toEqual({ "2026-11-27": { after: "2026-11-29", days: 1.5 } });
-      expect(redirect(await call("closed-offer-choice", { Digits: "1201" }, `p=${medium}&d=2026-11-28`))).toBe(`date-ask?p=${medium}&d=2026-12-01`);
+      expect(redirect(await call("closed-offer-choice", { Digits: "2" }, `p=${medium}&d=2026-11-28`))).toBe(`date?p=${medium}`);
     } finally {
       vi.useRealTimers();
     }

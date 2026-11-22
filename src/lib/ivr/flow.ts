@@ -352,6 +352,13 @@ async function isLaserBase(categoryId: number) {
   return Boolean(cat && /laser/i.test(cat.name) && cat.name !== LASER_ADDONS_CATEGORY);
 }
 
+/** Laser tag sets and paddle boat packages get a second one offered in box 25 (Abraham, Nov 22, 2026). */
+async function secondOneKind(categoryId: number): Promise<"laser" | "paddle" | null> {
+  if (await isLaserBase(categoryId)) return "laser";
+  const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, categoryId));
+  return cat && /paddle/i.test(cat.name) ? "paddle" : null;
+}
+
 /** An inflatable maze (Abraham, Nov 19, 2026: the laser guns add-on plays ONLY right after a maze is added). */
 async function isMaze(p: { name: string; categoryId: number }) {
   return /maze/i.test(p.name) && (await isLaserBase(p.categoryId));
@@ -1714,10 +1721,11 @@ const handlers: Record<string, Handler> = {
     await track(ctx.callSid, "category_heard", `Listened to ${cat.name}`, { category: cat.name, items: items.map((p) => p.name) });
     // Jumping balloons: box 153 (Abraham, Nov 19, 2026)
     if (await isBounceHouse(c)) return back(vr, "balloons", { c, f: f ?? undefined });
-    // Laser tag (box 13b, Nov 22, 2026): the four fixed lines, then the shared cart and star lines (no opening line)
+    // Laser tag (box 13b, Nov 22, 2026): the opening, the four fixed lines, then the shared cart and star lines
     if (await isLaserBase(c)) {
       const list = laserList(items);
       const g = keypad(vr, url("category-choice", { c, f: f ?? undefined }));
+      sp(g, ctx, "laser_open");
       for (const x of list) {
         if (x.line) sp(g, ctx, x.line);
         else sp(g, ctx, "category_item", { item: x.p.name, key: x.key });
@@ -1728,7 +1736,8 @@ const handlers: Record<string, Handler> = {
     }
     // 10 or more items (Abraham, Nov 17, 2026): two-key choices (10, 11, 12) work; a single key acts after a short wait
     const g = keypad(vr, url("category-choice", { c, f: f ?? undefined }), items.length > 9 ? { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS } : {});
-    sp(g, ctx, "book_category_list", { category: cat.spokenName || cat.name });
+    if (/paddle/i.test(cat.name)) sp(g, ctx, "paddle_open"); // Nov 22, 2026: "Here are our paddle boat packages."
+    else sp(g, ctx, "book_category_list", { category: cat.spokenName || cat.name });
     sp(g, ctx, "cart_key"); // Abraham (Phone Menu v3): the cart line before the items and again after them
     items.forEach((p, i) => sp(g, ctx, "category_item", { item: p.name, key: i + 1 }));
     sp(g, ctx, "cart_key");
@@ -1943,15 +1952,12 @@ const handlers: Record<string, Handler> = {
     const offer = prod ? closedDayOffer(date, todayISO(), cal as never, (iso) => dayInfo(iso, cal).closed) : null;
     if (!prod || !offer) return back(vr, "date", { p });
     const day = dayInfo(date, cal);
-    const g = keypad(vr, url("closed-offer-choice", { p, d: date }), { numDigits: 4, timeout: 4 });
-    sp(g, ctx, "closed_day_offer", {
-      date: spokenDate(date),
-      reason: day.reasonEn ?? day.reason ?? "a holiday",
-      before: spokenDate(offer.before),
-      after: spokenDate(offer.after),
-      price: spokenMoney(Math.round(prod.priceCents * offer.days)),
-    });
-    sp(g, ctx, "book_date_prompt");
+    // Box 17 (Nov 22, 2026): recorded pieces with the live parts between them; 1 books it, 2 another date, star back
+    const g = keypad(vr, url("closed-offer-choice", { p, d: date }));
+    sp(g, ctx, "closed_day_intro", { date: spokenDate(date), reason: day.reasonEn ?? day.reason ?? "a holiday" });
+    sp(g, ctx, "closed_day_get", { before: spokenDate(offer.before), after: spokenDate(offer.after), price: spokenMoney(Math.round(prod.priceCents * offer.days)) });
+    sp(g, ctx, "closed_book_it");
+    sp(g, ctx, "closed_pick_another");
     backLine(g, ctx);
     return bookNoInput(vr, ctx, "closed-offer", { p, d: date });
   },
@@ -1961,7 +1967,12 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     const d = ctx.body.Digits ?? "";
     if (!d) return bookNoInput(vr, ctx, "closed-offer", { p, d: date });
-    if (d !== "1") return handlers["date-heard"](ctx, vr); // star, or a new date
+    if (d === "2") return back(vr, "date", { p }); // pick another date
+    if (d === "*") return handlers["date-heard"](ctx, vr); // star: one step back, the item's list
+    if (d !== "1") {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "closed-offer", { p, d: date });
+    }
     const cal = await getSettings();
     const offer = closedDayOffer(date, todayISO(), cal as never, (iso) => dayInfo(iso, cal).closed);
     if (!offer) return back(vr, "date", { p });
@@ -2168,7 +2179,54 @@ const handlers: Record<string, Handler> = {
     // the ocean balls question first, a maze or laser guns the extra gun packs first
     if (await isBounceHouse(p.categoryId)) return back(vr, "ocean", { d: date });
     if ((await isMaze(p)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) return back(vr, "packs", { d: date });
+    // Box 25 for laser tag and paddle boats (Nov 22, 2026): the added line, then a second one while another is free
+    if (await secondOneKind(p.categoryId)) return back(vr, "added-second", { p: p.id, d: date, q });
     return back(vr, "added-menu");
+  },
+
+  /**
+   * Box 25, laser tag and paddle boats (Abraham, Nov 22, 2026): "Successfully added to your cart: {Qnt} {item} for
+   * {date}." then, only after the first one and while another is free that date (never how many), "To add a second
+   * one, press 1." and "Otherwise, stay on the line." Key 1 works until the keep-shopping line starts.
+   */
+  async "added-second"(ctx, vr) {
+    const p = await getProduct(Number(ctx.query.get("p")));
+    const date = ctx.query.get("d")!;
+    if (!p) return back(vr, "added-menu");
+    const kind = await secondOneKind(p.categoryId);
+    const q = Number(ctx.query.get("q") || 1);
+    const inCart = (await cartLines(ctx)).filter((l) => l.date === date && l.name === p.name).reduce((t, l) => t + l.qty, 0);
+    const free = await checkBookable(p.id, p.quantity, date, db, keptPickup(ctx, date));
+    const added = { qty: q, item: q === 1 ? p.name : pluralName(p.name), date: spokenDate(date) };
+    if (!kind || inCart !== 1 || free <= 0) return back(vr, "added-rest", { p: p.id, d: date, q });
+    const g = keypad(vr, url("second-choice", { p: p.id, d: date }), { timeout: 4 });
+    sp(g, ctx, "box25_added", added);
+    sp(g, ctx, kind === "laser" ? "second_laser" : "second_paddle");
+    sp(g, ctx, "stay_on_line");
+    return back(vr, "added-rest", { p: p.id, d: date }); // no key: on to the keep-shopping line
+  },
+
+  async "second-choice"(ctx, vr) {
+    const p = ctx.query.get("p")!;
+    const date = ctx.query.get("d")!;
+    const d = ctx.body.Digits;
+    if (d === "1") return back(vr, "add", { p, d: date, q: 1 }); // one more of the same item, the same date
+    if (d === "0") return back(vr, "cart");
+    if (d === "*") return starToCategory(vr, Number(p));
+    if (d) sp(vr, ctx, "not_valid");
+    return back(vr, "added-second", { p, d: date });
+  },
+
+  /** Box 25 after the second-one offer: the keep-shopping line, the cart line, the star line (as after any item). */
+  async "added-rest"(ctx, vr) {
+    const g = keypad(vr, url("after-add"));
+    const p = ctx.query.get("q") ? await getProduct(Number(ctx.query.get("p"))) : null;
+    const q = Number(ctx.query.get("q") || 1);
+    if (p) sp(g, ctx, "box25_added", { qty: q, item: q === 1 ? p.name : pluralName(p.name), date: spokenDate(ctx.query.get("d")!) });
+    sp(g, ctx, "box25_keep");
+    sp(g, ctx, "cart_key");
+    backLine(g, ctx);
+    return noInput(vr, ctx, "cart");
   },
 
   /** Box 151 dropped (Nov 22, 2026): a call still on the old step goes on to box 25. */
@@ -2329,7 +2387,8 @@ const handlers: Record<string, Handler> = {
       return back(vr, "book");
     }
     const g = keypad(vr, url("remove-choice"), lines.length > 9 ? { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS } : {});
-    sp(g, ctx, "remove_count", { amount: lines.length });
+    if (lines.length === 1) sp(g, ctx, "remove_count_one"); // "one, item" (Nov 22, 2026)
+    else sp(g, ctx, "remove_count", { amount: lines.length });
     lines.forEach((l, i) => sp(g, ctx, "remove_item", { item: l.name, key: i + 1 }));
     backLine(g, ctx);
     return noInput(vr, ctx, "remove");
@@ -2580,30 +2639,54 @@ const handlers: Record<string, Handler> = {
     return back(vr, "ask", { f: "street" });
   },
 
+  // Address steps 2 to 4 (Abraham, Nov 22, 2026, final): keypad only, the shared pound line, then the shared star line
   "addr-house"(ctx, vr) {
     const g = keypad(vr, url("addr-house-heard"), { numDigits: 7, timeout: 10, finishOnKey: "#" });
-    spPreviewDraft(g, ctx, "addr_house");
+    sp(g, ctx, "addr_house");
+    sp(g, ctx, "pound_done");
+    backLine(g, ctx);
     return repeatMenu(vr, ctx, "addr-house");
   },
 
   async "addr-house-heard"(ctx, vr) {
+    if ((ctx.body.Digits || "").includes("*")) return back(vr, "ask", { f: "street" }); // star: one step back
     const digits = (ctx.body.Digits || "").replace(/\D/g, "");
     if (!/^[0-9]{1,6}$/.test(digits) || /^0+$/.test(digits)) {
       sp(vr, ctx, "not_valid");
       return back(vr, "addr-house");
     }
     await updateSession(ctx.callSid, { data: { house: digits } }, ctx.session);
-    return back(vr, "ask", { f: "unit" });
+    return back(vr, "addr-unit");
+  },
+
+  /** Step 3: the unit number on the keypad; pound with nothing typed = no unit. */
+  "addr-unit"(ctx, vr) {
+    const g = keypad(vr, url("addr-unit-heard"), { numDigits: 7, timeout: 10, finishOnKey: "#" });
+    sp(g, ctx, "addr_unit");
+    sp(g, ctx, "pound_done");
+    sp(g, ctx, "addr_unit_skip");
+    backLine(g, ctx);
+    return repeatMenu(vr, ctx, "addr-unit");
+  },
+
+  async "addr-unit-heard"(ctx, vr) {
+    const raw = ctx.body.Digits || "";
+    if (raw.includes("*")) return back(vr, "addr-house"); // star: one step back
+    const unit = raw.replace(/\D/g, "");
+    await updateSession(ctx.callSid, { data: { unit: unit || undefined } }, ctx.session);
+    return back(vr, "addr-zip");
   },
 
   "addr-zip"(ctx, vr) {
     const g = keypad(vr, url("addr-zip-choice"));
-    spPreviewDraft(g, ctx, "addr_zip");
+    sp(g, ctx, "addr_zip");
+    backLine(g, ctx);
     return repeatMenu(vr, ctx, "addr-zip");
   },
 
   async "addr-zip-choice"(ctx, vr) {
     const d = ctx.body.Digits;
+    if (d === "*") return back(vr, "addr-unit"); // star: one step back
     if (d === "1") {
       await updateSession(ctx.callSid, { data: { zip: DEFAULT_ZIP } }, ctx.session);
       return back(vr, "addr-check");

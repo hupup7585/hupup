@@ -154,7 +154,7 @@ describe("phone: laser guns add-on ONLY right after an inflatable maze (Abraham,
     const day = "2026-12-28";
     h.session.orderId = null;
     h.session.data = {};
-    expect(redirect(await call("add", {}, `p=${guns6}&d=${day}&q=1`))).toBe("added-menu"); // box 25 (Nov 22, 2026)
+    expect(redirect(await call("add", {}, `p=${guns6}&d=${day}&q=1`))).toBe(`added-second?p=${guns6}&d=${day}&q=1`); // box 25 with the second one (Nov 22, 2026)
     expect(redirect(await call("add", {}, `p=${maze6}&d=${day}&q=1`))).toBe(`packs?d=${day}`);
     expect(said(await call("packs", {}, `d=${day}`))).toEqual([
       "Would you like to add more laser guns? To add a six-pack laser tag for $75, press 1. To add a four-pack laser tag for $50, press 2.",
@@ -183,10 +183,11 @@ describe("phone: laser guns add-on ONLY right after an inflatable maze (Abraham,
 });
 
 describe("laser tag list (box 13b, Abraham, Nov 22, 2026)", () => {
-  it("four fixed lines in order (no opening line), then the cart and star lines; the keys pick those items", async () => {
+  it("the opening line (Nov 22, 2026), four fixed lines in order, then the cart and star lines; the keys pick those items", async () => {
     const [cat] = await db.select().from(schema.categories).where(eq(schema.categories.name, "Laser Tag and Inflatable Mazes"));
     const xml = await call("category", {}, `c=${cat.id}`);
-    const lines = said(xml);
+    expect(said(xml)[0]).toBe("Here are our laser tag sets.");
+    const lines = said(xml).slice(1);
     expect(lines.slice(0, 3)).toEqual([
       "For the inflatable maze with a six-pack of laser guns, press 1.",
       "For the inflatable maze with a four-pack of laser guns, press 2.",

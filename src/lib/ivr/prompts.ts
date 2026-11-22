@@ -21,6 +21,23 @@ export type PromptDef = {
   message?: boolean;
   /** A spoken prompt of several lines (the main menu): one line per sentence, new lines allowed, up to 1,200 characters. */
   lines?: boolean;
+  /** Put together only from recordings of other slots (pieces and shared pieces), never its own recording. */
+  parts?: string[];
+};
+
+/**
+ * Shared pieces (Abraham, Nov 22, 2026): one recording used inside several lines ("for" in box 17, box 18 and box 25;
+ * "one, item" for a cart with one item). Listed once in Admin, under their own key.
+ */
+export const SHARED_PIECES: { key: string; group: string; label: string; text: string }[] = [
+  { key: "piece:for", group: "Date & quantity", label: "Shared piece: for (box 17, box 18 and box 25)", text: "for" },
+  { key: "piece:one_item", group: "Cart", label: "Cart - one item", text: "one, item" },
+];
+/** A line's own piece that plays a shared piece instead (the slot is listed once, under the shared key). */
+export const PIECE_ALIAS: Record<string, string> = {
+  "closed_day_intro#2": "piece:for",
+  "box18_book#2": "piece:for",
+  "box25_added#2": "piece:for",
 };
 
 export const PROMPTS = {
@@ -144,6 +161,12 @@ export const PROMPTS = {
   fri_only: { group: "Booking by item (key 1)", label: "Friday only (after pound in box 150), NOT APPROVED yet (Abraham's draft, Nov 19)", text: "For Friday, you will be charged for one full day, a total of {price}. Your rental will be picked up one hour after Shabbes. Please make sure it is ready outside on time.", vars: ["price"], pending: true },
   // Jumping balloons (Abraham, Nov 19, 2026, approved): box 153 menu, box 154 when a balloon is chosen
   // Old-cart item added (Nov 19, 2026)
+  // Box 25 for laser tag and paddle boats (Abraham, Nov 22, 2026): a second one while another is free that date
+  box25_added: { group: "Booking by item (key 1)", label: "Box 25 (laser tag and paddle boats): Successfully added to your cart", text: "Successfully added to your cart: {qty} {item} for {date}.", vars: ["qty", "item", "date"] },
+  second_laser: { group: "Booking by item (key 1)", label: "Box 25, laser tag: To add a second one, press 1", text: "To add a second one, press 1." },
+  second_paddle: { group: "Booking by item (key 1)", label: "Box 25, paddle boats: To add a second one, press 1", text: "To add a second one, press 1." },
+  stay_on_line: { group: "Booking by item (key 1)", label: "Shared: Otherwise, stay on the line (add-on offers)", text: "Otherwise, stay on the line." },
+  box25_keep: { group: "Booking by item (key 1)", label: "Box 25 (laser tag and paddle boats): keep shopping", text: "To keep shopping, for same day, press 1. For another day, press 2." },
   resume_added: { group: "Booking by item (key 1)", label: "Box 25: item added (every item, laser tag and paddle boats too; then the shared cart line and the star line)", text: "This item was successfully added to your cart. To keep shopping, for same day, press 1. For another day, press 2." },
   // Jumping balloons list (Nov 19, 2026, replaces box 153): the opening, then one line per balloon, then the cart line
   // Jumping balloon list (Abraham, Nov 22, 2026): each balloon = 3 fixed recordings: name, full item number, "press N."
@@ -190,8 +213,8 @@ export const PROMPTS = {
   laser_item_4: { group: "Booking by item (key 1)", label: "Laser tag list, key 4", text: "For a four-pack of laser guns without the maze, press 4." },
   balloons_open: { group: "Booking by item (key 1)", label: "Jumping balloons list: opening", text: "Here are our jumping balloons. Please note, our jumping balloons are not for water use." },
   // Laser tag and paddle boats lists (Nov 19, 2026): openings not final; slots only, not on the live line yet
-  laser_open: { group: "Booking by item (key 1)", label: "Laser tag list: opening (not final)", text: "Here are our laser tag sets.", pending: true },
-  paddle_open: { group: "Booking by item (key 1)", label: "Paddle boats list: opening (not final)", text: "Here are our paddle boat packages.", pending: true },
+  laser_open: { group: "Booking by item (key 1)", label: "Laser tag list: opening", text: "Here are our laser tag sets." },
+  paddle_open: { group: "Booking by item (key 1)", label: "Paddle boat list: opening", text: "Here are our paddle boat packages." },
   box153: { group: "Booking by item (key 1)", label: "Box 153: jumping balloons menu (replaced by the new list, Nov 19)", text: "For Soft Hop, item seven two zero one, press 1. For Sunlight Spot, item seven two zero two, press 2. For Blue Bounce, item seven two zero three, press 3. For Ball Buster, item seven two zero four, press 4. For Rising Joy, item seven two zero five, press 5. For Family Fun, item seven two zero six, press 6. For Adventure Zone, item seven two zero seven, press 7. For Wide Slide, item seven two zero eight, press 8. For Amusing Obstacle, item seven two zero nine, press 9. For Mega Mountain, item seven two one zero, press 1 0. For Bounce Blast, item seven two one one, press 1 1. For Wheel Thrill, item seven two one two, press 1 2. To go back, press star." },
   box154: { group: "Booking by item (key 1)", label: "Box 154: jumping balloon chosen", text: "{item}, item {number}, {price}. To add it to your shopping cart, press 1. For description and dimensions, press 2.", vars: ["item", "number", "price"] },
   box155: { group: "Booking by item (key 1)", label: "Box 155: balloon description and dimensions (NOT APPROVED yet)", text: "The {item} is {description}. The dimensions are as follows: {length} feet long, {width} feet wide, and {height} feet tall. To add it to your shopping cart, press 1.", vars: ["item", "description", "length", "width", "height"], pending: true },
@@ -247,6 +270,7 @@ export const PROMPTS = {
   cart_total: { group: "Cart", label: "Cart: rental total", text: "Your rental total is {total}, plus delivery and sales tax.", vars: ["total"] },
   cart_options: { group: "Cart", label: "Cart options (then the shared star line; no cart line)", text: "To check out, press 1. To keep shopping, press 2. To remove an item from your cart, press 3. To refresh your cart and start over, press 4." },
   // Remove an item (box 29b and 29a, Abraham, Nov 22, 2026)
+  remove_count_one: { group: "Cart", label: "Remove an item: one item in the cart (You have in your cart, then the shared piece one, item)", text: "You have in your cart one, item.", parts: ["remove_count#1", "piece:one_item"] },
   remove_count: { group: "Cart", label: "Remove an item: how many items", text: "You have in your cart {amount} items.", vars: ["amount"] },
   remove_item: { group: "Cart", label: "Remove an item: one line per item", text: "To remove the {item}, press {key}.", vars: ["item", "key"] },
   remove_qty: { group: "Cart", label: "Remove an item: more than one of it", text: "You have {qty} {item}.", vars: ["qty", "item"] },
@@ -263,9 +287,11 @@ export const PROMPTS = {
   // retry line are approved; steps 2 to 7 are drafts: the steps run on preview only until he approves them.
   addr_street: { group: "Checkout", label: "Address step 1: street name (approved)", text: "Thanks! Please say the street name of the delivery address after the tone. Or press star to type it on your keypad." },
   retry_spoken: { group: "Checkout", label: "Any spoken answer not understood (approved; the step's own line is not repeated)", text: "Sorry, we did not catch that. Please try again." },
-  addr_house: { group: "Checkout", label: "Address step 2: house number (draft)", text: "Now, with your keypad, please enter the house number. When you are finished, please press pound.", pending: true },
-  addr_unit: { group: "Checkout", label: "Address step 3: apartment or unit (draft)", text: "Thanks! Please say the apartment or unit number after the tone. Or press star to type it on your keypad. If there is no apartment or unit number, please press pound.", pending: true },
-  addr_zip: { group: "Checkout", label: "Address step 4: zip code (draft)", text: "Thanks! To continue with Monroe, New York, one zero nine five zero, press 1. To enter a different zip code, press 2.", pending: true },
+  addr_house: { group: "Checkout", label: "Address step 2 - house number", text: "Now, with your keypad, please enter the house number." },
+  pound_done: { group: "Checkout", label: "Shared - When you are done, press pound", text: "When you are done, press pound." },
+  addr_unit: { group: "Checkout", label: "Address step 3 - unit number", text: "Thanks, with your keypad, please enter the unit number." },
+  addr_unit_skip: { group: "Checkout", label: "Address step 3 - no unit, press pound to skip", text: "If there is no unit number, press pound to skip." },
+  addr_zip: { group: "Checkout", label: "Address step 4 - Monroe or a different zip code", text: "To continue with Monroe, New York, one zero nine five zero, press 1. To enter a different zip code, press 2." },
   addr_zip_enter: { group: "Checkout", label: "Address step 4: enter a zip code (draft)", text: "Please enter the 5-digit zip code. When you are finished, please press pound.", pending: true },
   addr_zip_bad: { group: "Checkout", label: "Address step 4: not 5 digits (draft)", text: "We are sorry, that is not a valid zip code. Please enter the 5-digit zip code again. When you are finished, please press pound.", pending: true },
   addr_outside: { group: "Checkout", label: "Address step 5: outside Orange County (draft)", text: "We are sorry, we do not serve this area. We deliver only in Orange County, New York. To enter a different zip code, press 1.", pending: true },
@@ -347,7 +373,15 @@ export const PROMPTS = {
   office_closed: { group: "Welcome & main menu", label: "Office closed (after the greeting, only when the office is closed; also key 7)", text: "Our office is closed right now, but you can still book anytime using our automated system." },
   date_closed: { group: "Date & quantity", label: "Chosen date is a closed day (no offer: the day before or after is closed too)", text: "Sorry, we are closed on {date} for {reason}. Let us pick another date.", vars: ["date", "reason"] },
   // Abraham, Nov 20, 2026: a closed day with the day before and the day after both open (then the date prompt and back line)
-  closed_day_offer: { group: "Date & quantity", label: "Closed day: get it the day before (1 books it)", text: "We are closed on {date} for {reason}. You can get it the day before, on {before}, in the morning before 12:00 PM, and keep it until {after}, at 9:00 AM, for a total of {price}. To book it, press 1. Otherwise, please pick another date.", vars: ["date", "reason", "before", "after", "price"] },
+  // Box 17, closed day (Abraham, Nov 22, 2026): played as recorded pieces with the live parts between them
+  closed_day_intro: { group: "Date & quantity", label: "Box 17: We are closed on {date} for {reason}", text: "We are closed on {date} for {reason}.", vars: ["date", "reason"] },
+  closed_day_get: { group: "Date & quantity", label: "Box 17: get it the day before", text: "You can get it the day before, on {before} and keep it until {after} at 9:00 AM, for a total of {price}.", vars: ["before", "after", "price"] },
+  closed_book_it: { group: "Date & quantity", label: "Box 17: To book it, press 1", text: "To book it, press 1." },
+  closed_pick_another: { group: "Date & quantity", label: "Box 17: To pick another date, press 2", text: "To pick another date, press 2." },
+  // Box 18, confirm the date (Abraham, Nov 22, 2026): recorded pieces; off the line until the second-day rules are in
+  box18_book: { group: "Date & quantity", label: "Box 18: To book the {item} for {date} press 1", text: "To book the {item} for {date} press 1.", vars: ["item", "date"], pending: true },
+  box18_second: { group: "Date & quantity", label: "Box 18: To add it also for {weekday} for only {price} more, press 2", text: "To add it also for {weekday} for only {price} more, press 2.", vars: ["weekday", "price"], pending: true },
+  box18_other_date: { group: "Date & quantity", label: "Box 18: To choose a different date, press 3", text: "To choose a different date, press 3.", pending: true },
   address_outside_area: { group: "Checkout", label: "Address outside the delivery area", text: "Sorry, we only deliver in Kiryas Joel and nearby Orange County towns. Please say a delivery address in our area." },
   address_not_found: { group: "Checkout", label: "Address not found on the map", text: "Sorry, we could not find that address. Please say the full address again: the house number, the street, and the town.", pending: true },
   checkout_total: { group: "Checkout", label: "Order total read-back", text: "Your total is {total}. That is {items} for the rentals, {delivery} for delivery, and {tax} sales tax.", vars: ["total", "items", "delivery", "tax"] },
@@ -601,6 +635,11 @@ export const googleLiveOn = (overrides: PromptOverrides) => Boolean(EXTRAS.get(o
 export function composeClips(overrides: PromptOverrides, key: PromptKey, vars: Record<string, string | number> = {}): string[] | null {
   const x = EXTRAS.get(overrides);
   if (!x?.achird) return null;
+  const parts0 = (PROMPTS[key] as PromptDef).parts;
+  if (parts0) {
+    const ids = parts0.map((k) => x.clips[PIECE_ALIAS[k] ?? k]);
+    return ids.every(Boolean) ? ids.map((id) => promptRecordingLink(id)) : null;
+  }
   const template = overrides[key]?.text?.trim() || PROMPTS[key].text;
   const parts = template.split(/(\{[a-z0-9_]+\})/i).map((p) => p.trim()).filter((p) => p && (/^\{/.test(p) || /[a-z]/i.test(p)));
   const urls: string[] = [];
@@ -609,7 +648,7 @@ export function composeClips(overrides: PromptOverrides, key: PromptKey, vars: R
     const v = /^\{([a-z0-9_]+)\}$/i.exec(p);
     if (!v) {
       piece++;
-      const id = x.clips[`${key}#${piece}`];
+      const id = x.clips[PIECE_ALIAS[`${key}#${piece}`] ?? `${key}#${piece}`];
       if (!id) return null;
       urls.push(promptRecordingLink(id));
       continue;
@@ -653,7 +692,7 @@ export function promptText(overrides: PromptOverrides, key: PromptKey, vars?: Re
 /** Lines with changing parts (names, emails, dates, totals) and consent lines always stay live Google voice. */
 export function promptRecordable(key: PromptKey): boolean {
   const def = PROMPTS[key] as PromptDef;
-  return !def.vars?.length && !def.textOnly;
+  return !def.vars?.length && !def.textOnly && !def.parts;
 }
 
 /** Waiting for Abraham's OK: never plays on the phone line until he approves it in Admin. */

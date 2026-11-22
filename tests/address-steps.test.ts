@@ -65,10 +65,16 @@ describe("address in steps (preview)", () => {
   it("the whole address, read back, then the price, then the directions", async () => {
     expect(redirect(await call("heard", { SpeechResult: "forest road" }, "f=street"))).toBe("addr-house");
     expect(h.session.data.street).toBe("Forest Road");
-    expect(said(await call("addr-house"))).toEqual([PROMPTS.addr_house.text]);
-    expect(redirect(await call("addr-house-heard", { Digits: "12" }))).toBe("ask?f=unit");
-    expect(redirect(await call("heard", { Digits: "#" }, "f=unit"))).toBe("addr-zip"); // no unit
-    expect(said(await call("addr-zip"))).toEqual(["Thanks! To continue with Monroe, New York, one zero nine five zero, press 1. To enter a different zip code, press 2."]);
+    // Steps 2 to 4 final (Abraham, Nov 22, 2026): keypad, the shared pound line, the shared star line
+    expect(said(await call("addr-house"))).toEqual(["Now, with your keypad, please enter the house number.", "When you are done, press pound.", "To go back, press star."]);
+    expect(redirect(await call("addr-house-heard", { Digits: "12" }))).toBe("addr-unit");
+    expect(said(await call("addr-unit"))).toEqual(["Thanks, with your keypad, please enter the unit number.", "When you are done, press pound.", "If there is no unit number, press pound to skip.", "To go back, press star."]);
+    expect(redirect(await call("addr-unit-heard", { Digits: "" }))).toBe("addr-zip"); // pound with nothing typed: no unit
+    expect(h.session.data.unit).toBeUndefined();
+    expect(redirect(await call("addr-unit-heard", { Digits: "*" }))).toBe("addr-house");
+    expect(redirect(await call("addr-house-heard", { Digits: "*" }))).toBe("ask?f=street");
+    expect(said(await call("addr-zip"))).toEqual(["To continue with Monroe, New York, one zero nine five zero, press 1. To enter a different zip code, press 2.", "To go back, press star."]);
+    expect(redirect(await call("addr-zip-choice", { Digits: "*" }))).toBe("addr-unit");
     expect(redirect(await call("addr-zip-choice", { Digits: "1" }))).toBe("addr-check");
     expect(redirect(await call("addr-check"))).toBe("addr-readback");
     // A Kiryas Joel street (the $10 zone): read back and saved as Kiryas Joel (Abraham, Nov 17, 2026)
