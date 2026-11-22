@@ -23,17 +23,17 @@ async function editedTexts(): Promise<Record<string, string | null>> {
   return Object.fromEntries((await db.select({ key: schema.voicePrompts.key, text: schema.voicePrompts.text }).from(schema.voicePrompts)).map((r) => [r.key, r.text]));
 }
 
-export async function slotsWithStatus(): Promise<(Slot & { status: SlotStatus; uploads: number; playing: boolean })[]> {
+export async function slotsWithStatus(): Promise<(Slot & { status: SlotStatus; uploads: number; playing: boolean; liveRecordingId: number | null })[]> {
   const slots = allSlots(await catalogItems(), await editedTexts());
   const rows = new Map((await db.select().from(schema.recordingSlots)).map((r) => [r.key, r]));
   const recs = await db.select({ key: schema.promptRecordings.promptKey, source: schema.promptRecordings.source, complete: schema.promptRecordings.complete }).from(schema.promptRecordings);
-  const playing = new Set((await db.select({ key: schema.voicePrompts.key, rec: schema.voicePrompts.recordingId }).from(schema.voicePrompts)).filter((v) => v.rec).map((v) => v.key));
+  const liveRec = new Map((await db.select({ key: schema.voicePrompts.key, rec: schema.voicePrompts.recordingId }).from(schema.voicePrompts)).filter((v) => v.rec).map((v) => [v.key, v.rec!]));
   return slots.map((s) => {
     const r = rows.get(s.key);
     const confirmed = Boolean(r?.confirmedText && r.confirmedText === s.text);
     const uploads = recs.filter((x) => x.key === s.key && x.complete && x.source === "upload").length;
     const status: SlotStatus = !confirmed ? "waiting" : uploads ? "uploaded" : r?.recordedAt ? "recorded" : "confirmed";
-    return { ...s, status, uploads, playing: playing.has(s.key) };
+    return { ...s, status, uploads, playing: liveRec.has(s.key), liveRecordingId: liveRec.get(s.key) ?? null };
   });
 }
 

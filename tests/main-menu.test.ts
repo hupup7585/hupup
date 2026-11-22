@@ -104,7 +104,7 @@ describe("Abraham's start of the call and main menu (Nov 16, 2026)", () => {
     expect(redirect(await call("no-key", {}, `to=menu&np=3&t0=${t0}`))).toBe(`menu?np=3&t0=${t0}`);
     // 3 plays and 20 seconds: the disconnect line
     const end = await call("no-key", {}, `to=menu&np=3&t0=${t0 - 25_000}`);
-    expect(end).toContain("It sounds like we got disconnected. You can call us back at any time. Thank you for calling Hup Up Attractions. Bye for now!");
+    expect(end).toContain("It sounds like we got disconnected, but you can call us back at any time. Thank you for calling Hup Up Attractions. Bye for now!");
     expect(end).toContain("<Hangup/>");
     // a key press always works
     expect(redirect(await call("menu-choice", { Digits: "1" }, `np=2&t0=${t0}`))).toBe("book");
@@ -190,8 +190,9 @@ describe("every key, office open", () => {
     expect(saidIn(book)).toEqual([
       "To receive our catalog by text or email, press 8.",
       "Please note, orders can be placed only through our automated system.",
+      "For information or questions, press 0 for customer service.",
       "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.",
-      "For information or questions, press 0 for customer service. For schools, corporate events, and organizational bookings, press 9.",
+      "For schools, corporate events, and organizational bookings, press 9.",
       "To go back, press star.",
     ]);
     expect(redirect(await call("book-choice", { Digits: "8" }))).toBe("catalog");
@@ -204,7 +205,7 @@ describe("every key, office open", () => {
     const [cat] = await db.select().from(schema.categories).limit(1);
     const [prod] = await db.insert(schema.products).values({ categoryId: cat.id, name: "Castle", priceCents: 1000, quantity: 1, active: true, sortOrder: 1 }).returning();
     expect(saidIn(await call("category", {}, `c=${cat.id}`))).toContain("To go back, press star.");
-    expect(redirect(await call("category-choice", { Digits: "*" }, `c=${cat.id}`))).toBe("book");
+    expect(redirect(await call("category-choice", { Digits: "*" }, `c=${cat.id}`))).toBe("cats"); // the categories menu (box 12a)
     expect(redirect(await call("date-heard", { Digits: "*" }, `p=${prod.id}`))).toBe(`category?c=${cat.id}`);
   });
 });

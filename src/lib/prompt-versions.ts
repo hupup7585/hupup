@@ -29,7 +29,8 @@ export function validateWording(key: string, text: string): string {
   if (clean.length > max) throw new PromptError(`Please keep it under ${max} characters.`);
   if (!def.message && !def.lines && clean.includes("\n")) throw new PromptError("A spoken line is one paragraph (no new lines).");
   // No short forms in any phone prompt (Abraham, Nov 17, 2026): "it is", never "it's"
-  const short = def.message ? null : shortForm(clean);
+  // Abraham's one approved exception (Nov 22, 2026): "Let's start shopping!" in the empty cart line
+  const short = def.message ? null : shortForm(key === "cart_empty" ? clean.replace(/\bLet['’]s\b/g, "Let us") : clean);
   if (short) throw new PromptError(`Please spell it out: no short forms on the phone (found "${short}"). For example "it is", "that is", "we will", "do not".`);
   const missing = (def.vars ?? []).filter((v) => !clean.includes(`{${v}}`));
   if (missing.length) throw new PromptError(`Keep these changing parts in the wording: ${missing.map((m) => `{${m}}`).join(", ")}`);

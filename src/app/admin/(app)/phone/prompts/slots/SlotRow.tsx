@@ -14,7 +14,7 @@ const STYLE: Record<string, string> = {
 };
 
 /** One recording slot: its exact text, status, and the next step (confirm, mark recorded, upload, use it). */
-export default function SlotRow(props: { slotKey: string; label: string; text: string; status: "waiting" | "confirmed" | "recorded" | "uploaded"; statusWords: string; latestUpload: { id: number; url: string } | null; playing: boolean }) {
+export default function SlotRow(props: { slotKey: string; label: string; text: string; status: "waiting" | "confirmed" | "recorded" | "uploaded"; statusWords: string; latestUpload: { id: number; url: string } | null; playing: boolean; liveRecordingId?: number | null }) {
   const [msg, setMsg] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, start] = useTransition();
   const [progress, setProgress] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export default function SlotRow(props: { slotKey: string; label: string; text: s
       <td className="td align-top font-mono text-sm" data-slot-text>{props.text}</td>
       <td className="td align-top">
         <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${STYLE[props.status]}`} data-slot-status>{props.statusWords}</span>
-        {props.playing && <span className="mt-1 block text-xs text-[#13895C]">Playing on the line</span>}
+        {props.playing && <span className="mt-1 block text-xs text-[#13895C]">{props.latestUpload && props.latestUpload.id !== props.liveRecordingId ? "An older recording is playing on the line" : "Playing on the line"}</span>}
       </td>
       <td className="td align-top">
         <div className="flex flex-wrap gap-1">
@@ -86,7 +86,8 @@ export default function SlotRow(props: { slotKey: string; label: string; text: s
           {props.latestUpload && (
             <>
               <audio controls preload="none" src={props.latestUpload.url} className="h-8 max-w-[14rem]" />
-              {!props.playing && (
+              {/* Nov 22, 2026: the button shows whenever the newest upload is not the one on the line (also when an older one is) */}
+              {props.latestUpload.id !== props.liveRecordingId && (
                 <button type="button" className="btn-dark !min-h-8 !py-1 text-xs" disabled={pending} onClick={() => run(() => selectRecordingAction(props.slotKey, props.latestUpload!.id))} data-use-recording>
                   Use this one
                 </button>

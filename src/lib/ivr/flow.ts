@@ -104,8 +104,11 @@ export function url(action: string, params: Record<string, string | number | und
   return `${config.baseUrl()}/api/voice/${action}${q ? `?${q}` : ""}`;
 }
 
+/** Google's spoken spelling (Abraham, Nov 22, 2026): written "Chanukah" / "Chol Hamoed" stay; the voice says these. */
+export const spokenSpelling = (text: string) => text.replace(/Chanukah/g, "Hanukkah").replace(/Chol Hamoed/g, "Hola moed");
+
 function say(target: VR | Gather, text: string) {
-  target.say(voice(), text);
+  target.say(voice(), spokenSpelling(text));
 }
 
 /** Speak a catalog prompt: uploaded recording if there is one, otherwise the (editable) text. */
@@ -119,7 +122,7 @@ function sp(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptK
   const clips = vars ? composeClips(ctx.prompts, key, vars) : null;
   if (clips) return void clips.forEach((u) => target.play(u));
   // Option B (Owner switch, off): Google speaks the line in Achird; otherwise the live voice (Puck)
-  if (vars && googleLiveOn(ctx.prompts)) return void target.play(liveVoiceLink(promptText(ctx.prompts, key, vars)));
+  if (vars && googleLiveOn(ctx.prompts)) return void target.play(liveVoiceLink(spokenSpelling(promptText(ctx.prompts, key, vars))));
   // Abraham, Nov 19, 2026: in a menu, a plain half-second pause after each option (Hark's recordings have it)
   if (isGather(target) && process.env.IVR_OPTION_PAUSES !== "off") return sayOptions(target, promptText(ctx.prompts, key, vars));
   say(target, promptText(ctx.prompts, key, vars));
@@ -143,7 +146,7 @@ function sayOptions(g: Gather, text: string) {
 function sayLive(target: VR | Gather, ctx: { prompts: PromptOverrides }, text: string) {
   const clips = liveClips(ctx.prompts, text);
   if (clips) return void clips.forEach((u) => target.play(u));
-  if (googleLiveOn(ctx.prompts)) return void target.play(liveVoiceLink(text));
+  if (googleLiveOn(ctx.prompts)) return void target.play(liveVoiceLink(spokenSpelling(text)));
   say(target, text);
 }
 
@@ -1370,9 +1373,14 @@ const handlers: Record<string, Handler> = {
         sp(vr, ctx, "went_wrong");
         return back(vr, "menu");
       }
+      // Box 109 (Abraham, Nov 22, 2026): star = the main menu; no key = the call ends
       const g = keypad(vr, url("catalog-done"));
       sp(g, ctx, "catalog_emailed");
-      vr.hangup(); // "Otherwise, you may hang up"
+      halfPause(g);
+      sp(g, ctx, "catalog_main_star");
+      halfPause(g);
+      sp(g, ctx, "catalog_bye");
+      vr.hangup();
       return vr;
     }
     if (d === "1") return back(vr, "catalog-email"); // start over
@@ -1382,7 +1390,7 @@ const handlers: Record<string, Handler> = {
   },
 
   "catalog-done"(ctx, vr) {
-    if (ctx.body.Digits === "*") return back(vr, "catalog"); // star: one menu back (Abraham, Nov 18, 2026)
+    if (ctx.body.Digits === "*") return back(vr, "menu"); // star: the main menu (box 109, Nov 22, 2026)
     vr.hangup();
     return vr;
   },
@@ -1585,7 +1593,7 @@ const handlers: Record<string, Handler> = {
     const k = ctx.body.Digits;
     if (k === "*") return back(vr, "book"); // star: one step back, the bookings menu
     if (k === "0") return back(vr, "cart");
-    if (k === "1") return back(vr, "book"); // keep shopping, the same day
+    if (k === "1") return back(vr, "cats"); // keep shopping, the same day: the categories menu (box 12a)
     if (k === "2") return back(vr, "date"); // another day
     if (k) {
       sp(vr, ctx, "not_valid");
@@ -1597,6 +1605,31 @@ const handlers: Record<string, Handler> = {
   /** Old menu (boxes 9 and 10, deleted): a call already in it goes on with the new way. */
   async "resume-pick"(_ctx, vr) {
     return back(vr, "resume-items");
+  },
+
+  /**
+   * The categories menu (box 12a, Abraham, Nov 22, 2026): bookings recording 2 (the three categories), the shared cart
+   * line, the shared star line. After "same day" on item added, and star in any item list. Star = the bookings menu.
+   */
+  cats(ctx, vr) {
+    const g = keypad(vr, url("cats-choice"));
+    sp(g, ctx, "book_r2");
+    sp(g, ctx, "cart_key");
+    backLine(g, ctx);
+    return bookNoInput(vr, ctx, "cats");
+  },
+
+  async "cats-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (!d) return bookNoInput(vr, ctx, "cats");
+    if (d === "*") return back(vr, "book");
+    if (d === "0") return back(vr, "cart");
+    const cat = /^[1-7]$/.test(d) ? (await phoneCategories())[Number(d) - 1] : undefined;
+    if (!cat) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "cats");
+    }
+    return back(vr, "category", { c: cat.id });
   },
 
   async "book-choice"(ctx, vr) {
@@ -1663,7 +1696,7 @@ const handlers: Record<string, Handler> = {
     const f = ctx.query.get("f") ?? undefined;
     const d = ctx.body.Digits;
     if (!d) return bookNoInput(vr, ctx, "balloons", { c, f });
-    if (d === "*") return back(vr, "book"); // star: one menu back
+    if (d === "*") return back(vr, "cats"); // star: the categories menu (box 12a, Nov 22, 2026)
     if (d === "0") return back(vr, "cart", { c, f }); // "To go to your shopping cart, press 0."
     // 1: wait 2 seconds for a second digit (10, 11, 12); pound skips the wait; nothing = Soft Hop
     if (d === "1") {
@@ -1741,7 +1774,7 @@ const handlers: Record<string, Handler> = {
     const c = Number(ctx.query.get("c"));
     const d = ctx.body.Digits;
     if (!d) return bookNoInput(vr, ctx, "category", { c });
-    if (d === "*") return back(vr, "book"); // one step back: the bookings menu
+    if (d === "*") return back(vr, "cats"); // star: the categories menu (box 12a, Nov 22, 2026)
     if (d === "0") return back(vr, "cart", { c }); // after the cart, the same item list plays again
     const items = await listItems(c, ctx.query.get("f"));
     const p = /^\d{1,2}$/.test(d) && !d.startsWith("0") ? items[Number(d) - 1] : undefined;
@@ -2128,7 +2161,7 @@ const handlers: Record<string, Handler> = {
   async "after-add"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "*") return back(vr, "book"); // star: one menu back, the bookings menu (Abraham, Nov 18, 2026)
-    if (d === "1") return back(vr, "book"); // keep shopping (the same day; the date was already chosen)
+    if (d === "1") return back(vr, "cats"); // keep shopping, the same day: the categories menu (box 12a, Nov 22, 2026)
     if (d === "2") return back(vr, "date"); // "To book another day, press 2." (Abraham, Nov 17, 2026)
     if (d === "0") return back(vr, "cart");
     if (d) {
@@ -2241,8 +2274,8 @@ const handlers: Record<string, Handler> = {
     if (d === "3") {
       for (const o of await callOrders(ctx)) await cancelHold(o.order.id);
       await updateSession(ctx.callSid, { orderId: null, outcome: "browsing", data: { dayOrderIds: [], day: undefined } }, ctx.session);
-      sp(vr, ctx, "cart_cleared");
-      return back(vr, "menu");
+      sp(vr, ctx, "cart_empty"); // Nov 22, 2026: the empty cart line, then straight to the bookings menu
+      return back(vr, "book");
     }
     if (d) {
       sp(vr, ctx, "not_valid"); // # or any other key

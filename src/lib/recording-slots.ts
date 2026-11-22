@@ -27,6 +27,8 @@ export const NUMBER_CLIPS: readonly string[] = [
   ...["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"],
   ...["thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"],
   "Hundred", "Thousand", "Dollars", "And", "Cents",
+  // Abraham, Nov 22, 2026: exactly one says "1 dollar" and "1 cent"
+  "Dollar", "Cent",
 ];
 
 /** The fixed pieces of a line with changing parts: the words between the {blanks}. */

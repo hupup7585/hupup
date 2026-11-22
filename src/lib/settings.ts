@@ -75,7 +75,7 @@ export const SETTING_DEFAULTS = {
   holidayPerDayCholHamoed: true,
   holidayNoPromos: true,
   holidayPickupAfterShabbesMin: "60",
-  holidayMutzeDeliveryAfterMin: "150",
+  holidayMutzeDeliveryAfterMin: "120", // Abraham, Nov 22, 2026: about two hours after Shabbes, everywhere
   holidaySundayPickup: "09:00",
   holidayFridayMutzeDays: "1.5",
   holidayMutzeAloneDays: "1",

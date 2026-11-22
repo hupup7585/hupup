@@ -12,7 +12,9 @@ export function formatMoney(cents: number, opts: { cents?: boolean } = {}): stri
 export function spokenMoney(cents: number): string {
   const dollars = Math.floor(cents / 100);
   const c = cents % 100;
-  return c ? `${dollars} dollars and ${c} cents` : `${dollars} dollars`;
+  // Abraham, Nov 22, 2026: exactly one is "1 dollar" and "1 cent"
+  const d = `${dollars} ${dollars === 1 ? "dollar" : "dollars"}`;
+  return c ? `${d} and ${c} ${c === 1 ? "cent" : "cents"}` : d;
 }
 
 export function parseMoneyToCents(input: string): number | null {

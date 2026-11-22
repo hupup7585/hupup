@@ -71,6 +71,7 @@ export default async function SlotsPage({ searchParams }: { searchParams: Promis
                 status={x.status}
                 statusWords={STATUS_WORDS[x.status]}
                 playing={x.playing}
+                liveRecordingId={x.liveRecordingId}
                 latestUpload={latest.has(x.key) ? { id: latest.get(x.key)!, url: promptRecordingLink(latest.get(x.key)!) } : null}
               />
             ))}

@@ -20,17 +20,17 @@ describe("phone dates", () => {
   });
   it("the approved lines, word for word", () => {
     expect(PROMPTS.book_date_prompt.text).toBe("Using your keypad, please enter your event date: two digits for the month, then two digits for the day. For example, for March fifth, press 0, 3, 0, 5.");
-    expect(PROMPTS.date_past.text).toBe("The date you picked has already passed, please pick another date.");
-    expect(PROMPTS.date_too_far.text).toBe("We can book up to the next three months, please pick another date.");
+    expect(PROMPTS.date_past.text).toBe("The date you picked has already passed. Please pick another date.");
+    expect(PROMPTS.date_too_far.text).toBe("We can book with you right now for the next three months. Please pick another date.");
     expect(PROMPTS.date_unclear.text).toBe("Sorry, I did not get that date. Please try that again.");
     expect(PROMPTS.book_date_entered.text).toBe("You entered {date}. If that is correct, press pound to continue. To enter a different date, press 1.");
-    expect(PROMPTS.category_empty.text).toBe("Sorry, nothing is available in that section right now.");
+    expect(PROMPTS.category_empty.text).toBe("Sorry, nothing is available in that section right now. Please check again later.");
     expect(PROMPTS.closed_day_offer.text).toBe("We are closed on {date} for {reason}. You can get it the day before, on {before}, in the morning before 12:00 PM, and keep it until {after}, at 9:00 AM, for a total of {price}. To book it, press 1. Otherwise, please pick another date.");
     expect(PROMPTS).not.toHaveProperty("qty_prompt");
     expect(PROMPTS).not.toHaveProperty("qty_invalid");
     for (const k of ["box151", "box151_none", "keep_shopping"] as const) expect(PROMPTS[k].text).not.toContain("shopping cart, press 0");
     expect(PROMPTS.resume_added.text).toBe("This item was successfully added to your cart. To keep shopping, for same day, press 1. For another day, press 2.");
-    const all = Object.values(PROMPTS).map((p) => p.text).join(" ");
+    const all = Object.entries(PROMPTS).filter(([k]) => k !== "cart_empty").map(([, p]) => p.text).join(" "); // "Let's": the one exception
     expect(all).not.toMatch(/\b(?:don't|can't|won't|we're|you're|it's|let's|isn't|didn't|we'll|you'll)\b/i);
   });
 });

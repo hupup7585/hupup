@@ -79,7 +79,7 @@ describe("box 153: the jumping balloons menu (approved Nov 19, 2026)", () => {
     expect(redirect(await call("balloon-key2", {}, `c=${cat}`))).toBe(`balloon-pick?c=${cat}&k=1`);
     expect(redirect(await call("balloon-pick", {}, `c=${cat}&k=1`))).toBe(`balloon?p=${ids["Soft Hop"]}`);
     expect(redirect(await call("balloon-pick", {}, `c=${cat}&k=13`))).toBe(`balloons?c=${cat}`);
-    expect(redirect(await call("balloon-key", { Digits: "*" }, `c=${cat}`))).toBe("book");
+    expect(redirect(await call("balloon-key", { Digits: "*" }, `c=${cat}`))).toBe("cats"); // the categories menu (box 12a)
   });
 });
 

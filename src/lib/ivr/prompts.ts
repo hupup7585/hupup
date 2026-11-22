@@ -58,7 +58,8 @@ export const PROMPTS = {
   // Abraham, Nov 19, 2026: its own recording, played only the first time the caller reaches the bookings menu
   book_orders_only: { group: "Booking by item (key 1)", label: "Bookings menu: orders-only line (first time only)", text: "Please note, orders can be placed only through our automated system." },
   book_r2: { group: "Booking by item (key 1)", label: "Bookings menu, recording 2", text: "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3." },
-  book_r3: { group: "Booking by item (key 1)", label: "Bookings menu, recording 3", text: "For information or questions, press 0 for customer service. For schools, corporate events, and organizational bookings, press 9." },
+  book_r3a: { group: "Booking by item (key 1)", label: "Bookings menu, recording 3a (customer service)", text: "For information or questions, press 0 for customer service." },
+  book_r3b: { group: "Booking by item (key 1)", label: "Bookings menu, recording 3b (schools and organizations)", text: "For schools, corporate events, and organizational bookings, press 9." },
   book_note: { group: "Booking by item (key 1)", label: "Bookings menu: first line (replaced by recording 1, Nov 19)", text: "Please note, orders can be placed only through our automated system. For information or questions, press 0 for customer service." },
   book_corporate: { group: "Booking by item (key 1)", label: "Bookings menu key 9 (replaced by recording 3, Nov 19)", text: "For schools, corporate events, and organizational bookings, press 9." },
   // The one shared star line (Nov 19, 2026): taken out of every menu line; played once after every menu with a way back
@@ -118,7 +119,7 @@ export const PROMPTS = {
   // Errors & retries
   idle_warning: { group: "Errors & retries", label: "Inside a booking: 9 minutes with no key (Abraham)", text: "Are you still there? Please press any key to continue. Otherwise, this call will end in one minute." },
   no_input: { group: "Errors & retries", label: "Didn't hear anything", text: "Sorry, I did not catch that. No problem, let us try that again." },
-  no_input_final: { group: "Errors & retries", label: "Disconnect line (no key after 3 plays of a menu, or 10 minutes idle in a booking)", text: "It sounds like we got disconnected. You can call us back at any time. Thank you for calling Hup Up Attractions. Bye for now!" },
+  no_input_final: { group: "Errors & retries", label: "Disconnect line (no key after 3 plays of a menu, or 10 minutes idle in a booking)", text: "It sounds like we got disconnected, but you can call us back at any time. Thank you for calling Hup Up Attractions. Bye for now!" },
   tech_error: { group: "Errors & retries", label: "Technical problem", text: "Oops, something went wrong on our end. Please call back in a few minutes. Sorry about that!" },
   went_wrong: { group: "Errors & retries", label: "Something went wrong, back to menu", text: "Sorry, something went wrong. Let us head back to the main menu." },
 
@@ -126,7 +127,7 @@ export const PROMPTS = {
   category_intro: { group: "Browsing", label: "Category intro", text: "Awesome, {category}!", vars: ["category"] },
   category_item: { group: "Browsing", label: "Item option in a category", text: "For the {item}, press {key}.", vars: ["item", "key"] },
   back_to_menu: { group: "Browsing", label: "Go back option (replaced by the one shared star line, Nov 19)", text: "To go back, press star." },
-  category_empty: { group: "Browsing", label: "Category has no items", text: "Sorry, nothing is available in that section right now." }, // Abraham, Nov 20, 2026: then the bookings menu
+  category_empty: { group: "Browsing", label: "Category has no items", text: "Sorry, nothing is available in that section right now. Please check again later." }, // Abraham, Nov 22, 2026: then the bookings menu
   product_intro: { group: "Browsing", label: "Item intro", text: "Great choice! The {item} is {price}. Delivery is available for an additional fee, and our team will give you the delivery price.", vars: ["item", "price"] },
   product_options: { group: "Browsing", label: "Item options", text: "To hear more about it, press 1. To add it to your cart, press 2." },
   product_default_desc: { group: "Browsing", label: "Description when an item has none", text: "The {item} is one of our most popular rentals. Kids love it!", vars: ["item"] },
@@ -184,8 +185,8 @@ export const PROMPTS = {
 
   // Date & quantity
   date_prompt: { group: "Date & quantity", label: "Ask for the party date", text: "What day is your party? Just say the date, like November 8th. Or type the month and day on your keypad. For November 8th, that is 1, 1, 0, 8." },
-  date_past: { group: "Date & quantity", label: "Date already passed", text: "The date you picked has already passed, please pick another date." },
-  date_too_far: { group: "Date & quantity", label: "Date too far ahead", text: "We can book up to the next three months, please pick another date." },
+  date_past: { group: "Date & quantity", label: "Date already passed", text: "The date you picked has already passed. Please pick another date." },
+  date_too_far: { group: "Date & quantity", label: "Date too far ahead", text: "We can book with you right now for the next three months. Please pick another date." },
   date_unclear: { group: "Date & quantity", label: "Did not understand the date", text: "Sorry, I did not get that date. Please try that again." },
   date_confirm_day: { group: "Date & quantity", label: "Confirm the date (whole rental day, delivery and pickup times)", text: "Got it, {date}! We will deliver that day between 9 AM and noon, and pick up on {pickup}. Please have the rental outside your door by 9 AM that morning. If that is right, press pound to continue. To pick a different date, press 1.", vars: ["date", "pickup"] },
   sold_out: { group: "Date & quantity", label: "Item booked up", text: "Oh no, the {item} is all booked up on {date}.", vars: ["item", "date"] },
@@ -207,7 +208,7 @@ export const PROMPTS = {
   laser_packs: { group: "Cart", label: "Laser guns add-on (only right after an inflatable maze is added)", text: "Would you like to add more laser guns? To add a six-pack laser tag for $75, press 1. To add a four-pack laser tag for $50, press 2." }, // Nov 19, 2026: only after an inflatable maze; then the shared skip line
   added: { group: "Cart", label: "Item added to cart", text: "Woohoo! I added {items} to your cart for {date}. It is saved just for you while we are on the phone.", vars: ["items", "date"] },
   after_add: { group: "Cart", label: "After adding", text: "To keep shopping, press 1. To check out, press 9." },
-  cart_empty: { group: "Cart", label: "Cart is empty (0 in an item list; then the same list again)", text: "Your shopping cart is empty right now. Let us start shopping!" },
+  cart_empty: { group: "Cart", label: "Cart is empty (0 in an item list; then the same list again)", text: "Your shopping cart is empty right now. Let's start shopping!" }, // "Let's": Abraham's one approved short form (Nov 22, 2026)
   bounce_water_note: { group: "Cart", label: "Before a bounce house is added (Abraham, Phone Menu v3)", text: "Please note, our bounce houses are not for water use." },
   checkout_tax_note: { group: "Cart", label: "Before checkout (Abraham, Phone Menu v3)", text: "Taxes will be calculated after checkout." },
   cart_summary: { group: "Cart", label: "Cart summary", text: "Here is your cart: {items}, for {date}. Your rental total is {total}, plus delivery and sales tax.", vars: ["items", "date", "total"] },
@@ -423,7 +424,9 @@ export const PROMPTS = {
   catalog_ending: { group: "Catalog (key 8)", label: "Email: choose the ending", text: "Now choose the ending. For at gmail dot com, press 1. For at outlook dot com, press 2. For at yahoo dot com, press 3. For at icloud dot com, press 4. For a different ending, press 5." },
   catalog_domain: { group: "Catalog (key 8)", label: "Email: a different ending", text: "Please give us the ending, after the at symbol. To type it, start pressing keys now. To say it, wait for the tone. When you are finished, please press pound." },
   catalog_final: { group: "Catalog (key 8)", label: "Email: final check", text: "Your email address is {email}. If that is correct, press pound to continue. To start over, press 1.", vars: ["email"] },
-  catalog_emailed: { group: "Catalog (key 8)", label: "Email: done", text: "We just emailed you our catalog! Check your inbox for a variety of attractions and endless fun for your entire family. Thank you for choosing Hup Up Attractions! To hear the main menu, press star. Otherwise, you may hang up." },
+  catalog_emailed: { group: "Catalog (key 8)", label: "Email: done", text: "We just emailed you our catalog! Check your inbox for a variety of attractions and endless fun for your entire family." },
+  catalog_main_star: { group: "Catalog (key 8)", label: "Email: done, star for the main menu", text: "To go to the main menu, press star." },
+  catalog_bye: { group: "Catalog (key 8)", label: "Email: done, goodbye", text: "Thank you for choosing Hup Up Attractions! Bye for now!" },
   vm9_greeting: {
     group: "Voicemail",
     label: "Key 9 greeting (general voicemail: feedback and comments)",

@@ -4,9 +4,11 @@ const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", 
 const ORD_ONES = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "eleventh", "twelfth", "thirteenth", "fourteenth", "fifteenth", "sixteenth", "seventeenth", "eighteenth", "nineteenth"];
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Shabbes"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+/** Compound ordinals, each its own recording (Abraham, Nov 22, 2026): "twenty-first", not "twenty" + "first". */
+const COMPOUND_ORDINALS = ["twenty-first", "twenty-second", "twenty-third", "twenty-fourth", "twenty-fifth", "twenty-sixth", "twenty-seventh", "twenty-eighth", "twenty-ninth", "thirty-first"];
 const OTHER_WORDS = ["hundred", "thousand", "dollar", "dollars", "cent", "cents", "and", "AM", "PM", "oh", "at", "on", "twentieth", "thirtieth"];
 
-export const WORDS: string[] = [...ONES, ...TENS.filter(Boolean), ...ORD_ONES.filter(Boolean), ...DAYS, "Saturday", ...MONTHS, ...OTHER_WORDS];
+export const WORDS: string[] = [...ONES, ...TENS.filter(Boolean), ...ORD_ONES.filter(Boolean), ...COMPOUND_ORDINALS, ...DAYS, "Saturday", ...MONTHS, ...OTHER_WORDS];
 export const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 /* ---- Turning a changing part into word slots ---- */
@@ -22,7 +24,7 @@ export function numberWords(n: number): string[] {
 export function ordinalWords(n: number): string[] {
   if (n < 20) return [ORD_ONES[n]];
   if (n % 10 === 0) return [n === 20 ? "twentieth" : n === 30 ? "thirtieth" : ""].filter(Boolean);
-  return [TENS[Math.floor(n / 10)], ORD_ONES[n % 10]];
+  return [`${TENS[Math.floor(n / 10)]}-${ORD_ONES[n % 10]}`]; // one recording each (Nov 22, 2026)
 }
 
 /**

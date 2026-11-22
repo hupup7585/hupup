@@ -7,7 +7,7 @@ import { addDays } from "@/lib/dates";
  *  - a Friday rental is one full day, picked up 1 hour after Shabbes ends (not held until Sunday), so the same item
  *    can go to a Mutze Shabbes customer;
  *  - no promos, discounts or offers those weeks;
- *  - Mutze Shabbes bookings (delivery 2 and a half hours after Shabbes, pickup Sunday 9:00 AM; Friday + Mutze Shabbes
+ *  - Mutze Shabbes bookings (delivery about two hours after Shabbes, pickup Sunday 9:00 AM; Friday + Mutze Shabbes
  *    = 1 and a half days) come once Abraham approves their phone lines.
  * Every number and switch is an Admin setting.
  */

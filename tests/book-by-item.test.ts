@@ -54,8 +54,9 @@ describe("key 1: booking by item", () => {
     expect(said(await call("book"))).toEqual([
       "To receive our catalog by text or email, press 8.",
       "Please note, orders can be placed only through our automated system.",
+      "For information or questions, press 0 for customer service.",
       "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.",
-      "For information or questions, press 0 for customer service. For schools, corporate events, and organizational bookings, press 9.",
+      "For schools, corporate events, and organizational bookings, press 9.",
       "To go back, press star.",
     ]); // Nov 19, 2026: three recordings, then the shared star line
     // Jumping balloons now play box 153 (Abraham, Nov 19, 2026)

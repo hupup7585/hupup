@@ -6,7 +6,7 @@ import type { PromptKey } from "@/lib/ivr/prompts";
  * Stored in the setting `menuOrders` as JSON: { "book": ["book_r1", ...] }. A missing or bad value = the default.
  */
 export const MENU_RECORDINGS = {
-  book: { label: "Bookings menu (main menu key 1)", keys: ["book_r1", "book_orders_only", "book_r2", "book_r3", "book_back"] },
+  book: { label: "Bookings menu (main menu key 1)", keys: ["book_r1", "book_orders_only", "book_r3a", "book_r2", "book_r3b", "book_back"] },
   balloons: { label: "Jumping balloons list", keys: ["balloons_open", "balloon_items", "cart_key", "book_back"] },
 } as const satisfies Record<string, { label: string; keys: readonly string[] }>;
 

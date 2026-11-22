@@ -78,7 +78,7 @@ describe("unfinished phone order", () => {
     expect(said(menu)).toEqual(["This item was successfully added to your cart. To keep shopping, for same day, press 1. For another day, press 2.", "To go to your shopping cart, press 0.", "To go back, press star."]);
     expect(redirect(menu)).toBe("resume-items"); // no key: the next old item
     expect(redirect(await call("resume-added-choice", { Digits: "0" }))).toBe("cart");
-    expect(redirect(await call("resume-added-choice", { Digits: "1" }))).toBe("book");
+    expect(redirect(await call("resume-added-choice", { Digits: "1" }))).toBe("cats"); // same day: the categories menu (box 12a)
     expect(redirect(await call("resume-added-choice", { Digits: "2" }))).toBe("date");
     expect(redirect(await call("resume-added-choice", { Digits: "7" }, "d=2026-12-22"))).toBe("resume-added?d=2026-12-22");
     // then the taken Castle: box 11a, same date or nearest date
