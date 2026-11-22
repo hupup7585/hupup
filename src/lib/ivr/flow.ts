@@ -57,6 +57,7 @@ import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
 const PHONEPAY_PROMPTS = ["phonepay_intro", "phonepay_back", "phonepay_paid", "phonepay_retry", "phonepay_retry_last", "phonepay_failed", "phonepay_unclear"] as const;
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
+import { pluralName } from "@/lib/spoken-words";
 import { lastPhoneDate, normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { liveVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
 import { FIRST_TIME_ONLY, menuOrder, type MenuId } from "./menu-order";
@@ -465,8 +466,41 @@ async function callOrders(ctx: Ctx) {
 
 const money = (cents: number) => (cents / 100).toFixed(2);
 
+/** "{Qnt} {item}" (Abraham, Nov 19, 2026): the number, then the name (singular for 1, plural for 2 or more). */
 function itemPhrase(qty: number, name: string) {
-  return qty === 1 ? `one ${name}` : `${qty} ${name}`;
+  return `${qty} ${qty === 1 ? name : pluralName(name)}`;
+}
+
+/** "1 Castle Combo, and 2 paddle boats": "and" before the second item on. */
+const itemsPhrase = (items: { qty: number; name: string }[]) => items.map((i) => itemPhrase(i.qty, i.name)).join(", and ");
+
+type CartLine = { itemId: number; orderId: number; name: string; qty: number; date: string };
+
+/** Every item in the cart, in cart order (day by day). */
+async function cartLines(ctx: Ctx): Promise<CartLine[]> {
+  const out: CartLine[] = [];
+  for (const o of await callOrders(ctx)) for (const i of o.items) out.push({ itemId: i.id, orderId: o.order.id, name: i.name, qty: i.qty, date: o.order.eventDate });
+  return out;
+}
+
+/**
+ * Item removed (box 29a): "Successfully removed from your cart: {Qnt} {item} for {date}." Items left: "Here is your
+ * updated cart." and the cart again; the last item: the empty cart line, then straight to the bookings menu.
+ */
+async function removeFromCart(ctx: Ctx, vr: VR, l: CartLine, n: number) {
+  if (n >= l.qty) await db.delete(schema.orderItems).where(eq(schema.orderItems.id, l.itemId));
+  else await db.update(schema.orderItems).set({ qty: l.qty - n }).where(eq(schema.orderItems.id, l.itemId));
+  const [left] = await db.select({ id: schema.orderItems.id }).from(schema.orderItems).where(eq(schema.orderItems.orderId, l.orderId)).limit(1);
+  if (left) await refreshOrderTotals(l.orderId); // a removed maze drops the laser gun add-ons back to their own price
+  else await cancelHold(l.orderId, "Removed from the cart by the caller");
+  await track(ctx.callSid, "step", `Removed ${itemPhrase(n, l.name)} for ${spokenDate(l.date)}`, { item: l.name, qty: n, date: l.date });
+  sp(vr, ctx, "removed", { qty: n, item: n === 1 ? l.name : pluralName(l.name), date: spokenDate(l.date) });
+  if (!(await callOrders(ctx)).length) {
+    await updateSession(ctx.callSid, { orderId: null, outcome: "browsing", data: { dayOrderIds: [], day: undefined } }, ctx.session);
+    sp(vr, ctx, "cart_empty");
+    return back(vr, "book");
+  }
+  return back(vr, "cart", { u: 1 });
 }
 
 
@@ -1532,7 +1566,7 @@ const handlers: Record<string, Handler> = {
     // Nov 19, 2026: "... you had in your cart {items} for {date}." Several days: each day's items with their date, the
     // last day's date in {date}
     const days = [...new Set(lines.map((l) => l.date))];
-    const dayItems = (d: string) => lines.filter((l) => l.date === d).map((l) => itemPhrase(l.qty, l.name)).join(" and ");
+    const dayItems = (d: string) => lines.filter((l) => l.date === d).map((l) => (l.qty === 1 ? `one ${l.name}` : `${l.qty} ${l.name}`)).join(" and "); // the approved welcome-back wording
     const last = days[days.length - 1];
     const items = [...days.slice(0, -1).map((d) => `${dayItems(d)} for ${spokenDate(d)}`), dayItems(last)].join(", and ");
     sp(g, ctx, "resume_offer", { items, date: spokenDate(last) });
@@ -2292,8 +2326,9 @@ const handlers: Record<string, Handler> = {
       return c ? back(vr, "category", { c }) : back(vr, "book");
     }
     const g = keypad(vr, url("cart-choice", { c }));
-    sp(g, ctx, "cart_intro");
-    for (const o of days) sp(g, ctx, "cart_day", { date: spokenDate(o.order.eventDate), items: o.items.map((i) => itemPhrase(i.qty, i.name)).join(", ") });
+    // Item removed (box 29a): "Here is your updated cart." then the cart from its date line
+    sp(g, ctx, ctx.query.get("u") ? "cart_updated" : "cart_intro");
+    for (const o of days) sp(g, ctx, "cart_day", { date: spokenDate(o.order.eventDate), items: itemsPhrase(o.items) });
     sp(g, ctx, "cart_total", { total: spokenMoney(days.reduce((t, o) => t + o.order.subtotalCents, 0)) });
     sp(g, ctx, "cart_options");
     backLine(g, ctx);
@@ -2311,7 +2346,9 @@ const handlers: Record<string, Handler> = {
       return back(vr, "ask", { f: "name" });
     }
     if (d === "2") return c ? back(vr, "category", { c }) : back(vr, "book"); // keep shopping
-    if (d === "3") {
+    if (d === "3") return back(vr, "remove"); // remove an item (box 29b)
+    if (d === "4") {
+      // refresh the cart and start over (box 29)
       for (const o of await callOrders(ctx)) await cancelHold(o.order.id);
       await updateSession(ctx.callSid, { orderId: null, outcome: "browsing", data: { dayOrderIds: [], day: undefined } }, ctx.session);
       sp(vr, ctx, "cart_empty"); // Nov 22, 2026: the empty cart line, then straight to the bookings menu
@@ -2322,6 +2359,63 @@ const handlers: Record<string, Handler> = {
       return back(vr, "cart", { c });
     }
     return c ? back(vr, "category", { c }) : noInput(vr, ctx, "cart");
+  },
+
+  /**
+   * Remove an item (box 29b, Abraham, Nov 22, 2026): "You have in your cart {amount} items." then one line per item in
+   * cart order, each its own key, then the star line. One of it: removed right away; more: how many to remove.
+   */
+  async remove(ctx, vr) {
+    const lines = await cartLines(ctx);
+    if (!lines.length) {
+      sp(vr, ctx, "cart_empty");
+      return back(vr, "book");
+    }
+    const g = keypad(vr, url("remove-choice"), lines.length > 9 ? { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS } : {});
+    sp(g, ctx, "remove_count", { amount: lines.length });
+    lines.forEach((l, i) => sp(g, ctx, "remove_item", { item: l.name, key: i + 1 }));
+    backLine(g, ctx);
+    return noInput(vr, ctx, "remove");
+  },
+
+  async "remove-choice"(ctx, vr) {
+    const d = (ctx.body.Digits ?? "").replace(/#/g, "");
+    if (d.startsWith("*")) return back(vr, "cart");
+    const lines = await cartLines(ctx);
+    const l = /^\d{1,2}$/.test(d) ? lines[Number(d) - 1] : undefined;
+    if (!l) {
+      if (!d) return noInput(vr, ctx, "remove");
+      sp(vr, ctx, "not_valid");
+      return back(vr, "remove");
+    }
+    if (l.qty === 1) return removeFromCart(ctx, vr, l, 1);
+    return back(vr, "remove-qty", { i: l.itemId });
+  },
+
+  /** More than one of it: "You have {Qnt} {item}." "Using your keypad, please enter the amount you would like to remove." */
+  async "remove-qty"(ctx, vr) {
+    const l = (await cartLines(ctx)).find((x) => x.itemId === Number(ctx.query.get("i")));
+    if (!l) return back(vr, "cart");
+    const g = keypad(vr, url("remove-qty-choice", { i: l.itemId }), { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS });
+    sp(g, ctx, "remove_qty", { qty: l.qty, item: pluralName(l.name) });
+    sp(g, ctx, "remove_enter");
+    backLine(g, ctx);
+    return noInput(vr, ctx, "remove-qty", { i: l.itemId });
+  },
+
+  async "remove-qty-choice"(ctx, vr) {
+    const d = (ctx.body.Digits ?? "").replace(/#/g, "");
+    const i = ctx.query.get("i") ?? "";
+    if (d.includes("*")) return back(vr, "remove");
+    const l = (await cartLines(ctx)).find((x) => x.itemId === Number(i));
+    if (!l) return back(vr, "cart");
+    if (!d) return noInput(vr, ctx, "remove-qty", { i });
+    const n = Number(d);
+    if (!/^\d+$/.test(d) || n < 1 || n > l.qty) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "remove-qty", { i });
+    }
+    return removeFromCart(ctx, vr, l, n);
   },
 
   /* ---- checkout: name -> address -> email -> phone -> finalize ---- */

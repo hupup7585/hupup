@@ -247,9 +247,17 @@ export const PROMPTS = {
   day_choice: { group: "Cart", label: "After an item: same day or another day (Abraham)", text: "For the same day, press 1. For another day, press 2." },
   cart_key: { group: "Cart", label: "Shared cart line: every booking step before the cart or checkout (not after row 11)", text: "To go to your shopping cart, press 0." },
   cart_intro: { group: "Cart", label: "Cart: opening line", text: "Here is your cart." },
-  cart_day: { group: "Cart", label: "Cart: one rental day", text: "For {date}: {items}.", vars: ["date", "items"] },
+  // The cart (Abraham, Nov 19 and 22, 2026): "For {date}, {Qnt} {item}, and {Qnt} {item}." one line per rental day
+  cart_day: { group: "Cart", label: "Cart: one rental day (each item with its number; and before the second item on)", text: "For {date}, {items}.", vars: ["date", "items"] },
   cart_total: { group: "Cart", label: "Cart: rental total", text: "Your rental total is {total}, plus delivery and sales tax.", vars: ["total"] },
-  cart_options: { group: "Cart", label: "Cart options", text: "To check out, press 1. To keep shopping, press 2. To start over with an empty cart, press 3." },
+  cart_options: { group: "Cart", label: "Cart options (then the shared star line; no cart line)", text: "To check out, press 1. To keep shopping, press 2. To remove an item from your cart, press 3. To refresh your cart and start over, press 4." },
+  // Remove an item (box 29b and 29a, Abraham, Nov 22, 2026)
+  remove_count: { group: "Cart", label: "Remove an item: how many items", text: "You have in your cart {amount} items.", vars: ["amount"] },
+  remove_item: { group: "Cart", label: "Remove an item: one line per item", text: "To remove the {item}, press {key}.", vars: ["item", "key"] },
+  remove_qty: { group: "Cart", label: "Remove an item: more than one of it", text: "You have {qty} {item}.", vars: ["qty", "item"] },
+  remove_enter: { group: "Cart", label: "Remove an item: how many to remove", text: "Using your keypad, please enter the amount you would like to remove." },
+  removed: { group: "Cart", label: "Item removed", text: "Successfully removed from your cart: {qty} {item} for {date}.", vars: ["qty", "item", "date"] },
+  cart_updated: { group: "Cart", label: "Item removed: the updated cart (then the cart from its date line)", text: "Here is your updated cart." },
   cart_cleared: { group: "Cart", label: "Cart emptied", text: "All set, your cart is empty. Let us start fresh!" },
   cart_expired: { group: "Cart", label: "Cart timed out", text: "Sorry, your cart timed out. Let us start again." },
 

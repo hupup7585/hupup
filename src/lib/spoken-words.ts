@@ -34,6 +34,9 @@ export function ordinalWords(n: number): string[] {
 export function wordSlotsFor(value: string, items: { id: number; name: string }[] = []): string[] | null {
   const item = items.find((i) => i.name.trim().toLowerCase() === value.trim().toLowerCase());
   if (item) return [`item:${item.id}`];
+  // "2 paddle boats": the number, then the plural name recording (Nov 19, 2026)
+  const plural = items.find((i) => pluralName(i.name).toLowerCase() === value.trim().toLowerCase() && pluralName(i.name) !== i.name);
+  if (plural) return [`item:${plural.id}:plural`];
   const keys: string[] = [];
   for (const raw of value.replace(/[,.!?]/g, " ").split(/\s+/).filter(Boolean)) {
     const time = /^(\d{1,2}):(\d{2})$/.exec(raw);
@@ -53,4 +56,13 @@ export function wordSlotsFor(value: string, items: { id: number; name: string }[
     }
   }
   return keys;
+}
+
+/** A rental's name for 2 or more ("2 paddle boats", "2 Castle Combos"); a name already plural stays. */
+export function pluralName(name: string): string {
+  const n = name.trim();
+  if (/s$/i.test(n)) return n;
+  if (/[^aeiou]y$/i.test(n)) return `${n.slice(0, -1)}ies`;
+  if (/(x|ch|sh|z)$/i.test(n)) return `${n}es`;
+  return `${n}s`;
 }
