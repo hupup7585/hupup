@@ -54,8 +54,13 @@ describe("approved wording", () => {
     expect(PROMPTS.book_r1.text).toBe("To receive our catalog by text or email, press 8.");
     expect(PROMPTS.book_orders_only.text).toBe("Please note, orders can be placed only through our automated system.");
     expect(PROMPTS.not_valid.text).toBe("Sorry, that is not a valid selection.");
-    expect(PROMPTS.balloon_7212.text).toBe("For the Wheel Thrill, item seven two");
-    expect(PROMPTS.balloon_press.text).toBe("press");
+    // Nov 22, 2026: three fixed recordings per balloon; Wheel Thrill is 7211 (key 11), Bounce Blast 7212 (key 12)
+    expect(PROMPTS.balloon_name_7211.text).toBe("For the Wheel Thrill,");
+    expect(PROMPTS.balloon_num_7211.text).toBe("item seven two one one");
+    expect(PROMPTS.balloon_key_11.text).toBe("press 11.");
+    expect(PROMPTS.balloon_name_7212.text).toBe("For the Bounce Blast,");
+    expect(PROMPTS.laser_item_1.text).toBe("For the inflatable maze with a six-pack of laser guns, press 1.");
+    expect(PROMPTS.laser_item_4.text).toBe("For a four-pack of laser guns without the maze, press 4.");
     expect(balloonKeyWords("4")).toBe("4");
     expect(balloonKeyWords("11")).toBe("one one");
   });

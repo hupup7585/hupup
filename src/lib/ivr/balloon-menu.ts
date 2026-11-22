@@ -14,8 +14,8 @@ export const BALLOON_MENU = [
   { key: "8", name: "Wide Slide", number: "7208" },
   { key: "9", name: "Amusing Obstacle", number: "7209" },
   { key: "10", name: "Mega Mountain", number: "7210" },
-  { key: "11", name: "Bounce Blast", number: "7211" },
-  { key: "12", name: "Wheel Thrill", number: "7212" },
+  { key: "11", name: "Wheel Thrill", number: "7211" }, // Abraham, Nov 22, 2026: Wheel Thrill is item 11
+  { key: "12", name: "Bounce Blast", number: "7212" },
 ] as const;
 
 /** Seconds the line waits for a second digit after 1. */

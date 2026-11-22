@@ -49,10 +49,13 @@ describe("box 153: the jumping balloons menu (approved Nov 19, 2026)", () => {
     expect(redirect(await call("category", {}, `c=${cat}`))).toBe(`balloons?c=${cat}`);
     const lines = said(await call("balloons", {}, `c=${cat}`));
     expect(lines[0]).toBe("Here are our jumping balloons. Please note, our jumping balloons are not for water use.");
-    expect(lines.slice(1, 5)).toEqual(["For the Soft Hop, item seven two", "zero one", "press", "1"]);
-    expect(lines.slice(37, 41)).toEqual(["For the Mega Mountain, item seven two", "one zero", "press", "one zero"]);
+    // Nov 22, 2026: three fixed recordings per balloon; Wheel Thrill key 11, Bounce Blast key 12
+    expect(lines.slice(1, 4)).toEqual(["For the Soft Hop,", "item seven two zero one", "press 1."]);
+    expect(lines.slice(28, 31)).toEqual(["For the Mega Mountain,", "item seven two one zero", "press 10."]);
+    expect(lines.slice(31, 34)).toEqual(["For the Wheel Thrill,", "item seven two one one", "press 11."]);
+    expect(lines.slice(34, 37)).toEqual(["For the Bounce Blast,", "item seven two one two", "press 12."]);
     expect(lines.slice(-2)).toEqual(["To go to your shopping cart, press 0.", "To go back, press star."]);
-    expect(lines).toHaveLength(1 + 12 * 4 + 2);
+    expect(lines).toHaveLength(1 + 12 * 3 + 2);
     expect(redirect(await call("balloon-key", { Digits: "0" }, `c=${cat}`))).toBe(`cart?c=${cat}`);
   });
   it("the Owner's order of the recordings (Admin, Menu order) is the order they play", async () => {
@@ -62,7 +65,7 @@ describe("box 153: the jumping balloons menu (approved Nov 19, 2026)", () => {
     try {
       const lines = said(await call("balloons", {}, `c=${cat}`));
       expect(lines[1]).toBe("To go to your shopping cart, press 0.");
-      expect(lines[2]).toBe("For the Soft Hop, item seven two");
+      expect(lines[2]).toBe("For the Soft Hop,");
     } finally {
       await saveSetting("menuOrders", "");
     }
@@ -75,7 +78,8 @@ describe("box 153: the jumping balloons menu (approved Nov 19, 2026)", () => {
     expect(one).not.toContain("<Say"); // pound is never announced
     expect(redirect(await call("balloon-key2", { Digits: "0" }, `c=${cat}`))).toBe(`balloon-pick?c=${cat}&k=10`);
     expect(redirect(await call("balloon-pick", {}, `c=${cat}&k=10`))).toBe(`balloon?p=${ids["Mega Mountain"]}`);
-    expect(redirect(await call("balloon-pick", {}, `c=${cat}&k=12`))).toBe(`balloon?p=${ids["Wheel Thrill"]}`);
+    expect(redirect(await call("balloon-pick", {}, `c=${cat}&k=11`))).toBe(`balloon?p=${ids["Wheel Thrill"]}`);
+    expect(redirect(await call("balloon-pick", {}, `c=${cat}&k=12`))).toBe(`balloon?p=${ids["Bounce Blast"]}`);
     expect(redirect(await call("balloon-key2", {}, `c=${cat}`))).toBe(`balloon-pick?c=${cat}&k=1`);
     expect(redirect(await call("balloon-pick", {}, `c=${cat}&k=1`))).toBe(`balloon?p=${ids["Soft Hop"]}`);
     expect(redirect(await call("balloon-pick", {}, `c=${cat}&k=13`))).toBe(`balloons?c=${cat}`);

@@ -503,6 +503,31 @@ async function attractionCategory(t: "1" | "2" | "3") {
 }
 
 /** Is this item in the bounce house (jumping balloons) category? */
+/**
+ * The laser tag list (box 13b, Abraham, Nov 22, 2026): keys 1 to 4 are fixed recordings, found by name (maze with 6
+ * guns, maze with 4 guns, 6 guns, 4 guns); any other laser tag item follows on key 5 and up, as before.
+ */
+const LASER_KEYS: { key: number; line: PromptKey; match: (n: string) => boolean }[] = [
+  { key: 1, line: "laser_item_1", match: (n) => /maze/i.test(n) && /\b6\b|six/i.test(n) },
+  { key: 2, line: "laser_item_2", match: (n) => /maze/i.test(n) && /\b4\b|four/i.test(n) },
+  { key: 3, line: "laser_item_3", match: (n) => !/maze/i.test(n) && /^\s*(6|six)\b[^]*laser guns/i.test(n) },
+  { key: 4, line: "laser_item_4", match: (n) => !/maze/i.test(n) && /^\s*(4|four)\b[^]*laser guns/i.test(n) },
+];
+function laserList<T extends { name: string }>(items: T[]): { p: T; key: number; line: PromptKey | null }[] {
+  const out: { p: T; key: number; line: PromptKey | null }[] = [];
+  const used = new Set<T>();
+  for (const k of LASER_KEYS) {
+    const p = items.find((x) => !used.has(x) && k.match(x.name));
+    if (p) {
+      used.add(p);
+      out.push({ p, key: k.key, line: k.line });
+    }
+  }
+  let next = 5;
+  for (const p of items) if (!used.has(p)) out.push({ p, key: next++, line: null });
+  return out;
+}
+
 /** A category's phone items; with a date (item taken, key 1), only the items free on that date (Nov 20, 2026). */
 async function listItems(c: number, f: string | null) {
   const items = await phoneProducts(c);
@@ -1661,6 +1686,18 @@ const handlers: Record<string, Handler> = {
     await track(ctx.callSid, "category_heard", `Listened to ${cat.name}`, { category: cat.name, items: items.map((p) => p.name) });
     // Jumping balloons: box 153 (Abraham, Nov 19, 2026)
     if (await isBounceHouse(c)) return back(vr, "balloons", { c, f: f ?? undefined });
+    // Laser tag (box 13b, Nov 22, 2026): the four fixed lines, then the shared cart and star lines (no opening line)
+    if (await isLaserBase(c)) {
+      const list = laserList(items);
+      const g = keypad(vr, url("category-choice", { c, f: f ?? undefined }));
+      for (const x of list) {
+        if (x.line) sp(g, ctx, x.line);
+        else sp(g, ctx, "category_item", { item: x.p.name, key: x.key });
+      }
+      sp(g, ctx, "cart_key");
+      backLine(g, ctx);
+      return bookNoInput(vr, ctx, "category", { c, f: f ?? undefined });
+    }
     // 10 or more items (Abraham, Nov 17, 2026): two-key choices (10, 11, 12) work; a single key acts after a short wait
     const g = keypad(vr, url("category-choice", { c, f: f ?? undefined }), items.length > 9 ? { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS } : {});
     sp(g, ctx, "book_category_list", { category: cat.spokenName || cat.name });
@@ -1684,10 +1721,10 @@ const handlers: Record<string, Handler> = {
     await playMenu(g, ctx, "balloons", (g) => {
       for (const b of BALLOON_MENU) {
         if (!items.some((p) => balloonEntry(p.name)?.key === b.key)) continue; // not active in Admin: not read
-        sp(g, ctx, `balloon_${b.number}` as PromptKey);
-        sayLive(g, ctx, digitWords(b.number.slice(2)));
-        sp(g, ctx, "balloon_press");
-        sayLive(g, ctx, balloonKeyWords(b.key));
+        // Nov 22, 2026: three fixed recordings per balloon (name, item number, "press N."), nothing said live
+        sp(g, ctx, `balloon_name_${b.number}` as PromptKey);
+        sp(g, ctx, `balloon_num_${b.number}` as PromptKey);
+        sp(g, ctx, `balloon_key_${b.key}` as PromptKey);
       }
     });
     return bookNoInput(vr, ctx, "balloons", { c, f });
@@ -1779,7 +1816,7 @@ const handlers: Record<string, Handler> = {
     if (d === "*") return back(vr, "cats"); // star: the categories menu (box 12a, Nov 22, 2026)
     if (d === "0") return back(vr, "cart", { c }); // after the cart, the same item list plays again
     const items = await listItems(c, ctx.query.get("f"));
-    const p = /^\d{1,2}$/.test(d) && !d.startsWith("0") ? items[Number(d) - 1] : undefined;
+    const p = /^\d{1,2}$/.test(d) && !d.startsWith("0") ? ((await isLaserBase(c)) ? laserList(items).find((x) => x.key === Number(d))?.p : items[Number(d) - 1]) : undefined;
     if (!p) {
       sp(vr, ctx, "not_valid");
       return back(vr, "category", { c });

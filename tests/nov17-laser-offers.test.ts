@@ -183,3 +183,21 @@ describe("phone: laser guns add-on ONLY right after an inflatable maze (Abraham,
     expect(await price()).toBe(7500);
   });
 });
+
+describe("laser tag list (box 13b, Abraham, Nov 22, 2026)", () => {
+  it("four fixed lines in order (no opening line), then the cart and star lines; the keys pick those items", async () => {
+    const [cat] = await db.select().from(schema.categories).where(eq(schema.categories.name, "Laser Tag and Inflatable Mazes"));
+    const xml = await call("category", {}, `c=${cat.id}`);
+    const lines = said(xml);
+    expect(lines.slice(0, 3)).toEqual([
+      "For the inflatable maze with a six-pack of laser guns, press 1.",
+      "For the inflatable maze with a four-pack of laser guns, press 2.",
+      "For a six-pack of laser guns without the maze, press 3.",
+    ]);
+    expect(lines.slice(-2)).toEqual(["To go to your shopping cart, press 0.", "To go back, press star."]);
+    h.session.data = {};
+    expect(redirect(await call("category-choice", { Digits: "1" }, `c=${cat.id}`))).toBe(`date?p=${maze6}`);
+    expect(redirect(await call("category-choice", { Digits: "2" }, `c=${cat.id}`))).toBe(`date?p=${maze4}`);
+    expect(redirect(await call("category-choice", { Digits: "3" }, `c=${cat.id}`))).toBe(`date?p=${guns6}`);
+  });
+});
