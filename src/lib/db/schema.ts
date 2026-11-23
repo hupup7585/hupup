@@ -236,6 +236,8 @@ export type CallData = {
   spanDays?: Record<string, { after: string; days: number | null; both?: string }>;
   /** Box 25 (Nov 22, 2026): the item just added, for "Successfully added to your cart: {Qnt} {item} for {date}." */
   lastAdded?: { name: string; qty: number; date: string; date2?: string };
+  /** Keypad typing one key at a time (preview, Nov 22, 2026): committed text, the key being cycled and its presses */
+  kt?: { text: string; key?: string; n?: number; star?: boolean };
   /** Key 8 catalog: the number to text, the two parts of the email, and keys typed so far */
   catPhone?: string;
   /** Shared text steps (boxes 142 to 144): what the number is for, and the order whose payment link it gets */

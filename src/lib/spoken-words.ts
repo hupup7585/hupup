@@ -34,6 +34,8 @@ export function ordinalWords(n: number): string[] {
 export function wordSlotsFor(value: string, items: { id: number; name: string }[] = []): string[] | null {
   const town = townSlot(value);
   if (town) return [town];
+  // Keypad echo (Nov 22, 2026): dot, dash, underscore and basement have their own recordings
+  if (/^(dot|dash|underscore|basement)$/i.test(value.trim())) return [`word:${value.trim().toLowerCase()}`];
   const item = items.find((i) => i.name.trim().toLowerCase() === value.trim().toLowerCase());
   if (item) return [`item:${item.id}`];
   // "2 paddle boats": the number, then the plural name recording (Nov 19, 2026)
