@@ -117,7 +117,7 @@ describe("limits: tries per call and declines per phone in 24 hours (Admin setti
     const f = readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(f).not.toContain("PHONEPAY_MAX_TRIES");
     expect(f).toContain("await startPayWatch(attempt.id);");
-    expect(f).toContain('if (await isPhonePayBlocked(callerPhoneOf(ctx))) return back(vr, "paylink", { o });');
+    expect(f).toMatch(/if \(await isPhonePayBlocked\(callerPhoneOf\(ctx\)\)\) \{[\s\S]{0,300}?return back\(vr, "paylink", \{ o \}\);/); // now also in the call log (Nov 22, 2026)
     expect(f).toContain("blockIfTooManyCalls(callerPhoneOf(ctx), ctx.callSid, limits.callsPerDay");
     expect(readFileSync("src/app/admin/(app)/phone/card-blocks/page.tsx", "utf8")).toContain("await requireAdmin()");
     expect(readFileSync("src/components/Sidebar.tsx", "utf8")).toContain('"/admin/phone/card-blocks", CreditCard, "Card blocks", OS]');
