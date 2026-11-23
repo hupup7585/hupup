@@ -103,11 +103,17 @@ describe("read-back joined from recordings (Nov 22, 2026, 11:12 PM)", () => {
     expect(amountSlots(279)).toEqual(["word:two", "word:hundred", "word:seventy nine"]);
     expect(amountSlots(380)).toEqual(["word:three", "word:hundred", "word:eighty"]);
     expect(amountSlots(12)).toEqual(["word:twelve"]);
-    // no street slots until Hark sends the 348 names: the computer voice reads it
-    expect(addressSlotKeys({ house: "21", street: "Rovna Court", unit: "312", town: "Monroe", zip: "10950" })).toBeNull();
+    // Hark's 348 streets (Nov 23, 2026): the street as said or as printed; slot named by the spoken name
+    expect(addressSlotKeys({ house: "21", street: "Acres Road", unit: "312", town: "Monroe", zip: "10950" })).toEqual(["word:twenty one", "street:acres_road", "word:unit", "word:three", "word:one", "word:two", "town:monroe_new_york", "zip:10950"]);
+    expect(addressSlotKeys({ house: "5", street: "ACRES RD", town: "Highland Mills", zip: "10930" })).toEqual(["word:five", "street:acres_road", "town:highland_mills_new_york", "zip:10930"]);
+    expect(addressSlotKeys({ house: "5", street: "Nowhere Lane", town: "Monroe", zip: "10950" })).toBeNull(); // not on the list: computer voice
+    const { allSlots: slots } = await import("@/lib/recording-slots");
+    const streets = slots().filter((s) => s.group === "Streets");
+    expect(streets).toHaveLength(348);
+    expect(streets[0]).toMatchObject({ key: "street:acres_road", label: "Street - Acres Road", text: "Acres Road" });
     const { allSlots } = await import("@/lib/recording-slots");
     const keys = allSlots().map((s) => s.key);
-    for (const k of ["word:twenty one", "word:ninety nine", "word:unit", "zip:10950"]) expect(keys, k).toContain(k);
+    for (const k of ["word:twenty one", "word:ninety nine", "word:unit", "zip:10950", "zip:10930", "zip:10918", "zip:10992", "zip:10917", "zip:10926"]) expect(keys, k).toContain(k);
     expect(keys).not.toContain("word:thirty zero");
   });
 });

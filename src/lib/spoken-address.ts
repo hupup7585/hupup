@@ -1,5 +1,5 @@
 import { numberWords, townSlotKey } from "@/lib/spoken-words";
-import { STREET_NAMES, streetSlotKey } from "@/lib/streets";
+import { UNIT_CODES, ZIP_CODES, findStreet, streetSlotKey, unitSlotKey } from "@/lib/streets";
 
 /**
  * Address read-back rules (Abraham, Nov 22, 2026, approved):
@@ -61,18 +61,19 @@ export function addressSlotKeys(a: { house: string; street: string; unit?: strin
   const unit = a.unit?.trim() || h.unit;
   const n = Number(h.house);
   if (!/^\d+$/.test(h.house) || !n) return null;
-  const street = STREET_NAMES.find((x) => x.toLowerCase() === a.street.trim().toLowerCase());
+  const street = findStreet(a.street);
   if (!street) return null;
-  const keys = [...amountSlots(n), streetSlotKey(street)];
+  const keys = [...amountSlots(n), streetSlotKey(street.spoken)];
   if (unit) {
     keys.push("word:unit");
     if (/^(bsmt|basement)$/i.test(unit)) keys.push("word:basement");
+    else if (UNIT_CODES.includes(unit.toUpperCase())) keys.push(unitSlotKey(unit)); // one recording for the whole unit
     else for (const c of unit.replace(/[^0-9A-Za-z]/g, "")) keys.push(/\d/.test(c) ? `word:${DIGIT[Number(c)]}` : `letter:${c.toLowerCase()}`);
   }
   if (a.areaPrinted && /blooming\s*grove/i.test(a.areaPrinted) && !/blooming\s*grove/i.test(a.town)) keys.push(townSlotKey("Blooming Grove"));
   keys.push(townSlotKey(`${a.town.trim()} New York`));
   const zip = a.zip.replace(/\D/g, "");
-  if (zip === "10950") keys.push("zip:10950");
+  if (ZIP_CODES.includes(zip)) keys.push(`zip:${zip}`); // one recording each (Hark, Nov 23, 2026)
   else for (const d of zip) keys.push(`word:${DIGIT[Number(d)]}`);
   return keys;
 }
