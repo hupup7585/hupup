@@ -234,6 +234,9 @@ export type CallData = {
   mutzeAnnounce?: string;
   /** Closed-day offers taken (Nov 20, 2026): the day before -> its pickup (the day after) and the days charged */
   spanDays?: Record<string, { after: string; days: number | null; both?: string }>;
+  /** Phone-number lookup (Nov 23, 2026): the number looked up, and the address the caller picked (for the owner alert) */
+  dirPhone?: string;
+  dirPick?: string;
   /** The directory entry's area as printed (Blooming Grove is said before Monroe New York) */
   dirArea?: string;
   /** Welcome back (Nov 23, 2026): the carts this call ended with, still holding items when the caller hung up */

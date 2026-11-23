@@ -40,6 +40,7 @@ import { alertMissedCall } from "@/lib/owner-alerts";
 import { alertSharedPhoneOrder, isSharedNumber } from "@/lib/shared-phones";
 import { addressParts, townPhrase } from "@/lib/spoken-address";
 import { lookupByPhone } from "@/lib/directory";
+import { findStreet } from "@/lib/streets";
 import { promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import {
@@ -2804,19 +2805,61 @@ const handlers: Record<string, Handler> = {
   // Nov 22, 2026 (Abraham): house number, street, unit, town and zip, read-back, delivery price
   async addr(ctx, vr) {
     if (!addrStepsActive(ctx)) return back(vr, "ask", { f: "address" });
-    // The directory (Nov 23, 2026, preview only): the caller's own number only, never anyone else's
-    if (directoryLookupOn() && (await lookupByPhone(toE164(ctx.from))).length) return back(vr, "addr-dir");
+    // The phone-number lookup (Nov 23, 2026, approved screens): preview only until Abraham approves the test call
+    if (directoryLookupOn()) return back(vr, "addr-lookup");
     return back(vr, "addr-house");
   },
 
-  /**
-   * Directory lookup by caller ID (Abraham, Nov 23, 2026; draft wording, preview only): one entry is read back with
-   * the step 6 pieces (1 = that address, 2 = a different one); a shared number reads each address and the caller picks.
-   */
-  async "addr-dir"(ctx, vr) {
-    const list = await lookupByPhone(toE164(ctx.from));
-    if (!list.length) return back(vr, "addr-house");
-    const g = keypad(vr, url("addr-dir-choice", { m: list.length > 1 ? 1 : 0 }));
+  /** Lookup screen 1: 1 = the number calling, 2 = a different phone number, 3 = enter the address manually. */
+  "addr-lookup"(ctx, vr) {
+    const g = keypad(vr, url("addr-lookup-choice"));
+    sp(g, ctx, "lookup_intro");
+    sp(g, ctx, "lookup_options");
+    backLine(g, ctx);
+    return repeatMenu(vr, ctx, "addr-lookup");
+  },
+
+  async "addr-lookup-choice"(ctx, vr) {
+    const d = ctx.body.Digits ?? "";
+    if (d === "*") return back(vr, "ask", { f: "name" }); // star: one step back
+    if (d === "1") {
+      await updateSession(ctx.callSid, { data: { dirPhone: toE164(ctx.from) ?? undefined } }, ctx.session);
+      sp(vr, ctx, "lookup_hold");
+      return back(vr, "addr-found");
+    }
+    if (d === "2") return back(vr, "addr-phone");
+    if (d === "3") return back(vr, "addr-house");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "addr-lookup");
+  },
+
+  /** A different phone number: 10 digits, starting with the area code; pound when done. */
+  "addr-phone"(ctx, vr) {
+    const g = keypad(vr, url("addr-phone-heard"), { numDigits: 11, timeout: NO_KEY_SECONDS, finishOnKey: "#" });
+    sp(g, ctx, "lookup_phone_enter");
+    sp(g, ctx, "pound_done");
+    backLine(g, ctx);
+    return repeatMenu(vr, ctx, "addr-phone");
+  },
+
+  async "addr-phone-heard"(ctx, vr) {
+    const raw = ctx.body.Digits ?? "";
+    if (raw.includes("*")) return back(vr, "addr-lookup"); // star: one step back
+    const digits = raw.replace(/\D/g, "");
+    if (!/^\d{10}$/.test(digits)) {
+      sp(vr, ctx, "phone_invalid");
+      return back(vr, "addr-phone");
+    }
+    await updateSession(ctx.callSid, { data: { dirPhone: `+1${digits}` } }, ctx.session);
+    sp(vr, ctx, "lookup_hold");
+    return back(vr, "addr-found");
+  },
+
+  /** Found (one family), found (a shared number: each family, the caller picks), or not found. */
+  async "addr-found"(ctx, vr) {
+    const list = await lookupByPhone(ctx.session?.data.dirPhone);
+    const m = list.length === 0 ? "none" : list.length === 1 ? "one" : "many";
+    const g = keypad(vr, url("addr-found-choice", { m, n: list.length }));
     const read = (e: (typeof list)[number]) => {
       for (const part of addressParts({ house: e.house, street: e.street, unit: e.unit, town: e.town, zip: e.zip, areaPrinted: e.areaPrinted })) {
         const urls = part.options.map((keys) => clipUrls(ctx.prompts, keys)).find(Boolean);
@@ -2824,36 +2867,51 @@ const handlers: Record<string, Handler> = {
         else say(g, part.text);
       }
     };
-    if (list.length === 1) {
-      spPreviewDraft(g, ctx, "dir_found");
+    const name = (e: (typeof list)[number]) => [e.lastName, e.firstName].filter(Boolean).join(", ");
+    if (m === "none") {
+      sp(g, ctx, "lookup_none");
+      sp(g, ctx, "lookup_try", { key: 1 });
+      sp(g, ctx, "lookup_manual", { key: 2 });
+    } else if (m === "one") {
+      sp(g, ctx, "lookup_one");
+      say(g, `${name(list[0])}.`);
       read(list[0]);
-      spPreviewDraft(g, ctx, "dir_confirm");
+      sp(g, ctx, "addr_rb_correct");
+      sp(g, ctx, "lookup_try", { key: 2 });
+      sp(g, ctx, "lookup_manual", { key: 3 });
     } else {
-      spPreviewDraft(g, ctx, "dir_many");
+      sp(g, ctx, "lookup_many");
       list.forEach((e, i) => {
+        say(g, `For ${name(e)},`);
         read(e);
-        spPreviewDraft(g, ctx, "dir_pick", { key: i + 1 });
+        sp(g, ctx, "lookup_press", { key: i + 1 });
       });
-      spPreviewDraft(g, ctx, "dir_other");
+      sp(g, ctx, "lookup_try", { key: list.length + 1 });
+      sp(g, ctx, "lookup_manual", { key: list.length + 2 });
     }
     backLine(g, ctx);
-    await track(ctx.callSid, "step", `Directory: ${list.length} address${list.length > 1 ? "es" : ""} on file for the caller's number`);
-    return repeatMenu(vr, ctx, "addr-dir");
+    await track(ctx.callSid, "step", `Address lookup: ${m === "none" ? "not found" : `${list.length} found`}`);
+    return repeatMenu(vr, ctx, "addr-found");
   },
 
-  async "addr-dir-choice"(ctx, vr) {
+  async "addr-found-choice"(ctx, vr) {
     const d = ctx.body.Digits ?? "";
-    const many = ctx.query.get("m") === "1";
-    if (d === "*") return back(vr, "ask", { f: "name" }); // star: one step back
-    if ((!many && d === "2") || (many && d === "0")) return back(vr, "addr-house"); // a different address: the usual steps
-    const list = await lookupByPhone(toE164(ctx.from));
-    const pick = !many && d === "1" ? list[0] : many && /^\d$/.test(d) ? list[Number(d) - 1] : undefined;
+    const m = ctx.query.get("m");
+    const n = Number(ctx.query.get("n") || 0);
+    if (d === "*") return back(vr, "addr-lookup"); // star: one step back
+    const tryKey = m === "none" ? "1" : m === "one" ? "2" : String(n + 1);
+    const manualKey = m === "none" ? "2" : m === "one" ? "3" : String(n + 2);
+    if (d === tryKey) return back(vr, "addr-phone");
+    if (d === manualKey) return back(vr, "addr-house");
+    const list = m === "none" ? [] : await lookupByPhone(ctx.session?.data.dirPhone);
+    const pick = m === "one" && d === "1" ? list[0] : m === "many" && /^\d{1,2}$/.test(d) && Number(d) <= n ? list[Number(d) - 1] : undefined;
     if (!pick) {
       sp(vr, ctx, "not_valid");
-      return back(vr, "addr-dir");
+      return back(vr, "addr-found");
     }
-    await updateSession(ctx.callSid, { data: { house: pick.house, street: pick.street, unit: pick.unit ?? undefined, zip: pick.zip, town: pick.town, dirArea: pick.areaPrinted ?? undefined } }, ctx.session);
-    await track(ctx.callSid, "step", `Directory address chosen (${list.length > 1 ? `${list.length} on file` : "one on file"})`);
+    const street = findStreet(pick.street)?.spoken ?? pick.street;
+    await updateSession(ctx.callSid, { data: { house: pick.house, street: pick.street, unit: pick.unit ?? undefined, zip: pick.zip, town: pick.town, dirArea: pick.areaPrinted ?? undefined, dirPick: `${pick.house} ${street}${pick.unit ? `, unit ${pick.unit}` : ""}` } }, ctx.session);
+    await track(ctx.callSid, "step", `Address lookup: the caller confirmed an address${n > 1 ? ` (${n} on the number)` : ""}`);
     return back(vr, "addr-check", { dir: 1 });
   },
 
@@ -2916,7 +2974,8 @@ const handlers: Record<string, Handler> = {
 
   "addr-zip-enter"(ctx, vr) {
     const g = keypad(vr, url("addr-zip-heard"), { numDigits: 6, timeout: 10, finishOnKey: "#" });
-    spPreviewDraft(g, ctx, ctx.query.get("bad") ? "addr_zip_bad" : "addr_zip_enter");
+    if (ctx.query.get("bad")) sp(g, ctx, "addr_zip_bad"); // Nov 23, 2026: the invalid line, then the entry prompt again
+    sp(g, ctx, "addr_zip_enter");
     return repeatMenu(vr, ctx, "addr-zip-enter", { bad: ctx.query.get("bad") ?? undefined });
   },
 
@@ -2938,8 +2997,9 @@ const handlers: Record<string, Handler> = {
     const firstDay = (await callOrders(ctx))[0]?.order.eventDate;
     const quote = await deliveryQuote(address, await getSettings(), fetch, firstDay ?? new Date());
     if (!quote.ok && quote.reason === "not_found") {
-      await updateSession(ctx.callSid, { data: { street: undefined, house: undefined, unit: undefined } }, ctx.session);
-      spPreviewDraft(vr, ctx, "addr_not_found");
+      // Nov 23, 2026: nothing entered is kept; the address starts again at the house number
+      await updateSession(ctx.callSid, { data: { street: undefined, house: undefined, unit: undefined, zip: undefined, town: undefined, address: undefined, dirArea: undefined, dirPick: undefined } }, ctx.session);
+      sp(vr, ctx, "addr_not_found");
       return back(vr, "addr-house");
     }
     if (!quote.ok) return back(vr, "addr-outside");
@@ -2947,8 +3007,11 @@ const handlers: Record<string, Handler> = {
     const placeTown = town;
     const placeAddress = address;
     await updateSession(ctx.callSid, { data: { address: placeAddress, town: placeTown, zip } }, ctx.session);
-    // From the directory: the caller already heard it and chose it, straight on to the delivery price (step 7)
-    if (ctx.query.get("dir") === "1") return back(vr, "addr-price");
+    // From the lookup (Nov 23, 2026): the caller confirmed it: "Thank you. Your delivery address has been saved.", then step 7
+    if (ctx.query.get("dir") === "1") {
+      sp(vr, ctx, "addr_saved");
+      return back(vr, "addr-price", { ns: 1 });
+    }
     await track(ctx.callSid, "said", `Address: ${placeAddress} (${quote.zone}, ${money(quote.feeCents)})`, { field: "address", value: placeAddress });
     return back(vr, "addr-readback");
   },
@@ -3016,7 +3079,7 @@ const handlers: Record<string, Handler> = {
       const cents = quote.kind ? deliveryFeeFor(quote.kind, settings, first?.eventDate ?? todayISO(), first?.offerNote ?? null) : quote.feeCents;
       sp(vr, ctx, "addr_price", { town: townPhrase(d.town), price: spokenMoney(cents) });
     }
-    sp(vr, ctx, "addr_saved");
+    if (!ctx.query.get("ns")) sp(vr, ctx, "addr_saved"); // already said after a lookup
     return back(vr, "directions");
   },
 
@@ -3282,7 +3345,9 @@ const handlers: Record<string, Handler> = {
     }
     await updateSession(ctx.callSid, { outcome: "checked_out" }, ctx.session);
     // A number two directory entries share (Abraham, Nov 22, 2026): alert him right away
-    await alertSharedPhoneOrder({ phone: (await isSharedNumber(ctx.from)) ? ctx.from : phone, name: data.name ?? null, address: data.address ?? null, orderIds: days.map((x) => x.order.id), source: "phone" }).catch((e) => console.error("shared number alert", e));
+    const sharedOn = [ctx.from, data.dirPhone ?? null, phone].find(Boolean);
+    const shared = (await isSharedNumber(ctx.from)) ? ctx.from : data.dirPhone && (await isSharedNumber(data.dirPhone)) ? data.dirPhone : sharedOn;
+    await alertSharedPhoneOrder({ phone: shared ?? null, name: data.name ?? null, address: data.address ?? null, orderIds: days.map((x) => x.order.id), source: "phone", chosen: data.dirPick ?? null }).catch((e) => console.error("shared number alert", e));
     await track(ctx.callSid, "booking_finished", `Booking finished: order #${orderNumber(primary.id)}${days.length > 1 ? ` (${days.length} days)` : ""}`, { orderIds: days.map((x) => x.order.id), days: days.map((x) => x.order.eventDate) });
     const sum = (k: "subtotalCents" | "deliveryFeeCents" | "taxCents" | "totalCents") => perDay.reduce((n, x) => n + x.t![k], 0);
     const totals = { subtotalCents: sum("subtotalCents"), deliveryFeeCents: sum("deliveryFeeCents"), taxCents: sum("taxCents"), totalCents: sum("totalCents") };

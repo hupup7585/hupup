@@ -28,7 +28,7 @@ export async function isSharedNumber(phone: string | null | undefined): Promise<
 }
 
 /** The alert: name, the address chosen, the items and the date(s). Email always; a text once texting is active. */
-export async function alertSharedPhoneOrder(input: { phone: string | null; name: string | null; address: string | null; orderIds: number[]; source: "phone" | "staff" | "website" }) {
+export async function alertSharedPhoneOrder(input: { phone: string | null; name: string | null; address: string | null; orderIds: number[]; source: "phone" | "staff" | "website"; chosen?: string | null }) {
   if (!input.phone || !input.orderIds.length || !(await isSharedNumber(input.phone))) return { sent: 0 };
   const phone = input.phone;
   const rows = await db
@@ -47,6 +47,7 @@ export async function alertSharedPhoneOrder(input: { phone: string | null; name:
   const body = [
     `An order came in from ${formatPhone(phone)}, a number two directory entries share, through ${how}.`,
     "",
+    ...(input.chosen ? [`Caller chose ${input.chosen}`] : []),
     `Name: ${who}`,
     `Address chosen: ${input.address?.trim() || "(no address yet)"}`,
     ...dates.map((d) => `Date and items: ${d}`),
@@ -56,7 +57,7 @@ export async function alertSharedPhoneOrder(input: { phone: string | null; name:
   let sent = 0;
   if (config.adminEmail() && (await sendEmail(config.adminEmail(), subject, body)).sent) sent++;
   if (config.adminPhone() && textingActive()) {
-    const text = `${BUSINESS_NAME}: order from the shared number ${formatPhone(phone)}. ${who}, ${input.address?.trim() || "no address yet"}. ${dates.join("; ")}.`;
+    const text = `${BUSINESS_NAME}: order from the shared number ${formatPhone(phone)}.${input.chosen ? ` Caller chose ${input.chosen}.` : ""} ${who}, ${input.address?.trim() || "no address yet"}. ${dates.join("; ")}.`;
     if ((await sendSms(config.adminPhone(), text, { kind: "system", event: "owner_alert" })).sent) sent++;
   }
   return { sent };

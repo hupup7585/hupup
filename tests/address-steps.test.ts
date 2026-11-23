@@ -85,7 +85,8 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
   it("a unit is read digit by digit; another zip fills its town; not 5 digits asks again", async () => {
     Object.assign(h.session.data, { street: "Main Street", house: "53", unit: "302A" });
     expect(redirect(await call("addr-zip-heard", { Digits: "123" }))).toBe("addr-zip-enter?bad=1");
-    expect(said(await call("addr-zip-enter", {}, "bad=1"))).toEqual([PROMPTS.addr_zip_bad.text]);
+    // Nov 23, 2026 (approved): the invalid line, then the entry prompt again
+    expect(said(await call("addr-zip-enter", {}, "bad=1"))).toEqual(["The zip code you entered is not valid. Please try again.", "Please enter the 5-digit zip code. When you are finished, please press pound."]);
     expect(redirect(await call("addr-zip-heard", { Digits: "10924" }))).toBe("addr-check");
     await call("addr-check");
     expect(h.session.data.town).toBe("Goshen");
@@ -102,12 +103,13 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     Object.assign(h.session.data, { street: "Nowhere Lane", house: "9", zip: "10950" });
     h.quote = { ok: false, reason: "not_found" };
     const nf = await call("addr-check");
-    expect(said(nf)).toEqual(["We are sorry, we could not find that address. Let us try again."]);
+    expect(said(nf)).toEqual(["We are sorry, we could not find that address. Please try again."]);
     expect(redirect(nf)).toBe("addr-house");
+    expect(h.session.data).toMatchObject({ house: undefined, street: undefined, zip: undefined }); // nothing entered is kept
   });
-  it("the live line keeps the one address question until the drafts are approved", async () => {
+  it("Nov 23, 2026: every address step is approved, so the live line uses the steps (the phone-number lookup stays on preview)", async () => {
     process.env.VERCEL_ENV = "production";
-    expect(redirect(await call("addr"))).toBe("ask?f=address");
+    expect(redirect(await call("addr"))).toBe("addr-house");
   });
   it("town slots: one per phrase; step 7 plays the town recording", async () => {
     const { allSlots } = await import("@/lib/recording-slots");

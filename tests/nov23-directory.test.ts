@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-/* The directory lookup by caller ID (Abraham, Nov 23, 2026; preview only, draft lines in Puck). Made-up entries. */
+/* The phone-number address lookup (Abraham, Nov 23, 2026, approved screens; preview only). Made-up entries. */
 const h = vi.hoisted(() => ({
   session: { callSid: "CAdir", fromNumber: "+18455550401", orderId: null as number | null, data: {} as Record<string, unknown>, status: "in_progress", outcome: "browsing" },
   from: "+18455550401",
@@ -24,6 +24,7 @@ import { handleVoice } from "@/lib/ivr/flow";
 const call = (action: string, body: Record<string, string> = {}, q = "") => handleVoice({ action, query: new URLSearchParams(q), body: { CallSid: "CAdir", ...body }, callSid: "CAdir", from: h.from });
 const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&apos;/g, "'"));
 const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/Redirect>/)?.[1].replace(/^.*\/api\/voice\//, "").replace(/&amp;/g, "&");
+const STAR = "To go back, press star.";
 
 beforeAll(async () => {
   process.env.PUBLIC_BASE_URL = "https://hupup.example";
@@ -42,41 +43,68 @@ beforeAll(async () => {
   expect(await loadDirectory(r.rows)).toBe(4);
 });
 
-describe("directory lookup by caller ID (preview)", () => {
-  it("1. a matching number: the address on file, read with the step 6 pieces; 1 = that address, then the delivery price", async () => {
-    h.from = "+18455550401";
+describe("phone-number address lookup (approved screens, preview)", () => {
+  it("screen 1: three choices and the star line", async () => {
     h.session.data = { name: "Sample Caller" };
-    expect(redirect(await call("addr"))).toBe("addr-dir");
-    const lines = said(await call("addr-dir"));
-    expect(lines).toEqual(["We have an address on file for the number you are calling from.", "ten", "D A Wieder Boulevard", "unit", "three zero one", "Monroe New York", "one zero nine five zero", "If that is the delivery address, press 1. To enter a different address, press 2.", "To go back, press star."]);
-    expect(redirect(await call("addr-dir-choice", { Digits: "1" }, "m=0"))).toBe("addr-check?dir=1");
-    expect(h.session.data).toMatchObject({ house: "10", street: "D A WIEDER BLVD", unit: "301", zip: "10950" });
-    expect(redirect(await call("addr-check", {}, "dir=1"))).toBe("addr-price"); // no second read-back
-    expect(redirect(await call("addr-dir-choice", { Digits: "2" }, "m=0"))).toBe("addr-house");
+    expect(redirect(await call("addr"))).toBe("addr-lookup");
+    expect(said(await call("addr-lookup"))).toEqual(["Next, we need the delivery address.", "To look it up with the number you are calling from, press 1. To look it up with a different phone number, press 2. To enter the address manually, press 3.", STAR]);
+    expect(redirect(await call("addr-lookup-choice", { Digits: "3" }))).toBe("addr-house");
+    expect(redirect(await call("addr-lookup-choice", { Digits: "*" }))).toBe("ask?f=name");
   });
-  it("2. a shared number: each address, then the caller picks; Blooming Grove said before Monroe New York", async () => {
-    h.from = "+18455550402";
-    const lines = said(await call("addr-dir"));
-    expect(lines[0]).toBe("We have more than one address on file for the number you are calling from.");
-    expect(lines.slice(1, 9)).toEqual(["twenty nine", "Dallas Drive", "unit", "zero zero one", "Monroe New York", "one zero nine five zero", "For this address, press 1.", "three hundred eighty"]);
+  it("1. the number calling, one family: hold line, name and address, confirm, saved, then the delivery price", async () => {
+    h.from = "+18455550401";
+    const hold = await call("addr-lookup-choice", { Digits: "1" });
+    expect(said(hold)).toEqual(["Please hold a moment while we look up the address."]);
+    expect(redirect(hold)).toBe("addr-found");
+    expect(said(await call("addr-found"))).toEqual([
+      "Here is the name and address we found for this phone number.",
+      "Sample, Chaim.",
+      "ten", "D A Wieder Boulevard", "unit", "three zero one", "Monroe New York", "one zero nine five zero",
+      "If that is correct, press 1.", "To try a different phone number, press 2.", "To enter the address manually, press 3.", STAR,
+    ]);
+    expect(redirect(await call("addr-found-choice", { Digits: "1" }, "m=one&n=1"))).toBe("addr-check?dir=1");
+    expect(h.session.data).toMatchObject({ house: "10", street: "D A WIEDER BLVD", unit: "301", zip: "10950", dirPick: "10 D A Wieder Boulevard, unit 301" });
+    const saved = await call("addr-check", {}, "dir=1");
+    expect(said(saved)).toEqual(["Thank you. Your delivery address has been saved."]);
+    expect(redirect(saved)).toBe("addr-price?ns=1");
+    expect(said(await call("addr-price", {}, "ns=1"))).toEqual(["Delivery to Monroe New York is 10 dollars."]); // no second saved line
+    expect(redirect(await call("addr-found-choice", { Digits: "2" }, "m=one&n=1"))).toBe("addr-phone");
+    expect(redirect(await call("addr-found-choice", { Digits: "3" }, "m=one&n=1"))).toBe("addr-house");
+  });
+  it("2. a different number, a shared number: each family, the caller picks; 3 = another number, 4 = manually", async () => {
+    expect(said(await call("addr-phone"))).toEqual(["Please enter a 10-digit phone number, starting with the area code.", "When you are done, press pound.", STAR]);
+    const bad = await call("addr-phone-heard", { Digits: "555040" });
+    expect(said(bad)).toEqual(["The phone number you entered is not valid. Please try again."]);
+    expect(redirect(bad)).toBe("addr-phone");
+    expect(said(await call("addr-phone-heard", { Digits: "8455550402" }))).toEqual(["Please hold a moment while we look up the address."]);
+    const lines = said(await call("addr-found"));
+    expect(lines[0]).toBe("Here is what we found for this phone number.");
+    expect(lines.slice(1, 9)).toEqual(["For Example, Moshe,", "twenty nine", "Dallas Drive", "unit", "zero zero one", "Monroe New York", "one zero nine five zero", "press 1."]);
     expect(lines).toContain("Blooming Grove");
-    expect(lines.slice(-3)).toEqual(["For this address, press 2.", "To enter a different address, press 0.", "To go back, press star."]);
-    expect(redirect(await call("addr-dir-choice", { Digits: "2" }, "m=1"))).toBe("addr-check?dir=1");
-    expect(h.session.data).toMatchObject({ house: "380", street: "LAKE SHORE DR", dirArea: "Blooming Grove" });
-    expect(redirect(await call("addr-dir-choice", { Digits: "0" }, "m=1"))).toBe("addr-house");
-    const { isSharedNumber } = await import("@/lib/shared-phones");
-    expect(await isSharedNumber("+18455550402")).toBe(true);
-    expect(await isSharedNumber("+18455550401")).toBe(false);
+    expect(lines.slice(-3)).toEqual(["To try a different phone number, press 3.", "To enter the address manually, press 4.", STAR]);
+    expect(redirect(await call("addr-found-choice", { Digits: "2" }, "m=many&n=2"))).toBe("addr-check?dir=1");
+    expect(h.session.data).toMatchObject({ house: "380", dirArea: "Blooming Grove", dirPick: "380 Lake Shore Drive" });
+    expect(redirect(await call("addr-found-choice", { Digits: "3" }, "m=many&n=2"))).toBe("addr-phone");
+    expect(redirect(await call("addr-found-choice", { Digits: "4" }, "m=many&n=2"))).toBe("addr-house");
   });
-  it("3. a number not in the list: straight to the usual address steps; nothing is read", async () => {
-    h.from = "+18455550499";
-    expect(redirect(await call("addr"))).toBe("addr-house");
-    expect(redirect(await call("addr-dir"))).toBe("addr-house");
+  it("3. not found: the line, 1 = another number, 2 = manually", async () => {
+    await call("addr-phone-heard", { Digits: "8455550499" });
+    expect(said(await call("addr-found"))).toEqual(["We could not find an address for this phone number.", "To try a different phone number, press 1.", "To enter the address manually, press 2.", STAR]);
+    expect(redirect(await call("addr-found-choice", { Digits: "1" }, "m=none&n=0"))).toBe("addr-phone");
+    expect(redirect(await call("addr-found-choice", { Digits: "2" }, "m=none&n=0"))).toBe("addr-house");
   });
-  it("off on the live line until Abraham approves the lines", async () => {
+  it("no key: the shared no-key rule (we did not get your choice, then the same screen)", async () => {
+    expect(redirect(await call("addr-found"))).toMatch(/^idle\?to=addr-found/);
+  });
+  it("off on the live line until Abraham approves the test call", async () => {
     const { directoryLookupOn } = await import("@/lib/ivr/flow");
     expect(directoryLookupOn({ VERCEL_ENV: "production" })).toBe(false);
     expect(directoryLookupOn({ VERCEL_ENV: "preview" })).toBe(true);
+  });
+  it("the shared-number alert names the address the caller chose", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/lib/shared-phones.ts", "utf8")).toContain("`Caller chose ${input.chosen}`");
+    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toContain("chosen: data.dirPick ?? null");
   });
   it("Weider and Wieder find the same street slot (072)", async () => {
     const { findStreet, streetSlotKey } = await import("@/lib/streets");
