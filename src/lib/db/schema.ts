@@ -1664,9 +1664,13 @@ export const directoryEntries = pgTable(
     zip: text("zip").notNull(),
     phone: text("phone"),
     areaPrinted: text("area_printed"),
+    // Directory list as a sheet (Nov 23, 2026): Yiddish names (Hebrew letters) and the row order
+    yiddishLastName: text("yiddish_last_name").notNull().default(""),
+    yiddishFirstName: text("yiddish_first_name").notNull().default(""),
+    sortOrder: doublePrecision("sort_order"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("directory_entries_phone_idx").on(t.phone)],
+  (t) => [index("directory_entries_phone_idx").on(t.phone), index("directory_entries_sort_idx").on(t.sortOrder)],
 );
 
 /** Every voicemail action by phone (Abraham, Nov 23, 2026): shown in Admin Voicemail with date, time and who. */

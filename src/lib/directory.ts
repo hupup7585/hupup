@@ -13,7 +13,7 @@ export async function loadDirectory(rows: DirectoryRow[]): Promise<number> {
     await tx.delete(schema.directoryEntries);
     for (let i = 0; i < rows.length; i += 500) {
       await tx.insert(schema.directoryEntries).values(
-        rows.slice(i, i + 500).map((r) => ({ lastName: r.lastName, firstName: r.firstName, house: r.house, street: r.street, unit: r.unit, town: r.town, state: r.state, zip: r.zip, phone: r.phone, areaPrinted: r.areaPrinted })),
+        rows.slice(i, i + 500).map((r, j) => ({ sortOrder: i + j + 1, yiddishLastName: r.yiddishLastName ?? "", yiddishFirstName: r.yiddishFirstName ?? "", lastName: r.lastName, firstName: r.firstName, house: r.house, street: r.street, unit: r.unit, town: r.town, state: r.state, zip: r.zip, phone: r.phone, areaPrinted: r.areaPrinted })),
       );
     }
   });

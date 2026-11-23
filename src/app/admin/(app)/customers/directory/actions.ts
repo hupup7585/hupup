@@ -110,3 +110,71 @@ export async function lookupDirectoryPhoneAction(raw: string): Promise<{ ok: boo
   const rows = await lookupByPhone(`+1${d}`);
   return { ok: true, found: rows.map((s) => `${s.lastName}, ${s.firstName} | ${s.house} ${s.street}${s.unit ? `, unit ${s.unit}` : ""} | ${s.town}, ${s.state} ${s.zip}`) };
 }
+
+/* ---------- The Directory list as a sheet (Abraham, Nov 23, 2026), Owner only; every change audited ---------- */
+type SheetKeyT = import("@/lib/directory-sheet").SheetKey;
+type SheetRowT = import("@/lib/directory-sheet").SheetRow;
+
+async function audit(userId: number | null, action: string, id: number | string, after?: Record<string, unknown>, before?: Record<string, unknown>) {
+  const { db, schema } = await import("@/lib/db");
+  await db.insert(schema.auditLog).values({ userId, action, entityType: "directory_entry", entityId: String(id), after: after ?? null, before: before ?? null });
+}
+
+export async function sheetRowsAction(): Promise<SheetRowT[]> {
+  await requireOwner();
+  const { sheetRows } = await import("@/lib/directory-sheet");
+  return sheetRows();
+}
+
+/** One cell, or a pasted row. A phone number already in the directory comes back with sharedWith, nothing saved. */
+export async function saveCellsAction(id: number, cells: Partial<Record<SheetKeyT, string>>, allowShared = false): Promise<{ ok: boolean; row?: SheetRowT; error?: string; sharedWith?: string[] }> {
+  const me = await requireOwner();
+  try {
+    const { saveCells } = await import("@/lib/directory-sheet");
+    const r = await saveCells(id, cells, { allowShared });
+    if (r.ok) await audit(me.userId, "directory.edited", id, { ...cells, ...(allowShared ? { shared: true } : {}) });
+    return r;
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function insertRowAction(where: { at: "end" } | { at: "above" | "below"; id: number }): Promise<{ ok: boolean; row?: SheetRowT }> {
+  const me = await requireOwner();
+  try {
+    const { insertRow } = await import("@/lib/directory-sheet");
+    const row = await insertRow(where);
+    await audit(me.userId, "directory.row_added", row.id, where);
+    return { ok: true, row };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Delete; the deleted entry comes back (as a token) so Undo can restore it exactly. */
+export async function deleteRowAction(id: number): Promise<{ ok: boolean; undo?: string }> {
+  const me = await requireOwner();
+  try {
+    const { deleteRow } = await import("@/lib/directory-sheet");
+    const row = await deleteRow(id);
+    if (!row) return { ok: false };
+    await audit(me.userId, "directory.row_deleted", id, undefined, row as unknown as Record<string, unknown>);
+    return { ok: true, undo: JSON.stringify(row) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function undoDeleteAction(undo: string): Promise<{ ok: boolean; row?: SheetRowT }> {
+  const me = await requireOwner();
+  try {
+    const e = JSON.parse(undo);
+    if (!e || typeof e.id !== "number") return { ok: false };
+    const { restoreRow } = await import("@/lib/directory-sheet");
+    const row = await restoreRow(e);
+    await audit(me.userId, "directory.row_restored", row.id);
+    return { ok: true, row };
+  } catch {
+    return { ok: false };
+  }
+}
