@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { BOOK_GROUPS, bookTabHref } from "@/lib/bookkeeping-tabs";
 import { Fragment, useEffect, useState } from "react";
-import { Activity, Boxes, CreditCard, Search, ArrowDownToLine, BadgePercent, BookOpen, Car, ChartColumn, FileClock, FileText, Gauge, IdCard, Landmark, List, ListOrdered, Percent, Receipt, Settings2, Wrench, CircleUser, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, Inbox, KeyRound, ChevronDown, ChevronRight, LayoutDashboard, Megaphone, LogOut, Menu, MessageSquare, Mic, Music, Package, Palette, PhoneCall, PhoneForwarded, PlusCircle, Settings, ShieldCheck, SlidersHorizontal, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
+import { Activity, BookUser, Boxes, CreditCard, Search, ArrowDownToLine, BadgePercent, BookOpen, Car, ChartColumn, FileClock, FileText, Gauge, IdCard, Landmark, List, ListOrdered, Percent, Receipt, Settings2, Wrench, CircleUser, CalendarClock, ListChecks, CalendarDays, Contact, History, ClipboardList, Inbox, KeyRound, ChevronDown, ChevronRight, LayoutDashboard, Megaphone, LogOut, Menu, MessageSquare, Mic, Music, Package, Palette, PhoneCall, PhoneForwarded, PlusCircle, Settings, ShieldCheck, SlidersHorizontal, Truck, Users, Voicemail, X, type LucideIcon } from "lucide-react";
 import type { Role } from "@/lib/db/schema";
 
 const O: Role[] = ["owner"];
@@ -60,6 +60,7 @@ export const NAV_GROUPS: Group[] = [
       ["/admin/orders", ClipboardList, "Orders", OS],
       ["/admin/pos", PlusCircle, "New booking", OS],
       ["/admin/customers", Contact, "Customers", OS],
+      ["/admin/customers/directory", BookUser, "Directory list", O], // Abraham, Nov 23, 2026: Owner only, under Customers
       ["/admin/catalog", Package, "Catalog", O],
       ["/admin/catalog-send", FileText, "Catalog email & text", O], // Abraham, Nov 17, 2026: catalog PDF + text pictures
       ["/admin/offers", Percent, "Offers", O], // Abraham, Nov 17, 2026: offers on their own page
@@ -135,7 +136,10 @@ export const isActive = (path: string, href: string, tab: string | null = null) 
     const want = new URLSearchParams(query).get("tab");
     return path === base && (tab || "overview") === want;
   }
-  return href === "/admin" ? path === "/admin" : path === href || path.startsWith(href + "/");
+  if (href === "/admin") return path === "/admin";
+  if (!(path === href || path.startsWith(href + "/"))) return false;
+  // A more exact menu item wins (Directory list, not Customers, on /admin/customers/directory)
+  return !NAV_GROUPS.some((g) => g.items.some(([h]) => !h.includes("?") && h.length > href.length && h.startsWith(href + "/") && (path === h || path.startsWith(h + "/"))));
 };
 
 /** Staff navigation: navy bar, yellow marker on the current page. Hidden when printing. */

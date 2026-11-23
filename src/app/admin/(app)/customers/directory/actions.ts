@@ -56,3 +56,57 @@ export async function loadDirectoryAction(form: FormData): Promise<{ ok: boolean
   revalidatePath("/admin/customers/directory");
   return { ok: true, message: `Saved: ${n} rows loaded${issues.length ? `, ${issues.length} rows with a problem not loaded` : ""}.` };
 }
+
+export type AddNameResult = { ok: boolean; message: string; sharedWith?: string[] };
+
+/** Owner only (Abraham, Nov 23, 2026): Add a name, one entry at a time. A number already in the directory asks first. */
+export async function addDirectoryNameAction(form: FormData, allowShared = false): Promise<AddNameResult> {
+  const me = await requireOwner();
+  const v = (k: string) => String(form.get(k) ?? "").trim();
+  const { STREETS } = await import("@/lib/streets");
+  const lastName = v("lastName");
+  const firstName = v("firstName");
+  const house = v("house");
+  const street = STREETS.find((s) => s.name === v("street"))?.name;
+  const unit = v("unit") || null;
+  const town = v("town");
+  const zip = v("zip");
+  const digits = v("phone").replace(/\D/g, "");
+  if (!lastName || !firstName) return { ok: false, message: "Enter the last name and first name." };
+  if (digits && digits.length !== 10) return { ok: false, message: "The phone number must be 10 digits, or leave it empty." };
+  if (!house) return { ok: false, message: "Enter the house number." };
+  if (!street) return { ok: false, message: "Pick the street from the list." };
+  if (!town) return { ok: false, message: "Enter the town." };
+  if (!/^\d{5}$/.test(zip)) return { ok: false, message: "The zip code must be 5 digits." };
+  const phone = digits ? `+1${digits}` : null;
+  const { addDirectoryEntry } = await import("@/lib/directory");
+  const r = await addDirectoryEntry({ lastName, firstName, phone, house, street, unit, town, zip }, { allowShared });
+  if (!r.ok) return { ok: false, message: "", sharedWith: r.sharedWith };
+  const { db, schema } = await import("@/lib/db");
+  await db.insert(schema.auditLog).values({ userId: me.userId, action: "directory.added", entityType: "directory_entry", entityId: String(r.id), after: { lastName, firstName, phone, house, street, unit, town, zip, shared: allowShared } });
+  const { revalidatePath } = await import("next/cache");
+  revalidatePath("/admin/customers/directory");
+  return { ok: true, message: "Saved" };
+}
+
+/** Owner only: removes one entry added with Add a name (a test entry, or a mistake). Audited. */
+export async function removeDirectoryNameAction(id: number): Promise<{ ok: boolean }> {
+  const me = await requireOwner();
+  const { removeDirectoryEntry } = await import("@/lib/directory");
+  const ok = await removeDirectoryEntry(id);
+  const { db, schema } = await import("@/lib/db");
+  if (ok) await db.insert(schema.auditLog).values({ userId: me.userId, action: "directory.removed", entityType: "directory_entry", entityId: String(id) });
+  const { revalidatePath } = await import("next/cache");
+  revalidatePath("/admin/customers/directory");
+  return { ok };
+}
+
+/** Owner only: what the phone lookup finds for a number (the same lookup the phone line uses, right away). */
+export async function lookupDirectoryPhoneAction(raw: string): Promise<{ ok: boolean; message?: string; found?: string[] }> {
+  await requireOwner();
+  const d = raw.replace(/\D/g, "");
+  if (d.length !== 10) return { ok: false, message: "Enter a 10-digit phone number." };
+  const { lookupByPhone } = await import("@/lib/directory");
+  const rows = await lookupByPhone(`+1${d}`);
+  return { ok: true, found: rows.map((s) => `${s.lastName}, ${s.firstName} | ${s.house} ${s.street}${s.unit ? `, unit ${s.unit}` : ""} | ${s.town}, ${s.state} ${s.zip}`) };
+}

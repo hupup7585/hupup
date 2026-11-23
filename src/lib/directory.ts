@@ -40,3 +40,26 @@ export async function lookupByPhone(phone: string | null | undefined): Promise<D
     return []; // the table is not there yet (before the update runs)
   }
 }
+
+export type NewDirectoryEntry = { lastName: string; firstName: string; phone: string | null; house: string; street: string; unit: string | null; town: string; zip: string };
+
+/**
+ * Add a name (Abraham, Nov 23, 2026): one entry into the same directory, without reloading the list. The phone lookup
+ * reads the table directly, so the new entry is found right away. Returns the other entries already on that number.
+ */
+export async function addDirectoryEntry(e: NewDirectoryEntry, opts: { allowShared: boolean }): Promise<{ ok: true; id: number } | { ok: false; sharedWith: string[] }> {
+  if (e.phone && !opts.allowShared) {
+    const same = await lookupByPhone(e.phone);
+    if (same.length) return { ok: false, sharedWith: same.map((s) => `${s.lastName}, ${s.firstName} (${s.house} ${s.street}${s.unit ? `, unit ${s.unit}` : ""}, ${s.town})`) };
+  }
+  const [row] = await db
+    .insert(schema.directoryEntries)
+    .values({ lastName: e.lastName, firstName: e.firstName, house: e.house, street: e.street, unit: e.unit, town: e.town, state: "NY", zip: e.zip, phone: e.phone, areaPrinted: null })
+    .returning({ id: schema.directoryEntries.id });
+  return { ok: true, id: row.id };
+}
+
+export async function removeDirectoryEntry(id: number): Promise<boolean> {
+  const r = await db.delete(schema.directoryEntries).where(eq(schema.directoryEntries.id, id)).returning({ id: schema.directoryEntries.id });
+  return r.length > 0;
+}
