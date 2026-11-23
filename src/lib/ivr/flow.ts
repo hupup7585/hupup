@@ -3332,10 +3332,16 @@ const handlers: Record<string, Handler> = {
     for (const a of earlier) await (a.payLegSid?.startsWith("CA") ? Promise.all([endPayLeg(a.payLegSid), endMainPayLeg(a.payLegSid)]) : null);
     const n = earlier.length + 1;
     const limits = phonePayLimits(await getSettings());
-    if (n > limits.triesPerCall) return back(vr, "phonepay-done", { o, a: 0 });
+    if (n > limits.triesPerCall) {
+      await track(ctx.callSid, "step", `Card payment try ${n}: not started (limit of ${limits.triesPerCall} tries per call)`);
+      return back(vr, "phonepay-done", { o, a: 0 });
+    }
     // A blocked number gets the payment link instead (Abraham, Nov 17-18, 2026). A new call's first card try checks the
     // limit of calls with card tries per caller number in 24 hours (the line for a blocked number is not approved yet)
-    if (await isPhonePayBlocked(callerPhoneOf(ctx))) return back(vr, "paylink", { o });
+    if (await isPhonePayBlocked(callerPhoneOf(ctx))) {
+      await track(ctx.callSid, "step", `Card payment try ${n}: not started (this number is blocked for card payments; payment link instead)`);
+      return back(vr, "paylink", { o });
+    }
     if (!earlier.length && (await blockIfTooManyCalls(callerPhoneOf(ctx), ctx.callSid, limits.callsPerDay, `order #${orderNumber(o)}`))) {
       await track(ctx.callSid, "step", "Card payment by phone blocked for this number (too many calls with card tries in 24 hours)");
       return back(vr, "paylink", { o });
@@ -3373,6 +3379,7 @@ const handlers: Record<string, Handler> = {
     // Sola hang-up helper (option a, once the Owner turns it on after the real test call): Sola's voice is what we send
     // to the caller on this call
     if (s.solaListenOn) startSolaListen(vr, attempt.id, "outbound", s);
+    await track(ctx.callSid, "step", `Card payment try ${n}: dialing the Sola line (no music: no songs set for the payment line)`, { attempt: attempt.id });
     phonePayDirectDial(vr, { number: s.solaPhonePayNumber, digits, action: url("phonepay-done", { o, a: attempt.id, ...(s.solaListenOn ? { ls: 1 } : {}) }), hangupOnStar: true });
     return vr;
   },

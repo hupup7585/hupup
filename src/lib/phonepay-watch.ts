@@ -125,6 +125,9 @@ export async function runWatchChunk(
     if (d === "stop") return false;
     if (d !== "wait") {
       await db.update(schema.phonepayAttempts).set({ solaSeen: d }).where(eq(schema.phonepayAttempts.id, attemptId));
+      // In the call log (Abraham, Nov 22, 2026: the retry check): what the watcher saw in Sola, and when
+      const { track } = await import("@/lib/call-journey");
+      await track(a.callSid, "step", `Payment watch: Sola shows ${d} (try ${a.tryNumber ?? "?"}); hanging up the Sola line`, { attempt: attemptId, solaSeen: d });
       // Option a: the helper hangs up about half a second after Sola stops talking (approved or declined)
       if (helperOn && (await (deps.helper ?? tellHelper)(attemptId))) {
         if (await helperHungUpWithin(attemptId, HELPER_GRACE_MS, now, sleep)) return false;
@@ -138,10 +141,14 @@ export async function runWatchChunk(
       // Declined: let Sola finish saying the result, then hang up before it asks for a new amount
       if (d === "declined") await sleep(declineWait);
       await (deps.end ?? endSolaLeg)({ callSid: a.callSid, payLegSid: a.payLegSid });
+      await track(a.callSid, "step", `Payment watch: Sola line hung up after ${d} (try ${a.tryNumber ?? "?"})`, { attempt: attemptId });
       return false;
     }
     await sleep(WATCH_INTERVAL_MS);
   }
+  const { track } = await import("@/lib/call-journey");
+  const [still] = await db.select({ callSid: schema.phonepayAttempts.callSid, tryNumber: schema.phonepayAttempts.tryNumber }).from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
+  if (still) await track(still.callSid, "step", `Payment watch: still waiting for Sola (try ${still.tryNumber ?? "?"}); nothing in Sola's record yet`, { attempt: attemptId });
   return true;
 }
 
