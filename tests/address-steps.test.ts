@@ -106,7 +106,8 @@ describe("address in steps (preview)", () => {
     Object.assign(h.session.data, { street: "Main Street", house: "5", unit: undefined, zip: "10001" });
     expect(townForZip("10001")).toBeNull();
     expect(redirect(await call("addr-check"))).toBe("addr-outside");
-    expect(said(await call("addr-outside"))).toEqual([PROMPTS.addr_outside.text]);
+    expect(said(await call("addr-outside"))).toEqual([PROMPTS.addr_outside.text, "To go back, press star."]); // approved Nov 22, 2026
+    expect(redirect(await call("addr-outside-choice", { Digits: "*" }))).toBe("addr-zip");
     expect(redirect(await call("addr-outside-choice", { Digits: "1" }))).toBe("addr-zip-enter");
     Object.assign(h.session.data, { street: "Nowhere Lane", house: "9", zip: "10950" });
     h.quote = { ok: false, reason: "not_found" };

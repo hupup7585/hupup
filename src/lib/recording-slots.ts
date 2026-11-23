@@ -17,6 +17,9 @@ export type SlotKind = "line" | "piece" | "word" | "letter" | "item";
 export type Slot = { key: string; kind: SlotKind; group: string; label: string; text: string };
 
 /** Lines no step leads to any more (Abraham, Nov 16, 2026): dropped from the recording list. */
+/** Keypad symbols and "basement" (Nov 22, 2026): one recording each. */
+export const KEYPAD_WORDS: readonly [string, string][] = [["dot", "Keypad - dot"], ["dash", "Keypad - dash"], ["underscore", "Keypad - underscore"], ["basement", "Word - basement"]];
+
 export const NOT_RECORDED: readonly string[] = ["product_intro", "product_options", "product_default_desc", "phonepay_choice", "phonepay_not_found", "catalog_offer", "box153", "book_note", "book_corporate", "booked_closest", "booked_bigger", "booked_smaller", "booked_keep", "bounce_water_note", "item_added", "keep_shopping", "another_day"];
 
 /**
@@ -56,6 +59,8 @@ export function allSlots(items: { id: number; name: string }[] = [], texts: Reco
   for (const w of NUMBER_CLIPS) out.push({ key: `word:${w.toLowerCase()}`, kind: "word", group: "Number clips (live numbers, item digits, prices)", label: w, text: w });
   for (const w of WORDS) if (!clips.has(w.toLowerCase())) out.push({ key: `word:${w.toLowerCase()}`, kind: "word", group: "Dates and times", label: w, text: w });
   for (const l of LETTERS) out.push({ key: `letter:${l.toLowerCase()}`, kind: "letter", group: "Letters A to Z", label: `Letter ${l}`, text: l });
+  // Keypad echo and the unit read-back (Abraham, Nov 22, 2026)
+  for (const [w, label] of KEYPAD_WORDS) out.push({ key: `word:${w}`, kind: "word", group: "Letters A to Z", label, text: `${w}.` });
   // Each rental name twice (Abraham, Nov 19, 2026): for 1, and for 2 or more
   for (const it of items) {
     out.push({ key: `item:${it.id}`, kind: "item", group: "Rental names", label: `${it.name} (one)`, text: it.name });

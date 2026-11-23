@@ -1,5 +1,7 @@
 "use server";
 
+import { alertSharedPhoneOrder } from "@/lib/shared-phones";
+
 import { ensurePriced, pricingProblem } from "@/lib/order-pricing";
 
 import { headers } from "next/headers";
@@ -172,6 +174,8 @@ export async function createBookingAction(input: {
     });
     message += sent.texted ? ` Payment link texted (held for ${POS_LINK_HOLD_MINUTES} minutes).` : sent.emailed ? ` No text consent: payment link emailed (held for ${POS_LINK_HOLD_MINUTES} minutes).` : ` Payment link not texted: ${sent.message}`;
   }
+  // A number two directory entries share (Abraham, Nov 22, 2026): alert him right away
+  await alertSharedPhoneOrder({ phone: phone ?? null, name: input.name, address: input.address, orderIds: [r.orderId], source: "staff" }).catch((e) => console.error("shared number alert", e));
   revalidatePath("/admin", "layout");
   return { ok: true, message, orderId: r.orderId };
 }

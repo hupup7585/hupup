@@ -10,7 +10,8 @@ type Row = { id: number; name: string | null; phone: string; email: string | nul
 
 /** Customer records (Owner and Secretary). No customer login exists anywhere. */
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  await requireStaff(["owner", "secretary"]);
+  const me = await requireStaff(["owner", "secretary"]);
+  const owner = me.role === "owner";
   const { q } = await searchParams;
   const like = q?.trim() ? `%${q.trim()}%` : null;
   const digits = q?.replace(/\D/g, "") || "";
@@ -25,7 +26,14 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   ).rows as Row[];
   return (
     <div className="mx-auto max-w-6xl">
-      <h1 className="mb-5 text-2xl font-black sm:text-3xl">Customers</h1>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-black sm:text-3xl">Customers</h1>
+        {owner && (
+          <Link href="/admin/customers/directory" className="text-sm font-bold text-navy" data-directory-link>
+            Directory list
+          </Link>
+        )}
+      </div>
       <form className="card mb-5 flex gap-2 p-4">
         <input name="q" defaultValue={q} placeholder="Name, phone, email or address" className="input" />
         <button className="btn-dark">Search</button>

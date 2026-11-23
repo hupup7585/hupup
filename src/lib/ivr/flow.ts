@@ -37,6 +37,7 @@ import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib
 import { sendMessage } from "@/lib/sms";
 import { STEP_LABELS, track, trackStep } from "@/lib/call-journey";
 import { alertMissedCall } from "@/lib/owner-alerts";
+import { alertSharedPhoneOrder, isSharedPhone } from "@/lib/shared-phones";
 import { promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import {
@@ -2791,14 +2792,17 @@ const handlers: Record<string, Handler> = {
     return back(vr, "addr-readback");
   },
 
+  /** Step 5 outside the service area (Abraham, Nov 22, 2026, approved): 1 = a different zip code; the star line. */
   "addr-outside"(ctx, vr) {
     const g = keypad(vr, url("addr-outside-choice"));
-    spPreviewDraft(g, ctx, "addr_outside");
+    sp(g, ctx, "addr_outside");
+    backLine(g, ctx);
     return repeatMenu(vr, ctx, "addr-outside");
   },
 
   "addr-outside-choice"(ctx, vr) {
     if (ctx.body.Digits === "1") return back(vr, "addr-zip-enter");
+    if (ctx.body.Digits === "*") return back(vr, "addr-zip"); // star: one step back
     sp(vr, ctx, "not_valid");
     return back(vr, "addr-outside");
   },
@@ -3101,6 +3105,8 @@ const handlers: Record<string, Handler> = {
         .where(and(eq(orders.id, o.order.id), eq(orders.status, "HOLD")));
     }
     await updateSession(ctx.callSid, { outcome: "checked_out" }, ctx.session);
+    // A number two directory entries share (Abraham, Nov 22, 2026): alert him right away
+    await alertSharedPhoneOrder({ phone: isSharedPhone(ctx.from) ? ctx.from : phone, name: data.name ?? null, address: data.address ?? null, orderIds: days.map((x) => x.order.id), source: "phone" }).catch((e) => console.error("shared number alert", e));
     await track(ctx.callSid, "booking_finished", `Booking finished: order #${orderNumber(primary.id)}${days.length > 1 ? ` (${days.length} days)` : ""}`, { orderIds: days.map((x) => x.order.id), days: days.map((x) => x.order.eventDate) });
     const sum = (k: "subtotalCents" | "deliveryFeeCents" | "taxCents" | "totalCents") => perDay.reduce((n, x) => n + x.t![k], 0);
     const totals = { subtotalCents: sum("subtotalCents"), deliveryFeeCents: sum("deliveryFeeCents"), taxCents: sum("taxCents"), totalCents: sum("totalCents") };
