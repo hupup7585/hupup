@@ -152,6 +152,7 @@ export async function saveRecording(input: { boxId: number; callSid: string | nu
     .returning();
   if (row) {
     await maybeNotify(row.id);
+    piecesLater(row);
     return row;
   }
   const [updated] = await db
@@ -159,8 +160,19 @@ export async function saveRecording(input: { boxId: number; callSid: string | nu
     .set({ ready: true, recordingUrl: input.recordingUrl, durationSec: input.durationSec })
     .where(eq(schema.voicemails.recordingSid, input.recordingSid))
     .returning();
-  if (updated) await maybeNotify(updated.id);
+  if (updated) {
+    await maybeNotify(updated.id);
+    piecesLater(updated);
+  }
   return updated ?? null;
+}
+
+/** Voicemail by phone (Nov 23, 2026): cut the message into 5-second pieces in R2 right after it arrives. */
+function piecesLater(v: Voicemail) {
+  if (process.env.VITEST) return;
+  void import("next/server")
+    .then(({ after }) => after(async () => void (await (await import("@/lib/vm-audio")).ensurePieces(v))))
+    .catch(() => null);
 }
 
 /** Twilio transcription callback: store the text, then notify (once). */

@@ -40,6 +40,7 @@ import { alertMissedCall } from "@/lib/owner-alerts";
 import { alertSharedPhoneOrder, isSharedNumber } from "@/lib/shared-phones";
 import { addressParts, townPhrase } from "@/lib/spoken-address";
 import { lookupByPhone } from "@/lib/directory";
+import { makeVmHandlers } from "./vmail";
 import { findStreet } from "@/lib/streets";
 import { promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
@@ -1063,6 +1064,8 @@ function emailHome(ctx: Ctx, vr: VR) {
 type Handler = (ctx: Ctx, vr: VR) => Promise<VR> | VR;
 
 const handlers: Record<string, Handler> = {
+  // Full voicemail by phone (Abraham, Nov 23, 2026): star 7 4 from the general voicemail
+  ...makeVmHandlers({ sp, say, back, url, backLine, when: vmaWhen, update: (sid, patch, s) => updateSession(sid, patch, s) }),
   /**
    * Music while a caller waits (Abraham, Nov 17, 2026): one piece at a time, like a radio (src/lib/music.ts). Used as
    * the wait music of a queue: Twilio asks again for the next piece when one ends. place = staff | pay.
@@ -3949,7 +3952,7 @@ const handlers: Record<string, Handler> = {
   async "vm-greeting-key"(ctx, vr) {
     const x = ctx.query.get("x");
     const d = ctx.body.Digits ?? "";
-    if (d === VM_ACCESS_KEYS && x === "9" && vmAccessActive()) return back(vr, "vma-pin");
+    if (d === VM_ACCESS_KEYS && x === "9" && vmAccessActive()) return back(vr, "vm-start"); // the full voicemail (Nov 23, 2026)
     const box = await vmBox(x);
     const n = Number(ctx.query.get("n") || 0);
     // pound (no other key) or the greeting ended: the tone. Another key: the greeting again (at most 3 times).
@@ -3963,6 +3966,7 @@ const handlers: Record<string, Handler> = {
 
   async "vma-pin"(ctx, vr) {
     if (!vmAccessActive()) return back(vr, "menu");
+    if (ctx.query.get("old") !== "1") return back(vr, "vm-start"); // Nov 23, 2026: the full voicemail replaces this
     const from = ctx.session?.fromNumber ?? ctx.from;
     if (await vmLockedUntil()) {
       await logVmAccess(ctx.callSid, from, "refused_locked");
@@ -4006,6 +4010,7 @@ const handlers: Record<string, Handler> = {
 
   async "vma-box"(ctx, vr) {
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
+    if (ctx.session?.data.vmMine) return back(vr, "vm-main", { s: 1 }); // back to the full voicemail main menu (Nov 23, 2026)
     const n = Number(ctx.query.get("n") || 0);
     if (n >= 3) {
       vr.hangup();

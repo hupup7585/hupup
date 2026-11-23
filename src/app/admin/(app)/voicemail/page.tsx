@@ -1,6 +1,8 @@
 import ConfirmSubmit from "@/components/ConfirmSubmit";
 import { Download, Phone } from "lucide-react";
+import { desc } from "drizzle-orm";
 import { requireStaff } from "@/lib/auth";
+import { ensurePersonalBoxes } from "@/lib/vm-boxes";
 import { formatPhone } from "@/lib/phone";
 import { TEXT_ALERTS_NOT_ACTIVE, hiddenVoicemails, listVoicemails, mainBox, textingActive } from "@/lib/voicemail";
 import { getSettings } from "@/lib/settings";
@@ -37,6 +39,9 @@ export default async function VoicemailPage() {
   const hidden = staff.role === "owner" ? await hiddenVoicemails() : [];
   const access = staff.role === "owner" ? { pinSet: await vmPinSet(), lockedUntil: await vmLockedUntil(), log: await recentVmAccess(30) } : null;
   const ACCESS_RESULT: Record<string, string> = { ok: "Signed in", wrong_pin: "Wrong password", locked: `Locked for ${VM_LOCK_MINUTES} minutes (you were emailed)`, refused_locked: "Refused: locked", no_pin: "Refused: no password set", pin_changed: "Password changed by phone (you were emailed)" };
+  const personal = staff.role === "owner" ? await ensurePersonalBoxes() : [];
+  const actions = staff.role === "owner" ? await db.select().from(schema.voicemailActions).orderBy(desc(schema.voicemailActions.id)).limit(100) : [];
+  const users = new Map((await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers)).map((u) => [u.id, u.name]));
   const boxes = new Map((await db.select({ id: schema.voicemailBoxes.id, name: schema.voicemailBoxes.name, isMain: schema.voicemailBoxes.isMain }).from(schema.voicemailBoxes)).map((b) => [b.id, b]));
   return (
     <div className="mx-auto max-w-4xl">
@@ -114,28 +119,29 @@ export default async function VoicemailPage() {
         <section className="card mt-8 p-5" data-vm-access>
           <h2 className="text-lg font-black">Voicemail by phone (staff)</h2>
           <p className="mt-1 text-sm text-muted">
-            Call the hotline, press 9 for the general voicemail, and while the greeting plays press star 7 4, with no pause of 3 seconds or more between keys. Then enter this password and press pound. Choose a box by its number (1 is the main box), press 0 to call a customer, who sees (845) 777-7585, or press star to change this password. Callers are never told about it. 3 wrong tries end the call and lock access for {VM_LOCK_MINUTES} minutes, and you get an email.
-            {!VM_ACCESS_LIVE_APPROVED && <b> Preview only until you approve it.</b>}
-            {!CALL_OUT_LIVE_APPROVED && <b> Calling out (key 0, and calling a message back) is off on the live line until you approve the price.</b>}
+            Call the hotline, press 9 for the general voicemail, and while the greeting plays press star 7 4. Calling from your own phone saved in Admin opens your box; from another phone, enter your box number and press pound. Then your box password and pound (1234 until you change it). 3 wrong tries lock the box for {VM_LOCK_MINUTES} minutes and the Owner is emailed. From the main menu, press 8 for the shared boxes (general voicemail and the extensions).
+            {!CALL_OUT_LIVE_APPROVED && <b> Calling back is off until you approve the price.</b>}
           </p>
-          <p className="mt-2 text-sm font-semibold">{access.pinSet ? "A password is set." : "No password set yet: the default password 1234 works until you change it here or by phone."}{access.lockedUntil ? ` Locked until ${when(access.lockedUntil)}.` : ""}</p>
-          <form action={setVmPinAction} className="mt-3 flex flex-wrap items-end gap-3">
-            <label className="block"><span className="label">{access.pinSet ? "New password" : "Password"} (4 to 8 digits)</span><input name="pin" type="password" inputMode="numeric" pattern="[0-9]{4,8}" required className="input w-40" autoComplete="new-password" /></label>
-            <label className="block"><span className="label">Same password again</span><input name="pinAgain" type="password" inputMode="numeric" pattern="[0-9]{4,8}" required className="input w-40" autoComplete="new-password" /></label>
-            <button className="btn-dark">{access.pinSet ? "Change password" : "Set password"}</button>
-          </form>
-          <h3 className="mt-5 font-bold">Sign-ins by phone</h3>
-          {access.log.length ? (
-            <table className="mt-2 w-full text-sm" data-vm-access-log>
-              <thead><tr><th className="th">When</th><th className="th">Calling from</th><th className="th">Result</th></tr></thead>
+          <table className="mt-3 w-full text-sm" data-vm-personal-boxes>
+            <thead><tr><th className="th">Box</th><th className="th">Box number</th><th className="th">Password</th><th className="th">New message alerts</th></tr></thead>
+            <tbody>
+              {personal.map((b) => (
+                <tr key={b.id}><td className="td font-bold">{b.name}</td><td className="td">{b.boxNumber}</td><td className="td">{b.pinHash ? "Changed" : "1234 (not changed yet)"}{b.lockedUntil && b.lockedUntil > new Date() ? ` · locked until ${when(b.lockedUntil)}` : ""}</td><td className="td">{b.alertsOn ? "On (email)" : "Off"}</td></tr>
+              ))}
+            </tbody>
+          </table>
+          <h3 className="mt-5 font-bold">Every action by phone</h3>
+          {actions.length ? (
+            <table className="mt-2 w-full text-sm" data-vm-actions>
+              <thead><tr><th className="th">When</th><th className="th">Who</th><th className="th">Box</th><th className="th">What</th></tr></thead>
               <tbody>
-                {access.log.map((r) => (
-                  <tr key={r.id}><td className="td">{when(r.createdAt)}</td><td className="td">{r.fromNumber ? formatPhone(r.fromNumber) : "Withheld"}</td><td className={`td ${r.result === "ok" ? "" : "font-bold text-[#C83A2F]"}`}>{ACCESS_RESULT[r.result] ?? r.result}</td></tr>
+                {actions.map((r) => (
+                  <tr key={r.id}><td className="td">{when(r.createdAt)}</td><td className="td">{r.userId ? users.get(r.userId) ?? "Staff" : "Unknown"}</td><td className="td">{r.boxId ? boxes.get(r.boxId)?.name ?? "" : ""}</td><td className={`td ${/wrong|locked/i.test(r.action) ? "font-bold text-[#C83A2F]" : ""}`}>{r.action}{r.voicemailId ? ` (message ${r.voicemailId})` : ""}</td></tr>
                 ))}
               </tbody>
             </table>
           ) : (
-            <p className="mt-1 text-sm text-muted">No sign-ins yet.</p>
+            <p className="mt-1 text-sm text-muted">Nothing yet.</p>
           )}
         </section>
       )}

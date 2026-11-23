@@ -63,6 +63,12 @@ export async function r2Put(key: string, data: Uint8Array, contentType: string) 
   if (!r.ok) throw new Error(`Photo storage refused the file (${r.status}).`);
 }
 
+export async function r2Delete(key: string) {
+  const { client, base } = await r2();
+  const r = await client.fetch(`${base}/${key}`, { method: "DELETE" });
+  if (!r.ok && r.status !== 404) throw new Error(`Storage could not delete the file (${r.status}).`);
+}
+
 export async function r2Get(key: string): Promise<Response> {
   const { client, base } = await r2();
   return client.fetch(`${base}/${key}`);

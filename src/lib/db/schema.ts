@@ -237,6 +237,11 @@ export type CallData = {
   /** Phone-number lookup (Nov 23, 2026): the number looked up, and the address the caller picked (for the owner alert) */
   dirPhone?: string;
   dirPick?: string;
+  /** Full voicemail by phone (Nov 23, 2026): the signed-in box and user, the during-message hint, a new password */
+  vmMine?: number;
+  vmMineUser?: number | null;
+  vmHint?: number;
+  vmNewPin?: string;
   /** The directory entry's area as printed (Blooming Grove is said before Monroe New York) */
   dirArea?: string;
   /** Welcome back (Nov 23, 2026): the carts this call ended with, still holding items when the caller hung up */
@@ -623,6 +628,18 @@ export const voicemailBoxes = pgTable("voicemail_boxes", {
   notifySms: text("notify_sms").array().notNull().default(sql`'{}'::text[]`),
   notifyEmail: text("notify_email").array().notNull().default(sql`'{}'::text[]`),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  /** Full voicemail by phone (Abraham, Nov 23, 2026): a personal box belongs to one staff user (Owner, Secretary) */
+  ownerUserId: integer("owner_user_id").unique(),
+  /** The number entered on the phone when caller ID does not pick the box */
+  boxNumber: text("box_number").unique(),
+  /** bcrypt of the box password; null = the default 1234 */
+  pinHash: text("pin_hash"),
+  wrongTries: integer("wrong_tries").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  /** Personal greeting and recorded name (R2 keys); null = the standard greeting / the typed name */
+  greetingKey: text("greeting_key"),
+  nameKey: text("name_key"),
+  alertsOn: boolean("alerts_on").notNull().default(true),
 });
 
 /** One caller message. Audio stays in Twilio and is played through a signed-in admin route (no public link). */
@@ -656,6 +673,14 @@ export const voicemails = pgTable(
     ready: boolean("ready").notNull().default(true),
     /** Shown in the alert, e.g. the caller hung up without confirming */
     note: text("note"),
+    /** Voicemail by phone (Nov 23, 2026): saved (pressed 9), the 5-second pieces in R2, and messages from inside */
+    savedAt: timestamp("saved_at", { withTimezone: true }),
+    pieces: integer("pieces"),
+    fromBoxId: integer("from_box_id"),
+    /** A forwarded copy plays this message's audio */
+    audioOf: integer("audio_of"),
+    /** A recorded note played before a forwarded message (R2 key) */
+    noteKey: text("note_key"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("voicemails_box_idx").on(t.boxId, t.createdAt)],
@@ -1643,3 +1668,15 @@ export const directoryEntries = pgTable(
   },
   (t) => [index("directory_entries_phone_idx").on(t.phone)],
 );
+
+/** Every voicemail action by phone (Abraham, Nov 23, 2026): shown in Admin Voicemail with date, time and who. */
+export const voicemailActions = pgTable("voicemail_actions", {
+  id: serial("id").primaryKey(),
+  boxId: integer("box_id"),
+  voicemailId: integer("voicemail_id"),
+  userId: integer("user_id"),
+  action: text("action").notNull(),
+  detail: text("detail"),
+  callSid: text("call_sid"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

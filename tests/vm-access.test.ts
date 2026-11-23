@@ -69,7 +69,7 @@ describe("getting in", () => {
     expect(vm).toMatch(/<Gather [^>]*timeout="3"/);
     expect(vm).toMatch(/<Gather [^>]*finishOnKey="#"/);
     expect(said(vm).join(" ")).not.toMatch(/PIN|password|7|seven/i);
-    expect(redirect(await call("vm-greeting-key", { Digits: "*74" }, "x=9"))).toBe("vma-pin");
+    expect(redirect(await call("vm-greeting-key", { Digits: "*74" }, "x=9"))).toBe("vm-start") // Nov 23, 2026: the full voicemail;
     // other boxes: no staff access at all
     expect(await call("vm-greeting-key", { Digits: "*74" }, "x=5")).not.toContain("vma-pin");
   });
@@ -88,7 +88,7 @@ describe("getting in", () => {
   });
   it("no password set yet: the default 1234 signs in from the first call", async () => {
     expect(VM_DEFAULT_PIN).toBe("1234");
-    expect(said(await call("vma-pin"))).toContain("Please enter your password.");
+    expect(said(await call("vma-pin", {}, "old=1"))).toContain("Please enter your password.");
     expect(redirect(await call("vma-pin-check", { Digits: "1234" }))).toBe("vma-box");
     expect(await log()).toEqual(["ok"]);
     h.session.data = {};
@@ -99,7 +99,7 @@ describe("getting in", () => {
     const [row] = await db.select().from(schema.appSettings).where(eq(schema.appSettings.key, "vm_access_pin_hash"));
     expect(String(row.value)).not.toContain("4821");
     expect(String(row.value)).toMatch(/^\$2[aby]\$/);
-    expect(said(await call("vma-pin"))).toContain("Please enter your password.");
+    expect(said(await call("vma-pin", {}, "old=1"))).toContain("Please enter your password.");
     expect(redirect(await call("vma-pin-check", { Digits: "4821" }))).toBe("vma-box");
     expect(h.session.data.vmaOk).toBe(1);
     expect(await log()).toEqual(["ok"]);

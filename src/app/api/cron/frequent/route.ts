@@ -22,6 +22,8 @@ export async function GET(req: Request) {
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
   const released = await runJob("Release ended holds (every 5 minutes)", () => releaseExpired());
   const voicemailAlerts = await runJob("Voicemail alerts safety net (every 5 minutes)", () => notifyStragglers());
+  // Deleted voicemails are kept 30 days, then erased forever with their pieces (Nov 23, 2026)
+  await runJob("Erase deleted voicemails after 30 days", async () => (await import("@/lib/vm-boxes")).purgeOldDeleted());
   const heldPromotions = await runJob("Held promotional texts (every 5 minutes)", () => processHeldPromotions());
   // Schedule send in the Admin Inbox (Abraham, Nov 19, 2026)
   const scheduledEmails = await runJob("Scheduled emails (every 5 minutes)", () => sendScheduledEmails());
