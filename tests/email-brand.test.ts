@@ -49,7 +49,7 @@ describe("email items 7, 10 and 13 (Abraham, Nov 17, 2026)", () => {
     const s = readFileSync("src/lib/catalog-send.ts", "utf8");
     expect(s).toContain('s.catalogAutoAttach !== false ? await catalogPdfAttachment()');
     expect(s).toContain("const t = catalogEmailTemplate(s);");
-    expect(s).toContain(`sendEmail(to, t.subject, t.body, [pdf], { noThanks: true, kind: "catalog" })`);
+    expect(s).toContain(`sendEmail(to, t.subject, t.body, [pdf], { noThanks: true, kind: "catalog", button })`);
     expect(readFileSync("src/app/admin/(app)/catalog-send/page.tsx", "utf8")).toContain("<CatalogEmailForm");
   });
 });

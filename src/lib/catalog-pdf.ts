@@ -38,6 +38,19 @@ export async function catalogPdfBytes(fileId: number): Promise<Buffer | null> {
   return chunks.length ? Buffer.concat(chunks.map((c) => Buffer.from(c.data))) : null;
 }
 
+/** The public link the "View the catalog" button opens (src/app/catalog/[file]/route.ts). */
+export const catalogPdfUrl = (baseUrl: string, fileId: number) => `${baseUrl.replace(/\/$/, "")}/catalog/${fileId}.pdf`;
+export const CATALOG_BUTTON_LABEL = "View the catalog"; // Abraham, Nov 23, 2026, exact text
+
+/** Always the public website (preview and live share one database, so a test email from preview opens the same file). */
+export const PUBLIC_SITE_URL = "https://hupupattractions.com";
+
+/** The button for a catalog email: the current catalog's public link, or null when none is uploaded. */
+export async function catalogButton(baseUrl: string = PUBLIC_SITE_URL): Promise<{ label: string; url: string } | null> {
+  const f = await currentCatalog();
+  return f?.complete ? { label: CATALOG_BUTTON_LABEL, url: catalogPdfUrl(baseUrl, f.id) } : null;
+}
+
 /** The current catalog as an email attachment, or null when none is uploaded. */
 export async function catalogPdfAttachment() {
   const f = await currentCatalog();

@@ -55,7 +55,10 @@ export async function sendCatalogEmail(to: string) {
   // With the PDF attached: the catalog email wording (approved by Abraham, Nov 17, 2026; the Owner can edit it in Admin)
   if (pdf) {
     const t = catalogEmailTemplate(s);
-    return sendEmail(to, t.subject, t.body, [pdf], { noThanks: true, kind: "catalog" });
+    // "View the catalog" inside the box, opening the PDF on hupupattractions.com; the PDF stays attached (Nov 23, 2026)
+    const { catalogButton } = await import("@/lib/catalog-pdf");
+    const button = await catalogButton();
+    return sendEmail(to, t.subject, t.body, [pdf], { noThanks: true, kind: "catalog", button });
   }
   return sendEmail(to, subject, text, [], { kind: "catalog" });
 }

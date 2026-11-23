@@ -42,10 +42,10 @@ export type EmailAttachment = { filename: string; content: string /* base64 */ }
 /** Where a sent email is kept in the Admin inbox (Abraham, Nov 20, 2026): code, catalog, or auto (the default). */
 export type SentKind = "code" | "catalog" | "auto";
 
-export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string>; record?: boolean; promo?: boolean; noThanks?: boolean; bodyHtml?: string | null; kind?: SentKind } = {}): Promise<SendResult> {
+export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string>; record?: boolean; promo?: boolean; noThanks?: boolean; bodyHtml?: string | null; kind?: SentKind; button?: { label: string; url: string } | null } = {}): Promise<SendResult> {
   if (!config.resendConfigured()) {
     if (config.isProd()) return { sent: false, error: "Email (Resend) is not configured" };
-    console.log(`[dev EMAIL to ${to}] ${subject}\n${text}${attachments.length ? `\n[attachments: ${attachments.map((a) => a.filename).join(", ")}]` : ""}`);
+    console.log(`[dev EMAIL to ${to}] ${subject}\n${text}${opts.button ? `\n[button: ${opts.button.label} ${opts.button.url}]` : ""}${attachments.length ? `\n[attachments: ${attachments.map((a) => a.filename).join(", ")}]` : ""}`);
     return { sent: true, dev: true };
   }
   try {
@@ -65,7 +65,7 @@ export async function sendEmail(to: string, subject: string, text: string, attac
       opts = { ...opts, headers: { ...(opts.headers ?? {}), "List-Unsubscribe": `<${promo.unsubscribeUrl.replace("/unsubscribe?", "/api/unsubscribe?")}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } };
     }
     const { cleanEmailHtml } = await import("@/lib/email-format");
-    const branded = brandedEmail(text, { baseUrl: config.baseUrl(), signature: s?.emailSignature ?? null, promo, noThanks: opts.noThanks, bodyHtml: opts.bodyHtml ? cleanEmailHtml(opts.bodyHtml) : null });
+    const branded = brandedEmail(text, { baseUrl: config.baseUrl(), signature: s?.emailSignature ?? null, promo, noThanks: opts.noThanks, bodyHtml: opts.bodyHtml ? cleanEmailHtml(opts.bodyHtml) : null, button: opts.button ?? null });
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },

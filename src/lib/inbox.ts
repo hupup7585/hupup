@@ -279,11 +279,13 @@ export async function sendNewEmail(input: { to: string; subject: string; body: s
     if (!pdf) throw new Error("No catalog PDF is uploaded yet. Upload it in Admin, Catalog email & text.");
     forwarded.push(pdf);
   }
+  // Every catalog email: the "View the catalog" button inside the box, plus the attachment (Abraham, Nov 23, 2026)
+  const button = input.attachCatalog ? await (await import("@/lib/catalog-pdf")).catalogButton() : null;
   if (files.reduce((n, f) => n + f.data.length, 0) > INBOX_FILE_MAX_BYTES) throw new Error(`Attachments can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
   if (files.reduce((n, f) => n + f.data.length, 0) + forwarded.reduce((n, f) => n + Buffer.byteLength(f.content, "base64"), 0) > INBOX_FILE_MAX_BYTES)
     throw new Error(`Attachments, with the forwarded ones, can be up to ${INBOX_FILE_MAX_LABEL} in all.`);
   const text = body + linkText; // the logo and signature are added to every email (src/lib/email-brand.ts)
-  const res = await sendEmail(to, subject, text, [...files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), ...forwarded], { record: false, noThanks: Boolean(input.attachCatalog), bodyHtml: htmlWithLinks(input.bodyHtml, linkText) });
+  const res = await sendEmail(to, subject, text, [...files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), ...forwarded], { record: false, noThanks: Boolean(input.attachCatalog), bodyHtml: htmlWithLinks(input.bodyHtml, linkText), button });
   const [sent] = await db
     .insert(schema.inboxReplies)
     .values({ emailId: null, toAddress: to, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })
