@@ -18,6 +18,7 @@ vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/
 vi.mock("@/lib/notify", () => ({ sendSms: async () => ({ sent: true }), sendEmail: async () => ({ sent: true }) }));
 
 import { db, schema } from "@/lib/db";
+import { eq } from "drizzle-orm";
 import { handleVoice } from "@/lib/ivr/flow";
 const call = (action: string, body: Record<string, string> = {}, query = "") =>
   handleVoice({ action, query: new URLSearchParams(query), body: { CallSid: "CAnew", ...body }, callSid: "CAnew", from: "+18455550277" });
@@ -49,6 +50,8 @@ beforeEach(async () => {
       { orderId: o.id, productId: castle, qty: 1, unitPriceCents: 20000 },
       { orderId: o.id, productId: laser, qty: 1, unitPriceCents: 30000 },
     ]);
+    // that call ended with these items still in the cart (recorded at hang-up, Nov 23, 2026)
+    await db.update(schema.callSessions).set({ data: { cartLeft: [o.id] } }).where(eq(schema.callSessions.callSid, "CAold"));
     // Since then someone else booked the Castle for Dec 22
     const [m] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: "2026-12-22", pickupDate: "2026-12-23" }).returning();
     await db.insert(schema.orderItems).values({ orderId: m.id, productId: castle, qty: 1, unitPriceCents: 20000 });

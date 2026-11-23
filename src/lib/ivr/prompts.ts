@@ -297,6 +297,12 @@ export const PROMPTS = {
   addr_outside: { group: "Checkout", label: "Address step 5 - outside service area", text: "We are sorry, we do not deliver to this area. We deliver only in Orange County, New York. To enter a different zip code, press 1." },
   addr_not_found: { group: "Checkout", label: "Address step 5: not found on the map, back to step 1 (draft)", text: "We are sorry, we could not find that address. Let us try again.", pending: true },
   // Step 6 (Abraham, Nov 22, 2026, final): the address is read live between the recorded lines
+  // Directory lookup by caller ID (Nov 23, 2026): DRAFT wording, preview only until Abraham approves each line
+  dir_found: { group: "Checkout", label: "Directory lookup: one address on file for the caller's number (draft)", text: "We have an address on file for the number you are calling from.", pending: true },
+  dir_confirm: { group: "Checkout", label: "Directory lookup: confirm it or enter a different address (draft)", text: "If that is the delivery address, press 1. To enter a different address, press 2.", pending: true },
+  dir_many: { group: "Checkout", label: "Directory lookup: more than one address for the caller's number (draft)", text: "We have more than one address on file for the number you are calling from.", pending: true },
+  dir_pick: { group: "Checkout", label: "Directory lookup: after each address (draft)", text: "For this address, press {key}.", vars: ["key"], pending: true },
+  dir_other: { group: "Checkout", label: "Directory lookup: a different address (draft)", text: "To enter a different address, press 0.", pending: true },
   addr_rb_intro: { group: "Checkout", label: "Address step 6 - Here is the address you entered", text: "Here is the address you entered." },
   addr_rb_address: { group: "Checkout", label: "Address step 6 - the address (live: house, street, unit, town New York, zip)", text: "{address}.", vars: ["address"] },
   addr_rb_correct: { group: "Checkout", label: "Address step 6 - If that is correct, press 1", text: "If that is correct, press 1." },

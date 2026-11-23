@@ -37,8 +37,9 @@ import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib
 import { sendMessage } from "@/lib/sms";
 import { STEP_LABELS, track, trackStep } from "@/lib/call-journey";
 import { alertMissedCall } from "@/lib/owner-alerts";
-import { alertSharedPhoneOrder, isSharedPhone } from "@/lib/shared-phones";
+import { alertSharedPhoneOrder, isSharedNumber } from "@/lib/shared-phones";
 import { addressParts, townPhrase } from "@/lib/spoken-address";
+import { lookupByPhone } from "@/lib/directory";
 import { promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import {
@@ -381,6 +382,9 @@ async function ktFinish(ctx: Ctx, vr: VR, f: Field, text: string) {
   return noInput(vr, ctx, "type", { f, again: 1 });
 }
 
+/** Directory lookup by caller ID: preview only until Abraham approves its lines (Nov 23, 2026). */
+export const directoryLookupOn = (env: Record<string, string | undefined> = process.env) => env.VERCEL_ENV === "preview" || env.DIRECTORY_LOOKUP === "on";
+
 /** Box 25's live parts: "{Qnt} {item}" (singular for 1) and the date, or both dates after box 18 key 2. */
 function addedVars(a: { name: string; qty: number; date: string; date2?: string }) {
   return { qty: a.qty, item: a.qty === 1 ? a.name : pluralName(a.name), date: a.date2 ? `${spokenDate(a.date)} and ${spokenDate(a.date2)}` : spokenDate(a.date) };
@@ -429,32 +433,32 @@ function resumeActive(ctx: Ctx, env: Record<string, string | undefined> = proces
 }
 
 /**
- * The cart from this number's most recent earlier call that ended without an order (the hold was released when they
- * hung up). Offered until its booking day has passed (Abraham, Nov 15, 2026), and not once the caller has booked on
- * a later call.
+ * Welcome back (Abraham, Nov 23, 2026): only when this number's LAST call ended with at least one item still in the
+ * cart (the caller hung up with it). Not when that call ended with an empty cart (nothing added, everything removed,
+ * or the cart cleared), never for a paid order, and only items whose dates have not passed.
  */
 async function unfinishedCart(ctx: Ctx): Promise<{ productId: number; name: string; qty: number; date: string }[]> {
   const from = toE164(ctx.session?.fromNumber ?? ctx.from);
   if (!from) return [];
-  const today = todayISO();
-  const res = await db.execute(sql`
-    SELECT cs.call_sid FROM call_sessions cs
-    WHERE cs.from_number = ${from} AND cs.call_sid <> ${ctx.callSid}
-      AND EXISTS (SELECT 1 FROM orders o WHERE o.call_sid = cs.call_sid AND o.status = 'CANCELLED' AND o.paid_cents = 0 AND o.event_date >= ${today}::date)
-      AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.call_sid = cs.call_sid AND o.status <> 'CANCELLED')
-      AND NOT EXISTS (
-        SELECT 1 FROM call_sessions later JOIN orders o2 ON o2.call_sid = later.call_sid
-        WHERE later.from_number = ${from} AND later.started_at > cs.started_at AND o2.status <> 'CANCELLED')
-    ORDER BY cs.started_at DESC LIMIT 1`);
-  const last = (res.rows[0] as { call_sid: string } | undefined)?.call_sid;
-  if (!last) return [];
+  const [last] = await db
+    .select({ callSid: schema.callSessions.callSid, data: schema.callSessions.data })
+    .from(schema.callSessions)
+    .where(and(eq(schema.callSessions.fromNumber, from), sql`${schema.callSessions.callSid} <> ${ctx.callSid}`))
+    .orderBy(desc(schema.callSessions.startedAt))
+    .limit(1);
+  const left = (last?.data?.cartLeft ?? []).filter((n) => Number.isInteger(n));
+  if (!last || !left.length) return [];
+  // that call placed an order (paid or waiting for payment): no welcome back
+  const [placed] = await db.select({ id: orders.id }).from(orders).where(and(eq(orders.callSid, last.callSid), sql`${orders.status} <> 'CANCELLED'`)).limit(1);
+  if (placed) return [];
   const rows = await db
-    .select({ productId: orderItems.productId, qty: orderItems.qty, date: orders.eventDate, name: products.name })
+    .select({ productId: orderItems.productId, qty: orderItems.qty, date: orders.eventDate, name: products.name, paid: orders.paidCents })
     .from(orderItems)
     .innerJoin(orders, eq(orders.id, orderItems.orderId))
     .innerJoin(products, eq(products.id, orderItems.productId))
-    .where(and(eq(orders.callSid, last), eq(orders.status, "CANCELLED")));
-  return rows.filter((r) => r.date >= todayISO()).sort((a, b) => a.date.localeCompare(b.date));
+    .where(and(inArray(orders.id, left), eq(orders.status, "CANCELLED")));
+  const today = todayISO();
+  return rows.filter((r) => !r.paid && r.date >= today).map(({ paid: _p, ...r }) => r).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** The directions step plays once Abraham approves its two lines; on preview it runs for his test. */
@@ -2798,9 +2802,59 @@ const handlers: Record<string, Handler> = {
    * keeps the one address question until then.
    */
   // Nov 22, 2026 (Abraham): house number, street, unit, town and zip, read-back, delivery price
-  addr(ctx, vr) {
+  async addr(ctx, vr) {
     if (!addrStepsActive(ctx)) return back(vr, "ask", { f: "address" });
+    // The directory (Nov 23, 2026, preview only): the caller's own number only, never anyone else's
+    if (directoryLookupOn() && (await lookupByPhone(toE164(ctx.from))).length) return back(vr, "addr-dir");
     return back(vr, "addr-house");
+  },
+
+  /**
+   * Directory lookup by caller ID (Abraham, Nov 23, 2026; draft wording, preview only): one entry is read back with
+   * the step 6 pieces (1 = that address, 2 = a different one); a shared number reads each address and the caller picks.
+   */
+  async "addr-dir"(ctx, vr) {
+    const list = await lookupByPhone(toE164(ctx.from));
+    if (!list.length) return back(vr, "addr-house");
+    const g = keypad(vr, url("addr-dir-choice", { m: list.length > 1 ? 1 : 0 }));
+    const read = (e: (typeof list)[number]) => {
+      for (const part of addressParts({ house: e.house, street: e.street, unit: e.unit, town: e.town, zip: e.zip, areaPrinted: e.areaPrinted })) {
+        const urls = part.options.map((keys) => clipUrls(ctx.prompts, keys)).find(Boolean);
+        if (urls) urls.forEach((u) => g.play(u));
+        else say(g, part.text);
+      }
+    };
+    if (list.length === 1) {
+      spPreviewDraft(g, ctx, "dir_found");
+      read(list[0]);
+      spPreviewDraft(g, ctx, "dir_confirm");
+    } else {
+      spPreviewDraft(g, ctx, "dir_many");
+      list.forEach((e, i) => {
+        read(e);
+        spPreviewDraft(g, ctx, "dir_pick", { key: i + 1 });
+      });
+      spPreviewDraft(g, ctx, "dir_other");
+    }
+    backLine(g, ctx);
+    await track(ctx.callSid, "step", `Directory: ${list.length} address${list.length > 1 ? "es" : ""} on file for the caller's number`);
+    return repeatMenu(vr, ctx, "addr-dir");
+  },
+
+  async "addr-dir-choice"(ctx, vr) {
+    const d = ctx.body.Digits ?? "";
+    const many = ctx.query.get("m") === "1";
+    if (d === "*") return back(vr, "ask", { f: "name" }); // star: one step back
+    if ((!many && d === "2") || (many && d === "0")) return back(vr, "addr-house"); // a different address: the usual steps
+    const list = await lookupByPhone(toE164(ctx.from));
+    const pick = !many && d === "1" ? list[0] : many && /^\d$/.test(d) ? list[Number(d) - 1] : undefined;
+    if (!pick) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "addr-dir");
+    }
+    await updateSession(ctx.callSid, { data: { house: pick.house, street: pick.street, unit: pick.unit ?? undefined, zip: pick.zip, town: pick.town, dirArea: pick.areaPrinted ?? undefined } }, ctx.session);
+    await track(ctx.callSid, "step", `Directory address chosen (${list.length > 1 ? `${list.length} on file` : "one on file"})`);
+    return back(vr, "addr-check", { dir: 1 });
   },
 
   // Address steps 2 to 4 (Abraham, Nov 22, 2026, final): keypad only, the shared pound line, then the shared star line
@@ -2893,6 +2947,8 @@ const handlers: Record<string, Handler> = {
     const placeTown = town;
     const placeAddress = address;
     await updateSession(ctx.callSid, { data: { address: placeAddress, town: placeTown, zip } }, ctx.session);
+    // From the directory: the caller already heard it and chose it, straight on to the delivery price (step 7)
+    if (ctx.query.get("dir") === "1") return back(vr, "addr-price");
     await track(ctx.callSid, "said", `Address: ${placeAddress} (${quote.zone}, ${money(quote.feeCents)})`, { field: "address", value: placeAddress });
     return back(vr, "addr-readback");
   },
@@ -3222,7 +3278,7 @@ const handlers: Record<string, Handler> = {
     }
     await updateSession(ctx.callSid, { outcome: "checked_out" }, ctx.session);
     // A number two directory entries share (Abraham, Nov 22, 2026): alert him right away
-    await alertSharedPhoneOrder({ phone: isSharedPhone(ctx.from) ? ctx.from : phone, name: data.name ?? null, address: data.address ?? null, orderIds: days.map((x) => x.order.id), source: "phone" }).catch((e) => console.error("shared number alert", e));
+    await alertSharedPhoneOrder({ phone: (await isSharedNumber(ctx.from)) ? ctx.from : phone, name: data.name ?? null, address: data.address ?? null, orderIds: days.map((x) => x.order.id), source: "phone" }).catch((e) => console.error("shared number alert", e));
     await track(ctx.callSid, "booking_finished", `Booking finished: order #${orderNumber(primary.id)}${days.length > 1 ? ` (${days.length} days)` : ""}`, { orderIds: days.map((x) => x.order.id), days: days.map((x) => x.order.eventDate) });
     const sum = (k: "subtotalCents" | "deliveryFeeCents" | "taxCents" | "totalCents") => perDay.reduce((n, x) => n + x.t![k], 0);
     const totals = { subtotalCents: sum("subtotalCents"), deliveryFeeCents: sum("deliveryFeeCents"), taxCents: sum("taxCents"), totalCents: sum("totalCents") };
@@ -4363,7 +4419,13 @@ export async function handleCallStatus(callSid: string, status: string) {
   const s = await getSession(callSid);
   if (!s) return;
   // Every day's held order on this call (cancelHold only affects orders still in HOLD)
-  for (const id of new Set([...(s.data?.dayOrderIds ?? []), ...(s.orderId ? [s.orderId] : [])])) await cancelHold(id);
+  const dayIds = [...new Set([...(s.data?.dayOrderIds ?? []), ...(s.orderId ? [s.orderId] : [])])];
+  // Welcome back (Abraham, Nov 23, 2026): remember which carts this call ended with, still holding at least one item
+  const left = dayIds.length
+    ? (await db.selectDistinct({ id: orders.id }).from(orders).innerJoin(orderItems, eq(orderItems.orderId, orders.id)).where(and(inArray(orders.id, dayIds), eq(orders.status, "HOLD")))).map((r) => r.id)
+    : [];
+  await updateSession(callSid, { data: { cartLeft: left } }, s).catch(() => null);
+  for (const id of dayIds) await cancelHold(id);
   // Items from the last call that were held while the caller decided (not added to the cart)
   for (const l of s.data?.resumeLines ?? []) if (l.state === "free" && l.holdId) await cancelHold(l.holdId);
   // Where the caller hung up (the last menu or question they reached) and whether a booking was finished

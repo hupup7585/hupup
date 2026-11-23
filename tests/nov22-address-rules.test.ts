@@ -49,7 +49,9 @@ describe("directory list file (nothing is loaded)", () => {
     expect(r.issues).toEqual([{ line: 5, reason: "no house number or street", text: expect.any(String) }]);
     expect(r.sharedPhones).toEqual([{ phone: "+18452382784", names: ["Rosner, Usher, 29-001 Dallas Drive", "Kleinman, Shimon, 380 Lake Shore Drive"] }]);
     const { readFileSync } = await import("node:fs");
-    expect(readFileSync("src/app/admin/(app)/customers/directory/actions.ts", "utf8")).not.toMatch(/db\.insert|db\.update/); // preview only
+    const actions = readFileSync("src/app/admin/(app)/customers/directory/actions.ts", "utf8");
+    const preview = actions.slice(actions.indexOf("export async function previewDirectoryAction"), actions.indexOf("export async function loadDirectoryAction"));
+    expect(preview).not.toMatch(/db\.insert|db\.update|loadDirectory/); // Check the file saves nothing; Load this list does (Nov 23, 2026)
   });
 });
 

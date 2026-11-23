@@ -7,7 +7,7 @@ import { parseCsv } from "@/lib/books";
  */
 export const DIRECTORY_COLUMNS = ["last name", "first name", "house number", "street", "unit", "town/state/zip", "phone", "area as printed"] as const;
 
-export type DirectoryRow = { lastName: string; firstName: string; house: string; street: string; unit: string | null; town: string; state: string; zip: string; phone: string; areaPrinted: string | null };
+export type DirectoryRow = { lastName: string; firstName: string; house: string; street: string; unit: string | null; town: string; state: string; zip: string; phone: string | null; areaPrinted: string | null };
 export type DirectoryIssue = { line: number; reason: string; text: string };
 
 /** "8452382784", "238-2784", "(845) 238-2784" -> +18452382784; anything else is null. */
@@ -36,12 +36,12 @@ export function parseDirectoryCsv(text: string): { rows: DirectoryRow[]; issues:
     const [lastName = "", firstName = "", house = "", street = "", unit = "", tsz = "", phoneRaw = "", area = ""] = r.map((c) => c.trim());
     const place = splitTownStateZip(tsz);
     const phone = directoryPhone(phoneRaw);
-    const reason = !lastName ? "no last name" : !house || !street ? "no house number or street" : !place ? "town/state/zip not like \"Monroe, NY 10950\"" : !phone ? "phone is not 7 or 10 digits" : null;
+    const reason = !lastName ? "no last name" : !house || !street ? "no house number or street" : !place ? "town/state/zip not like \"Monroe, NY 10950\"" : phoneRaw.replace(/\D/g, "") && !phone ? "phone is not 7 or 10 digits" : null; // no phone: kept (it just cannot be found by phone)
     if (reason) return void issues.push({ line, reason, text: r.join(", ").slice(0, 200) });
-    rows.push({ lastName, firstName, house, street, unit: unit || null, town: place!.town, state: place!.state, zip: place!.zip, phone: phone!, areaPrinted: area || null });
+    rows.push({ lastName, firstName, house, street, unit: unit || null, town: place!.town, state: place!.state, zip: place!.zip, phone: phone ?? null, areaPrinted: area || null });
   });
   const byPhone = new Map<string, string[]>();
-  for (const r of rows) byPhone.set(r.phone, [...(byPhone.get(r.phone) ?? []), `${r.lastName}, ${r.firstName}, ${r.house} ${r.street}`]);
+  for (const r of rows) if (r.phone) byPhone.set(r.phone, [...(byPhone.get(r.phone) ?? []), `${r.lastName}, ${r.firstName}, ${r.house} ${r.street}`]);
   const sharedPhones = [...byPhone.entries()].filter(([, n]) => n.length > 1).map(([phone, names]) => ({ phone, names }));
   return { rows, issues, sharedPhones };
 }

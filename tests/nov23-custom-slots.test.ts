@@ -58,7 +58,7 @@ describe("Add a new slot", () => {
 
   it("read-back for 10 D A Weider Boulevard, unit 301, Monroe New York, 10950: live recordings where there are some, Puck for the rest", async () => {
     process.env.PUBLIC_BASE_URL = "https://hupup.example";
-    const street = await live("street:d_a_weider_boulevard");
+    const street = await live("street:d_a_wieder_boulevard"); // street 072: Weider and Wieder are the same slot
     const unit = await live("unit:301");
     const zip = await live("zip:10950");
     h.session.data = { address: "10 D A Weider Boulevard, 301, Monroe, NY 10950", house: "10", street: "D A Weider Boulevard", unit: "301", zip: "10950", town: "Monroe" };

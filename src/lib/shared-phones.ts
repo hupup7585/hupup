@@ -18,9 +18,18 @@ export function isSharedPhone(phone: string | null | undefined): boolean {
   return Boolean(e && SHARED_PHONES.includes(e));
 }
 
+/** Shared: the number above, or any number the directory has for more than one entry (Nov 23, 2026: seven numbers). */
+export async function isSharedNumber(phone: string | null | undefined): Promise<boolean> {
+  const e = phone ? toE164(phone) : null;
+  if (!e) return false;
+  if (SHARED_PHONES.includes(e)) return true;
+  const { lookupByPhone } = await import("@/lib/directory");
+  return (await lookupByPhone(e)).length > 1;
+}
+
 /** The alert: name, the address chosen, the items and the date(s). Email always; a text once texting is active. */
 export async function alertSharedPhoneOrder(input: { phone: string | null; name: string | null; address: string | null; orderIds: number[]; source: "phone" | "staff" | "website" }) {
-  if (!input.phone || !isSharedPhone(input.phone) || !input.orderIds.length) return { sent: 0 };
+  if (!input.phone || !input.orderIds.length || !(await isSharedNumber(input.phone))) return { sent: 0 };
   const phone = input.phone;
   const rows = await db
     .select({ date: schema.orders.eventDate, qty: schema.orderItems.qty, item: schema.products.name })

@@ -234,6 +234,10 @@ export type CallData = {
   mutzeAnnounce?: string;
   /** Closed-day offers taken (Nov 20, 2026): the day before -> its pickup (the day after) and the days charged */
   spanDays?: Record<string, { after: string; days: number | null; both?: string }>;
+  /** The directory entry's area as printed (Blooming Grove is said before Monroe New York) */
+  dirArea?: string;
+  /** Welcome back (Nov 23, 2026): the carts this call ended with, still holding items when the caller hung up */
+  cartLeft?: number[];
   /** Box 25 (Nov 22, 2026): the item just added, for "Successfully added to your cart: {Qnt} {item} for {date}." */
   lastAdded?: { name: string; qty: number; date: string; date2?: string };
   /** Keypad typing one key at a time (preview, Nov 22, 2026): committed text, the key being cycled and its presses */
@@ -1616,3 +1620,23 @@ export const customerDiscounts = pgTable(
   (t) => [index("customer_discounts_phone_idx").on(t.phone)],
 );
 
+
+/** The community directory (Abraham, Nov 23, 2026): the phone address lookup source. Owner only; never a customer. */
+export const directoryEntries = pgTable(
+  "directory_entries",
+  {
+    id: serial("id").primaryKey(),
+    lastName: text("last_name").notNull(),
+    firstName: text("first_name").notNull().default(""),
+    house: text("house").notNull(),
+    street: text("street").notNull(),
+    unit: text("unit"),
+    town: text("town").notNull(),
+    state: text("state").notNull().default("NY"),
+    zip: text("zip").notNull(),
+    phone: text("phone"),
+    areaPrinted: text("area_printed"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("directory_entries_phone_idx").on(t.phone)],
+);

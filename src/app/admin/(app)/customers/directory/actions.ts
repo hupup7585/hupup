@@ -39,3 +39,20 @@ export async function previewDirectoryAction(form: FormData): Promise<DirectoryP
     shared: sharedPhones.map((s) => ({ phone: formatPhone(s.phone), names: s.names })),
   };
 }
+
+/** Owner only (Abraham, Nov 23, 2026: the list is final): replaces the directory with this file. Audited. */
+export async function loadDirectoryAction(form: FormData): Promise<{ ok: boolean; message: string }> {
+  const me = await requireOwner();
+  const file = form.get("file");
+  if (!(file instanceof File) || !file.size) return { ok: false, message: "Choose the CSV file first." };
+  if (file.size > 10 * 1024 * 1024) return { ok: false, message: "The file is larger than 10 MB." };
+  const { rows, issues } = parseDirectoryCsv(await file.text());
+  if (!rows.length) return { ok: false, message: "No rows to load." };
+  const { loadDirectory } = await import("@/lib/directory");
+  const n = await loadDirectory(rows);
+  const { db, schema } = await import("@/lib/db");
+  await db.insert(schema.auditLog).values({ userId: me.userId, action: "directory.loaded", entityType: "directory", entityId: "all", after: { rows: n, skipped: issues.length } });
+  const { revalidatePath } = await import("next/cache");
+  revalidatePath("/admin/customers/directory");
+  return { ok: true, message: `Saved: ${n} rows loaded${issues.length ? `, ${issues.length} rows with a problem not loaded` : ""}.` };
+}

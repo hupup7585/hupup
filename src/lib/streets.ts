@@ -356,9 +356,16 @@ export const STREET_NAMES: readonly string[] = STREETS.map((s) => s.name);
 
 /** The street as the caller gave it or as printed ("Acres Road" or "ACRES RD"). */
 export function findStreet(street: string) {
-  const v = street.trim().toLowerCase();
+  const v = streetAlias(street.trim().toLowerCase());
   return STREETS.find((s) => s.spoken.toLowerCase() === v || s.name.toLowerCase() === v) ?? null;
 }
+
+/**
+ * Other spellings of the same street (Hark, Nov 23, 2026): the directory prints D A WIEDER BLVD, the real name is
+ * Weider. Both find street 072's slot.
+ */
+const STREET_ALIASES: Record<string, string> = { "d a weider boulevard": "d a wieder boulevard", "d a weider blvd": "d a wieder blvd", "da weider boulevard": "d a wieder boulevard" };
+const streetAlias = (v: string) => STREET_ALIASES[v.replace(/\s+/g, " ")] ?? v;
 
 export const streetSlotKey = (street: string) => `street:${street.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}`;
 
