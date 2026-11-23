@@ -162,12 +162,11 @@ export const PROMPTS = {
   // Jumping balloons (Abraham, Nov 19, 2026, approved): box 153 menu, box 154 when a balloon is chosen
   // Old-cart item added (Nov 19, 2026)
   // Box 25 for laser tag and paddle boats (Abraham, Nov 22, 2026): a second one while another is free that date
-  box25_added: { group: "Booking by item (key 1)", label: "Box 25 (laser tag and paddle boats): Successfully added to your cart", text: "Successfully added to your cart: {qty} {item} for {date}.", vars: ["qty", "item", "date"] },
+  box25_added: { group: "Booking by item (key 1)", label: "Box 25: Successfully added to your cart (every item)", text: "Successfully added to your cart: {qty} {item} for {date}.", vars: ["qty", "item", "date"] },
   second_laser: { group: "Booking by item (key 1)", label: "Box 25, laser tag: To add a second one, press 1", text: "To add a second one, press 1." },
   second_paddle: { group: "Booking by item (key 1)", label: "Box 25, paddle boats: To add a second one, press 1", text: "To add a second one, press 1." },
   stay_on_line: { group: "Booking by item (key 1)", label: "Shared: Otherwise, stay on the line (add-on offers)", text: "Otherwise, stay on the line." },
-  box25_keep: { group: "Booking by item (key 1)", label: "Box 25 (laser tag and paddle boats): keep shopping", text: "To keep shopping, for same day, press 1. For another day, press 2." },
-  resume_added: { group: "Booking by item (key 1)", label: "Box 25: item added (every item, laser tag and paddle boats too; then the shared cart line and the star line)", text: "This item was successfully added to your cart. To keep shopping, for same day, press 1. For another day, press 2." },
+  box25_keep: { group: "Booking by item (key 1)", label: "Box 25: keep shopping (every item)", text: "To keep shopping, for same day, press 1. For another day, press 2." },
   // Jumping balloons list (Nov 19, 2026, replaces box 153): the opening, then one line per balloon, then the cart line
   // Jumping balloon list (Abraham, Nov 22, 2026): each balloon = 3 fixed recordings: name, full item number, "press N."
   balloon_name_7201: { group: "Booking by item (key 1)", label: "Jumping balloons list: Soft Hop, name", text: "For the Soft Hop," },
@@ -379,9 +378,9 @@ export const PROMPTS = {
   closed_book_it: { group: "Date & quantity", label: "Box 17: To book it, press 1", text: "To book it, press 1." },
   closed_pick_another: { group: "Date & quantity", label: "Box 17: To pick another date, press 2", text: "To pick another date, press 2." },
   // Box 18, confirm the date (Abraham, Nov 22, 2026): recorded pieces; off the line until the second-day rules are in
-  box18_book: { group: "Date & quantity", label: "Box 18: To book the {item} for {date} press 1", text: "To book the {item} for {date} press 1.", vars: ["item", "date"], pending: true },
-  box18_second: { group: "Date & quantity", label: "Box 18: To add it also for {weekday} for only {price} more, press 2", text: "To add it also for {weekday} for only {price} more, press 2.", vars: ["weekday", "price"], pending: true },
-  box18_other_date: { group: "Date & quantity", label: "Box 18: To choose a different date, press 3", text: "To choose a different date, press 3.", pending: true },
+  box18_book: { group: "Date & quantity", label: "Box 18: To book the {item} for {date} press 1", text: "To book the {item} for {date} press 1.", vars: ["item", "date"] },
+  box18_second: { group: "Date & quantity", label: "Box 18: To add it also for {weekday} for only {price} more, press 2", text: "To add it also for {weekday} for only {price} more, press 2.", vars: ["weekday", "price"] },
+  box18_other_date: { group: "Date & quantity", label: "Box 18: To choose a different date, press 3", text: "To choose a different date, press 3." },
   address_outside_area: { group: "Checkout", label: "Address outside the delivery area", text: "Sorry, we only deliver in Kiryas Joel and nearby Orange County towns. Please say a delivery address in our area." },
   address_not_found: { group: "Checkout", label: "Address not found on the map", text: "Sorry, we could not find that address. Please say the full address again: the house number, the street, and the town.", pending: true },
   checkout_total: { group: "Checkout", label: "Order total read-back", text: "Your total is {total}. That is {items} for the rentals, {delivery} for delivery, and {tax} sales tax.", vars: ["total", "items", "delivery", "tax"] },
@@ -556,7 +555,7 @@ export const PROMPTS = {
 } satisfies Record<string, PromptDef>;
 
 /** Old lines no longer played anywhere (kept so nothing is lost; shown as "Not used"). */
-export const RETIRED_PROMPTS = new Set<string>(["instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_heard", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard"]);
+export const RETIRED_PROMPTS = new Set<string>(["resume_added", "instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_heard", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard"]);
 
 /** The extension (or part of the call) each group of lines belongs to, for the Admin filter. New groups fall into "Other". */
 export const PROMPT_AREAS: Record<string, string> = {
@@ -633,8 +632,10 @@ export const googleLiveOn = (overrides: PromptOverrides) => Boolean(EXTRAS.get(o
  * part has a recording; otherwise null, and the line is spoken in the live voice as before.
  */
 export function composeClips(overrides: PromptOverrides, key: PromptKey, vars: Record<string, string | number> = {}): string[] | null {
+  // Nov 22, 2026: Hark's recordings (Puck) put the line together whenever every part is recorded; the Achird switch
+  // stays off until every prompt is recorded (Abraham)
   const x = EXTRAS.get(overrides);
-  if (!x?.achird) return null;
+  if (!x) return null;
   const parts0 = (PROMPTS[key] as PromptDef).parts;
   if (parts0) {
     const ids = parts0.map((k) => x.clips[PIECE_ALIAS[k] ?? k]);
@@ -667,7 +668,7 @@ export function composeClips(overrides: PromptOverrides, key: PromptKey, vars: R
 /** Words said live (numbers, a key) from Hark's word recordings, when the Owner's Achird switch is on and all are recorded. */
 export function liveClips(overrides: PromptOverrides, text: string): string[] | null {
   const x = EXTRAS.get(overrides);
-  if (!x?.achird) return null;
+  if (!x) return null;
   const words = wordSlotsFor(text, x.items);
   if (!words) return null;
   const urls: string[] = [];

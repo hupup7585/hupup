@@ -72,7 +72,7 @@ describe("key 1: date first, several days, one charge", () => {
     expect(redirect(addXml)).toBe(`ocean?d=${DAY1}`);
     expect(said(await call("ocean", {}, `d=${DAY1}`))).toEqual(["Would you like to add ocean balls? To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3.", "To skip, press pound.", "To go back, press star."]);
     expect(redirect(await call("ocean-choice", { Digits: "#" }, `d=${DAY1}`))).toBe("added-menu");
-    expect(said(await call("added-menu"))[0]).toBe("This item was successfully added to your cart. To keep shopping, for same day, press 1. For another day, press 2.");
+    expect(said(await call("added-menu")).slice(0, 2)).toEqual(["Successfully added to your cart: 1 Castle for Tuesday, December first.", "To keep shopping, for same day, press 1. For another day, press 2."]); // box 25 (Nov 22, 2026)
     expect(redirect(await call("after-add", { Digits: "1" }))).toBe("cats"); // same day: the categories menu (box 12a)
     expect(redirect(await call("after-add", { Digits: "0" }))).toBe("cart");
     expect(redirect(await call("after-add", { Digits: "2" }))).toBe("date");

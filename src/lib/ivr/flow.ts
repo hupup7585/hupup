@@ -5,7 +5,7 @@ import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { addDays, spokenLongDate, todayISO } from "@/lib/dates";
 import { spokenMoney } from "@/lib/money";
-import { closedDayOffer, friMutzeDays, friMutzeOffered, friMutzePickup } from "@/lib/holiday-rentals";
+import { closedDayOffer, friMutzeDays, friMutzeOffered, friMutzePickup, perDayRules } from "@/lib/holiday-rentals";
 import { BALLOON_MENU, BALLOON_SECOND_DIGIT_SECONDS, balloonEntry, balloonForKey, balloonSizes, balloonKeyWords, digitWords } from "@/lib/ivr/balloon-menu";
 import { formatPhone, last4, spokenDigits, toE164 } from "@/lib/phone";
 import { logStamp, phonePromoMode, phonePromoOn, readBack, tenDigitNumber } from "@/lib/phone-promo";
@@ -350,6 +350,32 @@ export const LASER_ADDONS_CATEGORY = "Laser tag add-ons";
 async function isLaserBase(categoryId: number) {
   const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, categoryId));
   return Boolean(cat && /laser/i.test(cat.name) && cat.name !== LASER_ADDONS_CATEGORY);
+}
+
+/** Box 25's live parts: "{Qnt} {item}" (singular for 1) and the date, or both dates after box 18 key 2. */
+function addedVars(a: { name: string; qty: number; date: string; date2?: string }) {
+  return { qty: a.qty, item: a.qty === 1 ? a.name : pluralName(a.name), date: a.date2 ? `${spokenDate(a.date)} and ${spokenDate(a.date2)}` : spokenDate(a.date) };
+}
+
+/** Box 25 (Nov 22, 2026): "Successfully added to your cart: {Qnt} {item} for {date}." then the keep-shopping line. */
+function spAdded(g: Gather, ctx: Ctx) {
+  const a = ctx.session?.data.lastAdded;
+  if (a) sp(g, ctx, "box25_added", addedVars(a));
+  sp(g, ctx, "box25_keep");
+}
+
+/**
+ * Box 18's second day (Abraham, Nov 22, 2026): the next day, only when it is open and the item is free through its
+ * pickup; "{price} more" = half the one-day price (the full one-day price on Chanukah and Chol Hamoed).
+ */
+async function secondDay(p: { id: number; quantity: number; priceCents: number }, date: string) {
+  const cal = await getSettings();
+  const next = addDays(date, 1);
+  if (dayInfo(next, cal).closed) return null;
+  const after = pickupDateFor(next, cal as never);
+  if ((await checkBookable(p.id, p.quantity, date, db, after)) <= 0) return null;
+  const days = perDayRules(date, cal as never) || perDayRules(next, cal as never) ? 2 : 1.5;
+  return { next, after, days, moreCents: Math.round(p.priceCents * (days - 1)) };
 }
 
 /** Laser tag sets and paddle boat packages get a second one offered in box 25 (Abraham, Nov 22, 2026). */
@@ -1621,7 +1647,7 @@ const handlers: Record<string, Handler> = {
       await db.update(orders).set({ holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES) }).where(eq(orders.id, cartOrder));
       lines[i] = { ...l, state: "added" };
       const ids = [...new Set([...(session.data?.dayOrderIds ?? []), cartOrder])];
-      await updateSession(ctx.callSid, { orderId: cartOrder, outcome: "carted", data: { day: l.d, dayOrderIds: ids, resumeLines: lines } }, session);
+      await updateSession(ctx.callSid, { orderId: cartOrder, outcome: "carted", data: { day: l.d, dayOrderIds: ids, resumeLines: lines, lastAdded: { name: l.name, qty: l.qty, date: l.d } } }, session);
       await track(ctx.callSid, "item_added", `Added ${itemPhrase(l.qty, l.name)} for ${spokenDate(l.d)} from the last call`, { item: l.name, productId: l.p, qty: l.qty, date: l.d, orderId: cartOrder });
       // Nov 19, 2026: a jumping balloon gets the ocean balls question first, then the old-cart added line
       const prod = await getProduct(l.p);
@@ -1645,7 +1671,7 @@ const handlers: Record<string, Handler> = {
   "resume-added"(ctx, vr) {
     const d = ctx.query.get("d") ?? undefined;
     const g = keypad(vr, url("resume-added-choice", { d }));
-    sp(g, ctx, "resume_added");
+    spAdded(g, ctx); // box 25 (Nov 22, 2026): every item, welcome back too
     sp(g, ctx, "cart_key");
     backLine(g, ctx);
     return back(vr, "resume-items");
@@ -1995,10 +2021,45 @@ const handlers: Record<string, Handler> = {
       backLine(g, ctx);
       return bookNoInput(vr, ctx, "date-ask", { p, d: date });
     }
+    // Box 18 (Abraham, Nov 22, 2026): the item is known: book it, add the next day too, or another date
+    const prod = p ? await getProduct(Number(p)) : null;
+    if (prod) {
+      const two = await secondDay(prod, date);
+      const g = keypad(vr, url("box18-choice", { p, d: date, t: two ? 1 : 0 }));
+      sp(g, ctx, "box18_book", { item: prod.name, date: spokenDate(date) });
+      if (two) sp(g, ctx, "box18_second", { weekday: spokenDate(two.next).split(",")[0], price: spokenMoney(two.moreCents) });
+      sp(g, ctx, "box18_other_date");
+      backLine(g, ctx);
+      return bookNoInput(vr, ctx, "date-ask", { p, d: date });
+    }
     const g = keypad(vr, url("date-confirm", { p, d: date }));
     sp(g, ctx, "book_date_entered", { date: spokenDate(date) });
     backLine(g, ctx); // Abraham, Nov 20, 2026: no shopping cart option on this step
     return bookNoInput(vr, ctx, "date-ask", { p, d: date });
+  },
+
+  async "box18-choice"(ctx, vr) {
+    const p = ctx.query.get("p")!;
+    const date = ctx.query.get("d")!;
+    const d = ctx.body.Digits;
+    if (d === "*" || d === "3") return back(vr, "date", { p }); // star: one step back; 3: a different date
+    if (d === "1") {
+      await chooseDay(ctx, date);
+      return back(vr, "qty", { p, d: date });
+    }
+    const prod = d === "2" && ctx.query.get("t") === "1" ? await getProduct(Number(p)) : null;
+    const two = prod ? await secondDay(prod, date) : null;
+    if (!two) {
+      if (d) sp(vr, ctx, "not_valid");
+      return back(vr, "date-ask", { p, d: date });
+    }
+    // Key 2: the next day too, charged as its days (1.5, or 2 on Chanukah and Chol Hamoed), picked up after it
+    const spans = { ...(ctx.session?.data.spanDays ?? {}), [date]: { after: two.after, days: two.days, both: two.next } };
+    await updateSession(ctx.callSid, { data: { spanDays: spans } }, ctx.session);
+    if (ctx.session) ctx.session.data.spanDays = spans;
+    await track(ctx.callSid, "step", `Box 18: ${spokenDate(date)} and ${spokenDate(two.next)}`, { date, next: two.next, days: two.days });
+    await chooseDay(ctx, date);
+    return back(vr, "qty", { p, d: date });
   },
 
   async "date-confirm"(ctx, vr) {
@@ -2171,7 +2232,8 @@ const handlers: Record<string, Handler> = {
     }
     const ids = [...new Set([...(session.data?.dayOrderIds ?? []), r.orderId])];
     const announce = session.data?.mutzeAnnounce === date;
-    await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted", data: { day: date, dayOrderIds: ids, ...(announce ? { mutzeAnnounce: undefined } : {}) } }, session);
+    const lastAdded = { name: p.name, qty: q, date, ...(span?.both ? { date2: span.both } : {}) }; // box 25 names both dates after key 2
+    await updateSession(ctx.callSid, { orderId: r.orderId, outcome: "carted", data: { day: date, dayOrderIds: ids, lastAdded, ...(announce ? { mutzeAnnounce: undefined } : {}) } }, session);
     // Box 149 when the date came before the item: now the item's price is known
     if (announce) await sayFriMutzePrice(vr, ctx, date, p.priceCents);
     // Abraham, Nov 22, 2026: box 25 after every item added, laser tag and paddle boats too (box 151 and box 152 dropped)
@@ -2180,7 +2242,7 @@ const handlers: Record<string, Handler> = {
     if (await isBounceHouse(p.categoryId)) return back(vr, "ocean", { d: date });
     if ((await isMaze(p)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) return back(vr, "packs", { d: date });
     // Box 25 for laser tag and paddle boats (Nov 22, 2026): the added line, then a second one while another is free
-    if (await secondOneKind(p.categoryId)) return back(vr, "added-second", { p: p.id, d: date, q });
+    if (await secondOneKind(p.categoryId)) return back(vr, "added-second", { p: p.id, d: date });
     return back(vr, "added-menu");
   },
 
@@ -2194,16 +2256,15 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     if (!p) return back(vr, "added-menu");
     const kind = await secondOneKind(p.categoryId);
-    const q = Number(ctx.query.get("q") || 1);
     const inCart = (await cartLines(ctx)).filter((l) => l.date === date && l.name === p.name).reduce((t, l) => t + l.qty, 0);
     const free = await checkBookable(p.id, p.quantity, date, db, keptPickup(ctx, date));
-    const added = { qty: q, item: q === 1 ? p.name : pluralName(p.name), date: spokenDate(date) };
-    if (!kind || inCart !== 1 || free <= 0) return back(vr, "added-rest", { p: p.id, d: date, q });
+    if (!kind || inCart !== 1 || free <= 0) return back(vr, "added-menu");
     const g = keypad(vr, url("second-choice", { p: p.id, d: date }), { timeout: 4 });
-    sp(g, ctx, "box25_added", added);
+    const a = ctx.session?.data.lastAdded;
+    if (a) sp(g, ctx, "box25_added", addedVars(a));
     sp(g, ctx, kind === "laser" ? "second_laser" : "second_paddle");
     sp(g, ctx, "stay_on_line");
-    return back(vr, "added-rest", { p: p.id, d: date }); // no key: on to the keep-shopping line
+    return back(vr, "added-menu", { n: 1 }); // no key: on to the keep-shopping line
   },
 
   async "second-choice"(ctx, vr) {
@@ -2217,16 +2278,9 @@ const handlers: Record<string, Handler> = {
     return back(vr, "added-second", { p, d: date });
   },
 
-  /** Box 25 after the second-one offer: the keep-shopping line, the cart line, the star line (as after any item). */
-  async "added-rest"(ctx, vr) {
-    const g = keypad(vr, url("after-add"));
-    const p = ctx.query.get("q") ? await getProduct(Number(ctx.query.get("p"))) : null;
-    const q = Number(ctx.query.get("q") || 1);
-    if (p) sp(g, ctx, "box25_added", { qty: q, item: q === 1 ? p.name : pluralName(p.name), date: spokenDate(ctx.query.get("d")!) });
-    sp(g, ctx, "box25_keep");
-    sp(g, ctx, "cart_key");
-    backLine(g, ctx);
-    return noInput(vr, ctx, "cart");
+  /** Old step name (a call in the middle of it when this went live): box 25's keep-shopping part. */
+  "added-rest"(_ctx, vr) {
+    return back(vr, "added-menu", { n: 1 });
   },
 
   /** Box 151 dropped (Nov 22, 2026): a call still on the old step goes on to box 25. */
@@ -2240,7 +2294,9 @@ const handlers: Record<string, Handler> = {
    */
   "added-menu"(ctx, vr) {
     const g = keypad(vr, url("after-add"));
-    sp(g, ctx, "resume_added");
+    // Box 25 (Abraham, Nov 22, 2026): every item; n = the added line already played with the second-one offer
+    if (ctx.query.get("n")) sp(g, ctx, "box25_keep");
+    else spAdded(g, ctx);
     sp(g, ctx, "cart_key");
     backLine(g, ctx);
     return noInput(vr, ctx, "cart");

@@ -26,7 +26,7 @@ describe("every line is on the page", () => {
     expect(lineStatus("promo_ask", o).status).toBe("Not active yet");
     expect(lineStatus("spoken_readback", o).status).toBe("Not active yet"); // wording approved Nov 15; speech to text still waits for his OK
     expect(lineStatus("voicemail_thanks", o).status).toBe("Not used");
-    expect(RETIRED_PROMPTS.size).toBe(41);
+    expect(RETIRED_PROMPTS.size).toBe(42); // resume_added retired for box 25 (Nov 22, 2026)
   });
   it("the page reads the prompt list itself, and is Owner only", () => {
     const page = readFileSync("src/app/admin/(app)/phone/prompts/page.tsx", "utf8");

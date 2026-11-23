@@ -70,28 +70,52 @@ describe("box 25 for laser tag and paddle boats (Nov 22, 2026)", () => {
   it("the added line, the second one while another is free, stay on the line; no key goes on to keep shopping", async () => {
     h.session.orderId = null;
     h.session.data = {};
-    expect(redirect(await call("add", {}, `p=${boat}&d=${D1}&q=1`))).toBe(`added-second?p=${boat}&d=${D1}&q=1`);
-    const xml = await call("added-second", {}, `p=${boat}&d=${D1}&q=1`);
+    expect(redirect(await call("add", {}, `p=${boat}&d=${D1}&q=1`))).toBe(`added-second?p=${boat}&d=${D1}`);
+    const xml = await call("added-second", {}, `p=${boat}&d=${D1}`);
     expect(said(xml)).toEqual(["Successfully added to your cart: 1 paddle boat for Tuesday, December twenty-second.", "To add a second one, press 1.", "Otherwise, stay on the line."]);
     expect(xml).toMatch(/<Gather [^>]*timeout="4"/);
-    expect(redirect(xml)).toBe(`added-rest?p=${boat}&d=${D1}`);
-    expect(said(await call("added-rest", {}, `p=${boat}&d=${D1}`))).toEqual(["To keep shopping, for same day, press 1. For another day, press 2.", "To go to your shopping cart, press 0.", "To go back, press star."]);
+    expect(redirect(xml)).toBe("added-menu?n=1");
+    expect(said(await call("added-menu", {}, "n=1"))).toEqual(["To keep shopping, for same day, press 1. For another day, press 2.", "To go to your shopping cart, press 0.", "To go back, press star."]);
     expect(redirect(await call("after-add", { Digits: "1" }))).toBe("cats");
     // 1 adds a second one; no third offer (and never how many are left)
     expect(redirect(await call("second-choice", { Digits: "1" }, `p=${boat}&d=${D1}`))).toBe(`add?p=${boat}&d=${D1}&q=1`);
     await call("add", {}, `p=${boat}&d=${D1}&q=1`);
-    const again = await call("added-second", {}, `p=${boat}&d=${D1}&q=1`);
-    expect(redirect(again)).toBe(`added-rest?p=${boat}&d=${D1}&q=1`);
-    expect(said(await call("added-rest", {}, `p=${boat}&d=${D1}&q=1`))[0]).toBe("Successfully added to your cart: 1 paddle boat for Tuesday, December twenty-second.");
+    expect(redirect(await call("added-second", {}, `p=${boat}&d=${D1}`))).toBe("added-menu");
+    expect(said(await call("added-menu"))[0]).toBe("Successfully added to your cart: 1 paddle boat for Tuesday, December twenty-second.");
   });
   it("laser tag: no second one when none is free; its own recording otherwise", async () => {
     h.session.orderId = null;
     h.session.data = {};
     await call("add", {}, `p=${guns}&d=${D2}&q=1`);
-    expect(redirect(await call("added-second", {}, `p=${guns}&d=${D2}&q=1`))).toBe(`added-rest?p=${guns}&d=${D2}&q=1`); // only one set
+    expect(redirect(await call("added-second", {}, `p=${guns}&d=${D2}`))).toBe("added-menu"); // only one set
     const { PROMPTS } = await import("@/lib/ivr/prompts");
     expect(PROMPTS.second_laser.text).toBe("To add a second one, press 1.");
     expect(PROMPTS.second_paddle.text).toBe("To add a second one, press 1.");
+  });
+});
+
+describe("box 18 (Abraham, Nov 22, 2026)", () => {
+  it("the next day for half the one-day price when it is open; key 2 books both days and box 25 names both dates", async () => {
+    h.session.orderId = null;
+    h.session.data = {};
+    // Tuesday, December twenty-ninth; the next day (Wednesday) is open
+    const T = "2026-12-29";
+    const lines = said(await call("date-ask", {}, `p=${boat}&d=${T}`));
+    expect(lines).toEqual(["To book the paddle boat for Tuesday, December twenty-ninth press 1.", "To add it also for Wednesday for only 50 dollars more, press 2.", "To choose a different date, press 3.", "To go back, press star."]);
+    expect(redirect(await call("box18-choice", { Digits: "2" }, `p=${boat}&d=${T}&t=1`))).toBe(`qty?p=${boat}&d=${T}`);
+    expect(h.session.data.spanDays).toMatchObject({ [T]: { both: "2026-12-30", days: 1.5 } });
+    await call("add", {}, `p=${boat}&d=${T}&q=1`);
+    const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, h.session.orderId!));
+    expect(o.spanDays).toBe(1.5);
+    expect(said(await call("added-menu"))[0]).toBe("Successfully added to your cart: 1 paddle boat for Tuesday, December twenty-ninth and Wednesday, December thirtieth.");
+  });
+  it("the next day closed (Friday, then Shabbes): no second-day line and no key 2", async () => {
+    h.session.orderId = null;
+    h.session.data = {};
+    const fri = "2027-01-08";
+    const lines = said(await call("date-ask", {}, `p=${boat}&d=${fri}`));
+    expect(lines.join(" ")).not.toContain("To add it also for");
+    expect(redirect(await call("box18-choice", { Digits: "2" }, `p=${boat}&d=${fri}&t=0`))).toBe(`date-ask?p=${boat}&d=${fri}`);
   });
 });
 

@@ -233,7 +233,9 @@ export type CallData = {
   mutzeDays?: string[];
   mutzeAnnounce?: string;
   /** Closed-day offers taken (Nov 20, 2026): the day before -> its pickup (the day after) and the days charged */
-  spanDays?: Record<string, { after: string; days: number | null }>;
+  spanDays?: Record<string, { after: string; days: number | null; both?: string }>;
+  /** Box 25 (Nov 22, 2026): the item just added, for "Successfully added to your cart: {Qnt} {item} for {date}." */
+  lastAdded?: { name: string; qty: number; date: string; date2?: string };
   /** Key 8 catalog: the number to text, the two parts of the email, and keys typed so far */
   catPhone?: string;
   /** Shared text steps (boxes 142 to 144): what the number is for, and the order whose payment link it gets */

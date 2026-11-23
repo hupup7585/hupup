@@ -67,8 +67,14 @@ describe("key 1: booking by item", () => {
     expect(said(date)).toEqual(["Using your keypad, please enter your event date: two digits for the month, then two digits for the day. For example, for March fifth, press 0, 3, 0, 5.", "To go back, press star."]);
     expect(date).not.toContain('input="dtmf speech"');
     expect(redirect(await call("date-heard", { Digits: "1201" }, `p=${medium}`))).toBe(`date-ask?p=${medium}&d=${TUE}`);
-    expect(said(await call("date-ask", {}, `p=${medium}&d=${TUE}`))).toEqual(["You entered Tuesday, December first. If that is correct, press pound to continue. To enter a different date, press 1.", "To go back, press star."]); // Nov 20, 2026: no cart option here
-    expect(redirect(await call("date-confirm", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`date?p=${medium}`);
+    // Box 18 (Abraham, Nov 22, 2026): the item is known; no cart option here
+    const box18 = said(await call("date-ask", {}, `p=${medium}&d=${TUE}`));
+    expect(box18[0]).toMatch(/^To book the .+ for Tuesday, December first press 1\.$/);
+    expect(box18.slice(-2)).toEqual(["To choose a different date, press 3.", "To go back, press star."]);
+    expect(redirect(await call("box18-choice", { Digits: "3" }, `p=${medium}&d=${TUE}&t=1`))).toBe(`date?p=${medium}`);
+    expect(redirect(await call("box18-choice", { Digits: "1" }, `p=${medium}&d=${TUE}&t=1`))).toBe(`qty?p=${medium}&d=${TUE}`);
+    // with no item yet, the old check stays (still open with Abraham)
+    expect(said(await call("date-ask", {}, `d=${TUE}`))).toEqual(["You entered Tuesday, December first. If that is correct, press pound to continue. To enter a different date, press 1.", "To go back, press star."]);
     expect(redirect(await call("date-confirm", { Digits: "#" }, `p=${medium}&d=${TUE}`))).toBe(`qty?p=${medium}&d=${TUE}`);
   });
 

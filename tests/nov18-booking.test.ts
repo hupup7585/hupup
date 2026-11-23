@@ -49,7 +49,7 @@ describe("box 150 and box 149 (approved Nov 18, 2026)", () => {
       "You entered Friday, December eleventh. If that is correct, press pound. To keep your rental for Mutze Shabbes, press 1. To enter a different date, press 2.",
       "To go back, press star.",
     ]);
-    expect(said(await call("date-ask", {}, `p=${castle}&d=${PLAIN_FRIDAY}`))).toEqual(["You entered Friday, November twenty-seventh. If that is correct, press pound to continue. To enter a different date, press 1.", "To go back, press star."]);
+    expect(said(await call("date-ask", {}, `p=${castle}&d=${PLAIN_FRIDAY}`))[0]).toMatch(/^To book the .+ for Friday, November twenty-seventh press 1\.$/); // box 18 (Nov 22, 2026)
   });
   it("box 150: 2 = a different date", async () => {
     expect(redirect(await call("date-confirm", { Digits: "2" }, `p=${castle}&d=${CHANUKAH_FRIDAY}&f=1`))).toBe(`date?p=${castle}`);
@@ -94,8 +94,8 @@ describe("one item at a time (Nov 18, 2026); box 151 and box 152 (approved Nov 1
     h.session.orderId = null;
     h.session.data = {};
     const day = "2026-12-21";
-    expect(redirect(await call("add", {}, `p=${boat}&d=${day}&q=1`))).toBe(`added-second?p=${boat}&d=${day}&q=1`); // box 25 with the second one (Nov 22, 3:13 PM)
-    expect(said(await call("added-menu"))).toEqual(["This item was successfully added to your cart. To keep shopping, for same day, press 1. For another day, press 2.", "To go to your shopping cart, press 0.", "To go back, press star."]);
+    expect(redirect(await call("add", {}, `p=${boat}&d=${day}&q=1`))).toBe(`added-second?p=${boat}&d=${day}`); // box 25 with the second one (Nov 22, 3:13 PM)
+    expect(said(await call("added-menu"))).toEqual(["Successfully added to your cart: 1 Paddle boat for Monday, December twenty-first.", "To keep shopping, for same day, press 1. For another day, press 2.", "To go to your shopping cart, press 0.", "To go back, press star."]);
     expect(redirect(await call("another", {}, `p=${boat}&d=${day}`))).toBe("added-menu"); // a call still on the old step
     const { PROMPTS } = await import("@/lib/ivr/prompts");
     for (const k of ["box151", "box151_none", "box152"]) expect(PROMPTS).not.toHaveProperty(k);
