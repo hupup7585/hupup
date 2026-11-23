@@ -38,7 +38,7 @@ import { sendMessage } from "@/lib/sms";
 import { STEP_LABELS, track, trackStep } from "@/lib/call-journey";
 import { alertMissedCall } from "@/lib/owner-alerts";
 import { alertSharedPhoneOrder, isSharedPhone } from "@/lib/shared-phones";
-import { spokenAddress, townPhrase } from "@/lib/spoken-address";
+import { addressSlotKeys, spokenAddress, townPhrase } from "@/lib/spoken-address";
 import { promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import {
@@ -70,7 +70,7 @@ import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staf
 import { calendarNow } from "@/lib/clock";
 import { bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
 import { matchBlock, parseBlockList } from "./caller-filter";
-import { PROMPTS, composeClips, fill, googleLiveOn, liveClips, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
+import { PROMPTS, clipUrls, composeClips, fill, googleLiveOn, liveClips, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
@@ -2287,7 +2287,8 @@ const handlers: Record<string, Handler> = {
     const kind = await secondOneKind(p.categoryId);
     const inCart = (await cartLines(ctx)).filter((l) => l.date === date && l.name === p.name).reduce((t, l) => t + l.qty, 0);
     const free = await checkBookable(p.id, p.quantity, date, db, keptPickup(ctx, date));
-    if (!kind || inCart !== 1 || free <= 0) return back(vr, "added-menu");
+    // Laser tag (Nov 22, 2026, 11:12 PM): "To add another" every time while another set is free; paddle boats: a second one
+    if (!kind || free <= 0 || (kind === "paddle" && inCart !== 1)) return back(vr, "added-menu");
     const g = keypad(vr, url("second-choice", { p: p.id, d: date }), { timeout: 4 });
     const a = ctx.session?.data.lastAdded;
     if (a) sp(g, ctx, "box25_added", addedVars(a));
@@ -2387,7 +2388,7 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("ocean-choice", { d, n }), { timeout: 4 });
     sp(g, ctx, "ocean_balls");
     halfPause(g);
-    sp(g, ctx, "skip_pound"); // the shared skip line (Nov 19, 2026)
+    sp(g, ctx, "stay_on_line"); // Nov 22, 2026, 11:12 PM: doing nothing skips them (pound still skips too)
     backLine(g, ctx);
     // an add-on offer with no key for 4 seconds: nothing added, straight on (Nov 22, 2026)
     return n === "resume" ? back(vr, "resume-added", { d }) : back(vr, "added-menu");
@@ -2920,7 +2921,12 @@ const handlers: Record<string, Handler> = {
     if (!d.address || !d.house || !d.street || !d.zip || !d.town) return back(vr, "addr-house");
     const g = keypad(vr, url("addr-readback-choice"));
     sp(g, ctx, "addr_rb_intro");
-    sp(g, ctx, "addr_rb_address", { address: spokenAddress({ house: d.house, street: d.street, unit: d.unit ?? null, town: d.town, zip: d.zip }) });
+    // Joined from Hark's recordings when every part is recorded (Nov 22, 2026, 11:12 PM), else the computer voice
+    const parts = { house: d.house, street: d.street, unit: d.unit ?? null, town: d.town, zip: d.zip };
+    const keys = addressSlotKeys(parts);
+    const joined = keys ? clipUrls(ctx.prompts, keys) : null;
+    if (joined) joined.forEach((u) => g.play(u));
+    else sp(g, ctx, "addr_rb_address", { address: spokenAddress(parts) });
     sp(g, ctx, "addr_rb_correct");
     sp(g, ctx, "addr_rb_again");
     backLine(g, ctx);

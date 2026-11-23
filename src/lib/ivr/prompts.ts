@@ -163,7 +163,7 @@ export const PROMPTS = {
   // Old-cart item added (Nov 19, 2026)
   // Box 25 for laser tag and paddle boats (Abraham, Nov 22, 2026): a second one while another is free that date
   box25_added: { group: "Booking by item (key 1)", label: "Box 25: Successfully added to your cart (every item)", text: "Successfully added to your cart: {qty} {item} for {date}.", vars: ["qty", "item", "date"] },
-  second_laser: { group: "Booking by item (key 1)", label: "Box 25, laser tag: To add a second one, press 1", text: "To add a second one, press 1." },
+  second_laser: { group: "Booking by item (key 1)", label: "Box 25, laser tag: To add another, press 1 (while another set is free)", text: "To add another, press 1." },
   second_paddle: { group: "Booking by item (key 1)", label: "Box 25, paddle boats: To add a second one, press 1", text: "To add a second one, press 1." },
   stay_on_line: { group: "Booking by item (key 1)", label: "Shared: Otherwise, stay on the line (add-on offers)", text: "Otherwise, stay on the line." },
   box25_keep: { group: "Booking by item (key 1)", label: "Box 25: keep shopping (every item)", text: "To keep shopping, for same day, press 1. For another day, press 2." },
@@ -672,6 +672,14 @@ export function composeClips(overrides: PromptOverrides, key: PromptKey, vars: R
 }
 
 /** Words said live (numbers, a key) from Hark's word recordings, when the Owner's Achird switch is on and all are recorded. */
+/** Hark's recordings for these slot keys, in order; null when any one is missing (then the computer voice says it). */
+export function clipUrls(overrides: PromptOverrides, keys: string[]): string[] | null {
+  const x = EXTRAS.get(overrides);
+  if (!x || !keys.length) return null;
+  const ids = keys.map((k) => x.clips[k]);
+  return ids.every(Boolean) ? ids.map((id) => promptRecordingLink(id)) : null;
+}
+
 export function liveClips(overrides: PromptOverrides, text: string): string[] | null {
   const x = EXTRAS.get(overrides);
   if (!x) return null;

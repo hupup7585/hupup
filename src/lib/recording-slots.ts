@@ -1,5 +1,6 @@
 import { PIECE_ALIAS, PROMPTS, SHARED_PIECES, promptRecordable, type PromptDef, type PromptKey } from "@/lib/ivr/prompts";
-import { LETTERS, TOWN_PHRASES, WORDS, pluralName, townSlotKey } from "@/lib/spoken-words";
+import { LETTERS, TOWN_PHRASES, WORDS, numberWords, pluralName, townSlotKey } from "@/lib/spoken-words";
+import { STREET_NAMES, streetSlotKey } from "@/lib/streets";
 export { LETTERS, WORDS, numberWords, ordinalWords, wordSlotsFor } from "@/lib/spoken-words";
 
 /**
@@ -59,6 +60,11 @@ export function allSlots(items: { id: number; name: string }[] = [], texts: Reco
   for (const w of NUMBER_CLIPS) out.push({ key: `word:${w.toLowerCase()}`, kind: "word", group: "Number clips (live numbers, item digits, prices)", label: w, text: w });
   for (const w of WORDS) if (!clips.has(w.toLowerCase())) out.push({ key: `word:${w.toLowerCase()}`, kind: "word", group: "Dates and times", label: w, text: w });
   for (const l of LETTERS) out.push({ key: `letter:${l.toLowerCase()}`, kind: "letter", group: "Letters A to Z", label: `Letter ${l}`, text: l });
+  // Read-back pieces (Abraham, Nov 22, 2026, 11:12 PM): 21 to 99 as one recording each, "unit", the 10950 zip, streets
+  for (let n = 21; n <= 99; n++) if (n % 10) out.push({ key: `word:${numberWords(n).join(" ")}`, kind: "word", group: "Number words 21 to 99", label: numberWords(n).join(" "), text: numberWords(n).join(" ") });
+  out.push({ key: "word:unit", kind: "word", group: "Address words", label: "Word - unit", text: "unit" });
+  out.push({ key: "zip:10950", kind: "word", group: "Address words", label: "Zip - one zero nine five zero", text: "one zero nine five zero" });
+  for (const st of STREET_NAMES) out.push({ key: streetSlotKey(st), kind: "word", group: "Streets", label: `Street - ${st}`, text: st });
   // Town phrases (Abraham, Nov 22, 2026): one recording each
   for (const t of TOWN_PHRASES) out.push({ key: townSlotKey(t), kind: "word", group: "Town", label: `Town - ${t}`, text: t });
   // Keypad echo and the unit read-back (Abraham, Nov 22, 2026)

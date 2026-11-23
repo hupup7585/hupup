@@ -1,4 +1,5 @@
-import { numberWords } from "@/lib/spoken-words";
+import { numberWords, townSlotKey } from "@/lib/spoken-words";
+import { STREET_NAMES, streetSlotKey } from "@/lib/streets";
 
 /**
  * Address read-back rules (Abraham, Nov 22, 2026, approved):
@@ -49,3 +50,49 @@ export function spokenAddress(a: { house: string; street: string; unit?: string 
 }
 
 export const spokenName = (last: string, first: string) => [last.trim(), first.trim()].filter(Boolean).join(", ");
+
+/**
+ * The read-back joined from Hark's recordings (Abraham, Nov 22, 2026, 11:12 PM): the house number as an amount (21 to 99
+ * one recording each), the street, "unit" and its digits one by one (skipped when none), the town phrase(s), and the
+ * zip: 10950 is one recording, other zips digit by digit. Null when a street has no slot.
+ */
+export function addressSlotKeys(a: { house: string; street: string; unit?: string | null; town: string; zip: string; areaPrinted?: string | null }): string[] | null {
+  const h = splitHouse(a.house);
+  const unit = a.unit?.trim() || h.unit;
+  const n = Number(h.house);
+  if (!/^\d+$/.test(h.house) || !n) return null;
+  const street = STREET_NAMES.find((x) => x.toLowerCase() === a.street.trim().toLowerCase());
+  if (!street) return null;
+  const keys = [...amountSlots(n), streetSlotKey(street)];
+  if (unit) {
+    keys.push("word:unit");
+    if (/^(bsmt|basement)$/i.test(unit)) keys.push("word:basement");
+    else for (const c of unit.replace(/[^0-9A-Za-z]/g, "")) keys.push(/\d/.test(c) ? `word:${DIGIT[Number(c)]}` : `letter:${c.toLowerCase()}`);
+  }
+  if (a.areaPrinted && /blooming\s*grove/i.test(a.areaPrinted) && !/blooming\s*grove/i.test(a.town)) keys.push(townSlotKey("Blooming Grove"));
+  keys.push(townSlotKey(`${a.town.trim()} New York`));
+  const zip = a.zip.replace(/\D/g, "");
+  if (zip === "10950") keys.push("zip:10950");
+  else for (const d of zip) keys.push(`word:${DIGIT[Number(d)]}`);
+  return keys;
+}
+
+/** 279 -> two, hundred, seventy nine: the number clips, with 21 to 99 as one recording each. */
+export function amountSlots(n: number): string[] {
+  const out: string[] = [];
+  const two = (x: number) => {
+    if (!x) return;
+    if (x > 20 && x % 10) out.push(`word:${numberWords(x).join(" ")}`);
+    else out.push(...numberWords(x).map((w) => `word:${w}`));
+  };
+  if (n >= 1000) {
+    out.push(...amountSlots(Math.floor(n / 1000)), "word:thousand");
+    n %= 1000;
+  }
+  if (n >= 100) {
+    out.push(`word:${numberWords(Math.floor(n / 100))[0]}`, "word:hundred");
+    n %= 100;
+  }
+  two(n);
+  return out;
+}
