@@ -580,8 +580,10 @@ export async function customChargeMadeBy(fromNumber: string | null | undefined, 
  * Returns false when the call to Sola could not be started (the caller then gets the direct way, as before).
  */
 export const payQueueName = (callerSid: string) => `pay-${callerSid}`;
-export async function startPayLegWithMusic(input: { callerSid: string; number: string; attemptId: number; baseUrl: string }): Promise<boolean> {
+export async function startPayLegWithMusic(input: { callerSid: string; number: string; attemptId: number; baseUrl: string; redial?: boolean; waitMs?: number }): Promise<boolean> {
   try {
+    // A second call right after the first one can be dropped by Sola (Nov 23, 2026): a short wait first
+    if (input.waitMs) await new Promise((r) => setTimeout(r, input.waitMs));
     const { getTwilio } = await import("@/lib/twilio-client");
     const c = getTwilio();
     const from = process.env.TWILIO_PHONE_NUMBER;
@@ -591,7 +593,7 @@ export async function startPayLegWithMusic(input: { callerSid: string; number: s
       from,
       url: `${input.baseUrl}/api/voice/pay-leg?a=${input.attemptId}`,
       method: "POST",
-      statusCallback: `${input.baseUrl}/api/voice/pay-leg-status?a=${input.attemptId}`,
+      statusCallback: `${input.baseUrl}/api/voice/pay-leg-status?a=${input.attemptId}${input.redial ? "&r=1" : ""}`,
       statusCallbackMethod: "POST",
       statusCallbackEvent: ["completed"],
       timeout: 30,

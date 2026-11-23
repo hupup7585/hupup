@@ -53,7 +53,7 @@ import {
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { stripePhonePayMode, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
 import { blockIfTooManyCalls, isPhonePayBlocked, phonePayLimits, startPayWatch, startSolaListen } from "@/lib/phonepay-watch";
-import { PHONEPAY_NOT_REACHED, amountParts, buildSendDigits, checkPhonePayTry, customChargeMadeBy, endMainPayLeg, endPayLeg, matchCustomCharge, parseCustomAmount, payQueueName, phonePayDirectDial, phonePayOffered, startPayLegWithMusic, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
+import { PHONEPAY_NOT_REACHED, amountParts, buildSendDigits, checkPhonePayTry, customChargeMadeBy, endMainPayLeg, matchCustomCharge, parseCustomAmount, payQueueName, phonePayDirectDial, phonePayOffered, startPayLegWithMusic, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
@@ -3335,7 +3335,8 @@ const handlers: Record<string, Handler> = {
       sp(g, ctx, "pay_card_line");
       return back(vr, "phonepay-go", { o, c: 1 }); // no key: straight on to the payment line
     }
-    for (const a of earlier) await (a.payLegSid?.startsWith("CA") ? Promise.all([endPayLeg(a.payLegSid), endMainPayLeg(a.payLegSid)]) : null);
+    // Earlier Sola calls end on the main account (Nov 23, 2026: the subaccount gave Twilio error 21220)
+    for (const a of earlier) if (a.payLegSid?.startsWith("CA")) await endMainPayLeg(a.payLegSid);
     const n = earlier.length + 1;
     const limits = phonePayLimits(await getSettings());
     if (n > limits.triesPerCall) {
@@ -3378,7 +3379,8 @@ const handlers: Record<string, Handler> = {
     const digits = buildSendDigits(s.solaPhonePayDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: group.due, orderNumber: orderNumber(o) });
     // Music while connecting (Abraham, Nov 17, 2026): when songs are chosen for the payment line, the caller waits with
     // them while a separate call enters the merchant code and amount, then joins the caller to Sola
-    if ((await placeTracks("pay")).length && (await startPayLegWithMusic({ callerSid: ctx.callSid, number: s.solaPhonePayNumber, attemptId: attempt.id, baseUrl: config.baseUrl() }))) {
+    // A retry waits 3 seconds before calling Sola again (Nov 23, 2026: Sola dropped a call made right after the first)
+    if ((await placeTracks("pay")).length && (await startPayLegWithMusic({ callerSid: ctx.callSid, number: s.solaPhonePayNumber, attemptId: attempt.id, baseUrl: config.baseUrl(), waitMs: earlier.length && !process.env.VITEST ? 3000 : 0 }))) {
       vr.enqueue({ waitUrl: url("music", { place: "pay" }), waitUrlMethod: "POST", action: url("phonepay-done", { o, a: attempt.id }), method: "POST" }, payQueueName(ctx.callSid));
       return vr;
     }
@@ -3404,25 +3406,48 @@ const handlers: Record<string, Handler> = {
     if (s.solaListenOn) startSolaListen(vr, a, "inbound", s);
     vr.play({ digits }); // the key tones go to Sola only; the caller is still on hold with the music
     const dial = vr.dial({ record: "do-not-record", timeLimit: 900 });
-    dial.queue(payQueueName(attempt.callSid));
+    // The queue's url runs for the waiting caller right as the two calls join: that marks the try as joined
+    dial.queue({ url: url("pay-leg-joined", { a: attempt.id }), method: "POST" }, payQueueName(attempt.callSid));
     return vr;
   },
 
-  /** The call to Sola ended or never connected: if it never reached Sola, the waiting caller goes on (backup number). */
+  /** The call to Sola just joined the waiting caller (nothing is played). */
+  async "pay-leg-joined"(ctx, vr) {
+    const a = Number(ctx.query.get("a"));
+    if (a) await db.update(schema.phonepayAttempts).set({ bridgedAt: new Date() }).where(eq(schema.phonepayAttempts.id, a));
+    return vr;
+  },
+
+  /**
+   * The call to Sola ended (Abraham, Nov 23, 2026). If it never joined the waiting caller, the caller is moved right
+   * away: one redial after a short wait, then the backup number (Sola never answered) or the try-again menu. Main
+   * Twilio account only.
+   */
   async "pay-leg-status"(ctx, vr) {
     const a = Number(ctx.query.get("a"));
     const status = ctx.body.CallStatus ?? "";
-    if (a && PHONEPAY_NOT_REACHED.includes(status)) {
-      const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1);
-      if (attempt?.orderId) {
-        try {
-          const { getTwilio } = await import("@/lib/twilio-client");
-          await getTwilio()?.calls(attempt.callSid).update({ url: url("phonepay-done", { o: attempt.orderId, a, nr: 1 }), method: "POST" });
-        } catch {
-          /* the caller already left */
-        }
+    const [attempt] = a ? await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1) : [];
+    if (!attempt?.orderId || attempt.bridgedAt || attempt.endedAt || attempt.result) return vr;
+    const redialed = ctx.query.get("r") === "1";
+    const moveCaller = async (params: Record<string, string | number>) => {
+      try {
+        const { getTwilio } = await import("@/lib/twilio-client");
+        await getTwilio()?.calls(attempt.callSid).update({ url: url("phonepay-done", params), method: "POST" });
+      } catch {
+        /* the caller already left */
+      }
+    };
+    await track(attempt.callSid, "step", `Payment line call ended before joining the caller (${status || "no status"}${ctx.body.CallDuration ? `, ${ctx.body.CallDuration} seconds` : ""})${redialed ? " on the redial" : ""}`, { attempt: a });
+    if (!redialed) {
+      const s = await getSettings();
+      const ok = await startPayLegWithMusic({ callerSid: attempt.callSid, number: s.solaPhonePayNumber, attemptId: a, baseUrl: config.baseUrl(), redial: true, waitMs: process.env.VITEST ? 0 : 3000 });
+      if (ok) {
+        await track(attempt.callSid, "step", "Payment line: calling Sola again once", { attempt: a });
+        return vr;
       }
     }
+    // Sola never answered: the backup number (as before); answered but dropped: the try-again menu
+    await moveCaller(PHONEPAY_NOT_REACHED.includes(status) ? { o: attempt.orderId, a, nr: 1 } : { o: attempt.orderId, a });
     return vr;
   },
 

@@ -1514,6 +1514,8 @@ export const phonepayAttempts = pgTable(
     unclearRefs: text("unclear_refs"),
     /** Sola hang-up helper (Nov 18, 2026): when it hung up the call to Sola at the end of Sola's sentence */
     helperEndedAt: timestamp("helper_ended_at", { withTimezone: true }),
+    /** Music path (Nov 23, 2026): when the call to Sola joined the waiting caller (null = never joined) */
+    bridgedAt: timestamp("bridged_at", { withTimezone: true }),
   },
   (t) => [index("phonepay_attempts_started_idx").on(t.startedAt)],
 );

@@ -58,12 +58,42 @@ describe("payment line with music", () => {
     // the call to Sola: the key tones, then it joins the caller's queue
     const leg = await call("pay-leg", {}, `a=${a.id}`, "CAsola");
     expect(leg).toMatch(/<Play digits="w+4321#w+80000#w+1"\/>/);
-    expect(leg).toContain("<Queue>pay-CAcaller</Queue>");
+    expect(leg).toMatch(/<Queue url="https:\/\/hupup\.example\/api\/voice\/pay-leg-joined\?a=\d+" method="POST">pay-CAcaller<\/Queue>/);
     // the music the caller hears comes piece by piece
     expect(await call("music", {}, "place=pay")).toContain(`/api/music/music/${t.id}/0.wav`);
-    // Sola never answered: the waiting caller is moved on (backup number)
+    // Sola never answered: one redial first (Nov 23, 2026), then the waiting caller is moved on (backup number)
     await call("pay-leg-status", { CallStatus: "no-answer" }, `a=${a.id}`, "CAsola");
+    expect(h.created).toHaveLength(2);
+    expect(String(h.created[1].statusCallback)).toContain(`pay-leg-status?a=${a.id}&r=1`);
+    expect(h.updated).toHaveLength(0);
+    await call("pay-leg-status", { CallStatus: "no-answer" }, `a=${a.id}&r=1`, "CAsola");
     expect(h.updated[0]).toMatchObject({ sid: "CAcaller" });
     expect(String(h.updated[0].body.url)).toContain(`phonepay-done?o=${orderId}&a=${a.id}&nr=1`);
+  });
+  it("Nov 23, 2026 bug: the call to Sola ends after 7 seconds without joining: redial once, then the try-again menu right away", async () => {
+    h.updated.length = 0;
+    const x = await call("phonepay-go", {}, `o=${orderId}&c=1`);
+    expect(x).toContain("<Enqueue");
+    const a = (await db.select().from(schema.phonepayAttempts)).at(-1)!;
+    const before = h.created.length;
+    await call("pay-leg-status", { CallStatus: "completed", CallDuration: "7" }, `a=${a.id}`, "CAsola");
+    expect(h.created.length).toBe(before + 1); // the redial
+    expect(h.updated).toHaveLength(0);
+    await call("pay-leg-status", { CallStatus: "completed", CallDuration: "7" }, `a=${a.id}&r=1`, "CAsola");
+    expect(h.updated[0]).toMatchObject({ sid: "CAcaller" });
+    expect(String(h.updated[0].body.url)).toContain(`phonepay-done?o=${orderId}&a=${a.id}`);
+    expect(String(h.updated[0].body.url)).not.toContain("nr=1");
+  });
+  it("joined: nothing moves the caller when the call to Sola ends", async () => {
+    h.updated.length = 0;
+    await call("phonepay-go", {}, `o=${orderId}&c=1`);
+    const a = (await db.select().from(schema.phonepayAttempts)).at(-1)!;
+    await call("pay-leg-joined", {}, `a=${a.id}`, "CAcaller");
+    const before = h.created.length;
+    await call("pay-leg-status", { CallStatus: "completed", CallDuration: "95" }, `a=${a.id}`, "CAsola");
+    expect(h.created.length).toBe(before);
+    expect(h.updated).toHaveLength(0);
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).not.toMatch(/endPayLeg\(/); // main account only
   });
 });
