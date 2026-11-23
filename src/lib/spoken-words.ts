@@ -32,6 +32,8 @@ export function ordinalWords(n: number): string[] {
  * "1 4 3 8", "3:40 PM"). Null = some word has no slot (the line then stays in the live voice).
  */
 export function wordSlotsFor(value: string, items: { id: number; name: string }[] = []): string[] | null {
+  const town = townSlot(value);
+  if (town) return [town];
   const item = items.find((i) => i.name.trim().toLowerCase() === value.trim().toLowerCase());
   if (item) return [`item:${item.id}`];
   // "2 paddle boats": the number, then the plural name recording (Nov 19, 2026)
@@ -65,4 +67,13 @@ export function pluralName(name: string): string {
   if (/[^aeiou]y$/i.test(n)) return `${n.slice(0, -1)}ies`;
   if (/(x|ch|sh|z)$/i.test(n)) return `${n}es`;
   return `${n}s`;
+}
+
+/** Town phrases, one recording each (Abraham, Nov 22, 2026): read-back and step 7. Neighborhoods use their postal town. */
+export const TOWN_PHRASES = ["Monroe New York", "Highland Mills New York", "Chester New York", "Washingtonville New York", "Central Valley New York", "Harriman New York", "Blooming Grove"] as const;
+export const townSlotKey = (phrase: string) => `town:${phrase.toLowerCase().replace(/[^a-z]+/g, "_")}`;
+export function townSlot(value: string): string | null {
+  const v = value.trim().toLowerCase();
+  const t = TOWN_PHRASES.find((x) => x.toLowerCase() === v);
+  return t ? townSlotKey(t) : null;
 }

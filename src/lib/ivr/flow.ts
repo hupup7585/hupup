@@ -38,6 +38,7 @@ import { sendMessage } from "@/lib/sms";
 import { STEP_LABELS, track, trackStep } from "@/lib/call-journey";
 import { alertMissedCall } from "@/lib/owner-alerts";
 import { alertSharedPhoneOrder, isSharedPhone } from "@/lib/shared-phones";
+import { spokenAddress, townPhrase } from "@/lib/spoken-address";
 import { promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import {
@@ -435,7 +436,7 @@ function directionsActive(ctx: Ctx, env: Record<string, string | undefined> = pr
 }
 
 /** The address in steps (Abraham, Nov 17, 2026): on preview now; on the live line once every draft step is approved. */
-export const ADDRESS_STEP_DRAFTS: PromptKey[] = ["addr_house", "addr_unit", "addr_zip", "addr_zip_enter", "addr_zip_bad", "addr_outside", "addr_not_found", "addr_readback", "addr_price"];
+export const ADDRESS_STEP_DRAFTS: PromptKey[] = ["addr_house", "addr_unit", "addr_zip", "addr_zip_enter", "addr_zip_bad", "addr_outside", "addr_not_found", "addr_rb_intro", "addr_price"];
 function addrStepsActive(ctx: Ctx, env: Record<string, string | undefined> = process.env) {
   return env.VERCEL_ENV !== "production" || ADDRESS_STEP_DRAFTS.every((k) => !promptWaiting(ctx.prompts, k));
 }
@@ -2446,7 +2447,9 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("remove-choice"), lines.length > 9 ? { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS } : {});
     if (lines.length === 1) sp(g, ctx, "remove_count_one"); // "one, item" (Nov 22, 2026)
     else sp(g, ctx, "remove_count", { amount: lines.length });
-    lines.forEach((l, i) => sp(g, ctx, "remove_item", { item: l.name, key: i + 1 }));
+    // Abraham, Nov 22, 2026: the date only when the same item is in the cart for two different days
+    const twoDays = (l: CartLine) => new Set(lines.filter((x) => x.name === l.name).map((x) => x.date)).size > 1;
+    lines.forEach((l, i) => (twoDays(l) ? sp(g, ctx, "remove_item_date", { item: l.name, date: spokenDate(l.date), key: i + 1 }) : sp(g, ctx, "remove_item", { item: l.name, key: i + 1 })));
     backLine(g, ctx);
     return noInput(vr, ctx, "remove");
   },
@@ -2691,9 +2694,10 @@ const handlers: Record<string, Handler> = {
    * directions. Steps 2 to 7 are drafts: the whole flow runs on preview only until he approves them; the live line
    * keeps the one address question until then.
    */
+  // Nov 22, 2026 (Abraham): house number, street, unit, town and zip, read-back, delivery price
   addr(ctx, vr) {
     if (!addrStepsActive(ctx)) return back(vr, "ask", { f: "address" });
-    return back(vr, "ask", { f: "street" });
+    return back(vr, "addr-house");
   },
 
   // Address steps 2 to 4 (Abraham, Nov 22, 2026, final): keypad only, the shared pound line, then the shared star line
@@ -2706,14 +2710,14 @@ const handlers: Record<string, Handler> = {
   },
 
   async "addr-house-heard"(ctx, vr) {
-    if ((ctx.body.Digits || "").includes("*")) return back(vr, "ask", { f: "street" }); // star: one step back
+    if ((ctx.body.Digits || "").includes("*")) return back(vr, "ask", { f: "name" }); // star: one step back, the name
     const digits = (ctx.body.Digits || "").replace(/\D/g, "");
     if (!/^[0-9]{1,6}$/.test(digits) || /^0+$/.test(digits)) {
       sp(vr, ctx, "not_valid");
       return back(vr, "addr-house");
     }
     await updateSession(ctx.callSid, { data: { house: digits } }, ctx.session);
-    return back(vr, "addr-unit");
+    return back(vr, "ask", { f: "street" }); // step 2: the street name
   },
 
   /** Step 3: the unit number on the keypad; pound with nothing typed = no unit. */
@@ -2728,7 +2732,7 @@ const handlers: Record<string, Handler> = {
 
   async "addr-unit-heard"(ctx, vr) {
     const raw = ctx.body.Digits || "";
-    if (raw.includes("*")) return back(vr, "addr-house"); // star: one step back
+    if (raw.includes("*")) return back(vr, "ask", { f: "street" }); // star: one step back
     const unit = raw.replace(/\D/g, "");
     await updateSession(ctx.callSid, { data: { unit: unit || undefined } }, ctx.session);
     return back(vr, "addr-zip");
@@ -2769,7 +2773,7 @@ const handlers: Record<string, Handler> = {
   /** Step 5: the town from the zip (Orange County only), then the delivery map (the street decides the price). */
   async "addr-check"(ctx, vr) {
     const data = ctx.session?.data ?? {};
-    if (!data.street || !data.house) return back(vr, "ask", { f: "street" });
+    if (!data.street || !data.house) return back(vr, "addr-house");
     const zip = data.zip ?? DEFAULT_ZIP;
     const town = townForZip(zip);
     if (!town) return back(vr, "addr-outside");
@@ -2779,14 +2783,12 @@ const handlers: Record<string, Handler> = {
     if (!quote.ok && quote.reason === "not_found") {
       await updateSession(ctx.callSid, { data: { street: undefined, house: undefined, unit: undefined } }, ctx.session);
       spPreviewDraft(vr, ctx, "addr_not_found");
-      return back(vr, "ask", { f: "street" });
+      return back(vr, "addr-house");
     }
     if (!quote.ok) return back(vr, "addr-outside");
-    // Kiryas Joel streets (the Kiryas Joel zone on the delivery map) are read back and saved as Kiryas Joel, not
-    // Monroe (Abraham, Nov 17, 2026); the zip alone can't tell, 10950 covers both
-    const kj = zip === DEFAULT_ZIP && quote.kind === "local";
-    const placeTown = kj ? "Kiryas Joel" : town;
-    const placeAddress = kj ? address.replace(`, ${town}, NY`, ", Kiryas Joel, NY") : address;
+    // The postal town always (Abraham, Nov 22, 2026: the Kiryas Joel idea was withdrawn)
+    const placeTown = town;
+    const placeAddress = address;
     await updateSession(ctx.callSid, { data: { address: placeAddress, town: placeTown, zip } }, ctx.session);
     await track(ctx.callSid, "said", `Address: ${placeAddress} (${quote.zone}, ${money(quote.feeCents)})`, { field: "address", value: placeAddress });
     return back(vr, "addr-readback");
@@ -2807,40 +2809,46 @@ const handlers: Record<string, Handler> = {
     return back(vr, "addr-outside");
   },
 
-  /** Step 6: "Thanks! I have 1 2 Forest Road, Monroe, New York, 1 0 9 5 0. If that is correct, press 1..." */
+  /**
+   * Step 6 (Abraham, Nov 22, 2026, final): "Here is the address you entered." {house} {street}, unit {unit}, {town}
+   * New York, {zip}. "If that is correct, press 1." "To enter the address again, press 2." Then the star line.
+   */
   "addr-readback"(ctx, vr) {
     const d = ctx.session?.data ?? {};
-    if (!d.address || !d.house || !d.street || !d.zip || !d.town) return back(vr, "ask", { f: "street" });
-    const template = lineTemplate(ctx, "addr_readback");
-    const text = fill(d.unit ? template : template.replace(/,\s*\{unit\}/, ""), { house: spokenDigits(d.house), street: d.street, unit: d.unit ?? "", town: d.town, zip: spokenDigits(d.zip) });
+    if (!d.address || !d.house || !d.street || !d.zip || !d.town) return back(vr, "addr-house");
     const g = keypad(vr, url("addr-readback-choice"));
-    say(g, text);
+    sp(g, ctx, "addr_rb_intro");
+    sp(g, ctx, "addr_rb_address", { address: spokenAddress({ house: d.house, street: d.street, unit: d.unit ?? null, town: d.town, zip: d.zip }) });
+    sp(g, ctx, "addr_rb_correct");
+    sp(g, ctx, "addr_rb_again");
+    backLine(g, ctx);
     return repeatMenu(vr, ctx, "addr-readback");
   },
 
   async "addr-readback-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "addr-price");
+    if (d === "*") return back(vr, "addr-zip"); // star: one step back
     if (d === "2") {
       await updateSession(ctx.callSid, { data: { address: undefined, street: undefined, house: undefined, unit: undefined, zip: undefined, town: undefined } }, ctx.session);
-      return back(vr, "ask", { f: "street" });
+      return back(vr, "addr-house"); // the address again, from the house number
     }
     sp(vr, ctx, "not_valid");
     return back(vr, "addr-readback");
   },
 
-  /** Step 7: "Thanks! Delivery to Monroe, New York, is 10 dollars." Then the directions (box 34). */
+  /** Step 7 (Abraham, Nov 22, 2026, final): "Delivery to {town} New York is {price}." then the saved line, then box 34. */
   async "addr-price"(ctx, vr) {
     const d = ctx.session?.data ?? {};
-    if (!d.address || !d.town) return back(vr, "ask", { f: "street" });
+    if (!d.address || !d.town) return back(vr, "addr-house");
     const settings = await getSettings();
     const first = (await callOrders(ctx))[0]?.order;
     const quote = await deliveryQuote(d.address, settings, fetch, first?.eventDate ?? new Date());
     if (quote.ok) {
       const cents = quote.kind ? deliveryFeeFor(quote.kind, settings, first?.eventDate ?? todayISO(), first?.offerNote ?? null) : quote.feeCents;
-      const price = cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2);
-      spPreviewDraft(vr, ctx, "addr_price", { town: d.town, price });
+      sp(vr, ctx, "addr_price", { town: townPhrase(d.town), price: spokenMoney(cents) });
     }
+    sp(vr, ctx, "addr_saved");
     return back(vr, "directions");
   },
 
@@ -4121,7 +4129,7 @@ const FIELDS: Record<
     hints: "Forest Road, Garfield Road, Bakertown Road, Mountain Road, Acres Road, Quickway Road, Seven Springs Road, Schunnemunk Road, Larkin Drive, Satmar Drive, Van Buren Drive",
     normalize: (s) => titleCase(s.replace(/[.,!?;:]+$/g, "").trim()) || null,
     readBack: (v) => v,
-    next: "addr-house",
+    next: "addr-unit",
   },
   unit: {
     prompt: "addr_unit",

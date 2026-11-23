@@ -44,63 +44,52 @@ beforeEach(() => {
 });
 
 describe("the approved lines", () => {
-  it("step 1 and the retry line, word for word", () => {
-    expect(PROMPTS.addr_street.text).toBe("Thanks! Please say the street name of the delivery address after the tone. Or press star to type it on your keypad.");
+  it("step 2 and the retry line, word for word", () => {
+    expect(PROMPTS.addr_street.text).toBe("Please say the street name of the delivery address after the tone."); // Nov 22, 2026
     expect(PROMPTS.retry_spoken.text).toBe("Sorry, we did not catch that. Please try again.");
   });
 });
 
-describe("address in steps (preview)", () => {
-  it("step 1: the street line, then the tone; not understood: only the retry line, then the tone", async () => {
-    expect(redirect(await call("addr"))).toBe("ask?f=street");
-    const ask = await call("ask", {}, "f=street");
-    expect(said(ask)).toEqual([PROMPTS.addr_street.text]);
-    expect(ask).toContain("/audio/tone.wav</Play></Gather>");
-    expect(redirect(await call("heard", { SpeechResult: "" }, "f=street"))).toBe("ask?f=street&n=1");
-    const again = await call("ask", {}, "f=street&n=1");
-    expect(said(again)).toEqual(["Sorry, I did not catch that. Let's try again."]); // the one shared did-not-catch line (Nov 22, 2026)
-    expect(again).toContain("/audio/tone.wav");
-    expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("type?f=street");
-  });
-  it("the whole address, read back, then the price, then the directions", async () => {
-    expect(redirect(await call("heard", { SpeechResult: "forest road" }, "f=street"))).toBe("addr-house");
-    expect(h.session.data.street).toBe("Forest Road");
-    // Steps 2 to 4 final (Abraham, Nov 22, 2026): keypad, the shared pound line, the shared star line
+describe("address in steps (preview), the Nov 22, 2026 order", () => {
+  it("house number, street, unit, town and zip, read-back, delivery price, saved, then the directions", async () => {
+    expect(redirect(await call("addr"))).toBe("addr-house");
     expect(said(await call("addr-house"))).toEqual(["Now, with your keypad, please enter the house number.", "When you are done, press pound.", "To go back, press star."]);
-    expect(redirect(await call("addr-house-heard", { Digits: "12" }))).toBe("addr-unit");
+    expect(redirect(await call("addr-house-heard", { Digits: "*" }))).toBe("ask?f=name");
+    expect(redirect(await call("addr-house-heard", { Digits: "12" }))).toBe("ask?f=street");
+    const ask = await call("ask", {}, "f=street");
+    expect(said(ask)).toEqual(["Please say the street name of the delivery address after the tone."]);
+    expect(ask).toContain("/audio/tone.wav</Play></Gather>");
+    expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("type?f=street"); // the keypad path
+    expect(redirect(await call("heard", { SpeechResult: "" }, "f=street"))).toBe("ask?f=street&n=1");
+    expect(said(await call("ask", {}, "f=street&n=1"))).toEqual(["Sorry, I did not catch that. Let's try again."]);
+    expect(redirect(await call("heard", { SpeechResult: "forest road" }, "f=street"))).toBe("addr-unit");
+    expect(h.session.data.street).toBe("Forest Road");
     expect(said(await call("addr-unit"))).toEqual(["Thanks, with your keypad, please enter the unit number.", "When you are done, press pound.", "If there is no unit number, press pound to skip.", "To go back, press star."]);
+    expect(redirect(await call("addr-unit-heard", { Digits: "*" }))).toBe("ask?f=street");
     expect(redirect(await call("addr-unit-heard", { Digits: "" }))).toBe("addr-zip"); // pound with nothing typed: no unit
     expect(h.session.data.unit).toBeUndefined();
-    expect(redirect(await call("addr-unit-heard", { Digits: "*" }))).toBe("addr-house");
-    expect(redirect(await call("addr-house-heard", { Digits: "*" }))).toBe("ask?f=street");
     expect(said(await call("addr-zip"))).toEqual(["To continue with Monroe, New York, one zero nine five zero, press 1. To enter a different zip code, press 2.", "To go back, press star."]);
     expect(redirect(await call("addr-zip-choice", { Digits: "*" }))).toBe("addr-unit");
     expect(redirect(await call("addr-zip-choice", { Digits: "1" }))).toBe("addr-check");
     expect(redirect(await call("addr-check"))).toBe("addr-readback");
-    // A Kiryas Joel street (the $10 zone): read back and saved as Kiryas Joel (Abraham, Nov 17, 2026)
-    expect(h.session.data.address).toBe("12 Forest Road, Kiryas Joel, NY 10950");
-    const rb = said(await call("addr-readback"));
-    expect(rb).toEqual(["Thanks! I have 1 2 Forest Road, Kiryas Joel, New York, 1 0 9 5 0. If that is correct, press 1. To enter the address again, press 2."]);
+    expect(h.session.data.address).toBe("12 Forest Road, Monroe, NY 10950"); // the postal town (the Kiryas Joel idea was withdrawn)
+    expect(said(await call("addr-readback"))).toEqual(["Here is the address you entered.", "twelve Forest Road, Monroe New York, one zero nine five zero.", "If that is correct, press 1.", "To enter the address again, press 2.", "To go back, press star."]);
+    expect(redirect(await call("addr-readback-choice", { Digits: "*" }))).toBe("addr-zip");
     expect(redirect(await call("addr-readback-choice", { Digits: "1" }))).toBe("addr-price");
     const price = await call("addr-price");
-    expect(said(price)).toEqual(["Thanks! Delivery to Kiryas Joel, New York, is 10 dollars."]);
+    expect(said(price)).toEqual(["Delivery to Monroe New York is 10 dollars.", "Thank you. Your delivery address has been saved."]);
     expect(redirect(price)).toBe("directions");
+    expect(redirect(await call("addr-readback-choice", { Digits: "2" }))).toBe("addr-house");
+    expect(h.session.data.house).toBeUndefined();
   });
-  it("a 10950 street outside Kiryas Joel stays Monroe", async () => {
-    Object.assign(h.session.data, { street: "Lakes Road", house: "40", unit: undefined, zip: "10950" });
-    h.quote = { ok: true, zone: "Blooming grove", feeCents: 1500, kind: "area" };
-    await call("addr-check");
-    expect(h.session.data.town).toBe("Monroe");
-    expect(h.session.data.address).toBe("40 Lakes Road, Monroe, NY 10950");
-  });
-  it("a unit is read back; another zip fills its town; not 5 digits asks again", async () => {
-    Object.assign(h.session.data, { street: "Main Street", house: "5", unit: "B" });
+  it("a unit is read digit by digit; another zip fills its town; not 5 digits asks again", async () => {
+    Object.assign(h.session.data, { street: "Main Street", house: "53", unit: "302A" });
     expect(redirect(await call("addr-zip-heard", { Digits: "123" }))).toBe("addr-zip-enter?bad=1");
     expect(said(await call("addr-zip-enter", {}, "bad=1"))).toEqual([PROMPTS.addr_zip_bad.text]);
     expect(redirect(await call("addr-zip-heard", { Digits: "10924" }))).toBe("addr-check");
     await call("addr-check");
     expect(h.session.data.town).toBe("Goshen");
-    expect(said(await call("addr-readback"))[0]).toBe("Thanks! I have 5 Main Street, B, Goshen, New York, 1 0 9 2 4. If that is correct, press 1. To enter the address again, press 2.");
+    expect(said(await call("addr-readback"))[1]).toBe("fifty three Main Street, unit three zero two A, Goshen New York, one zero nine two four.");
   });
   it("step 5: a zip outside Orange County, and an address not on the map", async () => {
     Object.assign(h.session.data, { street: "Main Street", house: "5", unit: undefined, zip: "10001" });
@@ -113,10 +102,19 @@ describe("address in steps (preview)", () => {
     h.quote = { ok: false, reason: "not_found" };
     const nf = await call("addr-check");
     expect(said(nf)).toEqual(["We are sorry, we could not find that address. Let us try again."]);
-    expect(redirect(nf)).toBe("ask?f=street");
+    expect(redirect(nf)).toBe("addr-house");
   });
   it("the live line keeps the one address question until the drafts are approved", async () => {
     process.env.VERCEL_ENV = "production";
     expect(redirect(await call("addr"))).toBe("ask?f=address");
+  });
+  it("town slots: one per phrase; step 7 plays the town recording", async () => {
+    const { allSlots } = await import("@/lib/recording-slots");
+    const towns = allSlots().filter((x) => x.group === "Town").map((x) => x.text);
+    expect(towns).toEqual(["Monroe New York", "Highland Mills New York", "Chester New York", "Washingtonville New York", "Central Valley New York", "Harriman New York", "Blooming Grove"]);
+    const { wordSlotsFor } = await import("@/lib/spoken-words");
+    expect(wordSlotsFor("Monroe New York")).toEqual(["town:monroe_new_york"]);
+    const keys = allSlots().map((x) => x.key);
+    for (const k of ["addr_rb_intro", "addr_rb_again", "addr_rb_correct", "addr_price#1", "addr_price#2", "addr_saved"]) expect(keys, k).toContain(k);
   });
 });

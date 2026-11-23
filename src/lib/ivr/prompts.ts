@@ -272,6 +272,7 @@ export const PROMPTS = {
   remove_count_one: { group: "Cart", label: "Remove an item: one item in the cart (You have in your cart, then the shared piece one, item)", text: "You have in your cart one, item.", parts: ["remove_count#1", "piece:one_item"] },
   remove_count: { group: "Cart", label: "Remove an item: how many items", text: "You have in your cart {amount} items.", vars: ["amount"] },
   remove_item: { group: "Cart", label: "Remove an item: one line per item", text: "To remove the {item}, press {key}.", vars: ["item", "key"] },
+  remove_item_date: { group: "Cart", label: "Remove an item: the same item on two days (with its date)", text: "To remove {item} for {date}, press {key}.", vars: ["item", "date", "key"] },
   remove_qty: { group: "Cart", label: "Remove an item: more than one of it", text: "You have {qty} {item}.", vars: ["qty", "item"] },
   remove_enter: { group: "Cart", label: "Remove an item: how many to remove", text: "Using your keypad, please enter the amount you would like to remove." },
   removed: { group: "Cart", label: "Item removed", text: "Successfully removed from your cart: {qty} {item} for {date}.", vars: ["qty", "item", "date"] },
@@ -284,9 +285,9 @@ export const PROMPTS = {
   ask_address: { group: "Checkout", label: "Ask for address", text: "Thanks! Now please say the delivery address, with the house number, street, and town." },
   // Delivery address in steps (Abraham, Nov 17, 2026; replaces the single address question, box 32). Step 1 and the
   // retry line are approved; steps 2 to 7 are drafts: the steps run on preview only until he approves them.
-  addr_street: { group: "Checkout", label: "Address step 1: street name (approved)", text: "Thanks! Please say the street name of the delivery address after the tone. Or press star to type it on your keypad." },
+  addr_street: { group: "Checkout", label: "Address step 2 - street name (say it after the tone, or star to type it)", text: "Please say the street name of the delivery address after the tone." },
   retry_spoken: { group: "Checkout", label: "Any spoken answer not understood (approved; the step's own line is not repeated)", text: "Sorry, we did not catch that. Please try again." },
-  addr_house: { group: "Checkout", label: "Address step 2 - house number", text: "Now, with your keypad, please enter the house number." },
+  addr_house: { group: "Checkout", label: "Address step 1 - house number", text: "Now, with your keypad, please enter the house number." },
   pound_done: { group: "Checkout", label: "Shared - When you are done, press pound", text: "When you are done, press pound." },
   addr_unit: { group: "Checkout", label: "Address step 3 - unit number", text: "Thanks, with your keypad, please enter the unit number." },
   addr_unit_skip: { group: "Checkout", label: "Address step 3 - no unit, press pound to skip", text: "If there is no unit number, press pound to skip." },
@@ -295,8 +296,13 @@ export const PROMPTS = {
   addr_zip_bad: { group: "Checkout", label: "Address step 4: not 5 digits (draft)", text: "We are sorry, that is not a valid zip code. Please enter the 5-digit zip code again. When you are finished, please press pound.", pending: true },
   addr_outside: { group: "Checkout", label: "Address step 5 - outside service area", text: "We are sorry, we do not deliver to this area. We deliver only in Orange County, New York. To enter a different zip code, press 1." },
   addr_not_found: { group: "Checkout", label: "Address step 5: not found on the map, back to step 1 (draft)", text: "We are sorry, we could not find that address. Let us try again.", pending: true },
-  addr_readback: { group: "Checkout", label: "Address step 6: read-back (draft; the unit part is left out when there is none)", text: "Thanks! I have {house} {street}, {unit}, {town}, New York, {zip}. If that is correct, press 1. To enter the address again, press 2.", vars: ["house", "street", "unit", "town", "zip"], pending: true },
-  addr_price: { group: "Checkout", label: "Address step 7: delivery price (draft)", text: "Thanks! Delivery to {town}, New York, is {price} dollars.", vars: ["town", "price"], pending: true },
+  // Step 6 (Abraham, Nov 22, 2026, final): the address is read live between the recorded lines
+  addr_rb_intro: { group: "Checkout", label: "Address step 6 - Here is the address you entered", text: "Here is the address you entered." },
+  addr_rb_address: { group: "Checkout", label: "Address step 6 - the address (live: house, street, unit, town New York, zip)", text: "{address}.", vars: ["address"] },
+  addr_rb_correct: { group: "Checkout", label: "Address step 6 - If that is correct, press 1", text: "If that is correct, press 1." },
+  addr_rb_again: { group: "Checkout", label: "Address step 6 - To enter the address again, press 2", text: "To enter the address again, press 2." },
+  addr_price: { group: "Checkout", label: "Step 7 - Delivery to {town} is {price}", text: "Delivery to {town} is {price}.", vars: ["town", "price"] },
+  addr_saved: { group: "Checkout", label: "Step 7 - Thank you. Your delivery address has been saved.", text: "Thank you. Your delivery address has been saved." },
   // Abraham, Nov 15, 2026: optional directions for the driver after the address (drafts for his OK)
   ask_directions: { group: "Checkout", label: "Ask for delivery directions (optional)", text: "Is there anything our delivery team should know, like a gate code, where to park, or where to set up? Please say it now.", pending: true },
   directions_saved: { group: "Checkout", label: "Delivery directions saved", text: "Thank you, we saved that for our delivery team.", pending: true },
@@ -555,7 +561,7 @@ export const PROMPTS = {
 } satisfies Record<string, PromptDef>;
 
 /** Old lines no longer played anywhere (kept so nothing is lost; shown as "Not used"). */
-export const RETIRED_PROMPTS = new Set<string>(["resume_added", "instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_heard", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard"]);
+export const RETIRED_PROMPTS = new Set<string>(["addr_readback", "resume_added", "instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_heard", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard"]);
 
 /** The extension (or part of the call) each group of lines belongs to, for the Admin filter. New groups fall into "Other". */
 export const PROMPT_AREAS: Record<string, string> = {

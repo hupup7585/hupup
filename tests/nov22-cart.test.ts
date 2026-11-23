@@ -76,7 +76,7 @@ describe("the cart (Nov 19 and 22, 2026)", () => {
   it("key 3: the count, one line per item, star; one of it goes at once, then the updated cart", async () => {
     const [a] = await freshCart();
     const lines = said(await call("remove"));
-    expect(lines).toEqual(["You have in your cart 3 items.", "To remove the Castle Combo, press 1.", "To remove the paddle boat, press 2.", "To remove the Castle Combo, press 3.", "To go back, press star."]);
+    expect(lines).toEqual(["You have in your cart 3 items.", "To remove Castle Combo for Tuesday, December twenty-second, press 1.", "To remove the paddle boat, press 2.", "To remove Castle Combo for Wednesday, December twenty-third, press 3.", "To go back, press star."]);
     expect(redirect(await call("remove-choice", { Digits: "*" }))).toBe("cart");
     const r = await call("remove-choice", { Digits: "1" });
     expect(said(r)).toEqual(["Successfully removed from your cart: 1 Castle Combo for Tuesday, December twenty-second."]);

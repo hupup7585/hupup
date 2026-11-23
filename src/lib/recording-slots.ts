@@ -1,5 +1,5 @@
 import { PIECE_ALIAS, PROMPTS, SHARED_PIECES, promptRecordable, type PromptDef, type PromptKey } from "@/lib/ivr/prompts";
-import { LETTERS, WORDS, pluralName } from "@/lib/spoken-words";
+import { LETTERS, TOWN_PHRASES, WORDS, pluralName, townSlotKey } from "@/lib/spoken-words";
 export { LETTERS, WORDS, numberWords, ordinalWords, wordSlotsFor } from "@/lib/spoken-words";
 
 /**
@@ -59,6 +59,8 @@ export function allSlots(items: { id: number; name: string }[] = [], texts: Reco
   for (const w of NUMBER_CLIPS) out.push({ key: `word:${w.toLowerCase()}`, kind: "word", group: "Number clips (live numbers, item digits, prices)", label: w, text: w });
   for (const w of WORDS) if (!clips.has(w.toLowerCase())) out.push({ key: `word:${w.toLowerCase()}`, kind: "word", group: "Dates and times", label: w, text: w });
   for (const l of LETTERS) out.push({ key: `letter:${l.toLowerCase()}`, kind: "letter", group: "Letters A to Z", label: `Letter ${l}`, text: l });
+  // Town phrases (Abraham, Nov 22, 2026): one recording each
+  for (const t of TOWN_PHRASES) out.push({ key: townSlotKey(t), kind: "word", group: "Town", label: `Town - ${t}`, text: t });
   // Keypad echo and the unit read-back (Abraham, Nov 22, 2026)
   for (const [w, label] of KEYPAD_WORDS) out.push({ key: `word:${w}`, kind: "word", group: "Letters A to Z", label, text: `${w}.` });
   // Each rental name twice (Abraham, Nov 19, 2026): for 1, and for 2 or more
