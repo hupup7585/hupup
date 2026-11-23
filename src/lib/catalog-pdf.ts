@@ -40,7 +40,7 @@ export async function catalogPdfBytes(fileId: number): Promise<Buffer | null> {
 
 /** The public link the "View the catalog" button opens (src/app/catalog/[file]/route.ts). */
 export const catalogPdfUrl = (baseUrl: string, fileId: number) => `${baseUrl.replace(/\/$/, "")}/catalog/${fileId}.pdf`;
-export const CATALOG_BUTTON_LABEL = "View the catalog"; // Abraham, Nov 23, 2026, exact text
+export const CATALOG_BUTTON_LABEL = "View our catalog"; // Abraham, Nov 23, 2026, exact text (changed from "View the catalog")
 
 /** Always the public website (preview and live share one database, so a test email from preview opens the same file). */
 export const PUBLIC_SITE_URL = "https://hupupattractions.com";

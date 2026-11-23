@@ -30,7 +30,7 @@ beforeAll(async () => {
 
 describe("View the catalog button", () => {
   it("sits inside the box (between the message and the signature), exact text, a public link", () => {
-    expect(CATALOG_BUTTON_LABEL).toBe("View the catalog");
+    expect(CATALOG_BUTTON_LABEL).toBe("View our catalog");
     const url = catalogPdfUrl("https://hupupattractions.com/", 7);
     expect(url).toBe("https://hupupattractions.com/catalog/7.pdf");
     const e = brandedEmail("Dear valued customer,\n\nFind our catalog attached.", { baseUrl: "https://hupupattractions.com", button: { label: CATALOG_BUTTON_LABEL, url } });
@@ -40,10 +40,12 @@ describe("View the catalog button", () => {
     expect(body).toBeGreaterThan(0);
     expect(button).toBeGreaterThan(body);
     expect(signature).toBeGreaterThan(button);
-    expect(e.html).toMatch(/<a href="https:\/\/hupupattractions\.com\/catalog\/7\.pdf" target="_blank"[^>]*>View the catalog<\/a>/);
+    expect(e.html).toMatch(/<a href="https:\/\/hupupattractions\.com\/catalog\/7\.pdf" target="_blank"[^>]*>View our catalog<\/a>/);
     expect(e.html.indexOf("</table>\n</td></tr></table>")).toBeGreaterThan(button); // inside the card
-    expect(e.text).toContain("View the catalog: https://hupupattractions.com/catalog/7.pdf");
-    expect(brandedEmail("Hello", { baseUrl: "https://x" }).html).not.toContain("View the catalog"); // other emails: no button
+    expect(e.html).toMatch(/align="center"[^>]*><table role="presentation" align="center"/); // centered
+    expect(e.html).toContain("border-radius:12px"); // round corners
+    expect(e.text).toContain("View our catalog: https://hupupattractions.com/catalog/7.pdf");
+    expect(brandedEmail("Hello", { baseUrl: "https://x" }).html).not.toContain("View our catalog"); // other emails: no button
   });
 
   it("the PDF opens in the browser with no sign-in; unknown files are not found", async () => {
@@ -59,10 +61,10 @@ describe("View the catalog button", () => {
   it("the automatic catalog email and Compose > Add our catalog both carry the button and the attachment", async () => {
     const { sendCatalogEmail } = await import("@/lib/catalog-send");
     await sendCatalogEmail("hupupattractions@gmail.com");
-    expect(h.emails[0]).toMatchObject({ to: "hupupattractions@gmail.com", subject: "Chanukah Catalog 2026 - Hup Up Attractions", files: ["Chanukah Catalog 2026.pdf"], button: { label: "View the catalog", url: `https://hupupattractions.com/catalog/${fileId}.pdf` } });
+    expect(h.emails[0]).toMatchObject({ to: "hupupattractions@gmail.com", subject: "Chanukah Catalog 2026 - Hup Up Attractions", files: ["Chanukah Catalog 2026.pdf"], button: { label: "View our catalog", url: `https://hupupattractions.com/catalog/${fileId}.pdf` } });
     const { sendNewEmail } = await import("@/lib/inbox");
     await sendNewEmail({ to: "hupupattractions@gmail.com", subject: "Chanukah Catalog 2026", body: "Here it is.", fileIds: [], userId: null, attachCatalog: true });
-    expect(h.emails[1]).toMatchObject({ files: ["Chanukah Catalog 2026.pdf"], button: { label: "View the catalog" } });
+    expect(h.emails[1]).toMatchObject({ files: ["Chanukah Catalog 2026.pdf"], button: { label: "View our catalog" } });
     await sendNewEmail({ to: "hupupattractions@gmail.com", subject: "Hello", body: "No catalog.", fileIds: [], userId: null });
     expect(h.emails[2].button).toBeNull();
   });
