@@ -2972,17 +2972,21 @@ const handlers: Record<string, Handler> = {
    * Step 6 (Abraham, Nov 22, 2026, final): "Here is the address you entered." {house} {street}, unit {unit}, {town}
    * New York, {zip}. "If that is correct, press 1." "To enter the address again, press 2." Then the star line.
    */
-  "addr-readback"(ctx, vr) {
+  async "addr-readback"(ctx, vr) {
     const d = ctx.session?.data ?? {};
     if (!d.address || !d.house || !d.street || !d.zip || !d.town) return back(vr, "addr-house");
     const g = keypad(vr, url("addr-readback-choice"));
     sp(g, ctx, "addr_rb_intro");
     // Joined from Hark's recordings part by part (Nov 23, 2026): a part with a live recording plays it, else Puck says it
-    for (const part of addressParts({ house: d.house, street: d.street, unit: d.unit ?? null, town: d.town, zip: d.zip })) {
+    const heard: string[] = [];
+    for (const part of addressParts({ house: d.house, street: d.street, unit: d.unit ?? null, town: d.town, zip: d.zip, areaPrinted: d.dirArea ?? null })) {
       const urls = part.options.map((keys) => clipUrls(ctx.prompts, keys)).find(Boolean);
       if (urls) urls.forEach((u) => g.play(u));
       else say(g, part.text);
+      heard.push(`${part.text} (${urls ? "recording" : "Puck"})`);
     }
+    // In the call log: each part and whether it played from a recording or Puck (for the test calls)
+    await track(ctx.callSid, "step", `Read-back: ${heard.join(", ")}`);
     sp(g, ctx, "addr_rb_correct");
     sp(g, ctx, "addr_rb_again");
     backLine(g, ctx);
