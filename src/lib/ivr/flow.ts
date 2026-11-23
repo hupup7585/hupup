@@ -38,7 +38,7 @@ import { sendMessage } from "@/lib/sms";
 import { STEP_LABELS, track, trackStep } from "@/lib/call-journey";
 import { alertMissedCall } from "@/lib/owner-alerts";
 import { alertSharedPhoneOrder, isSharedPhone } from "@/lib/shared-phones";
-import { addressSlotKeys, spokenAddress, townPhrase } from "@/lib/spoken-address";
+import { addressParts, townPhrase } from "@/lib/spoken-address";
 import { promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import {
@@ -2921,12 +2921,12 @@ const handlers: Record<string, Handler> = {
     if (!d.address || !d.house || !d.street || !d.zip || !d.town) return back(vr, "addr-house");
     const g = keypad(vr, url("addr-readback-choice"));
     sp(g, ctx, "addr_rb_intro");
-    // Joined from Hark's recordings when every part is recorded (Nov 22, 2026, 11:12 PM), else the computer voice
-    const parts = { house: d.house, street: d.street, unit: d.unit ?? null, town: d.town, zip: d.zip };
-    const keys = addressSlotKeys(parts);
-    const joined = keys ? clipUrls(ctx.prompts, keys) : null;
-    if (joined) joined.forEach((u) => g.play(u));
-    else sp(g, ctx, "addr_rb_address", { address: spokenAddress(parts) });
+    // Joined from Hark's recordings part by part (Nov 23, 2026): a part with a live recording plays it, else Puck says it
+    for (const part of addressParts({ house: d.house, street: d.street, unit: d.unit ?? null, town: d.town, zip: d.zip })) {
+      const urls = part.options.map((keys) => clipUrls(ctx.prompts, keys)).find(Boolean);
+      if (urls) urls.forEach((u) => g.play(u));
+      else say(g, part.text);
+    }
     sp(g, ctx, "addr_rb_correct");
     sp(g, ctx, "addr_rb_again");
     backLine(g, ctx);

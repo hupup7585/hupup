@@ -97,3 +97,30 @@ export function amountSlots(n: number): string[] {
   two(n);
   return out;
 }
+
+/**
+ * The read-back part by part (Abraham, Nov 23, 2026): each part plays the first of its recordings that is live
+ * (options in order), else Puck says that part. Lookup keys added in Admin (any street, unit or zip) are found too.
+ */
+export type AddressPart = { options: string[][]; text: string };
+export function addressParts(a: { house: string; street: string; unit?: string | null; town: string; zip: string; areaPrinted?: string | null }): AddressPart[] {
+  const h = splitHouse(a.house);
+  const unit = a.unit?.trim() || h.unit;
+  const n = Number(h.house);
+  const parts: AddressPart[] = [];
+  parts.push({ options: /^\d+$/.test(h.house) && n ? [amountSlots(n)] : [], text: houseWords(h.house) });
+  const listed = findStreet(a.street);
+  const spoken = listed?.spoken ?? a.street.trim();
+  parts.push({ options: [[streetSlotKey(spoken)], ...(listed ? [] : [[streetSlotKey(a.street)]])], text: spoken });
+  if (unit) {
+    parts.push({ options: [["word:unit"]], text: "unit" });
+    const u = unit.replace(/[^0-9A-Za-z]/g, "");
+    const digits = u.split("").map((c) => (/\d/.test(c) ? `word:${DIGIT[Number(c)]}` : `letter:${c.toLowerCase()}`));
+    parts.push({ options: /^(bsmt|basement)$/i.test(unit) ? [["word:basement"]] : [[unitSlotKey(unit)], digits], text: unitWords(unit) });
+  }
+  if (a.areaPrinted && /blooming\s*grove/i.test(a.areaPrinted) && !/blooming\s*grove/i.test(a.town)) parts.push({ options: [[townSlotKey("Blooming Grove")]], text: "Blooming Grove" });
+  parts.push({ options: [[townSlotKey(`${a.town.trim()} New York`)]], text: `${a.town.trim()} New York` });
+  const zip = a.zip.replace(/\D/g, "");
+  parts.push({ options: [[`zip:${zip}`], zip.split("").map((d) => `word:${DIGIT[Number(d)]}`)], text: zipWords(zip) });
+  return parts;
+}

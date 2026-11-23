@@ -5,6 +5,7 @@ import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { saveSetting } from "@/lib/settings";
 import { confirmSlot, markRecorded, slotsWithStatus, unconfirmSlot } from "@/lib/slot-status";
+import { addCustomSlot, addCustomSlots, deleteCustomSlot, renameCustomSlot } from "@/lib/custom-slots";
 
 type R = { ok: boolean; message: string };
 const done = (message: string): R => (revalidatePath("/admin/phone/prompts/slots"), { ok: true, message });
@@ -58,4 +59,50 @@ export async function googleLiveSwitchAction(on: boolean): Promise<R> {
   await saveSetting("googleLiveVoice", on, s.userId);
   await db.insert(schema.auditLog).values({ userId: s.userId, action: on ? "voice.google_live_on" : "voice.google_live_off", entityType: "settings", entityId: "googleLiveVoice" });
   return done(on ? "Google Achird for the changing parts is on." : "Google Achird for the changing parts is off.");
+}
+
+/** Add a new slot (Abraham, Nov 23, 2026). Audited. A duplicate lookup key warns and is not saved. */
+export async function addSlotAction(form: FormData): Promise<R> {
+  const s = await requireOwner();
+  const existing = (await slotsWithStatus()).map((x) => ({ key: x.key, group: x.group }));
+  const input = { name: String(form.get("name") || ""), group: String(form.get("group") || ""), text: String(form.get("text") || ""), lookup: String(form.get("lookup") || ""), plays: String(form.get("plays") || "") };
+  const r = await addCustomSlot(input, existing, s.userId);
+  if (!r.ok) return { ok: false, message: r.message };
+  await db.insert(schema.auditLog).values({ userId: s.userId, action: "recording_slot.added", entityType: "recording_slot", entityId: r.key, after: input });
+  return done("Saved");
+}
+
+/** Many slots from a CSV (name, group, exact text, key). Good rows are saved; problem rows are listed. */
+export async function addSlotsCsvAction(form: FormData): Promise<R & { added?: number; problems?: { line: number; message: string }[] }> {
+  const s = await requireOwner();
+  const file = form.get("file");
+  if (!(file instanceof File) || !file.size) return { ok: false, message: "Choose the CSV file first." };
+  const { parseCsv } = await import("@/lib/books");
+  const all = parseCsv((await file.text()).replace(/^\uFEFF/, "")).filter((r) => r.some((c) => c.trim()));
+  const head = (all[0] ?? []).map((c) => c.trim().toLowerCase());
+  const body = head[0]?.includes("name") ? all.slice(1) : all;
+  const rows = body.map(([name = "", group = "", text = "", lookup = "", plays = ""]) => ({ name, group, text, lookup, plays }));
+  const existing = (await slotsWithStatus()).map((x) => ({ key: x.key, group: x.group }));
+  const r = await addCustomSlots(rows, existing, s.userId);
+  await db.insert(schema.auditLog).values({ userId: s.userId, action: "recording_slot.added_csv", entityType: "recording_slot", entityId: "csv", after: { added: r.added, problems: r.problems.length } });
+  revalidatePath("/admin/phone/prompts/slots");
+  return { ok: r.added > 0 || !r.problems.length, message: `Saved ${r.added} slots.${r.problems.length ? ` ${r.problems.length} rows were not saved.` : ""}`, added: r.added, problems: r.problems.slice(0, 50) };
+}
+
+export async function renameSlotAction(key: string, name: string): Promise<R> {
+  const s = await requireOwner();
+  const r = await renameCustomSlot(key, name, s.userId);
+  if (!r.ok) return r;
+  await db.insert(schema.auditLog).values({ userId: s.userId, action: "recording_slot.renamed", entityType: "recording_slot", entityId: key, after: { name } });
+  return done("Saved");
+}
+
+/** Owner only, after the Are you sure check in the page. */
+export async function deleteSlotAction(key: string): Promise<R> {
+  const s = await requireOwner();
+  if (s.role !== "owner") return { ok: false, message: "Only the Owner can delete a slot." };
+  const r = await deleteCustomSlot(key, s.userId);
+  if (!r.ok) return r;
+  await db.insert(schema.auditLog).values({ userId: s.userId, action: "recording_slot.deleted", entityType: "recording_slot", entityId: key });
+  return done("Deleted");
 }

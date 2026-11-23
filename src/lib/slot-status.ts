@@ -1,6 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { allSlots, type Slot } from "@/lib/recording-slots";
+import { customSlots } from "@/lib/custom-slots";
 
 /**
  * Recording slot status (Abraham, Nov 15, 2026):
@@ -24,7 +25,7 @@ async function editedTexts(): Promise<Record<string, string | null>> {
 }
 
 export async function slotsWithStatus(): Promise<(Slot & { status: SlotStatus; uploads: number; playing: boolean; liveRecordingId: number | null })[]> {
-  const slots = allSlots(await catalogItems(), await editedTexts());
+  const slots = allSlots(await catalogItems(), await editedTexts(), await customSlots());
   const rows = new Map((await db.select().from(schema.recordingSlots)).map((r) => [r.key, r]));
   const recs = await db.select({ key: schema.promptRecordings.promptKey, source: schema.promptRecordings.source, complete: schema.promptRecordings.complete }).from(schema.promptRecordings);
   const liveRec = new Map((await db.select({ key: schema.voicePrompts.key, rec: schema.voicePrompts.recordingId }).from(schema.voicePrompts)).filter((v) => v.rec).map((v) => [v.key, v.rec!]));
@@ -38,7 +39,7 @@ export async function slotsWithStatus(): Promise<(Slot & { status: SlotStatus; u
 }
 
 export async function findSlot(key: string): Promise<Slot | null> {
-  return allSlots(await catalogItems(), await editedTexts()).find((s) => s.key === key) ?? null;
+  return allSlots(await catalogItems(), await editedTexts(), await customSlots()).find((s) => s.key === key) ?? null;
 }
 
 /** Abraham confirms the exact text (with every comma, period and exclamation mark). Owner only (checked by the caller). */

@@ -6,6 +6,8 @@ import { getSettings } from "@/lib/settings";
 import { promptRecordingLink } from "@/lib/signed-link";
 import { STATUS_WORDS, slotsWithStatus } from "@/lib/slot-status";
 import SlotRow from "./SlotRow";
+import AddSlotForm from "./AddSlotForm";
+import { SLOT_GROUPS, customSlotList } from "@/lib/custom-slots";
 import VoiceSwitches from "./VoiceSwitches";
 
 export const dynamic = "force-dynamic";
@@ -30,13 +32,14 @@ export default async function SlotsPage({ searchParams }: { searchParams: Promis
   const count = (st: string) => slots.filter((x) => x.status === st).length;
   const shown = slots.filter((x) => (!sp.s || x.status === sp.s) && (!sp.g || x.group === sp.g));
   const groups = [...new Set(slots.map((x) => x.group))];
+  const custom = new Map((await customSlotList()).map((c) => [c.key, c]));
   const allUploaded = count("uploaded") === slots.length;
   return (
     <div className="mx-auto max-w-6xl">
       <Link href="/admin/phone/prompts" className="text-sm font-bold text-navy underline-offset-2 hover:underline">← Hotline prompts</Link>
       <h1 className="mb-1 mt-2 text-2xl font-black sm:text-3xl">Recording text list</h1>
       <p className="mb-4 text-muted">
-        Every recording on the hotline, with its exact text. Abraham confirms each text word for word, with every comma, period and exclamation mark. Hark records it in Achird only after that, then uploads it here. A line without a recording keeps playing in the live voice (Puck).
+        Every recording on the hotline, with its exact text. Abraham confirms each text word for word, with every comma, period and exclamation mark. Hark records it in Puck only after that, then uploads it here. A line without a recording keeps playing in the live voice (Puck).
       </p>
       <div className="mb-4 flex flex-wrap gap-2 text-sm" data-slot-counts>
         <a href="?" className="btn-ghost !py-1">All {slots.length}</a>
@@ -47,6 +50,7 @@ export default async function SlotsPage({ searchParams }: { searchParams: Promis
         ))}
       </div>
       <VoiceSwitches achird={settings.achirdWholeLine} allUploaded={allUploaded} missing={slots.length - count("uploaded")} google={settings.googleLiveVoice} googleKey={Boolean(process.env.GOOGLE_TTS_API_KEY)} />
+      <AddSlotForm groups={[...new Set([...SLOT_GROUPS, ...groups])]} slots={slots.map((x) => ({ key: x.key, label: x.label, text: x.text, lookup: custom.get(x.key)?.lookup ?? null }))} />
       <form className="mb-3 flex flex-wrap items-end gap-2">
         {sp.s && <input type="hidden" name="s" value={sp.s} />}
         <label className="block"><span className="label">Group</span>
@@ -73,6 +77,7 @@ export default async function SlotsPage({ searchParams }: { searchParams: Promis
                 playing={x.playing}
                 liveRecordingId={x.liveRecordingId}
                 latestUpload={latest.has(x.key) ? { id: latest.get(x.key)!, url: promptRecordingLink(latest.get(x.key)!) } : null}
+                custom={custom.has(x.key) ? { name: x.label, plays: custom.get(x.key)!.plays } : null}
               />
             ))}
           </tbody>

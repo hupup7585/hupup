@@ -73,7 +73,7 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(redirect(await call("addr-zip-choice", { Digits: "1" }))).toBe("addr-check");
     expect(redirect(await call("addr-check"))).toBe("addr-readback");
     expect(h.session.data.address).toBe("12 Forest Road, Monroe, NY 10950"); // the postal town (the Kiryas Joel idea was withdrawn)
-    expect(said(await call("addr-readback"))).toEqual(["Here is the address you entered.", "twelve Forest Road, Monroe New York, one zero nine five zero.", "If that is correct, press 1.", "To enter the address again, press 2.", "To go back, press star."]);
+    expect(said(await call("addr-readback"))).toEqual(["Here is the address you entered.", "twelve", "Forest Road", "Monroe New York", "one zero nine five zero", "If that is correct, press 1.", "To enter the address again, press 2.", "To go back, press star."]);
     expect(redirect(await call("addr-readback-choice", { Digits: "*" }))).toBe("addr-zip");
     expect(redirect(await call("addr-readback-choice", { Digits: "1" }))).toBe("addr-price");
     const price = await call("addr-price");
@@ -89,7 +89,8 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(redirect(await call("addr-zip-heard", { Digits: "10924" }))).toBe("addr-check");
     await call("addr-check");
     expect(h.session.data.town).toBe("Goshen");
-    expect(said(await call("addr-readback"))[1]).toBe("fifty three Main Street, unit three zero two A, Goshen New York, one zero nine two four.");
+    // part by part (Nov 23, 2026): recordings where live, Puck for the rest
+    expect(said(await call("addr-readback")).slice(1, 7)).toEqual(["fifty three", "Main Street", "unit", "three zero two A", "Goshen New York", "one zero nine two four"]);
   });
   it("step 5: a zip outside Orange County, and an address not on the map", async () => {
     Object.assign(h.session.data, { street: "Main Street", house: "5", unit: undefined, zip: "10001" });

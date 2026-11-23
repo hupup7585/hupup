@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { recordingChunkAction, selectRecordingAction, startRecordingAction } from "../actions";
-import { confirmSlotAction, markRecordedAction, unconfirmSlotAction } from "./actions";
+import { confirmSlotAction, deleteSlotAction, markRecordedAction, renameSlotAction, unconfirmSlotAction } from "./actions";
 
 const CHUNK = 3 * 1024 * 1024;
 const STYLE: Record<string, string> = {
@@ -14,7 +14,7 @@ const STYLE: Record<string, string> = {
 };
 
 /** One recording slot: its exact text, status, and the next step (confirm, mark recorded, upload, use it). */
-export default function SlotRow(props: { slotKey: string; label: string; text: string; status: "waiting" | "confirmed" | "recorded" | "uploaded"; statusWords: string; latestUpload: { id: number; url: string } | null; playing: boolean; liveRecordingId?: number | null }) {
+export default function SlotRow(props: { slotKey: string; label: string; text: string; status: "waiting" | "confirmed" | "recorded" | "uploaded"; statusWords: string; latestUpload: { id: number; url: string } | null; playing: boolean; liveRecordingId?: number | null; custom?: { name: string; plays: string } | null }) {
   const [msg, setMsg] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, start] = useTransition();
   const [progress, setProgress] = useState<string | null>(null);
@@ -52,7 +52,35 @@ export default function SlotRow(props: { slotKey: string; label: string; text: s
 
   return (
     <tr data-slot={props.slotKey}>
-      <td className="td align-top text-xs text-muted">{props.label}</td>
+      <td className="td align-top text-xs text-muted">
+        {props.label}
+        {props.custom?.plays && <span className="block">Plays: {props.custom.plays}</span>}
+        {props.custom && (
+          <span className="mt-1 flex gap-2">
+            <button
+              type="button"
+              className="font-bold text-navy underline-offset-2 hover:underline"
+              data-rename-slot
+              onClick={() => {
+                const name = window.prompt("New slot name", props.custom!.name);
+                if (name && name.trim() && name.trim() !== props.custom!.name) run(() => renameSlotAction(props.slotKey, name));
+              }}
+            >
+              Rename
+            </button>
+            <button
+              type="button"
+              className="font-bold text-[#b3261e] underline-offset-2 hover:underline"
+              data-delete-slot
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to delete the slot "${props.custom!.name}"? This cannot be undone.`)) run(() => deleteSlotAction(props.slotKey));
+              }}
+            >
+              Delete
+            </button>
+          </span>
+        )}
+      </td>
       <td className="td align-top font-mono text-sm" data-slot-text>{props.text}</td>
       <td className="td align-top">
         <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${STYLE[props.status]}`} data-slot-status>{props.statusWords}</span>
@@ -95,7 +123,11 @@ export default function SlotRow(props: { slotKey: string; label: string; text: s
             </>
           )}
         </div>
-        {msg && <p className={`mt-1 text-xs font-semibold ${msg.ok ? "text-navy" : "text-[#b3261e]"}`}>{msg.message}</p>}
+        {msg && (
+          <p role="status" data-save-result={msg.ok ? "saved" : "failed"} className={`mt-1 inline-block rounded px-1.5 py-0.5 text-xs font-bold ${msg.ok ? "bg-[#E3F8EF] text-[#13895C]" : "bg-[#ffe6e4] text-[#b3261e]"}`}>
+            {msg.ok ? msg.message || "Saved" : `Not saved. ${msg.message || "Please try again."}`}
+          </p>
+        )}
       </td>
     </tr>
   );

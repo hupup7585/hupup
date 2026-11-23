@@ -44,7 +44,7 @@ export function pieces(text: string): string[] {
 }
 
 /** texts: the Admin text of each line where it was edited (the list always shows the text that plays). */
-export function allSlots(items: { id: number; name: string }[] = [], texts: Record<string, string | null | undefined> = {}): Slot[] {
+export function allSlots(items: { id: number; name: string }[] = [], texts: Record<string, string | null | undefined> = {}, custom: Slot[] = []): Slot[] {
   const out: Slot[] = [];
   for (const [k, d] of Object.entries(PROMPTS) as [PromptKey, PromptDef][]) {
     if ((d as { textOnly?: boolean }).textOnly || (d as PromptDef).parts || NOT_RECORDED.includes(k)) continue;
@@ -81,6 +81,8 @@ export function allSlots(items: { id: number; name: string }[] = [], texts: Reco
     out.push({ key: `item:${it.id}`, kind: "item", group: "Rental names", label: `${it.name} (one)`, text: it.name });
     out.push({ key: `item:${it.id}:plural`, kind: "item", group: "Rental names", label: `${it.name} (two or more)`, text: pluralName(it.name) });
   }
+  // Added in Admin (Nov 23, 2026)
+  for (const c of custom) if (!out.some((o) => o.key === c.key)) out.push(c);
   return out;
 }
 
