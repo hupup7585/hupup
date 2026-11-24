@@ -123,3 +123,34 @@ describe("the sheet", () => {
     expect(sheetXml).toContain("Area as printed");
   });
 });
+
+describe("Load this list replaces every column, the Yiddish ones too (Nov 23, 2026, Oberlander)", () => {
+  it("a second load with new Yiddish spellings leaves nothing of the old ones", async () => {
+    const head = "Yiddish last name,Yiddish first name,last name,first name,house number,street,unit,town/state/zip,phone,area as printed";
+    const row = (yl: string, yf: string, l: string, f: string, n: number) => `${yl},${yf},${l},${f},${n},FOREST RD,,"Monroe, NY 10950",845-555-${2000 + n},`;
+    const old = [head, ...Array.from({ length: 13 }, (_, i) => row("אבערלאנדער", "יואל", "Oberlander", "Joel", i + 1))].join("\n");
+    const fresh = [
+      head,
+      ...Array.from({ length: 13 }, (_, i) => row("אבערלענדער", "יואל", "Oberlander", "Joel", i + 1)),
+      row("באסול", "משה", "Basul", "Moshe", 20),
+      row("טארים", "דוד", "Torim", "Dovid", 21),
+      row("שווארץ", "יאזשעף", "Schwartz", "Yozef", 22),
+    ].join("\n");
+    await loadDirectory(parseDirectoryCsv(old).rows);
+    expect((await sheetRows()).filter((r) => r.lastName === "Oberlander").map((r) => r.yiddishLastName)).toEqual(Array(13).fill("אבערלאנדער"));
+    expect(await loadDirectory(parseDirectoryCsv(fresh).rows)).toBe(16);
+    const rows = await sheetRows();
+    expect(rows).toHaveLength(16);
+    expect(rows.filter((r) => r.lastName === "Oberlander").map((r) => r.yiddishLastName)).toEqual(Array(13).fill("אבערלענדער"));
+    expect(rows.some((r) => r.yiddishLastName === "אבערלאנדער")).toBe(false);
+    expect(rows.find((r) => r.lastName === "Basul")?.yiddishLastName).toBe("באסול");
+    expect(rows.find((r) => r.lastName === "Torim")?.yiddishLastName).toBe("טארים");
+    expect(rows.find((r) => r.firstName === "Yozef")?.yiddishFirstName).toBe("יאזשעף");
+  });
+
+  it("the sheet reads the list again right after Load this list", () => {
+    const { readFileSync } = require("node:fs") as typeof import("node:fs");
+    expect(readFileSync("src/app/admin/(app)/customers/directory/DirectoryPreviewForm.tsx", "utf8")).toContain('window.dispatchEvent(new Event("directory-reloaded"))');
+    expect(readFileSync("src/app/admin/(app)/customers/directory/DirectorySheet.tsx", "utf8")).toContain('window.addEventListener("directory-reloaded", load)');
+  });
+});

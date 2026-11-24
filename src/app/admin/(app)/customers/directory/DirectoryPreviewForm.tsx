@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { loadDirectoryAction, previewDirectoryAction, type DirectoryPreview } from "./actions";
 
 export default function DirectoryPreviewForm() {
@@ -8,6 +9,7 @@ export default function DirectoryPreviewForm() {
   const [pending, start] = useTransition();
   const [file, setFile] = useState<File | null>(null);
   const [load, setLoad] = useState<{ ok: boolean; text: string } | null>(null);
+  const router = useRouter();
   return (
     <div className="space-y-4">
       <form
@@ -41,6 +43,11 @@ export default function DirectoryPreviewForm() {
                 start(async () => {
                   const x = await loadDirectoryAction(fd).catch(() => ({ ok: false, message: "" }));
                   setLoad(x.ok ? { ok: true, text: x.message } : { ok: false, text: x.message ? `Not saved. ${x.message}` : "Not saved. Please try again." });
+                  // Nov 23, 2026 (Oberlander): the sheet and the counts show the new list right away, nothing old stays on screen
+                  if (x.ok) {
+                    window.dispatchEvent(new Event("directory-reloaded"));
+                    router.refresh();
+                  }
                 });
               }}
             >

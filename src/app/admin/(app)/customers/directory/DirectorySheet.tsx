@@ -81,9 +81,20 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
   const editRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    sheetRowsAction()
-      .then(setRows)
-      .catch(() => setLoadError(true));
+    const load = () =>
+      sheetRowsAction()
+        .then((r) => {
+          setRows(r);
+          setFresh(new Set());
+          setUndo([]); // undo steps belong to the old list
+          setAnchor(null);
+          setFocus(null);
+        })
+        .catch(() => setLoadError(true));
+    void load();
+    // "Load this list" replaced the whole directory: read it again (Nov 23, 2026)
+    window.addEventListener("directory-reloaded", load);
+    return () => window.removeEventListener("directory-reloaded", load);
   }, []);
   useEffect(() => {
     const el = box.current;
