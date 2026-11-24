@@ -4,7 +4,6 @@ import { requireStaff } from "@/lib/auth";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { listThreads, markThreadRead, threadCounts, threadMessages, type ThreadView } from "@/lib/messages";
 import ReplyForm from "./ReplyForm";
-import ListHeader from "./ListHeader";
 import MessageFiles from "@/components/staff/MessageFiles";
 import { filesForMessages } from "@/lib/message-files";
 import { dualDateTime } from "@/lib/dual-date";
@@ -28,13 +27,33 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
   const current = threads.find((t) => t.contact_phone === phone);
   return (
     <div className="mx-auto max-w-6xl">
-      <h1 className="mb-1 text-2xl font-black sm:text-3xl">Messages</h1>
-      <p className="mb-5 text-muted">Texts to and from customers on the hotline number.</p>
+      {/* Abraham, Nov 24, 2026: the search bar at the top right of the page (any number, name or word) */}
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="mb-1 text-2xl font-black sm:text-3xl">Messages</h1>
+          <p className="text-muted">Texts to and from customers on the hotline number.</p>
+        </div>
+        <form className="flex w-full gap-2 sm:w-96" role="search" data-search>
+          {view !== "conversations" && <input type="hidden" name="v" value={view} />}
+          <input name="q" defaultValue={sp.q} placeholder="Search any number, name or word" aria-label="Search texts" className="input" />
+          <button className="btn-ghost">Search</button>
+        </form>
+      </div>
       <NotActive k="sms" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
         <div className={`card p-3 ${phone ? "hidden lg:block" : ""}`}>
           {/* Abraham, Nov 24, 2026: the side is the conversation list; catalog requests are one extra line at its top */}
-          <ListHeader title={view === "catalog" ? `Catalog requests (${counts.catalog})` : view === "all" ? "All texts" : `All conversations (${counts.conversations})`} view={view} q={sp.q} />
+          <div className="mb-2 px-1">
+            <h2 className="text-base font-black text-navy" data-list-title>
+              {view === "catalog" ? `Catalog requests (${counts.catalog})` : view === "all" ? "All texts" : `All conversations (${counts.conversations})`}
+            </h2>
+            {sp.q && (
+              <p className="mt-1 flex items-center justify-between gap-2 text-xs text-muted">
+                <span>Results for &ldquo;{sp.q}&rdquo;</span>
+                <Link href={`/admin/messages${view === "conversations" ? "" : `?v=${view}`}`} className="font-semibold text-navy underline" data-clear-search>Clear search</Link>
+              </p>
+            )}
+          </div>
           {view === "conversations" ? (
             <Link href="/admin/messages?v=catalog" className="mb-2 flex items-center justify-between rounded-lg border border-line bg-bg px-3 py-2.5 text-sm font-bold text-navy hover:border-navy" data-catalog-entry>
               <span>Catalog requests</span>
