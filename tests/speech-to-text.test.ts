@@ -137,7 +137,8 @@ describe("speech to text: the call", () => {
     expect(said(xml).join(" ")).not.toContain("Someone Else");
   });
   it("star types it on the keypad; pound with nothing said skips the email; silence is 'did not catch that'", async () => {
-    expect(redirect(await call("stt-recorded", { Digits: "*", RecordingDuration: "0" }, "f=name"))).toBe("type?f=name");
+    expect(redirect(await call("stt-recorded", { Digits: "9", RecordingDuration: "0" }, "f=name"))).toBe("type?f=name"); // 9 types it (Nov 24, 2026)
+    expect(redirect(await call("stt-recorded", { Digits: "*", RecordingDuration: "0" }, "f=name"))).toBe("cart"); // star goes back
     const skip = await call("stt-recorded", { Digits: "#", RecordingDuration: "0" }, "f=email");
     expect(redirect(await call("heard", {}, redirect(skip)!.split("?")[1]))).toBe("phone");
     const quiet = await call("stt-recorded", { RecordingDuration: "0" }, "f=name");

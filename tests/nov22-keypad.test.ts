@@ -29,19 +29,9 @@ const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/R
 const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&apos;/g, "'").replace(/&amp;/g, "&"));
 
 describe("keypad typing directions (Nov 22, 2026)", () => {
-  it("every email typed on the keypad plays the box 103 recording, every time (pound line inside it)", async () => {
+  it("every typing step plays type_instructions after 9 (Abraham, Nov 24, 2026; box 103 and the address directions wait for his decision)", async () => {
     const { PROMPTS } = await import("@/lib/ivr/prompts");
-    const help = PROMPTS.catalog_keypad_help.text;
-    expect(help.startsWith("Press a key once for the first letter, twice for the second letter, and three times for the third letter.")).toBe(true);
-    expect(help.endsWith("To go back one letter, press star one time. When you are done, press pound, or you can hang up.")).toBe(true);
-    expect(said(await call("type", {}, "f=email"))).toEqual([help]);
-    expect(said(await call("type", {}, "f=email&again=1"))).toEqual([help]);
-  });
-  it("the address gets its own slot: the same how-to, the space line, then the pound line", async () => {
-    const { PROMPTS } = await import("@/lib/ivr/prompts");
-    const a = PROMPTS.address_keypad_help.text;
-    expect(a).toBe(PROMPTS.catalog_keypad_help.text.replace(" When you are done", " To add a space between words, press star twice. When you are done"));
-    expect(said(await call("type", {}, "f=address"))).toEqual([a]);
+    for (const f of ["email", "address", "street", "name"]) expect(said(await call("type", {}, `f=${f}`)), f).toEqual([PROMPTS.type_instructions.text]);
     const { allSlots } = await import("@/lib/recording-slots");
     const keys = allSlots().map((x) => x.key);
     expect(keys).toContain("address_keypad_help"); // one recording, like box 103

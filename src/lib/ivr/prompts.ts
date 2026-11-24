@@ -286,11 +286,11 @@ export const PROMPTS = {
   cart_expired: { group: "Cart", label: "Cart timed out", text: "Sorry, your cart timed out. Let us start again." },
 
   // Checkout
-  ask_name: { group: "Checkout", label: "Ask for name", text: "Thank you. Let us complete your booking. Please say your first and last name after the tone." }, // Abraham, Nov 23, 2026 (approved, word for word)
+  ask_name: { group: "Checkout", label: "Ask for name", text: "Let us complete your booking. Please say your first and last name after the tone." }, // Abraham, Nov 24, 2026 (approved, word for word)
   ask_address: { group: "Checkout", label: "Ask for address", text: "Thanks! Now please say the delivery address, with the house number, street, and town." },
   // Delivery address in steps (Abraham, Nov 17, 2026; replaces the single address question, box 32). Step 1 and the
   // retry line are approved; steps 2 to 7 are drafts: the steps run on preview only until he approves them.
-  addr_street: { group: "Checkout", label: "Address step 2 - street name (say it after the tone, or 9 to type it)", text: "Please say the street name of the delivery address after the tone. To type it on your keypad instead, press 9." }, // approved Nov 23, 2026, 11:41 PM (key 9 types it, star goes back)
+  addr_street: { group: "Checkout", label: "Address step 2 - street name (say it after the tone; then type_hint)", text: "Please say the street name of the delivery address after the tone." }, // Abraham, Nov 24, 2026: then type_hint (9 types it, star goes back)
   retry_spoken: { group: "Checkout", label: "Any spoken answer not understood (approved; the step's own line is not repeated)", text: "Sorry, we did not catch that. Please try again." },
   addr_house: { group: "Checkout", label: "Address step 1 - house number", text: "Now, with your keypad, please enter the house number." },
   pound_done: { group: "Checkout", label: "Shared - When you are done, press pound", text: "When you are done, press pound." },
@@ -334,7 +334,7 @@ export const PROMPTS = {
   // Abraham, Nov 17, 2026: every question that asks for information ends with this; pound ends the answer. Approved
   // with "please" added.
   press_pound_done: { group: "Checkout", label: "After every information question: press pound when finished", text: "When you are finished, please press pound." },
-  type_hint: { group: "Checkout", label: "Typing: how to switch", text: "To type it on your keypad instead, press star." },
+  type_hint: { group: "Checkout", label: "Typing: how to switch (after every spoken question)", text: "To type it with your keypad, press 9." }, // Abraham, Nov 24, 2026
   type_instructions: { group: "Checkout", label: "Typing: how to type", text: "Press 2 once for A, twice for B, three times for C, and so on for all keys. If two letters in a row use the same key, press star between them. To type a number, press the key one more time. To go back, press star twice. Press 0 once for a space, and twice for number 0. Press 1 once for number 1, twice for a dot, three times for a dash, and four times for an underscore. When you are finished, press the pound key." }, // Abraham, Nov 24, 2026, word for word (the one decoder: multitap.ts)
   type_email_symbols: { group: "Checkout", label: "Typing: email symbols", text: "For a dot, press 1 once. For the at sign, press 1 twice." },
   typed_back: { group: "Checkout", label: "Typing: read back", text: "You typed: {value}.", vars: ["value"] }, // Nov 23, 2026: ends with the shared Confirm ending (no pound to continue)

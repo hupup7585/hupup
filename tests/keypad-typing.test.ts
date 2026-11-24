@@ -64,11 +64,12 @@ describe("typing in the call", () => {
     process.env.PUBLIC_BASE_URL = "https://hupup.example";
     h.session.data = {};
   });
-  it("name, address and email: say it, or press star to type; the question tells callers about star", async () => {
-    const xml = await call("heard", { Digits: "*" }, "f=name");
+  it("name, address and email: say it, or press 9 to type (Abraham, Nov 24, 2026); star goes back", async () => {
+    const xml = await call("heard", { Digits: "9" }, "f=name");
     expect(redirect(xml)).toBe("type?f=name");
-    expect(redirect(await call("heard", { Digits: "*" }, "f=address"))).toBe("type?f=address");
-    expect(redirect(await call("heard", { Digits: "*" }, "f=email"))).toBe("type?f=email");
+    expect(redirect(await call("heard", { Digits: "9" }, "f=address"))).toBe("type?f=address");
+    expect(redirect(await call("heard", { Digits: "9" }, "f=email"))).toBe("type?f=email");
+    expect(redirect(await call("heard", { Digits: "*" }, "f=name"))).toBe("cart");
     expect(redirect(await call("heard", { Digits: "#" }, "f=email"))).toBe("phone"); // # still skips the email
   });
   it("typing plays the instructions, collects keys until #, then reads back what was typed", async () => {
@@ -79,7 +80,7 @@ describe("typing in the call", () => {
     expect(said(back)).toContain("You typed: Yossi Friedman.");
     expect(said(back)).toContain("If that is correct, press 1. To try again, press 2."); // the shared Confirm ending (Nov 23, 2026)
     expect(h.session.data.heard).toBe("Yossi Friedman");
-    expect(said(await call("type", {}, "f=email"))[0]).toMatch(/^Press a key once for the first letter/); // box 103 for every email (Nov 22, 2026)
+    expect(said(await call("type", {}, "f=email"))[0]).toMatch(/^Press 2 once for A/); // type_instructions for every typing step (Nov 24, 2026)
   });
   it("nothing usable typed: try again (instructions not repeated)", async () => {
     const xml = await call("typed", { Digits: "" }, "f=address");

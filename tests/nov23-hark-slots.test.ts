@@ -38,7 +38,7 @@ import { slotsWithStatus } from "@/lib/slot-status";
 
 describe("1. ask_name (Checkout)", () => {
   it("the new approved text, word for word; the slot is Waiting until the text is confirmed for the new recording", async () => {
-    expect(PROMPTS.ask_name.text).toBe("Thank you. Let us complete your booking. Please say your first and last name after the tone.");
+    expect(PROMPTS.ask_name.text).toBe("Let us complete your booking. Please say your first and last name after the tone."); // Abraham, Nov 24, 2026: "Thank you." removed
     expect(PROMPTS.ask_name.group).toBe("Checkout");
     const slot = (await slotsWithStatus()).find((s) => s.key === "ask_name");
     expect(slot).toMatchObject({ text: PROMPTS.ask_name.text, status: "waiting" });
@@ -129,7 +129,7 @@ describe("2. no 'press pound to continue': every confirm or read-back ends with 
 
 describe("3. the street step says how to type it (key 9, approved Nov 23, 2026, 11:41 PM)", () => {
   it("the approved street line says press 9; no separate star hint any more", () => {
-    expect(PROMPTS.addr_street.text).toBe("Please say the street name of the delivery address after the tone. To type it on your keypad instead, press 9.");
+    expect(PROMPTS.addr_street.text).toBe("Please say the street name of the delivery address after the tone."); // Nov 24, 2026: then type_hint
     expect(PROMPTS).not.toHaveProperty("addr_street_type_hint");
   });
   it("the unit step is keypad only and says so (no star line needed)", () => {
@@ -150,7 +150,7 @@ describe("4. automated orders only: a slot, not in the call yet", () => {
     const slots = await slotsWithStatus();
     const text = (k: string) => slots.find((s) => s.key === k)?.text;
     expect(text("confirm_ending")).toBe("If that is correct, press 1. To try again, press 2.");
-    expect(text("ask_name")).toBe("Thank you. Let us complete your booking. Please say your first and last name after the tone.");
+    expect(text("ask_name")).toBe("Let us complete your booking. Please say your first and last name after the tone.");
     expect(text("automated_only")).toBe("Please note, orders can only be placed through our automated system.");
   });
 });

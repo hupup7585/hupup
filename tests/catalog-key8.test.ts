@@ -63,9 +63,11 @@ describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
     expect(part).toContain("/audio/tone.wav"); // no key: the tone, then spoken letters
     expect(part.indexOf("tone.wav")).toBeGreaterThan(part.indexOf("first part"));
     // 9 9 9 = y, 6 6 6 = o, 7 7 7 7 = s, star, 7 7 7 7 = s, 4 4 4 = i (the first 9 came in the first step)
-    const typing = plain(await call("catalog-key", { Digits: "9" }, "part=local"));
-    expect(typing).toContain("Press a key once for the first letter, twice for the second letter, and three times for the third letter."); // box 103 (Nov 22, 2026)
-    expect(redirect(await call("catalog-typed", { Digits: "996667777*7777444" }, "part=local"))).toBe("catalog-got?part=local");
+    expect(part).toContain("To type it with your keypad, press 9."); // type_hint (Abraham, Nov 24, 2026)
+    expect(redirect(await call("catalog-key", { Digits: "9" }, "part=local"))).toBe("catalog-type?part=local"); // 9 switches to typing
+    const typing = plain(await call("catalog-type", {}, "part=local"));
+    expect(typing).toContain("Press 2 once for A, twice for B, three times for C, and so on for all keys."); // type_instructions
+    expect(redirect(await call("catalog-typed", { Digits: "9996667777*7777444" }, "part=local"))).toBe("catalog-got?part=local");
     expect(plain(await call("catalog-got", {}, "part=local"))).toContain("We got y o s s i. To continue, press pound. To start over, press 1. To add more, press 2.");
     expect(redirect(await call("catalog-got-choice", { Digits: "#" }, "part=local"))).toBe("catalog-ending");
     expect(plain(await call("catalog-ending"))).toContain("For at gmail dot com, press 1.");

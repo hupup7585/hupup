@@ -56,12 +56,13 @@ describe("catalog email: dot only where the address has one", () => {
 describe("pound to continue", () => {
   it("the pound line (approved Nov 17) plays on the live line and in keypad typing", async () => {
     await withCart();
+    // Abraham, Nov 24, 2026: the spoken question, then type_hint (9 to type); the pound line is in the typing directions
     const preview = await call("ask", {}, "f=name");
-    expect(said(preview)).toContain("When you are finished, please press pound.");
+    expect(said(preview)).toEqual(["Let us complete your booking. Please say your first and last name after the tone.", "To type it with your keypad, press 9."]);
     process.env.VERCEL_ENV = "production";
     const live = await call("ask", {}, "f=name");
     delete process.env.VERCEL_ENV;
-    expect(said(live)).toContain("When you are finished, please press pound.");
+    expect(said(live)).toContain("To type it with your keypad, press 9.");
     expect(said(await call("type", {}, "f=name")).some((s) => s.endsWith("When you are finished, press the pound key."))).toBe(true); // type_instructions, Nov 24, 2026
   });
   it("pound in the middle of a spoken answer ends it and keeps what was said", async () => {

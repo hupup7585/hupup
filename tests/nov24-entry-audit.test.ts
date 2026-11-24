@@ -88,10 +88,10 @@ describe("M1: street, 9 types it and star goes back", () => {
     expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("addr-house");
     expect(redirect(await call("stt-recorded", { Digits: "9" }, "f=street"))).toBe("type?f=street");
     expect(redirect(await call("stt-recorded", { Digits: "*" }, "f=street"))).toBe("addr-house");
-    expect(redirect(await call("heard", { Digits: "*" }, "f=name"))).toBe("type?f=name"); // other questions: star still types
+    expect(redirect(await call("heard", { Digits: "*" }, "f=name"))).toBe("cart"); // every question: star goes back (Nov 24, 2026)
   });
-  it("the street question is only the approved line (it already says press 9)", async () => {
-    expect(said(await call("ask", {}, "f=street"))).toEqual(["Please say the street name of the delivery address after the tone. To type it on your keypad instead, press 9."]);
+  it("the street question, then type_hint", async () => {
+    expect(said(await call("ask", {}, "f=street"))).toEqual(["Please say the street name of the delivery address after the tone.", "To type it with your keypad, press 9."]); // type_hint (Nov 24, 2026)
   });
 });
 

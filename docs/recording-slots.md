@@ -181,9 +181,9 @@ Thank you for choosing Hup Up Attractions! |
 | box156#1 | Box 156: discount applied (only when the customer has a discount), piece 1 | The total of your order is |
 | box156#2 | Box 156: discount applied (only when the customer has a discount), piece 2 | . We are happy to let you know that a discount of |
 | box156#3 | Box 156: discount applied (only when the customer has a discount), piece 3 | has been applied to your order. Your new total is |
-| ask_name | Ask for name | Thank you. Let us complete your booking. Please say your first and last name after the tone. |
+| ask_name | Ask for name | Let us complete your booking. Please say your first and last name after the tone. |
 | ask_address | Ask for address | Thanks! Now please say the delivery address, with the house number, street, and town. |
-| addr_street | Address step 2 - street name (say it after the tone, or 9 to type it) | Please say the street name of the delivery address after the tone. To type it on your keypad instead, press 9. |
+| addr_street | Address step 2 - street name (say it after the tone; then type_hint) | Please say the street name of the delivery address after the tone. |
 | retry_spoken | Any spoken answer not understood (approved; the step's own line is not repeated) | Sorry, we did not catch that. Please try again. |
 | addr_house | Address step 1 - house number | Now, with your keypad, please enter the house number. |
 | pound_done | Shared - When you are done, press pound | When you are done, press pound. |
@@ -218,7 +218,7 @@ Thank you for choosing Hup Up Attractions! |
 | ask_email_required | Ask for email (required: no texts) | To send your secure payment link, we need your email address. Please say your email address, like john at gmail dot com. |
 | ask_email | Ask for email | Almost done! Please say your email address for your receipt, like john at gmail dot com. Or press pound to skip. |
 | press_pound_done | After every information question: press pound when finished | When you are finished, please press pound. |
-| type_hint | Typing: how to switch | To type it on your keypad instead, press star. |
+| type_hint | Typing: how to switch (after every spoken question) | To type it with your keypad, press 9. |
 | type_instructions | Typing: how to type | Press 2 once for A, twice for B, three times for C, and so on for all keys. If two letters in a row use the same key, press star between them. To type a number, press the key one more time. To go back, press star twice. Press 0 once for a space, and twice for number 0. Press 1 once for number 1, twice for a dot, three times for a dash, and four times for an underscore. When you are finished, press the pound key. |
 | type_email_symbols | Typing: email symbols | For a dot, press 1 once. For the at sign, press 1 twice. |
 | typed_back#1 | Typing: read back, piece 1 | You typed: |

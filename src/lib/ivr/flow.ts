@@ -1361,6 +1361,7 @@ const handlers: Record<string, Handler> = {
     const add = ctx.query.get("add") ?? undefined;
     const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 3, finishOnKey: "", action: url("catalog-key", { part, add }), method: "POST" });
     sp(g, ctx, part === "domain" ? "catalog_domain" : "catalog_email_local");
+    sp(g, ctx, "type_hint"); // Abraham, Nov 24, 2026: every typing step: "To type it with your keypad, press 9."
     vr.play(`${config.baseUrl()}/audio/tone.wav`);
     if (sttActive()) {
       // Speech to text (preview only): record the spoken letters, Google types them up while the soft clip plays
@@ -1377,16 +1378,32 @@ const handlers: Record<string, Handler> = {
     const part = ctx.query.get("part") === "domain" ? "domain" : "local";
     const add = ctx.query.get("add") ?? undefined;
     const first = ctx.body.Digits || "";
-    if (first === "#") return back(vr, "catalog-got", { part }); // pound early: read back what we have
-    await updateSession(ctx.callSid, { data: { catKeys: first } }, ctx.session);
+    // Abraham, Nov 24, 2026: no step starts typing on the first key. 9 = type it; star = one step back; pound = read
+    // back what we have; any other key: the wrong-key line and the same question
+    if (first === "*") return part === "domain" ? back(vr, "catalog-ending") : emailHome(ctx, vr);
+    if (first === "#") return back(vr, "catalog-got", { part });
+    if (first !== "9") {
+      if (first) sp(vr, ctx, "not_valid");
+      return back(vr, "catalog-part", { part, add });
+    }
+    await updateSession(ctx.callSid, { data: { catKeys: "" } }, ctx.session);
+    return back(vr, "catalog-type", { part, add });
+  },
+
+  /** Typing the email part: the directions, a short beep, then keys until pound (a key during the directions is the first typed key). */
+  "catalog-type"(ctx, vr) {
+    const part = ctx.query.get("part") === "domain" ? "domain" : "local";
+    const add = ctx.query.get("add") ?? undefined;
     const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 20, action: url("catalog-typed", { part, add }), method: "POST" });
-    sp(g, ctx, "catalog_keypad_help");
+    sp(g, ctx, "type_instructions");
+    g.play(`${config.baseUrl()}/audio/tone.wav`);
     return back(vr, "catalog-typed", { part, add });
   },
 
   async "catalog-typed"(ctx, vr) {
     const part = ctx.query.get("part") === "domain" ? "domain" : "local";
     const keep = ctx.query.get("add") === "1" ? catPart(ctx, part) : "";
+    if ((ctx.body.Digits ?? "") === "*") return back(vr, "catalog-part", { part, add: ctx.query.get("add") ?? undefined }); // star before typing: back
     // The one keypad decoder for every typing step (Abraham, Nov 24, 2026)
     const text = decodeMultitap(`${ctx.session?.data.catKeys ?? ""}${ctx.body.Digits ?? ""}`.replace(/#/g, ""), "email", keep);
     await updateSession(ctx.callSid, { data: { catKeys: "", [part === "domain" ? "catDomain" : "catLocal"]: text, catStt: undefined } }, ctx.session);
@@ -2577,9 +2594,9 @@ const handlers: Record<string, Handler> = {
     // Abraham, Nov 17, 2026: not understood = only the retry line (the step's own line, with its thanks, never
     // repeats); every spoken question is followed by the tone, then the caller speaks.
     const retry = Number(n || 0) > 0;
-    // The street line says "press 9" to type it (approved Nov 23, 2026; Hark's audit M1), so it needs no extra hint;
-    // the unit is typed on the keypad anyway (addr-unit)
-    const ownHint = f === "street" || f === "unit";
+    // Abraham, Nov 24, 2026: after every spoken question, type_hint ("To type it with your keypad, press 9."); the unit
+    // is typed on the keypad anyway (addr-unit)
+    const ownHint = f === "unit";
     const tone = `${config.baseUrl()}/audio/tone.wav`;
     const question = (g: Gather, withTone = true) => {
       if (retry) sp(g, ctx, "field_unclear"); // the one shared did-not-catch line (Nov 22, 2026)
@@ -2587,7 +2604,6 @@ const handlers: Record<string, Handler> = {
         spPreviewDraft(g, ctx, prompt);
         if (!ownHint) {
           sp(g, ctx, "type_hint");
-          spPreviewDraft(g, ctx, "press_pound_done");
         }
       }
       if (withTone) g.play(tone);
@@ -2599,7 +2615,7 @@ const handlers: Record<string, Handler> = {
       const k = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 1, finishOnKey: "", action: url("heard", { f, n }), method: "POST" });
       question(k, false);
       vr.play(tone);
-      vr.record({ maxLength: 20, timeout: 3, playBeep: false, finishOnKey: f === "street" ? "#*9" : "#*", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
+      vr.record({ maxLength: 20, timeout: 3, playBeep: false, finishOnKey: "#*9", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
       return vr;
     }
     // Say it, or press star to type it on the keypad (Abraham L). finishOnKey "" so star and # arrive as keys.
@@ -2622,16 +2638,16 @@ const handlers: Record<string, Handler> = {
   type(ctx, vr) {
     const f = ctx.query.get("f") as Field;
     const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 15, action: url("typed", { f }), method: "POST" });
-    // Box 103 (Nov 22, 2026): the same recording every time an email is typed, in every flow (pound line inside it);
-    // the address gets the same how-to with the space line
-    if (f === "email") sp(g, ctx, "catalog_keypad_help");
-    else if (f === "address" || f === "street") sp(g, ctx, "address_keypad_help");
-    else if (!ctx.query.get("again")) sp(g, ctx, "type_instructions"); // ends with "When you are finished, please press pound."
+    // Abraham, Nov 24, 2026: after 9, the directions (type_instructions) and a short beep, then keys; a key pressed during
+    // the directions stops them and is the first typed key (Twilio's Gather)
+    if (!ctx.query.get("again")) sp(g, ctx, "type_instructions");
+    g.play(`${config.baseUrl()}/audio/tone.wav`);
     return back(vr, "typed", { f });
   },
 
   async typed(ctx, vr) {
     const f = ctx.query.get("f") as Field;
+    if ((ctx.body.Digits ?? "") === "*") return back(vr, "ask", { f }); // star before typing: back to the question
     const spec = FIELDS[f];
     const raw = decodeMultitap(ctx.body.Digits || "", f === "email" ? "email" : "text");
     const value = raw ? (f === "email" ? spec.normalize(raw) : titleCase(raw)) : null;
@@ -2653,10 +2669,9 @@ const handlers: Record<string, Handler> = {
     const n = ctx.query.get("n") ?? undefined;
     const digits = ctx.body.Digits || "";
     const secs = Number(ctx.body.RecordingDuration || 0);
-    // Street (audit M1): 9 types it, star goes back to the house number; other questions: star types it
-    if (f === "street" && digits === "9") return back(vr, "type", { f });
-    if (f === "street" && digits === "*") return back(vr, "addr-house");
-    if (digits === "*") return back(vr, "type", { f });
+    // Every question (Abraham, Nov 24, 2026): 9 types it, star goes back one step
+    if (digits === "9") return back(vr, "type", { f });
+    if (digits === "*") return back(vr, ...prevStep(f));
     if (!ctx.body.RecordingUrl || secs < 1) {
       // Nothing said: pound skips the email (as before); otherwise the usual "didn't catch that" path
       return back(vr, "heard", { f, n, empty: 1, ...(digits === "#" && f === "email" ? { skip: 1 } : {}) });
@@ -2693,10 +2708,9 @@ const handlers: Record<string, Handler> = {
     }
     const required = f === "email" && Boolean(ctx.session?.data.emailRequired);
     if (ctx.query.get("skip")) return required ? back(vr, "ask", { f }) : back(vr, "phone"); // pound on the recording: skip email
-    // Street (audit M1): 9 types it on the keypad, star goes back to the house number (kept); other questions: star types it
-    if (f === "street" && ctx.body.Digits === "9") return back(vr, "type", { f });
-    if (f === "street" && ctx.body.Digits === "*") return back(vr, "addr-house");
-    if (ctx.body.Digits === "*") return back(vr, "type", { f }); // switch to keypad typing
+    // Every question (Abraham, Nov 24, 2026): 9 switches to keypad typing, star goes back one step
+    if (ctx.body.Digits === "9") return back(vr, "type", { f });
+    if (ctx.body.Digits === "*") return back(vr, ...prevStep(f));
     // Speech to text: the typed-up answer comes from our own record of this call, not from Twilio's speech result
     const typedUp = await callSpokenAnswer(ctx, Number(ctx.query.get("a")));
     const viaStt = Boolean(typedUp) || ctx.query.get("empty") === "1";
@@ -4385,6 +4399,10 @@ const handlers: Record<string, Handler> = {
 /* ------------------------------------------------------------------ checkout fields */
 
 type Field = "name" | "address" | "email" | "street" | "unit" | "directions";
+/** The step before a question, for star (Abraham, Nov 24, 2026: star = go back everywhere). */
+function prevStep(f: Field): [string, Record<string, string>] {
+  return f === "street" ? ["addr-house", {}] : f === "unit" ? ["ask", { f: "street" }] : f === "address" ? ["ask", { f: "name" }] : ["cart", {}];
+}
 const FIELDS: Record<
   Field,
   { prompt: PromptKey; hints: string; normalize: (s: string) => string | null; readBack: (v: string) => string; next: string }

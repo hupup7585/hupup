@@ -45,7 +45,7 @@ beforeEach(() => {
 
 describe("the approved lines", () => {
   it("step 2 and the retry line, word for word", () => {
-    expect(PROMPTS.addr_street.text).toBe("Please say the street name of the delivery address after the tone. To type it on your keypad instead, press 9."); // approved Nov 23, 2026, 11:41 PM
+    expect(PROMPTS.addr_street.text).toBe("Please say the street name of the delivery address after the tone."); // Abraham, Nov 24, 2026: then type_hint
     expect(PROMPTS.retry_spoken.text).toBe("Sorry, we did not catch that. Please try again.");
   });
 });
@@ -57,7 +57,7 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(redirect(await call("addr-house-heard", { Digits: "*" }))).toBe("ask?f=name");
     expect(redirect(await call("addr-house-heard", { Digits: "12" }))).toBe("ask?f=street");
     const ask = await call("ask", {}, "f=street");
-    expect(said(ask)).toEqual(["Please say the street name of the delivery address after the tone. To type it on your keypad instead, press 9."]); // key 9 types it (Nov 23, 2026)
+    expect(said(ask)).toEqual(["Please say the street name of the delivery address after the tone.", "To type it with your keypad, press 9."]); // type_hint (Nov 24, 2026)
     expect(ask).toContain("/audio/tone.wav</Play></Gather>");
     expect(redirect(await call("heard", { Digits: "9" }, "f=street"))).toBe("type?f=street"); // the keypad path: 9 (Nov 23, 2026)
     expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("addr-house"); // star: one step back
