@@ -157,6 +157,7 @@ async function recalcSubtotal(tx: Tx | typeof db, orderId: number) {
   // Offers (Abraham, Nov 17, 2026; Owner switches, all off by default): the rentals total after the one offer
   const { bestOffer, offerSwitches } = await import("@/lib/offers");
   const offer = await bestOffer(tx, orderId, await offerSwitches(tx));
+  const was = (await tx.execute(sql`SELECT offer_note FROM orders WHERE id = ${orderId}`)).rows[0] as { offer_note: string | null } | undefined;
   await tx.execute(sql`
     UPDATE orders SET
       subtotal_cents = COALESCE((SELECT SUM(qty * unit_price_cents) FROM order_items WHERE order_id = ${orderId}), 0) - ${offer.discountCents},
@@ -165,6 +166,20 @@ async function recalcSubtotal(tx: Tx | typeof db, orderId: number) {
       updated_at = now()
     WHERE id = ${orderId}
   `);
+  // Audit H2 (Nov 24, 2026): an order already priced keeps its total in step with its rentals: the same delivery fee,
+  // sales tax on the new amount. A changed offer can change the delivery fee (the 4th Sunday), so it is priced again.
+  const r = await tx.execute(sql`SELECT subtotal_cents, delivery_fee_cents, tax_percent, total_cents FROM orders WHERE id = ${orderId}`);
+  const o = r.rows[0] as { subtotal_cents: number; delivery_fee_cents: number | null; tax_percent: string | null; total_cents: number | null } | undefined;
+  if (!o || o.total_cents === null) return;
+  if ((was?.offer_note ?? null) !== (offer.note ?? null) || o.tax_percent === null) {
+    await tx.execute(sql`UPDATE orders SET total_cents = NULL, tax_cents = 0, delivery_fee_cents = 0, delivery_zone = NULL WHERE id = ${orderId}`);
+    return;
+  }
+  const { taxOn } = await import("@/lib/pricing");
+  const sub = Number(o.subtotal_cents);
+  const fee = Number(o.delivery_fee_cents);
+  const tax = taxOn(sub + fee, String(o.tax_percent));
+  await tx.execute(sql`UPDATE orders SET tax_cents = ${tax}, total_cents = ${sub + fee + tax} WHERE id = ${orderId}`);
 }
 
 /**

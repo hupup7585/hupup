@@ -82,16 +82,32 @@ export async function sendPayLinkAction(orderId: number): Promise<ActionResult> 
 }
 
 export async function updateDetailsAction(orderId: number, form: FormData): Promise<ActionResult> {
-  await requireAdmin();
+  const staff = await requireAdmin();
+  const [before] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
+  if (!before) return { ok: false, message: "Not saved. Order not found." };
+  const deliveryAddress = String(form.get("deliveryAddress") || "").trim() || null;
+  const notes = String(form.get("notes") || "") || null;
+  const moved = (before.deliveryAddress ?? null) !== deliveryAddress;
+  // Audit H2 (Nov 24, 2026): a new address on an order nothing has been paid on is priced again (zone, delivery, tax,
+  // total), so the next payment link charges the new amount. Paid or finished orders keep their price.
+  const reprice = moved && before.paidCents === 0 && !["CANCELLED", "DELIVERED", "PICKED_UP"].includes(before.status);
   await db
     .update(schema.orders)
     .set({
-      deliveryAddress: String(form.get("deliveryAddress") || "") || null,
-      notes: String(form.get("notes") || "") || null,
+      deliveryAddress,
+      notes,
+      ...(reprice ? { totalCents: null, deliveryFeeCents: 0, taxCents: 0, deliveryZone: null } : {}),
       updatedAt: new Date(),
     })
     .where(eq(schema.orders.id, orderId));
+  let problem: string | null = null;
+  if (reprice && !(await ensurePriced(orderId))) problem = (await pricingProblem(orderId)) ?? "This order could not be priced.";
+  const [after] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
+  const pick = (o: typeof before) => ({ deliveryAddress: o.deliveryAddress, notes: o.notes, deliveryZone: o.deliveryZone, deliveryFeeCents: o.deliveryFeeCents, taxCents: o.taxCents, totalCents: o.totalCents });
+  await db.insert(schema.auditLog).values({ userId: staff.userId ?? null, action: "order.details", entityType: "order", entityId: String(orderId), before: pick(before), after: pick(after) });
   revalidatePath("/admin", "layout");
+  if (problem) return { ok: false, message: `Saved, but no payment link can be sent: ${problem}` };
+  if (moved && !reprice && before.paidCents > 0) return { ok: true, message: "Saved. Payment was already taken, so the price did not change." };
   return { ok: true, message: "Saved" };
 }
 
