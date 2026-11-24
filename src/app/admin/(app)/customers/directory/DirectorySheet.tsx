@@ -11,16 +11,16 @@ import type { SheetKey, SheetRow } from "@/lib/directory-sheet";
  */
 type Col = { key: SheetKey; label: string; rtl?: boolean; w: number };
 const COLS: Col[] = [
-  { key: "yiddishLastName", label: "Yiddish last name", rtl: true, w: 72 },
-  { key: "yiddishFirstName", label: "Yiddish first name", rtl: true, w: 72 },
-  { key: "lastName", label: "Last name", w: 72 },
-  { key: "firstName", label: "First name", w: 72 },
-  { key: "house", label: "House number", w: 54 },
-  { key: "street", label: "Street name", w: 90 },
-  { key: "unit", label: "Unit", w: 44 },
-  { key: "place", label: "Town, state and zip", w: 110 },
-  { key: "phone", label: "Phone number", w: 104 },
-  { key: "areaPrinted", label: "Area as printed", w: 72 },
+  { key: "yiddishLastName", label: "Yiddish last name", rtl: true, w: 40 },
+  { key: "yiddishFirstName", label: "Yiddish first name", rtl: true, w: 40 },
+  { key: "lastName", label: "Last name", w: 40 },
+  { key: "firstName", label: "First name", w: 40 },
+  { key: "house", label: "House number", w: 36 },
+  { key: "street", label: "Street name", w: 40 },
+  { key: "unit", label: "Unit", w: 32 },
+  { key: "place", label: "Town, state and zip", w: 40 },
+  { key: "phone", label: "Phone number", w: 40 },
+  { key: "areaPrinted", label: "Area as printed", w: 40 },
 ];
 const LETTERS = "ABCDEFGHIJ";
 /** The Download menu closes once a file is chosen. */
@@ -30,7 +30,7 @@ const closeMenu = (e: React.MouseEvent<HTMLElement>) => {
 };
 const ROW_H = 38;
 const NUM_W = 58;
-const CELL_PAD = 18; // left and right padding inside a cell
+const CELL_PAD = 12; // a small even trim on both sides of the words (Abraham, Nov 24, 2026)
 const MAX_W = 300;
 
 /**
@@ -45,10 +45,10 @@ function measureWidths(rows: SheetRow[], font: string): Record<SheetKey, number>
     if (ctx) {
       // the longest title word in small bold, then the widest values (the 30 longest by letters are measured)
       ctx.font = `700 11px ${font}`;
-      for (const word of c.label.split(" ")) w = Math.max(w, ctx.measureText(word).width * 1.04 + CELL_PAD + 16);
+      for (const word of c.label.split(" ")) w = Math.max(w, ctx.measureText(word).width * 1.02 + CELL_PAD + 3);
       ctx.font = `${c.rtl ? 600 : 400} 13.5px ${font}`;
       const longest = rows.map((r) => r[c.key]).filter(Boolean).sort((a, b) => b.length - a.length).slice(0, 30);
-      for (const v of longest) w = Math.max(w, ctx.measureText(v).width * 1.04 + CELL_PAD + 4);
+      for (const v of longest) w = Math.max(w, ctx.measureText(v).width * 1.02 + CELL_PAD + 2);
     }
     out[c.key] = Math.ceil(Math.min(MAX_W, w));
   }
@@ -469,11 +469,11 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
                     title="Click to sort"
                     onClick={() => setSort((s) => (s?.key !== c.key ? { key: c.key, dir: 1 } : s.dir === 1 ? { key: c.key, dir: -1 } : null))}
                     style={{ width: W[c.key] }}
-                    className={`flex shrink-0 items-center gap-0.5 overflow-hidden border-l border-white/10 px-[9px] text-left text-[11px] font-bold leading-[1.15] text-white hover:bg-white/10 ${c.rtl ? "justify-end text-right" : ""}`}
+                    className={`relative flex shrink-0 items-center overflow-hidden border-l border-white/10 px-[6px] text-left text-[11px] font-bold leading-[1.15] text-white hover:bg-white/10 ${c.rtl ? "justify-end text-right" : ""}`}
                     data-sort={c.key}
                   >
                     <span className="line-clamp-2 break-words">{c.label}</span>
-                    <span className={`text-[#FFD84D] ${on ? "" : "opacity-0"}`}>{on && sort!.dir === -1 ? "▼" : "▲"}</span>
+                    {on && <span className="absolute right-[2px] top-[1px] text-[9px] leading-none text-[#FFD84D]">{sort!.dir === -1 ? "▼" : "▲"}</span>}
                   </button>
                 );
               })}
@@ -558,7 +558,7 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
                         }}
                         onDoubleClick={() => startEdit({ r, c: ci })}
                         style={{ width: W[c.key] }}
-                        className={`relative flex shrink-0 items-center overflow-hidden border-b border-r border-[#EDF1F7] px-[9px] text-[13.5px] ${c.rtl ? "text-right font-[600]" : ""} ${picked ? "bg-[#E8F1FC]" : ""} ${isFocus && !editing ? "z-10 outline outline-2 -outline-offset-1 outline-[#2585D8]" : ""} text-[#1B2B41]`}
+                        className={`relative flex shrink-0 items-center overflow-hidden border-b border-r border-[#EDF1F7] px-[6px] text-[13.5px] ${c.rtl ? "text-right font-[600]" : ""} ${picked ? "bg-[#E8F1FC]" : ""} ${isFocus && !editing ? "z-10 outline outline-2 -outline-offset-1 outline-[#2585D8]" : ""} text-[#1B2B41]`}
                         data-cell={`${row.id}:${c.key}`}
                       >
                         {editing ? (
