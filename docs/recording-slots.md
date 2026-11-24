@@ -219,7 +219,7 @@ Thank you for choosing Hup Up Attractions! |
 | ask_email | Ask for email | Almost done! Please say your email address for your receipt, like john at gmail dot com. Or press pound to skip. |
 | press_pound_done | After every information question: press pound when finished | When you are finished, please press pound. |
 | type_hint | Typing: how to switch | To type it on your keypad instead, press star. |
-| type_instructions | Typing: how to type | To type, press each key until you reach the letter: press 2 once for A, twice for B, three times for C, and the same for every key. To type two letters on the same key, press star once between them. For example, A then B is 2, star, 2 2. Press star twice for a space. When you are finished, please press pound. |
+| type_instructions | Typing: how to type | Press 2 once for A, twice for B, three times for C, and so on for all keys. If two letters in a row use the same key, press star between them. To type a number, press the key one more time. To go back, press star twice. Press 0 once for a space, and twice for number 0. Press 1 once for number 1, twice for a dot, three times for a dash, and four times for an underscore. When you are finished, press the pound key. |
 | type_email_symbols | Typing: email symbols | For a dot, press 1 once. For the at sign, press 1 twice. |
 | typed_back#1 | Typing: read back, piece 1 | You typed: |
 | heard#1 | Read back what we heard, piece 1 | I heard: |

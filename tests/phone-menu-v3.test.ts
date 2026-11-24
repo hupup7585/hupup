@@ -27,7 +27,7 @@ import { db, schema } from "@/lib/db";
 import { handleVoice } from "@/lib/ivr/flow";
 import { PROMPTS, promptAudio, promptWaiting } from "@/lib/ivr/prompts";
 import { lineRingsNow, staffAnnouncement } from "@/lib/ivr/routing";
-import { decodeCatalogKeys } from "@/lib/ivr/catalog-keys";
+import { decodeMultitap } from "@/lib/ivr/multitap";
 import { isCatalogSubject, handleCatalogEmail } from "@/lib/catalog-send";
 import { promptRecordingLink, verifyPromptRecordingLink } from "@/lib/signed-link";
 import { audioKind, chooseGoogleVoice, chooseRecording, googleVoiceName, makeGoogleRecording, recordingBytes, recordingsByKey, saveRecordingChunk, startRecordingUpload } from "@/lib/prompt-recordings";
@@ -127,12 +127,12 @@ describe("section 8: bookings reminders", () => {
 
 describe("section 6: key 8 catalog keypad", () => {
   it("letters, one star between letters on the same key, two stars erase, three go back, 0 switches to numbers, 1 is . _ -", () => {
-    expect(decodeCatalogKeys("2*22").text).toBe("ab");
-    expect(decodeCatalogKeys("7777").text).toBe("s");
-    expect(decodeCatalogKeys("44433**3").text).toBe("id"); // 444 = i, 33 = e, two stars erase it, 3 = d
-    expect(decodeCatalogKeys("999666881").text).toBe("you.");
-    expect(decodeCatalogKeys("0123").text).toBe("123");
-    expect(decodeCatalogKeys("2***").back).toBe(true);
+    // the one decoder for every typing step (Abraham, Nov 24, 2026)
+    expect(decodeMultitap("2*22", "email")).toBe("ab");
+    expect(decodeMultitap("7777", "email")).toBe("s");
+    expect(decodeMultitap("44433**3", "email")).toBe("id"); // 444 = i, 33 = e, two stars erase it, 3 = d
+    expect(decodeMultitap("99966688111", "email")).toBe("you-"); // 111 = dash
+    expect(decodeMultitap("1*2222*3333", "email")).toBe("123");
   });
 });
 

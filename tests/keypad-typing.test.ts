@@ -3,21 +3,16 @@ import { decodeMultitap, titleCase } from "@/lib/ivr/multitap";
 
 /* Keypad typing for spoken answers (Abraham L). */
 
-/** How a caller types text: presses per letter, a star between letters on the same key, two stars for a space. */
+/** How a caller types (Abraham, Nov 24, 2026): presses per letter, a star between two presses on the same key, 0 once for a space. */
 function encode(text: string): string {
   const keys: Record<string, string> = { "2": "abc", "3": "def", "4": "ghi", "5": "jkl", "6": "mno", "7": "pqrs", "8": "tuv", "9": "wxyz" };
-  const sym: Record<string, string> = { ".": "1", "@": "11" };
+  const sym: Record<string, string> = { "1": "1", ".": "11", "-": "111", "_": "1111", "0": "00", " ": "0" };
   let out = "";
   let lastKey = "";
   for (const ch of text) {
-    if (ch === " ") {
-      out += "**";
-      lastKey = "";
-      continue;
-    }
     let press = sym[ch];
     if (!press) {
-      if (/\d/.test(ch)) press = ch === "0" || ch === "1" ? ch : ch.repeat(keys[ch].length + 1);
+      if (/\d/.test(ch)) press = ch.repeat(keys[ch].length + 1);
       else {
         const k = Object.keys(keys).find((x) => keys[x].includes(ch))!;
         press = k.repeat(keys[k].indexOf(ch) + 1);
@@ -33,15 +28,15 @@ describe("multi-tap decoding", () => {
   it.each([
     ["2", "a"], ["22", "b"], ["222", "c"], ["2222", "2"], ["22222", "a"],
     ["2*22", "ab"], ["22*2", "ba"], ["444", "i"], ["7777", "s"], ["9999", "z"], ["99999", "9"],
-    ["2**22", "a b"], ["0", "0"], ["1", "1"],
+    ["2022", "a b"], ["00", "0"], ["1", "1"], ["11", "."], ["111", "-"], ["1111", "_"], ["233**4", "ag"],
   ])("%s -> %s", (keys, text) => expect(decodeMultitap(keys)).toBe(text));
   it("a whole name and an address with numbers (typed exactly as a caller would)", () => {
-    expect(encode("yossi friedman")).toBe("9996667777*7777444**33377744433*36266");
+    expect(encode("yossi friedman")).toBe("9996667777*7777444033377744433*36266");
     expect(titleCase(decodeMultitap(encode("yossi friedman")))).toBe("Yossi Friedman");
     expect(titleCase(decodeMultitap(encode("12 forest road")))).toBe("12 Forest Road");
   });
-  it("email: key 1 is dot (once) and at (twice)", () => {
-    for (const e of ["yossi@gmail.com", "k.weiss@yahoo.com", "info@hupupattractions.com"]) expect(decodeMultitap(encode(e), "email")).toBe(e);
+  it("email parts: key 1 twice is a dot, three times a dash, four times an underscore (the ending is chosen from a menu)", () => {
+    for (const e of ["yossi", "k.weiss", "info_hup-up2"]) expect(decodeMultitap(encode(e), "email")).toBe(e);
   });
 });
 
@@ -79,7 +74,7 @@ describe("typing in the call", () => {
   it("typing plays the instructions, collects keys until #, then reads back what was typed", async () => {
     const t = await call("type", {}, "f=name");
     expect(t).toMatch(/<Gather [^>]*finishOnKey="#"/);
-    expect(said(t)[0]).toMatch(/^To type, press each key until you reach the letter: press 2 once for A, twice for B, three times for C/);
+    expect(said(t)[0]).toMatch(/^Press 2 once for A, twice for B, three times for C, and so on for all keys\./); // Abraham, Nov 24, 2026
     const back = await call("typed", { Digits: encode("yossi friedman") }, "f=name");
     expect(said(back)).toContain("You typed: Yossi Friedman.");
     expect(said(back)).toContain("If that is correct, press 1. To try again, press 2."); // the shared Confirm ending (Nov 23, 2026)

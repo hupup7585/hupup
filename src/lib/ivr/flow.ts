@@ -70,7 +70,7 @@ import { lastPhoneDate, normalizeSpokenAddress, normalizeSpokenEmail, normalizeS
 import { liveVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
 import { FIRST_TIME_ONLY, menuOrder, type MenuId } from "./menu-order";
 import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
-import { CATALOG_ENDINGS, decodeCatalogKeys, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
+import { CATALOG_ENDINGS, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
 import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState, textingActive } from "@/lib/voicemail";
 import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staffAnnouncement, type RingKey } from "./routing";
 import { calendarNow } from "@/lib/clock";
@@ -366,34 +366,6 @@ export const LASER_ADDONS_CATEGORY = "Laser tag add-ons";
 async function isLaserBase(categoryId: number) {
   const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, categoryId));
   return Boolean(cat && /laser/i.test(cat.name) && cat.name !== LASER_ADDONS_CATEGORY);
-}
-
-/** Keypad echo (preview only until Abraham says y, Nov 22, 2026). */
-export const keypadEchoOn = (env: Record<string, string | undefined> = process.env) => env.VERCEL_ENV === "preview" || env.KEYPAD_ECHO === "on";
-
-const KT_KEYS: Record<string, string> = { "2": "abc", "3": "def", "4": "ghi", "5": "jkl", "6": "mno", "7": "pqrs", "8": "tuv", "9": "wxyz" };
-/** The character for a key pressed n times (box 103): letters, then the digit; 1 = 1, dot, dash, underscore; 0 = 0. */
-export function ktChar(key: string, n: number, _mode: "email" | "text"): string {
-  const cycle = key === "1" ? ["1", ".", "-", "_"] : key === "0" ? ["0"] : [...(KT_KEYS[key] ?? ""), key];
-  return cycle[(n - 1) % cycle.length];
-}
-const ktSpoken = (c: string) => (c === "." ? "dot" : c === "-" ? "dash" : c === "_" ? "underscore" : /[a-z]/.test(c) ? c.toUpperCase() : c);
-
-async function ktFinish(ctx: Ctx, vr: VR, f: Field, text: string) {
-  const spec = FIELDS[f];
-  await updateSession(ctx.callSid, { data: { kt: undefined } }, ctx.session);
-  const raw = text.trim();
-  const value = raw ? (f === "email" ? spec.normalize(raw) : titleCase(raw)) : null;
-  if (!value) {
-    sp(vr, ctx, "field_unclear");
-    return back(vr, "type", { f, again: 1 });
-  }
-  await track(ctx.callSid, "typed", `Typed ${f}: ${value}`, { field: f, value });
-  await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
-  const g = keypad(vr, url("confirm", { f, t: 1 }));
-  sp(g, ctx, "typed_back", { value: spec.readBack(value) });
-  confirmEnd(g, ctx);
-  return noInput(vr, ctx, "readback", { f, t: 1 });
 }
 
 /** Directory lookup by caller ID: preview only until Abraham approves its lines (Nov 23, 2026). */
@@ -1415,9 +1387,9 @@ const handlers: Record<string, Handler> = {
   async "catalog-typed"(ctx, vr) {
     const part = ctx.query.get("part") === "domain" ? "domain" : "local";
     const keep = ctx.query.get("add") === "1" ? catPart(ctx, part) : "";
-    const r = decodeCatalogKeys(`${ctx.session?.data.catKeys ?? ""}${ctx.body.Digits ?? ""}`, keep);
-    await updateSession(ctx.callSid, { data: { catKeys: "", [part === "domain" ? "catDomain" : "catLocal"]: r.text, catStt: undefined } }, ctx.session);
-    if (r.back) return part === "domain" ? back(vr, "catalog-ending") : emailHome(ctx, vr); // star three times: one step back
+    // The one keypad decoder for every typing step (Abraham, Nov 24, 2026)
+    const text = decodeMultitap(`${ctx.session?.data.catKeys ?? ""}${ctx.body.Digits ?? ""}`.replace(/#/g, ""), "email", keep);
+    await updateSession(ctx.callSid, { data: { catKeys: "", [part === "domain" ? "catDomain" : "catLocal"]: text, catStt: undefined } }, ctx.session);
     return back(vr, "catalog-got", { part });
   },
 
@@ -2649,7 +2621,6 @@ const handlers: Record<string, Handler> = {
   /** Keypad typing: the instructions, then keys until # (star separates letters inside this prompt, not the menu). */
   type(ctx, vr) {
     const f = ctx.query.get("f") as Field;
-    if (keypadEchoOn()) return handlers["kt-start"](ctx, vr);
     const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 15, action: url("typed", { f }), method: "POST" });
     // Box 103 (Nov 22, 2026): the same recording every time an email is typed, in every flow (pound line inside it);
     // the address gets the same how-to with the space line
@@ -2657,80 +2628,6 @@ const handlers: Record<string, Handler> = {
     else if (f === "address" || f === "street") sp(g, ctx, "address_keypad_help");
     else if (!ctx.query.get("again")) sp(g, ctx, "type_instructions"); // ends with "When you are finished, please press pound."
     return back(vr, "typed", { f });
-  },
-
-  /**
-   * Keypad typing one key at a time, with each character said back (Abraham, Nov 22, 2026; PREVIEW ONLY until he
-   * says y). A key is cycled by pressing it again (2: A, B, C, 2); 1 second with no key keeps that character; star
-   * goes back one letter (twice quickly in an address = a space); pound finishes.
-   */
-  async "kt-start"(ctx, vr) {
-    const f = ctx.query.get("f") as Field;
-    await updateSession(ctx.callSid, { data: { kt: { text: "" } } }, ctx.session);
-    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 15, action: url("kt-key", { f }), method: "POST" });
-    if (f === "email") sp(g, ctx, "catalog_keypad_help");
-    else if (f === "address" || f === "street") sp(g, ctx, "address_keypad_help");
-    else sp(g, ctx, "type_instructions");
-    return back(vr, "kt-done", { f });
-  },
-
-  async "kt-key"(ctx, vr) {
-    const t0 = Date.now();
-    const f = ctx.query.get("f") as Field;
-    const k = ctx.body.Digits ?? "";
-    const st = { text: "", ...(ctx.session?.data.kt ?? {}) };
-    const mode = f === "email" ? "email" : "text";
-    if (k === "#") {
-      const text = st.text + (st.key ? ktChar(st.key, st.n ?? 1, mode) : "");
-      return ktFinish(ctx, vr, f, text);
-    }
-    let echo = "";
-    if (k === "*") {
-      if (st.star && mode === "text") {
-        st.text += " "; // star twice in an address: a space
-        st.star = false;
-        echo = "space";
-      } else {
-        // star once: back one letter (the one being typed, else the last one kept)
-        if (st.key) (st.key = undefined), (st.n = undefined);
-        else st.text = st.text.slice(0, -1);
-        st.star = mode === "text";
-      }
-    } else if (/^\d$/.test(k)) {
-      st.star = false;
-      if (st.key === k) st.n = (st.n ?? 1) + 1;
-      else {
-        if (st.key) st.text += ktChar(st.key, st.n ?? 1, mode);
-        st.key = k;
-        st.n = 1;
-      }
-      echo = ktSpoken(ktChar(k, st.n!, mode));
-    }
-    await updateSession(ctx.callSid, { data: { kt: st } }, ctx.session);
-    // 1 second with no key keeps the character (the wait starts when the echo has finished playing)
-    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 1, action: url("kt-key", { f }), method: "POST" });
-    if (echo) sayLive(g, ctx, echo);
-    console.log(JSON.stringify({ kt: "key", callSid: ctx.callSid, key: k, echo, serverMs: Date.now() - t0, at: new Date(t0).toISOString() }));
-    await track(ctx.callSid, "step", `Typed key ${k}${echo ? ` (said ${echo})` : ""}`, { field: f, key: k, echo, serverMs: Date.now() - t0 });
-    vr.redirect({ method: "POST" }, url("kt-keep", { f }));
-    return vr;
-  },
-
-  /** 1 second went by with no key: the character is kept; wait for the next key. */
-  async "kt-keep"(ctx, vr) {
-    const f = ctx.query.get("f") as Field;
-    const st = { text: "", ...(ctx.session?.data.kt ?? {}) };
-    if (st.key) st.text += ktChar(st.key, st.n ?? 1, f === "email" ? "email" : "text");
-    await updateSession(ctx.callSid, { data: { kt: { text: st.text } } }, ctx.session);
-    vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 10, action: url("kt-key", { f }), method: "POST" });
-    vr.redirect({ method: "POST" }, url("kt-done", { f }));
-    return vr;
-  },
-
-  /** No key for a while: what was typed so far is used (as if pound), or the did-not-catch line. */
-  async "kt-done"(ctx, vr) {
-    const f = ctx.query.get("f") as Field;
-    return ktFinish(ctx, vr, f, ctx.session?.data.kt?.text ?? "");
   },
 
   async typed(ctx, vr) {
