@@ -60,13 +60,17 @@ async function reserveInTx(
   if (!p.active) return { ok: false, reason: "inactive" };
 
   let orderId = opts.orderId ?? null;
+  let heldUntil = pickupDate;
   if (orderId) {
     const [o] = await tx.select().from(orders).where(eq(orders.id, orderId));
     if (!o) return { ok: false, reason: "not_found" };
     if (o.eventDate !== opts.eventDate) return { ok: false, reason: "date_mismatch" };
+    // Audit H1 (Nov 24, 2026): an item added to an order is out until that order's own pickup day, so it is checked
+    // through that day (a rental with a different pickup goes on its own order)
+    heldUntil = o.pickupDate;
   }
 
-  const free = await checkBookable(p.id, p.quantity, opts.eventDate, tx, pickupDate);
+  const free = await checkBookable(p.id, p.quantity, opts.eventDate, tx, heldUntil);
   if (free < opts.qty) return { ok: false, reason: "unavailable", free };
 
   if (!orderId) {

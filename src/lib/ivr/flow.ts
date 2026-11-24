@@ -785,9 +785,29 @@ function dialTargets(vr: VR, list: ReturnType<typeof ringListFor>, k: RingKey, i
   return vr;
 }
 
-/** This day becomes the one being shopped for on the call; an order already held for the same day is reused. */
+/**
+ * The held order on this call for this rental day with the same pickup and span (audit H1, Nov 24, 2026): a rental kept
+ * for the next day too (Box 18 key 2) or a closed day booked from the day before is its own order, so its pickup day and
+ * its 1.5x never touch the other items booked for that date.
+ */
+async function dayOrder(ctx: Ctx, date: string) {
+  const span = ctx.session?.data.spanDays?.[date];
+  const pickup = keptPickup(ctx, date) ?? pickupDateFor(date, await getSettings());
+  return (await callOrders(ctx)).find((o) => o.order.eventDate === date && o.order.pickupDate === pickup && (o.order.spanDays ?? null) === (span?.days ?? null)) ?? null;
+}
+
+/** A plain booking for this date (Box 18 key 1, or a date confirmed): no next-day span left over from earlier. */
+async function clearSpan(ctx: Ctx, date: string) {
+  const spans = { ...(ctx.session?.data.spanDays ?? {}) };
+  if (!spans[date]) return;
+  delete spans[date];
+  await updateSession(ctx.callSid, { data: { spanDays: spans } }, ctx.session);
+  if (ctx.session) ctx.session.data.spanDays = spans;
+}
+
+/** This day becomes the one being shopped for on the call; an order already held for the same rental is reused. */
 async function chooseDay(ctx: Ctx, date: string) {
-  const sameDay = (await callOrders(ctx)).find((o) => o.order.eventDate === date);
+  const sameDay = await dayOrder(ctx, date);
   await updateSession(ctx.callSid, { orderId: sameDay?.order.id ?? null, data: { day: date } }, ctx.session);
 }
 
@@ -2097,6 +2117,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (d === "*" || d === "3") return back(vr, "date", { p }); // star: one step back; 3: a different date
     if (d === "1") {
+      await clearSpan(ctx, date); // key 1: this date only, never stretched by an earlier key 2
       await chooseDay(ctx, date);
       return back(vr, "qty", { p, d: date });
     }
@@ -2125,6 +2146,7 @@ const handlers: Record<string, Handler> = {
       if (d) sp(vr, ctx, "not_valid");
       return back(vr, "date-ask", { p, d: date });
     }
+    await clearSpan(ctx, date);
     await chooseDay(ctx, date);
     return p ? back(vr, "qty", { p, d: date }) : back(vr, "book");
   },
@@ -2255,7 +2277,7 @@ const handlers: Record<string, Handler> = {
     // Nov 19, 2026: the water line moved to the opening of the jumping balloons list; it no longer plays here
     const session = ctx.session ?? (await ensureSession(ctx.callSid, ctx.from));
     // The held order for this day (one per rental day on the call)
-    const existing = (await callOrders(ctx)).find((o) => o.order.eventDate === date) ?? null;
+    const existing = await dayOrder(ctx, date);
     const r = await reserveItem({
       orderId: existing?.order.id ?? null,
       productId: p.id,
@@ -2393,8 +2415,8 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "not_valid");
       return back(vr, "packs", { d: date });
     }
-    const day = (await callOrders(ctx)).find((o) => o.order.eventDate === date) ?? null;
-    const r = await reserveItem({ orderId: day?.order.id ?? null, productId: pick.id, qty: 1, eventDate: date, channel: "PHONE", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid });
+    const day = await dayOrder(ctx, date); // the same rental as the item it goes with (audit H1)
+    const r = await reserveItem({ orderId: day?.order.id ?? null, productId: pick.id, qty: 1, eventDate: date, channel: "PHONE", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid, pickupDate: keptPickup(ctx, date) });
     if (r.ok) {
       await track(ctx.callSid, "item_added", `Added ${pick.name} for ${spokenDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
       const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), r.orderId])];
@@ -2432,8 +2454,8 @@ const handlers: Record<string, Handler> = {
       return back(vr, "ocean", { d: date, n });
     }
     // On the same day's order as the balloon, so it is on the order and in the payment total
-    const day = (await callOrders(ctx)).find((o) => o.order.eventDate === date) ?? null;
-    const r = await reserveItem({ orderId: day?.order.id ?? null, productId: pick.id, qty: 1, eventDate: date, channel: "PHONE", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid });
+    const day = await dayOrder(ctx, date); // the same rental as the item it goes with (audit H1)
+    const r = await reserveItem({ orderId: day?.order.id ?? null, productId: pick.id, qty: 1, eventDate: date, channel: "PHONE", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid, pickupDate: keptPickup(ctx, date) });
     if (r.ok) {
       await track(ctx.callSid, "item_added", `Added ${pick.name} for ${spokenDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
       const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), r.orderId])];
