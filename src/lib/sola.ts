@@ -87,6 +87,15 @@ export function verifyWebhookSignature(fields: Record<string, string>, signature
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+/**
+ * A sale (money in): "cc:sale", "check:sale" and the like. Refunds, voids, credits, auth-only, capture, save and
+ * adjust are not payments (Audit C1, Nov 24, 2026).
+ */
+export function isSaleCommand(command: string): boolean {
+  const c = command.trim().toLowerCase();
+  return /^(cc|check|ach|ebt|gift)?:?sale$/.test(c);
+}
+
 /** Case-insensitive field getter for Sola payloads. */
 export function field(fields: Record<string, string>, name: string): string | undefined {
   const k = Object.keys(fields).find((key) => key.toLowerCase() === name.toLowerCase());

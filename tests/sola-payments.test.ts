@@ -91,7 +91,7 @@ describe("Sola's webhook: Paid or Declined, with date and time and last 4 only",
     expect(paymentResultLabel(o)).toMatch(/^Declined [A-Z][a-z]{2} \d{1,2}, 20\d\d, \d{1,2}:\d\d [AP]M, card ending 0002$/);
   });
   it("approved: Paid, confirmed, with the time and last 4; nothing else about the card is stored", async () => {
-    const res = await post({ xResult: "A", xStatus: "Approved", xInvoice: invoiceFor(orderId), xAuthAmount: "232.47", xMaskedCardNumber: "4xxxxxxxxxxx1111", xRefNum: "101" });
+    const res = await post({ xResult: "A", xStatus: "Approved", xCommand: "cc:sale", xInvoice: invoiceFor(orderId), xAuthAmount: "232.47", xMaskedCardNumber: "4xxxxxxxxxxx1111", xRefNum: "101" });
     expect(res.status).toBe(200);
     const o = await order(orderId);
     expect(o.paymentResult).toBe("approved");
@@ -129,6 +129,60 @@ describe("no fake payment on the live site (Nov 24, 2026)", () => {
     const { POST } = await import("@/app/api/sola/webhook/route");
     const r = await POST(new Request("https://x/api/sola/webhook", { method: "POST", body: "xResult=A&xInvoice=HU-1001&xAmount=10.00&xRefNum=1" }));
     expect(r.status).toBe(503);
+  });
+});
+
+describe("Audit C1 (Nov 24, 2026): only a full sale confirms an order", () => {
+  let small = 0;
+  beforeAll(async () => {
+    process.env.SOLA_WEBHOOK_PIN = PIN;
+    process.env.ADMIN_EMAIL = "owner@example.com";
+    const [c] = await db.insert(schema.customers).values({ name: "Short Payer", phone: "+18455550177" }).returning();
+    const [o] = await db
+      .insert(schema.orders)
+      .values({ status: "PENDING_PAYMENT", channel: "POS", customerId: c.id, eventDate: "2026-12-15", pickupDate: "2026-12-16", deliveryAddress: "12 Forest Road, Monroe", subtotalCents: 20000 })
+      .returning();
+    small = o.id;
+    expect(await ensurePriced(small)).toBe(true);
+    expect((await order(small)).totalCents).toBe(23247);
+  });
+  const income = async (id: number) => (await db.select().from(schema.bookEntries).where(eq(schema.bookEntries.orderId, id))).filter((e) => e.kind === "income");
+
+  it("$1.00 approved on a $232.47 order: not confirmed, Needs attention, Owner emailed, no paid notice to the customer", async () => {
+    h.emails.length = 0;
+    h.sms.length = 0;
+    const res = await post({ xResult: "A", xStatus: "Approved", xCommand: "cc:sale", xInvoice: invoiceFor(small), xAmount: "1.00", xRefNum: "201" });
+    expect(res.status).toBe(200);
+    const o = await order(small);
+    expect(o.status).toBe("NEEDS_ATTENTION");
+    expect(o.paidCents).toBe(100);
+    expect(o.notes).toContain("Paid $1.00 of $232.47.");
+    expect(h.emails.some((e) => e.to === "owner@example.com" && /paid less than the total/.test(e.subject))).toBe(true);
+    expect(h.sms).toEqual([]); // no "paid" text
+  });
+
+  it("a $0.00 approval is ignored", async () => {
+    const res = await post({ xResult: "A", xCommand: "cc:sale", xInvoice: invoiceFor(small), xAmount: "0.00", xRefNum: "202" });
+    expect(await res.text()).toBe("ignored (zero amount)");
+    expect((await order(small)).paidCents).toBe(100);
+  });
+
+  it("a signed refund or void with result A for the same invoice is not a new payment", async () => {
+    const before = await income(small);
+    for (const [cmd, ref] of [["cc:refund", "203"], ["cc:void", "204"], ["cc:authonly", "205"], ["cc:save", "206"], ["cc:adjust", "207"]]) {
+      const res = await post({ xResult: "A", xStatus: "Approved", xCommand: cmd, xInvoice: invoiceFor(small), xAmount: "232.47", xRefNum: ref });
+      expect(await res.text()).toBe(`ignored (${cmd})`);
+    }
+    expect((await order(small)).paidCents).toBe(100);
+    expect(await income(small)).toHaveLength(before.length);
+  });
+
+  it("the rest paid as a sale (cc:sale): now paid in full, confirmed", async () => {
+    const res = await post({ xResult: "A", xStatus: "Approved", xCommand: "cc:sale", xInvoice: invoiceFor(small), xAmount: "231.47", xRefNum: "208" });
+    expect(res.status).toBe(200);
+    const o = await order(small);
+    expect(o.paidCents).toBe(23247);
+    expect(o.status).toBe("NEEDS_ATTENTION"); // staff set it right after an underpayment; a later full payment never auto-confirms over a flag
   });
 });
 

@@ -1,4 +1,4 @@
-import { field, isApproved, last4Of, orderIdFromInvoice, paymentResultOf, verifyWebhookSignature } from "@/lib/sola";
+import { field, isApproved, isSaleCommand, last4Of, orderIdFromInvoice, paymentResultOf, verifyWebhookSignature } from "@/lib/sola";
 import { paymentReceivedNotices, recordPaymentResult } from "@/lib/payment-result";
 import { getPaymentGroup, markGroupPaid } from "@/lib/orders";
 import { linkPaymentToAcceptance } from "@/lib/rental-terms";
@@ -22,6 +22,13 @@ export async function POST(req: Request) {
   if (!verifyWebhookSignature(fields, req.headers.get("ck-signature"), pin)) {
     return new Response("Bad signature", { status: 401 });
   }
+  // Audit C1 (Nov 24, 2026): only a sale is a payment. A refund, void, auth-only, save or adjust notice for the same
+  // invoice is logged and ignored, never counted as new money.
+  const command = (field(fields, "xCommand") || "").trim().toLowerCase();
+  if (command && !isSaleCommand(command)) {
+    console.log(`[sola webhook] ignored ${command} for ${field(fields, "xInvoice") ?? "(no invoice)"} ref ${field(fields, "xRefNum") ?? ""}`);
+    return new Response(`ignored (${command})`);
+  }
   const result = paymentResultOf(fields);
   const orderId = orderIdFromInvoice(field(fields, "xInvoice"));
   if (result === "declined") {
@@ -37,6 +44,7 @@ export async function POST(req: Request) {
 
   const cents = parseMoneyToCents(field(fields, "xAuthAmount") || field(fields, "xAmount") || "");
   if (!orderId || cents === null) return new Response("ignored (no invoice/amount)");
+  if (cents <= 0) return new Response("ignored (zero amount)");
 
   // One payment may cover several rental days booked together (a payment group); all of them are confirmed.
   const group = await getPaymentGroup(orderId);
@@ -49,6 +57,7 @@ export async function POST(req: Request) {
   // Evidence: tie this payment to the rental terms version the customer accepted (or record that none was).
   if (before.order.solaRefNum !== field(fields, "xRefNum")) await linkPaymentToAcceptance(orderId, field(fields, "xRefNum") || null, cents);
 
-  if (before.order.solaRefNum !== field(fields, "xRefNum")) await paymentReceivedNotices(orderId, cents);
+  // The "paid" notice only when the booking is now confirmed (Audit C1: never for less than the total)
+  if (before.order.solaRefNum !== field(fields, "xRefNum") && updated.some((u) => u.status === "CONFIRMED")) await paymentReceivedNotices(orderId, cents);
   return new Response("ok");
 }
