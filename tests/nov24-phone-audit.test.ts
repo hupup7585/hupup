@@ -24,3 +24,23 @@ describe("1. one main menu key map everywhere", () => {
     expect(readFileSync("src/lib/call-journey.ts", "utf8")).toContain("Learn about our rentals (key 6)");
   });
 });
+
+describe("4. a test payment link can never go out again", () => {
+  it("the link builder: no SOLA page name on Vercel or in production = no link at all, never /paid?dev=1", async () => {
+    const { paymentLink, devPaymentFallbackAllowed } = await import("@/lib/sola");
+    const save = { ...process.env };
+    delete process.env.SOLA_PAYMENTSITE_NAME;
+    for (const env of [{ VERCEL: "1", NODE_ENV: "production" }, { VERCEL: "1", NODE_ENV: "development" }, { NODE_ENV: "production" }]) {
+      expect(devPaymentFallbackAllowed(env), JSON.stringify(env)).toBe(false);
+    }
+    process.env.VERCEL = "1";
+    expect(paymentLink({ orderId: 5, amountCents: 1000 })).toBeNull();
+    process.env = save;
+  });
+  it("the text sender refuses a message with a test payment link on Vercel", async () => {
+    const { containsTestPayLink } = await import("@/lib/sms");
+    const body = "Pay here: https://hupup.vercel.app/paid?invoice=HU-1068&dev=1";
+    expect(containsTestPayLink(body, { VERCEL: "1" })).toBe(true);
+    expect(containsTestPayLink("Pay here: https://secure.cardknox.com/x?xInvoice=HU-1068", { VERCEL: "1" })).toBe(false);
+  });
+});

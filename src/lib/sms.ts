@@ -246,6 +246,10 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   if (containsCardNumber(input.body)) {
     return { sent: false, blocked: "card_number", error: "Message looks like it contains a card number and was not sent." };
   }
+  // Never a test payment link from the live site (Hark's audit item 4, Nov 24, 2026): /paid?...&dev=1 skipped the card step
+  if (containsTestPayLink(input.body)) {
+    return { sent: false, blocked: "not_allowed", error: "Message contains a test payment link and was not sent." };
+  }
 
   const customer = input.customerId
     ? (await db.select().from(schema.customers).where(eq(schema.customers.id, input.customerId)))[0] ?? null
@@ -397,6 +401,11 @@ async function cancelPending(phone: string, kinds: string[]): Promise<number> {
     canceled++;
   }
   return canceled;
+}
+
+/** A test payment link (/paid?...dev=1) in a message on Vercel (preview or live): never sent. */
+export function containsTestPayLink(body: string, env: Record<string, string | undefined> = process.env): boolean {
+  return Boolean(env.VERCEL) && /\/paid\?[^\s]*\bdev=1\b/.test(body);
 }
 
 export const NO_TEXT_CONSENT = "No text consent; call or email.";
