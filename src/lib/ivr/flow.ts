@@ -2904,12 +2904,16 @@ const handlers: Record<string, Handler> = {
     } else {
       sp(g, ctx, "lookup_many");
       list.forEach((e, i) => {
-        say(g, `For ${name(e)},`);
+        sp(g, ctx, "lookup_for", { name: name(e) }); // "For" from its recording, the name said live
         read(e);
         sp(g, ctx, "lookup_press", { key: i + 1 });
       });
-      sp(g, ctx, "lookup_try", { key: list.length + 1 });
-      sp(g, ctx, "lookup_manual", { key: list.length + 2 });
+      // Two families: slot B, one take (Nov 23, 2026); more families: the two lines with their own keys
+      if (list.length === 2) sp(g, ctx, "lookup_many_options");
+      else {
+        sp(g, ctx, "lookup_try", { key: list.length + 1 });
+        sp(g, ctx, "lookup_manual", { key: list.length + 2 });
+      }
     }
     backLine(g, ctx);
     await track(ctx.callSid, "step", `Address lookup: ${m === "none" ? "not found" : `${list.length} found`}`);

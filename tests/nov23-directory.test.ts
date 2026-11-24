@@ -82,7 +82,7 @@ describe("phone-number address lookup (approved screens, preview)", () => {
     expect(lines[0]).toBe("Here is what we found for this phone number.");
     expect(lines.slice(1, 9)).toEqual(["For Example, Moshe,", "twenty nine", "Dallas Drive", "unit", "zero zero one", "Monroe New York", "one zero nine five zero", "press 1."]);
     expect(lines).toContain("Blooming Grove");
-    expect(lines.slice(-3)).toEqual(["To try a different phone number, press 3.", "To enter the address manually, press 4.", STAR]);
+    expect(lines.slice(-2)).toEqual(["To try a different phone number, press 3. To enter the address manually, press 4.", STAR]); // slot B, one take
     expect(redirect(await call("addr-found-choice", { Digits: "2" }, "m=many&n=2"))).toBe("addr-check?dir=1");
     expect(h.session.data).toMatchObject({ house: "380", dirArea: "Blooming Grove", dirPick: "380 Lake Shore Drive" });
     expect(redirect(await call("addr-found-choice", { Digits: "3" }, "m=many&n=2"))).toBe("addr-phone");
@@ -133,5 +133,19 @@ describe("phone-number address lookup (approved screens, preview)", () => {
   it("the directory page and its actions are Owner only", async () => {
     const { readFileSync } = await import("node:fs");
     for (const f of ["page.tsx", "actions.ts"]) expect(readFileSync(`src/app/admin/(app)/customers/directory/${f}`, "utf8")).toContain("await requireOwner()");
+  });
+});
+
+describe("slots A, B and C (Nov 23, 2026)", () => {
+  it("are in Admin with the exact text, ready for Hark's uploads", async () => {
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    expect(PROMPTS.lookup_many.text).toBe("Here is what we found for this phone number.");
+    expect(PROMPTS.lookup_many.label).toMatch(/^Slot A/);
+    expect(PROMPTS.lookup_many_options.text).toBe("To try a different phone number, press 3. To enter the address manually, press 4.");
+    expect(PROMPTS.lookup_many_options.label).toMatch(/^Slot B/);
+    expect(PROMPTS.addr_zip.label).toBe("Slot C - Zip menu, all towns, press 1 to 7 (one take)");
+    const { allSlots } = await import("@/lib/recording-slots");
+    const keys = allSlots([]).map((x) => x.key);
+    for (const k of ["lookup_many", "lookup_many_options", "addr_zip", "lookup_for#1"]) expect(keys, k).toContain(k);
   });
 });
