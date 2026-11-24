@@ -20,6 +20,7 @@ export function notActiveReason(key: string, env: Record<string, string | undefi
   if (key === "msg_catalog_text") return SMS_CATALOG_REPLY_ON ? null : "Texting CATALOG and catalog texts wait for Twilio to approve texting.";
   if (key === "catalog_email_info") return infoCatalogAutoreplyOn(env) ? null : "Plays once the info@ Catalog auto-reply is connected (Cloudflare Email Worker).";
   if (key === "terms_notice" || key === "msg_terms_link") return termsActive() ? null : "The Terms step is off on the live site until the final Terms are in.";
+  if (key === "automated_only") return "Not placed in the call yet: waits for you to say where it plays.";
   if (key === "instr_balloons" || key === "instr_laser" || key === "instr_paddle") return "Waits for your script.";
   return null;
 }

@@ -83,6 +83,8 @@ export const PROMPTS = {
   book_back: { group: "Welcome & main menu", label: "Shared: go back (plays after every menu with a way back)", text: "To go back, press star." },
   // Abraham, Nov 23, 2026 (approved): no line says "press pound to continue"; every confirm or read-back line ends with
   // this one recording. 1 confirms and moves on, 2 tries that step again.
+  // Abraham, Nov 23, 2026 (approved, word for word; recording ready). Not in the call flow until he says where it plays.
+  automated_only: { group: "Welcome & main menu", label: "Automated orders only (where it plays is not decided yet)", text: "Please note, orders can only be placed through our automated system." },
   confirm_ending: { group: "Welcome & main menu", label: "Confirm ending (plays after every confirm or read-back line)", text: "If that is correct, press 1. To try again, press 2." },
   not_valid: { group: "Welcome & main menu", label: "Any menu: a key that is not a choice (Abraham)", text: "Sorry, that is not a valid selection." }, // Nov 19, 2026: then the same recording starts over
   // Main menu key 2 (Abraham W): instructions for each type of attraction. Editable here like every other prompt.

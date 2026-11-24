@@ -160,3 +160,21 @@ describe("3. the street step says how to type it", () => {
     expect(PROMPTS.addr_unit.text).toBe("Thanks, with your keypad, please enter the unit number.");
   });
 });
+
+describe("4. automated orders only: a slot, not in the call yet", () => {
+  it("exact text, slot Waiting, Admin says Not active yet, and no step plays it", async () => {
+    expect(PROMPTS.automated_only.text).toBe("Please note, orders can only be placed through our automated system.");
+    expect((await slotsWithStatus()).find((s) => s.key === "automated_only")).toMatchObject({ text: PROMPTS.automated_only.text, status: "waiting" });
+    const { lineStatus } = await import("@/lib/prompt-status");
+    expect(lineStatus("automated_only", {}).status).toBe("Not active yet");
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).not.toContain('"automated_only"');
+  });
+  it("5. the three recorded lines have slots whose text matches word for word", async () => {
+    const slots = await slotsWithStatus();
+    const text = (k: string) => slots.find((s) => s.key === k)?.text;
+    expect(text("confirm_ending")).toBe("If that is correct, press 1. To try again, press 2.");
+    expect(text("ask_name")).toBe("Thank you. Let us complete your booking. Please say your first and last name after the tone.");
+    expect(text("automated_only")).toBe("Please note, orders can only be placed through our automated system.");
+  });
+});

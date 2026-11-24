@@ -1,6 +1,6 @@
 # Hotline recording text list
 
-1019 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
+1020 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
 
 ## Welcome & main menu
 
@@ -21,6 +21,7 @@ To speak with an operator, press 0.
 To hear this menu again, press the star key.
 Thank you for choosing Hup Up Attractions! |
 | book_back | Shared: go back (plays after every menu with a way back) | To go back, press star. |
+| automated_only | Automated orders only (where it plays is not decided yet) | Please note, orders can only be placed through our automated system. |
 | confirm_ending | Confirm ending (plays after every confirm or read-back line) | If that is correct, press 1. To try again, press 2. |
 | not_valid | Any menu: a key that is not a choice (Abraham) | Sorry, that is not a valid selection. |
 | menu_category#1 | Menu option for a category, piece 1 | For |
