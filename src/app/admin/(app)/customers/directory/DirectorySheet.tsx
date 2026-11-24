@@ -29,7 +29,6 @@ const closeMenu = (e: React.MouseEvent<HTMLElement>) => {
   if (d) window.setTimeout(() => d.removeAttribute("open"), 0);
 };
 const ROW_H = 38;
-const NUM_W = 58;
 const CELL_PAD = 12; // a small even trim on both sides of the words (Abraham, Nov 24, 2026)
 const MAX_W = 300;
 
@@ -112,7 +111,12 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
     return out;
   }, [rows, search, filters, sort, fresh]);
 
-  const W = useMemo(() => measureWidths(rows ?? [], (typeof document !== "undefined" && getComputedStyle(document.body).fontFamily) || "Inter, Arial, sans-serif"), [rows]);
+  // Measured only in the browser, after the first draw: the titles and the cells then always get the same widths
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const W = useMemo(() => (mounted ? measureWidths(rows ?? [], getComputedStyle(document.body).fontFamily || "Inter, Arial, sans-serif") : (Object.fromEntries(COLS.map((c) => [c.key, c.w])) as Record<SheetKey, number>)), [rows, mounted]);
+  // The row-number column: just wide enough for the biggest row number (the three dots show over it when pointed at)
+  const NUM_W = 16 + 7 * String(Math.max(rows?.length ?? 0, 99)).length;
   const TOTAL_W = NUM_W + COLS.reduce((n, c) => n + W[c.key], 0);
   useEffect(() => {
     if (!full) return;
@@ -508,7 +512,7 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
               return (
                 <div key={row.id} role="row" className={`group absolute left-0 flex ${r % 2 ? "bg-[#FAFCFE]" : "bg-white"} hover:bg-[#F2F7FD]`} style={{ top: r * ROW_H, height: ROW_H, width: TOTAL_W }} data-row-id={row.id}>
                   <div
-                    className={`sticky left-0 z-20 flex shrink-0 items-center justify-between border-b border-r border-[#E6EDF6] pl-2 pr-1 text-[11px] tabular-nums ${rowSel ? "bg-[#DCEAFB] font-bold text-[#123D73]" : "bg-[#F6F9FD] text-[#8395AD]"}`}
+                    className={`sticky left-0 z-20 flex shrink-0 items-center border-b border-r border-[#E6EDF6] pl-[7px] text-[11px] tabular-nums ${rowSel ? "bg-[#DCEAFB] font-bold text-[#123D73]" : "bg-[#F6F9FD] text-[#8395AD]"}`}
                     style={{ width: NUM_W }}
                   >
                     <button
@@ -525,11 +529,11 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
                     >
                       {r + 1}
                     </button>
-                    <button type="button" aria-label="Row options" title="Row options" onClick={() => setMenu((m) => (m === row.id ? null : row.id))} className="rounded-md px-1 text-base leading-none text-[#6B7C93] opacity-0 hover:bg-white group-hover:opacity-100 focus:opacity-100" data-row-menu={row.id}>
+                    <button type="button" aria-label="Row options" title="Row options" onClick={() => setMenu((m) => (m === row.id ? null : row.id))} className="absolute right-[1px] top-1/2 -translate-y-1/2 rounded-md bg-white px-[3px] py-[2px] text-base leading-none text-[#123D73] opacity-0 shadow-sm ring-1 ring-[#D9E3F0] group-hover:opacity-100 focus:opacity-100" data-row-menu={row.id}>
                       ⋮
                     </button>
                     {menu === row.id && (
-                      <div className="absolute left-[54px] top-1 z-50 w-48 overflow-hidden rounded-xl border border-[#D9E3F0] bg-white text-[13px] shadow-xl" role="menu">
+                      <div className="absolute left-full top-1 z-50 ml-1 w-48 overflow-hidden rounded-xl border border-[#D9E3F0] bg-white text-[13px] shadow-xl" role="menu">
                         <button type="button" role="menuitem" onClick={() => addRow({ at: "above", id: row.id })} className="block w-full px-3 py-2 text-left font-bold text-[#123D73] hover:bg-[#F2F6FB]" data-insert-above>Insert a row above</button>
                         <button type="button" role="menuitem" onClick={() => addRow({ at: "below", id: row.id })} className="block w-full border-t border-[#EEF2F7] px-3 py-2 text-left font-bold text-[#123D73] hover:bg-[#F2F6FB]" data-insert-below>Insert a row below</button>
                         <button type="button" role="menuitem" onClick={() => removeRow(row.id)} className="block w-full border-t border-[#EEF2F7] px-3 py-2 text-left font-bold text-[#b3261e] hover:bg-[#fff2f1]" data-delete-row>Delete this row</button>
