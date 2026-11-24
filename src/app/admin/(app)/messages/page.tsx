@@ -92,13 +92,13 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
           <div className={`grid gap-2 ${phone ? "mb-3 border-b border-line pb-3" : ""}`} data-messages-toolbar>
             {staff.role === "owner" && (
               <form className="flex gap-2" data-new-text>
-                <input name="p" type="tel" inputMode="tel" autoComplete="off" required placeholder="Phone number" aria-label="Phone number for a new text" className="input" />
+                <input name="p" type="tel" inputMode="tel" autoComplete="off" required placeholder="845-415-7585" aria-label="Phone number for a new text" className="input" />
                 <button className="btn-dark whitespace-nowrap">New text</button>
               </form>
             )}
             {sp.p && !phone && (
               <p role="alert" className="text-sm font-semibold text-[#C83A2F]" data-bad-number>
-                &ldquo;{sp.p}&rdquo; is not a valid US or Canada mobile number. Enter 10 digits, for example 845-555-0123.
+                &ldquo;{sp.p}&rdquo; is not a valid US or Canada mobile number. Enter 10 digits, for example 845-415-7585.
               </p>
             )}
           </div>

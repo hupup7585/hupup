@@ -47,7 +47,7 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
       )}
       <label className="block">
         <span className="font-bold">Mobile phone number</span>
-        <input name="phone" type="tel" inputMode="tel" autoComplete="tel-national" required placeholder="(845) 555-0123" className="mt-1 block w-full rounded-xl border-2 border-hu-deep/30 px-4 py-3 text-lg focus:border-hu-deep focus:outline-none" />
+        <input name="phone" type="tel" inputMode="tel" autoComplete="tel-national" required placeholder="845-415-7585" className="mt-1 block w-full rounded-xl border-2 border-hu-deep/30 px-4 py-3 text-lg focus:border-hu-deep focus:outline-none" />
       </label>
       <label className="block">
         <span className="font-bold">First name</span> <span className="opacity-70">(optional)</span>

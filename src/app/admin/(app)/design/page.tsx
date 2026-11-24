@@ -49,7 +49,7 @@ export default function DesignPreview() {
       <Section title="1 · Entry form">
         <form className="grid gap-4 sm:grid-cols-2" aria-label="Sample entry form">
           <Field label="Customer name"><input className="input" placeholder="First and last name" disabled /></Field>
-          <Field label="Phone"><input className="input" placeholder="(845) 555-0123" disabled /></Field>
+          <Field label="Phone"><input className="input" placeholder="845-415-7585" disabled /></Field>
           <Field label="Event date"><input className="input" type="date" disabled /></Field>
           <Field label="Rental">
             <select className="input" disabled><option>Choose a rental</option></select>

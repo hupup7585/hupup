@@ -22,7 +22,7 @@ export default function LookupBox() {
           });
         }}
       >
-        <input value={look} onChange={(e) => setLook(e.target.value)} inputMode="tel" placeholder="845 555 0123" className="input max-w-xs" data-lookup-phone />
+        <input value={look} onChange={(e) => setLook(e.target.value)} inputMode="tel" placeholder="845-415-7585" className="input max-w-xs" data-lookup-phone />
         <button className="btn-dark" disabled={pending}>Look up</button>
       </form>
       {found && (
