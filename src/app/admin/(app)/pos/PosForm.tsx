@@ -171,7 +171,7 @@ export default function PosForm(props: {
               disabled={d.closed}
               onClick={() => setDate(d.date)}
               title={d.closed ? `Closed: ${d.reason}` : d.names.join(", ") || d.hebrew}
-              className={`min-w-[5.5rem] shrink-0 rounded-lg border px-2 py-1.5 text-left text-xs ${d.date === date ? "border-navy bg-navy text-white" : d.closed ? "border-line bg-bg text-muted line-through" : "border-line bg-white hover:border-navy"}`}
+              className={`min-w-[5.5rem] shrink-0 rounded-lg border px-2 py-1.5 text-left text-xs ${d.date === date ? "border-navy bg-navy text-white" : d.closed ? "border-line bg-bg text-muted line-through" : d.holidayWeek ? "border-[#CFE6FB] bg-[#EEF7FF] hover:border-navy" : "border-line bg-white hover:border-navy"}`}
             >
               <span className="block font-bold">{englishDate(d.date, "short")}</span>
               <HebrewDay yi iso={d.date} className="block" />

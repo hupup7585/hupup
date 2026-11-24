@@ -132,6 +132,7 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
                   data-day={d.date}
                   data-found={isFound || undefined}
                   data-closed={d.closed || undefined}
+                  data-holiday-week={d.holidayWeek || undefined}
                   className={`min-h-[4.25rem] min-w-0 overflow-hidden rounded-lg border p-1 text-left text-[11px] leading-tight sm:p-1.5 sm:text-xs ${
                     chosen
                       ? "border-navy bg-navy text-white"
@@ -139,7 +140,9 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
                         ? "cursor-not-allowed border-[#f5c2bd] bg-[#ffe6e4] text-[#b3261e]" // closed: its own light red color (Abraham)
                         : past
                           ? "cursor-not-allowed border-line bg-bg text-muted"
-                          : "border-line bg-white hover:border-navy"
+                          : d.holidayWeek
+                            ? "border-[#CFE6FB] bg-[#EEF7FF] hover:border-navy" // Chanukah and Chol Hamoed: a very light blue (Abraham, Nov 24, 2026)
+                            : "border-line bg-white hover:border-navy"
                   } ${other && !chosen ? "opacity-50" : ""} ${isFound ? "ring-2 ring-[#FFD84D] ring-offset-1" : ""}`}
                 >
                   {/* Day number with "Closed" next to it (Abraham, Nov 17, 2026: no crossed-out days) */}
@@ -204,6 +207,11 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
           </ul>
         );
       })()}
+      {weeks.some((w) => w.some((d) => d.holidayWeek)) && (
+        <p className="mt-2 flex items-center justify-end gap-1.5 text-[11px] text-muted" data-holiday-legend>
+          <i className="inline-block h-3 w-3 rounded border border-[#CFE6FB] bg-[#EEF7FF]" aria-hidden /> Chanukah and Chol Hamoed
+        </p>
+      )}
     </div>
   );
 }

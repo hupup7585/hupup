@@ -132,3 +132,16 @@ describe("credit card by staff (Nov 24, 2026)", () => {
     delete process.env.VERCEL;
   });
 });
+
+describe("Chanukah and Chol Hamoed on the booking calendar (Nov 24, 2026)", () => {
+  it("those days are marked for the light blue; the days before and after are not", async () => {
+    const { calendarFor } = await import("@/app/admin/(app)/pos/actions");
+    const days = await calendarFor("2026-12-01", 20);
+    const week = (iso: string) => days.find((d) => d.date === iso)?.holidayWeek ?? null;
+    expect(week("2026-12-08")).toBe("chanukah");
+    expect(week("2026-12-01")).toBeNull();
+    expect(week("2026-12-15")).toBeNull();
+    const pesach = await calendarFor("2027-04-24", 3);
+    expect(pesach.some((d) => d.holidayWeek === "cholHamoed")).toBe(true);
+  });
+});

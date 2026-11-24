@@ -13,6 +13,7 @@ import { db, schema } from "@/lib/db";
 import { getUsage, bookableQty, pickupDateFor } from "@/lib/availability";
 import { getSettings } from "@/lib/settings";
 import { checkEventDate, dayInfo } from "@/lib/jewish-calendar";
+import { holidayWeek } from "@/lib/holiday-rentals";
 import { addDays, isValidISO, todayISO } from "@/lib/dates";
 import { createOrderWithItems, getOrderWithItems, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES, POS_LINK_HOLD_MINUTES } from "@/lib/orders";
 import { parseMoneyToCents } from "@/lib/money";
@@ -34,11 +35,11 @@ export async function availabilityFor(date: string) {
   return Object.fromEntries(prods.map((p) => [p.id, bookableQty(p.quantity, usage, p.id, date, pickup)]));
 }
 
-export type CalendarDay = { date: string; hebrew: string; hebrewHe: string; names: string[]; closed: boolean; reason: string | null; closesAtLabel: string | null };
+export type CalendarDay = { date: string; hebrew: string; hebrewHe: string; names: string[]; closed: boolean; reason: string | null; closesAtLabel: string | null; /** Chanukah or Chol Hamoed week (Nov 24, 2026: light blue on the calendar) */ holidayWeek?: "chanukah" | "cholHamoed" | null };
 export type DateCheck = { ok: boolean; message: string | null; pickupWarning: string | null; pickup: string; day: CalendarDay };
 
 // Staff screen: Hebrew-letter holiday names (Abraham); days without one keep the calendar name
-const plainDay = (d: ReturnType<typeof dayInfo>): CalendarDay => ({ date: d.date, hebrew: d.hebrew, hebrewHe: d.hebrewHe, names: d.namesYi, closed: d.closed, reason: d.reasonYi ?? d.reason, closesAtLabel: d.closesAtLabel });
+const plainDay = (d: ReturnType<typeof dayInfo>): CalendarDay => ({ date: d.date, hebrew: d.hebrew, hebrewHe: d.hebrewHe, names: d.namesYi, closed: d.closed, reason: d.reasonYi ?? d.reason, closesAtLabel: d.closesAtLabel, holidayWeek: holidayWeek(d.date) });
 
 /** Jewish-calendar info for the POS: the coming days, and the selected event date. */
 export async function calendarFor(start: string, days = 14): Promise<CalendarDay[]> {
