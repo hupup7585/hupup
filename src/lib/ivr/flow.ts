@@ -3815,15 +3815,25 @@ const handlers: Record<string, Handler> = {
       return vr;
     }
     const unclear = ctx.query.get("u") === "1";
-    const g = keypad(vr, url("phonepay-retry-answer", { o, n, r: asked, ...(unclear ? { u: 1 } : {}) }), { numDigits: 1, timeout: 8 });
-    sp(g, ctx, unclear ? "phonepay_unclear" : n === max - 1 ? "phonepay_retry_last" : "phonepay_retry", undefined, { draftOk: true });
-    return back(vr, "phonepay-retry", { o, n, r: asked + 1, ...(unclear ? { u: 1 } : {}) });
+    if (!unclear) {
+      // Declined (Abraham's test call, Nov 24, 2026 bug): the line plays once, then the caller goes straight back to Sola
+      // PhonePay for the same order and amount. It used to wait for key 1 and replay the line again and again.
+      const g = keypad(vr, url("phonepay-retry-answer", { o, n, d: 1 }), { numDigits: 1, timeout: 1 });
+      sp(g, ctx, n === max - 1 ? "phonepay_retry_last" : "phonepay_retry", undefined, { draftOk: true });
+      await track(ctx.callSid, "step", `Card try ${n} did not go through: declined line played once; back to the payment line`);
+      return back(vr, "phonepay-go", { o });
+    }
+    const g = keypad(vr, url("phonepay-retry-answer", { o, n, r: asked, u: 1 }), { numDigits: 1, timeout: 8 });
+    sp(g, ctx, "phonepay_unclear", undefined, { draftOk: true });
+    return back(vr, "phonepay-retry", { o, n, r: asked + 1, u: 1 });
   },
 
   "phonepay-retry-answer"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     const n = Number(ctx.query.get("n") || 1);
     if (ctx.body.Digits === "1") return back(vr, "phonepay-go", { o });
+    // After a decline any key (or none) goes back to the payment line: the declined line is never repeated
+    if (ctx.query.get("d") === "1") return back(vr, "phonepay-go", { o });
     if (ctx.body.Digits) sp(vr, ctx, "not_valid"); // wrong key: the shared line, then the same question again
     return back(vr, "phonepay-retry", { o, n, r: Number(ctx.query.get("r") || 0) + 1, ...(ctx.query.get("u") === "1" ? { u: 1 } : {}) });
   },

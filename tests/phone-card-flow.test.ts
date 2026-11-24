@@ -170,6 +170,34 @@ describe("card payment on the phone line", () => {
     expect(said(await call("tx-enter", {}, `p=conf&o=${orderId}`))).toEqual(["Please enter the 10-digit phone number. When you are finished, please press pound."]);
     expect(redirect(await call("pay-approved-choice", {}, `o=${orderId}`))).toBe("promo-consent");
   });
+  it("decline bug (Abraham's test call, Nov 24, 2026): the declined line plays once, then the caller is sent back to PhonePay; a second decline does the same", async () => {
+    const { eq } = await import("drizzle-orm");
+    const [o3] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2026-11-27", pickupDate: "2026-11-27", subtotalCents: 45000, totalCents: 45000 }).returning();
+    h.sola = []; // Sola shows no approved charge: declined
+    const tryOnce = async (n: number, line: string) => {
+      const go = await call("phonepay-go", {}, `o=${o3.id}${n === 1 ? "&c=1" : ""}`);
+      expect(go).toMatch(/<Number sendDigits="w+4321#w+45000#w+1">\+18334343354<\/Number>/); // same order, same amount
+      const tries = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.orderId, o3.id)).orderBy(schema.phonepayAttempts.id);
+      expect(tries).toHaveLength(n);
+      expect(tries.at(-1)).toMatchObject({ tryNumber: n, amountCents: 45000 });
+      const done = await call("phonepay-done", { DialCallStatus: "completed" }, `o=${o3.id}&a=${tries.at(-1)!.id}`);
+      expect(redirect(done)).toBe(`phonepay-retry?o=${o3.id}&n=${n}`);
+      const retry = await call("phonepay-retry", {}, `o=${o3.id}&n=${n}`);
+      expect(said(retry).filter((s) => s === line)).toHaveLength(1); // the declined line once
+      expect(said(retry)).toEqual([line]);
+      expect(redirect(retry)).toBe(`phonepay-go?o=${o3.id}`); // then straight back to PhonePay, never the line again
+      // a key during the line also goes back to PhonePay (no repeat, no wrong-key line)
+      for (const Digits of ["1", "5", ""]) {
+        const x = await call("phonepay-retry-answer", { Digits }, `o=${o3.id}&n=${n}&d=1`);
+        expect(said(x)).toEqual([]);
+        expect(redirect(x)).toBe(`phonepay-go?o=${o3.id}`);
+      }
+    };
+    await tryOnce(1, "Your card did not go through. To try again, press 1.");
+    await tryOnce(2, "Your card did not go through. You have one more chance to try. To try again, press 1.");
+    // the next try is really placed with PhonePay again
+    expect(await call("phonepay-go", {}, `o=${o3.id}`)).toContain("+18334343354</Number>");
+  });
   it("nothing before payment sounds finished: the order number is not read at checkout", async () => {
     const { readFileSync } = await import("node:fs");
     const f = readFileSync("src/lib/ivr/flow.ts", "utf8");
