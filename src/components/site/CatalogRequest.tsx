@@ -7,7 +7,7 @@ import { CATALOG_EMAIL_BUTTON, CATALOG_FORM_DRAFT, CATALOG_TEXT_BUTTON, CATALOG_
 /* Balanced look (Abraham, Nov 18, 2026): between the first and the formal version. White inputs with a light-blue border,
    yellow email button and light-blue text button with navy text, medium corners; both rows lined up (same input width,
    same button width and height); on phones each box above its button, full width. */
-const INPUT = "h-11 w-full min-w-0 rounded-xl border border-[#9FCFF7] bg-white px-4 text-[17px] text-hu-deep outline-none placeholder:text-[#6F7F92] focus:border-hu-deep focus:ring-1 focus:ring-hu-deep sm:h-12 sm:w-auto sm:flex-1";
+const INPUT = "h-11 w-full min-w-0 rounded-xl border border-[#9FCFF7] bg-white px-4 text-[17px] text-hu-deep outline-none placeholder:text-[#B8C2CF] focus:border-hu-deep focus:ring-1 focus:ring-hu-deep sm:h-12 sm:w-auto sm:flex-1";
 const BUTTON = "h-11 w-full shrink-0 whitespace-nowrap rounded-xl px-5 text-base font-bold text-hu-deep transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hu-deep disabled:opacity-60 sm:h-12 sm:w-60 sm:text-[17px]";
 
 /** "Or text CATALOG to (845) 415-7585." and the "Email me the catalog" box (Abraham, Nov 18, 2026). */

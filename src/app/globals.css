@@ -90,3 +90,10 @@ html {
   text-decoration-skip-ink: none;
 }
 
+
+/* Example text in every box (Abraham, Nov 24, 2026): a very light gray, so it is clearly a hint, not something typed in */
+input::placeholder,
+textarea::placeholder {
+  color: #b8c2cf;
+  opacity: 1;
+}
