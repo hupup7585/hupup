@@ -46,16 +46,16 @@ beforeAll(async () => {
 describe("box 150 and box 149 (approved Nov 18, 2026)", () => {
   it("box 150 plays only for a Friday in Chanukah or Chol Hamoed; every other date keeps the normal check", async () => {
     expect(said(await call("date-ask", {}, `p=${castle}&d=${CHANUKAH_FRIDAY}`))).toEqual([
-      "You entered Friday, December eleventh. If that is correct, press pound. To keep your rental for Mutze Shabbes, press 1. To enter a different date, press 2.",
+      "You entered Friday, December eleventh. If that is correct, press 1. To keep your rental for Mutze Shabbes, press 2. To enter a different date, press 3.", // approved Nov 24, 2026
       "To go back, press star.",
     ]);
     expect(said(await call("date-ask", {}, `p=${castle}&d=${PLAIN_FRIDAY}`))[0]).toMatch(/^To book the .+ for Friday, November twenty-seventh press 1\.$/); // box 18 (Nov 22, 2026)
   });
   it("box 150: 2 = a different date", async () => {
-    expect(redirect(await call("date-confirm", { Digits: "2" }, `p=${castle}&d=${CHANUKAH_FRIDAY}&f=1`))).toBe(`date?p=${castle}`);
+    expect(redirect(await call("date-confirm", { Digits: "3" }, `p=${castle}&d=${CHANUKAH_FRIDAY}&f=1`))).toBe(`date?p=${castle}`);
   });
   it("box 150: 1 = Mutze Shabbes, then box 149 with the real price for one and a half days and the Sunday pickup", async () => {
-    const xml = await call("date-confirm", { Digits: "1" }, `p=${castle}&d=${CHANUKAH_FRIDAY}&f=1`);
+    const xml = await call("date-confirm", { Digits: "2" }, `p=${castle}&d=${CHANUKAH_FRIDAY}&f=1`); // 2 = Mutze Shabbes (Nov 24, 2026)
     expect(said(xml)).toContain("For Friday and Mutze Shabbes, you will be charged for only one and a half days, a total of 300 dollars. Your rental will be picked up on Sunday, December thirteenth, at 9:00 AM. Please make sure it is ready outside on time.");
     expect(redirect(xml)).toBe(`qty?p=${castle}&d=${CHANUKAH_FRIDAY}`);
     // one item, no "How many" question; the booking is picked up Sunday and priced at one and a half days
@@ -69,12 +69,12 @@ describe("box 150 and box 149 (approved Nov 18, 2026)", () => {
   it("box 150: pound = Friday only (picked up after Shabbes, one day's price); the Friday only line is preview only", async () => {
     h.session.orderId = null;
     h.session.data = {};
-    const xml = await call("date-confirm", { Digits: "#" }, `p=${boat}&d=${CHANUKAH_FRIDAY}&f=1`);
+    const xml = await call("date-confirm", { Digits: "1" }, `p=${boat}&d=${CHANUKAH_FRIDAY}&f=1`); // 1 = Friday only (Nov 24, 2026)
     expect(said(xml)).toContain("For Friday, you will be charged for one full day, a total of 100 dollars. Your rental will be picked up one hour after Shabbes. Please make sure it is ready outside on time.");
     expect((h.session.data.mutzeDays as string[]).includes(CHANUKAH_FRIDAY)).toBe(false);
     process.env.VERCEL_ENV = "production";
     try {
-      expect(said(await call("date-confirm", { Digits: "#" }, `p=${boat}&d=${CHANUKAH_FRIDAY}&f=1`)).join(" ")).not.toContain("one full day");
+      expect(said(await call("date-confirm", { Digits: "1" }, `p=${boat}&d=${CHANUKAH_FRIDAY}&f=1`)).join(" ")).not.toContain("one full day");
     } finally {
       delete process.env.VERCEL_ENV;
     }
@@ -104,5 +104,13 @@ describe("one item at a time (Nov 18, 2026); box 151 and box 152 (approved Nov 1
     h.session.orderId = null;
     h.session.data = {};
     expect(redirect(await call("add", {}, `p=${castle}&d=2026-12-22&q=1`))).toBe("ocean?d=2026-12-22");
+  });
+});
+
+describe("box 150 keys (approved Nov 24, 2026)", () => {
+  it("pound is no longer a key there; star is a different date", async () => {
+    const xml = await call("date-confirm", { Digits: "#" }, `p=${castle}&d=${CHANUKAH_FRIDAY}&f=1`);
+    expect(said(xml)).toEqual(["Sorry, that is not a valid selection."]);
+    expect(redirect(await call("date-confirm", { Digits: "*" }, `p=${castle}&d=${CHANUKAH_FRIDAY}&f=1`))).toBe(`date?p=${castle}`);
   });
 });

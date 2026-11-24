@@ -894,11 +894,14 @@ async function sayFriMutzePrice(target: VR | Gather, ctx: Ctx, friday: string, p
  * 9:00 AM), then box 149; 2 = a different date. The Friday only line is not approved yet (preview only).
  */
 async function friMutzeChoice(ctx: Ctx, vr: VR, p: string | undefined, date: string, d: string | undefined) {
-  if (d === "2" || d === "*") return back(vr, "date", { p });
-  if (d !== "#" && d !== "1") {
+  // Approved Nov 24, 2026: 1 = correct (Friday only), 2 = keep it for Mutze Shabbes, 3 or star = a different date;
+  // pound or any other key is not valid
+  if (d === "3" || d === "*") return back(vr, "date", { p });
+  if (d !== "1" && d !== "2") {
     if (d) sp(vr, ctx, "not_valid");
     return back(vr, "date-ask", { p, d: date });
   }
+  d = d === "2" ? "1" : "#"; // the code below: "1" keeps it for Mutze Shabbes, "#" is Friday only
   await chooseDay(ctx, date);
   const kept = new Set(ctx.session?.data.mutzeDays ?? []);
   const prod = p ? await getProduct(Number(p)) : null;
