@@ -20,6 +20,8 @@ export const EMAIL_LOGO_PATH = "/brand/hupup-logo-320.png";
 
 // Abraham, Nov 17, 2026 ("make the email look professional"): colors and sizes
 const NAVY = "#123D73";
+/** The website's light blue (src/lib/theme.ts sky), with deep blue text on it, as on the website (Abraham, Nov 24, 2026). */
+const SKY = "#8CCBFF";
 const YELLOW = "#FFD84D";
 const PAGE = "#F4F7FB";
 const TEXT = "#222222";
@@ -76,7 +78,7 @@ export function brandedEmail(text: string, opts: { baseUrl: string; signature?: 
   // A button inside the box (Abraham, Nov 23, 2026: "View the catalog"); a table button so Gmail and Outlook keep it
   const btn = opts.button;
   const buttonHtml = btn
-    ? `<tr><td class="hu-pad" align="center" style="padding:6px 32px 28px 32px;text-align:center"><table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto"><tr><td align="center" bgcolor="${NAVY}" style="border-radius:12px;background:${NAVY}"><a href="${esc(btn.url)}" target="_blank" style="display:inline-block;padding:14px 34px;font-family:${FONT};font-size:17px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px">${esc(btn.label)}</a></td></tr></table></td></tr>`
+    ? `<tr><td class="hu-pad" align="center" style="padding:6px 32px 28px 32px;text-align:center"><table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto"><tr><td align="center" bgcolor="${SKY}" style="border-radius:12px;background:${SKY}"><a href="${esc(btn.url)}" target="_blank" style="display:inline-block;padding:14px 34px;font-family:${FONT};font-size:17px;font-weight:700;color:${NAVY};text-decoration:none;border-radius:12px">${esc(btn.label)}</a></td></tr></table></td></tr>`
     : "";
   const plain = `${body}${btn ? `\n\n${btn.label}: ${btn.url}` : ""}\n\n--\n${signature}\n${promoText}`;
   // Formatted in Compose (Nov 19, 2026): the cleaned formatting is used as it is; otherwise the typed text

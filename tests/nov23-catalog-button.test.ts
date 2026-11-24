@@ -44,6 +44,8 @@ describe("View the catalog button", () => {
     expect(e.html.indexOf("</table>\n</td></tr></table>")).toBeGreaterThan(button); // inside the card
     expect(e.html).toMatch(/align="center"[^>]*><table role="presentation" align="center"/); // centered
     expect(e.html).toContain("border-radius:12px"); // round corners
+    expect(e.html).toContain('bgcolor="#8CCBFF"'); // the website's light blue
+    expect(e.html).toMatch(/color:#123D73;text-decoration:none[^>]*>View our catalog/); // deep blue text, never white on sky
     expect(e.text).toContain("View our catalog: https://hupupattractions.com/catalog/7.pdf");
     expect(brandedEmail("Hello", { baseUrl: "https://x" }).html).not.toContain("View our catalog"); // other emails: no button
   });
