@@ -75,6 +75,7 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
   const [fresh, setFresh] = useState<Set<number>>(new Set()); // rows added here: always shown
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(560);
+  const [boxW, setBoxW] = useState(0);
   const [full, setFull] = useState(false); // full screen: the sheet covers the whole page
   const box = useRef<HTMLDivElement>(null);
   const editRef = useRef<HTMLInputElement>(null);
@@ -88,8 +89,9 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
     const el = box.current;
     if (!el) return;
     setHeight(el.clientHeight);
+    setBoxW(el.clientWidth);
     setScrollTop(0);
-    const ro = new ResizeObserver(() => setHeight(el.clientHeight));
+    const ro = new ResizeObserver(() => (setHeight(el.clientHeight), setBoxW(el.clientWidth)));
     ro.observe(el);
     return () => ro.disconnect();
   }, [rows === null, full]); // full screen draws the grid again in a new place
@@ -114,9 +116,14 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
   // Measured only in the browser, after the first draw: the titles and the cells then always get the same widths
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const W = useMemo(() => (mounted ? measureWidths(rows ?? [], getComputedStyle(document.body).fontFamily || "Inter, Arial, sans-serif") : (Object.fromEntries(COLS.map((c) => [c.key, c.w])) as Record<SheetKey, number>)), [rows, mounted]);
+  const W0 = useMemo(() => (mounted ? measureWidths(rows ?? [], getComputedStyle(document.body).fontFamily || "Inter, Arial, sans-serif") : (Object.fromEntries(COLS.map((c) => [c.key, c.w])) as Record<SheetKey, number>)), [rows, mounted]);
   // The row-number column: just wide enough for the biggest row number (the three dots show over it when pointed at)
-  const NUM_W = 16 + 7 * String(Math.max(rows?.length ?? 0, 99)).length;
+  // Row numbers: room for the biggest number and the three dots side by side
+  const NUM_W = 34 + 7 * String(Math.max(rows?.length ?? 0, 99)).length;
+  // Each column fits its words; whatever room is left in the box is shared evenly by the ten columns (Nov 24, 2026)
+  const natural = NUM_W + COLS.reduce((n, c) => n + W0[c.key], 0);
+  const extra = boxW > natural ? Math.floor((boxW - natural) / COLS.length) : 0;
+  const W = useMemo(() => Object.fromEntries(COLS.map((c) => [c.key, W0[c.key] + extra])) as Record<SheetKey, number>, [W0, extra]);
   const TOTAL_W = NUM_W + COLS.reduce((n, c) => n + W[c.key], 0);
   useEffect(() => {
     if (!full) return;
@@ -529,7 +536,7 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
                     >
                       {r + 1}
                     </button>
-                    <button type="button" aria-label="Row options" title="Row options" onClick={() => setMenu((m) => (m === row.id ? null : row.id))} className="absolute right-[1px] top-1/2 -translate-y-1/2 rounded-md bg-white px-[3px] py-[2px] text-base leading-none text-[#123D73] opacity-0 shadow-sm ring-1 ring-[#D9E3F0] group-hover:opacity-100 focus:opacity-100" data-row-menu={row.id}>
+                    <button type="button" aria-label="Row options" title="Row options" onClick={() => setMenu((m) => (m === row.id ? null : row.id))} className="absolute right-[3px] top-1/2 -translate-y-1/2 rounded-md bg-white px-[4px] py-[2px] text-base leading-none text-[#123D73] opacity-0 shadow-sm ring-1 ring-[#D9E3F0] group-hover:opacity-100 focus:opacity-100" data-row-menu={row.id}>
                       ⋮
                     </button>
                     {menu === row.id && (
