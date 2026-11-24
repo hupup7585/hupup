@@ -1,22 +1,11 @@
+import { MAIN_MENU_KEYS } from "@/lib/ivr/main-menu-keys";
 import { Phone } from "lucide-react";
 import Link from "next/link";
 import type { CallAnalytics } from "@/lib/call-analytics";
 import { HebrewDay } from "@/components/DualDate";
 
 /** Staff labels for the main-menu keys (what each key does today). */
-export const MENU_KEY_LABELS: [string, string][] = [
-  ["1", "1 · Reservations and bookings"],
-  ["2", "2 · Equipment instructions"],
-  ["3", "3 · Learn about rentals"],
-  ["4", "4 · Customer service"],
-  ["5", "5 · Help during a rental"],
-  ["6", "6 · Delivery and pickup"],
-  ["7", "7 · Hours"],
-  ["8", "8 · Schools and organizations"],
-  ["9", "9 · Voicemail"],
-  ["0", "0 · Operator"],
-  ["*", "* · Replayed the menu"],
-];
+export const MENU_KEY_LABELS: [string, string][] = [...MAIN_MENU_KEYS.map(([k, l]): [string, string] => [k, `${k} · ${l}`]), ["*", "* · Replayed the menu"]];
 
 const hourLabel = (h: number) => `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? "AM" : "PM"}`;
 const length = (s: number | null) => (s === null ? "—" : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);

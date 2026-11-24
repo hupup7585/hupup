@@ -36,7 +36,7 @@ export const STEP_LABELS: Record<string, string> = {
   menu: "Main menu",
   "menu-choice": "Main menu: key pressed",
   instructions: "Instructions menu (key 2)",
-  learn: "Learn about our rentals (key 3)",
+  learn: "Learn about our rentals (key 6)",
   "attraction-choice": "Picked an attraction",
   attraction: "Heard about an attraction",
   "attraction-options": "Attraction options",
