@@ -27,12 +27,34 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type ReserveResult =
   | { ok: true; orderId: number }
   | { ok: false; reason: "unavailable"; free: number }
-  | { ok: false; reason: "inactive" | "date_mismatch" | "not_found" };
+  | { ok: false; reason: "inactive" | "date_mismatch" | "not_found" | "needs_maze" };
 
 /**
  * Atomically add `qty` of a product to an order (creating the order if needed).
  * Locks the product row so two simultaneous callers can never both get the last unit.
  */
+/** An additional gun pack (the hidden "Laser tag add-ons" group). */
+export async function isLaserAddon(exec: { execute: typeof db.execute }, productId: number): Promise<boolean> {
+  const r = await exec.execute(sql`SELECT 1 FROM products p JOIN categories c ON c.id = p.category_id WHERE p.id = ${productId} AND c.name ~* '^laser tag add-ons$'`);
+  return r.rows.length > 0;
+}
+/** The booking has an inflatable maze (laser category, "maze" in the name). */
+export async function orderHasMaze(exec: { execute: typeof db.execute }, orderId: number): Promise<boolean> {
+  const r = await exec.execute(sql`
+    SELECT 1 FROM order_items oi JOIN products p ON p.id = oi.product_id JOIN categories c ON c.id = p.category_id
+    WHERE oi.order_id = ${orderId} AND c.name ~* 'laser' AND c.name !~* 'add-ons' AND p.name ~* 'maze' LIMIT 1`);
+  return r.rows.length > 0;
+}
+/** Remove the additional gun packs from a booking that no longer has a maze (Abraham, Nov 24, 2026). Returns how many lines. */
+export async function dropOrphanPacks(exec: { execute: typeof db.execute }, orderId: number): Promise<number> {
+  if (await orderHasMaze(exec, orderId)) return 0;
+  const r = await exec.execute(sql`
+    DELETE FROM order_items oi USING products p, categories c
+    WHERE oi.order_id = ${orderId} AND p.id = oi.product_id AND c.id = p.category_id AND c.name ~* '^laser tag add-ons$'
+    RETURNING oi.id`);
+  return r.rows.length;
+}
+
 async function reserveInTx(
   tx: Tx,
   opts: {
@@ -46,18 +68,29 @@ async function reserveInTx(
     status?: OrderStatus;
     holdExpiresAt?: Date | null;
     callSid?: string | null;
+    /** The maze rule was already checked for the whole order (createOrderWithItems) */
+    mazeChecked?: boolean;
   },
 ): Promise<ReserveResult> {
   const pickupDate = opts.pickupDate ?? addDays(opts.eventDate, 1);
   // Items that share one unit (the maze): lock the whole group first, in id order, so two callers can't take it at the
   // same moment (and never lock the group in two different orders)
   await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${opts.productId}) ORDER BY id FOR UPDATE`);
+  // Laser items share their gun packs (Nov 24, 2026): lock every laser item, in id order, so two callers can never both
+  // take the last six-pack
+  await tx.execute(sql`
+    SELECT p.id FROM products p JOIN categories c ON c.id = p.category_id
+    WHERE c.name ~* 'laser' AND EXISTS (SELECT 1 FROM products q JOIN categories qc ON qc.id = q.category_id WHERE q.id = ${opts.productId} AND qc.name ~* 'laser')
+    ORDER BY p.id FOR UPDATE OF p`);
   const locked = await tx.execute(
     sql`SELECT id, quantity, price_cents, active FROM products WHERE id = ${opts.productId} FOR UPDATE`,
   );
   const p = locked.rows[0] as { id: number; quantity: number; price_cents: number; active: boolean } | undefined;
   if (!p) return { ok: false, reason: "not_found" };
   if (!p.active) return { ok: false, reason: "inactive" };
+  // The additional gun packs go only with an inflatable maze on the same booking (Abraham, Nov 24, 2026), never with
+  // plain laser guns. createOrderWithItems checks its whole list first, then skips this per item.
+  if (!opts.mazeChecked && (await isLaserAddon(tx, p.id)) && !(opts.orderId && (await orderHasMaze(tx, opts.orderId)))) return { ok: false, reason: "needs_maze" };
 
   let orderId = opts.orderId ?? null;
   let heldUntil = pickupDate;
@@ -94,7 +127,9 @@ async function reserveInTx(
     .select()
     .from(orderItems)
     .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, p.id)));
-  if (existing) {
+  // Laser gun items keep one line per item added, so "the third pack" is the third one added (Abraham, Nov 24, 2026)
+  const ownLine = (await tx.execute(sql`SELECT 1 FROM products q JOIN categories c ON c.id = q.category_id WHERE q.id = ${p.id} AND c.name ~* 'laser'`)).rows.length > 0;
+  if (existing && !ownLine) {
     await tx
       .update(orderItems)
       .set({ qty: existing.qty + opts.qty })
@@ -219,11 +254,23 @@ export async function createOrderWithItems(opts: {
   const items = [...opts.items].filter((i) => i.qty > 0).sort((a, b) => a.productId - b.productId);
   if (!items.length) return { ok: false, reason: "not_found" };
   const pickupDate = opts.pickupDate ?? pickupDateFor(opts.eventDate, await getSettings());
+  // The additional gun packs only with an inflatable maze in the same booking (Abraham, Nov 24, 2026)
+  {
+    let addon = false;
+    let maze = false;
+    for (const it of items) {
+      if (await isLaserAddon(db, it.productId)) addon = true;
+      const r = await db.execute(sql`SELECT 1 FROM products p JOIN categories c ON c.id = p.category_id WHERE p.id = ${it.productId} AND c.name ~* 'laser' AND c.name !~* 'add-ons' AND p.name ~* 'maze'`);
+      if (r.rows.length) maze = true;
+    }
+    if (addon && !maze) return { ok: false, reason: "needs_maze" };
+  }
   try {
     return await db.transaction(async (tx) => {
       let orderId: number | null = null;
       for (const it of items) {
         const r = await reserveInTx(tx, {
+          mazeChecked: true,
           orderId,
           productId: it.productId,
           qty: it.qty,

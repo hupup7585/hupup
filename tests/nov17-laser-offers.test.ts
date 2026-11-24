@@ -94,13 +94,14 @@ describe("laser tag third pack 50% off (Owner switch)", () => {
     expect(o.subtotalCents).toBe(31250 + 5000);
     await saveSetting("offerLaserThirdPackOn", false);
   });
-  it("guns only count too: 6 guns + two 6-packs (regular price without a maze), the 3rd pack half off", async () => {
+  it("guns only count too: three 6 guns (no maze), the 3rd half off; additional packs need a maze (Nov 24, 2026)", async () => {
     await saveSetting("offerLaserThirdPackOn", true);
     const r = await reserveItem({ orderId: null, productId: guns6, qty: 1, eventDate: "2026-12-21", channel: "POS", status: "CONFIRMED" });
     if (!r.ok) throw new Error("no order");
-    await reserveItem({ orderId: r.orderId, productId: ids.pack6, qty: 2, eventDate: "2026-12-21", channel: "POS", status: "CONFIRMED" });
+    expect(await reserveItem({ orderId: r.orderId, productId: ids.pack6, qty: 1, eventDate: "2026-12-21", channel: "POS", status: "CONFIRMED" })).toMatchObject({ ok: false, reason: "needs_maze" });
+    await reserveItem({ orderId: r.orderId, productId: guns6, qty: 1, eventDate: "2026-12-21", channel: "POS", status: "CONFIRMED" });
+    await reserveItem({ orderId: r.orderId, productId: guns6, qty: 1, eventDate: "2026-12-21", channel: "POS", status: "CONFIRMED" });
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId));
-    // Nov 19, 2026: no maze on this booking, so the packs are the regular 6 guns price ($110), the 3rd one half off
     expect(o.subtotalCents).toBe(11000 + 11000 + 5500);
     await saveSetting("offerLaserThirdPackOn", false);
   });
@@ -149,12 +150,12 @@ describe("4th Sunday free (Owner switch)", () => {
   });
 });
 
-describe("phone: laser guns add-on ONLY right after an inflatable maze (Abraham, Nov 19, 2026)", () => {
-  it("after plain laser guns: no add-on question; after a maze: the question, the shared skip line, the back line", async () => {
+describe("phone: laser guns add-on only after a maze (Abraham, Nov 24, 2026 revised), repeating after every pack", () => {
+  it("after plain laser guns: no offer; after a maze: the question, the shared skip line, the back line", async () => {
     const day = "2026-12-28";
     h.session.orderId = null;
     h.session.data = {};
-    expect(redirect(await call("add", {}, `p=${guns6}&d=${day}&q=1`))).toBe(`added-second?p=${guns6}&d=${day}`); // box 25 with the second one (Nov 22, 2026)
+    expect(redirect(await call("add", {}, `p=${guns6}&d=${day}&q=1`))).not.toBe(`packs?d=${day}`); // plain guns: no offer (Nov 24, 2026)
     expect(redirect(await call("add", {}, `p=${maze6}&d=${day}&q=1`))).toBe(`packs?d=${day}`);
     expect(said(await call("packs", {}, `d=${day}`))).toEqual([
       "Would you like to add more laser guns? To add a six-pack laser tag for $75, press 1. To add a four-pack laser tag for $50, press 2.",
@@ -162,7 +163,7 @@ describe("phone: laser guns add-on ONLY right after an inflatable maze (Abraham,
       "To go back, press star.",
     ]);
     const r = await call("packs-choice", { Digits: "1" }, `d=${day}`);
-    expect(redirect(r)).toBe("added-menu");
+    expect(redirect(r)).toBe(`packs?d=${day}`); // the offer again after every pack (Nov 24, 2026)
     const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, h.session.orderId!));
     expect(items.find((i) => i.productId === ids.pack6)?.unitPriceCents).toBe(7500);
     expect(redirect(await call("packs-choice", { Digits: "#" }, `d=${day}`))).toBe("added-menu");

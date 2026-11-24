@@ -5,7 +5,7 @@ import DateRangeHeading from "@/components/DateRangeHeading";
 import MyTasksCard from "@/components/MyTasksCard";
 import { asc } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { getUsage, freeOnDay, bookableQty } from "@/lib/availability";
+import { applyLaserPools, getUsage, freeOnDay, bookableQty, laserPoolInfo } from "@/lib/availability";
 import { runsForDay } from "@/lib/admin-queries";
 import { addDays, dayOfMonth, daysBetween, isValidISO, todayISO, weekdayShort } from "@/lib/dates";
 
@@ -40,6 +40,9 @@ export default async function CalendarPage({
     getUsage(start, addDays(end, 1)),
     runsForDay(selected),
   ]);
+  // Free and bookable counts use the shared laser gun packs (Nov 24, 2026); the booked counts stay each item's own
+  const pooled = new Map(usage);
+  applyLaserPools(pooled, await laserPoolInfo());
 
   const q = (o: Record<string, string | number>) =>
     "/admin/calendar?" + new URLSearchParams({ start, span: String(span), day: selected, ...Object.fromEntries(Object.entries(o).map(([k, v]) => [k, String(v)])) }).toString();
@@ -109,8 +112,8 @@ export default async function CalendarPage({
                     </td>
                     {days.map((d) => {
                       const u = usage.get(p.id)?.get(d) ?? { event: 0, pickup: 0, held: 0 };
-                      const free = freeOnDay(p.quantity, usage, p.id, d);
-                      const canBook = bookableQty(p.quantity, usage, p.id, d);
+                      const free = freeOnDay(p.quantity, pooled, p.id, d);
+                      const canBook = bookableQty(p.quantity, pooled, p.id, d);
                       let cls = "bg-[#E3F8EF] text-[#13895C]";
                       let label = `${free} free`;
                       if (u.held > 0) {

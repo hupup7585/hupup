@@ -112,6 +112,70 @@ export async function stockGroupIds(productId: number, exec: Executor = db): Pro
   return ids.length ? ids : [productId];
 }
 
+/*
+ * Shared laser tag stock (Hark for Abraham, Nov 24, 2026). The real stock is pools: 1 inflatable maze, a number of
+ * six-packs and a number of four-packs of laser guns. Every laser item takes from its pools:
+ *   maze with 6 guns = maze + six-pack; maze with 4 guns = maze + four-pack; only 6 guns / additional 6-pack = six-pack;
+ *   only 4 guns / additional 4-pack = four-pack.
+ * An item's pools come from its name in a laser category ("maze", "6", "4"); nothing is hard-coded. A pool's size is the
+ * Admin Catalog quantity of the items that use only that pool (six-pack items 6, four-pack items 7); the maze pool is the
+ * maze items' quantity (1). An item is free on a day when every one of its pools has one left.
+ */
+export type LaserPool = "maze" | "six" | "four";
+export function laserPoolsFor(name: string, category: string): LaserPool[] {
+  if (!/laser/i.test(category)) return [];
+  const pools: LaserPool[] = [];
+  if (/maze/i.test(name)) pools.push("maze");
+  if (/(^|\D)6(\D|$)|\bsix\b/i.test(name)) pools.push("six");
+  else if (/(^|\D)4(\D|$)|\bfour\b/i.test(name)) pools.push("four");
+  return pools;
+}
+export type LaserPoolInfo = { items: Map<number, { quantity: number; pools: LaserPool[]; active?: boolean }>; sizes: Record<LaserPool, number> };
+
+export async function laserPoolInfo(exec: Executor = db): Promise<LaserPoolInfo> {
+  const r = await exec.execute(sql`
+    SELECT p.id, p.name, p.quantity, p.active, coalesce(c.name, '') AS cat FROM products p LEFT JOIN categories c ON c.id = p.category_id
+    WHERE c.name ~* 'laser'`);
+  const items = new Map<number, { quantity: number; pools: LaserPool[]; active: boolean }>();
+  for (const x of r.rows as { id: number; name: string; quantity: number; active: boolean; cat: string }[]) {
+    const pools = laserPoolsFor(x.name, x.cat);
+    if (pools.length) items.set(Number(x.id), { quantity: Number(x.quantity), pools, active: Boolean(x.active) });
+  }
+  // a pool's size comes from the active items (an item switched off in Admin does not set it; its bookings still count)
+  const sizeOf = (pool: LaserPool) => {
+    const live = [...items.values()].filter((i) => i.active);
+    const only = live.filter((i) => i.pools.length === 1 && i.pools[0] === pool);
+    const any = live.filter((i) => i.pools.includes(pool));
+    return Math.max(0, ...(only.length ? only : any).map((i) => i.quantity));
+  };
+  return { items, sizes: { maze: sizeOf("maze"), six: sizeOf("six"), four: sizeOf("four") } };
+}
+
+/** Turn each laser item's own use into its pools' use: what is left for it is what its emptiest pool has left. */
+export function applyLaserPools(usage: UsageMap, info: LaserPoolInfo): void {
+  if (!info.items.size) return;
+  const days = new Set<string>();
+  for (const id of info.items.keys()) for (const d of usage.get(id)?.keys() ?? []) days.add(d);
+  const original = new Map([...info.items.keys()].map((id) => [id, usage.get(id)]));
+  const usedIn = (pool: LaserPool, day: string) => {
+    let n = 0;
+    for (const [id, it] of info.items) if (it.pools.includes(pool)) {
+      const u = original.get(id)?.get(day);
+      if (u) n += u.event + u.pickup;
+    }
+    return n;
+  };
+  for (const [id, it] of info.items) {
+    const byDay = new Map<string, Usage>();
+    for (const day of days) {
+      const left = Math.min(...it.pools.map((pool) => info.sizes[pool] - usedIn(pool, day)));
+      const used = Math.max(0, it.quantity - Math.max(0, left));
+      byDay.set(day, { event: used, pickup: 0, held: original.get(id)?.get(day)?.held ?? 0 });
+    }
+    usage.set(id, byDay);
+  }
+}
+
 /**
  * Bookable units for one product on one event date (fresh DB read). Pass `pickupDate` when inside a transaction.
  * Items in a stock group share their units (Abraham, Nov 17, 2026: one maze for both maze items), so a booking of
@@ -119,6 +183,13 @@ export async function stockGroupIds(productId: number, exec: Executor = db): Pro
  */
 export async function checkBookable(productId: number, quantity: number, eventDate: string, exec: Executor = db, pickupDate?: string) {
   const pickup = pickupDate ?? pickupDateFor(eventDate, await getSettings());
+  // A laser item: what is left of its shared pools (maze, six-packs, four-packs) on every day it is out
+  const laser = await laserPoolInfo(exec);
+  if (laser.items.has(productId)) {
+    const usage = await getUsage(eventDate, pickup, [...laser.items.keys()], exec);
+    applyLaserPools(usage, laser);
+    return bookableQty(quantity, usage, productId, eventDate, pickup);
+  }
   const ids = await stockGroupIds(productId, exec);
   const usage = await getUsage(eventDate, pickup, ids, exec);
   if (ids.length > 1) {

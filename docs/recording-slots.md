@@ -1,6 +1,6 @@
 # Hotline recording text list
 
-1019 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
+1020 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
 
 ## Welcome & main menu
 
@@ -301,6 +301,7 @@ Thank you for choosing Hup Up Attractions! |
 |---|---|---|
 | ocean_balls | Ocean balls (after every jumping balloon) | Would you like to add ocean balls? To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3. |
 | skip_pound | Shared: skip (after ocean balls, laser guns, delivery directions, promo texts) | To skip, press pound. |
+| cart_add_balls | Cart: add ocean balls (draft, waiting for Abraham's wording) | To add ocean balls, press 5. |
 | laser_packs | Laser guns add-on (only right after an inflatable maze is added) | Would you like to add more laser guns? To add a six-pack laser tag for $75, press 1. To add a four-pack laser tag for $50, press 2. |
 | added#1 | Item added to cart, piece 1 | Woohoo! I added |
 | added#2 | Item added to cart, piece 2 | to your cart for |

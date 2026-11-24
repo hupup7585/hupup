@@ -10,7 +10,7 @@ import { revalidatePath } from "next/cache";
 import { asc, eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { getUsage, bookableQty, pickupDateFor } from "@/lib/availability";
+import { applyLaserPools, getUsage, bookableQty, laserPoolInfo, pickupDateFor } from "@/lib/availability";
 import { getSettings } from "@/lib/settings";
 import { checkEventDate, dayInfo } from "@/lib/jewish-calendar";
 import { holidayWeek } from "@/lib/holiday-rentals";
@@ -32,6 +32,7 @@ export async function availabilityFor(date: string) {
   const prods = await db.select().from(schema.products).where(eq(schema.products.active, true)).orderBy(asc(schema.products.id));
   const pickup = pickupDateFor(date, await getSettings());
   const usage = await getUsage(date, pickup);
+  applyLaserPools(usage, await laserPoolInfo()); // shared laser gun packs (Nov 24, 2026)
   return Object.fromEntries(prods.map((p) => [p.id, bookableQty(p.quantity, usage, p.id, date, pickup)]));
 }
 
@@ -149,6 +150,7 @@ export async function createBookingAction(input: {
   });
   if (!r.ok) {
     if (r.reason === "unavailable") return { ok: false, message: `Not enough units available for ${dualDate(input.date)} (only ${r.free} left of one item). Refresh availability.` };
+    if (r.reason === "needs_maze") return { ok: false, message: "Not booked. The additional laser gun packs go only with an inflatable maze on the same booking." };
     return { ok: false, message: "Could not create the booking." };
   }
   // Offers need the customer on the order (4th Sunday free counts their Sundays): the rentals total again

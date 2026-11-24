@@ -234,6 +234,8 @@ export type CallData = {
   mutzeAnnounce?: string;
   /** Closed-day offers taken (Nov 20, 2026): the day before -> its pickup (the day after) and the days charged */
   spanDays?: Record<string, { after: string; days: number | null; both?: string }>;
+  /** The ocean balls offer already played on this call (once per call, Nov 24, 2026) */
+  oceanOffered?: boolean;
   /** Phone-number lookup (Nov 23, 2026): the number looked up, and the address the caller picked (for the owner alert) */
   dirPhone?: string;
   dirPick?: string;

@@ -1,3 +1,4 @@
+import { laserPoolsFor } from "@/lib/availability";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { addDays } from "@/lib/dates";
@@ -28,18 +29,24 @@ export async function offerSwitches(exec: Exec): Promise<OfferSettings> {
 export const FOURTH_SUNDAY_DELIVERY_CENTS = { local: 2000, area: 3000, outside: 4000 } as const;
 export const OFFER_NOTES = { laser: "Laser tag: third pack 50% off", thuSun: "Thursday to Sunday: 1.5 times the rental", fourthSunday: "4th Sunday free", friMutze: "Friday and Mutze Shabbes: one and a half days" } as const;
 
+/** How an offer shows on the pay page, the order page and the booking screen (Abraham, Nov 24, 2026). Null = no line. */
+export function offerLineLabel(note: string | null | undefined): string | null {
+  if (note === OFFER_NOTES.laser) return "Third laser pack half price";
+  return null;
+}
+
 const LASER = /laser/i;
 const RENTAL = /balloon|bounce|jump|inflatable|laser|paddle|boat/i;
 const ADDONS = /^laser tag add-ons$/i;
 
 type Exec = { execute: typeof db.execute };
-type Line = { id: number; productId: number; qty: number; unitPriceCents: number; category: string };
+type Line = { id: number; productId: number; qty: number; unitPriceCents: number; category: string; name?: string };
 async function lines(exec: Exec, orderId: number): Promise<Line[]> {
   const r = await exec.execute(sql`
-    SELECT oi.id, oi.product_id, oi.qty, oi.unit_price_cents, COALESCE(c.name, '') AS category
+    SELECT oi.id, oi.product_id, oi.qty, oi.unit_price_cents, COALESCE(c.name, '') AS category, p.name
     FROM order_items oi JOIN products p ON p.id = oi.product_id LEFT JOIN categories c ON c.id = p.category_id
     WHERE oi.order_id = ${orderId} ORDER BY oi.id`);
-  return (r.rows as { id: number; product_id: number; qty: number; unit_price_cents: number; category: string }[]).map((x) => ({ id: Number(x.id), productId: Number(x.product_id), qty: Number(x.qty), unitPriceCents: Number(x.unit_price_cents), category: String(x.category) }));
+  return (r.rows as { id: number; product_id: number; qty: number; unit_price_cents: number; category: string; name: string }[]).map((x) => ({ id: Number(x.id), productId: Number(x.product_id), qty: Number(x.qty), unitPriceCents: Number(x.unit_price_cents), category: String(x.category), name: String(x.name ?? "") }));
 }
 
 /** Rental items the offers cover (not ocean balls or other extras; the laser tag add-on packs count as laser tag). */
@@ -47,8 +54,14 @@ const isRental = (l: Line) => (RENTAL.test(l.category) || ADDONS.test(l.category
 
 /** Laser tag third pack: half the price of the 3rd pack, counting packs in the order they were added. */
 export function laserThirdPackDiscount(ls: Line[]): number {
+  // Abraham, Nov 24, 2026: a pack is anything with guns: a maze with its guns (pack 1), only 6 or 4 guns, an additional
+  // pack; lines in the order added (each laser item added is its own line); only the 3rd one is half its own price
   const packs: number[] = [];
-  for (const l of ls) if (LASER.test(l.category) || ADDONS.test(l.category)) for (let i = 0; i < l.qty; i++) packs.push(l.unitPriceCents);
+  for (const l of ls) {
+    if (!(LASER.test(l.category) || ADDONS.test(l.category))) continue;
+    if (l.name !== undefined && !laserPoolsFor(l.name, l.category).length) continue; // a laser item with no guns
+    for (let i = 0; i < l.qty; i++) packs.push(l.unitPriceCents);
+  }
   return packs.length >= 3 ? Math.round(packs[2] / 2) : 0;
 }
 

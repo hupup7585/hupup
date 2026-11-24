@@ -9,7 +9,7 @@ import { closedDayOffer, friMutzeDays, friMutzeOffered, friMutzePickup, perDayRu
 import { BALLOON_MENU, BALLOON_SECOND_DIGIT_SECONDS, balloonEntry, balloonForKey, balloonSizes, balloonKeyWords, digitWords } from "@/lib/ivr/balloon-menu";
 import { formatPhone, last4, spokenDigits, toE164 } from "@/lib/phone";
 import { logStamp, phonePromoMode, phonePromoOn, readBack, tenDigitNumber } from "@/lib/phone-promo";
-import { checkBookable, pickupDateFor } from "@/lib/availability";
+import { checkBookable, laserPoolsFor, pickupDateFor } from "@/lib/availability";
 import { checkEventDate, dayInfo } from "@/lib/jewish-calendar";
 import { officeOpenNow, websiteHoursLines } from "@/lib/business-hours";
 import {
@@ -22,6 +22,7 @@ import {
   orderNumber,
   refreshOrderTotals,
   reserveItem,
+  dropOrphanPacks,
   upsertCustomer,
 } from "@/lib/orders";
 import { payPageLink } from "@/lib/rental-terms";
@@ -581,7 +582,12 @@ function itemPhrase(qty: number, name: string) {
 }
 
 /** "1 Castle Combo, and 2 paddle boats": "and" before the second item on. */
-const itemsPhrase = (items: { qty: number; name: string }[]) => items.map((i) => itemPhrase(i.qty, i.name)).join(", and ");
+const itemsPhrase = (items: { qty: number; name: string }[]) => {
+  // the same item on several lines (laser items keep one line each, Nov 24, 2026) is said once, with its total
+  const merged = new Map<string, number>();
+  for (const i of items) merged.set(i.name, (merged.get(i.name) ?? 0) + i.qty);
+  return [...merged].map(([name, qty]) => itemPhrase(qty, name)).join(", and ");
+};
 
 type CartLine = { itemId: number; orderId: number; name: string; qty: number; date: string };
 
@@ -599,6 +605,10 @@ async function cartLines(ctx: Ctx): Promise<CartLine[]> {
 async function removeFromCart(ctx: Ctx, vr: VR, l: CartLine, n: number) {
   if (n >= l.qty) await db.delete(schema.orderItems).where(eq(schema.orderItems.id, l.itemId));
   else await db.update(schema.orderItems).set({ qty: l.qty - n }).where(eq(schema.orderItems.id, l.itemId));
+  // A removed maze takes its additional gun packs with it (Abraham, Nov 24, 2026); the usual "removed" line plays for
+  // the maze only (no new wording without his OK)
+  const packs = await dropOrphanPacks(db, l.orderId);
+  if (packs) await track(ctx.callSid, "step", `Removed the additional gun packs with the maze (${packs} line${packs > 1 ? "s" : ""})`);
   const [left] = await db.select({ id: schema.orderItems.id }).from(schema.orderItems).where(eq(schema.orderItems.orderId, l.orderId)).limit(1);
   if (left) await refreshOrderTotals(l.orderId); // a removed maze drops the laser gun add-ons back to their own price
   else await cancelHold(l.orderId, "Removed from the cart by the caller");
@@ -688,6 +698,36 @@ async function singularCategory(categoryId: number) {
   if (/laser/i.test(n)) return "laser tag set";
   if (/paddle|boat/i.test(n)) return "paddle boat";
   return (cat?.spoken || n).toLowerCase().replace(/s$/, "");
+}
+
+/** A laser tag item that uses the shared gun packs (maze with guns, guns only, additional packs). */
+async function isLaserItem(p: { name: string; categoryId: number }) {
+  const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, p.categoryId));
+  return Boolean(cat && laserPoolsFor(p.name, cat.name).length);
+}
+
+/** Ocean balls from the cart: on preview, or once Abraham approves its line. */
+const cartBallsOn = (ctx: Ctx) => process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "cart_add_balls");
+/** The first rental day in the cart with a jumping balloon and no ocean balls yet, or null. */
+async function cartBallsDay(ctx: Ctx): Promise<string | null> {
+  const balls = new Set((await oceanBallProducts()).map((b) => b.id));
+  for (const o of await callOrders(ctx)) {
+    if (o.items.some((i) => balls.has(i.productId))) continue;
+    for (const i of o.items) {
+      const [p] = await db.select({ categoryId: products.categoryId }).from(products).where(eq(products.id, i.productId));
+      if (p && (await isBounceHouse(p.categoryId))) return o.order.eventDate;
+    }
+  }
+  return null;
+}
+
+/** The extra gun packs (1 = six-pack, 2 = four-pack) and whether each still has one for this rental. */
+async function packOffer(ctx: Ctx, date: string) {
+  const packs = await addOnProducts(LASER_ADDONS_CATEGORY);
+  const full = await db.select({ id: products.id, quantity: products.quantity }).from(products).where(inArray(products.id, packs.map((x) => x.id).concat(0)));
+  const qty = new Map(full.map((x) => [x.id, x.quantity]));
+  const free = await Promise.all(packs.map(async (x) => (await checkBookable(x.id, qty.get(x.id) ?? 0, date, db, keptPickup(ctx, date))) > 0));
+  return packs.map((x, i) => ({ ...x, key: String(i + 1), free: free[i] }));
 }
 
 async function isBounceHouse(categoryId: number) {
@@ -1768,7 +1808,10 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "item_added", `Added ${itemPhrase(l.qty, l.name)} for ${spokenDate(l.d)} from the last call`, { item: l.name, productId: l.p, qty: l.qty, date: l.d, orderId: cartOrder });
       // Nov 19, 2026: a jumping balloon gets the ocean balls question first, then the old-cart added line
       const prod = await getProduct(l.p);
-      if (prod && (await isBounceHouse(prod.categoryId))) return back(vr, "ocean", { d: l.d, n: "resume" });
+      if (prod && (await isBounceHouse(prod.categoryId)) && !ctx.session?.data.oceanOffered) {
+        await updateSession(ctx.callSid, { data: { oceanOffered: true } }, ctx.session); // once per call (Nov 24, 2026)
+        return back(vr, "ocean", { d: l.d, n: "resume" });
+      }
       return back(vr, "resume-added", { d: l.d });
     }
     const t = lines.findIndex((l) => l.state === "taken");
@@ -2370,8 +2413,14 @@ const handlers: Record<string, Handler> = {
     // Abraham, Nov 22, 2026: box 25 after every item added, laser tag and paddle boats too (box 151 and box 152 dropped)
     // Abraham, Nov 19, 2026: row 11 every time an item is added (no shared cart line after it); a jumping balloon gets
     // the ocean balls question first, a maze or laser guns the extra gun packs first
-    if (await isBounceHouse(p.categoryId)) return back(vr, "ocean", { d: date });
-    if ((await isMaze(p)) && (process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "laser_packs"))) return back(vr, "packs", { d: date });
+    // Ocean balls only after the FIRST jumping balloon of the call (Abraham, Nov 24, 2026)
+    if ((await isBounceHouse(p.categoryId)) && !ctx.session?.data.oceanOffered) {
+      await updateSession(ctx.callSid, { data: { oceanOffered: true } }, ctx.session);
+      return back(vr, "ocean", { d: date });
+    }
+    // The extra gun packs after a maze (Abraham, Nov 24, 2026, revised: never after plain 6 or 4 guns), while a pack is
+    // left for that date; the approved wording plays in the live voice until its recording is uploaded
+    if (await isMaze(p)) return back(vr, "packs", { d: date });
     // Box 25 for laser tag and paddle boats (Nov 22, 2026): the added line, then a second one while another is free
     if (await secondOneKind(p.categoryId)) return back(vr, "added-second", { p: p.id, d: date });
     return back(vr, "added-menu");
@@ -2448,11 +2497,20 @@ const handlers: Record<string, Handler> = {
   },
 
   /** Extra laser gun packs after a maze or guns (Abraham, Nov 17, 2026): 1 = 6-pack $75, 2 = 4-pack $50, # skips. */
-  packs(ctx, vr) {
+  async packs(ctx, vr) {
     const d = ctx.query.get("d")!;
+    const offer = (await packOffer(ctx, d)).slice(0, 2);
+    const left = offer.filter((x) => x.free);
+    if (!left.length) return back(vr, "added-menu"); // no pack left for that date: no offer
     const g = keypad(vr, url("packs-choice", { d }), { timeout: 4 });
-    if (promptWaiting(ctx.prompts, "laser_packs")) say(g, promptText(ctx.prompts, "laser_packs"));
-    else sp(g, ctx, "laser_packs");
+    if (left.length === offer.length) {
+      if (promptWaiting(ctx.prompts, "laser_packs")) say(g, promptText(ctx.prompts, "laser_packs"));
+      else sp(g, ctx, "laser_packs");
+    } else {
+      // Only one kind left: the question and only that kind's sentence (split at the sentence)
+      const parts = promptText(ctx.prompts, "laser_packs").match(/[^.?!]+[.?!]/g)?.map((x) => x.trim()) ?? [];
+      say(g, [parts[0], ...left.map((x) => parts[Number(x.key)])].filter(Boolean).join(" "));
+    }
     halfPause(g);
     sp(g, ctx, "skip_pound"); // the shared skip line (Nov 19, 2026)
     backLine(g, ctx);
@@ -2465,8 +2523,8 @@ const handlers: Record<string, Handler> = {
     if (k === "#") return back(vr, "added-menu");
     if (k === "0") return back(vr, "cart");
     if (k === "*") return back(vr, "added-menu");
-    const packs = await addOnProducts(LASER_ADDONS_CATEGORY);
-    const pick = /^[12]$/.test(k) ? packs[Number(k) - 1] : undefined;
+    const offer = (await packOffer(ctx, date)).slice(0, 2);
+    const pick = offer.find((x) => x.key === k && x.free); // only a pack that is still there
     if (!pick) {
       sp(vr, ctx, "not_valid");
       return back(vr, "packs", { d: date });
@@ -2477,7 +2535,7 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "item_added", `Added ${pick.name} for ${spokenDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
       const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), r.orderId])];
       await updateSession(ctx.callSid, { data: { dayOrderIds: ids } }, ctx.session);
-      return back(vr, "added-menu"); // row 11 (Nov 19, 2026)
+      return back(vr, "packs", { d: date }); // the offer again after every pack (Abraham, Nov 24, 2026)
     }
     sp(vr, ctx, r.reason === "unavailable" ? "just_booked" : "went_wrong", { item: pick.name });
     return back(vr, "added-menu");
@@ -2493,13 +2551,13 @@ const handlers: Record<string, Handler> = {
     sp(g, ctx, "stay_on_line"); // Nov 22, 2026, 11:12 PM: doing nothing skips them (pound still skips too)
     backLine(g, ctx);
     // an add-on offer with no key for 4 seconds: nothing added, straight on (Nov 22, 2026)
-    return n === "resume" ? back(vr, "resume-added", { d }) : back(vr, "added-menu");
+    return n === "resume" ? back(vr, "resume-added", { d }) : n === "cart" ? back(vr, "cart") : back(vr, "added-menu");
   },
 
   async "ocean-choice"(ctx, vr) {
     const date = ctx.query.get("d")!;
     const n = ctx.query.get("n") ?? undefined;
-    const next = () => (n === "resume" ? back(vr, "resume-added", { d: date }) : back(vr, "added-menu"));
+    const next = () => (n === "resume" ? back(vr, "resume-added", { d: date }) : n === "cart" ? back(vr, "cart") : back(vr, "added-menu"));
     const k = ctx.body.Digits ?? "";
     if (k === "#" || k === "*") return next(); // star: one step back, the item-added line
     if (k === "0") return back(vr, "cart");
@@ -2534,6 +2592,8 @@ const handlers: Record<string, Handler> = {
     for (const o of days) sp(g, ctx, "cart_day", { date: spokenDate(o.order.eventDate), items: itemsPhrase(o.items) });
     sp(g, ctx, "cart_total", { total: spokenMoney(days.reduce((t, o) => t + o.order.subtotalCents, 0)) });
     sp(g, ctx, "cart_options");
+    // Ocean balls from the cart (Abraham, Nov 24, 2026): built, but its line waits for his wording (preview only)
+    if (await cartBallsDay(ctx)) spPreviewDraft(g, ctx, "cart_add_balls");
     backLine(g, ctx);
     // From an item list: once the cart has been read, the same item list plays again (Abraham, Phone Menu v3)
     if (c) return back(vr, "category", { c });
@@ -2555,6 +2615,10 @@ const handlers: Record<string, Handler> = {
     }
     if (d === "2") return c ? back(vr, "category", { c }) : back(vr, "book"); // keep shopping
     if (d === "3") return back(vr, "remove"); // remove an item (box 29b)
+    if (d === "5" && cartBallsOn(ctx)) {
+      const day = await cartBallsDay(ctx);
+      if (day) return back(vr, "ocean", { d: day, n: "cart" }); // the balls offer, then back to the cart
+    }
     if (d === "4") {
       // refresh the cart and start over (box 29)
       for (const o of await callOrders(ctx)) await cancelHold(o.order.id);

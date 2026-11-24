@@ -52,6 +52,12 @@ export default function PosForm(props: {
   const [oceanFor, setOceanFor] = useState<number | null>(null);
   const oceanCat = props.categories.find((c) => OCEAN.test(c.name.trim()));
   const oceanItems = oceanCat ? props.products.filter((p) => p.categoryId === oceanCat.id) : [];
+  // Inflatable mazes and the additional gun packs (Abraham, Nov 24, 2026: packs only with a maze on the booking)
+  const addonCatIds = new Set(props.categories.filter((c) => /^laser tag add-ons$/i.test(c.name.trim())).map((c) => c.id));
+  const laserCatIds = new Set(props.categories.filter((c) => /laser/i.test(c.name) && !addonCatIds.has(c.id)).map((c) => c.id));
+  const mazeIds = new Set(props.products.filter((p) => laserCatIds.has(p.categoryId) && /maze/i.test(p.name)).map((p) => p.id));
+  const addonIds = new Set(props.products.filter((p) => addonCatIds.has(p.categoryId)).map((p) => p.id));
+  const mazePicked = [...mazeIds].some((id) => (qty[id] || 0) > 0);
   const balloonCats = new Set(props.categories.filter((c) => BALLOON.test(c.name) && !OCEAN.test(c.name.trim())).map((c) => c.id));
 
   useEffect(() => {
@@ -203,6 +209,9 @@ export default function PosForm(props: {
           props.categories.map((c) => {
             const items = props.products.filter((p) => p.categoryId === c.id);
             if (!items.length) return null;
+            // The additional gun packs only with an inflatable maze on this booking (Abraham, Nov 24, 2026; the server
+            // refuses them otherwise too)
+            if (/^laser tag add-ons$/i.test(c.name) && !mazePicked) return null;
             return (
               <div key={c.id} className="mb-4">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{c.name}</div>
@@ -222,7 +231,19 @@ export default function PosForm(props: {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button type="button" className="btn-ghost h-9 w-9 !p-0" disabled={!q} onClick={() => setQty({ ...qty, [p.id]: q - 1 })}>−</button>
+                        <button
+                          type="button"
+                          className="btn-ghost h-9 w-9 !p-0"
+                          disabled={!q}
+                          onClick={() => {
+                            const next: Record<string, number> = { ...qty, [p.id]: q - 1 };
+                            // the last maze taken off: its additional gun packs go too
+                            if (mazeIds.has(p.id) && ![...mazeIds].some((id) => (next[id] || 0) > 0)) for (const id of addonIds) next[id] = 0;
+                            setQty(next);
+                          }}
+                        >
+                          −
+                        </button>
                         <span className="w-6 text-center font-bold">{q}</span>
                         <button
                           type="button"
@@ -326,7 +347,7 @@ export default function PosForm(props: {
         <div className="space-y-1 border-t border-line pt-3 text-sm" data-pos-totals>
           <div className="flex justify-between"><span className="text-muted">Items</span><span className="font-semibold" data-pos-items>{money(quote?.itemsCents ?? total)}</span></div>
           {quote && quote.offerCents !== 0 && (
-            <div className="flex justify-between"><span className="text-muted">{quote.offerNote}</span><span className="font-semibold">{quote.offerCents > 0 ? `−${money(quote.offerCents)}` : `+${money(-quote.offerCents)}`}</span></div>
+            <div className="flex justify-between"><span className="text-muted">{/third pack 50% off/i.test(quote.offerNote ?? "") ? "Third laser pack half price:" : quote.offerNote}</span><span className="font-semibold">{quote.offerCents > 0 ? `−${money(quote.offerCents)}` : `+${money(-quote.offerCents)}`}</span></div>
           )}
           <div className="flex justify-between"><span className="text-muted">Delivery</span><span className="font-semibold" data-pos-delivery>{quote?.deliveryCents != null ? money(quote.deliveryCents) : "—"}</span></div>
           <div className="flex justify-between"><span className="text-muted">Sales tax{quote?.taxPercent != null ? ` (${quote.taxPercent}%)` : ""}</span><span className="font-semibold" data-pos-tax>{quote?.taxCents != null ? money(quote.taxCents) : "—"}</span></div>
