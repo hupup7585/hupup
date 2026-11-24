@@ -6,10 +6,10 @@ import { detectKeyword, detectKeywordDetail } from "@/lib/sms-inbound";
 import { inMarketingHours, marketingBody } from "@/lib/sms";
 
 describe("phone consent language (A2P 10DLC)", () => {
-  it("transactional disclosure: brand, program, frequency, rates, STOP, HELP, terms, keypad options (no saying yes or no, Abraham Nov 15)", () => {
-    const t = PROMPTS.consent_transactional.text;
-    for (const part of ["Hup Up Attractions", "reservation, order, payment, delivery, pickup, and customer service", "authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages", "Message frequency varies.", "Message and data rates may apply.", "reply STOP to opt out", "HELP for help", "text message terms and privacy policy", "To agree, press 1.", "press 2."])
-      expect(t).toContain(part);
+  it("box 49 (Abraham, Nov 24, 2026): the one short line; the disclosure moves to the first text (frequency, rates, STOP, HELP, terms link)", () => {
+    expect(PROMPTS.consent_transactional.text).toBe("To receive text updates to your phone number, about your reservation, press 1.");
+    const f = PROMPTS.msg_first_text_footer.text;
+    for (const part of ["Msg frequency varies.", "Msg and data rates may apply.", "Reply STOP to opt out", "HELP for help", "Terms: {link}"]) expect(f).toContain(part);
   });
   it("promotional disclosure is separate, says it is not a condition of purchase, and covers provider sharing", () => {
     const t = PROMPTS.consent_marketing.text;
@@ -18,7 +18,6 @@ describe("phone consent language (A2P 10DLC)", () => {
     expect(t).not.toBe(PROMPTS.consent_transactional.text);
   });
   it("consent prompts are always spoken from the stored text, never a recording", () => {
-    expect(promptAudio({ consent_transactional: { text: null, audioUrl: "https://x/a.mp3" } }, "consent_transactional")).toBeNull();
     expect(promptAudio({ consent_marketing: { text: null, audioUrl: "https://x/b.mp3" } }, "consent_marketing")).toBeNull();
   });
   it("version: dated default, custom-<hash> when edited (same text = same version)", () => {

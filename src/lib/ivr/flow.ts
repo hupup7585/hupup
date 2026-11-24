@@ -338,6 +338,12 @@ async function cartGone(vr: VR, ctx: Ctx) {
   return vr;
 }
 
+/** A +1 number read in three groups, the same way as the phone read-back ("eight four five, ..."). */
+function spokenPhone(e164: string) {
+  const d = e164.replace(/\D/g, "").slice(-10);
+  return `${spokenDigits(d.slice(0, 3))}, ${spokenDigits(d.slice(3, 6))}, ${spokenDigits(d.slice(6))}`;
+}
+
 /** Inside a booking: the fallthrough after a step with no key (the idle clock decides). */
 function idleNoKey(vr: VR, ctx: Ctx, action: string, params: Record<string, string | number | undefined> = {}) {
   // nk = when the screen first finished with no key (kept while the caller keeps not pressing; a key press drops it)
@@ -3507,47 +3513,50 @@ const handlers: Record<string, Handler> = {
 
   /* ---- SMS consent: transactional (before the payment link), separate from promotional (after the order) ---- */
 
+  /*
+   * Box 49 (Abraham, Nov 24, 2026): "To receive text updates to your phone number, about your reservation, press 1."
+   * Key 1 records the consent (transactional, number, time, exact wording) and plays the thank-you with the number
+   * spoken between its two recordings. No key 2: no key = no texts, and checkout continues. Skipped (silently) when the
+   * number already agreed or replied STOP. The number is not confirmed again here.
+   */
   async "sms-consent"(ctx, vr) {
     const phone = ctx.session?.data.phone;
     if (!phone) return back(vr, "phone");
-    const retry = Number(ctx.query.get("n") || 0) > 0;
-    if (!retry) {
+    if (!ctx.query.get("n")) {
       const customer = await customerByPhone(phone);
       if (customer?.smsOptOut) {
-        // Twilio blocks texts to a number that replied STOP until it texts START; don't ask, explain.
-        sp(vr, ctx, "consent_stopped");
         await updateSession(ctx.callSid, { data: { smsConsent: "stopped" } }, ctx.session);
         return back(vr, "finalize");
       }
-      const state = await consentState(phone);
-      if (state.transactional?.action === "opt_in") {
+      if ((await consentState(phone)).transactional?.action === "opt_in") {
         await updateSession(ctx.callSid, { data: { smsConsent: "existing" } }, ctx.session);
         return back(vr, "finalize");
       }
     }
-    // Abraham, Nov 15, 2026: yes or no questions are answered by key only (1 yes, 2 no), never by speech
     const g = keypad(vr, url("sms-consent-answer", { n: ctx.query.get("n") ?? undefined }), { timeout: 8 });
-    // Nov 22, 2026: no answer = the system-wide no-choice line, then the same question
-    if (retry && ctx.query.get("k") !== "1") sp(g, ctx, "no_choice");
     sp(g, ctx, "consent_transactional");
-    backLine(g, ctx);
-    return bookNoInput(vr, ctx, "sms-consent", { n: Number(ctx.query.get("n") || 0) + 1, k: 1 }); // no key: never a silent hang-up (audit L7)
+    return back(vr, "sms-consent-answer", { none: 1 }); // no key: no texts, on with checkout
   },
 
   async "sms-consent-answer"(ctx, vr) {
     const phone = ctx.session?.data.phone;
     if (!phone) return back(vr, "phone");
-    if (ctx.body.Digits === "*") return back(vr, "phone"); // star: one step back (Nov 20, 2026)
-    const n = Number(ctx.query.get("n") || 0);
-    const answer = parseConsentAnswer({ digits: ctx.body.Digits, speech: ctx.body.SpeechResult, confidence: ctx.body.Confidence });
-    // A wrong key (Abraham, Nov 16, 2026): the shared line, then the same question again
-    if (answer === "unclear" && ctx.body.Digits && n < 2) {
-      sp(vr, ctx, "not_valid");
-      return back(vr, "sms-consent", { n: n + 1, k: 1 });
+    const d = ctx.query.get("none") ? "" : ctx.body.Digits ?? "";
+    if (d === "*") return back(vr, "phone"); // star: one step back (Nov 20, 2026)
+    if (d === "1") {
+      await recordPhoneConsent(ctx, "transactional", "opt_in", phone);
+      await updateSession(ctx.callSid, { data: { smsConsent: "yes" } }, ctx.session);
+      sp(vr, ctx, "consent_tx_thanks", { number: spokenPhone(phone) });
+      return back(vr, "finalize");
     }
-    if (answer === "unclear" && n < 1) return back(vr, "sms-consent", { n: n + 1 });
-    await recordPhoneConsent(ctx, "transactional", answer === "yes" ? "opt_in" : "declined", phone);
-    await updateSession(ctx.callSid, { data: { smsConsent: answer === "yes" ? "yes" : "no" } }, ctx.session);
+    // Another key (wrong key): the shared line and the question once more; then, like no key, no texts
+    const n = Number(ctx.query.get("n") || 0);
+    if (d && n < 1) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "sms-consent", { n: n + 1 });
+    }
+    await recordPhoneConsent(ctx, "transactional", "declined", phone);
+    await updateSession(ctx.callSid, { data: { smsConsent: "no" } }, ctx.session);
     return back(vr, "finalize");
   },
 

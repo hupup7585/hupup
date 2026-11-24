@@ -133,14 +133,17 @@ describe("transactional consent step (before the payment link)", () => {
     const xml = await call("phone-choice", { Digits: "1" });
     expect(xml).toContain("/api/voice/sms-consent");
   });
-  it("asks with the exact disclosure, keys only (Abraham, Nov 15: yes or no is never said)", async () => {
+  it("box 49 (Abraham, Nov 24, 2026): the one line, keys only; no key 2, no long disclosure", async () => {
     const xml = await call("sms-consent");
     expect(xml).toContain('input="dtmf"');
     expect(xml).not.toContain("speech");
-    expect(xml).toContain("Message frequency varies. Message and data rates may apply.");
+    expect(xml).toContain("To receive text updates to your phone number, about your reservation, press 1.");
+    expect(xml).not.toContain("press 2");
+    expect(xml).not.toContain("Message frequency varies");
     expect(xml).toContain("/api/voice/sms-consent-answer");
+    expect(xml).toContain("/api/voice/sms-consent-answer?none=1"); // no key: no texts, checkout continues
   });
-  it("press 1 records an opt-in with number, method, exact language, version, call and order", async () => {
+  it("press 1 records an opt-in with number, method, exact language, version, call and order; then the thank-you with the number", async () => {
     const xml = await call("sms-consent-answer", { Digits: "1" });
     expect(h.recorded).toHaveLength(1);
     expect(h.recorded[0]).toMatchObject({
@@ -157,34 +160,36 @@ describe("transactional consent step (before the payment link)", () => {
       orderId: 7,
     });
     expect(h.session.data.smsConsent).toBe("yes");
+    expect(xml).toContain("Thank you. You will get text updates about your reservation, to 8 4 5, 5 5 5, 0 1 0 0. Message and data rates may apply.");
     expect(xml).toContain("/api/voice/finalize");
   });
-  it("a spoken yes records method speech with the transcript and confidence", async () => {
-    await call("sms-consent-answer", { SpeechResult: "Yes please", Confidence: "0.87" });
-    expect(h.recorded[0]).toMatchObject({ action: "opt_in", method: "speech", response: 'said "Yes please"', speechConfidence: 0.87 });
-  });
-  it("an unclear answer is asked once more, then recorded as declined", async () => {
-    let xml = await call("sms-consent-answer", { SpeechResult: "hmm", Confidence: "0.9" });
-    expect(h.recorded).toHaveLength(0);
-    expect(xml).toContain("/api/voice/sms-consent?n=1");
-    xml = await call("sms-consent", {}, "n=1");
-    expect(xml).toContain(PROMPTS.no_choice.text); // Nov 22, 2026: the system-wide no-choice line, then the same question
-    expect(xml).toContain(PROMPTS.consent_transactional.text.slice(0, 40));
-    xml = await call("sms-consent-answer", {}, "n=1");
+  it("no key: no texts (recorded as declined, no answer), checkout continues", async () => {
+    const xml = await call("sms-consent-answer", {}, "none=1");
     expect(h.recorded[0]).toMatchObject({ action: "declined", response: "no answer" });
     expect(h.session.data.smsConsent).toBe("no");
+    expect(xml).toContain("/api/voice/finalize");
+  });
+  it("a wrong key: the shared line and the question once more; then like no key", async () => {
+    let xml = await call("sms-consent-answer", { Digits: "2" });
+    expect(h.recorded).toHaveLength(0);
+    expect(xml).toContain(PROMPTS.not_valid.text);
+    expect(xml).toContain("/api/voice/sms-consent?n=1");
+    xml = await call("sms-consent-answer", { Digits: "2" }, "n=1");
+    expect(h.recorded[0]).toMatchObject({ action: "declined" });
+    expect(xml).toContain("/api/voice/finalize");
   });
   it("already opted in: not asked again", async () => {
     h.state.transactional = { action: "opt_in", at: new Date() };
     const xml = await call("sms-consent");
-    expect(xml).not.toContain("Message frequency varies");
+    expect(xml).not.toContain("text updates");
     expect(xml).toContain("/api/voice/finalize");
     expect(h.session.data.smsConsent).toBe("existing");
   });
-  it("number that replied STOP: explained, not asked, nothing recorded", async () => {
+  it("number that replied STOP: box 49 skipped, nothing said, nothing recorded", async () => {
     h.customer = { id: 9, phone: "+18455550100", smsOptOut: true, marketingOptIn: false };
     const xml = await call("sms-consent");
-    expect(xml).toContain("text the word START");
+    expect(xml).not.toContain("<Say");
+    expect(xml).toContain("/api/voice/finalize");
     expect(h.recorded).toHaveLength(0);
     expect(h.session.data.smsConsent).toBe("stopped");
   });

@@ -26,7 +26,8 @@ describe("STOP line on order texts", () => {
     await sendMessage({ to: PHONE, body: "Your order #1001 is confirmed.", kind: "transactional", now: day(0) });
     await sendMessage({ to: PHONE, body: "Your driver is on the way.", kind: "transactional", now: day(1) });
     await sendMessage({ to: PHONE, body: "Pickup reminder for tomorrow.", kind: "transactional", now: day(40) });
-    expect(h.sent).toEqual(["Your order #1001 is confirmed. Reply STOP to opt out.", "Your driver is on the way.", "Pickup reminder for tomorrow. Reply STOP to opt out."]);
+    // The first text after the consent carries the full disclosure and the terms link (box 49, Nov 24, 2026)
+    expect(h.sent).toEqual([`Your order #1001 is confirmed. Msg frequency varies. Msg and data rates may apply. Reply STOP to opt out, HELP for help. Terms: ${process.env.PUBLIC_BASE_URL ?? "http://localhost:3000"}/sms-terms`, "Your driver is on the way.", "Pickup reminder for tomorrow. Reply STOP to opt out."]);
   });
   it("never adds a second STOP line", () => {
     expect(withOrderStopLine("Order confirmed. Reply HELP for help, STOP to opt out.", true)).toBe("Order confirmed. Reply HELP for help, STOP to opt out.");

@@ -116,6 +116,6 @@ describe("M6 and L items: star and no key never land in the main menu", () => {
     expect(redirect(await call("category-choice", {}, "c=1&f=1"))).toMatch(/^idle\?to=category&q=c%3D1%26f%3D1/);
     h.session.data = { ...h.session.data, phone: "+18455550199", smsConsent: undefined };
     const xml = await call("sms-consent");
-    if (xml.includes("sms-consent-answer")) expect(redirect(xml)).toMatch(/^idle\?to=sms-consent/);
+    if (xml.includes("sms-consent-answer")) expect(redirect(xml)).toBe("sms-consent-answer?none=1"); // box 49 (Nov 24, 2026): no key = no texts, checkout goes on
   });
 });

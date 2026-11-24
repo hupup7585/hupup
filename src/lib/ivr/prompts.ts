@@ -362,11 +362,17 @@ export const PROMPTS = {
   goodbye_order: { group: "Checkout", label: "Goodbye after ordering", text: "We will deliver on {date} and pick up on {pickup}. Thanks so much for choosing Hup Up Attractions. Have an amazing party, bye for now!", vars: ["date", "pickup"] },
 
   // Text message consent (A2P 10DLC). The exact text spoken is stored with every consent record.
+  // Box 49 (Abraham, Nov 24, 2026): the only line; key 1 agrees, no key 2, no long disclosure (the first text carries it)
   consent_transactional: {
     group: "Text message consent",
-    label: "Ask for order and service texts (transactional)",
-    textOnly: true,
-    text: "Can Hup Up Attractions text you at this number about your reservation, order, payment, delivery, pickup, and customer service? By agreeing, you also authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages. Message frequency varies. Message and data rates may apply. You can reply STOP to opt out, or HELP for help, at any time. Our text message terms and privacy policy are on our website. To agree, press 1. If not, press 2.",
+    label: "Box 49: text updates about your reservation (press 1)",
+    text: "To receive text updates to your phone number, about your reservation, press 1.",
+  },
+  consent_tx_thanks: {
+    group: "Text message consent",
+    label: "Box 49 after key 1: thank you (the number is spoken between the two recordings)",
+    text: "Thank you. You will get text updates about your reservation, to {number}. Message and data rates may apply.",
+    vars: ["number"],
   },
   consent_marketing: {
     group: "Text message consent",
@@ -634,6 +640,8 @@ export const PROMPTS = {
   msg_receipt_body: { group: "Texts and emails", message: true, label: "Receipt email after a phone payment", text: "{greeting}\n\nThank you for your payment! Here is your receipt.\n\nOrder number: {number}\nPaid on: {paid_on}\nAmount: ${amount}\nCard: ending in {last4}\n\nYour rentals are booked. If you have any questions, call us at (845) 777-7585 or reply to this email.\n\nHup Up Attractions\nhupupattractions.com", vars: ["greeting", "number", "paid_on", "amount", "last4"] },
   msg_payment_received: { group: "Texts and emails", message: true, label: "Payment received (one rental day; text, and email for website payments)", text: "Hup Up Attractions: payment received for order #{number}. You are all set for {date}! We will deliver that day and pick up {pickup}.", vars: ["number", "date", "pickup"] },
   msg_payment_received_days: { group: "Texts and emails", message: true, label: "Payment received (several rental days)", text: "Hup Up Attractions: payment received for order #{number}. You are all set for {dates}! We will deliver and pick up on the days you chose.", vars: ["number", "dates"] },
+  // The first text after a phone consent (Abraham, Nov 24, 2026): ends with the required disclosure and the terms link
+  msg_first_text_footer: { group: "Texts and emails", message: true, label: "Added to the first text after texting consent", text: "Msg frequency varies. Msg and data rates may apply. Reply STOP to opt out, HELP for help. Terms: {link}", vars: ["link"] },
   msg_terms_link: { group: "Texts and emails", message: true, label: "Terms and Conditions link by text (during checkout)", text: "Hup Up Attractions Terms and Conditions: {link}", vars: ["link"] },
 } satisfies Record<string, PromptDef>;
 

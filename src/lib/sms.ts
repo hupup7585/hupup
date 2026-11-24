@@ -131,6 +131,36 @@ export async function needsOrderStopLine(phone: string, now = new Date()): Promi
 }
 
 /** Order text body: the STOP line only on the first text or after a 30-day gap; never twice. */
+/** True when this number agreed to order texts and no order text went out since (the first text after consent). */
+export async function needsConsentFooter(phone: string): Promise<boolean> {
+  const [c] = await db
+    .select({ at: schema.smsConsents.createdAt, action: schema.smsConsents.action })
+    .from(schema.smsConsents)
+    .where(and(eq(schema.smsConsents.phone, phone), eq(schema.smsConsents.scope, "transactional")))
+    .orderBy(desc(schema.smsConsents.createdAt), desc(schema.smsConsents.id))
+    .limit(1);
+  if (!c || c.action !== "opt_in") return false;
+  const [r] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.messages)
+    .where(
+      and(
+        eq(schema.messages.contactPhone, phone),
+        eq(schema.messages.kind, "transactional"),
+        eq(schema.messages.direction, "out"),
+        gte(schema.messages.createdAt, c.at),
+        sql`${schema.messages.status} not in ('blocked', 'failed', 'undelivered', 'canceled')`,
+      ),
+    );
+  return (r?.n ?? 0) === 0;
+}
+
+/** "Msg frequency varies. Msg and data rates may apply. Reply STOP to opt out, HELP for help. Terms: {link}" (Admin-editable). */
+export async function consentFooter(): Promise<string> {
+  const { messageText } = await import("@/lib/ivr/prompts");
+  return messageText("msg_first_text_footer", { link: `${config.baseUrl()}/sms-terms` });
+}
+
 export function withOrderStopLine(body: string, needed: boolean): string {
   const b = body.trim();
   if (!needed || /\bSTOP\b/i.test(b)) return b;
@@ -241,7 +271,11 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   const kind = input.kind ?? "transactional";
   const log = input.log !== false;
   if (kind === "marketing") input = { ...input, body: marketingBody(input.body) };
-  if (kind === "transactional") input = { ...input, body: withOrderStopLine(input.body, await needsOrderStopLine(to, input.now)) };
+  if (kind === "transactional") {
+    // The first text after a texting consent carries the full disclosure and the terms link (Abraham, Nov 24, 2026)
+    const footer = (await needsConsentFooter(to)) ? await consentFooter() : null;
+    input = { ...input, body: footer ? `${input.body.trim()} ${footer}` : withOrderStopLine(input.body, await needsOrderStopLine(to, input.now)) };
+  }
 
   if (containsCardNumber(input.body)) {
     return { sent: false, blocked: "card_number", error: "Message looks like it contains a card number and was not sent." };
