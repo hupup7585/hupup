@@ -145,3 +145,23 @@ describe("Chanukah and Chol Hamoed on the booking calendar (Nov 24, 2026)", () =
     expect(pesach.some((d) => d.holidayWeek === "cholHamoed")).toBe(true);
   });
 });
+
+describe("Admin bugs (Nov 24, 2026)", () => {
+  it("Deliveries 1: no booking with an address that can't be priced, even cash or check", async () => {
+    for (const payment of ["cash", "check", "later"] as const) {
+      const r = await createBookingAction({ ...base, date: DATE, items: { [castle]: 1 }, phone: "", address: "14 D A Weuder #201", payment, amountPaid: "300.00" });
+      expect(r.ok, payment).toBe(false);
+      expect(r.message).toMatch(/^Not booked\./);
+    }
+  });
+  it("Inbox 2: the voicemail page never shows the default box password", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/app/admin/(app)/voicemail/page.tsx", "utf8")).not.toMatch(/1234/);
+  });
+  it("Deliveries 2: an impossible date falls back to today instead of crashing", async () => {
+    const { isValidISO } = await import("@/lib/dates");
+    expect(isValidISO("2026-13-45")).toBe(false);
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/app/admin/deliveries/page.tsx", "utf8")).toContain("sp.d && isValidISO(sp.d) ? sp.d : todayISO()");
+  });
+});

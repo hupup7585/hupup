@@ -119,14 +119,14 @@ export default async function VoicemailPage() {
         <section className="card mt-8 p-5" data-vm-access>
           <h2 className="text-lg font-black">Voicemail by phone (staff)</h2>
           <p className="mt-1 text-sm text-muted">
-            Call the hotline, press 9 for the general voicemail, and while the greeting plays press star 7 4. Calling from your own phone saved in Admin opens your box; from another phone, enter your box number and press pound. Then your box password and pound (1234 until you change it). 3 wrong tries lock the box for {VM_LOCK_MINUTES} minutes and the Owner is emailed. From the main menu, press 8 for the shared boxes (general voicemail and the extensions).
+            Call the hotline, press 9 for the general voicemail, and while the greeting plays press star 7 4. Calling from your own phone saved in Admin opens your box; from another phone, enter your box number and press pound. Then your box password and pound (the default password until you change it). 3 wrong tries lock the box for {VM_LOCK_MINUTES} minutes and the Owner is emailed. From the main menu, press 8 for the shared boxes (general voicemail and the extensions).
             {!CALL_OUT_LIVE_APPROVED && <b> Calling back is off until you approve the price.</b>}
           </p>
           <table className="mt-3 w-full text-sm" data-vm-personal-boxes>
             <thead><tr><th className="th">Box</th><th className="th">Box number</th><th className="th">Password</th><th className="th">New message alerts</th></tr></thead>
             <tbody>
               {personal.map((b) => (
-                <tr key={b.id}><td className="td font-bold">{b.name}</td><td className="td">{b.boxNumber}</td><td className="td">{b.pinHash ? "Changed" : "1234 (not changed yet)"}{b.lockedUntil && b.lockedUntil > new Date() ? ` · locked until ${when(b.lockedUntil)}` : ""}</td><td className="td">{b.alertsOn ? "On (email)" : "Off"}</td></tr>
+                <tr key={b.id}><td className="td font-bold">{b.name}</td><td className="td">{b.boxNumber}</td><td className="td">{b.pinHash ? "Changed" : "Default, not changed yet"}{b.lockedUntil && b.lockedUntil > new Date() ? ` · locked until ${when(b.lockedUntil)}` : ""}</td><td className="td">{b.alertsOn ? "On (email)" : "Off"}</td></tr>
               ))}
             </tbody>
           </table>

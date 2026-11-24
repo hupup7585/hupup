@@ -140,7 +140,7 @@ export default function PosForm(props: {
         ))}
       </ul>
     ) : null;
-  const linkBlocked = (payment === "link" || payment === "card") && Boolean(quote?.problem);
+  const linkBlocked = Boolean(quote?.problem); // no booking at all until the address can be priced (delivery always applies)
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
 
@@ -339,7 +339,7 @@ export default function PosForm(props: {
               {fullTotal == null && !quote?.problem && total > 0 && <p className="text-xs text-muted">Items only, until the address is priced</p>}
             </div>
           </div>
-          {linkBlocked && <p className="rounded-lg bg-[#ffe6e4] p-2 text-xs font-bold text-[#b3261e]" data-pos-link-blocked>{payment === "card" ? "No card payment" : "No payment link"} until the address can be priced.</p>}
+          {linkBlocked && <p className="rounded-lg bg-[#ffe6e4] p-2 text-xs font-bold text-[#b3261e]" data-pos-link-blocked>No booking until the address can be priced.</p>}
           {payment === "card" && !linkBlocked && <p className="rounded-lg bg-bg p-2 text-xs text-muted" data-pos-card-note>After Book it, open the secure Sola card page and type the customer&apos;s credit or debit card there. The card number never goes through our system.</p>}
         </div>
         <button className="btn w-full py-3.5" disabled={pending || !date || total === 0 || check?.ok === false || linkBlocked || (props.askTerms !== false && !form.termsVia)} onClick={submit}>

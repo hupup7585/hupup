@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isValidISO } from "@/lib/dates";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { Clock, MapPin, Navigation, Route, Warehouse } from "lucide-react";
 import { requireStaff } from "@/lib/auth";
@@ -28,7 +29,8 @@ export const metadata = { title: "Deliveries · Hup Up Attractions", robots: { i
 export default async function DeliveriesPage({ searchParams }: { searchParams: Promise<{ d?: string }> }) {
   const staff = await requireStaff(["owner", "secretary", "delivery"]);
   const sp = await searchParams;
-  const day = sp.d && /^\d{4}-\d{2}-\d{2}$/.test(sp.d) ? sp.d : todayISO();
+  // A real date only (Deliveries bug 2, Nov 24, 2026: 2026-13-45 used to crash the page); anything else is today
+  const day = sp.d && isValidISO(sp.d) ? sp.d : todayISO();
   const rows = await db
     .select()
     .from(schema.orders)

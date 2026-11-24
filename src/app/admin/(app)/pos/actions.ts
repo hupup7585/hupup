@@ -116,6 +116,13 @@ export async function createBookingAction(input: {
   if (input.phone && !phone) return { ok: false, message: "Phone number doesn't look right." };
   if (input.payment === "link" && !phone) return { ok: false, message: "A phone number is needed to text a payment link." };
 
+  // Deliveries bug 1 (Nov 24, 2026, order 1068): delivery always applies, so no booking with an address that can't be
+  // priced (no town or zip, outside every zone), whatever the payment
+  {
+    const { addressProblem } = await import("@/lib/order-pricing");
+    const problem = await addressProblem(input.address.trim() || null, await getSettings(), input.date);
+    if (problem) return { ok: false, message: `Not booked. ${problem}` };
+  }
   const paidCents = input.payment === "cash" || input.payment === "check" ? parseMoneyToCents(input.amountPaid) ?? 0 : 0;
   // Credit card by staff (Nov 24, 2026): typed on Sola's secure page, never on ours; Sola's webhook marks it paid
   if (input.payment === "card") {
