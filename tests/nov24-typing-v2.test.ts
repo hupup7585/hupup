@@ -54,16 +54,16 @@ describe("slot texts, word for word", () => {
 describe("every typing step: the question, then type_hint; 9 types, star goes back", () => {
   it("name and street: the question then type_hint", async () => {
     expect(said(await call("ask", {}, "f=name"))).toEqual([PROMPTS.ask_name.text, PROMPTS.type_hint.text]);
-    expect(said(await call("ask", {}, "f=street"))).toEqual([PROMPTS.addr_street.text, PROMPTS.type_hint.text]);
+    expect(said(await call("ask", {}, "f=street"))).toEqual([PROMPTS.addr_street.text]); // street step (Nov 24, 2026): voice was chosen in the street menu
   });
   it("9 before typing switches to typing (not W); star goes back to the last step", async () => {
     for (const f of ["name", "street", "email"]) expect(redirect(await call("heard", { Digits: "9" }, `f=${f}`)), f).toBe(`type?f=${f}`);
     expect(redirect(await call("heard", { Digits: "*" }, "f=name"))).toBe("cart");
-    expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("addr-house");
+    expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("addr-street");
     expect(redirect(await call("stt-recorded", { Digits: "9" }, "f=name"))).toBe("type?f=name");
   });
   it("after 9: type_instructions, a short beep, then keys (one Gather, so a key during the directions is the first key)", async () => {
-    const xml = await call("type", {}, "f=street");
+    const xml = await call("type", {}, "f=name");
     expect(said(xml)).toEqual([PROMPTS.type_instructions.text]);
     expect(xml).toMatch(/<Gather [^>]*finishOnKey="#"[^>]*>.*type_instructions|<Gather [^>]*finishOnKey="#"/s);
     expect(xml).toMatch(/<\/Say><Play>[^<]*tone\.wav<\/Play><\/Gather>/);

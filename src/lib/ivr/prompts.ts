@@ -296,6 +296,11 @@ export const PROMPTS = {
   retry_spoken: { group: "Checkout", label: "Any spoken answer not understood (approved; the step's own line is not repeated)", text: "Sorry, we did not catch that. Please try again." },
   addr_house: { group: "Checkout", label: "Address step 1 - house number", text: "Now, with your keypad, please enter the house number." },
   pound_done: { group: "Checkout", label: "Shared - When you are done, press pound", text: "When you are done, press pound." },
+  // The street step (Abraham, Nov 24, 2026, final): search the street by voice or keypad in the zip's street list
+  addr_street_menu: { group: "Checkout", label: "Address street step - voice or keypad search", text: "To search for the street name by voice, press 1. To search it with your keypad, press 2." },
+  street_keys_intro: { group: "Checkout", label: "Street keypad search - first four letters (draft)", text: "Please enter the first four letters of the street name, then press pound.", pending: true },
+  street_pick_item: { group: "Checkout", label: "Street keypad search - one of several streets (draft)", text: "For {street}, press {key}.", vars: ["street", "key"], pending: true },
+  street_none: { group: "Checkout", label: "Street keypad search - no street found (draft)", text: "We could not find a street that starts with those letters. To try again, press 1. To search by voice, press 2.", pending: true },
   addr_unit: { group: "Checkout", label: "Address step 3 - unit number", text: "Thanks, with your keypad, please enter the unit number." },
   addr_unit_skip: { group: "Checkout", label: "Address step 3 - no unit, press pound to skip", text: "If there is no unit number, press pound to skip." },
   addr_zip: { group: "Checkout", label: "Slot C - Zip menu, all towns, press 1 to 7 (one take)", text: "For Monroe, New York, one zero nine five zero, press 1. For Highland Mills, New York, one zero nine three zero, press 2. For Chester, New York, one zero nine one eight, press 3. For Washingtonville, New York, one zero nine nine two, press 4. For Central Valley, New York, one zero nine one seven, press 5. For Harriman, New York, one zero nine two six, press 6. To enter a different zip code, press 7." },

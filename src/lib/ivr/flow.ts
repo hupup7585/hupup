@@ -46,6 +46,7 @@ import { addressParts, townPhrase } from "@/lib/spoken-address";
 import { lookupByPhone } from "@/lib/directory";
 import { makeVmHandlers } from "./vmail";
 import { findStreet, streetSlotKey, unitSlotKey } from "@/lib/streets";
+import { closestStreet, exactStreet, streetsByPrefix, streetsForZip } from "@/lib/street-search";
 import { promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import {
@@ -2712,7 +2713,8 @@ const handlers: Record<string, Handler> = {
     const retry = Number(n || 0) > 0;
     // Abraham, Nov 24, 2026: after every spoken question, type_hint ("To type it with your keypad, press 9."); the unit
     // is typed on the keypad anyway (addr-unit)
-    const ownHint = f === "unit";
+    // The street (Nov 24, 2026): the caller chose voice in the street menu, so no keypad line; the tone right after
+    const ownHint = f === "unit" || f === "street";
     const tone = `${config.baseUrl()}/audio/tone.wav`;
     const question = (g: Gather, withTone = true) => {
       if (retry) sp(g, ctx, "field_unclear"); // the one shared did-not-catch line (Nov 22, 2026)
@@ -2738,7 +2740,8 @@ const handlers: Record<string, Handler> = {
     // Pound ends a spoken answer and keeps what was said so far (Abraham, Nov 17, 2026): Twilio's partial results are
     // saved as the caller speaks, because a key press alone would drop the words.
     await updateSession(ctx.callSid, { data: { speechPartial: undefined } }, ctx.session);
-    const g = speech(vr, url("heard", { f, n }), spec.hints, { dtmf: true, numDigits: 1, finishOnKey: "", partial: url("speech-partial") });
+    const hints = f === "street" ? (await streetsForZip(ctx.session?.data.zip)).join(", ") : spec.hints;
+    const g = speech(vr, url("heard", { f, n }), hints, { dtmf: true, numDigits: 1, finishOnKey: "", partial: url("speech-partial") });
     question(g);
     return vr;
   },
@@ -2753,6 +2756,7 @@ const handlers: Record<string, Handler> = {
   /** Keypad typing: the instructions, then keys until # (star separates letters inside this prompt, not the menu). */
   type(ctx, vr) {
     const f = ctx.query.get("f") as Field;
+    if (f === "street") return back(vr, "addr-street-keys"); // the street keypad search (Nov 24, 2026)
     const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 15, action: url("typed", { f }), method: "POST" });
     // Abraham, Nov 24, 2026: after 9, the directions (type_instructions) and a short beep, then keys; a key pressed during
     // the directions stops them and is the first typed key (Twilio's Gather)
@@ -2854,7 +2858,14 @@ const handlers: Record<string, Handler> = {
       return back(vr, "ask", { f, n });
     }
     await track(ctx.callSid, "said", `Said ${f}: ${value}`, { field: f, value, raw, ...(viaStt ? { via: "speech to text" } : {}) });
-    if (f === "street" || f === "unit") {
+    if (f === "street") {
+      // Voice search (Abraham, Nov 24, 2026): the closest street in the zip's list, read back: 1 confirms, 2 says it again
+      const match = closestStreet(value, await streetsForZip(ctx.session?.data.zip)) ?? value;
+      await track(ctx.callSid, "step", `Street voice search: heard "${value}", closest street ${match}`);
+      await updateSession(ctx.callSid, { data: { heard: match } }, ctx.session);
+      return back(vr, "addr-street-rb", { m: "v" });
+    }
+    if (f === "unit") {
       // The address steps read the whole address back at step 6, not each part
       await updateSession(ctx.callSid, { data: { [f]: value, heard: undefined } }, ctx.session);
       return back(vr, spec.next);
@@ -3043,7 +3054,7 @@ const handlers: Record<string, Handler> = {
       return back(vr, "addr-house");
     }
     await updateSession(ctx.callSid, { data: { house: digits } }, ctx.session);
-    return back(vr, "ask", { f: "street" }); // step 2: the street name
+    return back(vr, "addr-unit"); // then the unit and the zip; the street is searched in that zip's list (Nov 24, 2026)
   },
 
   /** Step 3: the unit number on the keypad; pound with nothing typed = no unit. */
@@ -3060,7 +3071,7 @@ const handlers: Record<string, Handler> = {
 
   async "addr-unit-heard"(ctx, vr) {
     const raw = ctx.body.Digits || "";
-    if (raw.includes("*")) return back(vr, "ask", { f: "street" }); // star: one step back
+    if (raw.includes("*")) return back(vr, "addr-house"); // star: one step back, the house number
     // Nothing typed: pound alone = no unit (on to the zip menu); a real timeout = the no-key rule on this question
     if (!raw.replace(/\D/g, "") && ctx.body.FinishedOnKey !== "#") return idleNoKey(vr, ctx, "addr-unit");
     const unit = raw.replace(/\D/g, "");
@@ -3082,7 +3093,7 @@ const handlers: Record<string, Handler> = {
     const zip = ZIP_MENU_KEYS[d ?? ""];
     if (zip) {
       await updateSession(ctx.callSid, { data: { zip } }, ctx.session);
-      return back(vr, "addr-check");
+      return back(vr, "addr-street");
     }
     if (d === "7") return back(vr, "addr-zip-enter");
     sp(vr, ctx, "not_valid");
@@ -3101,13 +3112,141 @@ const handlers: Record<string, Handler> = {
     const zip = (ctx.body.Digits || "").replace(/\D/g, "");
     if (!/^[0-9]{5}$/.test(zip)) return back(vr, "addr-zip-enter", { bad: 1 });
     await updateSession(ctx.callSid, { data: { zip } }, ctx.session);
-    return back(vr, "addr-check");
+    return back(vr, "addr-street");
+  },
+
+  /*
+   * The street step (Abraham, Nov 24, 2026, final), after the house number, unit and zip: "To search for the street name
+   * by voice, press 1. To search it with your keypad, press 2." Star = back to the zip menu. No keypad-typing line here.
+   */
+  "addr-street"(ctx, vr) {
+    const g = keypad(vr, url("addr-street-choice"));
+    sp(g, ctx, "addr_street_menu");
+    backLine(g, ctx);
+    return repeatMenu(vr, ctx, "addr-street");
+  },
+
+  "addr-street-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (d === "*") return back(vr, "addr-zip"); // star: one step back
+    if (d === "1") return back(vr, "ask", { f: "street" }); // voice: the Address step 2 recording, the tone, then the search
+    if (d === "2") return back(vr, "addr-street-keys");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "addr-street");
+  },
+
+  /** Keypad search: the first four letters (multi-tap), then pound. Star alone = back to the street menu. */
+  "addr-street-keys"(ctx, vr) {
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 15, action: url("addr-street-typed"), method: "POST" });
+    if (!ctx.query.get("again")) {
+      spPreviewDraft(g, ctx, "street_keys_intro"); // draft: preview only until Abraham approves the wording
+      sp(g, ctx, "type_instructions");
+    }
+    g.play(`${config.baseUrl()}/audio/tone.wav`);
+    return back(vr, "addr-street-typed");
+  },
+
+  async "addr-street-typed"(ctx, vr) {
+    const raw = ctx.body.Digits ?? "";
+    if (raw === "*") return back(vr, "addr-street");
+    const typed = decodeMultitap(raw, "text");
+    if (!typed.replace(/[^A-Za-z]/g, "")) {
+      sp(vr, ctx, "field_unclear");
+      return back(vr, "addr-street-keys", { again: 1 });
+    }
+    const list = await streetsForZip(ctx.session?.data.zip);
+    const matches = streetsByPrefix(typed, list);
+    await track(ctx.callSid, "typed", `Street keypad search: "${typed}", ${matches.length} street${matches.length === 1 ? "" : "s"} found${matches.length ? `: ${matches.slice(0, 9).join(", ")}` : ""}`, { field: "street", value: typed });
+    const live = (key: PromptKey) => !(process.env.VERCEL_ENV === "production" && promptWaiting(ctx.prompts, key));
+    const pick = (street: string) => updateSession(ctx.callSid, { data: { heard: street, streetMatches: undefined } }, ctx.session);
+    if (matches.length === 1) {
+      await pick(matches[0]);
+      return back(vr, "addr-street-rb", { m: "k" });
+    }
+    if (matches.length > 1 && live("street_pick_item")) {
+      await updateSession(ctx.callSid, { data: { streetMatches: matches.slice(0, 9) } }, ctx.session);
+      return back(vr, "addr-street-pick");
+    }
+    if (!matches.length && live("street_none")) return back(vr, "addr-street-none");
+    // The new lines are still waiting for Abraham's OK (live line): the whole name typed is used, as before
+    await pick(exactStreet(typed, matches) ?? titleCase(typed));
+    return back(vr, "addr-street-rb", { m: "k" });
+  },
+
+  /** Several streets start with those letters: each with its own key ("For {street}, press {key}."). */
+  "addr-street-pick"(ctx, vr) {
+    const list = ctx.session?.data.streetMatches ?? [];
+    if (!list.length) return back(vr, "addr-street");
+    const g = keypad(vr, url("addr-street-pick-choice"));
+    list.forEach((street, i) => {
+      if (i) halfPause(g);
+      spPreviewDraft(g, ctx, "street_pick_item", { street, key: i + 1 });
+    });
+    backLine(g, ctx);
+    return repeatMenu(vr, ctx, "addr-street-pick");
+  },
+
+  async "addr-street-pick-choice"(ctx, vr) {
+    const d = ctx.body.Digits ?? "";
+    if (d === "*") return back(vr, "addr-street-keys"); // star: back to the letters
+    const list = ctx.session?.data.streetMatches ?? [];
+    const street = /^[1-9]$/.test(d) ? list[Number(d) - 1] : undefined;
+    if (!street) {
+      if (d) sp(vr, ctx, "not_valid");
+      return back(vr, "addr-street-pick");
+    }
+    await updateSession(ctx.callSid, { data: { heard: street, streetMatches: undefined } }, ctx.session);
+    return back(vr, "addr-street-rb", { m: "k" });
+  },
+
+  /** No street starts with those letters: 1 = try the letters again, 2 = search by voice. */
+  "addr-street-none"(ctx, vr) {
+    const g = keypad(vr, url("addr-street-none-choice"));
+    spPreviewDraft(g, ctx, "street_none");
+    backLine(g, ctx);
+    return repeatMenu(vr, ctx, "addr-street-none");
+  },
+
+  "addr-street-none-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (d === "1") return back(vr, "addr-street-keys");
+    if (d === "2") return back(vr, "ask", { f: "street" });
+    if (d === "*") return back(vr, "addr-street");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "addr-street-none");
+  },
+
+  /** The street found, read back ("I heard:" by voice, "You typed:" by keypad), then 1 = correct, 2 = search again. */
+  "addr-street-rb"(ctx, vr) {
+    const street = ctx.session?.data.heard;
+    const keys = ctx.query.get("m") === "k";
+    if (!street) return back(vr, "addr-street");
+    const g = keypad(vr, url("addr-street-rb-choice", { m: keys ? "k" : "v" }));
+    readBackLine(g, ctx, keys ? "typed_back" : "heard", "street", street);
+    confirmEnd(g, ctx);
+    return repeatMenu(vr, ctx, "addr-street-rb", { m: keys ? "k" : "v" });
+  },
+
+  async "addr-street-rb-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    const keys = ctx.query.get("m") === "k";
+    if (d === "*") return back(vr, "addr-street"); // star: back to the street menu
+    if (d === "2") return keys ? back(vr, "addr-street-keys") : back(vr, "ask", { f: "street" }); // say it / type it again
+    const street = ctx.session?.data.heard;
+    if (d === "1" && street) {
+      await track(ctx.callSid, keys ? "typed" : "said", `Street: ${street}`, { field: "street", value: street });
+      await updateSession(ctx.callSid, { data: { street, heard: undefined, streetMatches: undefined } }, ctx.session);
+      return back(vr, "addr-check");
+    }
+    sp(vr, ctx, "not_valid");
+    return back(vr, "addr-street-rb", { m: keys ? "k" : "v" });
   },
 
   /** Step 5: the town from the zip (Orange County only), then the delivery map (the street decides the price). */
   async "addr-check"(ctx, vr) {
     const data = ctx.session?.data ?? {};
-    if (!data.street || !data.house) return back(vr, "addr-house");
+    if (!data.house) return back(vr, "addr-house");
+    if (!data.street) return back(vr, "addr-street");
     const zip = data.zip ?? DEFAULT_ZIP;
     const town = townForZip(zip);
     if (!town) return back(vr, "addr-outside");
@@ -3115,10 +3254,10 @@ const handlers: Record<string, Handler> = {
     const firstDay = (await callOrders(ctx))[0]?.order.eventDate;
     const quote = await deliveryQuote(address, await getSettings(), fetch, firstDay ?? new Date());
     if (!quote.ok && quote.reason === "not_found") {
-      // Nov 23, 2026: nothing entered is kept; the address starts again at the house number
-      await updateSession(ctx.callSid, { data: { street: undefined, house: undefined, unit: undefined, zip: undefined, town: undefined, address: undefined, dirArea: undefined, dirPick: undefined } }, ctx.session);
+      // Street not found (Abraham, Nov 24, 2026): the house number, unit and zip are kept; only the street is asked again
+      await updateSession(ctx.callSid, { data: { street: undefined, town: undefined, address: undefined, dirArea: undefined, dirPick: undefined } }, ctx.session);
       sp(vr, ctx, "addr_not_found");
-      return back(vr, "addr-house");
+      return back(vr, "addr-street");
     }
     if (!quote.ok) return back(vr, "addr-outside");
     // The postal town always (Abraham, Nov 22, 2026: the Kiryas Joel idea was withdrawn)
@@ -4527,7 +4666,7 @@ const handlers: Record<string, Handler> = {
 type Field = "name" | "address" | "email" | "street" | "unit" | "directions";
 /** The step before a question, for star (Abraham, Nov 24, 2026: star = go back everywhere). */
 function prevStep(f: Field): [string, Record<string, string>] {
-  return f === "street" ? ["addr-house", {}] : f === "unit" ? ["ask", { f: "street" }] : f === "address" ? ["ask", { f: "name" }] : ["cart", {}];
+  return f === "street" ? ["addr-street", {}] : f === "unit" ? ["addr-house", {}] : f === "address" ? ["ask", { f: "name" }] : ["cart", {}];
 }
 const FIELDS: Record<
   Field,
@@ -4545,7 +4684,7 @@ const FIELDS: Record<
     hints: "Forest Road, Garfield Road, Bakertown Road, Mountain Road, Acres Road, Quickway Road, Seven Springs Road, Schunnemunk Road, Larkin Drive, Satmar Drive, Van Buren Drive",
     normalize: (s) => titleCase(s.replace(/[.,!?;:]+$/g, "").trim()) || null,
     readBack: (v) => v,
-    next: "addr-unit",
+    next: "addr-check",
   },
   unit: {
     prompt: "addr_unit",

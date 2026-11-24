@@ -83,15 +83,15 @@ describe("H3: unit, pound alone = no unit", () => {
 });
 
 describe("M1: street, 9 types it and star goes back", () => {
-  it("speech and recorded answers: 9 = keypad, star = the house number", async () => {
+  it("speech and recorded answers: 9 = keypad, star = the street menu (Nov 24, 2026)", async () => {
     expect(redirect(await call("heard", { Digits: "9" }, "f=street"))).toBe("type?f=street");
-    expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("addr-house");
+    expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("addr-street");
     expect(redirect(await call("stt-recorded", { Digits: "9" }, "f=street"))).toBe("type?f=street");
-    expect(redirect(await call("stt-recorded", { Digits: "*" }, "f=street"))).toBe("addr-house");
+    expect(redirect(await call("stt-recorded", { Digits: "*" }, "f=street"))).toBe("addr-street");
     expect(redirect(await call("heard", { Digits: "*" }, "f=name"))).toBe("cart"); // every question: star goes back (Nov 24, 2026)
   });
-  it("the street question, then type_hint", async () => {
-    expect(said(await call("ask", {}, "f=street"))).toEqual(["Please say the street name of the delivery address after the tone.", "To type it with your keypad, press 9."]); // type_hint (Nov 24, 2026)
+  it("the street question by voice: the Address step 2 line and the tone, no keypad line (street step, Nov 24, 2026)", async () => {
+    expect(said(await call("ask", {}, "f=street"))).toEqual(["Please say the street name of the delivery address after the tone."]);
   });
 });
 

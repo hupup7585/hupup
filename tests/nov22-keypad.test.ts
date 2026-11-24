@@ -31,7 +31,10 @@ const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].ma
 describe("keypad typing directions (Nov 22, 2026)", () => {
   it("every typing step plays type_instructions after 9 (Abraham, Nov 24, 2026; box 103 and the address directions wait for his decision)", async () => {
     const { PROMPTS } = await import("@/lib/ivr/prompts");
-    for (const f of ["email", "address", "street", "name"]) expect(said(await call("type", {}, `f=${f}`)), f).toEqual([PROMPTS.type_instructions.text]);
+    for (const f of ["email", "address", "name"]) expect(said(await call("type", {}, `f=${f}`)), f).toEqual([PROMPTS.type_instructions.text]);
+    // The street (Nov 24, 2026): its own keypad search, the four-letter line (draft, preview) then the same directions
+    expect(redirect(await call("type", {}, "f=street"))).toMatch(/addr-street-keys$/);
+    expect(said(await call("addr-street-keys"))).toEqual([PROMPTS.street_keys_intro.text, PROMPTS.type_instructions.text]);
     const { allSlots } = await import("@/lib/recording-slots");
     const keys = allSlots().map((x) => x.key);
     expect(keys).toContain("address_keypad_help"); // one recording, like box 103

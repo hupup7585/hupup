@@ -55,23 +55,28 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(redirect(await call("addr"))).toBe("addr-house");
     expect(said(await call("addr-house"))).toEqual(["Now, with your keypad, please enter the house number.", "When you are done, press pound.", "To go back, press star."]);
     expect(redirect(await call("addr-house-heard", { Digits: "*" }))).toBe("ask?f=name");
-    expect(redirect(await call("addr-house-heard", { Digits: "12" }))).toBe("ask?f=street");
-    const ask = await call("ask", {}, "f=street");
-    expect(said(ask)).toEqual(["Please say the street name of the delivery address after the tone.", "To type it with your keypad, press 9."]); // type_hint (Nov 24, 2026)
-    expect(ask).toContain("/audio/tone.wav</Play></Gather>");
-    expect(redirect(await call("heard", { Digits: "9" }, "f=street"))).toBe("type?f=street"); // the keypad path: 9 (Nov 23, 2026)
-    expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("addr-house"); // star: one step back
-    expect(redirect(await call("heard", { SpeechResult: "" }, "f=street"))).toBe("ask?f=street&n=1");
-    expect(said(await call("ask", {}, "f=street&n=1"))).toEqual(["Sorry, I did not catch that. Let's try again."]);
-    expect(redirect(await call("heard", { SpeechResult: "forest road" }, "f=street"))).toBe("addr-unit");
-    expect(h.session.data.street).toBe("Forest Road");
+    // Street step (Abraham, Nov 24, 2026): house, unit, zip, then the street searched in that zip's list
+    expect(redirect(await call("addr-house-heard", { Digits: "12" }))).toBe("addr-unit");
     expect(said(await call("addr-unit"))).toEqual(["Thanks, with your keypad, please enter the unit number.", "When you are done, press pound.", "If there is no unit number, press pound to skip.", "To go back, press star."]);
-    expect(redirect(await call("addr-unit-heard", { Digits: "*" }))).toBe("ask?f=street");
+    expect(redirect(await call("addr-unit-heard", { Digits: "*" }))).toBe("addr-house");
     expect(redirect(await call("addr-unit-heard", { Digits: "", FinishedOnKey: "#" }))).toBe("addr-zip"); // pound with nothing typed: no unit
     expect(h.session.data.unit).toBeUndefined();
     expect(said(await call("addr-zip"))).toEqual(["For Monroe, New York, one zero nine five zero, press 1. For Highland Mills, New York, one zero nine three zero, press 2. For Chester, New York, one zero nine one eight, press 3. For Washingtonville, New York, one zero nine nine two, press 4. For Central Valley, New York, one zero nine one seven, press 5. For Harriman, New York, one zero nine two six, press 6. To enter a different zip code, press 7.", "To go back, press star."]);
     expect(redirect(await call("addr-zip-choice", { Digits: "*" }))).toBe("addr-unit");
-    expect(redirect(await call("addr-zip-choice", { Digits: "1" }))).toBe("addr-check");
+    expect(redirect(await call("addr-zip-choice", { Digits: "1" }))).toBe("addr-street");
+    expect(said(await call("addr-street"))).toEqual(["To search for the street name by voice, press 1. To search it with your keypad, press 2.", "To go back, press star."]);
+    expect(redirect(await call("addr-street-choice", { Digits: "*" }))).toBe("addr-zip");
+    expect(redirect(await call("addr-street-choice", { Digits: "1" }))).toBe("ask?f=street");
+    const ask = await call("ask", {}, "f=street");
+    expect(said(ask)).toEqual(["Please say the street name of the delivery address after the tone."]); // no keypad line on this step
+    expect(ask).toContain("/audio/tone.wav</Play></Gather>");
+    expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("addr-street"); // star: back to the street menu
+    expect(redirect(await call("heard", { SpeechResult: "" }, "f=street"))).toBe("ask?f=street&n=1");
+    expect(said(await call("ask", {}, "f=street&n=1"))).toEqual(["Sorry, I did not catch that. Let's try again."]);
+    expect(redirect(await call("heard", { SpeechResult: "forest road" }, "f=street"))).toBe("addr-street-rb?m=v");
+    expect(said(await call("addr-street-rb", {}, "m=v"))).toEqual(["I heard:", "Forest Road", "If that is correct, press 1. To try again, press 2."]);
+    expect(redirect(await call("addr-street-rb-choice", { Digits: "1" }, "m=v"))).toBe("addr-check");
+    expect(h.session.data.street).toBe("Forest Road");
     expect(redirect(await call("addr-check"))).toBe("addr-readback");
     expect(h.session.data.address).toBe("12 Forest Road, Monroe, NY 10950"); // the postal town (the Kiryas Joel idea was withdrawn)
     expect(said(await call("addr-readback"))).toEqual(["Here is the address you entered.", "twelve", "Forest Road", "Monroe New York", "one zero nine five zero", "If that is correct, press 1. To try again, press 2.", "To go back, press star."]); // the shared Confirm ending (Hark audit 10)
@@ -88,7 +93,7 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(redirect(await call("addr-zip-heard", { Digits: "123" }))).toBe("addr-zip-enter?bad=1");
     // Nov 23, 2026 (approved): the invalid line, then the entry prompt again
     expect(said(await call("addr-zip-enter", {}, "bad=1"))).toEqual(["The zip code you entered is not valid. Please try again.", "Please enter the 5-digit zip code. When you are finished, please press pound."]);
-    expect(redirect(await call("addr-zip-heard", { Digits: "10924" }))).toBe("addr-check");
+    expect(redirect(await call("addr-zip-heard", { Digits: "10924" }))).toBe("addr-street");
     await call("addr-check");
     expect(h.session.data.town).toBe("Goshen");
     // part by part (Nov 23, 2026): recordings where live, Puck for the rest
@@ -105,8 +110,8 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     h.quote = { ok: false, reason: "not_found" };
     const nf = await call("addr-check");
     expect(said(nf)).toEqual(["We are sorry, we could not find that address. Please try again."]);
-    expect(redirect(nf)).toBe("addr-house");
-    expect(h.session.data).toMatchObject({ house: undefined, street: undefined, zip: undefined }); // nothing entered is kept
+    expect(redirect(nf)).toBe("addr-street"); // Nov 24, 2026: only the street is asked again
+    expect(h.session.data).toMatchObject({ house: "9", street: undefined, zip: "10950" }); // house number, unit and zip kept
   });
   it("Nov 23, 2026: every address step is approved, so the live line uses the steps (the phone-number lookup stays on preview)", async () => {
     process.env.VERCEL_ENV = "production";
@@ -136,7 +141,7 @@ describe("zip menu keys 1 to 7 (Abraham, Nov 24, 2026)", () => {
     ];
     for (const [key, town, zip] of keys) {
       h.session.data = { name: "Sara Klein", house: "12", street: "Forest Road" };
-      expect(redirect(await call("addr-zip-choice", { Digits: key }))).toBe("addr-check");
+      expect(redirect(await call("addr-zip-choice", { Digits: key }))).toBe("addr-street");
       expect(h.session.data.zip).toBe(zip);
       expect(redirect(await call("addr-check"))).toBe("addr-readback");
       expect(h.session.data.address).toBe(`12 Forest Road, ${town}, NY ${zip}`);

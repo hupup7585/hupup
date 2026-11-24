@@ -33,7 +33,7 @@ describe("the one keypad decoder", () => {
     expect(readFileSync("src/lib/ivr/catalog-keys.ts", "utf8")).not.toContain("decodeCatalogKeys");
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(flow).not.toMatch(/ktChar|"kt-key"|keypadEchoOn/);
-    expect(flow.match(/decodeMultitap\(/g)?.length).toBe(2); // typed (name, street, checkout email) and catalog-typed (catalog and payment-link email)
+    expect(flow.match(/decodeMultitap\(/g)?.length).toBe(3); // typed (name, checkout email), catalog-typed (catalog and payment-link email) and the street keypad search
     expect(existsSync("src/lib/ivr/keypad-typing.ts")).toBe(false);
   });
   it("type_instructions: Abraham's exact text; nothing says wait one second", () => {
