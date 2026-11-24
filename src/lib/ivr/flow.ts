@@ -328,6 +328,16 @@ function repeatMenu(vr: VR, ctx: Ctx, action: string, params: Record<string, str
   return vr;
 }
 
+/**
+ * Box 30 (Abraham, Nov 24, 2026): the cart's hold ran out (the caller stopped responding): the call just ends. No
+ * "cart timed out" line and no return to the main menu.
+ */
+async function cartGone(vr: VR, ctx: Ctx) {
+  await track(ctx.callSid, "step", "Cart hold ran out (no keys pressed): call ended");
+  vr.hangup();
+  return vr;
+}
+
 /** Inside a booking: the fallthrough after a step with no key (the idle clock decides). */
 function idleNoKey(vr: VR, ctx: Ctx, action: string, params: Record<string, string | number | undefined> = {}) {
   // nk = when the screen first finished with no key (kept while the caller keeps not pressing; a key press drops it)
@@ -2700,10 +2710,7 @@ const handlers: Record<string, Handler> = {
   /* ---- checkout: name -> address -> email -> phone -> finalize ---- */
 
   async ask(ctx, vr) {
-    if (!(await callOrders(ctx)).length) {
-      sp(vr, ctx, "cart_empty");
-      return back(vr, "menu");
-    }
+    if (!(await callOrders(ctx)).length) return cartGone(vr, ctx); // the checkout questions: the cart's time ran out
     const f = ctx.query.get("f") as Field;
     const n = ctx.query.get("n") ?? undefined;
     const spec = FIELDS[f];
@@ -3397,10 +3404,7 @@ const handlers: Record<string, Handler> = {
   async "terms-answer"(ctx, vr) {
     if (ctx.body.Digits === "*") return back(vr, "cart"); // star: one step back (Nov 20, 2026)
     const order = (await callOrders(ctx))[0] ?? null; // the first day's order stands for the whole reservation
-    if (!order) {
-      sp(vr, ctx, "cart_expired");
-      return back(vr, "menu");
-    }
+    if (!order) return cartGone(vr, ctx);
     if (ctx.body.Digits === "1") {
       // Text the Terms link (only with order-text consent from this call or before).
       const phone = ctx.session?.data.phone ?? toE164(ctx.from);
@@ -3550,10 +3554,7 @@ const handlers: Record<string, Handler> = {
   async finalize(ctx, vr) {
     const days = await callOrders(ctx);
     const data = ctx.session?.data ?? {};
-    if (!days.length) {
-      sp(vr, ctx, "cart_expired");
-      return back(vr, "menu");
-    }
+    if (!days.length) return cartGone(vr, ctx);
     if (!data.name || !data.address) return back(vr, "ask", { f: !data.name ? "name" : "address" });
     if (termsActive() && !data.termsAccepted) return back(vr, "terms"); // off on live until the final Terms are in
     // Audit C2 (Nov 24, 2026): a hold may have run out while the caller answered; every line is checked again, locked.
@@ -4755,7 +4756,8 @@ export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Prom
   // Audit C2: every step keeps every day of the cart held (only holds that are still active)
   if (session?.data?.dayOrderIds?.length || session?.orderId) {
     const { keepCartHeld } = await import("@/lib/orders");
-    await keepCartHeld([...new Set([...(session.data?.dayOrderIds ?? []), ...(session.orderId ? [session.orderId] : [])])]).catch((e) => console.error("[keep cart held]", e));
+    const keyPressed = Boolean(ctx.body.Digits || (ctx.body.SpeechResult || "").trim());
+    await keepCartHeld([...new Set([...(session.data?.dayOrderIds ?? []), ...(session.orderId ? [session.orderId] : [])])], { keyPressed }).catch((e) => console.error("[keep cart held]", e));
   }
   // Abraham's idle rule inside a booking: remember when the caller last pressed a key (or said something)
   let current = session;

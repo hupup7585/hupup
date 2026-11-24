@@ -482,12 +482,14 @@ export async function recheckHolds(orderIds: number[]): Promise<{ orderId: numbe
 }
 
 /** Keeps every day of the caller's cart held while they keep going (Audit C2): only holds still active are renewed. */
-export async function keepCartHeld(orderIds: number[]) {
+export async function keepCartHeld(orderIds: number[], opts: { keyPressed?: boolean } = {}) {
   if (!orderIds.length) return;
+  // Box 30 (Abraham, Nov 24, 2026): while the caller presses keys the cart never runs out, so a key press renews the
+  // hold even if its time just passed (as long as it was not released yet); any other step renews only active holds
   await db
     .update(orders)
     .set({ holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES) })
-    .where(and(inArray(orders.id, orderIds), eq(orders.status, "HOLD"), sql`${orders.holdExpiresAt} > now()`));
+    .where(and(inArray(orders.id, orderIds), eq(orders.status, "HOLD"), ...(opts.keyPressed ? [] : [sql`${orders.holdExpiresAt} > now()`])));
 }
 
 /** Owner email: a payment for less than the order's total (Audit C1, Nov 24, 2026). */
