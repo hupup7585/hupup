@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 /** The steps in the How to use box (Abraham, Nov 23, 2026): plain English, one list per action. */
 const HOW_TO: { title: string; steps: string[] }[] = [
+  { title: "Full screen", steps: ["Click \"Full screen\" above the list. The sheet covers the whole screen, with every column in view.", "Work in the sheet the same way.", "To go back to the page, click \"Exit full screen\" or press Esc."] },
   { title: "Edit a cell", steps: ["Click the cell once to pick it (a blue frame shows).", "Start typing, or click it again, or press Enter.", "Type the new value.", "Press Enter to save. The list shows a green \"Saved\". To cancel instead, press Esc."] },
   { title: "Add a row at the end", steps: ["Click \"+ Add a row at the end\" above the list.", "A new empty row appears at the bottom, with its Last name cell picked.", "Type each value and press Tab to move to the next cell. Every cell saves by itself."] },
   { title: "Insert a row above or below", steps: ["Point at the row number on the left of the row.", "Click the three dots that show next to the number.", "Click \"Insert a row above\" or \"Insert a row below\".", "Fill in the new empty row the same way as editing a cell. (When the list is sorted, turn the sort off first.)"] },

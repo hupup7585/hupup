@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { deleteRowAction, insertRowAction, saveCellsAction, sheetRowsAction, undoDeleteAction } from "./actions";
 import type { SheetKey, SheetRow } from "@/lib/directory-sheet";
 
@@ -10,16 +11,16 @@ import type { SheetKey, SheetRow } from "@/lib/directory-sheet";
  */
 type Col = { key: SheetKey; label: string; rtl?: boolean; w: number };
 const COLS: Col[] = [
-  { key: "yiddishLastName", label: "Yiddish last name", rtl: true, w: 160 },
-  { key: "yiddishFirstName", label: "Yiddish first name", rtl: true, w: 160 },
-  { key: "lastName", label: "Last name", w: 150 },
-  { key: "firstName", label: "First name", w: 140 },
-  { key: "house", label: "House number", w: 110 },
-  { key: "street", label: "Street", w: 220 },
-  { key: "unit", label: "Unit", w: 90 },
-  { key: "place", label: "Town, state and zip", w: 210 },
-  { key: "phone", label: "Phone", w: 150 },
-  { key: "areaPrinted", label: "Area as printed", w: 170 },
+  { key: "yiddishLastName", label: "Yiddish last name", rtl: true, w: 72 },
+  { key: "yiddishFirstName", label: "Yiddish first name", rtl: true, w: 72 },
+  { key: "lastName", label: "Last name", w: 72 },
+  { key: "firstName", label: "First name", w: 72 },
+  { key: "house", label: "House number", w: 54 },
+  { key: "street", label: "Street name", w: 90 },
+  { key: "unit", label: "Unit", w: 44 },
+  { key: "place", label: "Town, state and zip", w: 110 },
+  { key: "phone", label: "Phone number", w: 104 },
+  { key: "areaPrinted", label: "Area as printed", w: 72 },
 ];
 const LETTERS = "ABCDEFGHIJ";
 /** The Download menu closes once a file is chosen. */
@@ -28,8 +29,31 @@ const closeMenu = (e: React.MouseEvent<HTMLElement>) => {
   if (d) window.setTimeout(() => d.removeAttribute("open"), 0);
 };
 const ROW_H = 38;
-const NUM_W = 76;
-const TOTAL_W = NUM_W + COLS.reduce((n, c) => n + c.w, 0);
+const NUM_W = 58;
+const CELL_PAD = 18; // left and right padding inside a cell
+const MAX_W = 300;
+
+/**
+ * Each column exactly as wide as its longest text (Abraham, Nov 24, 2026); a title that does not fit goes small on two
+ * lines. Measured with the page's own font.
+ */
+function measureWidths(rows: SheetRow[], font: string): Record<SheetKey, number> {
+  const out = {} as Record<SheetKey, number>;
+  const ctx = typeof document !== "undefined" ? document.createElement("canvas").getContext("2d") : null;
+  for (const c of COLS) {
+    let w = c.w;
+    if (ctx) {
+      // the longest title word in small bold, then the widest values (the 30 longest by letters are measured)
+      ctx.font = `700 11px ${font}`;
+      for (const word of c.label.split(" ")) w = Math.max(w, ctx.measureText(word).width * 1.04 + CELL_PAD + 16);
+      ctx.font = `${c.rtl ? 600 : 400} 13.5px ${font}`;
+      const longest = rows.map((r) => r[c.key]).filter(Boolean).sort((a, b) => b.length - a.length).slice(0, 30);
+      for (const v of longest) w = Math.max(w, ctx.measureText(v).width * 1.04 + CELL_PAD + 4);
+    }
+    out[c.key] = Math.ceil(Math.min(MAX_W, w));
+  }
+  return out;
+}
 const NAVY = "#123D73";
 
 type Pos = { r: number; c: number };
@@ -52,6 +76,7 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
   const [fresh, setFresh] = useState<Set<number>>(new Set()); // rows added here: always shown
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(560);
+  const [full, setFull] = useState(false); // full screen: the sheet covers the whole page
   const box = useRef<HTMLDivElement>(null);
   const editRef = useRef<HTMLInputElement>(null);
 
@@ -63,10 +88,12 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
   useEffect(() => {
     const el = box.current;
     if (!el) return;
+    setHeight(el.clientHeight);
+    setScrollTop(0);
     const ro = new ResizeObserver(() => setHeight(el.clientHeight));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [rows === null]);
+  }, [rows === null, full]); // full screen draws the grid again in a new place
   useEffect(() => {
     if (edit) editRef.current?.focus();
   }, [edit?.r, edit?.c]);
@@ -84,6 +111,17 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
     }
     return out;
   }, [rows, search, filters, sort, fresh]);
+
+  const W = useMemo(() => measureWidths(rows ?? [], (typeof document !== "undefined" && getComputedStyle(document.body).fontFamily) || "Inter, Arial, sans-serif"), [rows]);
+  const TOTAL_W = NUM_W + COLS.reduce((n, c) => n + W[c.key], 0);
+  useEffect(() => {
+    if (!full) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && !editRef.current && setFull(false);
+    window.addEventListener("keydown", esc);
+    return () => ((document.body.style.overflow = prev), window.removeEventListener("keydown", esc));
+  }, [full]);
 
   const sel = anchor && focus ? { r0: Math.min(anchor.r, focus.r), r1: Math.max(anchor.r, focus.r), c0: Math.min(anchor.c, focus.c), c1: Math.max(anchor.c, focus.c) } : null;
   const inSel = (r: number, c: number) => !!sel && r >= sel.r0 && r <= sel.r1 && c >= sel.c0 && c <= sel.c1;
@@ -327,8 +365,8 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
   const filtered = search.trim() || Object.values(filters).some((v) => v?.trim());
   const lastUndo = undo[undo.length - 1];
 
-  return (
-    <section className="overflow-hidden rounded-2xl border border-[#D9E3F0] bg-white shadow-[0_6px_24px_rgba(18,61,115,0.08)]" data-directory-sheet>
+  const sheet = (
+    <section className={full ? "fixed inset-0 z-[1000] flex flex-col bg-white" : "overflow-hidden rounded-2xl border border-[#D9E3F0] bg-white shadow-[0_6px_24px_rgba(18,61,115,0.08)]"} data-directory-sheet data-full={full ? "1" : undefined}>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 border-b border-[#E6EDF6] bg-gradient-to-r from-[#F6F9FD] to-white px-4 py-3">
         <div className="relative min-w-[220px] flex-1">
@@ -348,6 +386,18 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
         </button>
         <button type="button" onClick={() => void doUndo()} disabled={!lastUndo} title={lastUndo ? `Undo ${lastUndo.label}` : "Nothing to undo"} className="rounded-xl border border-[#D9E3F0] bg-white px-3 py-2 text-sm font-bold text-[#123D73] disabled:opacity-40" data-sheet-undo>
           Undo
+        </button>
+        <button
+          type="button"
+          onClick={() => setFull((f) => !f)}
+          title={full ? "Back to the page (Esc)" : "Open the sheet on the full screen"}
+          className="flex items-center gap-1.5 rounded-xl border border-[#123D73] bg-white px-3 py-2 text-sm font-bold text-[#123D73] hover:bg-[#F2F6FB]"
+          data-sheet-full
+        >
+          <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            {full ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+          </svg>
+          {full ? "Exit full screen" : "Full screen"}
         </button>
         <details className="relative">
           <summary className="cursor-pointer list-none rounded-xl border border-[#D9E3F0] bg-white px-3 py-2 text-sm font-bold text-[#123D73]" data-sheet-download>
@@ -392,20 +442,20 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
         onKeyDown={onKeyDown}
         onCopy={onCopy}
         onPaste={onPaste}
-        className="relative h-[68vh] min-h-[420px] overflow-auto border-t border-[#E6EDF6] outline-none"
+        className={`relative overflow-auto border-t border-[#E6EDF6] outline-none ${full ? "min-h-0 flex-1" : "h-[68vh] min-h-[420px]"}`}
         data-sheet-grid
       >
         <div style={{ width: TOTAL_W }} className="relative">
           {/* Frozen header: column letters, names (click to sort), filters */}
           <div className="sticky top-0 z-30" style={{ width: TOTAL_W }}>
             <div className="flex bg-[#0E3160] text-[10px] font-bold tracking-widest text-[#9FB6D6]" style={{ height: 22 }}>
-              <div className="sticky left-0 z-10 bg-[#0E3160]" style={{ width: NUM_W }} />
+              <div className="sticky left-0 z-10 shrink-0 bg-[#0E3160]" style={{ width: NUM_W }} />
               {COLS.map((c, i) => (
-                <div key={c.key} style={{ width: c.w }} className="flex items-center justify-center border-l border-white/10">{LETTERS[i]}</div>
+                <div key={c.key} style={{ width: W[c.key] }} className="flex shrink-0 items-center justify-center border-l border-white/10">{LETTERS[i]}</div>
               ))}
             </div>
             <div className="flex" style={{ height: ROW_H, background: NAVY }} role="row">
-              <div className="sticky left-0 z-10 flex items-center justify-center text-[11px] font-bold text-[#9FB6D6]" style={{ width: NUM_W, background: NAVY }}>
+              <div className="sticky left-0 z-10 flex shrink-0 items-center justify-center text-[11px] font-bold text-[#9FB6D6]" style={{ width: NUM_W, background: NAVY }}>
                 #
               </div>
               {COLS.map((c) => {
@@ -418,11 +468,11 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
                     aria-sort={on ? (sort!.dir === 1 ? "ascending" : "descending") : "none"}
                     title="Click to sort"
                     onClick={() => setSort((s) => (s?.key !== c.key ? { key: c.key, dir: 1 } : s.dir === 1 ? { key: c.key, dir: -1 } : null))}
-                    style={{ width: c.w }}
-                    className={`flex items-center gap-1 truncate border-l border-white/10 px-3 text-left text-[13px] font-bold text-white hover:bg-white/10 ${c.rtl ? "justify-end" : ""}`}
+                    style={{ width: W[c.key] }}
+                    className={`flex shrink-0 items-center gap-0.5 overflow-hidden border-l border-white/10 px-[9px] text-left text-[11px] font-bold leading-[1.15] text-white hover:bg-white/10 ${c.rtl ? "justify-end text-right" : ""}`}
                     data-sort={c.key}
                   >
-                    <span className="truncate">{c.label}</span>
+                    <span className="line-clamp-2 break-words">{c.label}</span>
                     <span className={`text-[#FFD84D] ${on ? "" : "opacity-0"}`}>{on && sort!.dir === -1 ? "▼" : "▲"}</span>
                   </button>
                 );
@@ -430,11 +480,11 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
             </div>
             {showFilters && (
               <div className="flex border-b border-[#D9E3F0] bg-[#F2F6FB]" style={{ height: ROW_H }}>
-                <div className="sticky left-0 z-10 flex items-center justify-center bg-[#F2F6FB] text-[10px] font-bold uppercase text-[#6B7C93]" style={{ width: NUM_W }}>
+                <div className="sticky left-0 z-10 flex shrink-0 items-center justify-center bg-[#F2F6FB] text-[10px] font-bold uppercase text-[#6B7C93]" style={{ width: NUM_W }}>
                   Filter
                 </div>
                 {COLS.map((c) => (
-                  <div key={c.key} style={{ width: c.w }} className="border-l border-[#E1E8F2] p-1">
+                  <div key={c.key} style={{ width: W[c.key] }} className="shrink-0 border-l border-[#E1E8F2] p-1">
                     <input
                       dir={c.rtl ? "rtl" : "ltr"}
                       value={filters[c.key] ?? ""}
@@ -458,7 +508,7 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
               return (
                 <div key={row.id} role="row" className={`group absolute left-0 flex ${r % 2 ? "bg-[#FAFCFE]" : "bg-white"} hover:bg-[#F2F7FD]`} style={{ top: r * ROW_H, height: ROW_H, width: TOTAL_W }} data-row-id={row.id}>
                   <div
-                    className={`sticky left-0 z-20 flex items-center justify-between border-b border-r border-[#E6EDF6] pl-2 pr-1 text-[11px] tabular-nums ${rowSel ? "bg-[#DCEAFB] font-bold text-[#123D73]" : "bg-[#F6F9FD] text-[#8395AD]"}`}
+                    className={`sticky left-0 z-20 flex shrink-0 items-center justify-between border-b border-r border-[#E6EDF6] pl-2 pr-1 text-[11px] tabular-nums ${rowSel ? "bg-[#DCEAFB] font-bold text-[#123D73]" : "bg-[#F6F9FD] text-[#8395AD]"}`}
                     style={{ width: NUM_W }}
                   >
                     <button
@@ -479,7 +529,7 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
                       ⋮
                     </button>
                     {menu === row.id && (
-                      <div className="absolute left-[70px] top-1 z-50 w-48 overflow-hidden rounded-xl border border-[#D9E3F0] bg-white text-[13px] shadow-xl" role="menu">
+                      <div className="absolute left-[54px] top-1 z-50 w-48 overflow-hidden rounded-xl border border-[#D9E3F0] bg-white text-[13px] shadow-xl" role="menu">
                         <button type="button" role="menuitem" onClick={() => addRow({ at: "above", id: row.id })} className="block w-full px-3 py-2 text-left font-bold text-[#123D73] hover:bg-[#F2F6FB]" data-insert-above>Insert a row above</button>
                         <button type="button" role="menuitem" onClick={() => addRow({ at: "below", id: row.id })} className="block w-full border-t border-[#EEF2F7] px-3 py-2 text-left font-bold text-[#123D73] hover:bg-[#F2F6FB]" data-insert-below>Insert a row below</button>
                         <button type="button" role="menuitem" onClick={() => removeRow(row.id)} className="block w-full border-t border-[#EEF2F7] px-3 py-2 text-left font-bold text-[#b3261e] hover:bg-[#fff2f1]" data-delete-row>Delete this row</button>
@@ -507,8 +557,8 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
                           else (setAnchor(p), setFocus(p));
                         }}
                         onDoubleClick={() => startEdit({ r, c: ci })}
-                        style={{ width: c.w }}
-                        className={`relative flex items-center border-b border-r border-[#EDF1F7] px-3 text-[13.5px] ${c.rtl ? "text-right font-[600]" : ""} ${picked ? "bg-[#E8F1FC]" : ""} ${isFocus && !editing ? "z-10 outline outline-2 -outline-offset-1 outline-[#2585D8]" : ""} text-[#1B2B41]`}
+                        style={{ width: W[c.key] }}
+                        className={`relative flex shrink-0 items-center overflow-hidden border-b border-r border-[#EDF1F7] px-[9px] text-[13.5px] ${c.rtl ? "text-right font-[600]" : ""} ${picked ? "bg-[#E8F1FC]" : ""} ${isFocus && !editing ? "z-10 outline outline-2 -outline-offset-1 outline-[#2585D8]" : ""} text-[#1B2B41]`}
                         data-cell={`${row.id}:${c.key}`}
                       >
                         {editing ? (
@@ -524,7 +574,7 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
                               else if (e.key === "Escape") (e.preventDefault(), setEdit(null), box.current?.focus());
                             }}
                             onBlur={() => void commitEdit(null)}
-                            className="absolute inset-0 z-20 w-full rounded-[3px] border-2 border-[#2585D8] bg-white px-[10px] text-[13.5px] shadow-[0_4px_14px_rgba(37,133,216,0.25)] outline-none"
+                            className="absolute inset-0 z-20 w-full min-w-[160px] rounded-[3px] border-2 border-[#2585D8] bg-white px-[7px] text-[13.5px] shadow-[0_4px_14px_rgba(37,133,216,0.25)] outline-none"
                             data-cell-editor
                           />
                         ) : (
@@ -543,4 +593,6 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
       </div>
     </section>
   );
+  // Full screen: drawn on the page itself, above the side menu and everything else
+  return full && typeof document !== "undefined" ? createPortal(sheet, document.body) : sheet;
 }
