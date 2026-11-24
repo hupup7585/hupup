@@ -6,7 +6,12 @@ import { toE164 } from "@/lib/phone";
 describe("Messages: New text to any number", () => {
   const page = readFileSync("src/app/admin/(app)/messages/page.tsx", "utf8");
   it("a New text box (Owner only) opens that number's conversation with the send box", () => {
-    expect(page).toMatch(/staff\.role === "owner" && \(\s*<form className="mb-3 flex gap-2" data-new-text>/);
+    expect(page).toMatch(/staff\.role === "owner" && \(\s*<form className="flex gap-2" data-new-text>/);
+    // Abraham, Nov 24, 2026: search and New text at the top of the right box; the side keeps the conversations, with
+    // catalog requests as one extra line at its top
+    expect(page.indexOf("data-messages-toolbar")).toBeGreaterThan(page.indexOf("data-catalog-entry"));
+    expect(page.indexOf("data-search")).toBeGreaterThan(page.indexOf("data-messages-toolbar"));
+    expect(page).not.toContain('tab("all"');
     expect(page).toContain('name="p" type="tel"');
     expect(page).toContain("No texts with this number yet. Type your message below.");
   });

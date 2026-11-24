@@ -20,11 +20,6 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
   // Abraham, Nov 19, 2026: real conversations by default; numbers that only texted CATALOG on their own tab; All too
   const view: ThreadView = sp.v === "catalog" || sp.v === "all" ? sp.v : "conversations";
   const [threads, counts] = await Promise.all([listThreads(sp.q, 200, view), threadCounts()]);
-  const tab = (v: ThreadView, label: string, n = 0) => (
-    <Link href={`/admin/messages${v === "conversations" ? "" : `?v=${v}`}`} className={`rounded-full px-3 py-1 text-sm ${view === v ? "bg-navy font-bold text-white" : "hover:bg-bg"}`} data-thread-tab={v}>
-      {label}{n > 0 ? ` (${n})` : ""}
-    </Link>
-  );
   const phone = sp.p ? toE164(sp.p) : null;
   const msgs = phone ? await threadMessages(phone) : [];
   if (phone) await markThreadRead(phone);
@@ -37,29 +32,32 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
       <NotActive k="sms" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
         <div className={`card p-3 ${phone ? "hidden lg:block" : ""}`}>
-          <nav className="mb-3 flex flex-wrap gap-1" aria-label="Which texts">
-            {tab("conversations", "Conversations", counts.conversations)}
-            {tab("catalog", "Catalog requests", counts.catalog)}
-            {tab("all", "All")}
-          </nav>
-          <form className="mb-3 flex gap-2">
-            {view !== "conversations" && <input type="hidden" name="v" value={view} />}
-            <input name="q" defaultValue={sp.q} placeholder="Search name, number or text" className="input" />
-            <button className="btn-ghost">Search</button>
-          </form>
-          {/* Abraham, Nov 24, 2026: start a text to any number, not only reply to a conversation (Owner) */}
-          {staff.role === "owner" && (
-            <form className="mb-3 flex gap-2" data-new-text>
-              <input name="p" type="tel" inputMode="tel" autoComplete="off" required placeholder="New text: phone number" aria-label="Phone number for a new text" className="input" />
-              <button className="btn-dark whitespace-nowrap">New text</button>
-            </form>
+          {/* Abraham, Nov 24, 2026: the side is the conversation list; catalog requests are one extra line at its top */}
+          <div className="mb-2 flex items-center justify-between gap-2 px-1">
+            <h2 className="text-base font-black text-navy" data-list-title>
+              {view === "catalog" ? `Catalog requests (${counts.catalog})` : view === "all" ? "All texts" : `All conversations (${counts.conversations})`}
+            </h2>
+            {sp.q && (
+              <Link href={`/admin/messages${view === "conversations" ? "" : `?v=${view}`}`} className="text-xs font-semibold text-navy underline" data-clear-search>
+                Clear search
+              </Link>
+            )}
+          </div>
+          {view === "conversations" ? (
+            <Link href="/admin/messages?v=catalog" className="mb-2 flex items-center justify-between rounded-lg border border-line bg-bg px-3 py-2.5 text-sm font-bold text-navy hover:border-navy" data-catalog-entry>
+              <span>Catalog requests</span>
+              <span className="flex items-center gap-2">
+                {counts.catalog > 0 && <span className="rounded-full bg-sun px-2 text-xs font-black">{counts.catalog}</span>}
+                <span aria-hidden>›</span>
+              </span>
+            </Link>
+          ) : (
+            <Link href="/admin/messages" className="mb-2 flex items-center gap-2 rounded-lg border border-line bg-bg px-3 py-2.5 text-sm font-bold text-navy hover:border-navy" data-conversations-entry>
+              <span aria-hidden>‹</span> All conversations
+            </Link>
           )}
-          {sp.p && !phone && (
-            <p role="alert" className="mb-3 text-sm font-semibold text-[#C83A2F]" data-bad-number>
-              &ldquo;{sp.p}&rdquo; is not a valid US or Canada mobile number. Enter 10 digits, for example 845-555-0123.
-            </p>
-          )}
-          {!threads.length && <p className="p-3 text-muted">{view === "catalog" ? "No catalog requests yet." : "No conversations yet."}</p>}
+          {sp.q && <p className="mb-2 px-1 text-xs text-muted">Results for &ldquo;{sp.q}&rdquo;</p>}
+          {!threads.length && <p className="p-3 text-muted">{sp.q ? "Nothing found." : view === "catalog" ? "No catalog requests yet." : "No conversations yet."}</p>}
           <ul className="divide-y divide-line">
             {threads.map((t) => (
               <li key={t.contact_phone}>
@@ -78,8 +76,27 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
           </ul>
         </div>
 
-        <div className={`card p-4 ${phone ? "" : "hidden lg:block"}`}>
-          {!phone && <p className="p-3 text-muted">Choose a conversation.</p>}
+        <div className="card order-first p-4 lg:order-none">
+          {/* Abraham, Nov 24, 2026: search and a new text at the top of this box */}
+          <div className={`grid gap-2 sm:grid-cols-2 ${phone ? "mb-3 border-b border-line pb-3" : ""}`} data-messages-toolbar>
+            <form className="flex gap-2" data-search>
+              {view !== "conversations" && <input type="hidden" name="v" value={view} />}
+              <input name="q" defaultValue={sp.q} placeholder="Search name, number or text" aria-label="Search texts" className="input" />
+              <button className="btn-ghost">Search</button>
+            </form>
+            {staff.role === "owner" && (
+              <form className="flex gap-2" data-new-text>
+                <input name="p" type="tel" inputMode="tel" autoComplete="off" required placeholder="Phone number" aria-label="Phone number for a new text" className="input" />
+                <button className="btn-dark whitespace-nowrap">New text</button>
+              </form>
+            )}
+            {sp.p && !phone && (
+              <p role="alert" className="text-sm font-semibold text-[#C83A2F] sm:col-span-2" data-bad-number>
+                &ldquo;{sp.p}&rdquo; is not a valid US or Canada mobile number. Enter 10 digits, for example 845-555-0123.
+              </p>
+            )}
+          </div>
+          {!phone && <p className="hidden p-3 text-muted lg:block">Choose a conversation{staff.role === "owner" ? ", or start a new text above" : ""}.</p>}
           {phone && (
             <>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
