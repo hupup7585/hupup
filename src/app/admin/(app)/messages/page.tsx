@@ -47,6 +47,18 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
             <input name="q" defaultValue={sp.q} placeholder="Search name, number or text" className="input" />
             <button className="btn-ghost">Search</button>
           </form>
+          {/* Abraham, Nov 24, 2026: start a text to any number, not only reply to a conversation (Owner) */}
+          {staff.role === "owner" && (
+            <form className="mb-3 flex gap-2" data-new-text>
+              <input name="p" type="tel" inputMode="tel" autoComplete="off" required placeholder="New text: phone number" aria-label="Phone number for a new text" className="input" />
+              <button className="btn-dark whitespace-nowrap">New text</button>
+            </form>
+          )}
+          {sp.p && !phone && (
+            <p role="alert" className="mb-3 text-sm font-semibold text-[#C83A2F]" data-bad-number>
+              &ldquo;{sp.p}&rdquo; is not a valid US or Canada mobile number. Enter 10 digits, for example 845-555-0123.
+            </p>
+          )}
           {!threads.length && <p className="p-3 text-muted">{view === "catalog" ? "No catalog requests yet." : "No conversations yet."}</p>}
           <ul className="divide-y divide-line">
             {threads.map((t) => (
@@ -81,6 +93,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
                   {current?.customer_id && <Link className="btn-ghost" href={`/admin/customers/${current.customer_id}`}>Customer</Link>}
                 </div>
               </div>
+              {!msgs.length && <p className="p-3 text-muted" data-new-thread>No texts with this number yet. Type your message below.</p>}
               <ol className="max-h-[60vh] space-y-2 overflow-y-auto pr-1" data-thread>
                 {msgs.map((m) => (
                   <li key={m.id} className={`flex ${m.direction === "out" ? "justify-end" : "justify-start"}`}>
