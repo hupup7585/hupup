@@ -65,9 +65,10 @@ const OUTCOME: Record<string, [string, string]> = {
   voicemail: ["Left a voicemail", "bg-[#F1E8FF] text-[#6B3FB8]"],
 };
 
-export default async function CallsPage() {
+export default async function CallsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const staff = await requireStaff(["owner", "secretary"]);
-  const calls = await recentCalls();
+  const { q } = await searchParams;
+  const calls = await recentCalls(100, q);
   const journeySection = await safeSection("call journeys", callJourneys(calls.map((c) => c.call_sid)));
   const journeys = journeySection.ok ? journeySection.value : new Map<string, JourneyEvent[]>();
   const tz = process.env.BUSINESS_TIMEZONE || "America/New_York";
@@ -76,6 +77,12 @@ export default async function CallsPage() {
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Call log</h1>
       {!journeySection.ok && <SectionNotActive title="Call journeys" reason={journeySection.reason} />}
       <p className="mb-5 text-muted">Every call to the hotline. Callers who hung up with items in their cart are listed so you can call them back. Open &ldquo;Journey&rdquo; on a call to see every menu, key, item, date and answer, and where the caller hung up.</p>
+      <form className="mb-3 flex max-w-md gap-2" role="search" data-call-search>
+        <input name="q" defaultValue={q} placeholder="Search a phone number or name" aria-label="Search calls" className="input" />
+        <button className="btn-ghost">Search</button>
+        {q && <Link href="/admin/calls" className="btn-ghost">Clear</Link>}
+      </form>
+      {q && !calls.length && <p className="mb-3 text-muted">No calls match &ldquo;{q}&rdquo;.</p>}
       <div className="card overflow-x-auto p-4">
         <table className="w-full min-w-[760px] text-sm">
           <thead>

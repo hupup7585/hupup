@@ -1,3 +1,4 @@
+import { phoneQueryDigits } from "@/lib/phone-search";
 import { and, desc, eq, ilike, isNull, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 
@@ -9,7 +10,7 @@ export async function searchEverything(raw: string, opts: { owner: boolean }) {
   const q = raw.trim().slice(0, 100);
   if (q.length < 2) return { q, orders: [], customers: [], emails: [], voicemails: [], calls: [] };
   const like = `%${q}%`;
-  const digits = q.replace(/\D/g, "");
+  const digits = phoneQueryDigits(q) ?? q.replace(/\D/g, ""); // a phone number however it is typed (Nov 24, 2026)
   const phoneLike = digits.length >= 3 ? `%${digits.slice(-10)}%` : null;
   const orderNo = /^#?\d{1,7}$/.test(q) ? Number(q.replace("#", "")) : null;
   const orderId = orderNo && orderNo > 1000 ? orderNo - 1000 : orderNo; // order numbers are 1000 + id

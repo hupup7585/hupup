@@ -1,3 +1,4 @@
+import { phoneQueryDigits } from "@/lib/phone-search";
 import Link from "next/link";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -14,14 +15,14 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const owner = me.role === "owner";
   const { q } = await searchParams;
   const like = q?.trim() ? `%${q.trim()}%` : null;
-  const digits = q?.replace(/\D/g, "") || "";
+  const digits = phoneQueryDigits(q) ?? (q?.replace(/\D/g, "") || ""); // a phone number however it is typed (Nov 24, 2026)
   const rows = (
     await db.execute(sql`
       SELECT c.id, c.name, c.phone, c.email, c.marketing_opt_in, c.sms_opt_out, c.is_test,
              (SELECT COUNT(*)::int FROM orders o WHERE o.customer_id = c.id AND o.status <> 'CANCELLED') AS bookings,
              (SELECT MAX(o.event_date)::text FROM orders o WHERE o.customer_id = c.id AND o.status <> 'CANCELLED') AS last_event
       FROM customers c
-      ${like ? sql`WHERE c.name ILIKE ${like} OR c.email ILIKE ${like} OR c.address ILIKE ${like} ${digits.length >= 3 ? sql`OR c.phone LIKE ${`%${digits}%`}` : sql``}` : sql``}
+      ${like ? sql`WHERE c.name ILIKE ${like} OR c.email ILIKE ${like} OR c.address ILIKE ${like} ${digits.length >= 3 ? sql`OR regexp_replace(coalesce(c.phone, ''), '[^0-9]', '', 'g') LIKE ${`%${digits}%`}` : sql``}` : sql``}
       ORDER BY c.created_at DESC LIMIT 300`)
   ).rows as Row[];
   return (

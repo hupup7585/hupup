@@ -1,5 +1,6 @@
 "use client";
 
+import { cellMatches } from "@/lib/phone-search";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { deleteRowAction, insertRowAction, saveCellsAction, sheetRowsAction, undoDeleteAction } from "./actions";
@@ -115,7 +116,8 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
     if (!rows) return [] as SheetRow[];
     const q = search.trim().toLowerCase();
     const fs = Object.entries(filters).filter(([, v]) => v?.trim()) as [SheetKey, string][];
-    let out = rows.filter((r) => fresh.has(r.id) || ((!q || COLS.some((c) => r[c.key].toLowerCase().includes(q))) && fs.every(([k, v]) => r[k].toLowerCase().includes(v.trim().toLowerCase()))));
+    // Phone numbers match by their digits however they are typed (Abraham, Nov 24, 2026): 8457, (845) 7, 845-7, +1 845 7
+    let out = rows.filter((r) => fresh.has(r.id) || ((!q || COLS.some((c) => cellMatches(r[c.key], q))) && fs.every(([k, v]) => cellMatches(r[k], v))));
     if (sort) {
       const keep = out.filter((r) => fresh.has(r.id));
       out = out.filter((r) => !fresh.has(r.id)).sort((a, b) => sort.dir * a[sort.key].localeCompare(b[sort.key], undefined, { numeric: true, sensitivity: "base" }));

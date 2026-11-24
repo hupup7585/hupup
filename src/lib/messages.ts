@@ -1,3 +1,4 @@
+import { phoneQueryDigits } from "@/lib/phone-search";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 
@@ -18,7 +19,7 @@ export type ThreadView = "conversations" | "catalog" | "all";
 
 export async function listThreads(q?: string, limit = 200, view: ThreadView = "all"): Promise<ThreadRow[]> {
   const like = q?.trim() ? `%${q.trim()}%` : null;
-  const digits = q?.replace(/\D/g, "") || "";
+  const digits = phoneQueryDigits(q) ?? (q?.replace(/\D/g, "") || ""); // however it is typed (Nov 24, 2026)
   const catalogOnly = sql`(
     EXISTS (SELECT 1 FROM messages m2 WHERE m2.contact_phone = l.contact_phone AND m2.direction = 'in' AND ${CATALOG_TEXT})
     AND NOT EXISTS (SELECT 1 FROM messages m2 WHERE m2.contact_phone = l.contact_phone AND m2.direction = 'in' AND NOT (${CATALOG_TEXT}))

@@ -236,10 +236,11 @@ export async function directorySuggestAction(q: string): Promise<DirectoryHit[]>
   if (text.length < 2) return [];
   const { sql, and, or, ilike } = await import("drizzle-orm");
   const d = schema.directoryEntries;
-  const digits = text.replace(/\D/g, "");
+  const { phoneQueryDigits } = await import("@/lib/phone-search");
+  const digits = phoneQueryDigits(text) ?? text.replace(/\D/g, ""); // however it is typed (Nov 24, 2026)
   const words = text.replace(/[^\p{L}\p{N}\s'-]/gu, " ").split(/\s+/).filter((w) => /\p{L}/u.test(w)); // a phone number typed with dashes is not a name
   const conds = [];
-  if (digits.length >= 3) conds.push(or(sql`${d.phone} LIKE ${`%${digits}%`}`, ilike(d.house, `${digits}%`))!);
+  if (digits.length >= 3) conds.push(or(sql`regexp_replace(coalesce(${d.phone}, ''), '[^0-9]', '', 'g') LIKE ${`%${digits}%`}`, ilike(d.house, `${digits}%`))!);
   for (const w of words) conds.push(or(ilike(d.lastName, `${w}%`), ilike(d.firstName, `${w}%`), ilike(d.street, `%${w}%`), ilike(d.yiddishLastName, `${w}%`), ilike(d.yiddishFirstName, `${w}%`))!);
   if (!conds.length) return [];
   const rows = await db.select().from(d).where(and(...conds)).orderBy(d.lastName, d.firstName, d.id).limit(12);

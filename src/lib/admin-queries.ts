@@ -126,9 +126,11 @@ export async function listOrders(f: { q?: string; status?: string; from?: string
     // An order number (up to 7 digits) only; a 10-digit phone number used to overflow the id and crash the page
     const orderNo = digits.length >= 1 && digits.length <= 7 ? Number(digits) - 1000 : 0;
     // A phone number however it is typed: 8457990925, 845-799-0925, (845) 799-0925, 7990925 (Admin bugs 1 and 7, Nov 24, 2026)
-    const phoneDigits = digits.length >= 4 ? digits.replace(/^1(?=\d{10}$)/, "") : "";
+    const { phoneQueryDigits } = await import("@/lib/phone-search");
+    const pd = phoneQueryDigits(f.q);
+    const phoneDigits = pd && pd.length >= 3 ? pd : digits.length >= 4 ? digits.replace(/^1(?=\d{10}$)/, "") : "";
     conds.push(sql`(c.name ILIKE ${like} OR c.phone ILIKE ${like} OR o.delivery_address ILIKE ${like}
-      ${phoneDigits ? sql`OR regexp_replace(coalesce(c.phone, ''), '\D', '', 'g') LIKE ${`%${phoneDigits}%`}` : sql``}
+      ${phoneDigits ? sql`OR regexp_replace(coalesce(c.phone, ''), '[^0-9]', '', 'g') LIKE ${`%${phoneDigits}%`}` : sql``}
       ${orderNo > 0 ? sql`OR o.id = ${orderNo}` : sql``})`);
   }
   const where = sql.join(conds.map((c) => sql`(${c})`), sql` AND `);
@@ -168,7 +170,12 @@ export async function runsForDay(day: string) {
     ORDER BY kind, o.delivery_time NULLS LAST, o.id`);
 }
 
-export async function recentCalls(limit = 100) {
+export async function recentCalls(limit = 100, q?: string) {
+  // Search by number however it is typed, or by name (Abraham, Nov 24, 2026)
+  const { phoneQueryDigits } = await import("@/lib/phone-search");
+  const t = q?.trim() ?? "";
+  const pd = phoneQueryDigits(t);
+  const where = !t ? sql`` : pd ? sql`WHERE regexp_replace(coalesce(s.from_number, ''), '[^0-9]', '', 'g') LIKE ${`%${pd}%`}` : sql`WHERE s.data->>'name' ILIKE ${`%${t}%`}`;
   return rows<Row & {
     call_sid: string; from_number: string | null; order_id: number | null; status: string; outcome: string;
     started_at: string; ended_at: string | null; customer_name: string | null; order_status: OrderStatus | null; subtotal_cents: number | null;
@@ -176,5 +183,6 @@ export async function recentCalls(limit = 100) {
     SELECT s.call_sid, s.from_number, s.order_id, s.status, s.outcome, s.started_at::text, s.ended_at::text,
            s.data->>'name' AS customer_name, o.status AS order_status, o.subtotal_cents
     FROM call_sessions s LEFT JOIN orders o ON o.id = s.order_id
+    ${where}
     ORDER BY s.started_at DESC LIMIT ${limit}`);
 }
