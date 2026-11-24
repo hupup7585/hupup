@@ -66,8 +66,8 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
           <span className="mt-1 block text-xs text-muted">One phone number per line. While &ldquo;Only test calls&rdquo; is ticked, only calls from these numbers (and always (845) 777-7585) are offered pay by card.</span>
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block"><span className="label">PhonePay number</span><input name="number" defaultValue={formatPhone(s.solaPhonePayNumber)} className="input" placeholder="(833) 434-3354" /></label>
-          <label className="block"><span className="label">Backup number (used if the first does not answer)</span><input name="backup" defaultValue={formatPhone(s.solaPhonePayBackup)} className="input" placeholder="(844) 422-7356" /></label>
+          <label className="block"><span className="label">PhonePay number</span><input name="number" type="tel" inputMode="tel" defaultValue={formatPhone(s.solaPhonePayNumber)} className="input" placeholder="(833) 434-3354" /></label>
+          <label className="block"><span className="label">Backup number (used if the first does not answer)</span><input name="backup" type="tel" inputMode="tel" defaultValue={formatPhone(s.solaPhonePayBackup)} className="input" placeholder="(844) 422-7356" /></label>
           <label className="block" data-phonepay-limits><span className="label">Card tries per call</span><input name="triesPerCall" type="number" min={1} max={20} defaultValue={String(s.phonePayTriesPerCall)} className="input" /></label>
           <label className="block">
             <span className="label">Calls with card tries per caller number in 24 hours, then card by phone is blocked</span>

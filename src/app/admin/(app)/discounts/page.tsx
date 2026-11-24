@@ -29,7 +29,7 @@ export default async function DiscountsPage({ searchParams }: { searchParams: Pr
       {m && <p className="mb-4 rounded-xl bg-bg p-3 text-sm font-semibold" role="status">{m}</p>}
       <form action={addDiscountAction} className="card mb-6 grid gap-3 p-5 sm:grid-cols-2">
         <h2 className="text-xl font-black sm:col-span-2">Add a discount</h2>
-        <label className="block"><span className="label">Customer phone</span><input name="phone" className="input" placeholder="(845) 555-0123" required /></label>
+        <label className="block"><span className="label">Customer phone</span><input name="phone" type="tel" inputMode="tel" className="input" placeholder="845-555-0123" required /></label>
         <div className="grid grid-cols-[auto_1fr] gap-2">
           <label className="block"><span className="label">Type</span>
             <select name="kind" className="input" defaultValue="amount"><option value="amount">Dollars off</option><option value="percent">Percent off</option></select>

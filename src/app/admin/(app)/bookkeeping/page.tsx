@@ -245,7 +245,7 @@ async function Invoices({ today }: { today: string }) {
             <Field label="Type"><select name="kind" className="input"><option value="invoice">Invoice</option><option value="quote">Quote</option><option value="credit_note">Credit note</option></select></Field>
             <Field label="Customer or school"><input name="customerName" list="book-customers" className="input" required /><datalist id="book-customers">{customers.map((c) => <option key={c} value={c} />)}</datalist></Field>
             <Field label="Email"><input name="customerEmail" type="email" className="input" /></Field>
-            <Field label="Phone"><input name="customerPhone" className="input" /></Field>
+            <Field label="Phone"><input name="customerPhone" type="tel" inputMode="tel" className="input" placeholder="845-555-0123" /></Field>
             <Field label="Billing address" wide><input name="billingAddress" className="input" /></Field>
             <Field label="Date"><input type="date" name="issueDate" defaultValue={today} className="input" /></Field>
             <Field label="Payment terms (days)"><input name="termsDays" type="number" min={0} defaultValue={0} className="input" /></Field>
