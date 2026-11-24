@@ -32,11 +32,11 @@ beforeEach(() => {
 });
 
 describe("required details", () => {
-  it("name and address are never skipped: after 3 tries the caller types it on the keypad (or reaches a person)", async () => {
+  it("name and address are never skipped: after 3 tries, box 41 and the field's first menu again (Abraham, Nov 24, 2026)", async () => {
     const name = await call("heard", { SpeechResult: "" }, "f=name&n=2");
-    expect(redirect(name)).toBe("type?f=name");
+    expect(redirect(name)).toBe("ask?f=name");
     const address = await call("heard", { SpeechResult: "" }, "f=address&n=2");
-    expect(redirect(address)).toBe("type?f=address");
+    expect(redirect(address)).toBe("ask?f=address");
     expect(redirect(address)).not.toBe("phone");
   });
   it("the address leads to the optional directions step, then the email", () => {

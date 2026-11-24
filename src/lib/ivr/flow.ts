@@ -2845,14 +2845,13 @@ const handlers: Record<string, Handler> = {
     const value = raw ? spec.normalize(raw) : null;
     if (!value) {
       const n = Number(ctx.query.get("n") || 0) + 1;
-      if (f === "email" && n >= 2 && !required) {
-        sp(vr, ctx, "email_skip");
-        return back(vr, "phone");
-      }
+      // Box 40 (Abraham, Nov 24, 2026): skipping the email goes straight to the texting number step, no line between
+      if (f === "email" && n >= 2 && !required) return back(vr, "phone");
       if (n >= MAX_NO_INPUT) {
+        // Box 41 (Abraham, Nov 24, 2026): never a person, never typing on its own; back to this field's first menu, where
+        // the caller says it again or presses 9 to type
         sp(vr, ctx, "field_trouble");
-        // Abraham, Nov 15, 2026: name and address can never be skipped. A person takes it, or the caller types it.
-        return config.forwardPhone() ? back(vr, "operator") : back(vr, "type", { f });
+        return f === "street" ? back(vr, "addr-street") : back(vr, "ask", { f });
       }
       // the ask step plays the shared did-not-catch line itself (Nov 22, 2026)
       return back(vr, "ask", { f, n });
