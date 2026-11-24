@@ -281,7 +281,7 @@ export const PROMPTS = {
   cart_expired: { group: "Cart", label: "Cart timed out", text: "Sorry, your cart timed out. Let us start again." },
 
   // Checkout
-  ask_name: { group: "Checkout", label: "Ask for name", text: "Awesome, let us get you booked! Please say your first and last name." },
+  ask_name: { group: "Checkout", label: "Ask for name", text: "Thank you. Let us complete your booking. Please say your first and last name after the tone." }, // Abraham, Nov 23, 2026 (approved, word for word)
   ask_address: { group: "Checkout", label: "Ask for address", text: "Thanks! Now please say the delivery address, with the house number, street, and town." },
   // Delivery address in steps (Abraham, Nov 17, 2026; replaces the single address question, box 32). Step 1 and the
   // retry line are approved; steps 2 to 7 are drafts: the steps run on preview only until he approves them.
