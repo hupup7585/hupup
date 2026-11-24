@@ -43,7 +43,7 @@ export default function PosForm(props: {
   const [thuSun, setThuSun] = useState(false);
   const isThursday = Boolean(date) && new Date(`${date}T12:00:00Z`).getUTCDay() === 4;
   const [form, setForm] = useState({ name: "", termsVia: "", phone: "", email: "", address: "", deliveryTime: "", notes: "", amountPaid: "" });
-  const [payment, setPayment] = useState<"link" | "cash" | "check" | "later">("link");
+  const [payment, setPayment] = useState<"link" | "card" | "cash" | "check" | "later">("link");
   const [result, setResult] = useState<PosResult | null>(null);
   const [days, setDays] = useState<CalendarDay[]>([]);
   const [check, setCheck] = useState<DateCheck | null>(null);
@@ -140,7 +140,7 @@ export default function PosForm(props: {
         ))}
       </ul>
     ) : null;
-  const linkBlocked = payment === "link" && Boolean(quote?.problem);
+  const linkBlocked = (payment === "link" || payment === "card") && Boolean(quote?.problem);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
 
@@ -311,6 +311,7 @@ export default function PosForm(props: {
             ["cash", "Cash"],
             ["check", "Check"],
             ["later", "Pay on delivery"],
+            ["card", "Credit card (enter now)"],
           ] as const).map(([v, l]) => (
             <button key={v} type="button" onClick={() => setPayment(v)} className={`btn-ghost text-sm ${payment === v ? "!border-navy !bg-bg" : ""}`}>
               {l}
@@ -337,7 +338,8 @@ export default function PosForm(props: {
               {fullTotal == null && !quote?.problem && total > 0 && <p className="text-xs text-muted">Items only, until the address is priced</p>}
             </div>
           </div>
-          {linkBlocked && <p className="rounded-lg bg-[#ffe6e4] p-2 text-xs font-bold text-[#b3261e]" data-pos-link-blocked>No payment link until the address can be priced.</p>}
+          {linkBlocked && <p className="rounded-lg bg-[#ffe6e4] p-2 text-xs font-bold text-[#b3261e]" data-pos-link-blocked>{payment === "card" ? "No card payment" : "No payment link"} until the address can be priced.</p>}
+          {payment === "card" && !linkBlocked && <p className="rounded-lg bg-bg p-2 text-xs text-muted" data-pos-card-note>After Book it, open the secure Sola card page and type the customer&apos;s card there. The card number never goes through our system.</p>}
         </div>
         <button className="btn w-full py-3.5" disabled={pending || !date || total === 0 || check?.ok === false || linkBlocked || (props.askTerms !== false && !form.termsVia)} onClick={submit}>
           {pending ? "Booking…" : "Book it"}
@@ -346,6 +348,11 @@ export default function PosForm(props: {
           <p className={`rounded-xl p-3 text-sm font-semibold ${result.ok ? "bg-mint/15 text-[#13895C]" : "bg-coral/10 text-coral-dark"}`}>
             {result.message}{" "}
             {result.orderId && <Link className="underline" href={`/admin/orders/${result.orderId}`}>Open order</Link>}
+            {result.cardUrl && (
+              <a href={result.cardUrl} target="_blank" rel="noopener noreferrer" className="btn mt-3 block w-full py-3 text-center" data-pos-card-page>
+                Open the secure card page ({money(result.cardCents ?? 0)})
+              </a>
+            )}
           </p>
         )}
       </div>

@@ -56,7 +56,7 @@ export async function checkDateFor(date: string): Promise<DateCheck | null> {
   return { ok: c.ok, message: c.message, pickupWarning: c.pickupWarning, pickup: pickupDateFor(date, cal), day: plainDay(c.day) };
 }
 
-export type PosResult = { ok: boolean; message: string; orderId?: number };
+export type PosResult = { ok: boolean; message: string; orderId?: number; /** Credit card by staff: Sola's secure card page for this order */ cardUrl?: string; cardCents?: number };
 
 /** The live total on the booking screen (Nov 24, 2026): the same math the saved booking gets. */
 export async function quoteAction(input: { date: string; items: Record<string, number>; phone: string; address: string; thuSun: boolean }): Promise<import("@/lib/order-pricing").BookingQuote | null> {
@@ -83,7 +83,7 @@ export async function createBookingAction(input: {
   address: string;
   deliveryTime: string;
   notes: string;
-  payment: "link" | "cash" | "check" | "later";
+  payment: "link" | "card" | "cash" | "check" | "later";
   amountPaid: string;
   /** How the customer accepted the Terms and Conditions (required). */
   termsVia: string;
@@ -116,7 +116,12 @@ export async function createBookingAction(input: {
   if (input.payment === "link" && !phone) return { ok: false, message: "A phone number is needed to text a payment link." };
 
   const paidCents = input.payment === "cash" || input.payment === "check" ? parseMoneyToCents(input.amountPaid) ?? 0 : 0;
-  const status = input.payment === "link" ? "PENDING_PAYMENT" : "CONFIRMED";
+  // Credit card by staff (Nov 24, 2026): typed on Sola's secure page, never on ours; Sola's webhook marks it paid
+  if (input.payment === "card") {
+    const { onlinePaymentReady, PAYMENT_UNAVAILABLE } = await import("@/lib/sola");
+    if (!onlinePaymentReady()) return { ok: false, message: `${PAYMENT_UNAVAILABLE.replace("Please call us.", "")}Card payments need SOLA_PAYMENTSITE_NAME in Vercel.`.trim() };
+  }
+  const status = input.payment === "link" || input.payment === "card" ? "PENDING_PAYMENT" : "CONFIRMED";
 
   // Thursday to Sunday: only while the offer is on, and only for a Thursday (pickup Monday)
   const s = await getSettings();
@@ -127,7 +132,7 @@ export async function createBookingAction(input: {
     eventDate: input.date,
     channel: "POS",
     status,
-    holdExpiresAt: input.payment === "link" ? minutesFromNow(POS_LINK_HOLD_MINUTES) /* New booking link (Abraham, Nov 13, 2026: 25 minutes) */ : null,
+    holdExpiresAt: input.payment === "link" || input.payment === "card" ? minutesFromNow(POS_LINK_HOLD_MINUTES) /* New booking link (Abraham, Nov 13, 2026: 25 minutes) */ : null,
     customer: { name: input.name.trim(), phone, email: input.email.trim() || null, address: input.address.trim() || null },
     deliveryTime: input.deliveryTime || null,
     notes: input.notes || null,
@@ -173,7 +178,21 @@ export async function createBookingAction(input: {
   if (consents.stopped) message += " Text consent wasn't saved: this number replied STOP (the customer can text START to get texts again).";
   // Price the booking (items + delivery + tax) so the link and every total include delivery and tax
   const priced = await ensurePriced(r.orderId);
-  if (input.payment === "link" && phone && !priced) {
+  let cardUrl: string | undefined;
+  let cardCents: number | undefined;
+  if (input.payment === "card") {
+    if (!priced) message += ` Card not charged: ${(await pricingProblem(r.orderId)) ?? "the order has no price yet."}`;
+    else {
+      const { paymentLink } = await import("@/lib/sola");
+      const full = await getOrderWithItems(r.orderId);
+      const link = paymentLink({ orderId: r.orderId, amountCents: full!.order.totalCents ?? full!.order.subtotalCents, name: full?.customer?.name, email: full?.customer?.email, phone: full?.customer?.phone });
+      if (link) {
+        cardUrl = link;
+        cardCents = full!.order.totalCents ?? full!.order.subtotalCents;
+        message += ` Open the secure card page and enter the card. The order shows Paid as soon as Sola approves it (held for ${POS_LINK_HOLD_MINUTES} minutes).`;
+      } else message += " Card page not available: SOLA_PAYMENTSITE_NAME is missing in Vercel.";
+    }
+  } else if (input.payment === "link" && phone && !priced) {
     message += ` Payment link not sent. ${(await pricingProblem(r.orderId)) ?? ""}`;
   } else if (input.payment === "link" && phone) {
     const full = await getOrderWithItems(r.orderId);
@@ -193,7 +212,7 @@ export async function createBookingAction(input: {
   // A number two directory entries share (Abraham, Nov 22, 2026): alert him right away
   await alertSharedPhoneOrder({ phone: phone ?? null, name: input.name, address: input.address, orderIds: [r.orderId], source: "staff" }).catch((e) => console.error("shared number alert", e));
   revalidatePath("/admin", "layout");
-  return { ok: true, message, orderId: r.orderId };
+  return { ok: true, message, orderId: r.orderId, ...(cardUrl ? { cardUrl, cardCents } : {}) };
 }
 
 export type DirectoryHit = { id: number; lastName: string; firstName: string; house: string; street: string; unit: string | null; town: string; zip: string; phone: string | null; address: string; shared: boolean };

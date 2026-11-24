@@ -109,3 +109,26 @@ describe("Highland Mills address priced on screen", () => {
     console.log("Highland Mills quote:", JSON.stringify({ delivery: q!.deliveryCents, tax: q!.taxCents, total: q!.totalCents, problem: q!.problem }));
   });
 });
+
+describe("credit card by staff (Nov 24, 2026)", () => {
+  it("books, then gives Sola's secure card page for the full total; the card never touches our server", async () => {
+    process.env.SOLA_PAYMENTSITE_NAME = "hupupattractions";
+    const q = await quoteAction({ date: DATE, items: { [castle]: 1 }, phone: "845-555-0150", address: "12 Forest Road, Monroe", thuSun: false });
+    const r = await createBookingAction({ ...base, date: DATE, items: { [castle]: 1 }, phone: "845-555-0150", address: "12 Forest Road, Monroe", payment: "card" });
+    expect(r.ok).toBe(true);
+    const u = new URL(r.cardUrl!);
+    expect(u.host).toBe("secure.cardknox.com");
+    expect(u.searchParams.get("xAmount")).toBe((q!.totalCents! / 100).toFixed(2));
+    expect(r.cardCents).toBe(q!.totalCents);
+    const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId!));
+    expect(o.status).toBe("PENDING_PAYMENT"); // paid only when Sola's webhook approves it
+    delete process.env.SOLA_PAYMENTSITE_NAME;
+  });
+  it("without the Sola page name: not booked, and says why", async () => {
+    process.env.VERCEL = "1";
+    const r = await createBookingAction({ ...base, date: DATE, items: { [castle]: 1 }, phone: "", address: "12 Forest Road, Monroe", payment: "card" });
+    expect(r.ok).toBe(false);
+    expect(r.message).toMatch(/SOLA_PAYMENTSITE_NAME/);
+    delete process.env.VERCEL;
+  });
+});
