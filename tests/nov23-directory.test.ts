@@ -69,7 +69,8 @@ describe("phone-number address lookup (approved screens, preview)", () => {
     expect(redirect(saved)).toBe("addr-price?ns=1");
     expect(said(await call("addr-price", {}, "ns=1"))).toEqual(["Delivery to Monroe New York is 10 dollars."]); // no second saved line
     expect(redirect(await call("addr-found-choice", { Digits: "2" }, "m=one&n=1"))).toBe("addr-phone");
-    expect(redirect(await call("addr-found-choice", { Digits: "3" }, "m=one&n=1"))).toBe("addr-house");
+    expect(h.session.data.name).toBe("Sample, Chaim"); // the order name from the directory (Nov 23, 2026)
+    expect(redirect(await call("addr-found-choice", { Digits: "3" }, "m=one&n=1"))).toBe("ask?f=name"); // manually: the name first
   });
   it("2. a different number, a shared number: each family, the caller picks; 3 = another number, 4 = manually", async () => {
     expect(said(await call("addr-phone"))).toEqual(["Please enter a 10-digit phone number, starting with the area code.", "When you are done, press pound.", STAR]);
@@ -85,16 +86,34 @@ describe("phone-number address lookup (approved screens, preview)", () => {
     expect(redirect(await call("addr-found-choice", { Digits: "2" }, "m=many&n=2"))).toBe("addr-check?dir=1");
     expect(h.session.data).toMatchObject({ house: "380", dirArea: "Blooming Grove", dirPick: "380 Lake Shore Drive" });
     expect(redirect(await call("addr-found-choice", { Digits: "3" }, "m=many&n=2"))).toBe("addr-phone");
-    expect(redirect(await call("addr-found-choice", { Digits: "4" }, "m=many&n=2"))).toBe("addr-house");
+    expect(redirect(await call("addr-found-choice", { Digits: "4" }, "m=many&n=2"))).toBe("ask?f=name");
   });
   it("3. not found: the line, 1 = another number, 2 = manually", async () => {
     await call("addr-phone-heard", { Digits: "8455550499" });
     expect(said(await call("addr-found"))).toEqual(["We could not find an address for this phone number.", "To try a different phone number, press 1.", "To enter the address manually, press 2.", STAR]);
     expect(redirect(await call("addr-found-choice", { Digits: "1" }, "m=none&n=0"))).toBe("addr-phone");
-    expect(redirect(await call("addr-found-choice", { Digits: "2" }, "m=none&n=0"))).toBe("addr-house");
+    expect(redirect(await call("addr-found-choice", { Digits: "2" }, "m=none&n=0"))).toBe("ask?f=name");
   });
   it("no key: the shared no-key rule (we did not get your choice, then the same screen)", async () => {
     expect(redirect(await call("addr-found"))).toMatch(/^idle\?to=addr-found/);
+  });
+  it("Nov 23, 2026: the lookup comes before the name; a found family gives the name, no name question", async () => {
+    // found: checkout goes straight to the lookup; the caller confirms; no name question; the name is on the order data
+    h.from = "+18455550401";
+    h.session.data = {};
+    const start = await call("cart-choice", { Digits: "1" });
+    expect(redirect(start)).toBe("addr-lookup");
+    expect(redirect(await call("addr-lookup-choice", { Digits: "*" }))).toBe("cart"); // star: back to the cart
+    await call("addr-lookup-choice", { Digits: "1" });
+    expect(redirect(await call("addr-found-choice", { Digits: "1" }, "m=one&n=1"))).toBe("addr-check?dir=1");
+    expect(h.session.data).toMatchObject({ name: "Sample, Chaim", nameFromDirectory: true, lookupDone: true });
+    // not found: manually, the name first (box 31), then the house number, not the lookup again
+    h.session.data = {};
+    await call("cart-choice", { Digits: "1" });
+    await call("addr-phone-heard", { Digits: "8455550499" });
+    expect(redirect(await call("addr-found-choice", { Digits: "2" }, "m=none&n=0"))).toBe("ask?f=name");
+    h.session.data = { ...h.session.data, name: "Moshe Klein" }; // the name step's answer (box 31, tested elsewhere)
+    expect(redirect(await call("addr"))).toBe("addr-house"); // the lookup is not asked again
   });
   it("off on the live line until Abraham approves the test call", async () => {
     const { directoryLookupOn } = await import("@/lib/ivr/flow");

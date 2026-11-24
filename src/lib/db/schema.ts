@@ -237,6 +237,10 @@ export type CallData = {
   /** Phone-number lookup (Nov 23, 2026): the number looked up, and the address the caller picked (for the owner alert) */
   dirPhone?: string;
   dirPick?: string;
+  /** The address lookup ran before the name (Nov 23, 2026): the name step then goes straight to the house number */
+  lookupDone?: boolean;
+  /** The order name came from the directory (no name question) */
+  nameFromDirectory?: boolean;
   /** Full voicemail by phone (Nov 23, 2026): the signed-in box and user, the during-message hint, a new password */
   vmMine?: number;
   vmMineUser?: number | null;

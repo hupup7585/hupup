@@ -477,6 +477,16 @@ function addrStepsActive(ctx: Ctx, env: Record<string, string | undefined> = pro
   return env.VERCEL_ENV !== "production" || ADDRESS_STEP_DRAFTS.every((k) => !promptWaiting(ctx.prompts, k));
 }
 
+/**
+ * Enter the address manually (or nobody found): the name first, with its tone and retry (box 31), then the house
+ * number; when the name is already given, straight to the house number (Nov 23, 2026).
+ */
+async function manualAddress(ctx: Ctx, vr: VR) {
+  const data = ctx.session?.data ?? {};
+  await updateSession(ctx.callSid, { data: { lookupDone: true, ...(data.nameFromDirectory ? { name: undefined, nameFromDirectory: undefined } : {}) } }, ctx.session);
+  return data.name && !data.nameFromDirectory ? back(vr, "addr-house") : back(vr, "ask", { f: "name" });
+}
+
 /** A line's wording with its changing parts still in braces (Admin edits included). */
 function lineTemplate(ctx: Ctx, key: PromptKey) {
   return ctx.prompts[key]?.text?.trim() || PROMPTS[key].text;
@@ -2455,6 +2465,9 @@ const handlers: Record<string, Handler> = {
     if (d === "*") return c ? back(vr, "category", { c }) : back(vr, "menu"); // star: one step back
     if (d === "1") {
       sp(vr, ctx, "checkout_tax_note"); // Abraham (Phone Menu v3): before checkout
+      // Nov 23, 2026 (Abraham): the address lookup comes BEFORE the name; a found family gives the name, no name question
+      await updateSession(ctx.callSid, { data: { lookupDone: undefined, nameFromDirectory: undefined } }, ctx.session);
+      if (addrStepsActive(ctx) && directoryLookupOn()) return back(vr, "addr-lookup");
       return back(vr, "ask", { f: "name" });
     }
     if (d === "2") return c ? back(vr, "category", { c }) : back(vr, "book"); // keep shopping
@@ -2812,7 +2825,7 @@ const handlers: Record<string, Handler> = {
   async addr(ctx, vr) {
     if (!addrStepsActive(ctx)) return back(vr, "ask", { f: "address" });
     // The phone-number lookup (Nov 23, 2026, approved screens): preview only until Abraham approves the test call
-    if (directoryLookupOn()) return back(vr, "addr-lookup");
+    if (directoryLookupOn() && !ctx.session?.data.lookupDone) return back(vr, "addr-lookup");
     return back(vr, "addr-house");
   },
 
@@ -2827,14 +2840,14 @@ const handlers: Record<string, Handler> = {
 
   async "addr-lookup-choice"(ctx, vr) {
     const d = ctx.body.Digits ?? "";
-    if (d === "*") return back(vr, "ask", { f: "name" }); // star: one step back
+    if (d === "*") return ctx.session?.data.name && !ctx.session.data.nameFromDirectory ? back(vr, "ask", { f: "name" }) : back(vr, "cart"); // star: one step back
     if (d === "1") {
       await updateSession(ctx.callSid, { data: { dirPhone: toE164(ctx.from) ?? undefined } }, ctx.session);
       sp(vr, ctx, "lookup_hold");
       return back(vr, "addr-found");
     }
     if (d === "2") return back(vr, "addr-phone");
-    if (d === "3") return back(vr, "addr-house");
+    if (d === "3") return manualAddress(ctx, vr);
     sp(vr, ctx, "not_valid");
     return back(vr, "addr-lookup");
   },
@@ -2908,7 +2921,7 @@ const handlers: Record<string, Handler> = {
     const tryKey = m === "none" ? "1" : m === "one" ? "2" : String(n + 1);
     const manualKey = m === "none" ? "2" : m === "one" ? "3" : String(n + 2);
     if (d === tryKey) return back(vr, "addr-phone");
-    if (d === manualKey) return back(vr, "addr-house");
+    if (d === manualKey) return manualAddress(ctx, vr);
     const list = m === "none" ? [] : await lookupByPhone(ctx.session?.data.dirPhone);
     const pick = m === "one" && d === "1" ? list[0] : m === "many" && /^\d{1,2}$/.test(d) && Number(d) <= n ? list[Number(d) - 1] : undefined;
     if (!pick) {
@@ -2916,7 +2929,9 @@ const handlers: Record<string, Handler> = {
       return back(vr, "addr-found");
     }
     const street = findStreet(pick.street)?.spoken ?? pick.street;
-    await updateSession(ctx.callSid, { data: { house: pick.house, street: pick.street, unit: pick.unit ?? undefined, zip: pick.zip, town: pick.town, dirArea: pick.areaPrinted ?? undefined, dirPick: `${pick.house} ${street}${pick.unit ? `, unit ${pick.unit}` : ""}` } }, ctx.session);
+    // The order name from the directory: last name, then first name (Nov 23, 2026); no name question
+    const dirName = [pick.lastName, pick.firstName].filter(Boolean).join(", ");
+    await updateSession(ctx.callSid, { data: { lookupDone: true, ...(dirName ? { name: dirName, nameFromDirectory: true } : {}), house: pick.house, street: pick.street, unit: pick.unit ?? undefined, zip: pick.zip, town: pick.town, dirArea: pick.areaPrinted ?? undefined, dirPick: `${pick.house} ${street}${pick.unit ? `, unit ${pick.unit}` : ""}` } }, ctx.session);
     await track(ctx.callSid, "step", `Address lookup: the caller confirmed an address${n > 1 ? ` (${n} on the number)` : ""}`);
     return back(vr, "addr-check", { dir: 1 });
   },
