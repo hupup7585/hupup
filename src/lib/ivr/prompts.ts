@@ -700,6 +700,55 @@ export const googleLiveOn = (overrides: PromptOverrides) => Boolean(EXTRAS.get(o
  * numbers, letters, words or a rental name. Only when the Owner has turned on "Achird for the whole line" and every
  * part has a recording; otherwise null, and the line is spoken in the live voice as before.
  */
+/**
+ * A line put together piece by piece (Abraham, Nov 23, 2026: "use ALL uploaded recordings"): every piece with an
+ * uploaded recording plays it; only a piece with no recording is said by the live voice. Null when nothing at all is
+ * recorded (the line is then said the usual way).
+ */
+export type LinePiece = { url: string } | { say: string };
+export function composeMixed(overrides: PromptOverrides, key: PromptKey, vars: Record<string, string | number> = {}): LinePiece[] | null {
+  const x = EXTRAS.get(overrides);
+  if (!x) return null;
+  const clip = (k: string): string[] | null => {
+    const id = x.clips[k];
+    if (id) return [promptRecordingLink(id)];
+    // "eighty eight" not uploaded yet: "eighty" + "eight" when those are
+    const m = /^word:(\S+) (\S+)$/.exec(k);
+    if (m && x.clips[`word:${m[1]}`] && x.clips[`word:${m[2]}`]) return [promptRecordingLink(x.clips[`word:${m[1]}`]!), promptRecordingLink(x.clips[`word:${m[2]}`]!)];
+    return null;
+  };
+  const out: LinePiece[] = [];
+  const parts0 = (PROMPTS[key] as PromptDef).parts;
+  if (parts0) {
+    for (const k of parts0) {
+      const id = x.clips[PIECE_ALIAS[k] ?? k];
+      if (id) out.push({ url: promptRecordingLink(id) });
+      else out.push({ say: overrides[k as PromptKey]?.text?.trim() || (PROMPTS as Record<string, { text: string }>)[k]?.text || "" });
+    }
+  } else {
+    const template = overrides[key]?.text?.trim() || PROMPTS[key].text;
+    const parts = template.split(/(\{[a-z0-9_]+\})/i).map((p) => p.trim()).filter((p) => p && (/^\{/.test(p) || /[a-z]/i.test(p)));
+    let piece = 0;
+    for (const p of parts) {
+      const v = /^\{([a-z0-9_]+)\}$/i.exec(p);
+      if (!v) {
+        piece++;
+        const id = x.clips[PIECE_ALIAS[`${key}#${piece}`] ?? `${key}#${piece}`];
+        out.push(id ? { url: promptRecordingLink(id) } : { say: p });
+        continue;
+      }
+      const value = String(vars[v[1]] ?? "");
+      const words = wordSlotsFor(value, x.items);
+      const urls = words ? words.map(clip) : null;
+      if (urls && urls.every(Boolean)) urls.forEach((u) => u!.forEach((url) => out.push({ url })));
+      else if (words && urls) words.forEach((w, i) => (urls[i] ? urls[i]!.forEach((url) => out.push({ url })) : out.push({ say: w.replace(/^[a-z]+:/, "").replace(/_/g, " ") })));
+      else if (value.trim()) out.push({ say: value });
+    }
+  }
+  const merged = out.filter((p) => !("say" in p) || p.say.trim());
+  return merged.some((p) => "url" in p) ? merged : null;
+}
+
 export function composeClips(overrides: PromptOverrides, key: PromptKey, vars: Record<string, string | number> = {}): string[] | null {
   // Nov 22, 2026: Hark's recordings (Puck) put the line together whenever every part is recorded; the Achird switch
   // stays off until every prompt is recorded (Abraham)

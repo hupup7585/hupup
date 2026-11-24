@@ -1,3 +1,4 @@
+import { ZIP_CODES } from "@/lib/streets";
 /** The words the hotline can say from recordings (Abraham, Nov 15, 2026). No other imports, so prompts.ts can use it. */
 const ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
 const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
@@ -31,6 +32,27 @@ export function ordinalWords(n: number): string[] {
  * The word slots for a changing part as it is spoken today ("245 dollars and 50 cents", "Tuesday, March 5th",
  * "1 4 3 8", "3:40 PM"). Null = some word has no slot (the line then stays in the live voice).
  */
+/** 279 -> word:two, word:hundred, word:seventy nine (21 to 99 not a multiple of ten: one recording). */
+export function numberSlotKeys(n: number): string[] {
+  const out: string[] = [];
+  const two = (x: number) => {
+    if (!x) return;
+    if (x > 20 && x < 100 && x % 10) out.push(`word:${numberWords(x).join(" ")}`);
+    else out.push(...numberWords(x).map((w) => `word:${w.toLowerCase()}`));
+  };
+  if (n === 0) return ["word:zero"];
+  if (n >= 1000) {
+    out.push(...numberSlotKeys(Math.floor(n / 1000)), "word:thousand");
+    n %= 1000;
+  }
+  if (n >= 100) {
+    out.push(`word:${numberWords(Math.floor(n / 100))[0]}`, "word:hundred");
+    n %= 100;
+  }
+  two(n);
+  return out;
+}
+
 export function wordSlotsFor(value: string, items: { id: number; name: string }[] = []): string[] | null {
   const town = townSlot(value);
   if (town) return [town];
@@ -48,7 +70,16 @@ export function wordSlotsFor(value: string, items: { id: number; name: string }[
     let words: string[] | null = null;
     if (time) words = [...numberWords(Number(time[1])), ...(time[2] === "00" ? [] : Number(time[2]) < 10 ? ["oh", ...numberWords(Number(time[2]))] : numberWords(Number(time[2])))];
     else if (ord) words = ordinalWords(Number(ord[1]));
-    else if (/^\d+$/.test(raw)) words = numberWords(Number(raw));
+    else if (/^\d{5}$/.test(raw)) {
+      // A zip code (Nov 23, 2026): the six zips are one recording each, any other zip digit by digit
+      if (ZIP_CODES.includes(raw)) keys.push(`zip:${raw}`);
+      else for (const d of raw) keys.push(`word:${numberWords(Number(d))[0]}`);
+      continue;
+    } else if (/^\d+$/.test(raw)) {
+      // A whole number (Nov 23, 2026): 21 to 99 one recording each ("eighty eight"), the rest from the number clips
+      keys.push(...numberSlotKeys(Number(raw)));
+      continue;
+    }
     else if (/^[A-Z]$/.test(raw)) {
       keys.push(`letter:${raw.toLowerCase()}`);
       continue;

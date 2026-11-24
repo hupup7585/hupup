@@ -10,7 +10,7 @@ vi.mock("@/lib/db", async () => {
 import { db, schema } from "@/lib/db";
 import { allSlots, numberWords, pieces, wordSlotsFor } from "@/lib/recording-slots";
 import { confirmSlot, isConfirmed, slotsWithStatus } from "@/lib/slot-status";
-import { composeClips, loadPromptOverrides } from "@/lib/ivr/prompts";
+import { composeClips, composeMixed, loadPromptOverrides } from "@/lib/ivr/prompts";
 
 describe("recording slots", () => {
   it("every fixed line, the fixed pieces of lines with changing parts, numbers, dates, times and letters A to Z", () => {
@@ -21,7 +21,13 @@ describe("recording slots", () => {
   });
   it("changing parts become word slots: amounts, order numbers, dates, times; anything unknown stays in the live voice", () => {
     expect(numberWords(245)).toEqual(["two", "hundred", "forty", "five"]);
-    expect(wordSlotsFor("245 dollars and 50 cents")).toEqual(["word:two", "word:hundred", "word:forty", "word:five", "word:dollars", "word:and", "word:fifty", "word:cents"]);
+    // Nov 23, 2026 (Abraham): 21 to 99 one recording each ("forty five"), the six zips one recording each
+    expect(wordSlotsFor("245 dollars and 50 cents")).toEqual(["word:two", "word:hundred", "word:forty five", "word:dollars", "word:and", "word:fifty", "word:cents"]);
+    expect(wordSlotsFor("88")).toEqual(["word:eighty eight"]);
+    expect(wordSlotsFor("12")).toEqual(["word:twelve"]);
+    expect(wordSlotsFor("10950")).toEqual(["zip:10950"]);
+    expect(wordSlotsFor("10930")).toEqual(["zip:10930"]);
+    expect(wordSlotsFor("10941")).toEqual(["word:one", "word:zero", "word:nine", "word:four", "word:one"]); // another zip: digit by digit
     expect(wordSlotsFor("1 4 3 8")).toEqual(["word:one", "word:four", "word:three", "word:eight"]);
     expect(wordSlotsFor("Tuesday, March 5th")).toEqual(["word:tuesday", "word:march", "word:fifth"]);
     expect(wordSlotsFor("3:05 PM")).toEqual(["word:three", "word:oh", "word:five", "word:pm"]);
@@ -51,5 +57,23 @@ describe("recording slots", () => {
     const clips = composeClips(await loadPromptOverrides(), "checkout_total", vars);
     expect(clips).toHaveLength(5 + 2 + 2 + 2 + 2);
     expect(id).toBe(1010);
+  });
+  it("Nov 23, 2026: every recorded piece plays; only a piece with no recording is said by the live voice", async () => {
+    const add = async (k: string) => {
+      const [r] = await db.insert(schema.promptRecordings).values({ promptKey: k, source: "upload", fileName: `${k}.mp3`, contentType: "audio/mpeg", sizeBytes: 1, complete: true }).returning();
+      await db.insert(schema.voicePrompts).values({ key: k, recordingId: r.id }).onConflictDoNothing();
+    };
+    // "Delivery to {town} is {price}." with the pieces, the town and "dollars" recorded, but not "eighty eight" yet
+    for (const k of ["addr_price#1", "addr_price#2", "town:highland_mills_new_york"]) await add(k);
+    let m = composeMixed(await loadPromptOverrides(), "addr_price", { town: "Highland Mills New York", price: "88 dollars" });
+    expect(m?.filter((p) => "url" in p)).toHaveLength(4); // Delivery to / the town / is / dollars
+    expect(m?.filter((p) => "say" in p)).toEqual([{ say: "eighty eight" }]); // only the missing number
+    await add("word:eighty eight");
+    m = composeMixed(await loadPromptOverrides(), "addr_price", { town: "Highland Mills New York", price: "88 dollars" });
+    expect(m?.every((p) => "url" in p)).toBe(true); // nothing in the live voice
+    expect(m).toHaveLength(5);
+    // a zip: the one-piece recording
+    await add("zip:10930");
+    expect(composeMixed(await loadPromptOverrides(), "addr_price", { town: "Highland Mills New York", price: "10930" })?.every((p) => "url" in p)).toBe(true);
   });
 });

@@ -76,7 +76,7 @@ import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staf
 import { calendarNow } from "@/lib/clock";
 import { bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
 import { matchBlock, parseBlockList } from "./caller-filter";
-import { PROMPTS, clipUrls, composeClips, fill, googleLiveOn, liveClips, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
+import { PROMPTS, clipUrls, composeClips, composeMixed, fill, googleLiveOn, liveClips, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
@@ -130,6 +130,9 @@ function sp(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptK
   // Achird for the whole line (Owner switch): put together from Hark's recordings when every part is recorded
   const clips = vars ? composeClips(ctx.prompts, key, vars) : null;
   if (clips) return void clips.forEach((u) => target.play(u));
+  // Nov 23, 2026 (Abraham): every recorded piece plays; the live voice only says a piece with no recording yet
+  const mixed = composeMixed(ctx.prompts, key, vars ?? {});
+  if (mixed) return void mixed.forEach((p) => ("url" in p ? target.play(p.url) : say(target, p.say)));
   // Option B (Owner switch, off): Google speaks the line in Achird; otherwise the live voice (Puck)
   if (vars && googleLiveOn(ctx.prompts)) return void target.play(liveVoiceLink(spokenSpelling(promptText(ctx.prompts, key, vars))));
   // Abraham, Nov 19, 2026: in a menu, a plain half-second pause after each option (Hark's recordings have it)
