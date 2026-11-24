@@ -133,8 +133,10 @@ export default function DirectorySheet({ streets }: { streets: string[] }) {
   const NUM_W = 34 + 7 * String(Math.max(rows?.length ?? 0, 99)).length;
   // Each column fits its words; whatever room is left in the box is shared evenly by the ten columns (Nov 24, 2026)
   const natural = NUM_W + COLS.reduce((n, c) => n + W0[c.key], 0);
-  const extra = boxW > natural ? Math.floor((boxW - natural) / COLS.length) : 0;
-  const W = useMemo(() => Object.fromEntries(COLS.map((c) => [c.key, W0[c.key] + extra])) as Record<SheetKey, number>, [W0, extra]);
+  const spare = Math.max(0, Math.floor(boxW - natural));
+  const extra = Math.floor(spare / COLS.length);
+  const rest = spare - extra * COLS.length; // the last few pixels: one more each for the first columns, so the sheet ends at the edge
+  const W = useMemo(() => Object.fromEntries(COLS.map((c, i) => [c.key, W0[c.key] + extra + (i < rest ? 1 : 0)])) as Record<SheetKey, number>, [W0, extra, rest]);
   const TOTAL_W = NUM_W + COLS.reduce((n, c) => n + W[c.key], 0);
   useEffect(() => {
     if (!full) return;
