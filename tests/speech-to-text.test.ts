@@ -115,18 +115,20 @@ describe("speech to text: the call", () => {
     const back = await call("heard", {}, `f=name&a=${a}`);
     // Google voice audio, never Twilio's Say: "We got" + the caller's words + "If that is correct..."
     expect(said(back).join(" ")).not.toContain("We got");
-    expect([...back.matchAll(/<Play>[^<]*\/api\/voice-audio\/prompt\/\d+/g)]).toHaveLength(3);
-    expect(h.tts).toEqual(["We got", "Yossi Friedman.", "If that is correct, press pound to continue. To say it again, press 1."]);
+    expect([...back.matchAll(/<Play>[^<]*\/api\/voice-audio\/prompt\/\d+/g)]).toHaveLength(2);
+    expect(h.tts).toEqual(["We got", "Yossi Friedman."]);
+    expect(said(back)).toEqual(["If that is correct, press 1. To try again, press 2."]); // the shared Confirm ending (Nov 23, 2026)
     expect(h.session.data.heard).toBe("Yossi Friedman");
     // the fixed words are made once and reused; only the caller's words are new
     h.tts = [];
     await db.update(schema.spokenAnswers).set({ text: "sara klein" }).where(eq(schema.spokenAnswers.id, a));
     const again = await call("heard", {}, `f=name&a=${a}`);
     expect(h.tts).toEqual(["Sara Klein."]);
-    // Abraham, Nov 15: pound confirms; 1 records it again from the start of the step
-    expect(again).toContain('action="https://hupup.example/api/voice/confirm?f=name&amp;k=pound"');
-    expect(redirect(await call("confirm", { Digits: "1" }, "f=name&k=pound"))).toBe("ask?f=name");
-    expect(redirect(await call("confirm", { Digits: "#" }, "f=name&k=pound"))).toBe("addr");
+    // Abraham, Nov 23, 2026: 1 confirms; 2 records it again from the start of the step; pound is not a confirm
+    expect(again).toContain('action="https://hupup.example/api/voice/confirm?f=name"');
+    expect(redirect(await call("confirm", { Digits: "2" }, "f=name"))).toBe("ask?f=name");
+    expect(redirect(await call("confirm", { Digits: "#" }, "f=name"))).toBe("readback?f=name");
+    expect(redirect(await call("confirm", { Digits: "1" }, "f=name"))).toBe("addr");
     expect(h.session.data.name).toBe("Sara Klein");
   });
   it("another call's answer is never read back", async () => {

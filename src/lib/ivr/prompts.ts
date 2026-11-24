@@ -81,6 +81,9 @@ export const PROMPTS = {
   book_corporate: { group: "Booking by item (key 1)", label: "Bookings menu key 9 (replaced by recording 3, Nov 19)", text: "For schools, corporate events, and organizational bookings, press 9." },
   // The one shared star line (Nov 19, 2026): taken out of every menu line; played once after every menu with a way back
   book_back: { group: "Welcome & main menu", label: "Shared: go back (plays after every menu with a way back)", text: "To go back, press star." },
+  // Abraham, Nov 23, 2026 (approved): no line says "press pound to continue"; every confirm or read-back line ends with
+  // this one recording. 1 confirms and moves on, 2 tries that step again.
+  confirm_ending: { group: "Welcome & main menu", label: "Confirm ending (plays after every confirm or read-back line)", text: "If that is correct, press 1. To try again, press 2." },
   not_valid: { group: "Welcome & main menu", label: "Any menu: a key that is not a choice (Abraham)", text: "Sorry, that is not a valid selection." }, // Nov 19, 2026: then the same recording starts over
   // Main menu key 2 (Abraham W): instructions for each type of attraction. Editable here like every other prompt.
   attraction_choice: { group: "Key 2: Instructions", label: "Which attraction (keys 2 and 3, Abraham)", text: "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3." },
@@ -219,7 +222,7 @@ export const PROMPTS = {
   box155: { group: "Booking by item (key 1)", label: "Box 155: balloon description and dimensions (NOT APPROVED yet)", text: "The {item} is {description}. The dimensions are as follows: {length} feet long, {width} feet wide, and {height} feet tall. To add it to your shopping cart, press 1.", vars: ["item", "description", "length", "width", "height"], pending: true },
   // Box 156 (Abraham, Nov 19, 2026, approved): before payment, only when the customer has a discount from the Owner
   box156: { group: "Checkout", label: "Box 156: discount applied (only when the customer has a discount)", text: "The total of your order is {amount}. We are happy to let you know that a discount of {discount} has been applied to your order. Your new total is {newtotal}.", vars: ["amount", "discount", "newtotal"] },
-  book_date_entered: { group: "Booking by item (key 1)", label: "Confirm the date", text: "You entered {date}. If that is correct, press pound to continue. To enter a different date, press 1.", vars: ["date"] },
+  book_date_entered: { group: "Booking by item (key 1)", label: "Confirm the date", text: "You entered {date}.", vars: ["date"] }, // Nov 23, 2026: ends with the shared Confirm ending (no pound to continue)
   // Abraham, Nov 15, 2026: unfinished cart from the last call (drafts for his OK)
   // Welcome back (Abraham, Nov 17, 2026), his wording: approved. {items} = "one Castle and one Laser tag set for Tuesday, December 22"
   resume_offer: { group: "Booking by item (key 1)", label: "Welcome back: last call's unfinished cart", text: "Welcome back! On your last call you had in your cart {items} for {date}. To check if they are still available, press 1. To start a new order, press 2.", vars: ["items", "date"] },
@@ -332,8 +335,8 @@ export const PROMPTS = {
   type_hint: { group: "Checkout", label: "Typing: how to switch", text: "To type it on your keypad instead, press star." },
   type_instructions: { group: "Checkout", label: "Typing: how to type", text: "To type, press each key until you reach the letter: press 2 once for A, twice for B, three times for C, and the same for every key. To type two letters on the same key, press star once between them. For example, A then B is 2, star, 2 2. Press star twice for a space. When you are finished, please press pound." },
   type_email_symbols: { group: "Checkout", label: "Typing: email symbols", text: "For a dot, press 1 once. For the at sign, press 1 twice." },
-  typed_back: { group: "Checkout", label: "Typing: read back", text: "You typed: {value}. If that is right, press pound to continue. To try again, press 1.", vars: ["value"] },
-  heard: { group: "Checkout", label: "Read back what we heard", text: "I heard: {value}. If that is right, press pound to continue. To try again, press 1.", vars: ["value"] },
+  typed_back: { group: "Checkout", label: "Typing: read back", text: "You typed: {value}.", vars: ["value"] }, // Nov 23, 2026: ends with the shared Confirm ending (no pound to continue)
+  heard: { group: "Checkout", label: "Read back what we heard", text: "I heard: {value}.", vars: ["value"] }, // Nov 23, 2026: ends with the shared Confirm ending (no pound to continue)
   // ONE shared did-not-catch line (Abraham, Nov 22, 2026): name, address, email, keypad typing, catalog email part
   field_unclear: { group: "Checkout", label: "Shared: did not catch it (name, address, email, typing, catalog email)", text: "Sorry, I did not catch that. Let's try again." },
   email_unclear: { group: "Checkout", label: "Didn't catch the email", text: "Sorry, I could not quite catch that email. Let us try that again." },
@@ -342,7 +345,7 @@ export const PROMPTS = {
   phone_confirm: { group: "Checkout", label: "Confirm texting number", text: "We will text your secure payment link to the number you are calling from, ending in {last4}. Press 1 to use this number, or 2 to enter a different one.", vars: ["last4"] },
   phone_enter: { group: "Checkout", label: "Type a cell number", text: "Sure thing! Please type your 10 digit cell phone number, starting with the area code." },
   phone_bad: { group: "Checkout", label: "Bad phone number", text: "Hmm, that does not look like a 10 digit number. Let us try again." },
-  phone_heard: { group: "Checkout", label: "Read back phone number", text: "I have {number}. If that is right, press pound to continue. To type it again, press 1.", vars: ["number"] },
+  phone_heard: { group: "Checkout", label: "Read back phone number", text: "I have {number}.", vars: ["number"] }, // Nov 23, 2026: ends with the shared Confirm ending (no pound to continue)
   thanks_order: { group: "Checkout", label: "Order placed", text: "You are all set, {name}! Your order number is {number}.", vars: ["name", "number"] },
   link_sent: { group: "Checkout", label: "Payment link texted (Abraham, Nov 13, 2026)", text: "We just texted you a secure payment link. Your party rentals are saved for {minutes} minutes while you pay. After that, they go back into stock, and you will need to book them again.", vars: ["minutes"] },
   link_failed: { group: "Checkout", label: "Couldn't text the link", text: "We could not send the text, so someone from our team will call you back shortly to finish up." },
@@ -377,7 +380,7 @@ export const PROMPTS = {
   promo_ask: { group: "Promo texts by phone (keys only)", label: "Step 1: after the order", text: "To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1." },
   promo_which: { group: "Promo texts by phone (keys only)", label: "Step 2: which number", text: "To get texts at the number you are calling from, press 1. To use a different phone number, press 2." },
   promo_enter: { group: "Promo texts by phone (keys only)", label: "Step 3: enter a number", text: "Please enter the 10-digit mobile number. When you are finished, please press pound." },
-  promo_heard: { group: "Promo texts by phone (keys only)", label: "Step 3: read the number back", text: "You entered {number}. If that is right, press pound to continue. To enter it again, press 1.", vars: ["number"] },
+  promo_heard: { group: "Promo texts by phone (keys only)", label: "Step 3: read the number back", text: "You entered {number}.", vars: ["number"] }, // Nov 23, 2026: ends with the shared Confirm ending (no pound to continue)
   promo_bad: { group: "Promo texts by phone (keys only)", label: "Step 3: not 10 digits", text: "Sorry, that number did not work. Please try again." },
   promo_final: { group: "Promo texts by phone (keys only)", label: "Final line", text: "Thanks! We just sent a text. Reply YES within 24 hours to finish signing up." },
   promo_disclosure: { group: "Promo texts by phone (keys only)", label: "Disclosure line (right after the Final line)", text: "Message and data rates may apply, and you are signed up only after you reply YES to our confirmation text." },
@@ -553,7 +556,7 @@ export const PROMPTS = {
   text_heard: { group: "Texts to the caller (every flow)", label: "Box 144: read the number back", text: "I have {number}. If that is correct, press 1. To enter a different number, press 2.", vars: ["number"] },
   catalog_text_which: { group: "Catalog (key 8)", label: "Text: which number", text: "We will text it to the number you are calling from. To use this number, press 1. To enter a different number, press 2." },
   catalog_text_enter: { group: "Catalog (key 8)", label: "Text: enter a number", text: "Please enter the 10-digit phone number, then press pound." },
-  catalog_text_heard: { group: "Catalog (key 8)", label: "Text: read the number back", text: "I have {number}. If that is correct, press pound to continue. To try again, press 1.", vars: ["number"] },
+  catalog_text_heard: { group: "Catalog (key 8)", label: "Text: read the number back", text: "I have {number}.", vars: ["number"] }, // Nov 23, 2026: ends with the shared Confirm ending (no pound to continue)
   catalog_texted: { group: "Catalog (key 8)", label: "Text: done", text: "Done! We just texted you our catalog. Thank you for choosing Hup Up Attractions!" },
   catalog_text_not_yet: { group: "Catalog (key 8)", label: "Text: not available yet", text: "Sorry, we cannot send it by text just yet. Let us send it by email instead." },
   catalog_email_info: { group: "Catalog (key 8)", label: "Email: send us an empty email (plays once the info@ auto-reply is on)", text: "You can also send us an empty email to info at hup up attractions dot com, with the subject Catalog, and we will send it right back to you." },
@@ -565,7 +568,7 @@ export const PROMPTS = {
   catalog_got: { group: "Catalog (key 8)", label: "Email: read back what we got", text: "We got {letters}. To continue, press pound. To start over, press 1. To add more, press 2.", vars: ["letters"] },
   catalog_ending: { group: "Catalog (key 8)", label: "Email: choose the ending", text: "Now choose the ending. For at gmail dot com, press 1. For at outlook dot com, press 2. For at yahoo dot com, press 3. For at icloud dot com, press 4. For a different ending, press 5." },
   catalog_domain: { group: "Catalog (key 8)", label: "Email: a different ending", text: "Please give us the ending, after the at symbol. To type it, start pressing keys now. To say it, wait for the tone. When you are finished, please press pound." },
-  catalog_final: { group: "Catalog (key 8)", label: "Email: final check", text: "Your email address is {email}. If that is correct, press pound to continue. To start over, press 1.", vars: ["email"] },
+  catalog_final: { group: "Catalog (key 8)", label: "Email: final check", text: "Your email address is {email}.", vars: ["email"] }, // Nov 23, 2026: ends with the shared Confirm ending (no pound to continue)
   catalog_emailed: { group: "Catalog (key 8)", label: "Email: done", text: "We just emailed you our catalog! Check your inbox for a variety of attractions and endless fun for your entire family." },
   catalog_main_star: { group: "Catalog (key 8)", label: "Email: done, star for the main menu", text: "To go to the main menu, press star." },
   catalog_bye: { group: "Catalog (key 8)", label: "Email: done, goodbye", text: "Thank you for choosing Hup Up Attractions! Bye for now!" },
@@ -602,8 +605,8 @@ export const PROMPTS = {
   spoken_readback: {
     group: "Checkout",
     label: "Read back a spoken answer (speech to text, Google voice)",
-    // Abraham's wording, Nov 15, 2026 (approved): pound confirms, 1 records it again
-    text: "We got {text}. If that is correct, press pound to continue. To say it again, press 1.",
+    // Nov 23, 2026: the read-back, then the shared Confirm ending (1 confirms, 2 says it again)
+    text: "We got {text}.",
     vars: ["text"],
   },
 

@@ -23,7 +23,7 @@ describe("phone dates", () => {
     expect(PROMPTS.date_past.text).toBe("The date you picked has already passed. Please pick another date.");
     expect(PROMPTS.date_too_far.text).toBe("We can book with you right now for the next three months. Please pick another date.");
     expect(PROMPTS.date_unclear.text).toBe("Sorry, I did not get that date. Please try that again.");
-    expect(PROMPTS.book_date_entered.text).toBe("You entered {date}. If that is correct, press pound to continue. To enter a different date, press 1.");
+    expect(PROMPTS.book_date_entered.text).toBe("You entered {date}."); // then the shared Confirm ending (Nov 23, 2026)
     expect(PROMPTS.category_empty.text).toBe("Sorry, nothing is available in that section right now. Please check again later.");
     expect(PROMPTS.closed_day_intro.text).toBe("We are closed on {date} for {reason}."); // box 17 in pieces (Nov 22, 2026)
     expect(PROMPTS).not.toHaveProperty("qty_prompt");

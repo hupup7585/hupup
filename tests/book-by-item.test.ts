@@ -74,8 +74,8 @@ describe("key 1: booking by item", () => {
     expect(redirect(await call("box18-choice", { Digits: "3" }, `p=${medium}&d=${TUE}&t=1`))).toBe(`date?p=${medium}`);
     expect(redirect(await call("box18-choice", { Digits: "1" }, `p=${medium}&d=${TUE}&t=1`))).toBe(`qty?p=${medium}&d=${TUE}`);
     // with no item yet, the old check stays (still open with Abraham)
-    expect(said(await call("date-ask", {}, `d=${TUE}`))).toEqual(["You entered Tuesday, December first. If that is correct, press pound to continue. To enter a different date, press 1.", "To go back, press star."]);
-    expect(redirect(await call("date-confirm", { Digits: "#" }, `p=${medium}&d=${TUE}`))).toBe(`qty?p=${medium}&d=${TUE}`);
+    expect(said(await call("date-ask", {}, `d=${TUE}`))).toEqual(["You entered Tuesday, December first.", "If that is correct, press 1. To try again, press 2.", "To go back, press star."]);
+    expect(redirect(await call("date-confirm", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`qty?p=${medium}&d=${TUE}`);
   });
 
   it("available: straight on to the current booking steps", async () => {

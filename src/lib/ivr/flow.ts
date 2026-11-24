@@ -167,6 +167,11 @@ function sayLive(target: VR | Gather, ctx: { prompts: PromptOverrides }, text: s
  * pause, then "To go back, press star." Star goes back one step. Not on the main menu, typing, address steps, the
  * voicemail offer, the staff voicemail box or the hear-again lines.
  */
+/** The shared Confirm ending after a confirm or read-back line (Abraham, Nov 23, 2026): 1 confirms, 2 tries again. */
+function confirmEnd(g: Gather, ctx: { prompts: PromptOverrides }) {
+  sp(g, ctx, "confirm_ending");
+}
+
 function backLine(g: Gather, ctx: { prompts: PromptOverrides }) {
   halfPause(g);
   sp(g, ctx, "book_back");
@@ -385,9 +390,10 @@ async function ktFinish(ctx: Ctx, vr: VR, f: Field, text: string) {
   }
   await track(ctx.callSid, "typed", `Typed ${f}: ${value}`, { field: f, value });
   await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
-  const g = keypad(vr, url("confirm", { f }));
+  const g = keypad(vr, url("confirm", { f, t: 1 }));
   sp(g, ctx, "typed_back", { value: spec.readBack(value) });
-  return noInput(vr, ctx, "type", { f, again: 1 });
+  confirmEnd(g, ctx);
+  return noInput(vr, ctx, "readback", { f, t: 1 });
 }
 
 /** Directory lookup by caller ID: preview only until Abraham approves its lines (Nov 23, 2026). */
@@ -1512,6 +1518,7 @@ const handlers: Record<string, Handler> = {
     if (!email) return back(vr, "catalog-email");
     const g = keypad(vr, url("catalog-final-choice"));
     sp(g, ctx, "catalog_final", { email: spokenEmail(email) });
+    confirmEnd(g, ctx);
     backLine(g, ctx);
     return repeatMenu(vr, ctx, "catalog-final");
   },
@@ -1519,7 +1526,8 @@ const handlers: Record<string, Handler> = {
   async "catalog-final-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     const email = catalogEmailOf(ctx);
-    if (d === "#" && email && ctx.session?.data.emailFor === "pay") {
+    // Nov 23, 2026: 1 confirms (was pound), 2 starts the email over (was 1)
+    if (d === "1" && email && ctx.session?.data.emailFor === "pay") {
       // The payment link by email (box 145), then box 146
       const o = ctx.session.data.payOrder;
       await updateSession(ctx.callSid, { data: { emailFor: undefined } }, ctx.session);
@@ -1527,7 +1535,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, sent ? "pay_link_sent" : "link_failed");
       return back(vr, "promo-consent");
     }
-    if (d === "#" && email) {
+    if (d === "1" && email) {
       const r = await sendCatalogEmail(email);
       await logCatalogRequest(ctx, "email", email, r.sent);
       if (!r.sent) {
@@ -1544,7 +1552,7 @@ const handlers: Record<string, Handler> = {
       vr.hangup();
       return vr;
     }
-    if (d === "1") return back(vr, "catalog-email"); // start over
+    if (d === "2") return back(vr, "catalog-email"); // try again: the email from the start
     if (d === "*") return back(vr, "catalog-ending");
     sp(vr, ctx, "not_valid");
     return back(vr, "catalog-final");
@@ -2107,6 +2115,7 @@ const handlers: Record<string, Handler> = {
     }
     const g = keypad(vr, url("date-confirm", { p, d: date }));
     sp(g, ctx, "book_date_entered", { date: spokenDate(date) });
+    confirmEnd(g, ctx);
     backLine(g, ctx); // Abraham, Nov 20, 2026: no shopping cart option on this step
     return bookNoInput(vr, ctx, "date-ask", { p, d: date });
   },
@@ -2141,8 +2150,9 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     const d = ctx.body.Digits;
     if (ctx.query.get("f") === "1") return friMutzeChoice(ctx, vr, p, date, d);
-    if (d === "1" || d === "*") return back(vr, "date", { p }); // a different date; star: one step back, the date
-    if (d !== "#") {
+    // Nov 23, 2026: 1 confirms; 2 tries again (the date step); star one step back; pound or another key is not valid
+    if (d === "2" || d === "*") return back(vr, "date", { p });
+    if (d !== "1") {
       if (d) sp(vr, ctx, "not_valid");
       return back(vr, "date-ask", { p, d: date });
     }
@@ -2719,9 +2729,10 @@ const handlers: Record<string, Handler> = {
     }
     await track(ctx.callSid, "typed", `Typed ${f}: ${value}`, { field: f, value });
     await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
-    const g = keypad(vr, url("confirm", { f }));
+    const g = keypad(vr, url("confirm", { f, t: 1 }));
     sp(g, ctx, "typed_back", { value: spec.readBack(value) });
-    return noInput(vr, ctx, "type", { f, again: 1 });
+    confirmEnd(g, ctx);
+    return noInput(vr, ctx, "readback", { f, t: 1 });
   },
 
   /** Speech to text: the answer was recorded. Type it up in the background; the caller hears the hold clip. */
@@ -2805,14 +2816,16 @@ const handlers: Record<string, Handler> = {
       // Read back in the Google voice (never Twilio's Say); the draft wording plays on preview for Abraham's test
       const links = await googleReadback(lineTemplate(ctx, "spoken_readback"), { text: spec.readBack(value) });
       if (!links) return back(vr, "type", { f }); // Google voice not available: type it on the keypad instead
-      // Abraham, Nov 15, 2026: pound confirms; 1 records the answer again from the start of this step
-      const g = keypad(vr, url("confirm", { f, k: "pound" }));
+      // Nov 23, 2026: the shared Confirm ending; 1 confirms, 2 records the answer again from the start of this step
+      const g = keypad(vr, url("confirm", { f }));
       for (const l of links) g.play(l);
-      return noInput(vr, ctx, "ask", { f });
+      confirmEnd(g, ctx);
+      return noInput(vr, ctx, "readback", { f });
     }
     const g = keypad(vr, url("confirm", { f }));
     sp(g, ctx, "heard", { value: spec.readBack(value) });
-    return noInput(vr, ctx, "ask", { f });
+    confirmEnd(g, ctx);
+    return noInput(vr, ctx, "readback", { f });
   },
 
   /**
@@ -3138,13 +3151,15 @@ const handlers: Record<string, Handler> = {
   async confirm(ctx, vr) {
     const f = ctx.query.get("f") as Field;
     const d = ctx.body.Digits;
+    const typed = ctx.query.get("t") === "1";
     if (d === "*") return back(vr, "ask", { f }); // star: one step back, the same question (Nov 20, 2026)
-    // Abraham, Nov 15, 2026: every read-back confirms with pound; 1 asks again. Any other key (Nov 16, 2026): the
-    // shared wrong-key line, then the same read-back again.
-    const yes = d === "#";
-    if (d && d !== "1" && !yes && ctx.session?.data.heard) {
-      sp(vr, ctx, "not_valid");
-      return back(vr, "readback", { f });
+    // Abraham, Nov 23, 2026: 1 confirms and moves on; 2 tries that step again (typing again when it was typed). Pound
+    // or any other key: the shared wrong-key line, then the same read-back again. No key: the same read-back again.
+    const yes = d === "1";
+    if (d === "2") return back(vr, typed ? "type" : "ask", { f });
+    if (!yes && ctx.session?.data.heard) {
+      if (d) sp(vr, ctx, "not_valid");
+      return back(vr, "readback", { f, t: typed ? 1 : undefined });
     }
     if (!yes) return back(vr, "ask", { f });
     const heard = ctx.session?.data.heard;
@@ -3172,10 +3187,12 @@ const handlers: Record<string, Handler> = {
     const f = ctx.query.get("f") as Field;
     const heard = ctx.session?.data.heard;
     if (!heard || !FIELDS[f]) return back(vr, "ask", { f });
-    const g = keypad(vr, url("confirm", { f }));
-    sp(g, ctx, "heard", { value: FIELDS[f].readBack(heard) });
+    const typed = ctx.query.get("t") === "1";
+    const g = keypad(vr, url("confirm", { f, t: typed ? 1 : undefined }));
+    sp(g, ctx, typed ? "typed_back" : "heard", { value: FIELDS[f].readBack(heard) });
+    confirmEnd(g, ctx);
     backLine(g, ctx);
-    return noInput(vr, ctx, "ask", { f });
+    return noInput(vr, ctx, "readback", { f, t: typed ? 1 : undefined });
   },
 
   /* ---- Terms: "By pressing #, you agree to our Terms and Conditions..." (logged with time, phone, order, version) ---- */
@@ -3271,22 +3288,25 @@ const handlers: Record<string, Handler> = {
     await updateSession(ctx.callSid, { data: { heard: e164 } }, ctx.session);
     const g = keypad(vr, url("phone-confirm"));
     sp(g, ctx, "phone_heard", { number: `${spokenDigits(e164.slice(2, 5))}, ${spokenDigits(e164.slice(5, 8))}, ${spokenDigits(e164.slice(8))}` });
+    confirmEnd(g, ctx);
     backLine(g, ctx);
-    return noInput(vr, ctx, "phone-enter");
+    return noInput(vr, ctx, "phone-confirm");
   },
 
   async "phone-confirm"(ctx, vr) {
     const d = ctx.body.Digits;
     const heard = ctx.session?.data.heard;
     if (d === "*") return back(vr, "phone"); // star: one step back (Nov 20, 2026)
-    if (d && d !== "#" && d !== "1" && heard) {
-      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
+    // Nov 23, 2026: 1 confirms, 2 types it again; pound or another key: the wrong-key line; no key: the same read-back
+    if (d === "2" || !heard) return back(vr, "phone-enter");
+    if (d !== "1") {
+      if (d) sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
       const g = keypad(vr, url("phone-confirm"));
       sp(g, ctx, "phone_heard", { number: `${spokenDigits(heard.slice(2, 5))}, ${spokenDigits(heard.slice(5, 8))}, ${spokenDigits(heard.slice(8))}` });
+      confirmEnd(g, ctx);
       backLine(g, ctx);
-      return noInput(vr, ctx, "phone-enter");
+      return noInput(vr, ctx, "phone-confirm");
     }
-    if (d !== "#" || !heard) return back(vr, "phone-enter");
     await updateSession(ctx.callSid, { data: { phone: heard, heard: undefined } }, ctx.session);
     return back(vr, "sms-consent");
   },

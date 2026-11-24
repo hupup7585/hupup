@@ -60,7 +60,7 @@ describe("key 1: date first, several days, one charge", () => {
     expect(said(await call("book"))[0]).toBe("To receive our catalog by text or email, press 8.");
     expect(redirect(await call("category-choice", { Digits: "1" }, `c=${catId}`))).toBe(`date?p=${productId}`);
     expect(said(await call("date", {}, `p=${productId}`))[0]).toMatch(/^Using your keypad, please enter your event date: two digits for the month/);
-    expect(redirect(await call("date-confirm", { Digits: "#" }, `d=${DAY1}`))).toBe("book");
+    expect(redirect(await call("date-confirm", { Digits: "1" }, `d=${DAY1}`))).toBe("book");
     expect(h.session.data.day).toBe(DAY1);
     expect(redirect(await call("category", {}, `c=${catId}`))).toBe(`balloons?c=${catId}`); // jumping balloons: box 153 (Nov 19, 2026)
   });
@@ -77,11 +77,11 @@ describe("key 1: date first, several days, one charge", () => {
     expect(redirect(await call("after-add", { Digits: "0" }))).toBe("cart");
     expect(redirect(await call("after-add", { Digits: "2" }))).toBe("date");
     // another day: a new held order for that day
-    expect(redirect(await call("date-confirm", { Digits: "#" }, `d=${DAY2}`))).toBe("book");
+    expect(redirect(await call("date-confirm", { Digits: "1" }, `d=${DAY2}`))).toBe("book");
     expect(h.session.orderId).toBeNull();
     await call("add", {}, `p=${productId}&d=${DAY2}&q=2`);
     // back to the first day: more items join that day's order
-    await call("date-confirm", { Digits: "#" }, `d=${DAY1}`);
+    await call("date-confirm", { Digits: "1" }, `d=${DAY1}`);
     await call("add", {}, `p=${productId}&d=${DAY1}&q=1`);
     const held = await db.select().from(schema.orders).where(eq(schema.orders.status, "HOLD"));
     expect(held.map((o) => o.eventDate).sort()).toEqual([DAY1, DAY2]);
@@ -129,9 +129,9 @@ describe("key 1: date first, several days, one charge", () => {
 
   it("hanging up releases every held day on the call", async () => {
     Object.assign(h.session, { callSid: "CAmd2", orderId: null, data: {} });
-    await call("date-confirm", { Digits: "#" }, `d=${DAY1}`);
+    await call("date-confirm", { Digits: "1" }, `d=${DAY1}`);
     await call("add", {}, `p=${productId}&d=${DAY1}&q=1`);
-    await call("date-confirm", { Digits: "#" }, `d=${DAY2}`);
+    await call("date-confirm", { Digits: "1" }, `d=${DAY2}`);
     await call("add", {}, `p=${productId}&d=${DAY2}&q=1`);
     const ids = h.session.data.dayOrderIds as number[];
     expect(ids).toHaveLength(2);

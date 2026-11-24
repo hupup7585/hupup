@@ -221,7 +221,7 @@ describe("payment link: box 141, text or email (Abraham, Nov 17, 2026)", () => {
     expect(await call("paylink-choice", { Digits: "2" }, "o=7")).toContain("/api/voice/catalog-email?p=pay&amp;o=7");
     await call("catalog-email", {}, "p=pay&o=7");
     h.session.data = { ...h.session.data, catLocal: "yossi", catDomain: "gmail.com" };
-    const xml = await call("catalog-final-choice", { Digits: "#" });
+    const xml = await call("catalog-final-choice", { Digits: "1" });
     expect(h.emails).toEqual([{ to: "yossi@gmail.com" }]);
     expect(xml).toContain("Done! We just sent you the payment link.");
     expect(xml).toContain("/api/voice/promo-consent");
@@ -347,13 +347,13 @@ describe("no time zone question (Abraham, Nov 16, 2026): every customer is on Ea
 describe("checkout pricing, delivery area and terms (Abram's final decisions)", () => {
   it("an address outside the delivery area stops checkout and asks again", async () => {
     h.session.data.heard = "5 Main Street, Albany";
-    const xml = await call("confirm", { Digits: "#" }, "f=address");
+    const xml = await call("confirm", { Digits: "1" }, "f=address");
     expect(xml).toContain("we only deliver in Kiryas Joel and nearby Orange County towns");
     expect(xml).toContain("/api/voice/ask?f=address");
   });
   it("an in-area address continues", async () => {
     h.session.data.heard = "5 Main Street, Monroe";
-    const xml = await call("confirm", { Digits: "#" }, "f=address");
+    const xml = await call("confirm", { Digits: "1" }, "f=address");
     expect(xml).not.toContain("we only deliver");
   });
   it("finalize asks for the terms first, with the exact notice", async () => {

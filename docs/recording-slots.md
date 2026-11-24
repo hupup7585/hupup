@@ -1,6 +1,6 @@
 # Hotline recording text list
 
-1025 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
+1018 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
 
 ## Welcome & main menu
 
@@ -21,6 +21,7 @@ To speak with an operator, press 0.
 To hear this menu again, press the star key.
 Thank you for choosing Hup Up Attractions! |
 | book_back | Shared: go back (plays after every menu with a way back) | To go back, press star. |
+| confirm_ending | Confirm ending (plays after every confirm or read-back line) | If that is correct, press 1. To try again, press 2. |
 | not_valid | Any menu: a key that is not a choice (Abraham) | Sorry, that is not a valid selection. |
 | menu_category#1 | Menu option for a category, piece 1 | For |
 | menu_category#2 | Menu option for a category, piece 2 | , press |
@@ -114,7 +115,6 @@ Thank you for choosing Hup Up Attractions! |
 | box155#5 | Box 155: balloon description and dimensions (NOT APPROVED yet), piece 5 | feet wide, and |
 | box155#6 | Box 155: balloon description and dimensions (NOT APPROVED yet), piece 6 | feet tall. To add it to your shopping cart, press 1. |
 | book_date_entered#1 | Confirm the date, piece 1 | You entered |
-| book_date_entered#2 | Confirm the date, piece 2 | . If that is correct, press pound to continue. To enter a different date, press 1. |
 | resume_offer#1 | Welcome back: last call's unfinished cart, piece 1 | Welcome back! On your last call you had in your cart |
 | resume_offer#2 | Welcome back: last call's unfinished cart, piece 2 | for |
 | resume_offer#3 | Welcome back: last call's unfinished cart, piece 3 | . To check if they are still available, press 1. To start a new order, press 2. |
@@ -221,9 +221,7 @@ Thank you for choosing Hup Up Attractions! |
 | type_instructions | Typing: how to type | To type, press each key until you reach the letter: press 2 once for A, twice for B, three times for C, and the same for every key. To type two letters on the same key, press star once between them. For example, A then B is 2, star, 2 2. Press star twice for a space. When you are finished, please press pound. |
 | type_email_symbols | Typing: email symbols | For a dot, press 1 once. For the at sign, press 1 twice. |
 | typed_back#1 | Typing: read back, piece 1 | You typed: |
-| typed_back#2 | Typing: read back, piece 2 | . If that is right, press pound to continue. To try again, press 1. |
 | heard#1 | Read back what we heard, piece 1 | I heard: |
-| heard#2 | Read back what we heard, piece 2 | . If that is right, press pound to continue. To try again, press 1. |
 | field_unclear | Shared: did not catch it (name, address, email, typing, catalog email) | Sorry, I did not catch that. Let's try again. |
 | email_unclear | Didn't catch the email | Sorry, I could not quite catch that email. Let us try that again. |
 | email_skip | Skipping email | No problem, we will skip the email. |
@@ -233,7 +231,6 @@ Thank you for choosing Hup Up Attractions! |
 | phone_enter | Type a cell number | Sure thing! Please type your 10 digit cell phone number, starting with the area code. |
 | phone_bad | Bad phone number | Hmm, that does not look like a 10 digit number. Let us try again. |
 | phone_heard#1 | Read back phone number, piece 1 | I have |
-| phone_heard#2 | Read back phone number, piece 2 | . If that is right, press pound to continue. To type it again, press 1. |
 | thanks_order#1 | Order placed, piece 1 | You are all set, |
 | thanks_order#2 | Order placed, piece 2 | ! Your order number is |
 | link_sent#1 | Payment link texted (Abraham, Nov 13, 2026), piece 1 | We just texted you a secure payment link. Your party rentals are saved for |
@@ -260,7 +257,6 @@ Thank you for choosing Hup Up Attractions! |
 | link_call_back | No texts and no email | No problem, we will not text you. Someone from our team will call you shortly to finish your payment. |
 | address_keypad_help | Address: keypad directions | Press a key once for the first letter, twice for the second letter, and three times for the third letter. Example, to type letter C, press 2 three times. To type a number, press it one more time after the last letter. Example, to type number 7, press 7 five times. For 0, press 0 once. For number 1, press 1 once. For a dot, press 1 twice. For a dash, press 1 three times. For an underscore, press 1 four times. If the next letter is on the same key, wait one second first. To go back one letter, press star one time. To add a space between words, press star twice. When you are done, press pound, or you can hang up. |
 | spoken_readback#1 | Read back a spoken answer (speech to text, Google voice), piece 1 | We got |
-| spoken_readback#2 | Read back a spoken answer (speech to text, Google voice), piece 2 | . If that is correct, press pound to continue. To say it again, press 1. |
 
 ## Date & quantity
 
@@ -356,7 +352,6 @@ Thank you for choosing Hup Up Attractions! |
 | promo_which | Step 2: which number | To get texts at the number you are calling from, press 1. To use a different phone number, press 2. |
 | promo_enter | Step 3: enter a number | Please enter the 10-digit mobile number. When you are finished, please press pound. |
 | promo_heard#1 | Step 3: read the number back, piece 1 | You entered |
-| promo_heard#2 | Step 3: read the number back, piece 2 | . If that is right, press pound to continue. To enter it again, press 1. |
 | promo_bad | Step 3: not 10 digits | Sorry, that number did not work. Please try again. |
 | promo_final | Final line | Thanks! We just sent a text. Reply YES within 24 hours to finish signing up. |
 | promo_disclosure | Disclosure line (right after the Final line) | Message and data rates may apply, and you are signed up only after you reply YES to our confirmation text. |
@@ -518,7 +513,6 @@ To delete and re-record, press 3. |
 | catalog_text_which | Text: which number | We will text it to the number you are calling from. To use this number, press 1. To enter a different number, press 2. |
 | catalog_text_enter | Text: enter a number | Please enter the 10-digit phone number, then press pound. |
 | catalog_text_heard#1 | Text: read the number back, piece 1 | I have |
-| catalog_text_heard#2 | Text: read the number back, piece 2 | . If that is correct, press pound to continue. To try again, press 1. |
 | catalog_texted | Text: done | Done! We just texted you our catalog. Thank you for choosing Hup Up Attractions! |
 | catalog_text_not_yet | Text: not available yet | Sorry, we cannot send it by text just yet. Let us send it by email instead. |
 | catalog_email_info | Email: send us an empty email (plays once the info@ auto-reply is on) | You can also send us an empty email to info at hup up attractions dot com, with the subject Catalog, and we will send it right back to you. |
@@ -529,7 +523,6 @@ To delete and re-record, press 3. |
 | catalog_ending | Email: choose the ending | Now choose the ending. For at gmail dot com, press 1. For at outlook dot com, press 2. For at yahoo dot com, press 3. For at icloud dot com, press 4. For a different ending, press 5. |
 | catalog_domain | Email: a different ending | Please give us the ending, after the at symbol. To type it, start pressing keys now. To say it, wait for the tone. When you are finished, please press pound. |
 | catalog_final#1 | Email: final check, piece 1 | Your email address is |
-| catalog_final#2 | Email: final check, piece 2 | . If that is correct, press pound to continue. To start over, press 1. |
 | catalog_emailed | Email: done | We just emailed you our catalog! Check your inbox for a variety of attractions and endless fun for your entire family. |
 | catalog_main_star | Email: done, star for the main menu | To go to the main menu, press star. |
 | catalog_bye | Email: done, goodbye | Thank you for choosing Hup Up Attractions! Bye for now! |
