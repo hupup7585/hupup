@@ -108,17 +108,17 @@ async function reserveInTx(
  * (the "6 Laser Guns" / "4 Laser Guns" item); with a maze again, the add-on price comes back. Nothing else changes.
  */
 export const LASER_ADDONS_GROUP = "Laser tag add-ons";
-async function repriceLaserAddOns(tx: Tx | typeof db, orderId: number) {
-  const r = await tx.execute(sql`
-    SELECT oi.id, oi.unit_price_cents, p.name, p.price_cents, c.name AS cat
-    FROM order_items oi JOIN products p ON p.id = oi.product_id JOIN categories c ON c.id = p.category_id
-    WHERE oi.order_id = ${orderId}`);
-  const rows = r.rows as { id: number; unit_price_cents: number; name: string; price_cents: number; cat: string }[];
+/**
+ * The laser tag add-on packs' price: the add-on price with a maze on the booking, else the regular price of the same
+ * size pack (Nov 24, 2026: shared by saved orders and the booking screen's live total).
+ */
+export async function laserAddonPrices(tx: { execute: typeof db.execute }, rows: { key: number; name: string; cat: string; priceCents: number }[]): Promise<Map<number, number>> {
+  const out = new Map<number, number>();
   const addons = rows.filter((x) => x.cat === LASER_ADDONS_GROUP);
-  if (!addons.length) return;
+  if (!addons.length) return out;
   const hasMaze = rows.some((x) => x.cat !== LASER_ADDONS_GROUP && /laser/i.test(x.cat) && /maze/i.test(x.name));
   for (const a of addons) {
-    let target = a.price_cents;
+    let target = a.priceCents;
     if (!hasMaze) {
       const n = /(\d+)\s*-?\s*pack/i.exec(a.name)?.[1];
       if (n) {
@@ -130,7 +130,21 @@ async function repriceLaserAddOns(tx: Tx | typeof db, orderId: number) {
         if (price) target = price;
       }
     }
-    if (target !== a.unit_price_cents) await tx.execute(sql`UPDATE order_items SET unit_price_cents = ${target} WHERE id = ${a.id}`);
+    out.set(a.key, target);
+  }
+  return out;
+}
+
+async function repriceLaserAddOns(tx: Tx | typeof db, orderId: number) {
+  const r = await tx.execute(sql`
+    SELECT oi.id, oi.unit_price_cents, p.name, p.price_cents, c.name AS cat
+    FROM order_items oi JOIN products p ON p.id = oi.product_id JOIN categories c ON c.id = p.category_id
+    WHERE oi.order_id = ${orderId}`);
+  const rows = r.rows as { id: number; unit_price_cents: number; name: string; price_cents: number; cat: string }[];
+  const targets = await laserAddonPrices(tx, rows.map((x) => ({ key: x.id, name: x.name, cat: x.cat, priceCents: x.price_cents })));
+  for (const a of rows) {
+    const target = targets.get(a.id);
+    if (target !== undefined && target !== a.unit_price_cents) await tx.execute(sql`UPDATE order_items SET unit_price_cents = ${target} WHERE id = ${a.id}`);
   }
 }
 

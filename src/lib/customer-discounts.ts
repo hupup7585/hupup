@@ -23,6 +23,17 @@ export async function discountForOrder(exec: Exec, orderId: number, today: strin
   return (r.rows[0] as DiscountRow | undefined) ?? null;
 }
 
+/** The same discount by the customer's phone (the booking screen, before the order exists; Nov 24, 2026). */
+export async function discountForPhone(exec: Exec, phone: string | null, today: string): Promise<DiscountRow | null> {
+  if (!phone) return null;
+  const r = await exec.execute(sql`
+    SELECT d.kind, d.amount_cents, d.percent, d.note, d.ends_on::text AS ends_on
+    FROM customer_discounts d
+    WHERE d.phone = ${phone} AND d.active AND (d.ends_on IS NULL OR d.ends_on >= ${today}::date)
+    ORDER BY d.id DESC LIMIT 1`);
+  return (r.rows[0] as DiscountRow | undefined) ?? null;
+}
+
 /** The money off the rentals: dollars (never more than the rentals) or a percent, rounded to the cent. */
 export function discountCents(d: Pick<DiscountRow, "kind" | "amount_cents" | "percent">, rentalsCents: number): number {
   if (rentalsCents <= 0) return 0;

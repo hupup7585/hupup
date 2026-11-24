@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import TextConsentBoxes from "@/components/TextConsentBoxes";
-import { availabilityFor, createBookingAction, type PosResult , calendarFor, checkDateFor, type CalendarDay, type DateCheck } from "./actions";
+import { availabilityFor, createBookingAction, type PosResult , calendarFor, checkDateFor, type CalendarDay, type DateCheck, quoteAction, directorySuggestAction, type DirectoryHit } from "./actions";
+import type { BookingQuote } from "@/lib/order-pricing";
 import DualDate, { HebrewDay } from "@/components/DualDate";
 import { englishDate } from "@/lib/dual-date";
 import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
@@ -16,6 +17,10 @@ const BALLOON = /balloon|bounce|jump|inflatable(?!.*maze)/i;
 const OCEAN = /^ocean balls$/i;
 
 const money = (c: number) => (c / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+const phoneShown = (e164: string | null) => {
+  const d = (e164 ?? "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+  return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : e164 ?? "";
+};
 
 export default function PosForm(props: {
   today: string;
@@ -68,9 +73,74 @@ export default function PosForm(props: {
     [qty, props.products],
   );
 
+  // Live total (Nov 24, 2026): items, delivery, sales tax and total, the same math the saved booking gets
+  const [quote, setQuote] = useState<BookingQuote | null>(null);
+  const [quoting, setQuoting] = useState(false);
   useEffect(() => {
-    if (payment === "cash" || payment === "check") setForm((f) => ({ ...f, amountPaid: (total / 100).toFixed(2) }));
-  }, [payment, total]);
+    if (!date || total === 0) {
+      setQuote(null);
+      return;
+    }
+    let live = true;
+    setQuoting(true);
+    const t = window.setTimeout(() => {
+      quoteAction({ date, items: qty, phone: form.phone, address: form.address, thuSun: thuSun && isThursday })
+        .then((q) => live && setQuote(q))
+        .catch(() => live && setQuote(null))
+        .finally(() => live && setQuoting(false));
+    }, 350);
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
+  }, [date, qty, form.address, form.phone, thuSun, isThursday, total]);
+  const fullTotal = quote?.totalCents ?? null;
+
+  useEffect(() => {
+    if (payment === "cash" || payment === "check") setForm((f) => ({ ...f, amountPaid: ((fullTotal ?? total) / 100).toFixed(2) }));
+  }, [payment, total, fullTotal]);
+
+  // Directory suggestions (Owner only) as a name, phone number or street is typed (Nov 24, 2026)
+  const [lookFor, setLookFor] = useState<{ field: "name" | "phone" | "address"; text: string } | null>(null);
+  const [hits, setHits] = useState<DirectoryHit[]>([]);
+  useEffect(() => {
+    if (!lookFor || lookFor.text.trim().length < 2) {
+      setHits([]);
+      return;
+    }
+    let live = true;
+    const t = window.setTimeout(() => {
+      directorySuggestAction(lookFor.text).then((h) => live && setHits(h)).catch(() => live && setHits([]));
+    }, 250);
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
+  }, [lookFor]);
+  const pick = (h: DirectoryHit) => {
+    setForm((f) => ({ ...f, name: [h.firstName, h.lastName].filter(Boolean).join(" "), phone: h.phone ? phoneShown(h.phone) : f.phone, address: h.address }));
+    setLookFor(null);
+    setHits([]);
+  };
+  const typing = (k: "name" | "phone" | "address") => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, [k]: e.target.value });
+    setLookFor({ field: k, text: e.target.value });
+  };
+  const suggestions = (k: "name" | "phone" | "address") =>
+    lookFor?.field === k && hits.length > 0 ? (
+      <ul className="mt-1 max-h-72 overflow-auto rounded-xl border border-[#D9E3F0] bg-white text-sm shadow-lg" role="listbox" data-dir-suggest>
+        {hits.map((h) => (
+          <li key={h.id}>
+            <button type="button" role="option" aria-selected={false} onMouseDown={(e) => (e.preventDefault(), pick(h))} className="block w-full px-3 py-2 text-left hover:bg-[#F2F6FB]" data-dir-hit={h.id}>
+              <span className="font-bold">{h.lastName}, {h.firstName}</span>
+              {h.shared && <span className="ml-2 rounded-full bg-[#FFF6D6] px-2 py-0.5 text-[11px] font-bold text-[#8A6100]">Shared number</span>}
+              <span className="block text-[13px] text-[#4A5B72]">{h.house} {h.street}{h.unit ? `, unit ${h.unit}` : ""}, {h.town} {h.zip}{h.phone ? ` · ${phoneShown(h.phone)}` : ""}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    ) : null;
+  const linkBlocked = payment === "link" && Boolean(quote?.problem);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
 
@@ -201,10 +271,19 @@ export default function PosForm(props: {
 
       <div className="card space-y-3 p-5">
         <h2 className="font-bold">Customer</h2>
-        <input className="input" placeholder="Full name *" value={form.name} onChange={set("name")} />
-        <input className="input" placeholder="Mobile phone" inputMode="tel" value={form.phone} onChange={set("phone")} />
+        <div>
+          <input className="input" placeholder="Full name *" value={form.name} onChange={typing("name")} onBlur={() => window.setTimeout(() => setLookFor(null), 150)} autoComplete="off" data-pos-name />
+          {suggestions("name")}
+        </div>
+        <div>
+          <input className="input" placeholder="Mobile phone" inputMode="tel" value={form.phone} onChange={typing("phone")} onBlur={() => window.setTimeout(() => setLookFor(null), 150)} autoComplete="off" data-pos-phone />
+          {suggestions("phone")}
+        </div>
         <input className="input" placeholder="Email (optional)" type="email" value={form.email} onChange={set("email")} />
-        <input className="input" placeholder="Delivery address" value={form.address} onChange={set("address")} />
+        <div>
+          <input className="input" placeholder="Delivery address (or type a name, phone or street to find it in the Directory)" value={form.address} onChange={typing("address")} onBlur={() => window.setTimeout(() => setLookFor(null), 150)} autoComplete="off" data-pos-address />
+          {suggestions("address")}
+        </div>
         {/* Whole rental days (Abraham): no delivery time; delivery is always 9:00 AM - 12:00 PM, pickup by 9:00 AM */}
         <p data-rental-window className="text-sm text-muted">Delivery {DELIVERY_WINDOW} · pickup by {PICKUP_BY} on the pickup day</p>
         <textarea className="input" placeholder="Notes" rows={2} value={form.notes} onChange={set("notes")} />
@@ -242,11 +321,25 @@ export default function PosForm(props: {
           <input className="input" placeholder="Amount received" inputMode="decimal" value={form.amountPaid} onChange={set("amountPaid")} />
         )}
 
-        <div className="flex items-center justify-between border-t border-line pt-3">
-          <span className="text-muted">Total</span>
-          <span className="text-2xl font-black">{money(total)}</span>
+        <div className="space-y-1 border-t border-line pt-3 text-sm" data-pos-totals>
+          <div className="flex justify-between"><span className="text-muted">Items</span><span className="font-semibold" data-pos-items>{money(quote?.itemsCents ?? total)}</span></div>
+          {quote && quote.offerCents !== 0 && (
+            <div className="flex justify-between"><span className="text-muted">{quote.offerNote}</span><span className="font-semibold">{quote.offerCents > 0 ? `−${money(quote.offerCents)}` : `+${money(-quote.offerCents)}`}</span></div>
+          )}
+          <div className="flex justify-between"><span className="text-muted">Delivery</span><span className="font-semibold" data-pos-delivery>{quote?.deliveryCents != null ? money(quote.deliveryCents) : "—"}</span></div>
+          <div className="flex justify-between"><span className="text-muted">Sales tax{quote?.taxPercent != null ? ` (${quote.taxPercent}%)` : ""}</span><span className="font-semibold" data-pos-tax>{quote?.taxCents != null ? money(quote.taxCents) : "—"}</span></div>
+          <div className="flex items-start justify-between gap-3 pt-1">
+            <span className="pt-1.5 text-base text-muted">Total</span>
+            <div className="text-right">
+              <span className="text-2xl font-black" data-pos-total>{fullTotal != null ? money(fullTotal) : money(total)}</span>
+              {quoting && <span className="ml-2 text-xs text-muted">updating…</span>}
+              {quote?.problem && <p className="mt-1 max-w-xs text-xs font-bold text-[#b3261e]" role="alert" data-pos-problem>{quote.problem}</p>}
+              {fullTotal == null && !quote?.problem && total > 0 && <p className="text-xs text-muted">Items only, until the address is priced</p>}
+            </div>
+          </div>
+          {linkBlocked && <p className="rounded-lg bg-[#ffe6e4] p-2 text-xs font-bold text-[#b3261e]" data-pos-link-blocked>No payment link until the address can be priced.</p>}
         </div>
-        <button className="btn w-full py-3.5" disabled={pending || !date || total === 0 || check?.ok === false || (props.askTerms !== false && !form.termsVia)} onClick={submit}>
+        <button className="btn w-full py-3.5" disabled={pending || !date || total === 0 || check?.ok === false || linkBlocked || (props.askTerms !== false && !form.termsVia)} onClick={submit}>
           {pending ? "Booking…" : "Book it"}
         </button>
         {result && (

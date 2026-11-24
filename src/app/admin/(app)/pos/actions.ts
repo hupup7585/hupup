@@ -58,6 +58,22 @@ export async function checkDateFor(date: string): Promise<DateCheck | null> {
 
 export type PosResult = { ok: boolean; message: string; orderId?: number };
 
+/** The live total on the booking screen (Nov 24, 2026): the same math the saved booking gets. */
+export async function quoteAction(input: { date: string; items: Record<string, number>; phone: string; address: string; thuSun: boolean }): Promise<import("@/lib/order-pricing").BookingQuote | null> {
+  await requireAdmin();
+  if (!isValidISO(input.date)) return null;
+  const s = await getSettings();
+  const thuSun = Boolean(input.thuSun) && Boolean(s.offerThuSunOn) && new Date(`${input.date}T12:00:00Z`).getUTCDay() === 4;
+  const { quoteBooking } = await import("@/lib/order-pricing");
+  return quoteBooking({
+    items: Object.entries(input.items).map(([id, qty]) => ({ productId: Number(id), qty: Number(qty) })),
+    eventDate: input.date,
+    thuSun,
+    phone: input.phone ? toE164(input.phone) : null,
+    address: input.address.trim() || null,
+  });
+}
+
 export async function createBookingAction(input: {
   date: string;
   items: Record<string, number>;
@@ -178,4 +194,49 @@ export async function createBookingAction(input: {
   await alertSharedPhoneOrder({ phone: phone ?? null, name: input.name, address: input.address, orderIds: [r.orderId], source: "staff" }).catch((e) => console.error("shared number alert", e));
   revalidatePath("/admin", "layout");
   return { ok: true, message, orderId: r.orderId };
+}
+
+export type DirectoryHit = { id: number; lastName: string; firstName: string; house: string; street: string; unit: string | null; town: string; zip: string; phone: string | null; address: string; shared: boolean };
+
+/**
+ * New booking: Directory entries matching a phone number, a name or a street (Abraham, Nov 24, 2026). The Directory
+ * list is Owner only (Nov 22-23, 2026), so the Secretary gets no suggestions here.
+ */
+export async function directorySuggestAction(q: string): Promise<DirectoryHit[]> {
+  const me = await requireAdmin();
+  if (me.role !== "owner") return [];
+  const text = q.trim();
+  if (text.length < 2) return [];
+  const { sql, and, or, ilike } = await import("drizzle-orm");
+  const d = schema.directoryEntries;
+  const digits = text.replace(/\D/g, "");
+  const words = text.replace(/[^\p{L}\p{N}\s'-]/gu, " ").split(/\s+/).filter((w) => /\p{L}/u.test(w)); // a phone number typed with dashes is not a name
+  const conds = [];
+  if (digits.length >= 3) conds.push(or(sql`${d.phone} LIKE ${`%${digits}%`}`, ilike(d.house, `${digits}%`))!);
+  for (const w of words) conds.push(or(ilike(d.lastName, `${w}%`), ilike(d.firstName, `${w}%`), ilike(d.street, `%${w}%`), ilike(d.yiddishLastName, `${w}%`), ilike(d.yiddishFirstName, `${w}%`))!);
+  if (!conds.length) return [];
+  const rows = await db.select().from(d).where(and(...conds)).orderBy(d.lastName, d.firstName, d.id).limit(12);
+  const phones = [...new Set(rows.map((r) => r.phone).filter(Boolean))] as string[];
+  const counts = new Map<string, number>();
+  if (phones.length) {
+    const c = await db.execute(sql`SELECT phone, COUNT(*)::int AS n FROM directory_entries WHERE phone IN (${sql.join(phones.map((p) => sql`${p}`), sql`, `)}) GROUP BY phone`);
+    for (const x of c.rows as { phone: string; n: number }[]) counts.set(x.phone, Number(x.n));
+  }
+  const { findStreet } = await import("@/lib/streets");
+  return rows.map((r) => {
+    const street = findStreet(r.street)?.spoken ?? r.street;
+    return {
+      id: r.id,
+      lastName: r.lastName,
+      firstName: r.firstName,
+      house: r.house,
+      street: r.street,
+      unit: r.unit,
+      town: r.town,
+      zip: r.zip,
+      phone: r.phone,
+      address: `${r.house} ${street}${r.unit ? `, unit ${r.unit}` : ""}, ${r.town}, NY ${r.zip}`,
+      shared: (r.phone ? counts.get(r.phone) ?? 1 : 1) > 1,
+    };
+  });
 }

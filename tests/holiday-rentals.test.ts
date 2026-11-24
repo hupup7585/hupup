@@ -23,7 +23,7 @@ describe("holiday rentals", () => {
     expect(noPromosOn("2026-12-08", { holidayNoPromos: false })).toBe(false);
     expect(noPromosOn("2026-11-23", {})).toBe(false);
     expect(perDayRules("2027-04-25", { holidayPerDayCholHamoed: false })).toBe(false);
-    expect(readFileSync("src/lib/offers.ts", "utf8")).toContain("if (noPromosOn(o.event_date, s as never)) return { discountCents: 0, note: null };");
+    expect(readFileSync("src/lib/offers.ts", "utf8")).toContain("if (noPromosOn(o.eventDate, s as never)) return { discountCents: 0, note: null };");
   });
   it("Admin settings on the Offers page, Owner only", () => {
     const a = readFileSync("src/app/admin/(app)/offers/actions.ts", "utf8");

@@ -42,7 +42,7 @@ describe("free delivery promo counts by the delivery date", () => {
     expect(zoneFee("local", on, "2026-12-05")).toBe(0);
     expect(zoneFee("local", on, "2026-12-11")).toBe(1000);
     expect(zoneFee("area", on, "2026-11-30")).toBe(1500);
-    expect(readFileSync("src/lib/order-pricing.ts", "utf8")).toContain("priceOrder(fresh.subtotalCents, o.deliveryAddress, s, undefined, o.eventDate)");
+    expect(readFileSync("src/lib/order-pricing.ts", "utf8")).toContain("priceOrder(subtotalCents, address, s, undefined, eventDate)");
     expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toContain("deliveryFeeFor(quote.kind, settings, o.order.eventDate, o.order.offerNote)");
   });
 });

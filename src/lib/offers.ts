@@ -89,35 +89,55 @@ export async function fourthSundayDiscount(exec: Exec, o: { id: number; customer
 
 /** The one offer for this booking (the biggest saving), or none. Positive = money off; negative = Thursday to Sunday extra. */
 export async function bestOffer(exec: Exec, orderId: number, s: OfferSettings): Promise<{ discountCents: number; note: string | null }> {
-  const r = await exec.execute(sql`SELECT id, customer_id, event_date::text AS event_date, pickup_date::text AS pickup_date FROM orders WHERE id = ${orderId}`);
-  const o = r.rows[0] as { id: number; customer_id: number | null; event_date: string; pickup_date: string } | undefined;
+  const r = await exec.execute(sql`SELECT id, customer_id, event_date::text AS event_date, pickup_date::text AS pickup_date, span_days FROM orders WHERE id = ${orderId}`);
+  const o = r.rows[0] as { id: number; customer_id: number | null; event_date: string; pickup_date: string; span_days: number | null } | undefined;
   if (!o) return { discountCents: 0, note: null };
-  const ls = await lines(exec, orderId);
+  const { discountForOrder } = await import("@/lib/customer-discounts");
+  const { todayISO } = await import("@/lib/dates");
+  return bestOfferFor(
+    exec,
+    { id: Number(o.id), customerId: o.customer_id ? Number(o.customer_id) : null, eventDate: o.event_date, pickupDate: o.pickup_date, spanDays: Number(o.span_days ?? 0) },
+    await lines(exec, orderId),
+    s,
+    () => discountForOrder(exec as never, Number(o.id), todayISO()),
+  );
+}
+
+export type OfferLine = Line;
+/**
+ * The one offer for these lines (Nov 24, 2026: shared by a saved order and the booking screen's live total, so both
+ * match to the cent). Positive = money off; negative = an extra (Thursday to Sunday, a longer rental).
+ */
+export async function bestOfferFor(
+  exec: Exec,
+  o: { id: number; customerId: number | null; eventDate: string; pickupDate: string; spanDays: number },
+  ls: Line[],
+  s: OfferSettings,
+  customerDiscount: () => Promise<import("@/lib/customer-discounts").DiscountRow | null>,
+): Promise<{ discountCents: number; note: string | null }> {
   // Chanukah and Chol Hamoed (Abraham, Nov 18, 2026): no promos, discounts or offers those weeks
   const { noPromosOn, isFriMutze, friMutzeDays } = await import("@/lib/holiday-rentals");
   // Friday plus Mutze Shabbes (box 149, Abraham, Nov 18, 2026): one and a half days, its own price, never an offer
-  if (isFriMutze({ eventDate: o.event_date, pickupDate: o.pickup_date }, s as never)) {
+  if (isFriMutze({ eventDate: o.eventDate, pickupDate: o.pickupDate }, s as never)) {
     const rentals = ls.filter(isRental).reduce((t, l) => t + l.qty * l.unitPriceCents, 0);
     return { discountCents: -Math.round(rentals * (friMutzeDays(s as never) - 1)), note: OFFER_NOTES.friMutze };
   }
   // A closed day booked from the day before to the day after (Abraham, Nov 20, 2026): its own price, never an offer
-  const sd = await exec.execute(sql`SELECT span_days FROM orders WHERE id = ${orderId}`);
-  const span = Number((sd.rows[0] as { span_days: number | null } | undefined)?.span_days ?? 0);
+  const span = o.spanDays;
   if (span > 1) {
     const rentals = ls.filter(isRental).reduce((t, l) => t + l.qty * l.unitPriceCents, 0);
     return { discountCents: -Math.round(rentals * (span - 1)), note: `Closed day: ${span === 1.5 ? "one and a half" : span} days` };
   }
-  if (noPromosOn(o.event_date, s as never)) return { discountCents: 0, note: null };
+  if (noPromosOn(o.eventDate, s as never)) return { discountCents: 0, note: null };
   // Thursday to Sunday is its own price (1.5 times), never combined with the others (a customer discount included)
-  if (on(s.offerThuSunOn) && isThuSun({ eventDate: o.event_date, pickupDate: o.pickup_date })) return { discountCents: thuSunAdjustment(ls), note: OFFER_NOTES.thuSun };
+  if (on(s.offerThuSunOn) && isThuSun({ eventDate: o.eventDate, pickupDate: o.pickupDate })) return { discountCents: thuSunAdjustment(ls), note: OFFER_NOTES.thuSun };
   const options: { discountCents: number; note: string }[] = [];
   // A customer discount (Abraham, Nov 18, 2026) is one more choice: never combined, the bigger saving applies
-  const { discountForOrder, discountCents, discountNote } = await import("@/lib/customer-discounts");
-  const { todayISO } = await import("@/lib/dates");
-  const cd = await discountForOrder(exec as never, Number(o.id), todayISO());
+  const { discountCents, discountNote } = await import("@/lib/customer-discounts");
+  const cd = await customerDiscount();
   if (cd) options.push({ discountCents: discountCents(cd, ls.reduce((t, l) => t + l.qty * l.unitPriceCents, 0)), note: discountNote(cd) });
   if (on(s.offerLaserThirdPackOn)) options.push({ discountCents: laserThirdPackDiscount(ls), note: OFFER_NOTES.laser });
-  if (on(s.offerFourthSundayOn)) options.push({ discountCents: await fourthSundayDiscount(exec, { id: Number(o.id), customerId: o.customer_id ? Number(o.customer_id) : null, eventDate: o.event_date }, ls), note: OFFER_NOTES.fourthSunday });
+  if (on(s.offerFourthSundayOn)) options.push({ discountCents: await fourthSundayDiscount(exec, { id: o.id, customerId: o.customerId, eventDate: o.eventDate }, ls), note: OFFER_NOTES.fourthSunday });
   const best = options.filter((x) => x.discountCents > 0).sort((a, b) => b.discountCents - a.discountCents)[0];
   return best ?? { discountCents: 0, note: null };
 }

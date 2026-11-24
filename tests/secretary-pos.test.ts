@@ -8,7 +8,7 @@ describe("New booking (POS) access", () => {
     expect(auth).toMatch(/export async function requireAdmin\(\) \{[\s\S]*?if \(s\.role === "delivery"\) redirect\("\/admin\/deliveries"\);/);
     expect(readFileSync("src/app/admin/(app)/layout.tsx", "utf8")).toContain("await requireAdmin()"); // guards every admin page, New booking included
     const actions = readFileSync("src/app/admin/(app)/pos/actions.ts", "utf8");
-    expect((actions.match(/await requireAdmin\(\)/g) || []).length).toBe(4); // every server action
+    expect((actions.match(/await requireAdmin\(\)/g) || []).length).toBe(6); // every server action (Nov 24, 2026: the live total and the Directory suggestions too)
     expect(readFileSync("src/components/Sidebar.tsx", "utf8")).toContain('["/admin/pos", PlusCircle, "New booking", OS]');
   });
   it("bookings there use the same shared inventory and whole-rental-day rules as the phone and website", () => {
