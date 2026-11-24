@@ -291,7 +291,7 @@ export const PROMPTS = {
   pound_done: { group: "Checkout", label: "Shared - When you are done, press pound", text: "When you are done, press pound." },
   addr_unit: { group: "Checkout", label: "Address step 3 - unit number", text: "Thanks, with your keypad, please enter the unit number." },
   addr_unit_skip: { group: "Checkout", label: "Address step 3 - no unit, press pound to skip", text: "If there is no unit number, press pound to skip." },
-  addr_zip: { group: "Checkout", label: "Address step 4 - Monroe or a different zip code", text: "To continue with Monroe, New York, one zero nine five zero, press 1. To enter a different zip code, press 2." },
+  addr_zip: { group: "Checkout", label: "Zip menu - all towns press 1 to 7", text: "For Monroe, New York, one zero nine five zero, press 1. For Highland Mills, New York, one zero nine three zero, press 2. For Chester, New York, one zero nine one eight, press 3. For Washingtonville, New York, one zero nine nine two, press 4. For Central Valley, New York, one zero nine one seven, press 5. For Harriman, New York, one zero nine two six, press 6. To enter a different zip code, press 7." },
   addr_zip_enter: { group: "Checkout", label: "Address step 4: enter a zip code", text: "Please enter the 5-digit zip code. When you are finished, please press pound." },
   addr_zip_bad: { group: "Checkout", label: "Address step 4: zip code not valid", text: "The zip code you entered is not valid. Please try again." },
   addr_outside: { group: "Checkout", label: "Address step 5 - outside service area", text: "We are sorry, we do not deliver to this area. We deliver only in Orange County, New York. To enter a different zip code, press 1." },

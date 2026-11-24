@@ -31,6 +31,9 @@ import { getSettings } from "@/lib/settings";
 import { totalsWithFee } from "@/lib/pricing";
 import { deliveryQuote } from "@/lib/delivery-areas";
 import { DEFAULT_ZIP, townForZip } from "@/lib/orange-zips";
+
+/** Zip menu (Abraham, Nov 24, 2026): 1 Monroe, 2 Highland Mills, 3 Chester, 4 Washingtonville, 5 Central Valley, 6 Harriman; 7 = type another zip. */
+export const ZIP_MENU_KEYS: Record<string, string> = { "1": "10950", "2": "10930", "3": "10918", "4": "10992", "5": "10917", "6": "10926" };
 import { nextPiece, placeTracks } from "@/lib/music";
 import { deliveryFeeFor } from "@/lib/offer-delivery";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, termsActive } from "@/lib/rental-terms";
@@ -2966,11 +2969,13 @@ const handlers: Record<string, Handler> = {
   async "addr-zip-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "*") return back(vr, "addr-unit"); // star: one step back
-    if (d === "1") {
-      await updateSession(ctx.callSid, { data: { zip: DEFAULT_ZIP } }, ctx.session);
+    // The zip menu, keys 1 to 7 (Abraham, Nov 24, 2026, matching the approved recording); Blooming Grove uses Monroe 10950
+    const zip = ZIP_MENU_KEYS[d ?? ""];
+    if (zip) {
+      await updateSession(ctx.callSid, { data: { zip } }, ctx.session);
       return back(vr, "addr-check");
     }
-    if (d === "2") return back(vr, "addr-zip-enter");
+    if (d === "7") return back(vr, "addr-zip-enter");
     sp(vr, ctx, "not_valid");
     return back(vr, "addr-zip");
   },

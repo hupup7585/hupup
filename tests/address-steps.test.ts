@@ -68,7 +68,7 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(redirect(await call("addr-unit-heard", { Digits: "*" }))).toBe("ask?f=street");
     expect(redirect(await call("addr-unit-heard", { Digits: "" }))).toBe("addr-zip"); // pound with nothing typed: no unit
     expect(h.session.data.unit).toBeUndefined();
-    expect(said(await call("addr-zip"))).toEqual(["To continue with Monroe, New York, one zero nine five zero, press 1. To enter a different zip code, press 2.", "To go back, press star."]);
+    expect(said(await call("addr-zip"))).toEqual(["For Monroe, New York, one zero nine five zero, press 1. For Highland Mills, New York, one zero nine three zero, press 2. For Chester, New York, one zero nine one eight, press 3. For Washingtonville, New York, one zero nine nine two, press 4. For Central Valley, New York, one zero nine one seven, press 5. For Harriman, New York, one zero nine two six, press 6. To enter a different zip code, press 7.", "To go back, press star."]);
     expect(redirect(await call("addr-zip-choice", { Digits: "*" }))).toBe("addr-unit");
     expect(redirect(await call("addr-zip-choice", { Digits: "1" }))).toBe("addr-check");
     expect(redirect(await call("addr-check"))).toBe("addr-readback");
@@ -119,5 +119,34 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(wordSlotsFor("Monroe New York")).toEqual(["town:monroe_new_york"]);
     const keys = allSlots().map((x) => x.key);
     for (const k of ["addr_rb_intro", "addr_rb_again", "addr_rb_correct", "addr_price#1", "addr_price#2", "addr_saved"]) expect(keys, k).toContain(k);
+  });
+});
+
+describe("zip menu keys 1 to 7 (Abraham, Nov 24, 2026)", () => {
+  it("each key reads back its own town, state and zip; 7 types another zip; star goes back to the unit step", async () => {
+    const words = (z: string) => z.split("").map((d) => ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][Number(d)]).join(" ");
+    const keys: [string, string, string][] = [
+      ["1", "Monroe", "10950"],
+      ["2", "Highland Mills", "10930"],
+      ["3", "Chester", "10918"],
+      ["4", "Washingtonville", "10992"],
+      ["5", "Central Valley", "10917"],
+      ["6", "Harriman", "10926"],
+    ];
+    for (const [key, town, zip] of keys) {
+      h.session.data = { name: "Sara Klein", house: "12", street: "Forest Road" };
+      expect(redirect(await call("addr-zip-choice", { Digits: key }))).toBe("addr-check");
+      expect(h.session.data.zip).toBe(zip);
+      expect(redirect(await call("addr-check"))).toBe("addr-readback");
+      expect(h.session.data.address).toBe(`12 Forest Road, ${town}, NY ${zip}`);
+      const rb = said(await call("addr-readback"));
+      expect(rb).toContain(`${town} New York`);
+      expect(rb).toContain(words(zip));
+    }
+    expect(redirect(await call("addr-zip-choice", { Digits: "7" }))).toBe("addr-zip-enter");
+    expect(redirect(await call("addr-zip-choice", { Digits: "*" }))).toBe("addr-unit");
+    const bad = await call("addr-zip-choice", { Digits: "8" });
+    expect(said(bad)).toEqual(["Sorry, that is not a valid selection."]);
+    expect(redirect(bad)).toBe("addr-zip");
   });
 });
