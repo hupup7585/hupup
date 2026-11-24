@@ -1,6 +1,6 @@
 import { paymentsClosedLine } from "@/lib/payments-closed";
 import { notFound, redirect } from "next/navigation";
-import { paymentLink } from "@/lib/sola";
+import { PAYMENT_UNAVAILABLE, onlinePaymentReady, paymentLink } from "@/lib/sola";
 import { getPaymentGroup, orderNumber } from "@/lib/orders";
 import { ensureGroupPriced } from "@/lib/order-pricing";
 import { termsActive, verifyPayToken } from "@/lib/rental-terms";
@@ -35,6 +35,15 @@ export default async function PayPage({ params, searchParams }: { params: Promis
         </div>
       </main>
     );
+  // Nov 24, 2026: no online payment without the Sola page name; never a link that skips the card step
+  if (before.due > 0 && !onlinePaymentReady())
+    return (
+      <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">
+        <div className="mx-auto max-w-md rounded-2xl border-2 border-hu-deep bg-white p-6 text-center" data-payment-unavailable>
+          <h1 className="text-2xl font-extrabold">{PAYMENT_UNAVAILABLE}</h1>
+        </div>
+      </main>
+    );
   // The link rule (Abraham, Nov 13, 2026; preview until he approves the wording)
   const rules = linkRulesActive();
   if (rules && before.orders.some((d) => holdEnded(d.order))) {
@@ -64,7 +73,8 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   // Live site while the Terms are still a draft: no Terms box, straight to the secure payment page (as before)
   if (!termsActive() && o.status === "PENDING_PAYMENT" && due > 0) {
     if (rules) await holdForCardPage(group.orders.map((d) => d.order.id)); // straight to the card page: 10 minutes there
-    redirect(paymentLink({ orderId: o.id, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone: full.customer?.phone }));
+    const link = paymentLink({ orderId: o.id, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone: full.customer?.phone });
+    if (link) redirect(link);
   }
   return (
     <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">

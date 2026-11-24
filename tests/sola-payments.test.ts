@@ -52,11 +52,15 @@ describe("the link charges items + delivery + tax", () => {
     const o = await order(orderId);
     expect([o.deliveryFeeCents, o.taxCents, o.totalCents]).toEqual([1500, 1747, 23247]);
     process.env.SOLA_PAYMENTSITE_NAME = "hupupattractions";
-    const link = new URL(paymentLink({ orderId, amountCents: o.totalCents! }));
+    const link = new URL(paymentLink({ orderId, amountCents: o.totalCents! })!);
     expect(link.host).toBe("secure.cardknox.com");
     expect(link.searchParams.get("xAmount")).toBe("232.47");
     expect(link.searchParams.get("xInvoice")).toBe(invoiceFor(orderId));
     delete process.env.SOLA_PAYMENTSITE_NAME;
+    // Nov 24, 2026: on Vercel (preview or production) a missing page name means no link at all, never the test link
+    process.env.VERCEL = "1";
+    expect(paymentLink({ orderId, amountCents: o.totalCents! })).toBeNull();
+    delete process.env.VERCEL;
   });
   it("no link for an address outside the delivery area (it couldn't include delivery and tax)", async () => {
     const [o] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "POS", eventDate: "2026-12-20", pickupDate: "2026-12-21", deliveryAddress: "5 Main St, Albany", subtotalCents: 10000 }).returning();
@@ -107,3 +111,24 @@ describe("no card digits on our side", () => {
     expect(execSync("grep -rlE 'vr\\.pay\\(|\\.pay\\(\\{' src || true").toString().trim()).toBe("src/lib/stripe-pay-voice.ts");
   });
 });
+
+describe("no fake payment on the live site (Nov 24, 2026)", () => {
+  it("the test link only on a developer's own computer; the missing settings are named for Admin", async () => {
+    const { devPaymentFallbackAllowed, onlinePaymentReady, solaMissing, PAYMENT_UNAVAILABLE } = await import("@/lib/sola");
+    expect(PAYMENT_UNAVAILABLE).toBe("Online payment is not available right now. Please call us.");
+    expect(devPaymentFallbackAllowed({ VERCEL: "1", NODE_ENV: "production" })).toBe(false);
+    expect(devPaymentFallbackAllowed({ NODE_ENV: "production" })).toBe(false);
+    expect(devPaymentFallbackAllowed({ NODE_ENV: "development" })).toBe(true);
+    expect(onlinePaymentReady({ VERCEL: "1", NODE_ENV: "production" })).toBe(false);
+    expect(onlinePaymentReady({ VERCEL: "1", NODE_ENV: "production", SOLA_PAYMENTSITE_NAME: "hupup" })).toBe(true);
+    expect(solaMissing({})).toEqual(["SOLA_PAYMENTSITE_NAME", "SOLA_WEBHOOK_PIN"]);
+    expect(solaMissing({ SOLA_PAYMENTSITE_NAME: "x", SOLA_WEBHOOK_PIN: "y" })).toEqual([]);
+  });
+  it("the webhook marks nothing paid without SOLA_WEBHOOK_PIN", async () => {
+    delete process.env.SOLA_WEBHOOK_PIN;
+    const { POST } = await import("@/app/api/sola/webhook/route");
+    const r = await POST(new Request("https://x/api/sola/webhook", { method: "POST", body: "xResult=A&xInvoice=HU-1001&xAmount=10.00&xRefNum=1" }));
+    expect(r.status).toBe(503);
+  });
+});
+

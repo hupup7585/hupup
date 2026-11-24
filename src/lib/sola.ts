@@ -27,13 +27,31 @@ export function orderIdFromInvoice(invoice: string | null | undefined): number |
   return id > 0 ? id : null;
 }
 
+/** What the customer sees when online payment is off (Nov 24, 2026). */
+export const PAYMENT_UNAVAILABLE = "Online payment is not available right now. Please call us.";
+
+/**
+ * The test fallback (/paid?dev=1, no card step) only on a developer's own computer, never on Vercel (preview or
+ * production): there it once let customers skip the card step (Nov 24, 2026).
+ */
+export const devPaymentFallbackAllowed = (env: Record<string, string | undefined> = process.env) => !env.VERCEL && env.NODE_ENV !== "production";
+
+/** Online card payment can be offered: the Sola page name is set (or a developer's own computer). */
+export const onlinePaymentReady = (env: Record<string, string | undefined> = process.env) => Boolean(env.SOLA_PAYMENTSITE_NAME) || devPaymentFallbackAllowed(env);
+
+/** The Sola settings that are missing, for the red warning in Admin. */
+export function solaMissing(env: Record<string, string | undefined> = process.env): string[] {
+  return [!env.SOLA_PAYMENTSITE_NAME && "SOLA_PAYMENTSITE_NAME", !env.SOLA_WEBHOOK_PIN && "SOLA_WEBHOOK_PIN"].filter(Boolean) as string[];
+}
+
+/** The secure Sola card page for this amount and invoice; null when online payment is not set up (never a fake link). */
 export function paymentLink(o: {
   orderId: number;
   amountCents: number;
   name?: string | null;
   email?: string | null;
   phone?: string | null;
-}): string {
+}): string | null {
   const site = process.env.SOLA_PAYMENTSITE_NAME;
   const params = new URLSearchParams({
     xAmount: (o.amountCents / 100).toFixed(2),
@@ -44,7 +62,11 @@ export function paymentLink(o: {
   if (o.phone) params.set("xBillPhone", o.phone);
   params.set("xRedirectURL", `${config.baseUrl()}/paid?invoice=${invoiceFor(o.orderId)}`);
   if (!site) {
-    // Dev fallback so the flow can be tested without a Sola account.
+    if (!devPaymentFallbackAllowed()) {
+      console.error(`[sola] SOLA_PAYMENTSITE_NAME is not set: no payment link for ${invoiceFor(o.orderId)}`);
+      return null;
+    }
+    // Dev fallback on a developer's computer only, so the flow can be tested without a Sola account.
     return `${config.baseUrl()}/paid?invoice=${invoiceFor(o.orderId)}&dev=1`;
   }
   return `https://secure.cardknox.com/${encodeURIComponent(site)}?${params.toString()}`;

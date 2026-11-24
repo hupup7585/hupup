@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { config } from "@/lib/config";
 import { getPaymentGroup } from "@/lib/orders";
 import { ensureGroupPriced } from "@/lib/order-pricing";
-import { paymentLink } from "@/lib/sola";
+import { PAYMENT_UNAVAILABLE, onlinePaymentReady, paymentLink } from "@/lib/sola";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, verifyPayToken } from "@/lib/rental-terms";
 import { TERMS_TEXT } from "@/lib/terms-content";
 import { PAY_AGREE_LABEL } from "./label";
@@ -22,6 +22,8 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
   }
   if (!verifyPayToken(orderId, token)) return { error: "This payment link is not valid. Please call us." };
   if (!agreed) return { error: "Please check the box to agree to the Terms and Conditions before paying." };
+  // Nov 24, 2026: no online payment without the Sola page name (never the test link on the live site)
+  if (!onlinePaymentReady()) return { error: PAYMENT_UNAVAILABLE };
   // One charge for every rental day booked together (payment group)
   const pre = await getPaymentGroup(orderId);
   if (!pre) return { error: "Order not found." };
@@ -64,7 +66,9 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
   });
   // 10 minutes to finish on the secure card page (Sola can't tell us about typing there)
   if (linkRulesActive()) await holdForCardPage(group.orders.map((d) => d.order.id));
-  redirect(paymentLink({ orderId: full.order.id, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone: full.customer?.phone }));
+  const link = paymentLink({ orderId: full.order.id, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone: full.customer?.phone });
+  if (!link) return { error: PAYMENT_UNAVAILABLE };
+  redirect(link);
 }
 
 /** Expired link: "Check availability again". Free items are held again; taken ones get their nearest options. */

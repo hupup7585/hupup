@@ -21,6 +21,7 @@ import { callAnalytics } from "@/lib/call-analytics";
 import CallsCard from "./CallsCard";
 import JourneyCard from "./JourneyCard";
 import { journeyStats } from "@/lib/call-journey";
+import { solaMissing } from "@/lib/sola";
 
 const RANGES = { week: "This week", month: "This month", year: "This year" } as const;
 type Range = keyof typeof RANGES;
@@ -54,6 +55,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     safeSection("caller journeys", journeyStats(range === "week" ? 7 : range === "year" ? 365 : 30)),
   ]);
   const thisWeek = startOfWeek(today);
+  const solaGaps = solaMissing();
   const maxWeek = Math.max(1, ...weeks.map((w) => Math.max(w.phone, w.pos)));
   const maxBoard = Math.max(1, ...board.map((b) => b.cents));
   const phone = split.find((s) => s.channel === "PHONE");
@@ -61,6 +63,17 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
   return (
     <div className="mx-auto max-w-7xl" data-dashboard>
+      {solaGaps.length > 0 && (
+        // Nov 24, 2026: online payments off until both Sola settings are in Vercel
+        <div role="alert" className="mb-4 rounded-xl border-2 border-[#b3261e] bg-[#ffe6e4] p-4 text-[#b3261e]" data-sola-warning>
+          <p className="font-black">Online card payments are off.</p>
+          <p className="mt-1 text-sm font-semibold">
+            Missing in Vercel: {solaGaps.join(" and ")}.
+            {solaGaps.includes("SOLA_PAYMENTSITE_NAME") ? " Customers see \u201cOnline payment is not available right now. Please call us.\u201d instead of the card page." : ""}
+            {solaGaps.includes("SOLA_WEBHOOK_PIN") ? " No order is marked paid from Sola until the PIN is added." : ""}
+          </p>
+        </div>
+      )}
       <SearchBar />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <StaffGreeting staff={staff} />

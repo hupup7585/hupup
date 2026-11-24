@@ -13,6 +13,9 @@ export default async function Paid({ searchParams }: { searchParams: Promise<Rec
   const sp = await searchParams;
   const invoice = sp.invoice || sp.xInvoice;
   const declined = sp.xResult && sp.xResult !== "A";
+  // Nov 24, 2026: the old test link (dev=1, no card step) on the live site never says thank you
+  const { devPaymentFallbackAllowed, PAYMENT_UNAVAILABLE } = await import("@/lib/sola");
+  const devLink = sp.dev === "1" && !devPaymentFallbackAllowed();
   return (
     <main className="grid min-h-screen place-items-center bg-[#8CCBFF] px-4 py-10" data-paid-page>
       <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white text-center shadow-2xl ring-1 ring-black/5">
@@ -22,7 +25,12 @@ export default async function Paid({ searchParams }: { searchParams: Promise<Rec
         </div>
         <div className="h-1.5 bg-[#FFD84D]" aria-hidden />
         <div className="px-8 pb-8 pt-6 text-[#123D73]">
-          {declined ? (
+          {devLink ? (
+            <>
+              <h1 className="text-2xl font-black" data-payment-unavailable>{PAYMENT_UNAVAILABLE}</h1>
+              <p className="mt-2">{config.hotlineDisplay}</p>
+            </>
+          ) : declined ? (
             <>
               <h1 className="text-2xl font-black">Payment did not go through</h1>
               <p className="mt-2">Please try the link again, or call us at {config.hotlineDisplay}.</p>
