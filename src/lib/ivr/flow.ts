@@ -3324,6 +3324,17 @@ const handlers: Record<string, Handler> = {
     }
     if (!data.name || !data.address) return back(vr, "ask", { f: !data.name ? "name" : "address" });
     if (termsActive() && !data.termsAccepted) return back(vr, "terms"); // off on live until the final Terms are in
+    // Audit C2 (Nov 24, 2026): a hold may have run out while the caller answered; every line is checked again, locked.
+    // A line someone else booked in the meantime is taken out of the cart and the caller hears the item-taken screen.
+    {
+      const { recheckHolds } = await import("@/lib/orders");
+      const taken = await recheckHolds(days.map((d) => d.order.id));
+      if (taken.length) {
+        const t = taken[0];
+        await track(ctx.callSid, "unavailable", `At checkout: ${taken.length === 1 ? "an item" : `${taken.length} items`} in the cart had been booked by someone else`, { taken });
+        return back(vr, "booked", { p: t.productId, d: t.eventDate });
+      }
+    }
     // No email in the booking (Abraham, Nov 17, 2026): it is asked only for a payment link by email (box 145)
     const caller = ctx.session?.fromNumber ?? ctx.from;
     const settings = await getSettings();
@@ -4495,6 +4506,11 @@ export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Prom
   if (!session && ctx.action !== "incoming") await ensureSession(ctx.callSid, ctx.from);
   // Caller journey (Abraham S): this menu or question, with the key pressed or the words said
   await trackStep(ctx.callSid, ctx.action, ctx.body, ctx.query);
+  // Audit C2: every step keeps every day of the cart held (only holds that are still active)
+  if (session?.data?.dayOrderIds?.length || session?.orderId) {
+    const { keepCartHeld } = await import("@/lib/orders");
+    await keepCartHeld([...new Set([...(session.data?.dayOrderIds ?? []), ...(session.orderId ? [session.orderId] : [])])]).catch((e) => console.error("[keep cart held]", e));
+  }
   // Abraham's idle rule inside a booking: remember when the caller last pressed a key (or said something)
   let current = session;
   if ((ctx.body.Digits || (ctx.body.SpeechResult || "").trim()) && current) {

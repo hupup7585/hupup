@@ -377,6 +377,53 @@ export async function markPaid(orderId: number, cents: number, method: string, r
   return updated;
 }
 
+/**
+ * Before a held phone cart becomes PENDING_PAYMENT (Audit C2, Nov 24, 2026): one locked transaction that re-checks
+ * every line, the same locks as reserveInTx (stock group, then product, in id order). The cart's own holds are taken out
+ * of the count, then put back day by day, so an expired hold whose unit someone else booked is caught. A taken line is
+ * removed from the cart (never charged); the taken lines are returned. Holds that pass are renewed.
+ */
+export async function recheckHolds(orderIds: number[]): Promise<{ orderId: number; productId: number; eventDate: string; qty: number }[]> {
+  if (!orderIds.length) return [];
+  return db.transaction(async (tx) => {
+    const ords = (await tx.select().from(orders).where(and(inArray(orders.id, orderIds), eq(orders.status, "HOLD")))).sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.id - b.id);
+    if (!ords.length) return [];
+    const lines = await tx.select().from(orderItems).where(inArray(orderItems.orderId, ords.map((o) => o.id)));
+    for (const pid of [...new Set(lines.map((l) => l.productId))].sort((a, b) => a - b)) {
+      await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${pid}) ORDER BY id FOR UPDATE`);
+      await tx.execute(sql`SELECT id FROM products WHERE id = ${pid} FOR UPDATE`);
+    }
+    // Out of the count while checked (now() is the transaction's start time)
+    await tx.update(orders).set({ holdExpiresAt: sql`now() - interval '1 second'` }).where(inArray(orders.id, ords.map((o) => o.id)));
+    const taken: { orderId: number; productId: number; eventDate: string; qty: number }[] = [];
+    for (const o of ords) {
+      let removed = false;
+      for (const l of lines.filter((x) => x.orderId === o.id).sort((a, b) => a.productId - b.productId)) {
+        const [p] = await tx.select({ quantity: products.quantity }).from(products).where(eq(products.id, l.productId));
+        const free = p ? await checkBookable(l.productId, p.quantity, o.eventDate, tx, o.pickupDate) : 0;
+        if (free < l.qty) {
+          taken.push({ orderId: o.id, productId: l.productId, eventDate: o.eventDate, qty: l.qty });
+          await tx.delete(orderItems).where(eq(orderItems.id, l.id));
+          removed = true;
+        }
+      }
+      if (removed) await recalcSubtotal(tx, o.id);
+      // Back in the count before the next day is checked
+      await tx.update(orders).set({ holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES) }).where(eq(orders.id, o.id));
+    }
+    return taken;
+  });
+}
+
+/** Keeps every day of the caller's cart held while they keep going (Audit C2): only holds still active are renewed. */
+export async function keepCartHeld(orderIds: number[]) {
+  if (!orderIds.length) return;
+  await db
+    .update(orders)
+    .set({ holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES) })
+    .where(and(inArray(orders.id, orderIds), eq(orders.status, "HOLD"), sql`${orders.holdExpiresAt} > now()`));
+}
+
 /** Owner email: a payment for less than the order's total (Audit C1, Nov 24, 2026). */
 async function underpaidAlert(orderId: number, paidCents: number, owedCents: number, method: string, ref: string | null) {
   const { config, BUSINESS_NAME } = await import("@/lib/config");

@@ -54,4 +54,41 @@ describe.skipIf(!hasDb)("reservations (Postgres)", async () => {
       expect(o.status).toBe("CANCELLED");
     }
   });
+
+  it("Audit C2: an expired cart hold whose unit someone else booked is caught at checkout, never booked twice", async () => {
+    const { createOrderWithItems, recheckHolds, keepCartHeld } = await import("@/lib/orders");
+    const date = "2027-04-14";
+    // The first caller's cart: its hold ran out a minute ago
+    const a = await reserveItem({ productId, qty: 1, eventDate: date, channel: "PHONE", status: "HOLD", holdExpiresAt: new Date(Date.now() - 60_000) });
+    expect(a.ok).toBe(true);
+    if (!a.ok) return;
+    created.push(a.orderId);
+    // keepCartHeld never brings an expired hold back
+    await keepCartHeld([a.orderId]);
+    const [stillExpired] = await db.select().from(schema.orders).where(eq(schema.orders.id, a.orderId));
+    expect(stillExpired.holdExpiresAt!.getTime()).toBeLessThan(Date.now());
+    // Someone else books the same unit (allowed: the hold had run out)
+    const b = await createOrderWithItems({ items: [{ productId, qty: 1 }], eventDate: date, channel: "POS", status: "CONFIRMED" });
+    expect(b.ok).toBe(true);
+    if (b.ok) created.push(b.orderId);
+    // The first caller reaches checkout: the line is caught and taken out of the cart
+    const taken = await recheckHolds([a.orderId]);
+    expect(taken).toEqual([{ orderId: a.orderId, productId, eventDate: date, qty: 1 }]);
+    const lines = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, a.orderId));
+    expect(lines).toHaveLength(0); // nothing left to charge
+    expect(await checkBookable(productId, 1, date)).toBe(0); // only the second booking holds the unit
+  });
+
+  it("Audit C2: a hold still free passes the check and is renewed", async () => {
+    const { recheckHolds } = await import("@/lib/orders");
+    const date = "2027-05-12";
+    const a = await reserveItem({ productId, qty: 1, eventDate: date, channel: "PHONE", status: "HOLD", holdExpiresAt: new Date(Date.now() - 60_000) });
+    expect(a.ok).toBe(true);
+    if (!a.ok) return;
+    created.push(a.orderId);
+    expect(await recheckHolds([a.orderId])).toEqual([]);
+    const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, a.orderId));
+    expect(o.holdExpiresAt!.getTime()).toBeGreaterThan(Date.now());
+  });
 });
+
