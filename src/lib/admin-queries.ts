@@ -122,9 +122,14 @@ export async function listOrders(f: { q?: string; status?: string; from?: string
   if (f.to) conds.push(sql`o.event_date <= ${f.to}::date`);
   if (f.q) {
     const like = `%${f.q.trim()}%`;
-    const num = Number(f.q.replace(/\D/g, ""));
+    const digits = f.q.replace(/\D/g, "");
+    // An order number (up to 7 digits) only; a 10-digit phone number used to overflow the id and crash the page
+    const orderNo = digits.length >= 1 && digits.length <= 7 ? Number(digits) - 1000 : 0;
+    // A phone number however it is typed: 8457990925, 845-799-0925, (845) 799-0925, 7990925 (Admin bugs 1 and 7, Nov 24, 2026)
+    const phoneDigits = digits.length >= 4 ? digits.replace(/^1(?=\d{10}$)/, "") : "";
     conds.push(sql`(c.name ILIKE ${like} OR c.phone ILIKE ${like} OR o.delivery_address ILIKE ${like}
-      ${num ? sql`OR o.id = ${num - 1000}` : sql``})`);
+      ${phoneDigits ? sql`OR regexp_replace(coalesce(c.phone, ''), '\D', '', 'g') LIKE ${`%${phoneDigits}%`}` : sql``}
+      ${orderNo > 0 ? sql`OR o.id = ${orderNo}` : sql``})`);
   }
   const where = sql.join(conds.map((c) => sql`(${c})`), sql` AND `);
   return rows<OrderListRow>(sql`
@@ -137,6 +142,15 @@ export async function listOrders(f: { q?: string; status?: string; from?: string
     WHERE ${where}
     ORDER BY o.event_date DESC, o.id DESC
     LIMIT ${f.limit ?? 200}`);
+}
+
+/** How many abandoned phone carts (cancelled, never given a customer) "All" leaves out (Admin bug 2, Nov 24, 2026). */
+export async function abandonedCartCount(f: { from?: string; to?: string }) {
+  const conds = [sql`o.status = 'CANCELLED' AND o.customer_id IS NULL`];
+  if (f.from) conds.push(sql`o.event_date >= ${f.from}::date`);
+  if (f.to) conds.push(sql`o.event_date <= ${f.to}::date`);
+  const r = await rows<{ n: number }>(sql`SELECT count(*)::int AS n FROM orders o WHERE ${sql.join(conds.map((c) => sql`(${c})`), sql` AND `)}`);
+  return Number(r[0]?.n ?? 0);
 }
 
 export async function runsForDay(day: string) {

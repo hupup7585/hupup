@@ -1,7 +1,7 @@
 import { paymentResultLabel } from "@/lib/payment-result";
 import { Download } from "lucide-react";
 import Link from "next/link";
-import { listOrders } from "@/lib/admin-queries";
+import { abandonedCartCount, listOrders } from "@/lib/admin-queries";
 import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { orderNumber } from "@/lib/orders";
@@ -15,7 +15,10 @@ export default async function OrdersPage({
   searchParams: Promise<{ q?: string; status?: string; from?: string; to?: string }>;
 }) {
   const sp = await searchParams;
-  const list = await listOrders({ q: sp.q, status: sp.status || "ALL", from: sp.from, to: sp.to });
+  const status = sp.status || "ALL";
+  const list = await listOrders({ q: sp.q, status, from: sp.from, to: sp.to });
+  // Admin bugs 2 and 12 (Nov 24, 2026): the count, and how many abandoned phone carts "All" leaves out
+  const hidden = status === "ALL" && !sp.q ? await abandonedCartCount({ from: sp.from, to: sp.to }) : 0;
   const csv = new URLSearchParams(Object.entries(sp).filter(([, v]) => v) as [string, string][]).toString();
   return (
     <div className="mx-auto max-w-7xl">
@@ -39,6 +42,10 @@ export default async function OrdersPage({
         <input type="date" name="to" defaultValue={sp.to} className="input" aria-label="To event date" />
         <button className="btn-dark">Filter</button>
       </form>
+      <p className="mb-2 text-sm text-muted" data-order-count>
+        <b className="text-navy">{list.length}</b> {list.length === 1 ? "order" : "orders"}
+        {hidden > 0 && <> · {hidden} abandoned phone {hidden === 1 ? "cart" : "carts"} not shown (cancelled before a customer was given; choose Cancelled to see them)</>}
+      </p>
       <div className="card overflow-x-auto p-4">
         <table className="w-full min-w-[860px] text-sm">
           <thead>
