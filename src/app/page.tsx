@@ -154,7 +154,7 @@ export default async function Home() {
                 </article>
               ))}
             </div>
-            {/* Text CATALOG and Email me the catalog (Abraham, Nov 18, 2026): preview first, live after his OK. On preview the
+            {/* Email me the catalog (Abraham, Nov 18, 2026): preview first, live after his OK. On preview the
                 whole catalog part is one formal white card (Catalog Section Design, Nov 18, 2026); the wording is unchanged. */}
             {websiteCatalogFormShown() ? (
               <div data-catalog-card className="mt-8 rounded-xl border border-[#BFE0FF] bg-[#EEF7FF] p-5 text-hu-deep shadow-[0_2px_8px_rgba(18,61,115,0.08)] sm:p-7">

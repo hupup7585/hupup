@@ -16,7 +16,7 @@ vi.mock("@/lib/catalog-send", async (orig) => ({
 }));
 
 import { requestCatalogAction, textCatalogAction } from "@/app/catalog-actions";
-import { CATALOG_EMAIL_BUTTON, CATALOG_TEXT_LINE, websiteCatalogFormShown } from "@/lib/catalog-request";
+import { CATALOG_EMAIL_BUTTON, websiteCatalogFormShown } from "@/lib/catalog-request";
 
 const form = (o: Record<string, string>) => {
   const f = new FormData();
@@ -26,7 +26,8 @@ const form = (o: Record<string, string>) => {
 
 describe("website catalog request", () => {
   it("approved wording; live since Abraham approved the card (Nov 19, 2026)", () => {
-    expect(`${CATALOG_TEXT_LINE.before}${CATALOG_TEXT_LINE.phone}${CATALOG_TEXT_LINE.after}`).toBe("Or text CATALOG to (845) 415-7585.");
+    // Abraham, Nov 24, 2026: the "Or text CATALOG to (845) 415-7585." line is gone everywhere; the email box stays
+    for (const f of ["src/components/site/CatalogRequest.tsx", "src/lib/catalog-request-copy.ts", "src/app/page.tsx"]) expect(readFileSync(f, "utf8"), f).not.toMatch(/text CATALOG|body=CATALOG/i);
     expect(CATALOG_EMAIL_BUTTON).toBe("Email me the catalog");
     expect(websiteCatalogFormShown({ VERCEL_ENV: "production" })).toBe(true);
     expect(websiteCatalogFormShown({ VERCEL_ENV: "preview" })).toBe(true);

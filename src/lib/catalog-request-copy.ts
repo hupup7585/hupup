@@ -1,5 +1,4 @@
 /* Website catalog request wording (Abraham, Nov 18, 2026). No server code here: the page form imports it. */
-export const CATALOG_TEXT_LINE = { before: "Or text CATALOG to ", phone: "(845) 415-7585", sms: "+18454157585", after: "." };
 export const CATALOG_EMAIL_BUTTON = "Email me the catalog";
 /** Draft (Abraham, Nov 18, 2026: "an option to receive it by text from our website"), waiting for his OK. */
 export const CATALOG_TEXT_BUTTON = "Text me the catalog";

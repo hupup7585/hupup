@@ -109,11 +109,11 @@ describe("only the app answers these; exactly one reply", () => {
     await withOrderTexts(p);
     expect(await repliesTo(p, "JOIN")).toBe(1);
   });
-  it("CATALOG: only the catalog (Abraham, Nov 18, 2026: the first text, then each catalog photo as its own message)", async () => {
+  it("CATALOG: no reply at all (Abraham, Nov 24, 2026: a normal message for the staff inbox)", async () => {
     const { saveSetting } = await import("@/lib/settings");
     await saveSetting("catalogTextItems", JSON.stringify([{ photo: "/api/catalog-photo/catalog/text/a.jpg", text: "" }]));
     const p = fresh();
     await withOrderTexts(p);
-    expect(await repliesTo(p, "CATALOG")).toBe(2);
+    expect(await repliesTo(p, "CATALOG")).toBe(0);
   });
 });

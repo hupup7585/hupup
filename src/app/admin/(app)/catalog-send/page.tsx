@@ -18,7 +18,7 @@ export default async function CatalogSendPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="text-2xl font-black sm:text-3xl">Catalog email &amp; text</h1>
-      <p className="mb-5 mt-1 text-muted">What a caller gets after asking for the catalog (phone key 8, or texting CATALOG): the PDF by email, the pictures by text.</p>
+      <p className="mb-5 mt-1 text-muted">What a caller gets after asking for the catalog (phone key 8): the PDF by email, the pictures by text.</p>
       <CatalogPdf
         current={
           pdf

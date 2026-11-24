@@ -7,7 +7,6 @@ import { emailIncomingText } from "@/lib/owner-alerts";
 import { cancelQueuedMessages, cancelQueuedPromotions, sendMessage } from "@/lib/sms";
 import { TRANSACTIONAL_CONFIRMATION_SMS } from "@/lib/sms-consent";
 import { PROMO_ENROLLED_SMS, promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
-import { isCatalogText, replyToCatalogText } from "@/lib/catalog-send";
 import { cancelPendingReenroll, handleStart, handleYes, requestPromoConfirmation } from "@/lib/sms-reenroll";
 
 export const STOP_WORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "REVOKE", "OPTOUT"];
@@ -196,14 +195,7 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
   if (effects.sendPromoEnrolled && customer)
     await sendMessage({ to: from, body: PROMO_ENROLLED_SMS, kind: "system", event: "consent_confirmation", customerId: customer.id });
 
-  // Section 18: CATALOG gets the catalog text back (not active until Twilio approves texting; never a promo sign-up)
-  if (!keyword && isCatalogText(text)) {
-    await replyToCatalogText(from, {
-      optedOut: Boolean(customer?.smsOptOut),
-      // The person asked for it: the same kind as key 8's catalog text (never needs order consent; never after STOP)
-      send: (to, b, media) => sendMessage({ to, body: b, ...(media?.length ? { mediaUrls: media } : {}), kind: "system", event: "catalog_reply", customerId: customer?.id }),
-    }).catch((e) => console.error("catalog text reply failed", e));
-  }
+  // Texting CATALOG no longer sends the catalog (Abraham, Nov 24, 2026): it is a normal message in the staff inbox
 
   // Forward a copy to the owner (not for STOP/START, which Twilio handles, and not the owner's own texts).
   let forwarded = false;

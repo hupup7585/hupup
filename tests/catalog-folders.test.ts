@@ -44,6 +44,6 @@ describe("texts", () => {
     expect((await listThreads(undefined, 200, "catalog")).map((t) => t.contact_phone)).toEqual(["+18455550101"]);
     expect((await listThreads(undefined, 200, "conversations")).map((t) => t.contact_phone).sort()).toEqual(["+18455550102", "+18455550103"]);
     expect((await listThreads(undefined, 200, "all")).length).toBe(3);
-    expect(await unreadTexts()).toBe(2); // the two real texts; the CATALOG texts are not counted
+    expect(await unreadTexts()).toBe(3); // Nov 24, 2026: only a CATALOG text that got the old automatic reply is not counted
   });
 });

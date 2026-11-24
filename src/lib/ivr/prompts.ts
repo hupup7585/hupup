@@ -630,7 +630,7 @@ export const PROMPTS = {
   staff_whisper_no_number: { group: "Ringing staff", label: "Staff hear when they answer (Schools and Corporate, no extension number)", text: "Call from Hup Up Attractions, {name} extension. Press 1 to accept, or press 2 to reject.", vars: ["name"] },
 
   // Texts and emails the phone system sends (Abraham, Nov 13, 2026: every word on this page)
-  msg_catalog_text: { group: "Texts and emails", message: true, label: "Catalog by text (key 8 and texting CATALOG)", text: "Hup Up Attractions: Here is our {Catalog Name}! You can call us anytime to book with our automated system at (845) 777-7585 Ext. 1." }, // approved Nov 18, 2026; {Catalog Name} from Admin, Catalog email & text
+  msg_catalog_text: { group: "Texts and emails", message: true, label: "Catalog by text (key 8 and Admin)", text: "Hup Up Attractions: Here is our {Catalog Name}! You can call us anytime to book with our automated system at (845) 777-7585 Ext. 1." }, // approved Nov 18, 2026; {Catalog Name} from Admin, Catalog email & text
   msg_catalog_email_subject: { group: "Texts and emails", message: true, label: "Catalog email: subject (key 8 and info@ Catalog)", text: "Hup Up Attractions catalog" },
   msg_catalog_email_top: { group: "Texts and emails", message: true, label: "Catalog email: before the list of rentals", text: "Thank you for your interest in Hup Up Attractions!\n\nHere is our catalog:" },
   msg_catalog_email_bottom: { group: "Texts and emails", message: true, label: "Catalog email: after the list of rentals", text: "See our rentals: hupupattractions.com/#rentals\nTo book, call (845) 777-7585." },

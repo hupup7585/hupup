@@ -24,6 +24,7 @@ export async function listThreads(q?: string, limit = 200, view: ThreadView = "a
     EXISTS (SELECT 1 FROM messages m2 WHERE m2.contact_phone = l.contact_phone AND m2.direction = 'in' AND ${CATALOG_TEXT})
     AND NOT EXISTS (SELECT 1 FROM messages m2 WHERE m2.contact_phone = l.contact_phone AND m2.direction = 'in' AND NOT (${CATALOG_TEXT}))
     AND NOT EXISTS (SELECT 1 FROM messages m2 WHERE m2.contact_phone = l.contact_phone AND m2.direction = 'out' AND coalesce(m2.event, '') <> 'catalog_reply')
+    AND EXISTS (SELECT 1 FROM messages m2 WHERE m2.contact_phone = l.contact_phone AND m2.direction = 'out' AND m2.event = 'catalog_reply')
   )`;
   const viewWhere = view === "catalog" ? catalogOnly : view === "conversations" ? sql`NOT ${catalogOnly}` : sql`true`;
   const r = await db.execute(sql`
@@ -84,7 +85,8 @@ export async function unreadTexts() {
     .select({ n: sql<number>`count(*)::int` })
     .from(schema.messages)
     // Catalog-only texts (CATALOG) have their own tab and are not counted here (Abraham, Nov 19, 2026)
-    .where(and(eq(schema.messages.direction, "in"), isNull(schema.messages.readAt), sql`NOT (regexp_replace(lower(coalesce(${schema.messages.body}, '')), '[^a-z]', '', 'g') IN ('catalog', 'catalogue') AND jsonb_array_length(${schema.messages.mediaUrls}) = 0)`));
+    // Nov 24, 2026: only numbers that got the old automatic catalog reply; a CATALOG text now is a normal message
+    .where(and(eq(schema.messages.direction, "in"), isNull(schema.messages.readAt), sql`NOT (regexp_replace(lower(coalesce(${schema.messages.body}, '')), '[^a-z]', '', 'g') IN ('catalog', 'catalogue') AND jsonb_array_length(${schema.messages.mediaUrls}) = 0 AND EXISTS (SELECT 1 FROM messages r WHERE r.contact_phone = ${schema.messages.contactPhone} AND r.direction = 'out' AND r.event = 'catalog_reply'))`));
   return r?.n ?? 0;
 }
 

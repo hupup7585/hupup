@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-/* Texting CATALOG gets the catalog (Abraham, Nov 18, 2026: "It's not sending catalog texts by request"). In-memory database. */
+/* Texting CATALOG no longer sends the catalog (Abraham, Nov 24, 2026); the catalog text itself still works. In-memory database. */
 vi.mock("@/lib/db", async () => {
   const { createMemoryDb } = await import("./helpers/memory-db");
   const m = await createMemoryDb();
@@ -18,29 +18,27 @@ beforeAll(async () => {
 });
 
 describe("CATALOG by text", () => {
-  it("a new number with no booking-text consent still gets the catalog reply (it asked for it), first text with the approved wording", async () => {
+  it("Abraham, Nov 24, 2026: texting CATALOG sends nothing; it is a normal message in the staff inbox", async () => {
     await handleInboundSms({ From: "+18455550111", To: "+18454157585", Body: "Catalog", MessageSid: "SMcat1" });
-    const out = (await db.select().from(schema.messages)).filter((m) => m.direction === "out" && m.event === "catalog_reply");
-    expect(out.length).toBeGreaterThan(0);
-    expect(out.every((m) => m.status !== "blocked")).toBe(true);
-    expect(out[0].kind).toBe("system");
+    const all = await db.select().from(schema.messages);
+    expect(all.filter((m) => m.direction === "out" && m.toNumber === "+18455550111")).toHaveLength(0);
+    expect(all.some((m) => m.direction === "in" && m.fromNumber === "+18455550111" && m.body === "Catalog")).toBe(true);
+    const { listThreads } = await import("@/lib/messages");
+    expect((await listThreads(undefined, 200, "conversations")).map((t) => t.contact_phone)).toContain("+18455550111");
+  });
+  it("the catalog by text still goes out from the phone menu, the website and Admin (the same sender), first text with the approved wording", async () => {
+    const { replyToCatalogText } = await import("@/lib/catalog-send");
+    const { sendMessage } = await import("@/lib/sms");
+    const r = await replyToCatalogText("+18455550114", { optedOut: false, send: (to, b, media) => sendMessage({ to, body: b, ...(media?.length ? { mediaUrls: media } : {}), kind: "system", event: "catalog_reply" }) });
+    expect(r.replied).toBe(true);
+    const out = (await db.select().from(schema.messages)).filter((m) => m.direction === "out" && m.toNumber === "+18455550114");
     expect(out).toHaveLength(2); // the first text, then the photo
-    expect(out[1].mediaUrls).toEqual(["https://hupup.example/api/catalog-photo/catalog/text/a.jpg"]);
     expect(out[0].body).toBe("Hup Up Attractions: Here is our catalog! You can call us anytime to book with our automated system at (845) 777-7585 Ext. 1.");
   });
   it("never after STOP", async () => {
-    await db.insert(schema.customers).values({ phone: "+18455550112", smsOptOut: true });
-    await handleInboundSms({ From: "+18455550112", To: "+18454157585", Body: "CATALOG", MessageSid: "SMcat2" });
-    const out = (await db.select().from(schema.messages)).filter((m) => m.direction === "out" && m.toNumber === "+18455550112" && m.status !== "blocked");
-    expect(out).toHaveLength(0);
-  });
-  it("no catalog photos at all: nothing is sent, the Owner sees a warning in Admin", async () => {
-    await saveSetting("catalogTextItems", "");
-    await handleInboundSms({ From: "+18455550113", To: "+18454157585", Body: "catalog", MessageSid: "SMcat3" });
-    const out = (await db.select().from(schema.messages)).filter((m) => m.direction === "out" && m.toNumber === "+18455550113");
-    expect(out).toHaveLength(0);
-    const { getSettings } = await import("@/lib/settings");
-    expect(String((await getSettings()).catalogTextMissingAt)).not.toBe("");
+    const { replyToCatalogText } = await import("@/lib/catalog-send");
+    const r = await replyToCatalogText("+18455550112", { optedOut: true, send: async () => ({ sent: true }) });
+    expect(r).toMatchObject({ replied: false, reason: "opted_out" });
   });
   it("a requested catalog is not held by the texting test window; other customer texts still are", async () => {
     const { testWindowBlocks } = await import("@/lib/sms");
