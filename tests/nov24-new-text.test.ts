@@ -10,7 +10,11 @@ describe("Messages: New text to any number", () => {
     // Abraham, Nov 24, 2026: search and New text at the top of the right box; the side keeps the conversations, with
     // catalog requests as one extra line at its top
     expect(page.indexOf("data-messages-toolbar")).toBeGreaterThan(page.indexOf("data-catalog-entry"));
-    expect(page.indexOf("data-search")).toBeGreaterThan(page.indexOf("data-messages-toolbar"));
+    // Nov 24, 2026 (later): search is an icon on the conversation list that opens the search bar
+    expect(page).not.toContain("data-search>");
+    const header = readFileSync("src/app/admin/(app)/messages/ListHeader.tsx", "utf8");
+    expect(header).toContain("data-search-toggle");
+    expect(header).toMatch(/\{open && \(\s*<form/);
     expect(page).not.toContain('tab("all"');
     expect(page).toContain('name="p" type="tel"');
     expect(page).toContain("No texts with this number yet. Type your message below.");

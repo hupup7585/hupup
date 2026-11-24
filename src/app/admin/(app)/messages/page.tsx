@@ -4,6 +4,7 @@ import { requireStaff } from "@/lib/auth";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { listThreads, markThreadRead, threadCounts, threadMessages, type ThreadView } from "@/lib/messages";
 import ReplyForm from "./ReplyForm";
+import ListHeader from "./ListHeader";
 import MessageFiles from "@/components/staff/MessageFiles";
 import { filesForMessages } from "@/lib/message-files";
 import { dualDateTime } from "@/lib/dual-date";
@@ -33,16 +34,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
         <div className={`card p-3 ${phone ? "hidden lg:block" : ""}`}>
           {/* Abraham, Nov 24, 2026: the side is the conversation list; catalog requests are one extra line at its top */}
-          <div className="mb-2 flex items-center justify-between gap-2 px-1">
-            <h2 className="text-base font-black text-navy" data-list-title>
-              {view === "catalog" ? `Catalog requests (${counts.catalog})` : view === "all" ? "All texts" : `All conversations (${counts.conversations})`}
-            </h2>
-            {sp.q && (
-              <Link href={`/admin/messages${view === "conversations" ? "" : `?v=${view}`}`} className="text-xs font-semibold text-navy underline" data-clear-search>
-                Clear search
-              </Link>
-            )}
-          </div>
+          <ListHeader title={view === "catalog" ? `Catalog requests (${counts.catalog})` : view === "all" ? "All texts" : `All conversations (${counts.conversations})`} view={view} q={sp.q} />
           {view === "conversations" ? (
             <Link href="/admin/messages?v=catalog" className="mb-2 flex items-center justify-between rounded-lg border border-line bg-bg px-3 py-2.5 text-sm font-bold text-navy hover:border-navy" data-catalog-entry>
               <span>Catalog requests</span>
@@ -56,7 +48,6 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
               <span aria-hidden>‹</span> All conversations
             </Link>
           )}
-          {sp.q && <p className="mb-2 px-1 text-xs text-muted">Results for &ldquo;{sp.q}&rdquo;</p>}
           {!threads.length && <p className="p-3 text-muted">{sp.q ? "Nothing found." : view === "catalog" ? "No catalog requests yet." : "No conversations yet."}</p>}
           <ul className="divide-y divide-line">
             {threads.map((t) => (
@@ -78,12 +69,8 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
 
         <div className="card order-first p-4 lg:order-none">
           {/* Abraham, Nov 24, 2026: search and a new text at the top of this box */}
-          <div className={`grid gap-2 sm:grid-cols-2 ${phone ? "mb-3 border-b border-line pb-3" : ""}`} data-messages-toolbar>
-            <form className="flex gap-2" data-search>
-              {view !== "conversations" && <input type="hidden" name="v" value={view} />}
-              <input name="q" defaultValue={sp.q} placeholder="Search name, number or text" aria-label="Search texts" className="input" />
-              <button className="btn-ghost">Search</button>
-            </form>
+          {/* Abraham, Nov 24, 2026: a new text at the top of this box; search is the icon on the conversation list */}
+          <div className={`grid gap-2 ${phone ? "mb-3 border-b border-line pb-3" : ""}`} data-messages-toolbar>
             {staff.role === "owner" && (
               <form className="flex gap-2" data-new-text>
                 <input name="p" type="tel" inputMode="tel" autoComplete="off" required placeholder="Phone number" aria-label="Phone number for a new text" className="input" />
@@ -91,7 +78,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
               </form>
             )}
             {sp.p && !phone && (
-              <p role="alert" className="text-sm font-semibold text-[#C83A2F] sm:col-span-2" data-bad-number>
+              <p role="alert" className="text-sm font-semibold text-[#C83A2F]" data-bad-number>
                 &ldquo;{sp.p}&rdquo; is not a valid US or Canada mobile number. Enter 10 digits, for example 845-555-0123.
               </p>
             )}
