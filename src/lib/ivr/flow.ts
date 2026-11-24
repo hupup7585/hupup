@@ -2595,12 +2595,15 @@ const handlers: Record<string, Handler> = {
     // Abraham, Nov 17, 2026: not understood = only the retry line (the step's own line, with its thanks, never
     // repeats); every spoken question is followed by the tone, then the caller speaks.
     const retry = Number(n || 0) > 0;
-    const ownStar = f === "street" || f === "unit"; // these lines already say "press star to type it"
+    // Nov 23, 2026: the street line has no star line, so it gets its own typing hint (waiting for Abraham's wording);
+    // the unit is typed on the keypad anyway (addr-unit), so it needs none
+    const ownStar = f === "unit";
     const question = (g: Gather) => {
       if (retry) sp(g, ctx, "field_unclear"); // the one shared did-not-catch line (Nov 22, 2026)
       else {
         spPreviewDraft(g, ctx, prompt);
-        if (!ownStar) {
+        if (f === "street") spPreviewDraft(g, ctx, "addr_street_type_hint");
+        else if (!ownStar) {
           sp(g, ctx, "type_hint");
           spPreviewDraft(g, ctx, "press_pound_done");
         }

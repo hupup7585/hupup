@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 /* Hark, Nov 23, 2026, 11:38 PM: Abraham's newest approved hotline lines and Admin recording slots. In-memory database. */
 const h = vi.hoisted(() => ({
+  overrides: {} as Record<string, { approvedAt?: Date }>,
   session: { callSid: "CAconfirm", fromNumber: "+18455550122", orderId: null as number | null, data: {} as Record<string, unknown>, status: "in_progress", outcome: "browsing" },
 }));
 vi.mock("@/lib/db", async () => {
@@ -15,7 +16,7 @@ vi.mock("@/lib/ivr/session", () => ({
   updateSession: async (_sid: string, patch: Record<string, unknown> & { data?: Record<string, unknown> }) =>
     Object.assign(h.session, { ...patch, data: { ...h.session.data, ...(patch.data ?? {}) } }),
 }));
-vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
+vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => h.overrides }));
 vi.mock("@/lib/business-hours", async (orig) => ({ ...(await orig<typeof import("@/lib/business-hours")>()), officeOpenNow: () => true, lateHoursToday: () => null }));
 vi.mock("@/lib/notify", () => ({ sendSms: async () => ({ sent: true }), sendEmail: async () => ({ sent: true }), sendMessage: async () => ({ sent: true }) }));
 
@@ -123,5 +124,39 @@ describe("2. no 'press pound to continue': every confirm or read-back ends with 
     const xml = await call("idle", {}, "to=readback&q=f%3Dname");
     expect(said(xml)).toEqual(["We did not get your choice. Please try again."]);
     expect(redirect(xml)).toMatch(/^readback\?f=name/);
+  });
+});
+
+describe("3. the street step says how to type it", () => {
+  const DAY = "2026-12-29";
+  beforeAll(async () => {
+    const { db, schema } = await import("@/lib/db");
+    const [c] = await db.insert(schema.categories).values({ name: "Paddle Boats", spokenName: "Paddle Boats", ivrDigit: 3, sortOrder: 3, active: true }).returning();
+    const [p] = await db.insert(schema.products).values({ categoryId: c.id, name: "paddle boat", priceCents: 10000, quantity: 2, active: true }).returning();
+    const [o] = await db.insert(schema.orders).values({ eventDate: DAY, pickupDate: DAY, status: "HOLD", channel: "PHONE", subtotalCents: 10000, holdExpiresAt: new Date(Date.now() + 3_600_000) }).returning();
+    await db.insert(schema.orderItems).values({ orderId: o.id, productId: p.id, qty: 1, unitPriceCents: 10000 });
+    h.session.orderId = o.id;
+  });
+  const street = async () => said(await call("ask", {}, "f=street"));
+  it("the street text itself is unchanged; its own typing hint waits for Abraham", () => {
+    expect(PROMPTS.addr_street.text).toBe("Please say the street name of the delivery address after the tone.");
+    expect(PROMPTS.addr_street_type_hint).toMatchObject({ pending: true });
+  });
+  it("live site: not played until Abraham approves it; preview: it plays; once approved it plays live", async () => {
+    const env = process.env.VERCEL_ENV;
+    h.session.data = { dayOrderIds: [h.session.orderId] };
+    process.env.VERCEL_ENV = "production";
+    expect(await street()).toEqual([PROMPTS.addr_street.text]);
+    process.env.VERCEL_ENV = "preview";
+    expect(await street()).toEqual([PROMPTS.addr_street.text, PROMPTS.addr_street_type_hint.text]);
+    process.env.VERCEL_ENV = "production";
+    h.overrides = { addr_street_type_hint: { approvedAt: new Date() } };
+    expect(await street()).toEqual([PROMPTS.addr_street.text, PROMPTS.addr_street_type_hint.text]);
+    h.overrides = {};
+    process.env.VERCEL_ENV = env;
+    expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("type?f=street"); // star types it
+  });
+  it("the unit step is keypad only and says so (no star line needed)", () => {
+    expect(PROMPTS.addr_unit.text).toBe("Thanks, with your keypad, please enter the unit number.");
   });
 });

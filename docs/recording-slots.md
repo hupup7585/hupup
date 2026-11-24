@@ -1,6 +1,6 @@
 # Hotline recording text list
 
-1018 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
+1019 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
 
 ## Welcome & main menu
 
@@ -186,6 +186,7 @@ Thank you for choosing Hup Up Attractions! |
 | retry_spoken | Any spoken answer not understood (approved; the step's own line is not repeated) | Sorry, we did not catch that. Please try again. |
 | addr_house | Address step 1 - house number | Now, with your keypad, please enter the house number. |
 | pound_done | Shared - When you are done, press pound | When you are done, press pound. |
+| addr_street_type_hint | Address step 2 - how to type the street (wording waiting for Abraham) | To type it on your keypad instead, press star. |
 | addr_unit | Address step 3 - unit number | Thanks, with your keypad, please enter the unit number. |
 | addr_unit_skip | Address step 3 - no unit, press pound to skip | If there is no unit number, press pound to skip. |
 | addr_zip | Slot C - Zip menu, all towns, press 1 to 7 (one take) | For Monroe, New York, one zero nine five zero, press 1. For Highland Mills, New York, one zero nine three zero, press 2. For Chester, New York, one zero nine one eight, press 3. For Washingtonville, New York, one zero nine nine two, press 4. For Central Valley, New York, one zero nine one seven, press 5. For Harriman, New York, one zero nine two six, press 6. To enter a different zip code, press 7. |

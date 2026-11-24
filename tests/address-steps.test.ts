@@ -57,7 +57,7 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(redirect(await call("addr-house-heard", { Digits: "*" }))).toBe("ask?f=name");
     expect(redirect(await call("addr-house-heard", { Digits: "12" }))).toBe("ask?f=street");
     const ask = await call("ask", {}, "f=street");
-    expect(said(ask)).toEqual(["Please say the street name of the delivery address after the tone."]);
+    expect(said(ask)).toEqual(["Please say the street name of the delivery address after the tone.", "To type it on your keypad instead, press star."]); // the street typing hint, preview only until approved (Nov 23, 2026)
     expect(ask).toContain("/audio/tone.wav</Play></Gather>");
     expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("type?f=street"); // the keypad path
     expect(redirect(await call("heard", { SpeechResult: "" }, "f=street"))).toBe("ask?f=street&n=1");
