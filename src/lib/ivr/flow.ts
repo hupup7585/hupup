@@ -3038,8 +3038,7 @@ const handlers: Record<string, Handler> = {
     }
     // In the call log: each part and whether it played from a recording or Puck (for the test calls)
     await track(ctx.callSid, "step", `Read-back: ${heard.join(", ")}`);
-    sp(g, ctx, "addr_rb_correct");
-    sp(g, ctx, "addr_rb_again");
+    confirmEnd(g, ctx); // the shared Confirm ending: 1 correct, 2 enter it again (Hark's audit item 10, Nov 24, 2026)
     backLine(g, ctx);
     return repeatMenu(vr, ctx, "addr-readback");
   },

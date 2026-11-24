@@ -45,7 +45,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
           {/* Abraham, Nov 24, 2026: the side is the conversation list; catalog requests are one extra line at its top */}
           <div className="mb-2 px-1">
             <h2 className="text-base font-black text-navy" data-list-title>
-              {view === "catalog" ? `Catalog requests (${counts.catalog})` : view === "all" ? "All texts" : `All conversations (${counts.conversations})`}
+              {view === "catalog" ? `Catalog requests (${counts.totalCatalog})` : view === "all" ? "All texts" : `All conversations (${counts.totalConversations})`}
             </h2>
             {sp.q && (
               <p className="mt-1 flex items-center justify-between gap-2 text-xs text-muted">

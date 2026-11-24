@@ -47,7 +47,8 @@ export async function listThreads(q?: string, limit = 200, view: ThreadView = "a
 /** How many threads with unread texts in each view (the tabs' counts). */
 export async function threadCounts() {
   const [conv, cat] = await Promise.all([listThreads(undefined, 1000, "conversations"), listThreads(undefined, 1000, "catalog")]);
-  return { conversations: conv.filter((t) => t.unread > 0).length, catalog: cat.filter((t) => t.unread > 0).length };
+  // unread: the badges; total: the list headings (Hark's audit item 9: the heading showed the unread count, "(0)" over a list of 4)
+  return { conversations: conv.filter((t) => t.unread > 0).length, catalog: cat.filter((t) => t.unread > 0).length, totalConversations: conv.length, totalCatalog: cat.length };
 }
 
 export async function threadMessages(phone: string) {

@@ -74,7 +74,7 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(redirect(await call("addr-zip-choice", { Digits: "1" }))).toBe("addr-check");
     expect(redirect(await call("addr-check"))).toBe("addr-readback");
     expect(h.session.data.address).toBe("12 Forest Road, Monroe, NY 10950"); // the postal town (the Kiryas Joel idea was withdrawn)
-    expect(said(await call("addr-readback"))).toEqual(["Here is the address you entered.", "twelve", "Forest Road", "Monroe New York", "one zero nine five zero", "If that is correct, press 1.", "To enter the address again, press 2.", "To go back, press star."]);
+    expect(said(await call("addr-readback"))).toEqual(["Here is the address you entered.", "twelve", "Forest Road", "Monroe New York", "one zero nine five zero", "If that is correct, press 1. To try again, press 2.", "To go back, press star."]); // the shared Confirm ending (Hark audit 10)
     expect(redirect(await call("addr-readback-choice", { Digits: "*" }))).toBe("addr-zip");
     expect(redirect(await call("addr-readback-choice", { Digits: "1" }))).toBe("addr-price");
     const price = await call("addr-price");

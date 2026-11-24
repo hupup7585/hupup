@@ -44,3 +44,24 @@ describe("4. a test payment link can never go out again", () => {
     expect(containsTestPayLink("Pay here: https://secure.cardknox.com/x?xInvoice=HU-1068", { VERCEL: "1" })).toBe(false);
   });
 });
+
+describe("9, 10, 12, 14: counts, address confirm, old lines", () => {
+  it("9: the Messages heading shows the total, the badge the unread", async () => {
+    expect(readFileSync("src/app/admin/(app)/messages/page.tsx", "utf8")).toContain("All conversations (${counts.totalConversations})");
+    expect(readFileSync("src/lib/messages.ts", "utf8")).toContain("totalConversations: conv.length");
+  });
+  it("10: the address read-back ends with the shared Confirm ending", () => {
+    const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
+    const rb = flow.slice(flow.indexOf('"addr-readback"('), flow.indexOf('"addr-readback-choice"('));
+    expect(rb).toContain("confirmEnd(g, ctx)");
+    expect(rb).not.toContain('"addr_rb_again"');
+  });
+  it("12 and 14: every line no step plays is marked Not used (no old 'press 9 for the cart' line shows as Live)", async () => {
+    const { RETIRED_PROMPTS } = await import("@/lib/ivr/prompts");
+    const { lineStatus } = await import("@/lib/prompt-status");
+    for (const k of ["book_note", "book_corporate", "box153", "after_add", "addr_rb_again", "type_email_symbols", "no_input"]) {
+      expect(RETIRED_PROMPTS.has(k), k).toBe(true);
+      expect(lineStatus(k as never, {}).status, k).toBe("Not used");
+    }
+  });
+});
