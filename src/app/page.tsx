@@ -203,7 +203,7 @@ export default async function Home() {
                     const rows = whyRows(w);
                     return rows ? (
                       <span data-why-rows className="min-w-0 flex-1">
-                        <span className="block">{rows[0]}</span>
+                        <span className="block">{rows[0]}</span>{" "}
                         <span className="block">{rows[1]}</span>
                       </span>
                     ) : (

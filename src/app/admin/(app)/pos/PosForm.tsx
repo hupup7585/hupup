@@ -306,14 +306,15 @@ export default function PosForm(props: {
 
         <h2 className="pt-2 font-bold">Payment</h2>
         <div className="grid grid-cols-2 gap-2">
+          {/* Abraham, Nov 24, 2026: Cash and Check, then card and Pay on delivery, then the payment link on one long line */}
           {([
-            ["link", "Send payment link by text"],
             ["cash", "Cash"],
             ["check", "Check"],
+            ["card", "Credit or debit card"],
             ["later", "Pay on delivery"],
-            ["card", "Credit card (enter now)"],
+            ["link", "Send payment link by text"],
           ] as const).map(([v, l]) => (
-            <button key={v} type="button" onClick={() => setPayment(v)} className={`btn-ghost text-sm ${payment === v ? "!border-navy !bg-bg" : ""}`}>
+            <button key={v} type="button" onClick={() => setPayment(v)} className={`btn-ghost text-sm ${v === "link" ? "col-span-2" : ""} ${payment === v ? "!border-navy !bg-bg" : ""}`} data-pay-option={v}>
               {l}
             </button>
           ))}
@@ -339,7 +340,7 @@ export default function PosForm(props: {
             </div>
           </div>
           {linkBlocked && <p className="rounded-lg bg-[#ffe6e4] p-2 text-xs font-bold text-[#b3261e]" data-pos-link-blocked>{payment === "card" ? "No card payment" : "No payment link"} until the address can be priced.</p>}
-          {payment === "card" && !linkBlocked && <p className="rounded-lg bg-bg p-2 text-xs text-muted" data-pos-card-note>After Book it, open the secure Sola card page and type the customer&apos;s card there. The card number never goes through our system.</p>}
+          {payment === "card" && !linkBlocked && <p className="rounded-lg bg-bg p-2 text-xs text-muted" data-pos-card-note>After Book it, open the secure Sola card page and type the customer&apos;s credit or debit card there. The card number never goes through our system.</p>}
         </div>
         <button className="btn w-full py-3.5" disabled={pending || !date || total === 0 || check?.ok === false || linkBlocked || (props.askTerms !== false && !form.termsVia)} onClick={submit}>
           {pending ? "Booking…" : "Book it"}
