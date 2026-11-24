@@ -83,7 +83,7 @@ describe("unfinished phone order", () => {
     expect(redirect(menu)).toBe("resume-items"); // no key: the next old item
     expect(redirect(await call("resume-added-choice", { Digits: "0" }))).toBe("cart");
     expect(redirect(await call("resume-added-choice", { Digits: "1" }))).toBe("cats"); // same day: the categories menu (box 12a)
-    expect(redirect(await call("resume-added-choice", { Digits: "2" }))).toBe("date");
+    expect(redirect(await call("resume-added-choice", { Digits: "2" }))).toBe("date?a=1"); // another day (audit H1)
     expect(redirect(await call("resume-added-choice", { Digits: "7" }, "d=2026-12-22"))).toBe("resume-added?d=2026-12-22");
     // then the taken Castle: box 11a, same date or nearest date
     expect(redirect(await call("resume-items"))).toBe(`booked?p=${castle}&d=2026-12-22`);

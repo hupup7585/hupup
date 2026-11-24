@@ -60,7 +60,7 @@ describe("key 1: date first, several days, one charge", () => {
     expect(said(await call("book"))[0]).toBe("To receive our catalog by text or email, press 8.");
     expect(redirect(await call("category-choice", { Digits: "1" }, `c=${catId}`))).toBe(`date?p=${productId}`);
     expect(said(await call("date", {}, `p=${productId}`))[0]).toMatch(/^Using your keypad, please enter your event date: two digits for the month/);
-    expect(redirect(await call("date-confirm", { Digits: "1" }, `d=${DAY1}`))).toBe("book");
+    expect(redirect(await call("date-confirm", { Digits: "1" }, `d=${DAY1}`))).toBe("cats"); // the categories for that day (Hark's audit H1, Nov 24, 2026)
     expect(h.session.data.day).toBe(DAY1);
     expect(redirect(await call("category", {}, `c=${catId}`))).toBe(`balloons?c=${catId}`); // jumping balloons: box 153 (Nov 19, 2026)
   });
@@ -75,9 +75,9 @@ describe("key 1: date first, several days, one charge", () => {
     expect(said(await call("added-menu")).slice(0, 2)).toEqual(["Successfully added to your cart: 1 Castle for Tuesday, December first.", "To keep shopping, for same day, press 1. For another day, press 2."]); // box 25 (Nov 22, 2026)
     expect(redirect(await call("after-add", { Digits: "1" }))).toBe("cats"); // same day: the categories menu (box 12a)
     expect(redirect(await call("after-add", { Digits: "0" }))).toBe("cart");
-    expect(redirect(await call("after-add", { Digits: "2" }))).toBe("date");
+    expect(redirect(await call("after-add", { Digits: "2" }))).toBe("date?a=1");
     // another day: a new held order for that day
-    expect(redirect(await call("date-confirm", { Digits: "1" }, `d=${DAY2}`))).toBe("book");
+    expect(redirect(await call("date-confirm", { Digits: "1" }, `d=${DAY2}&a=1`))).toBe("cats");
     expect(h.session.orderId).toBeNull();
     await call("add", {}, `p=${productId}&d=${DAY2}&q=2`);
     // back to the first day: more items join that day's order

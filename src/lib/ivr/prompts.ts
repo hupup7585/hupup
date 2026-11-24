@@ -290,13 +290,10 @@ export const PROMPTS = {
   ask_address: { group: "Checkout", label: "Ask for address", text: "Thanks! Now please say the delivery address, with the house number, street, and town." },
   // Delivery address in steps (Abraham, Nov 17, 2026; replaces the single address question, box 32). Step 1 and the
   // retry line are approved; steps 2 to 7 are drafts: the steps run on preview only until he approves them.
-  addr_street: { group: "Checkout", label: "Address step 2 - street name (say it after the tone, or star to type it)", text: "Please say the street name of the delivery address after the tone." },
+  addr_street: { group: "Checkout", label: "Address step 2 - street name (say it after the tone, or 9 to type it)", text: "Please say the street name of the delivery address after the tone. To type it on your keypad instead, press 9." }, // approved Nov 23, 2026, 11:41 PM (key 9 types it, star goes back)
   retry_spoken: { group: "Checkout", label: "Any spoken answer not understood (approved; the step's own line is not repeated)", text: "Sorry, we did not catch that. Please try again." },
   addr_house: { group: "Checkout", label: "Address step 1 - house number", text: "Now, with your keypad, please enter the house number." },
   pound_done: { group: "Checkout", label: "Shared - When you are done, press pound", text: "When you are done, press pound." },
-  // Nov 23, 2026: the street step never told callers they can type it. Draft wording (the shared typing line) waits for
-  // Abraham's exact text: plays on preview only until he approves it in Admin.
-  addr_street_type_hint: { group: "Checkout", label: "Address step 2 - how to type the street (wording waiting for Abraham)", text: "To type it on your keypad instead, press star.", pending: true },
   addr_unit: { group: "Checkout", label: "Address step 3 - unit number", text: "Thanks, with your keypad, please enter the unit number." },
   addr_unit_skip: { group: "Checkout", label: "Address step 3 - no unit, press pound to skip", text: "If there is no unit number, press pound to skip." },
   addr_zip: { group: "Checkout", label: "Slot C - Zip menu, all towns, press 1 to 7 (one take)", text: "For Monroe, New York, one zero nine five zero, press 1. For Highland Mills, New York, one zero nine three zero, press 2. For Chester, New York, one zero nine one eight, press 3. For Washingtonville, New York, one zero nine nine two, press 4. For Central Valley, New York, one zero nine one seven, press 5. For Harriman, New York, one zero nine two six, press 6. To enter a different zip code, press 7." },

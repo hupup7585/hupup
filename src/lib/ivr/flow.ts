@@ -852,7 +852,7 @@ async function friMutzeChoice(ctx: Ctx, vr: VR, p: string | undefined, date: str
     if (prod) spPreviewDraft(vr, ctx, "fri_only", { price: spokenMoney(prod.priceCents) });
   }
   await updateSession(ctx.callSid, { data: { mutzeDays: [...kept], mutzeAnnounce: d === "1" && !prod ? date : undefined } });
-  return p ? back(vr, "qty", { p, d: date }) : back(vr, "book");
+  return p ? back(vr, "qty", { p, d: date }) : back(vr, "cats"); // another day: the categories (audit H1)
 }
 
 /**
@@ -1540,7 +1540,7 @@ const handlers: Record<string, Handler> = {
       await logCatalogRequest(ctx, "email", email, r.sent);
       if (!r.sent) {
         sp(vr, ctx, "went_wrong");
-        return back(vr, "menu");
+        return back(vr, "catalog"); // the catalog choices again (text instead), not the main menu (audit L8)
       }
       // Box 109 (Abraham, Nov 22, 2026): star = the main menu; no key = the call ends
       const g = keypad(vr, url("catalog-done"));
@@ -1763,7 +1763,7 @@ const handlers: Record<string, Handler> = {
     if (k === "*") return back(vr, "book"); // star: one step back, the bookings menu
     if (k === "0") return back(vr, "cart");
     if (k === "1") return back(vr, "cats"); // keep shopping, the same day: the categories menu (box 12a)
-    if (k === "2") return back(vr, "date"); // another day
+    if (k === "2") return back(vr, "date", { a: 1 }); // another day (a: back to box 25 on star, the categories after the date)
     if (k) {
       sp(vr, ctx, "not_valid");
       return back(vr, "resume-added", { d: ctx.query.get("d") ?? undefined });
@@ -1956,7 +1956,7 @@ const handlers: Record<string, Handler> = {
   async "category-choice"(ctx, vr) {
     const c = Number(ctx.query.get("c"));
     const d = ctx.body.Digits;
-    if (!d) return bookNoInput(vr, ctx, "category", { c });
+    if (!d) return bookNoInput(vr, ctx, "category", { c, f: ctx.query.get("f") ?? undefined }); // keeps the "free that date" filter (audit L3)
     if (d === "*") return back(vr, "cats"); // star: the categories menu (box 12a, Nov 22, 2026)
     if (d === "0") return back(vr, "cart", { c }); // after the cart, the same item list plays again
     const items = await listItems(c, ctx.query.get("f"));
@@ -2010,27 +2010,30 @@ const handlers: Record<string, Handler> = {
   /** The event date, keys only (Abraham): MMDD. p = the item chosen (then its availability). */
   date(ctx, vr) {
     const p = ctx.query.get("p") ?? undefined;
-    const g = keypad(vr, url("date-heard", { p }), { numDigits: 4, timeout: 8 });
+    const a = ctx.query.get("a") ?? undefined; // "another day" from box 25 or welcome back (Hark's audit H1, Nov 24, 2026)
+    // Pound after the digits finishes the date (audit M3): it is never read as part of the date
+    const g = keypad(vr, url("date-heard", { p, a }), { numDigits: 4, timeout: 8, finishOnKey: "#" });
     sp(g, ctx, "book_date_prompt");
     backLine(g, ctx);
-    return bookNoInput(vr, ctx, "date", { p });
+    return bookNoInput(vr, ctx, "date", { p, a });
   },
 
   async "date-heard"(ctx, vr) {
     const p = ctx.query.get("p") ?? undefined;
-    const digits = ctx.body.Digits;
-    if (!digits) return bookNoInput(vr, ctx, "date", { p });
+    const a = ctx.query.get("a") ?? undefined;
+    const digits = (ctx.body.Digits ?? "").replace(/#/g, ""); // "1208#": the pound only ends the entry (audit M3)
+    if (!digits) return bookNoInput(vr, ctx, "date", { p, a });
     if (digits.includes("*")) {
-      // Star goes back one step: the rentals in that item's category (or the bookings menu)
+      // Star goes back one step: the rentals in that item's category, box 25 for another day, or the bookings menu
       const prod = p ? await getProduct(Number(p)) : null;
-      return prod ? back(vr, "category", { c: prod.categoryId }) : back(vr, "book");
+      return prod ? back(vr, "category", { c: prod.categoryId }) : a ? back(vr, "added-menu") : back(vr, "book");
     }
     const today = todayISO();
     const r = parseDateInput({ digits }, today);
     if (!r.ok) {
       await track(ctx.callSid, "date_unclear", `Date not usable (${r.reason})`, { key: digits, reason: r.reason });
       sp(vr, ctx, r.reason === "past" ? "date_past" : r.reason === "too_far" ? "date_too_far" : "date_unclear");
-      return back(vr, "date", { p });
+      return back(vr, "date", { p, a });
     }
     const cal = await getSettings();
     const chk = checkEventDate(r.date, cal);
@@ -2039,10 +2042,10 @@ const handlers: Record<string, Handler> = {
       // Abraham, Nov 20, 2026: the day before and the day after both open, and the item known: get it the day before
       if (p && closedDayOffer(r.date, today, cal as never, (iso) => dayInfo(iso, cal).closed)) return back(vr, "closed-offer", { p, d: r.date });
       sp(vr, ctx, "date_closed", { date: spokenDate(r.date), reason: chk.day.reasonEn ?? chk.day.reason ?? "a holiday" }); // Ashkenazi English names (Abraham)
-      return back(vr, "date", { p });
+      return back(vr, "date", { p, a });
     }
     await track(ctx.callSid, "date_asked", `Asked about ${spokenDate(r.date)}`, { date: r.date, key: digits });
-    return back(vr, "date-ask", { p, d: r.date });
+    return back(vr, "date-ask", { p, d: r.date, a });
   },
 
   /**
@@ -2097,10 +2100,10 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     // Box 150 (Abraham, Nov 18, 2026): a Friday in Chanukah or Chol Hamoed can be kept for Mutze Shabbes
     if (friMutzeOffered(date, (await getSettings()) as never)) {
-      const g = keypad(vr, url("date-confirm", { p, d: date, f: 1 }));
+      const g = keypad(vr, url("date-confirm", { p, d: date, f: 1, a: ctx.query.get("a") ?? undefined }));
       sp(g, ctx, "fri_mutze_check", { date: spokenDate(date) });
       backLine(g, ctx);
-      return bookNoInput(vr, ctx, "date-ask", { p, d: date });
+      return bookNoInput(vr, ctx, "date-ask", { p, d: date, a: ctx.query.get("a") ?? undefined });
     }
     // Box 18 (Abraham, Nov 22, 2026): the item is known: book it, add the next day too, or another date
     const prod = p ? await getProduct(Number(p)) : null;
@@ -2111,13 +2114,13 @@ const handlers: Record<string, Handler> = {
       if (two) sp(g, ctx, "box18_second", { weekday: spokenDate(two.next).split(",")[0], price: spokenMoney(two.moreCents) });
       sp(g, ctx, "box18_other_date");
       backLine(g, ctx);
-      return bookNoInput(vr, ctx, "date-ask", { p, d: date });
+      return bookNoInput(vr, ctx, "date-ask", { p, d: date, a: ctx.query.get("a") ?? undefined });
     }
-    const g = keypad(vr, url("date-confirm", { p, d: date }));
+    const g = keypad(vr, url("date-confirm", { p, d: date, a: ctx.query.get("a") ?? undefined }));
     sp(g, ctx, "book_date_entered", { date: spokenDate(date) });
     confirmEnd(g, ctx);
     backLine(g, ctx); // Abraham, Nov 20, 2026: no shopping cart option on this step
-    return bookNoInput(vr, ctx, "date-ask", { p, d: date });
+    return bookNoInput(vr, ctx, "date-ask", { p, d: date, a: ctx.query.get("a") ?? undefined });
   },
 
   async "box18-choice"(ctx, vr) {
@@ -2151,14 +2154,17 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (ctx.query.get("f") === "1") return friMutzeChoice(ctx, vr, p, date, d);
     // Nov 23, 2026: 1 confirms; 2 tries again (the date step); star one step back; pound or another key is not valid
-    if (d === "2" || d === "*") return back(vr, "date", { p });
+    const a = ctx.query.get("a") ?? undefined;
+    if (d === "2" || d === "*") return back(vr, "date", { p, a });
     if (d !== "1") {
       if (d) sp(vr, ctx, "not_valid");
-      return back(vr, "date-ask", { p, d: date });
+      return back(vr, "date-ask", { p, d: date, a });
     }
     await clearSpan(ctx, date);
     await chooseDay(ctx, date);
-    return p ? back(vr, "qty", { p, d: date }) : back(vr, "book");
+    // No item yet (another day, from box 25 or welcome back): the categories (box 12a) for that day, never the bookings
+    // menu (Hark's audit H1, Nov 24, 2026: callers heard it as "back to the first menu")
+    return p ? back(vr, "qty", { p, d: date }) : back(vr, "cats");
   },
 
   /**
@@ -2214,7 +2220,7 @@ const handlers: Record<string, Handler> = {
     const dist = (x: string) => Math.abs(Date.parse(x) - Date.parse(date));
     const near = a && b ? (dist(b) < dist(a) ? b : a) : (a ?? b);
     const showDraft = near && !(process.env.VERCEL_ENV === "production" && promptWaiting(ctx.prompts, "nearest_date"));
-    const g = keypad(vr, url("nearest-choice", { p: p.id, n: showDraft ? near : undefined }), { numDigits: 4, timeout: showDraft ? 4 : 8 });
+    const g = keypad(vr, url("nearest-choice", { p: p.id, n: showDraft ? near : undefined, d: date }), { numDigits: 4, timeout: showDraft ? 4 : 8, finishOnKey: "#" });
     if (showDraft) spPreviewDraft(g, ctx, "nearest_date", { item: p.name, date: spokenDate(near) });
     sp(g, ctx, "book_date_prompt");
     backLine(g, ctx);
@@ -2224,12 +2230,14 @@ const handlers: Record<string, Handler> = {
   async "nearest-choice"(ctx, vr) {
     const p = ctx.query.get("p")!;
     const near = ctx.query.get("n");
-    const d = ctx.body.Digits ?? "";
+    const d = (ctx.body.Digits ?? "").replace(/#/g, "");
     if (d === "1" && near) {
       await chooseDay(ctx, near);
       return back(vr, "qty", { p, d: near });
     }
     if (d === "*") return starToCategory(vr, Number(p));
+    // No key: the same offer again, so "available on {date}, press 1" is not lost (Hark's audit L2, Nov 24, 2026)
+    if (!d) return bookNoInput(vr, ctx, "nearest-date", { p, d: ctx.query.get("d") ?? undefined });
     ctx.query.set("p", p);
     return handlers["date-heard"](ctx, vr); // a new date
   },
@@ -2305,7 +2313,7 @@ const handlers: Record<string, Handler> = {
         return back(vr, "booked", { p: p.id, d: date });
       }
       sp(vr, ctx, "went_wrong");
-      return back(vr, "menu");
+      return (await callOrders(ctx)).length ? back(vr, "cart") : back(vr, "cats"); // not the main menu (audit L8)
     }
     await track(ctx.callSid, "item_added", `Added ${itemPhrase(q, p.name)} for ${spokenDate(date)}`, { item: p.name, productId: p.id, qty: q, date, orderId: r.orderId });
     // A closed day booked from the day before (Nov 20, 2026): the booking is charged as its days (1.5 or 2)
@@ -2392,7 +2400,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (d === "*") return back(vr, "book"); // star: one menu back, the bookings menu (Abraham, Nov 18, 2026)
     if (d === "1") return back(vr, "cats"); // keep shopping, the same day: the categories menu (box 12a, Nov 22, 2026)
-    if (d === "2") return back(vr, "date"); // "To book another day, press 2." (Abraham, Nov 17, 2026)
+    if (d === "2") return back(vr, "date", { a: 1 }); // "To book another day, press 2." (Abraham, Nov 17, 2026); a = another day
     if (d === "0") return back(vr, "cart");
     if (d) {
       sp(vr, ctx, "not_valid");
@@ -2497,7 +2505,9 @@ const handlers: Record<string, Handler> = {
   async "cart-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     const c = ctx.query.get("c") ?? undefined;
-    if (d === "*") return c ? back(vr, "category", { c }) : back(vr, "menu"); // star: one step back
+    // Star: one step back. With no list to return to, box 25 (when something is in the cart), else the bookings menu;
+    // never the main menu (Hark's audit M6, Nov 24, 2026)
+    if (d === "*") return c ? back(vr, "category", { c }) : (await callOrders(ctx)).length ? back(vr, "added-menu") : back(vr, "book");
     if (d === "1") {
       sp(vr, ctx, "checkout_tax_note"); // Abraham (Phone Menu v3): before checkout
       // Nov 23, 2026 (Abraham): the address lookup comes BEFORE the name; a found family gives the name, no name question
@@ -2595,27 +2605,29 @@ const handlers: Record<string, Handler> = {
     // Abraham, Nov 17, 2026: not understood = only the retry line (the step's own line, with its thanks, never
     // repeats); every spoken question is followed by the tone, then the caller speaks.
     const retry = Number(n || 0) > 0;
-    // Nov 23, 2026: the street line has no star line, so it gets its own typing hint (waiting for Abraham's wording);
-    // the unit is typed on the keypad anyway (addr-unit), so it needs none
-    const ownStar = f === "unit";
-    const question = (g: Gather) => {
+    // The street line says "press 9" to type it (approved Nov 23, 2026; Hark's audit M1), so it needs no extra hint;
+    // the unit is typed on the keypad anyway (addr-unit)
+    const ownHint = f === "street" || f === "unit";
+    const tone = `${config.baseUrl()}/audio/tone.wav`;
+    const question = (g: Gather, withTone = true) => {
       if (retry) sp(g, ctx, "field_unclear"); // the one shared did-not-catch line (Nov 22, 2026)
       else {
         spPreviewDraft(g, ctx, prompt);
-        if (f === "street") spPreviewDraft(g, ctx, "addr_street_type_hint");
-        else if (!ownStar) {
+        if (!ownHint) {
           sp(g, ctx, "type_hint");
           spPreviewDraft(g, ctx, "press_pound_done");
         }
       }
-      g.play(`${config.baseUrl()}/audio/tone.wav`);
+      if (withTone) g.play(tone);
     };
     if (sttActive()) {
-      // Speech to text (preview only until Abraham approves the price): the question, a moment for star (type it) or
-      // pound (skip email), then the answer is recorded and typed up by Google while a soft clip plays.
+      // Speech to text: the question with a moment for a key (star or 9 to type, pound to skip email), then the tone
+      // and the recording starts the moment the tone ends (Hark's audit H2, Nov 24, 2026: with the tone inside the
+      // key window, the first second of the answer was lost and short names came back empty)
       const k = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 1, finishOnKey: "", action: url("heard", { f, n }), method: "POST" });
-      question(k);
-      vr.record({ maxLength: 20, timeout: 3, playBeep: false, finishOnKey: "#*", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
+      question(k, false);
+      vr.play(tone);
+      vr.record({ maxLength: 20, timeout: 3, playBeep: false, finishOnKey: f === "street" ? "#*9" : "#*", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
       return vr;
     }
     // Say it, or press star to type it on the keypad (Abraham L). finishOnKey "" so star and # arrive as keys.
@@ -2744,6 +2756,9 @@ const handlers: Record<string, Handler> = {
     const n = ctx.query.get("n") ?? undefined;
     const digits = ctx.body.Digits || "";
     const secs = Number(ctx.body.RecordingDuration || 0);
+    // Street (audit M1): 9 types it, star goes back to the house number; other questions: star types it
+    if (f === "street" && digits === "9") return back(vr, "type", { f });
+    if (f === "street" && digits === "*") return back(vr, "addr-house");
     if (digits === "*") return back(vr, "type", { f });
     if (!ctx.body.RecordingUrl || secs < 1) {
       // Nothing said: pound skips the email (as before); otherwise the usual "didn't catch that" path
@@ -2781,6 +2796,9 @@ const handlers: Record<string, Handler> = {
     }
     const required = f === "email" && Boolean(ctx.session?.data.emailRequired);
     if (ctx.query.get("skip")) return required ? back(vr, "ask", { f }) : back(vr, "phone"); // pound on the recording: skip email
+    // Street (audit M1): 9 types it on the keypad, star goes back to the house number (kept); other questions: star types it
+    if (f === "street" && ctx.body.Digits === "9") return back(vr, "type", { f });
+    if (f === "street" && ctx.body.Digits === "*") return back(vr, "addr-house");
     if (ctx.body.Digits === "*") return back(vr, "type", { f }); // switch to keypad typing
     // Speech to text: the typed-up answer comes from our own record of this call, not from Twilio's speech result
     const typedUp = await callSpokenAnswer(ctx, Number(ctx.query.get("a")));
@@ -2905,7 +2923,7 @@ const handlers: Record<string, Handler> = {
   async "addr-phone-heard"(ctx, vr) {
     const raw = ctx.body.Digits ?? "";
     if (raw.includes("*")) return back(vr, "addr-lookup"); // star: one step back
-    const digits = raw.replace(/\D/g, "");
+    const digits = raw.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, ""); // "1 845 ..." works too (audit L4)
     if (!/^\d{10}$/.test(digits)) {
       sp(vr, ctx, "phone_invalid");
       return back(vr, "addr-phone");
@@ -3003,7 +3021,9 @@ const handlers: Record<string, Handler> = {
 
   /** Step 3: the unit number on the keypad; pound with nothing typed = no unit. */
   "addr-unit"(ctx, vr) {
-    const g = keypad(vr, url("addr-unit-heard"), { numDigits: 7, timeout: 10, finishOnKey: "#" });
+    // actionOnEmptyResult: pound with nothing typed reaches us as "no unit" (Hark's audit H3, Nov 24, 2026); Twilio
+    // otherwise treats it as no input and the caller was stuck on this question
+    const g = vr.gather({ input: ["dtmf"], numDigits: 7, timeout: 10, finishOnKey: "#", actionOnEmptyResult: true, action: url("addr-unit-heard"), method: "POST" });
     sp(g, ctx, "addr_unit");
     sp(g, ctx, "pound_done");
     sp(g, ctx, "addr_unit_skip");
@@ -3014,6 +3034,8 @@ const handlers: Record<string, Handler> = {
   async "addr-unit-heard"(ctx, vr) {
     const raw = ctx.body.Digits || "";
     if (raw.includes("*")) return back(vr, "ask", { f: "street" }); // star: one step back
+    // Nothing typed: pound alone = no unit (on to the zip menu); a real timeout = the no-key rule on this question
+    if (!raw.replace(/\D/g, "") && ctx.body.FinishedOnKey !== "#") return idleNoKey(vr, ctx, "addr-unit");
     const unit = raw.replace(/\D/g, "");
     await updateSession(ctx.callSid, { data: { unit: unit || undefined } }, ctx.session);
     return back(vr, "addr-zip");
@@ -3048,6 +3070,7 @@ const handlers: Record<string, Handler> = {
   },
 
   async "addr-zip-heard"(ctx, vr) {
+    if ((ctx.body.Digits || "").includes("*")) return back(vr, "addr-zip"); // star: back to the zip menu (audit L5)
     const zip = (ctx.body.Digits || "").replace(/\D/g, "");
     if (!/^[0-9]{5}$/.test(zip)) return back(vr, "addr-zip-enter", { bad: 1 });
     await updateSession(ctx.callSid, { data: { zip } }, ctx.session);
@@ -3276,7 +3299,7 @@ const handlers: Record<string, Handler> = {
   },
 
   "phone-enter"(ctx, vr) {
-    const g = keypad(vr, url("phone-heard"), { numDigits: 10, timeout: 10, finishOnKey: "#" });
+    const g = keypad(vr, url("phone-heard"), { numDigits: 11, timeout: 10, finishOnKey: "#" }); // 10 digits + pound (audit M2)
     sp(g, ctx, "phone_enter");
     spPreviewDraft(g, ctx, "press_pound_done");
     return noInput(vr, ctx, "phone-enter");
@@ -3340,7 +3363,7 @@ const handlers: Record<string, Handler> = {
     if (retry && ctx.query.get("k") !== "1") sp(g, ctx, "no_choice");
     sp(g, ctx, "consent_transactional");
     backLine(g, ctx);
-    return vr;
+    return bookNoInput(vr, ctx, "sms-consent", { n: Number(ctx.query.get("n") || 0) + 1, k: 1 }); // no key: never a silent hang-up (audit L7)
   },
 
   async "sms-consent-answer"(ctx, vr) {
@@ -3856,7 +3879,7 @@ const handlers: Record<string, Handler> = {
 
   "promo-enter"(ctx, vr) {
     const tries = Number(ctx.query.get("t") || 0);
-    const g = keypad(vr, url("promo-heard", { t: tries }), { numDigits: 10, timeout: 10, finishOnKey: "#" });
+    const g = keypad(vr, url("promo-heard", { t: tries }), { numDigits: 11, timeout: 10, finishOnKey: "#" }); // 10 digits + pound (audit M2)
     sp(g, ctx, "text_enter"); // box 143, the same line in every flow that texts the caller
     vr.redirect({ method: "POST" }, url("promo-heard", { t: tries })); // nothing typed counts as a try
     return vr;

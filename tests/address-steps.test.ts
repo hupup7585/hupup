@@ -45,7 +45,7 @@ beforeEach(() => {
 
 describe("the approved lines", () => {
   it("step 2 and the retry line, word for word", () => {
-    expect(PROMPTS.addr_street.text).toBe("Please say the street name of the delivery address after the tone."); // Nov 22, 2026
+    expect(PROMPTS.addr_street.text).toBe("Please say the street name of the delivery address after the tone. To type it on your keypad instead, press 9."); // approved Nov 23, 2026, 11:41 PM
     expect(PROMPTS.retry_spoken.text).toBe("Sorry, we did not catch that. Please try again.");
   });
 });
@@ -57,16 +57,17 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(redirect(await call("addr-house-heard", { Digits: "*" }))).toBe("ask?f=name");
     expect(redirect(await call("addr-house-heard", { Digits: "12" }))).toBe("ask?f=street");
     const ask = await call("ask", {}, "f=street");
-    expect(said(ask)).toEqual(["Please say the street name of the delivery address after the tone.", "To type it on your keypad instead, press star."]); // the street typing hint, preview only until approved (Nov 23, 2026)
+    expect(said(ask)).toEqual(["Please say the street name of the delivery address after the tone. To type it on your keypad instead, press 9."]); // key 9 types it (Nov 23, 2026)
     expect(ask).toContain("/audio/tone.wav</Play></Gather>");
-    expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("type?f=street"); // the keypad path
+    expect(redirect(await call("heard", { Digits: "9" }, "f=street"))).toBe("type?f=street"); // the keypad path: 9 (Nov 23, 2026)
+    expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("addr-house"); // star: one step back
     expect(redirect(await call("heard", { SpeechResult: "" }, "f=street"))).toBe("ask?f=street&n=1");
     expect(said(await call("ask", {}, "f=street&n=1"))).toEqual(["Sorry, I did not catch that. Let's try again."]);
     expect(redirect(await call("heard", { SpeechResult: "forest road" }, "f=street"))).toBe("addr-unit");
     expect(h.session.data.street).toBe("Forest Road");
     expect(said(await call("addr-unit"))).toEqual(["Thanks, with your keypad, please enter the unit number.", "When you are done, press pound.", "If there is no unit number, press pound to skip.", "To go back, press star."]);
     expect(redirect(await call("addr-unit-heard", { Digits: "*" }))).toBe("ask?f=street");
-    expect(redirect(await call("addr-unit-heard", { Digits: "" }))).toBe("addr-zip"); // pound with nothing typed: no unit
+    expect(redirect(await call("addr-unit-heard", { Digits: "", FinishedOnKey: "#" }))).toBe("addr-zip"); // pound with nothing typed: no unit
     expect(h.session.data.unit).toBeUndefined();
     expect(said(await call("addr-zip"))).toEqual(["For Monroe, New York, one zero nine five zero, press 1. For Highland Mills, New York, one zero nine three zero, press 2. For Chester, New York, one zero nine one eight, press 3. For Washingtonville, New York, one zero nine nine two, press 4. For Central Valley, New York, one zero nine one seven, press 5. For Harriman, New York, one zero nine two six, press 6. To enter a different zip code, press 7.", "To go back, press star."]);
     expect(redirect(await call("addr-zip-choice", { Digits: "*" }))).toBe("addr-unit");

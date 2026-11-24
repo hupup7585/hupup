@@ -60,7 +60,7 @@ describe("2. no 'press pound to continue': every confirm or read-back ends with 
   it("book_date_entered: the line, the ending, the star line; 1 confirms, 2 the date again, pound not valid, star back", async () => {
     h.session.data = {};
     expect(said(await call("date-ask", {}, `d=${D}`))).toEqual(["You entered Tuesday, December twenty-ninth.", ENDING, "To go back, press star."]);
-    expect(redirect(await call("date-confirm", { Digits: "1" }, `d=${D}`))).toBe("book");
+    expect(redirect(await call("date-confirm", { Digits: "1" }, `d=${D}`))).toBe("cats"); // the categories for that day (audit H1)
     expect(redirect(await call("date-confirm", { Digits: "2" }, `d=${D}`))).toBe("date");
     const pound = await call("date-confirm", { Digits: "#" }, `d=${D}`);
     expect(said(pound)).toEqual(["Sorry, that is not a valid selection."]);
@@ -127,34 +127,10 @@ describe("2. no 'press pound to continue': every confirm or read-back ends with 
   });
 });
 
-describe("3. the street step says how to type it", () => {
-  const DAY = "2026-12-29";
-  beforeAll(async () => {
-    const { db, schema } = await import("@/lib/db");
-    const [c] = await db.insert(schema.categories).values({ name: "Paddle Boats", spokenName: "Paddle Boats", ivrDigit: 3, sortOrder: 3, active: true }).returning();
-    const [p] = await db.insert(schema.products).values({ categoryId: c.id, name: "paddle boat", priceCents: 10000, quantity: 2, active: true }).returning();
-    const [o] = await db.insert(schema.orders).values({ eventDate: DAY, pickupDate: DAY, status: "HOLD", channel: "PHONE", subtotalCents: 10000, holdExpiresAt: new Date(Date.now() + 3_600_000) }).returning();
-    await db.insert(schema.orderItems).values({ orderId: o.id, productId: p.id, qty: 1, unitPriceCents: 10000 });
-    h.session.orderId = o.id;
-  });
-  const street = async () => said(await call("ask", {}, "f=street"));
-  it("the street text itself is unchanged; its own typing hint waits for Abraham", () => {
-    expect(PROMPTS.addr_street.text).toBe("Please say the street name of the delivery address after the tone.");
-    expect(PROMPTS.addr_street_type_hint).toMatchObject({ pending: true });
-  });
-  it("live site: not played until Abraham approves it; preview: it plays; once approved it plays live", async () => {
-    const env = process.env.VERCEL_ENV;
-    h.session.data = { dayOrderIds: [h.session.orderId] };
-    process.env.VERCEL_ENV = "production";
-    expect(await street()).toEqual([PROMPTS.addr_street.text]);
-    process.env.VERCEL_ENV = "preview";
-    expect(await street()).toEqual([PROMPTS.addr_street.text, PROMPTS.addr_street_type_hint.text]);
-    process.env.VERCEL_ENV = "production";
-    h.overrides = { addr_street_type_hint: { approvedAt: new Date() } };
-    expect(await street()).toEqual([PROMPTS.addr_street.text, PROMPTS.addr_street_type_hint.text]);
-    h.overrides = {};
-    process.env.VERCEL_ENV = env;
-    expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("type?f=street"); // star types it
+describe("3. the street step says how to type it (key 9, approved Nov 23, 2026, 11:41 PM)", () => {
+  it("the approved street line says press 9; no separate star hint any more", () => {
+    expect(PROMPTS.addr_street.text).toBe("Please say the street name of the delivery address after the tone. To type it on your keypad instead, press 9.");
+    expect(PROMPTS).not.toHaveProperty("addr_street_type_hint");
   });
   it("the unit step is keypad only and says so (no star line needed)", () => {
     expect(PROMPTS.addr_unit.text).toBe("Thanks, with your keypad, please enter the unit number.");

@@ -1,6 +1,6 @@
 # Hotline recording text list
 
-1020 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
+1019 slots, plus one per rental name (on the Admin page). Hark records a slot in Achird only after Abraham confirms its exact text, with every comma, period and exclamation mark. Live status: Admin > Phone > Hotline prompts > Recording text list.
 
 ## Welcome & main menu
 
@@ -140,17 +140,17 @@ Thank you for choosing Hup Up Attractions! |
 | instr_paddle | Instructions: paddle boats | Here is how to enjoy your paddle boats safely. Setup: our team places the boats in the pool or water area and shows you how they work. Safe use: one rider per boat, unless the boat says otherwise. Riders stay seated, keep their hands and feet inside, and never stand up or bump boats hard. Children who cannot swim should wear a life jacket. Supervision: a responsible adult must watch the water at all times while the boats are in use, and stay close enough to reach a child right away. Please follow the age and weight limits on each boat. Weather: if it gets windy, starts to rain, or you hear thunder, have everyone get out of the water right away. Getting ready for pickup: take the boats out of the water if you can, line them up in one place, and remove any toys or trash. We will take care of the rest. Thank you! |
 | attraction_after | After instructions or a description: options (keys 2 and 3) | To hear this again, press the star key. To choose another attraction, press 1. To go back to the main menu, press 2. |
 
-## Key 4: Learn about our rentals
+## Key 6: Learn about our rentals
 
 | Slot | Line | Exact text |
 |---|---|---|
-| learn_intro | Key 3 opening line | We would love to tell you about our rentals. |
+| learn_intro | Key 6 opening line | We would love to tell you about our rentals. |
 | learn_balloons | About jumping balloons | Our jumping balloons are inflatable bounce houses, and many come with slides or play areas. They are a favorite for birthday parties, family simchas, school events and community celebrations, with options for toddlers and for older kids. Jumping balloons are mostly set up outdoors on grass or a flat, open area. Some smaller units can go indoors in a large room with a high ceiling. Each unit needs open space around it and a nearby power outlet for the blower. |
 | learn_laser | About laser tag | Our laser tag comes with blasters and vests, and our inflatable mazes make the game even more exciting. It is a hit with kids around age six and up, teens, and adults, and it is great for parties, schools, camps and group events. Laser tag can be played outdoors, or indoors in a large hall or gym. The maze needs a good amount of open space and a power outlet for the blower. |
 | learn_paddle | About paddle boats | Our paddle boats are small, easy-to-steer boats that kids pedal or paddle around the water. They are a fun, special attraction for summer parties, camps and outdoor events. Paddle boats are used outdoors, in a pool or a calm water area with an adult watching. You can rent as many as you need for your space. |
 | learn_items#1 | Our items in this category (from Admin), piece 1 | Our |
 | learn_items#2 | Our items in this category (from Admin), piece 2 | include: |
-| learn_deliver | We deliver (key 3) | We deliver, set up, and pick up, so you can relax and enjoy your event. To book, go back to the main menu and press 1. |
+| learn_deliver | We deliver (key 6) | We deliver, set up, and pick up, so you can relax and enjoy your event. To book, go back to the main menu and press 1. |
 | learn_none | No items in this category right now | We are updating this part of our catalog right now. Please check back with us soon. |
 
 ## Errors & retries
@@ -183,11 +183,10 @@ Thank you for choosing Hup Up Attractions! |
 | box156#3 | Box 156: discount applied (only when the customer has a discount), piece 3 | has been applied to your order. Your new total is |
 | ask_name | Ask for name | Thank you. Let us complete your booking. Please say your first and last name after the tone. |
 | ask_address | Ask for address | Thanks! Now please say the delivery address, with the house number, street, and town. |
-| addr_street | Address step 2 - street name (say it after the tone, or star to type it) | Please say the street name of the delivery address after the tone. |
+| addr_street | Address step 2 - street name (say it after the tone, or 9 to type it) | Please say the street name of the delivery address after the tone. To type it on your keypad instead, press 9. |
 | retry_spoken | Any spoken answer not understood (approved; the step's own line is not repeated) | Sorry, we did not catch that. Please try again. |
 | addr_house | Address step 1 - house number | Now, with your keypad, please enter the house number. |
 | pound_done | Shared - When you are done, press pound | When you are done, press pound. |
-| addr_street_type_hint | Address step 2 - how to type the street (wording waiting for Abraham) | To type it on your keypad instead, press star. |
 | addr_unit | Address step 3 - unit number | Thanks, with your keypad, please enter the unit number. |
 | addr_unit_skip | Address step 3 - no unit, press pound to skip | If there is no unit number, press pound to skip. |
 | addr_zip | Slot C - Zip menu, all towns, press 1 to 7 (one take) | For Monroe, New York, one zero nine five zero, press 1. For Highland Mills, New York, one zero nine three zero, press 2. For Chester, New York, one zero nine one eight, press 3. For Washingtonville, New York, one zero nine nine two, press 4. For Central Valley, New York, one zero nine one seven, press 5. For Harriman, New York, one zero nine two six, press 6. To enter a different zip code, press 7. |
