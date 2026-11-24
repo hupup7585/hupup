@@ -64,12 +64,19 @@ export function wordSlotsFor(value: string, items: { id: number; name: string }[
   const plural = items.find((i) => pluralName(i.name).toLowerCase() === value.trim().toLowerCase() && pluralName(i.name) !== i.name);
   if (plural) return [`item:${plural.id}:plural`];
   const keys: string[] = [];
-  for (const raw of value.replace(/[,.!?]/g, " ").split(/\s+/).filter(Boolean)) {
+  // a colon that ends a word ("Sunday to Thursday: 10:00 AM") is not part of it; a time keeps its colon
+  for (const raw of value.replace(/[,.!?]/g, " ").replace(/:(?=\s|$)/g, " ").split(/\s+/).filter(Boolean)) {
     const time = /^(\d{1,2}):(\d{2})$/.exec(raw);
     const ord = /^(\d{1,2})(st|nd|rd|th)$/i.exec(raw);
     let words: string[] | null = null;
-    if (time) words = [...numberWords(Number(time[1])), ...(time[2] === "00" ? [] : Number(time[2]) < 10 ? ["oh", ...numberWords(Number(time[2]))] : numberWords(Number(time[2])))];
-    else if (ord) words = ordinalWords(Number(ord[1]));
+    if (time) {
+      // 3:45 PM: three, forty five (one recording), PM; 3:05: three, oh, five (Abraham, Nov 24, 2026)
+      keys.push(...numberSlotKeys(Number(time[1])));
+      const m = Number(time[2]);
+      if (m && m < 10) keys.push("word:oh", ...numberSlotKeys(m));
+      else if (m) keys.push(...numberSlotKeys(m));
+      continue;
+    } else if (ord) words = ordinalWords(Number(ord[1]));
     else if (/^\d{5}$/.test(raw)) {
       // A zip code (Nov 23, 2026): the six zips are one recording each, any other zip digit by digit
       if (ZIP_CODES.includes(raw)) keys.push(`zip:${raw}`);
@@ -80,14 +87,17 @@ export function wordSlotsFor(value: string, items: { id: number; name: string }[
       keys.push(...numberSlotKeys(Number(raw)));
       continue;
     }
-    else if (/^[A-Z]$/.test(raw)) {
+    else if (/^[A-Za-z]$/.test(raw)) {
+      // A spelled letter in any case ("y o s s i" in an email read-back): its letter recording (Nov 24, 2026)
       keys.push(`letter:${raw.toLowerCase()}`);
+      continue;
+    } else if (/^(dot|dash|underscore|basement)$/i.test(raw)) {
+      keys.push(`word:${raw.toLowerCase()}`);
       continue;
     } else words = [raw];
     for (const w of words) {
-      const k = `word:${w.toLowerCase()}`;
-      if (!WORDS.some((x) => x.toLowerCase() === w.toLowerCase())) return null;
-      keys.push(k);
+      // A word with no recording slot is said live on its own; the words around it still play (Nov 24, 2026)
+      keys.push(WORDS.some((x) => x.toLowerCase() === w.toLowerCase()) ? `word:${w.toLowerCase()}` : `say:${w}`);
     }
   }
   return keys;

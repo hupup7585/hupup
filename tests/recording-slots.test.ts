@@ -32,7 +32,7 @@ describe("recording slots", () => {
     expect(wordSlotsFor("Tuesday, March 5th")).toEqual(["word:tuesday", "word:march", "word:fifth"]);
     expect(wordSlotsFor("3:05 PM")).toEqual(["word:three", "word:oh", "word:five", "word:pm"]);
     expect(wordSlotsFor("Royal Castle", [{ id: 7, name: "Royal Castle" }])).toEqual(["item:7"]);
-    expect(wordSlotsFor("Yossi")).toBeNull();
+    expect(wordSlotsFor("Yossi")).toEqual(["say:Yossi"]); // a word with no recording is said live on its own (Nov 24, 2026)
   });
   it("status: Waiting for Abraham until he confirms; a text change sends it back to Waiting", async () => {
     expect(await isConfirmed("greeting")).toBe(false);

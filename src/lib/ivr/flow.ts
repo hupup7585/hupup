@@ -44,7 +44,7 @@ import { alertSharedPhoneOrder, isSharedNumber } from "@/lib/shared-phones";
 import { addressParts, townPhrase } from "@/lib/spoken-address";
 import { lookupByPhone } from "@/lib/directory";
 import { makeVmHandlers } from "./vmail";
-import { findStreet } from "@/lib/streets";
+import { findStreet, streetSlotKey, unitSlotKey } from "@/lib/streets";
 import { promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import {
@@ -76,7 +76,7 @@ import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staf
 import { calendarNow } from "@/lib/clock";
 import { bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
 import { matchBlock, parseBlockList } from "./caller-filter";
-import { PROMPTS, clipUrls, composeClips, composeMixed, fill, googleLiveOn, liveClips, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
+import { PROMPTS, clipUrls, composeClips, composeMixed, fill, textPieces, type LinePiece, googleLiveOn, liveClips, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
@@ -132,7 +132,10 @@ function sp(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptK
   if (clips) return void clips.forEach((u) => target.play(u));
   // Nov 23, 2026 (Abraham): every recorded piece plays; the live voice only says a piece with no recording yet
   const mixed = composeMixed(ctx.prompts, key, vars ?? {});
-  if (mixed) return void mixed.forEach((p) => ("url" in p ? target.play(p.url) : say(target, p.say)));
+  if (mixed) {
+    if (vars) logVoice(ctx.prompts, key, mixed);
+    return void mixed.forEach((p) => ("url" in p ? target.play(p.url) : say(target, p.say)));
+  }
   // Option B (Owner switch, off): Google speaks the line in Achird; otherwise the live voice (Puck)
   if (vars && googleLiveOn(ctx.prompts)) return void target.play(liveVoiceLink(spokenSpelling(promptText(ctx.prompts, key, vars))));
   // Abraham, Nov 19, 2026: in a menu, a plain half-second pause after each option (Hark's recordings have it)
@@ -141,6 +144,50 @@ function sp(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptK
 }
 
 const isGather = (t: VR | Gather): t is Gather => t.constructor?.name === "Gather";
+
+/**
+ * Which parts of a line with changing parts played from a recording and which in the live voice (Abraham, Nov 24, 2026:
+ * shown in the call log for every step). Kept per request; handleVoice writes it to the call journey.
+ */
+const VOICE_LOG = new WeakMap<PromptOverrides, string[]>();
+function logVoice(prompts: PromptOverrides, key: string, pieces: LinePiece[]) {
+  const rec = pieces.filter((p) => "url" in p).length;
+  const live = pieces.flatMap((p) => ("say" in p ? [`"${p.say.trim()}"`] : []));
+  const list = VOICE_LOG.get(prompts) ?? [];
+  list.push(`${key}: ${rec} recorded${live.length ? `, live voice: ${live.join(", ")}` : ", nothing live"}`);
+  VOICE_LOG.set(prompts, list);
+}
+
+/**
+ * "You typed: {value}." / "I heard: {value}." for a street or a unit (Abraham, Nov 24, 2026, bug 5): the street plays its
+ * street recording when it is on our list, the unit its unit recording, else its digits and letters one by one, the same
+ * parts as the address read-back. Other answers: the usual line.
+ */
+function readBackLine(g: Gather, ctx: Ctx, key: "typed_back" | "heard", f: Field, value: string) {
+  if (f !== "street" && f !== "unit") return sp(g, ctx, key, { value: FIELDS[f].readBack(value) });
+  const prefix = promptText(ctx.prompts, key, { value: "" }).replace(/[\s.]+$/, "");
+  const pre = clipUrls(ctx.prompts, [`${key}#1`]);
+  const listed = f === "street" ? findStreet(value) : null;
+  const options: string[][] =
+    f === "street"
+      ? [[streetSlotKey(listed?.spoken ?? value)]]
+      : [[unitSlotKey(value)], value.replace(/[^0-9A-Za-z]/g, "").split("").map((c) => (/\d/.test(c) ? `word:${["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][Number(c)]}` : `letter:${c.toLowerCase()}`))];
+  const urls = options.map((k) => clipUrls(ctx.prompts, k)).find(Boolean);
+  const pieces: LinePiece[] = [pre ? { url: pre[0] } : { say: prefix }, ...(urls ? urls.map((url) => ({ url })) : [{ say: listed?.spoken ?? value }])];
+  logVoice(ctx.prompts, key, pieces);
+  pieces.forEach((p) => ("url" in p ? g.play(p.url) : say(g, p.say)));
+}
+
+/** Text with numbers, days and times (Key 7 hours): word by word from the recordings, only missing words live. */
+function playText(target: VR | Gather, ctx: { prompts: PromptOverrides }, text: string, label = "text") {
+  const pieces = textPieces(ctx.prompts, text);
+  if (!pieces) {
+    logVoice(ctx.prompts, label, [{ say: text }]);
+    return say(target, text);
+  }
+  logVoice(ctx.prompts, label, pieces);
+  pieces.forEach((p) => ("url" in p ? target.play(p.url) : say(target, p.say)));
+}
 
 /** Splits a menu line after each "press ..." option and puts a half-second pause between them (computer voice). */
 export function optionParts(text: string): string[] {
@@ -1904,7 +1951,9 @@ const handlers: Record<string, Handler> = {
     const p = await getProduct(Number(ctx.query.get("p")));
     if (!p) return back(vr, "book");
     const g = keypad(vr, url("balloon-choice", { p: p.id }));
-    sp(g, ctx, "box154", { item: p.name, number: digitWords(balloonEntry(p.name)?.number ?? ""), price: spokenMoney(p.priceCents) });
+    // the whole item recording ("item seven two zero one") for "item {number}" when it is uploaded (Nov 24, 2026)
+    const bn = balloonEntry(p.name)?.number;
+    sp(g, ctx, "box154", { item: p.name, number: digitWords(bn ?? ""), price: spokenMoney(p.priceCents), ...(bn ? { "@number": `balloon_num_${bn}` } : {}) });
     sp(g, ctx, "cart_key");
     backLine(g, ctx); // the shared star line (Nov 19, 2026)
     return bookNoInput(vr, ctx, "balloon", { p: p.id });
@@ -2658,7 +2707,7 @@ const handlers: Record<string, Handler> = {
     await track(ctx.callSid, "typed", `Typed ${f}: ${value}`, { field: f, value });
     await updateSession(ctx.callSid, { data: { heard: value } }, ctx.session);
     const g = keypad(vr, url("confirm", { f, t: 1 }));
-    sp(g, ctx, "typed_back", { value: spec.readBack(value) });
+    readBackLine(g, ctx, "typed_back", f, value);
     confirmEnd(g, ctx);
     return noInput(vr, ctx, "readback", { f, t: 1 });
   },
@@ -3125,7 +3174,7 @@ const handlers: Record<string, Handler> = {
     if (!heard || !FIELDS[f]) return back(vr, "ask", { f });
     const typed = ctx.query.get("t") === "1";
     const g = keypad(vr, url("confirm", { f, t: typed ? 1 : undefined }));
-    sp(g, ctx, typed ? "typed_back" : "heard", { value: FIELDS[f].readBack(heard) });
+    readBackLine(g, ctx, typed ? "typed_back" : "heard", f, heard);
     confirmEnd(g, ctx);
     backLine(g, ctx);
     return noInput(vr, ctx, "readback", { f, t: typed ? 1 : undefined });
@@ -3865,7 +3914,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "office_closed");
       shortPause(vr);
     }
-    for (const line of hoursForSpeech(settings)) say(vr, line);
+    for (const line of hoursForSpeech(settings)) playText(vr, ctx, line, "hours"); // recordings word by word (Nov 24, 2026)
     shortPause(vr);
     return back(vr, "menu");
   },
@@ -4501,6 +4550,8 @@ export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Prom
   }
   try {
     await handler({ ...ctx, session: current ?? session ?? (await getSession(ctx.callSid)) }, vr);
+    const voice = VOICE_LOG.get(prompts);
+    if (voice?.length) await track(ctx.callSid, "step", `Voice: ${voice.join(" | ")}`).catch(() => undefined);
   } catch (e) {
     console.error("IVR handler error", ctx.action, e);
     const err = new twilio.twiml.VoiceResponse();

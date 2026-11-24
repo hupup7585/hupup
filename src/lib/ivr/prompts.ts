@@ -714,16 +714,19 @@ export const googleLiveOn = (overrides: PromptOverrides) => Boolean(EXTRAS.get(o
  * recorded (the line is then said the usual way).
  */
 export type LinePiece = { url: string } | { say: string };
+/** What a word slot says in the live voice when it has no recording: "word:twenty five" -> "twenty five", "letter:y" -> "y". */
+export function slotSpoken(k: string): string {
+  if (k.startsWith("zip:")) return k.slice(4).split("").join(" ");
+  return k.replace(/^[a-z]+:/, "").replace(/^(\d+):plural$/, "$1").replace(/_/g, " ");
+}
 export function composeMixed(overrides: PromptOverrides, key: PromptKey, vars: Record<string, string | number> = {}): LinePiece[] | null {
   const x = EXTRAS.get(overrides);
   if (!x) return null;
+  // Abraham, Nov 24, 2026: a one-piece number ("twenty five") is never glued from "twenty" + "five"; with no recording
+  // it is said in the live voice (and listed in the call log)
   const clip = (k: string): string[] | null => {
     const id = x.clips[k];
-    if (id) return [promptRecordingLink(id)];
-    // "eighty eight" not uploaded yet: "eighty" + "eight" when those are
-    const m = /^word:(\S+) (\S+)$/.exec(k);
-    if (m && x.clips[`word:${m[1]}`] && x.clips[`word:${m[2]}`]) return [promptRecordingLink(x.clips[`word:${m[1]}`]!), promptRecordingLink(x.clips[`word:${m[2]}`]!)];
-    return null;
+    return id ? [promptRecordingLink(id)] : null;
   };
   const out: LinePiece[] = [];
   const parts0 = (PROMPTS[key] as PromptDef).parts;
@@ -737,19 +740,32 @@ export function composeMixed(overrides: PromptOverrides, key: PromptKey, vars: R
     const template = overrides[key]?.text?.trim() || PROMPTS[key].text;
     const parts = template.split(/(\{[a-z0-9_]+\})/i).map((p) => p.trim()).filter((p) => p && (/^\{/.test(p) || /[a-z]/i.test(p)));
     let piece = 0;
-    for (const p of parts) {
+    for (let pi = 0; pi < parts.length; pi++) {
+      const p = parts[pi];
       const v = /^\{([a-z0-9_]+)\}$/i.exec(p);
       if (!v) {
         piece++;
+        // A whole recording stands for this word and the value after it (box 154: "item seven two zero one" for
+        // "item {number}", Nov 24, 2026): the word is not said twice
+        const next = /^\{([a-z0-9_]+)\}$/i.exec(parts[pi + 1] ?? "");
+        const whole = next ? vars[`@${next[1]}`] : undefined;
+        if (whole && x.clips[String(whole)] && /^[,\s]*item$/i.test(p)) {
+          out.push({ url: promptRecordingLink(x.clips[String(whole)]!) });
+          pi++; // the value is in that recording
+          continue;
+        }
         const id = x.clips[PIECE_ALIAS[`${key}#${piece}`] ?? `${key}#${piece}`];
         out.push(id ? { url: promptRecordingLink(id) } : { say: p });
         continue;
       }
       const value = String(vars[v[1]] ?? "");
       const words = wordSlotsFor(value, x.items);
-      const urls = words ? words.map(clip) : null;
-      if (urls && urls.every(Boolean)) urls.forEach((u) => u!.forEach((url) => out.push({ url })));
-      else if (words && urls) words.forEach((w, i) => (urls[i] ? urls[i]!.forEach((url) => out.push({ url })) : out.push({ say: w.replace(/^[a-z]+:/, "").replace(/_/g, " ") })));
+      // Word by word (Abraham, Nov 24, 2026): every word with a recording plays it; only a missing word is said live
+      if (words) words.forEach((w) => {
+        const u = clip(w);
+        if (u) u.forEach((url) => out.push({ url }));
+        else out.push({ say: slotSpoken(w) });
+      });
       else if (value.trim()) out.push({ say: value });
     }
   }
@@ -798,6 +814,29 @@ export function clipUrls(overrides: PromptOverrides, keys: string[]): string[] |
   if (!x || !keys.length) return null;
   const ids = keys.map((k) => x.clips[k]);
   return ids.every(Boolean) ? ids.map((id) => promptRecordingLink(id)) : null;
+}
+
+/**
+ * Any text played word by word from the recordings (Abraham, Nov 24, 2026: Key 7 hours, and every other place that
+ * used to say numbers live): each word with a recording plays it; only a missing word is said live (neighbors joined).
+ * Null when nothing at all is recorded (the caller says the whole text live).
+ */
+export function textPieces(overrides: PromptOverrides, text: string): LinePiece[] | null {
+  const x = EXTRAS.get(overrides);
+  if (!x) return null;
+  const words = wordSlotsFor(text, x.items);
+  if (!words) return null;
+  const out: LinePiece[] = [];
+  for (const w of words) {
+    const id = x.clips[w];
+    if (id) out.push({ url: promptRecordingLink(id) });
+    else {
+      const last = out[out.length - 1];
+      if (last && "say" in last) last.say = `${last.say} ${slotSpoken(w)}`;
+      else out.push({ say: slotSpoken(w) });
+    }
+  }
+  return out.some((p) => "url" in p) ? out : null;
 }
 
 export function liveClips(overrides: PromptOverrides, text: string): string[] | null {
