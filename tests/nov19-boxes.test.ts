@@ -128,7 +128,7 @@ describe("box 154 and box 155", () => {
     expect(balloonSizes("15 by 15 feet")).toBeNull();
     expect(digitWords("7210")).toBe("seven two one zero");
     h.session.orderId = null;
-    expect(redirect(await call("add", {}, `p=${ids["Soft Hop"]}&d=2026-12-22&q=1`))).toBe("ocean?d=2026-12-22");
+    expect(redirect(await call("add", {}, `p=${ids["Soft Hop"]}&d=2026-12-22&q=1`))).toBe("added-menu?o=2026-12-22"); // the ocean balls offer in box 25 (Nov 25, 2026, 14:08)
   });
 });
 

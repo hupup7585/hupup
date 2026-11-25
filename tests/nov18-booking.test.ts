@@ -103,7 +103,7 @@ describe("one item at a time (Nov 18, 2026); box 151 and box 152 (approved Nov 1
   it("jumping balloons never offer a second one", async () => {
     h.session.orderId = null;
     h.session.data = {};
-    expect(redirect(await call("add", {}, `p=${castle}&d=2026-12-22&q=1`))).toBe("ocean?d=2026-12-22");
+    expect(redirect(await call("add", {}, `p=${castle}&d=2026-12-22&q=1`))).toBe("added-menu?o=2026-12-22"); // the ocean balls offer in box 25 (Nov 25, 2026, 14:08)
   });
 });
 

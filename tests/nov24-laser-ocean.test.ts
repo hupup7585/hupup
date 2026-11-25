@@ -175,24 +175,21 @@ describe("3. ocean balls only after the first balloon of the call", () => {
     const day = "2027-03-15";
     h.session.orderId = null;
     h.session.data = {};
-    expect(redirect(await call("add", {}, `p=${balloon}&d=${day}&q=1`))).toBe(`ocean?d=${day}`);
+    expect(redirect(await call("add", {}, `p=${balloon}&d=${day}&q=1`))).toBe(`added-menu?o=${day}`); // the offer (Nov 25, 2026, 14:08)
     expect(h.session.data.oceanOffered).toBe(true);
     expect(redirect(await call("add", {}, `p=${balloon}&d=${day}&q=1`))).toBe("added-menu");
   });
 });
 
-describe("4. ocean balls from the cart (built; its line waits for Abraham's wording)", () => {
-  it("key 5 in the cart goes to the balls offer and back to the cart; on the live line it stays off until approved", async () => {
+describe("4. ocean balls from the cart (Nov 25, 2026, 14:08: key 9, live)", () => {
+  it("key 9 in the cart goes to the amounts and back to the cart", async () => {
     const day = "2027-03-22";
     h.session.orderId = null;
     h.session.data = { oceanOffered: true };
     await call("add", {}, `p=${balloon}&d=${day}&q=1`);
-    expect(redirect(await call("cart-choice", { Digits: "5" }))).toBe(`ocean?d=${day}&n=cart`);
-    expect(redirect(await call("ocean-choice", { Digits: "#" }, `d=${day}&n=cart`))).toBe("cart");
-    process.env.VERCEL_ENV = "production";
-    expect(redirect(await call("cart-choice", { Digits: "5" }))).not.toMatch(/^ocean/);
-    expect(said(await call("cart")).join(" ")).not.toContain("ocean balls");
-    delete process.env.VERCEL_ENV;
+    expect(redirect(await call("cart-choice", { Digits: "9" }))).toBe(`ocean?d=${day}&n=cart`);
+    expect(redirect(await call("ocean-choice", { Digits: "*" }, `d=${day}&n=cart`))).toBe("cart");
+    expect(said(await call("cart")).join(" ")).toContain("To add ocean balls, press 9.");
   });
 });
 

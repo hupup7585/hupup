@@ -550,13 +550,6 @@ function addedVars(a: { name: string; qty: number; date: string; date2?: string 
   return { qty: a.qty, item: a.qty === 1 ? a.name : pluralName(a.name), date: a.date2 ? `${spokenDate(a.date)} and ${spokenDate(a.date2)}` : spokenDate(a.date) };
 }
 
-/** Box 25 (Nov 22, 2026): "Successfully added to your cart: {Qnt} {item} for {date}." then the keep-shopping line. */
-function spAdded(g: Gather, ctx: Ctx) {
-  const a = ctx.session?.data.lastAdded;
-  if (a) sp(g, ctx, "box25_added", addedVars(a));
-  sp(g, ctx, "box25_keep");
-}
-
 /**
  * Box 18's second day (Abraham, Nov 22, 2026): the next day, only when it is open and the item is free through its
  * pickup; "{price} more" = half the one-day price (the full one-day price on Chanukah and Chol Hamoed).
@@ -828,13 +821,10 @@ async function isLaserItem(p: { name: string; categoryId: number }) {
   return Boolean(cat && laserPoolsFor(p.name, cat.name).length);
 }
 
-/** Ocean balls from the cart: on preview, or once Abraham approves its line. */
-const cartBallsOn = (ctx: Ctx) => process.env.VERCEL_ENV !== "production" || !promptWaiting(ctx.prompts, "cart_add_balls");
 /** The first rental day in the cart with a jumping balloon and no ocean balls yet, or null. */
-async function cartBallsDay(ctx: Ctx): Promise<string | null> {
-  const balls = new Set((await oceanBallProducts()).map((b) => b.id));
+/** The date of a jumping balloon in the cart (the first one), with or without balls already (Nov 25, 2026, 14:08). */
+async function cartBalloonDay(ctx: Ctx): Promise<string | null> {
   for (const o of await callOrders(ctx)) {
-    if (o.items.some((i) => balls.has(i.productId))) continue;
     for (const i of o.items) {
       const [p] = await db.select({ categoryId: products.categoryId }).from(products).where(eq(products.id, i.productId));
       if (p && (await isBounceHouse(p.categoryId))) return o.order.eventDate;
@@ -2038,8 +2028,7 @@ const handlers: Record<string, Handler> = {
       const prod = await getProduct(l.p);
       if (prod && (await isBounceHouse(prod.categoryId)) && !ctx.session?.data.oceanOffered) {
         await updateSession(ctx.callSid, { data: { oceanOffered: true } }, ctx.session); // once per call (Nov 24, 2026)
-        sp(vr, ctx, "box25_added", addedVars({ name: l.name, qty: l.qty, date: l.d })); // Batch 3 item 4: the same order
-        return back(vr, "ocean", { d: l.d, n: "resume" });
+        return back(vr, "resume-added", { d: l.d, o: l.d }); // the added line, then "To add ocean balls, press 9." (Nov 25, 2026)
       }
       return back(vr, "resume-added", { d: l.d });
     }
@@ -2060,9 +2049,15 @@ const handlers: Record<string, Handler> = {
   "resume-added"(ctx, vr) {
     const d = ctx.query.get("d") ?? undefined;
     const n = ctx.query.get("n") ?? undefined;
-    const g = keypad(vr, url("resume-added-choice", { d, n }));
+    const o = ctx.query.get("o") ?? undefined;
+    const g = keypad(vr, url("resume-added-choice", { d, n, o }));
     if (n) sp(g, ctx, "box25_keep"); // the added line already played (Batch 3 item 4)
-    else spAdded(g, ctx); // box 25 (Nov 22, 2026): every item, welcome back too
+    else {
+      const a = ctx.session?.data.lastAdded;
+      if (a) sp(g, ctx, "box25_added", addedVars(a));
+      if (o) sp(g, ctx, "ocean_offer"); // the first balloon of the call (Nov 25, 2026, 14:08)
+      sp(g, ctx, "box25_keep");
+    }
     sp(g, ctx, "cart_key");
     backLine(g, ctx);
     return back(vr, "resume-items");
@@ -2074,6 +2069,8 @@ const handlers: Record<string, Handler> = {
     if (k === "0") return back(vr, "cart");
     if (k === "1") return back(vr, "cats"); // keep shopping, the same day: the categories menu (box 12a)
     if (k === "2") return back(vr, "date", { a: 1 }); // another day (a: back to box 25 on star, the categories after the date)
+    const o = ctx.query.get("o") ?? undefined;
+    if (k === "9" && o) return back(vr, "ocean", { d: o, n: "resume" });
     if (k) {
       sp(vr, ctx, "not_valid");
       return back(vr, "resume-added", { d: ctx.query.get("d") ?? undefined, n: ctx.query.get("n") ?? undefined });
@@ -2656,8 +2653,8 @@ const handlers: Record<string, Handler> = {
     // Ocean balls only after the FIRST jumping balloon of the call (Abraham, Nov 24, 2026)
     if ((await isBounceHouse(p.categoryId)) && !ctx.session?.data.oceanOffered) {
       await updateSession(ctx.callSid, { data: { oceanOffered: true } }, ctx.session);
-      sp(vr, ctx, "box25_added", addedVars(lastAdded)); // Batch 3 item 4: the added line first, then the offer
-      return back(vr, "ocean", { d: date });
+      // Ocean balls v2 (Nov 25, 2026, 14:08): box 25 with "To add ocean balls, press 9." after the added line
+      return back(vr, "added-menu", { o: date });
     }
     // The extra gun packs after a maze (Abraham, Nov 24, 2026, revised: never after plain 6 or 4 guns), while a pack is
     // left for that date; the approved wording plays in the live voice until its recording is uploaded
@@ -2718,13 +2715,20 @@ const handlers: Record<string, Handler> = {
    * to your shopping cart, press 0. To keep shopping, for same day, press 1. For another day, press 2."
    */
   "added-menu"(ctx, vr) {
-    const g = keypad(vr, url("after-add", { n: ctx.query.get("n") ?? undefined }));
+    const n = ctx.query.get("n") ?? undefined;
+    const o = ctx.query.get("o") ?? undefined; // the first balloon's date: the ocean balls offer (Nov 25, 2026, 14:08)
+    const g = keypad(vr, url("after-add", { n, o }));
     // Box 25 (Abraham, Nov 22, 2026): every item; n = the added line already played with the second-one offer
-    if (ctx.query.get("n")) sp(g, ctx, "box25_keep");
-    else spAdded(g, ctx);
+    if (n) sp(g, ctx, "box25_keep");
+    else {
+      const a = ctx.session?.data.lastAdded;
+      if (a) sp(g, ctx, "box25_added", addedVars(a));
+      if (o) sp(g, ctx, "ocean_offer"); // right after the added line, once per call
+      sp(g, ctx, "box25_keep");
+    }
     sp(g, ctx, "cart_key");
     backLine(g, ctx);
-    return noInput(vr, ctx, "added-menu", { n: ctx.query.get("n") ?? undefined }); // no key: box 25 again (Batch 3 item 10)
+    return noInput(vr, ctx, "added-menu", { n, o }); // no key: box 25 again (Batch 3 item 10)
   },
 
   async "after-add"(ctx, vr) {
@@ -2733,11 +2737,13 @@ const handlers: Record<string, Handler> = {
     if (d === "1") return back(vr, "cats"); // keep shopping, the same day: the categories menu (box 12a, Nov 22, 2026)
     if (d === "2") return back(vr, "date", { a: 1 }); // "To book another day, press 2." (Abraham, Nov 17, 2026); a = another day
     if (d === "0") return back(vr, "cart");
+    const o = ctx.query.get("o") ?? undefined;
+    if (d === "9" && o) return back(vr, "ocean", { d: o }); // the ocean balls amounts (Nov 25, 2026, 14:08)
     if (d) {
       sp(vr, ctx, "not_valid");
-      return back(vr, "added-menu");
+      return back(vr, "added-menu", { o });
     }
-    return noInput(vr, ctx, "added-menu", { n: ctx.query.get("n") ?? undefined }); // Batch 3 item 10
+    return noInput(vr, ctx, "added-menu", { n: ctx.query.get("n") ?? undefined, o }); // Batch 3 item 10
   },
 
   /** Extra laser gun packs after a maze or guns (Abraham, Nov 17, 2026): 1 = 6-pack $75, 2 = 4-pack $50, # skips. */
@@ -2787,17 +2793,20 @@ const handlers: Record<string, Handler> = {
     return back(vr, "added-menu", { n: 1 });
   },
 
-  /** Ocean balls after every jumping balloon (Abraham, Nov 17, 2026): 1 = 200 for $10, 2 = 500 for $15, 3 = 700 for $20, # skips. */
+  /**
+   * Ocean balls amounts (Abraham, Nov 25, 2026, 14:08): reached with 9 from box 25 (first balloon of the call), the
+   * welcome-back added line, or the cart. 1 = 200 for $10, 2 = 500 for $15, 3 = 700 for $20; star = back.
+   * n = resume (welcome back) or cart; none = box 25.
+   */
   ocean(ctx, vr) {
     const d = ctx.query.get("d")!;
     const n = ctx.query.get("n") ?? undefined;
-    const g = keypad(vr, url("ocean-choice", { d, n }), { timeout: 4 });
-    sp(g, ctx, "ocean_balls");
-    halfPause(g);
-    sp(g, ctx, "stay_on_line"); // Nov 22, 2026, 11:12 PM: doing nothing skips them (pound still skips too)
+    const g = keypad(vr, url("ocean-choice", { d, n }));
+    sp(g, ctx, "ocean_200");
+    sp(g, ctx, "ocean_500");
+    sp(g, ctx, "ocean_700");
     backLine(g, ctx);
-    // an add-on offer with no key for 4 seconds: nothing added, straight on (Nov 22, 2026)
-    return n === "resume" ? back(vr, "resume-added", { d, n: 1 }) : n === "cart" ? back(vr, "cart") : back(vr, "added-menu", { n: 1 });
+    return noInput(vr, ctx, "ocean", { d, n }); // the system-wide no-key rule
   },
 
   async "ocean-choice"(ctx, vr) {
@@ -2805,12 +2814,14 @@ const handlers: Record<string, Handler> = {
     const n = ctx.query.get("n") ?? undefined;
     const next = () => (n === "resume" ? back(vr, "resume-added", { d: date, n: 1 }) : n === "cart" ? back(vr, "cart") : back(vr, "added-menu", { n: 1 }));
     const k = ctx.body.Digits ?? "";
-    if (k === "#" || k === "*") return next(); // star: one step back, the item-added line
+    // star: one step back, to the screen that offered the balls
+    if (k === "*") return n === "cart" ? back(vr, "cart") : n === "resume" ? back(vr, "resume-added", { d: date, o: date }) : back(vr, "added-menu", { o: date });
     if (k === "0") return back(vr, "cart");
+    if (!k) return noInput(vr, ctx, "ocean", { d: date, n });
     const sets = await oceanBallProducts();
     const pick = /^[1-3]$/.test(k) ? sets[Number(k) - 1] : undefined;
     if (!pick) {
-      sp(vr, ctx, "not_valid");
+      sp(vr, ctx, "not_valid"); // pound too: there is no skip line any more
       return back(vr, "ocean", { d: date, n });
     }
     // On the same day's order as the balloon, so it is on the order and in the payment total
@@ -2840,8 +2851,8 @@ const handlers: Record<string, Handler> = {
     for (const o of days) sp(g, ctx, "cart_day", { date: spokenDate(o.order.eventDate), items: itemsPhrase(o.items) });
     sp(g, ctx, "cart_total", { total: spokenMoney(days.reduce((t, o) => t + o.order.subtotalCents, 0)) });
     sp(g, ctx, "cart_options");
-    // Ocean balls from the cart (Abraham, Nov 24, 2026): built, but its line waits for his wording (preview only)
-    if (await cartBallsDay(ctx)) spPreviewDraft(g, ctx, "cart_add_balls");
+    // Ocean balls from the cart (Abraham, Nov 25, 2026, 14:08): while a jumping balloon is in the cart, even after balls
+    if (await cartBalloonDay(ctx)) sp(g, ctx, "cart_ocean");
     backLine(g, ctx);
     // From an item list: once the cart has been read, the same item list plays again (Abraham, Phone Menu v3)
     if (c) return back(vr, "category", { c });
@@ -2863,9 +2874,9 @@ const handlers: Record<string, Handler> = {
     }
     if (d === "2") return c ? back(vr, "category", { c }) : back(vr, "cats"); // keep shopping: the categories menu (Batch 3 item 9, Nov 25, 2026)
     if (d === "3") return back(vr, "remove"); // remove an item (box 29b)
-    if (d === "5" && cartBallsOn(ctx)) {
-      const day = await cartBallsDay(ctx);
-      if (day) return back(vr, "ocean", { d: day, n: "cart" }); // the balls offer, then back to the cart
+    if (d === "9") {
+      const day = await cartBalloonDay(ctx);
+      if (day) return back(vr, "ocean", { d: day, n: "cart" }); // the amounts, then back to the cart
     }
     if (d === "4") {
       // refresh the cart and start over (box 29)

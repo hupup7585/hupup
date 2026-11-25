@@ -26,7 +26,7 @@ describe("every line is on the page", () => {
     expect(lineStatus("promo_ask", o).status).toBe("Not active yet");
     expect(lineStatus("spoken_readback", o).status).toBe("Not active yet"); // wording approved Nov 15; speech to text still waits for his OK
     expect(lineStatus("voicemail_thanks", o).status).toBe("Not used");
-    expect(RETIRED_PROMPTS.size).toBe(71); // + phonepay_back (Nov 25, 2026, 12:27) // + phonepay_approved_join (replaced by pay_approved_optin, Nov 25, 2026, 12:22) // + address_outside_area (Batch 2, Nov 25, 2026) // + the owner charge amount lines (Nov 24, 2026) // + ask_directions, directions_saved, addr_price, addr_saved (Box 34 and Menu 2, Nov 25, 2026) // phone_heard is box 48 again; + addr_unit_skip (Nov 25, 2026) // + cart_expired (box 30, Nov 24, 2026) // + 17 lines no step plays (Hark audit 12 and 14, Nov 24, 2026)
+    expect(RETIRED_PROMPTS.size).toBe(73); // + ocean_balls, cart_add_balls (ocean balls v2, Nov 25, 2026, 14:08) // + phonepay_back (Nov 25, 2026, 12:27) // + phonepay_approved_join (replaced by pay_approved_optin, Nov 25, 2026, 12:22) // + address_outside_area (Batch 2, Nov 25, 2026) // + the owner charge amount lines (Nov 24, 2026) // + ask_directions, directions_saved, addr_price, addr_saved (Box 34 and Menu 2, Nov 25, 2026) // phone_heard is box 48 again; + addr_unit_skip (Nov 25, 2026) // + cart_expired (box 30, Nov 24, 2026) // + 17 lines no step plays (Hark audit 12 and 14, Nov 24, 2026)
   });
   it("the page reads the prompt list itself, and is Owner only", () => {
     const page = readFileSync("src/app/admin/(app)/phone/prompts/page.tsx", "utf8");

@@ -113,6 +113,10 @@ describe("box 56 on a call", () => {
       `That includes 240 dollars for the jumping balloons, 60 dollars for the paddle boat, ${money(o.deliveryFeeCents)} for delivery, and ${money(o.taxCents)} sales tax.`,
     ]);
     expect(o.subtotalCents + o.deliveryFeeCents + o.taxCents).toBe(o.totalCents);
+    // Abraham, Nov 25, 2026, 14:09: each amount is before tax (240 + 60 = the rentals before tax); one tax for the order
+    expect(24000 + 6000).toBe(o.subtotalCents);
+    expect(o.taxCents).toBeGreaterThan(0);
+    expect(lines[2].match(/sales tax/g)).toHaveLength(1);
     expect(lines.join(" ")).not.toMatch(/You are all set|Sara/);
   });
   it("1 laser tag set: singular", async () => {

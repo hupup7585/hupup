@@ -51,8 +51,8 @@ describe("a jumping balloons list with 12 items", () => {
 describe("ocean balls after a jumping balloon", () => {
   it("2 adds 500 balls for $15 to the same day's order, so it's in the payment total", async () => {
     const add = await call("add", {}, `p=${ids[0]}&d=${DAY}&q=1`);
-    expect(said(add)).toHaveLength(1); // Batch 3 item 4: the added line first, then the ocean balls question
-    expect(redirect(add)).toBe(`ocean?d=${DAY}`);
+    expect(redirect(add)).toBe(`added-menu?o=${DAY}`); // box 25 with the offer (Nov 25, 2026, 14:08)
+    expect(redirect(await call("after-add", { Digits: "9" }, `o=${DAY}`))).toBe(`ocean?d=${DAY}`);
     const r = await call("ocean-choice", { Digits: "2" }, `d=${DAY}`);
     expect(redirect(r)).toBe("added-menu?n=1");
     expect(said(r)[0]).toMatch(/^Successfully added to your cart: 500 ocean balls for /); // no count in front of "500 ocean balls"
