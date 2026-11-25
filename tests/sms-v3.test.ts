@@ -241,6 +241,7 @@ describe("website request, staff restrictions, A2P off", () => {
     expect(r).toMatchObject({ sent: false, blocked: "not_active" });
     expect((await sendMessage({ to: "+18457777585", body: "New voicemail", kind: "system", event: "owner_alert" })).blocked).toBe("not_active"); // every text goes through the Messaging Service
     process.env.TWILIO_MESSAGING_SERVICE_SID = "MG1";
+    await (await import("@/lib/settings")).saveSetting("smsTestOnly", true, null); // the window (off by default since Nov 25, 2026)
     expect((await sendMessage({ to: P, body: "Your order is confirmed.", kind: "transactional" })).blocked).toBe("test_only");
     const owner = await sendMessage({ to: "+18457777585", body: "New voicemail", kind: "system", event: "owner_alert" });
     expect(owner.blocked).toBeUndefined();

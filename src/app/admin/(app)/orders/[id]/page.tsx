@@ -267,6 +267,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 <div className="text-lg font-bold">{customer.name}</div>
                 {customer.phone && <a className="block text-navy underline-offset-2 hover:underline" href={`tel:${customer.phone}`}>{formatPhone(customer.phone)}</a>}
                 {customer.email && <a className="block text-navy underline-offset-2 hover:underline" href={`mailto:${customer.email}`}>{customer.email}</a>}
+                {o.textPhone && o.textPhone !== customer.phone && (
+                  <div data-order-text-phone className="text-sm">Texts for this order go to <b>{formatPhone(o.textPhone)}</b></div>
+                )}
               </div>
             ) : (
               <p className="text-muted">Not entered yet (caller still on the phone or abandoned cart).</p>

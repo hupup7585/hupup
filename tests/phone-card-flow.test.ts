@@ -81,7 +81,7 @@ describe("card payment on the phone line", () => {
     expect(x).not.toContain("<Sip");
     expect(x).toMatch(/<Number sendDigits="w+4321#w+80000#w+1">\+18334343354<\/Number>/);
     expect(x).toContain('record="do-not-record"');
-    expect(said(x)).toEqual(["We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you."]); // after box 140 (no key): the hold line, then the payment line
+    expect(said(x)).toEqual(["We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you. Once your payment has been processed, please remain on the line to receive your booking confirmation."]); // after box 140 (no key): the hold line, then the payment line
     const [a] = await db.select().from(schema.phonepayAttempts);
     expect(a).toMatchObject({ orderId, tryNumber: 1, amountCents: 80000 });
   });
@@ -101,11 +101,11 @@ describe("card payment on the phone line", () => {
     expect(said(bad)).toEqual(["Sorry, that is not a valid selection."]);
     expect(redirect(bad)).toBe(`phonepay-go?o=${o2.id}`);
     const go = await call("phonepay-go", {}, `o=${o2.id}&c=1`);
-    expect(said(go)).toEqual(["We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you."]);
+    expect(said(go)).toEqual(["We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you. Once your payment has been processed, please remain on the line to receive your booking confirmation."]);
     expect(go).toContain("<Dial");
     // a retry: the hold line, no box 140
     const retry = await call("phonepay-go", {}, `o=${o2.id}`);
-    expect(said(retry)).toEqual(["We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you."]);
+    expect(said(retry)).toEqual(["We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you. Once your payment has been processed, please remain on the line to receive your booking confirmation."]);
     expect(retry).toContain("<Dial");
     await db.delete(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.orderId, o2.id));
   });
@@ -121,7 +121,7 @@ describe("card payment on the phone line", () => {
     const [t1] = await db.select().from(schema.phonepayAttempts).where((await import("drizzle-orm")).eq(schema.phonepayAttempts.id, tries[0].id));
     expect(t1.payLegSid).toBe("CAleg1");
     x = await call("phonepay-retry", {}, `o=${orderId}&n=1`);
-    expect(said(x)).toContain("Your card did not go through. To try again, press 1.");
+    expect(said(x)).toContain("We are sorry, your card did not go through. To try again, press 1.");
     expect(redirect(await call("phonepay-retry-answer", { Digits: "1" }, `o=${orderId}&n=1`))).toBe(`phonepay-go?o=${orderId}`);
     await call("phonepay-go", {}, `o=${orderId}`); // a later try: straight to the card (the link question is only before the first)
     const [, second] = await db.select().from(schema.phonepayAttempts).orderBy(schema.phonepayAttempts.id);
@@ -138,10 +138,10 @@ describe("card payment on the phone line", () => {
   it("tries per call from Admin (3 to start, Abraham, Nov 17, 2026): try 2 warns and emails; try 3 ends the call and emails; no payment link anywhere", async () => {
     h.emails = [];
     let x = await call("phonepay-retry", {}, `o=${orderId}&n=2`);
-    expect(said(x)).toContain("Your card did not go through. You have one more chance to try. To try again, press 1.");
+    expect(said(x)).toContain("We are sorry, your card did not go through. You have one more chance. To try again, press 1.");
     expect(h.emails.some((e) => e.includes("failed 2 times"))).toBe(true);
     x = await call("phonepay-retry", {}, `o=${orderId}&n=3`);
-    expect(said(x)).toEqual(["Sorry, your card did not go through. Please call us back to try again. Goodbye."]);
+    expect(said(x)).toEqual(["We are sorry, we were not able to process your card at this time. Please call us back later to complete your order, or you can contact customer service at extension 3 from the main menu. Thank you for calling Hup Up Attractions. Goodbye."]);
     expect(x).toContain("<Hangup/>");
     expect(h.emails.some((e) => e.includes("failed 3 times"))).toBe(true);
     expect(x).not.toMatch(/payment link/i);
@@ -185,15 +185,6 @@ describe("card payment on the phone line", () => {
     expect(h.voided).toEqual(["UNC1"]);
     expect(h.emails.some((e) => e.includes("unclear phone payment checked"))).toBe(true);
   });
-  it("box 148 (Abraham, Nov 18, 2026): You are all set and the order number only after payment; 1 sends the confirmation to another number", async () => {
-    const [cu] = await db.insert(schema.customers).values({ name: "Sara Klein", phone: "+18457990925" }).returning();
-    await db.update(schema.orders).set({ customerId: cu.id }).where((await import("drizzle-orm")).eq(schema.orders.id, orderId));
-    const x = await call("pay-approved", {}, `o=${orderId}`);
-    expect(said(x)).toEqual([`You are all set, Sara! Your payment was approved, and your booking is confirmed. Your order number is ${(1000 + orderId).toString().split("").join(" ")}. We will text your confirmation to the number you are calling from. To send it to a different number, press 1. Thank you for choosing Hup Up Attractions!`]);
-    expect(redirect(await call("pay-approved-choice", { Digits: "1" }, `o=${orderId}`))).toBe(`tx-enter?p=conf&o=${orderId}`);
-    expect(said(await call("tx-enter", {}, `p=conf&o=${orderId}`))).toEqual(["Please enter the 10-digit phone number. When you are finished, please press pound."]);
-    expect(redirect(await call("pay-approved-choice", {}, `o=${orderId}`))).toBe("promo-consent");
-  });
   it("decline bug (Abraham's test call, Nov 24, 2026): the declined line plays once, then the caller is sent back to PhonePay; a second decline does the same", async () => {
     const { eq } = await import("drizzle-orm");
     const [o3] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2026-11-27", pickupDate: "2026-11-27", subtotalCents: 45000, totalCents: 45000 }).returning();
@@ -217,8 +208,8 @@ describe("card payment on the phone line", () => {
         expect(redirect(x)).toBe(`phonepay-go?o=${o3.id}`);
       }
     };
-    await tryOnce(1, "Your card did not go through. To try again, press 1.");
-    await tryOnce(2, "Your card did not go through. You have one more chance to try. To try again, press 1.");
+    await tryOnce(1, "We are sorry, your card did not go through. To try again, press 1.");
+    await tryOnce(2, "We are sorry, your card did not go through. You have one more chance. To try again, press 1.");
     // the next try is really placed with PhonePay again
     expect(await call("phonepay-go", {}, `o=${o3.id}`)).toContain("+18334343354</Number>");
   });

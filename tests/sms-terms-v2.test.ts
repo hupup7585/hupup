@@ -148,7 +148,8 @@ describe("Abraham U checks", () => {
     const a = readFileSync("src/app/admin/deliveries/actions.ts", "utf8");
     expect(a).toContain("const t = DELIVERY_TEMPLATES[key]");
     expect(a).toContain("body: t.body");
-    expect(a).toContain("phone: full.customer.phone");
+    expect(a).toContain("phone: textTo"); // the order's own text number (Nov 25, 2026), else the customer's phone
+    expect(a).toContain("full.order.textPhone || full.customer?.phone");
     expect(a).toContain('staff.role === "delivery" && (!isCurrentStop(full.order) || !hasAnyStop(full.order, staff.userId))');
   });
 

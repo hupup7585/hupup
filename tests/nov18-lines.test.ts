@@ -12,10 +12,8 @@ import { htmlToText } from "@/lib/inbox-format";
 
 /* Abraham, Nov 18, 2026: Music, Inbox, Catalog, Lines. */
 describe("approved lines", () => {
-  it("box 148 is the exact approved text, played only from the paid step; nothing at checkout says 'You are all set'", () => {
-    expect(PROMPTS.phonepay_approved.text).toBe(
-      "You are all set, {name}! Your payment was approved, and your booking is confirmed. Your order number is {number}. We will text your confirmation to the number you are calling from. To send it to a different number, press 1. Thank you for choosing Hup Up Attractions!",
-    );
+  it("box 148 (Nov 25, 2026): the approved Part A, played only from the paid step; nothing at checkout says 'You are all set'", () => {
+    expect(PROMPTS.phonepay_approved.text).toBe("Thank you! Your payment was approved, and your booking is confirmed. Your order number is {number}.");
     const f = readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(f).not.toMatch(/"thanks_order"/);
     expect(f).not.toMatch(/ctx, "phonepay_paid"/);

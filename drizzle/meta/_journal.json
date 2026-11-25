@@ -659,6 +659,20 @@
       "when": 1795740000000,
       "tag": "0093_pay_hold_timing",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1795750000000,
+      "tag": "0094_customer_texts_on",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1795760000000,
+      "tag": "0095_order_text_phone",
+      "breakpoints": true
     }
   ]
 }

@@ -104,7 +104,7 @@ describe("payment line with music", () => {
 });
 
 describe("connect timing (Abraham, Nov 25, 2026): Sola is called before the hold line; the line is never cut", () => {
-  const HOLD = "We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you.";
+  const HOLD = "We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you. Once your payment has been processed, please remain on the line to receive your booking confirmation.";
   const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1]);
   let o2 = 0;
   beforeAll(async () => {

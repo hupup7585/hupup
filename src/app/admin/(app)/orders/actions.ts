@@ -57,7 +57,7 @@ export async function sendPayLinkAction(orderId: number): Promise<ActionResult> 
   if (!(await ensurePriced(orderId))) return { ok: false, message: (await pricingProblem(orderId)) ?? "This order could not be priced." };
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found" };
-  const phone = full.customer?.phone;
+  const phone = full.order.textPhone || full.customer?.phone; // the order's text number (Nov 25, 2026)
   if (!phone) return { ok: false, message: "This customer has no phone number" };
   const due = (full.order.totalCents ?? full.order.subtotalCents) - full.order.paidCents;
   if (due <= 0) return { ok: false, message: "Nothing left to pay" };

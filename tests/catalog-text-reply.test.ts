@@ -44,10 +44,22 @@ describe("CATALOG by text", () => {
     const { testWindowBlocks } = await import("@/lib/sms");
     const was = process.env.VERCEL_ENV;
     process.env.VERCEL_ENV = "production";
+    await saveSetting("smsTestOnly", true); // the window is off since Nov 25, 2026; switched on here to test it
     try {
       expect(await testWindowBlocks("+18453955264", "catalog_request")).toBe(false);
       expect(await testWindowBlocks("+18453955264", "catalog_reply")).toBe(false);
       expect(await testWindowBlocks("+18453955264", "order_confirmation")).toBe(true);
+    } finally {
+      process.env.VERCEL_ENV = was;
+      await saveSetting("smsTestOnly", false);
+    }
+  });
+  it("Nov 25, 2026: customer texts are on for everyone by default (the test window is off)", async () => {
+    const { testWindowBlocks } = await import("@/lib/sms");
+    const was = process.env.VERCEL_ENV;
+    process.env.VERCEL_ENV = "production";
+    try {
+      expect(await testWindowBlocks("+18453955264", "order_confirmation")).toBe(false);
     } finally {
       process.env.VERCEL_ENV = was;
     }

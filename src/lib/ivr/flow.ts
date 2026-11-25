@@ -17,6 +17,7 @@ import {
   PHONE_HOLD_MINUTES,
   cancelHold,
   getOrderWithItems,
+  orderTextPhone,
   getPaymentGroup,
   minutesFromNow,
   orderNumber,
@@ -406,6 +407,25 @@ async function box56(vr: VR, ctx: Ctx, orderId: number, days: { order: { id: num
 async function payLegPossible() {
   const { getTwilio } = await import("@/lib/twilio-client");
   return Boolean(getTwilio() && process.env.TWILIO_PHONE_NUMBER);
+}
+
+/**
+ * Did this caller agree to order texts (Abraham, Nov 25, 2026)? The order's text number (or the customer's phone, or
+ * the number given on this call) has an order-text consent.
+ */
+async function orderTextsAgreed(ctx: Ctx, orderId: number): Promise<boolean> {
+  const full = orderId ? await getOrderWithItems(orderId) : null;
+  const phone = (full ? orderTextPhone(full.order, full.customer) : null) ?? ctx.session?.data.phone ?? toE164(ctx.from);
+  if (!phone) return false;
+  if ((ctx.session?.data.smsConsent === "yes" || ctx.session?.data.smsConsent === "existing") && (!ctx.session?.data.phone || ctx.session.data.phone === phone)) return true;
+  return (await consentState(phone)).transactional?.action === "opt_in";
+}
+
+/** The number every text for this order (and its other rental days) goes to from now on. */
+async function setOrderTextPhone(orderId: number, phone: string) {
+  const [o] = await db.select({ group: orders.paymentGroupId }).from(orders).where(eq(orders.id, orderId)).limit(1);
+  const ids = o?.group ? (await db.select({ id: orders.id }).from(orders).where(eq(orders.paymentGroupId, o.group))).map((x) => x.id) : [orderId];
+  await db.update(orders).set({ textPhone: phone, updatedAt: new Date() }).where(inArray(orders.id, [...new Set([orderId, ...ids])]));
 }
 
 /** A +1 number read in three groups, the same way as the phone read-back ("eight four five, ..."). */
@@ -1205,10 +1225,21 @@ async function txSend(ctx: Ctx, vr: VR, p: "cat" | "pay" | "conf", to: string) {
     // Box 148, press 1: the payment confirmation text to the number the caller entered (they asked for it)
     const o = Number(ctx.query.get("o"));
     if (o) {
+      // Abraham, Nov 25, 2026: the chosen number gets the confirmation AND every later update text for this order. The
+      // caller asked for it on this call (key 1), so the order-text consent for that number is recorded first.
+      const joined = Boolean(ctx.session?.data.textJoin);
+      const blocked = (await customerByPhone(to))?.smsOptOut;
+      if (blocked) {
+        sp(vr, ctx, "consent_stopped");
+        return back(vr, "promo-consent");
+      }
+      await recordPhoneConsent(ctx, "transactional", "opt_in", to, joined ? "phonepay_approved_join" : "phonepay_approved_text");
+      await setOrderTextPhone(o, to);
+      await updateSession(ctx.callSid, { data: { textJoin: undefined } }, ctx.session);
       const { confirmationText } = await import("@/lib/payment-result");
       const body = await confirmationText(o);
-      if (body) await sendMessage({ to, body, kind: "system", event: "confirmation_resend", orderId: o, callSid: ctx.callSid });
-      await track(ctx.callSid, "step", `Payment confirmation texted to the number the caller entered`, { to });
+      const r = body ? await sendMessage({ to, body, kind: "transactional", event: "confirmation_resend", orderId: o, callSid: ctx.callSid }) : null;
+      await track(ctx.callSid, "step", `Box 148: the order's text number is now ${to}${r?.sent ? "; confirmation texted" : ""}${joined ? " (signed up for this order's texts)" : ""}`, { to });
     }
     return back(vr, "promo-consent");
   }
@@ -4053,20 +4084,43 @@ const handlers: Record<string, Handler> = {
    * Box 148 (Abraham, Nov 18, 2026), only after Sola shows the payment approved: "You are all set, {name}! ... Your order
    * number is {number}. ... To send it to a different number, press 1. ..." No key: on with the call.
    */
+  /*
+   * Box 148 (Abraham, Nov 25, 2026, 00:29): "Thank you! Your payment was approved, and your booking is confirmed. Your
+   * order number is {number}." (no name), "To hear it again, press star.", then, only for a caller who agreed to order
+   * texts, "We will text your confirmation ... press 1.", else the line for texts (draft, preview only until approved),
+   * then "We look forward to serving you again. ..." Star replays "Your order number is {number}." and the rest.
+   * r=1: the rest only (after a wrong key); st=1: the number again (star).
+   */
   async "pay-approved"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "promo-consent");
-    const first = (group.primary.customer?.name ?? "").trim().split(/\s+/)[0] ?? "";
+    const number = spokenDigits(orderNumber(o));
     const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: 6 });
-    sp(g, ctx, "phonepay_approved", { name: first, number: spokenDigits(orderNumber(o)) });
-    return back(vr, "promo-consent");
+    if (ctx.query.get("st")) sp(g, ctx, "checkout_order_number", { number });
+    else if (!ctx.query.get("r")) sp(g, ctx, "phonepay_approved", { number });
+    sp(g, ctx, "phonepay_approved_star");
+    if (await orderTextsAgreed(ctx, o)) sp(g, ctx, "phonepay_approved_text");
+    else spPreviewDraft(g, ctx, "phonepay_approved_join");
+    sp(g, ctx, "phonepay_approved_bye");
+    return back(vr, "promo-consent"); // no key: on with the call, as before
   },
 
-  "pay-approved-choice"(ctx, vr) {
+  async "pay-approved-choice"(ctx, vr) {
     const o = ctx.query.get("o") ?? undefined;
-    if (ctx.body.Digits === "1") return back(vr, "tx-enter", { p: "conf", o }); // box 143, then the read-back
-    if (ctx.body.Digits) sp(vr, ctx, "not_valid");
+    const d = ctx.body.Digits;
+    if (d === "*") return back(vr, "pay-approved", { o, st: 1 }); // star: the order number again (nothing to go back to)
+    if (d === "1") {
+      // Agreed to order texts: a different number (box 143, then the read-back). Not agreed: pressing 1 signs up for this
+      // order's texts, to the number they choose (box 142, then the read-back) (Abraham, Nov 25, 2026, 00:34)
+      if (await orderTextsAgreed(ctx, Number(o))) return back(vr, "tx-enter", { p: "conf", o });
+      await updateSession(ctx.callSid, { data: { textJoin: true } }, ctx.session);
+      return back(vr, "tx-which", { p: "conf", o });
+    }
+    if (d) {
+      sp(vr, ctx, "not_valid");
+      return back(vr, "pay-approved", { o, r: 1 });
+    }
     return back(vr, "promo-consent");
   },
 

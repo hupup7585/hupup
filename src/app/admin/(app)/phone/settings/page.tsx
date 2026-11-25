@@ -6,6 +6,7 @@ import FeedbackNameForm from "../../settings/FeedbackNameForm";
 import RoutingForm from "../../settings/RoutingForm";
 import BlockingForm from "../../settings/BlockingForm";
 import RecordingForm from "../../settings/RecordingForm";
+import TextingForm from "../../settings/TextingForm";
 import { PROMPTS } from "@/lib/ivr/prompts";
 import { RING_KEYS, afterHoursWindow, RING_KEY_LABELS, isLoopNumber, last4, ringListFor, routeSummary, routeTargets } from "@/lib/ivr/routing";
 import { toE164 } from "@/lib/phone";
@@ -74,6 +75,10 @@ export default async function PhoneSettingsPage() {
             <FeedbackNameForm initial={settings.ringName9} />
           </div>
         </div>
+      </section>
+      <section className="card mb-6 p-5" id="texting">
+        <h2 className="mb-3 text-lg font-extrabold">Customer texts</h2>
+        <TextingForm everyone={!settings.smsTestOnly} />
       </section>
       <section className="card mb-6 p-5" id="recording">
         <h2 className="mb-3 text-lg font-extrabold">Call recording</h2>

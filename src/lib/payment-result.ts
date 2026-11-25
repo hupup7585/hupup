@@ -57,7 +57,9 @@ export async function paymentReceivedNotices(orderId: number, cents: number, opt
       ? await messageText("msg_payment_received_days", { number: num, dates: days.map((d) => messageDate(d.order.eventDate)).join(" and ") })
       : await messageText("msg_payment_received", { number: num, date: messageDate(before.order.eventDate), pickup: messageDate(before.order.pickupDate) });
   // Order/service text only with order-text consent (checked in sendMessage); the email copy goes out as before.
-  if (before.customer?.phone) await sendSms(before.customer.phone, msg, { kind: "transactional", event: "payment_confirmation", orderId, customerId: before.customer.id });
+  // To the order's text number (Nov 25, 2026: a different number chosen on box 148 gets every update)
+  const textTo = before.order.textPhone || before.customer?.phone;
+  if (textTo) await sendSms(textTo, msg, { kind: "transactional", event: "payment_confirmation", orderId, customerId: before.customer?.id });
   if (before.customer?.email && !opts.skipCustomerEmail) await sendEmail(before.customer.email, `Order #${num} confirmed`, msg);
   if (process.env.ADMIN_PHONE) {
     await sendSms(process.env.ADMIN_PHONE, `New paid order #${num}: $${(cents / 100).toFixed(2)} for ${messageDate(before.order.eventDate)}${days.length > 1 ? ` and ${days.length - 1} more day${days.length > 2 ? "s" : ""}` : ""}.`, { kind: "system", event: "owner_alert" });

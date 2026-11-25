@@ -47,7 +47,7 @@ describe("Sola PhonePay", () => {
     expect(easternToDate("11/16/2026 12:30:00 AM").toISOString()).toBe("2026-11-16T05:30:00.000Z");
   });
   it("the connect line is Abraham's exact wording, named PhonePay connect (approved; the audio waits for his OK)", () => {
-    expect(PROMPTS.pay_hold_secure.text).toBe("We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you.");
+    expect(PROMPTS.pay_hold_secure.text).toBe("We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you. Once your payment has been processed, please remain on the line to receive your booking confirmation.");
   });
 });
 
@@ -128,8 +128,8 @@ describe("card payment plan (Abraham, Nov 15, 2026): the caller never controls t
     expect(Object.keys(JSON.parse(calls[0]))).not.toContain("xAmount");
   });
   it("the three try-again lines are the approved wording", async () => {
-    expect(PROMPTS.phonepay_retry.text).toBe("Your card did not go through. To try again, press 1.");
-    expect(PROMPTS.phonepay_retry_last.text).toBe("Your card did not go through. You have one more chance to try. To try again, press 1.");
-    expect(PROMPTS.phonepay_failed.text).toBe("Sorry, your card did not go through. Please call us back to try again. Goodbye.");
+    expect(PROMPTS.phonepay_retry.text).toBe("We are sorry, your card did not go through. To try again, press 1.");
+    expect(PROMPTS.phonepay_retry_last.text).toBe("We are sorry, your card did not go through. You have one more chance. To try again, press 1.");
+    expect(PROMPTS.phonepay_failed.text).toBe("We are sorry, we were not able to process your card at this time. Please call us back later to complete your order, or you can contact customer service at extension 3 from the main menu. Thank you for calling Hup Up Attractions. Goodbye.");
   });
 });

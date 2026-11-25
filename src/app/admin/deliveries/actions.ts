@@ -19,7 +19,8 @@ export async function sendTemplateAction(orderId: number, key: TemplateKey): Pro
   const t = DELIVERY_TEMPLATES[key];
   if (!t) return { ok: false, message: "Choose an approved message." };
   const full = await getOrderWithItems(orderId);
-  if (!full?.customer?.phone) return { ok: false, message: "No customer phone on this order." };
+  const textTo = full ? full.order.textPhone || full.customer?.phone : null; // the order's text number (Nov 25, 2026)
+  if (!full?.customer || !textTo) return { ok: false, message: "No customer phone on this order." };
   // Delivery staff (Abraham U): only for an order that is one of their current stops (delivery or pickup today,
   // or yesterday's late stop), and only to that order's own phone number (taken from the order, never the browser).
   if (staff.role === "delivery" && (!isCurrentStop(full.order) || !hasAnyStop(full.order, staff.userId))) return { ok: false, message: "You can only text the customer of one of your own stops today." };
@@ -28,7 +29,7 @@ export async function sendTemplateAction(orderId: number, key: TemplateKey): Pro
   const { deliveryPhotoLink } = await import("@/lib/signed-link");
   const [photo] = await db.select({ id: schema.deliveryPhotos.id }).from(schema.deliveryPhotos).where(eq(schema.deliveryPhotos.orderId, orderId)).orderBy(desc(schema.deliveryPhotos.createdAt)).limit(1);
   const r = await sendOrderText({
-    phone: full.customer.phone,
+    phone: textTo,
     email: full.customer.email,
     subject: `${BUSINESS_NAME} order #${orderNumber(orderId)}`,
     body: t.body,

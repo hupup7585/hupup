@@ -340,6 +340,11 @@ export async function upsertCustomer(
   return row.id;
 }
 
+/** The number an order's texts go to (Abraham, Nov 25, 2026): the order's own text number, else the customer's phone. */
+export function orderTextPhone(order: { textPhone?: string | null }, customer: { phone?: string | null } | null | undefined): string | null {
+  return order.textPhone || customer?.phone || null;
+}
+
 export async function getOrderWithItems(orderId: number) {
   const [o] = await db.select().from(orders).where(eq(orders.id, orderId));
   if (!o) return null;
