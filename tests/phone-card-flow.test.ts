@@ -61,14 +61,14 @@ beforeAll(async () => {
 describe("card payment on the phone line", () => {
   it("before the first try: card is the default; 0 gets a payment link by text instead (approved, live)", async () => {
     const ask = await call("phonepay-go", {}, `o=${orderId}`);
-    expect(said(ask)).toEqual(["To pay with a credit or debit card, please stay on the line to connect to our secure payment line. To get a payment link instead, press 0."]);
+    expect(said(ask)).toEqual(["If you would like to pay by credit or debit card, please stay on the line. To receive a payment link instead, press 0."]);
     expect(redirect(ask)).toBe(`phonepay-go?o=${orderId}&c=1`); // no key: on to the card
     expect(ask).not.toContain("<Dial");
     // approved: it plays on the live line too
     process.env.VERCEL_ENV = "production";
     const live = await call("phonepay-go", {}, `o=${orderId}`);
     delete process.env.VERCEL_ENV;
-    expect(said(live)).toEqual(["To pay with a credit or debit card, please stay on the line to connect to our secure payment line. To get a payment link instead, press 0."]);
+    expect(said(live)).toEqual(["If you would like to pay by credit or debit card, please stay on the line. To receive a payment link instead, press 0."]);
     expect(redirect(await call("phonepay-option", { Digits: "2" }, `o=${orderId}`))).toBe(`phonepay-go?o=${orderId}`); // 2 is not a choice here
     await db.delete(schema.phonepayAttempts);
     expect(redirect(await call("phonepay-option", { Digits: "5" }, `o=${orderId}`))).toBe(`phonepay-go?o=${orderId}`);
@@ -81,9 +81,33 @@ describe("card payment on the phone line", () => {
     expect(x).not.toContain("<Sip");
     expect(x).toMatch(/<Number sendDigits="w+4321#w+80000#w+1">\+18334343354<\/Number>/);
     expect(x).toContain('record="do-not-record"');
-    expect(said(x).join(" ")).not.toContain("secure payment line. All card"); // the first try: box 56 already said the hold line
+    expect(said(x)).toEqual(["We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you."]); // after box 140 (no key): the hold line, then the payment line
     const [a] = await db.select().from(schema.phonepayAttempts);
     expect(a).toMatchObject({ orderId, tryNumber: 1, amountCents: 80000 });
+  });
+
+  it("box 140 (Abraham, Nov 24, 2026): no key -> the hold line and the payment line; 0 -> box 141, no hold line; wrong key -> not valid and box 140 again", async () => {
+    const { eq } = await import("drizzle-orm");
+    const [o2] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2026-12-01", pickupDate: "2026-12-02", subtotalCents: 10000, totalCents: 10000 }).returning();
+    const first = await call("phonepay-go", {}, `o=${o2.id}`);
+    expect(said(first)).toEqual(["If you would like to pay by credit or debit card, please stay on the line. To receive a payment link instead, press 0."]);
+    expect(first).toContain('timeout="5"');
+    expect(first).not.toContain("<Dial");
+    expect(redirect(first)).toBe(`phonepay-go?o=${o2.id}&c=1`); // no key
+    const zero = await call("phonepay-option", { Digits: "0" }, `o=${o2.id}`);
+    expect(redirect(zero)).toBe(`paylink?o=${o2.id}`);
+    expect(said(zero).join(" ")).not.toContain("All card information");
+    const bad = await call("phonepay-option", { Digits: "5" }, `o=${o2.id}`);
+    expect(said(bad)).toEqual(["Sorry, that is not a valid selection."]);
+    expect(redirect(bad)).toBe(`phonepay-go?o=${o2.id}`);
+    const go = await call("phonepay-go", {}, `o=${o2.id}&c=1`);
+    expect(said(go)).toEqual(["We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you."]);
+    expect(go).toContain("<Dial");
+    // a retry: the hold line, no box 140
+    const retry = await call("phonepay-go", {}, `o=${o2.id}`);
+    expect(said(retry)).toEqual(["We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you."]);
+    expect(retry).toContain("<Dial");
+    await db.delete(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.orderId, o2.id));
   });
 
   it("no charge: the try-again menu on our line; a wrong amount is voided and the Owner is emailed", async () => {

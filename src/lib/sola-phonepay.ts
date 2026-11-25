@@ -518,7 +518,18 @@ export function phonePayDialTwiml(vr: DialHost, phone: string, digits: string, a
  * real order, a found payment is recorded on that order ("Phone, custom charge (owner)"). Without one, it is only
  * logged on the attempt. No card data, ever.
  */
-export async function matchCustomCharge(attemptId: number, cents: number, orderId: number | null, deps: { fetcher?: typeof fetch; waitMs?: number; now?: () => Date; madeBy?: string } = {}): Promise<{ found: boolean; reason: string; orderId?: number | null }> {
+/**
+ * Owner custom charge without our amount (Abraham, Nov 24, 2026): the one approved Sola charge made during this call
+ * to Sola (from the dial to the caller's return) is the match. More than one in that time = not certain (no match).
+ */
+export function pickWindowMatch(txns: SolaTxn[], want: { from: Date; to: Date }, alreadyUsed: Set<string> = new Set()): { match: SolaTxn | null; reason: "found" | "not_found" | "ambiguous" } {
+  const inWindow = txns.filter((t) => t.approved && t.refNum && !alreadyUsed.has(t.refNum) && t.at >= new Date(want.from.getTime() - 60_000) && t.at <= new Date(want.to.getTime() + 120_000));
+  if (inWindow.length === 1) return { match: inWindow[0], reason: "found" };
+  return { match: null, reason: inWindow.length ? "ambiguous" : "not_found" };
+}
+
+/** cents = null: no amount entered on our line, the charge is matched by the time of the call to Sola (pickWindowMatch). */
+export async function matchCustomCharge(attemptId: number, cents: number | null, orderId: number | null, deps: { fetcher?: typeof fetch; waitMs?: number; now?: () => Date; madeBy?: string } = {}): Promise<{ found: boolean; reason: string; orderId?: number | null }> {
   const { orderNumber, markGroupPaid } = await import("@/lib/orders");
   const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
   const from = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
@@ -529,7 +540,8 @@ export async function matchCustomCharge(attemptId: number, cents: number, orderI
     if (i) await new Promise((r) => setTimeout(r, deps.waitMs ?? 3000));
     try {
       const now = deps.now?.() ?? new Date();
-      const r = pickMatch(await solaApprovedBetween(new Date(from.getTime() - 60_000), now, deps.fetcher), { amountCents: cents, orderNumber: num || "none", from, to: now }, await usedSolaRefs());
+      const txns = await solaApprovedBetween(new Date(from.getTime() - 60_000), now, deps.fetcher);
+      const r = cents === null ? pickWindowMatch(txns, { from, to: now }, await usedSolaRefs()) : pickMatch(txns, { amountCents: cents, orderNumber: num || "none", from, to: now }, await usedSolaRefs());
       reason = r.reason;
       found = r.match;
     } catch (e) {
@@ -546,11 +558,12 @@ export async function matchCustomCharge(attemptId: number, cents: number, orderI
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
     const [o] = await db
       .insert(schema.orders)
-      .values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: today, pickupDate: today, subtotalCents: cents, totalCents: cents, notes: `Custom charge made on the hotline by ${deps.madeBy ?? "the Owner"}. Fill in the customer and rental details.` })
+      .values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: today, pickupDate: today, subtotalCents: found.amountCents, totalCents: found.amountCents, notes: `Custom charge made on the hotline by ${deps.madeBy ?? "the Owner"}. Fill in the customer and rental details.` })
       .returning({ id: schema.orders.id });
     orderId = o.id;
     await db.update(schema.phonepayAttempts).set({ orderId }).where(eq(schema.phonepayAttempts.id, attemptId));
   }
+  if (cents === null) await db.update(schema.phonepayAttempts).set({ amountCents: found.amountCents }).where(eq(schema.phonepayAttempts.id, attemptId));
   await finishAttempt(attemptId, { matched: true, solaRef: found.refNum, last4: found.last4, cardType: found.cardType, note: "Paid" });
   if (orderId) {
     await markGroupPaid(orderId, found.amountCents, PHONEPAY_CUSTOM_METHOD, found.refNum);

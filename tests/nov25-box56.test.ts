@@ -123,7 +123,7 @@ describe("box 56 on a call", () => {
     await cart(["package", "boat"]);
     expect(said(await call("finalize"))[2]).toMatch(/^That includes 90 dollars for the paddle boat package, 60 dollars for the paddle boat, /);
   });
-  it("pay by card: the four lines in order, the new hold line last, then the call connects to the payment line", async () => {
+  it("pay by card (Nov 24, 2026): the three box 56 lines, then box 140 (on the next step), then the hold line, then the payment line", async () => {
     const { saveSetting } = await import("@/lib/settings");
     await saveSetting("solaPhonePayOn", true);
     await saveSetting("solaPhonePayOwnerOnly", false);
@@ -131,17 +131,21 @@ describe("box 56 on a call", () => {
     const id = await cart(["castle", "boat"]);
     const xml = await call("finalize");
     const lines = said(xml);
-    expect(lines).toHaveLength(4);
+    expect(lines).toHaveLength(3);
     expect(lines[0]).toBe(`Your order number is ${String(1000 + id).split("").join(" ")}.`);
     expect(lines[1]).toMatch(/^Your total is /);
     expect(lines[2]).toMatch(/^That includes 120 dollars for the jumping balloon, 60 dollars for the paddle boat, /);
-    expect(lines[3]).toBe(PROMPTS.pay_hold_secure.text);
     expect(redirect(xml)).toBe(`phonepay-go?o=${id}&n=1`);
-    // the old wording is gone from the prompts and the slot list
+    const box140 = await call("phonepay-go", {}, `o=${id}&n=1`);
+    expect(said(box140)).toEqual([PROMPTS.pay_card_line.text]);
+    const go = await call("phonepay-go", {}, `o=${id}&c=1`);
+    expect(said(go)).toEqual([PROMPTS.pay_hold_secure.text]);
+    expect(go).toContain("+18334343354</Number>");
     const { allSlots } = await import("@/lib/recording-slots");
     expect(JSON.stringify(PROMPTS) + JSON.stringify(allSlots())).not.toContain("Please hold for a moment");
     expect(allSlots().find((x) => x.key === "pay_hold_secure")?.text).toBe(PROMPTS.pay_hold_secure.text);
   });
+
 
 });
 

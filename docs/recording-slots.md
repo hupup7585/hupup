@@ -363,7 +363,7 @@ Thank you for choosing Hup Up Attractions! |
 | Slot | Line | Exact text |
 |---|---|---|
 | phonepay_link_option | Before the card: get a payment link by text instead | To pay by card now, please stay on the line. To get a secure payment link by text instead, press 0. |
-| pay_card_line | Box 140: card line (no key: the payment line; 0: a payment link) | To pay with a credit or debit card, please stay on the line to connect to our secure payment line. To get a payment link instead, press 0. |
+| pay_card_line | Box 140: card line (no key: the payment line; 0: a payment link) | If you would like to pay by credit or debit card, please stay on the line. To receive a payment link instead, press 0. |
 | pay_link_how | Box 141: payment link by text or email | To receive the payment link by text, press 1. To receive by email, press 2. |
 | pay_link_sent | Box 146: payment link sent | Done! We just sent you the payment link. To keep your booking, please complete your payment within the next ten minutes. Otherwise, the booking will be released. Thank you for choosing Hup Up Attractions! |
 | pay_hold_secure | Box 56: connecting to the secure payment line | We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you. |

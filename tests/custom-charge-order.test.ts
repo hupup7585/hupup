@@ -53,3 +53,32 @@ describe("custom charge without an order number", () => {
     expect((await db.select().from(schema.orders)).length).toBe(before);
   });
 });
+
+describe("custom charge matched by the time of the call to Sola (Abraham, Nov 24, 2026: no amount on our line)", () => {
+  it("the one charge made during the call is the match, with its own amount; it attaches to the given order", async () => {
+    process.env.SOLA_API_KEY = "test-key";
+    const [order] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2026-12-20", pickupDate: "2026-12-21", subtotalCents: 23000, totalCents: 23000 }).returning();
+    const a = await startAttempt(order.id, "CAowner3", 0, "custom");
+    const r = await matchCustomCharge(a.id, null, order.id, { fetcher: solaReturns("230.00", "R-600"), waitMs: 0 });
+    expect(r).toMatchObject({ found: true, orderId: order.id });
+    const [att] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a.id));
+    expect(att).toMatchObject({ solaRef: "R-600", amountCents: 23000 });
+    const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, order.id));
+    expect(o.paidCents).toBe(23000);
+  });
+  it("no order number: a new order with the charged amount", async () => {
+    const a = await startAttempt(null, "CAowner4", 0, "custom");
+    const r = await matchCustomCharge(a.id, null, null, { fetcher: solaReturns("75.50", "R-601"), waitMs: 0, madeBy: "the Owner" });
+    expect(r.found).toBe(true);
+    const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId!));
+    expect(o.totalCents).toBe(7550);
+  });
+  it("nothing charged during the call: not found, the same handling as today (no order made)", async () => {
+    const before = (await db.select().from(schema.orders)).length;
+    const a = await startAttempt(null, "CAowner5", 0, "custom");
+    const empty = (async () => new Response(JSON.stringify({ xResult: "S", xReportData: [] }))) as unknown as typeof fetch;
+    const r = await matchCustomCharge(a.id, null, null, { fetcher: empty, waitMs: 0 });
+    expect(r).toMatchObject({ found: false, reason: "not_found" });
+    expect((await db.select().from(schema.orders)).length).toBe(before);
+  });
+});

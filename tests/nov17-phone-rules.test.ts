@@ -13,7 +13,7 @@ describe("the approved lines, word for word", () => {
     expect((PROMPTS.laser_packs as PromptDef).pending).toBeUndefined();
   });
   it("payment flow, boxes 140 to 146", () => {
-    expect(PROMPTS.pay_card_line.text).toBe("To pay with a credit or debit card, please stay on the line to connect to our secure payment line. To get a payment link instead, press 0.");
+    expect(PROMPTS.pay_card_line.text).toBe("If you would like to pay by credit or debit card, please stay on the line. To receive a payment link instead, press 0."); // approved Nov 24, 2026
     expect(PROMPTS.pay_link_how.text).toBe("To receive the payment link by text, press 1. To receive by email, press 2.");
     expect(PROMPTS.text_which.text).toBe("To text it to the number you are calling from, press 1. To enter a different number, press 2.");
     expect(PROMPTS.text_enter.text).toBe("Please enter the 10-digit phone number. When you are finished, please press pound.");

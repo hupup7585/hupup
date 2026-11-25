@@ -61,7 +61,7 @@ import {
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { stripePhonePayMode, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
 import { blockIfTooManyCalls, isPhonePayBlocked, phonePayLimits, startPayWatch, startSolaListen } from "@/lib/phonepay-watch";
-import { PHONEPAY_NOT_REACHED, amountParts, buildSendDigits, checkPhonePayTry, customChargeMadeBy, endMainPayLeg, matchCustomCharge, parseCustomAmount, payQueueName, phonePayDirectDial, phonePayOffered, startPayLegWithMusic, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
+import { PHONEPAY_NOT_REACHED, buildSendDigits, checkPhonePayTry, customChargeMadeBy, endMainPayLeg, matchCustomCharge, payQueueName, phonePayDirectDial, phonePayOffered, startPayLegWithMusic, startAttempt, triesSoFar } from "@/lib/sola-phonepay";
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
@@ -3775,7 +3775,7 @@ const handlers: Record<string, Handler> = {
       if (keypadPayFor(caller, stripePhonePayMode(process.env, payCfg), process.env, payCfg.paymentTestNumbers) && PAY_PROMPTS.every((k) => stripePhonePayMode(process.env, payCfg) !== "live" || !promptWaiting(ctx.prompts, k)))
         return back(vr, "pay-keypad", { o: primary.id });
     } else if (phonePayOffered(caller, payCfg) && !(await isPhonePayBlocked(callerPhoneOf(ctx))) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k)))) {
-      sp(vr, ctx, "pay_hold_secure", undefined, { draftOk: true }); // box 56's last line (Nov 25, 2026), then the payment line
+      // Abraham, Nov 24, 2026: box 140 first (5 seconds), then the hold line and the payment line (phonepay-go)
       return back(vr, "phonepay-go", { o: primary.id, n: 1 });
     }
     // Card on the phone not offered to this caller: the payment link, by text or email (box 141)
@@ -3906,7 +3906,8 @@ const handlers: Record<string, Handler> = {
     // Watch Sola every second while the call to Sola is up (no time limit, Abraham, Nov 18, 2026)
     await startPayWatch(attempt.id);
     // Box 140 already told the caller they are being connected; later tries keep the "please hold" line
-    if (earlier.length) sp(vr, ctx, "pay_hold_secure", undefined, { draftOk: true });
+    // The hold line right before the payment line: after box 140 on the first try, and before every retry (no box 140)
+    sp(vr, ctx, "pay_hold_secure", undefined, { draftOk: true });
     // Straight from the hotline to Sola PhonePay (Abraham, Nov 17, 2026): PIN, the order amount (from the order, never
     // the caller) and 1, sent once PhonePay answers. Star brings the caller back at any time.
     const s = await getSettings();
@@ -4559,6 +4560,10 @@ const handlers: Record<string, Handler> = {
 
   /* ---- Owner custom charge through Sola PhonePay (Abraham, Nov 14, 2026); only after the voicemail password ---- */
 
+  /*
+   * Owner custom charge (Abraham, Nov 24, 2026): no amount on our line (Sola PhonePay asks for it itself) and no hold
+   * line. The optional order number, then Sola; the charge made during this call to Sola is matched by its time.
+   */
   async "vma-charge"(ctx, vr) {
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
     const settings = await getSettings();
@@ -4566,55 +4571,21 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "not_valid"); // PhonePay is switched off (or not set up): this key does nothing
       return back(vr, "vma-box");
     }
-    const t = Number(ctx.query.get("t") || 0);
-    if (t >= 3) {
-      sp(vr, ctx, "vma_charge_back", undefined, { draftOk: true });
-      return back(vr, "vma-box");
-    }
-    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 12, action: url("vma-charge-amount", { t }), method: "POST" });
-    sp(g, ctx, "vma_charge_amount", undefined, { draftOk: true });
-    return back(vr, "vma-charge", { t: t + 1 });
-  },
-
-  async "vma-charge-amount"(ctx, vr) {
-    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
-    const t = Number(ctx.query.get("t") || 0);
-    const cents = parseCustomAmount(ctx.body.Digits, Number((await getSettings()).solaPhonePayCustomCapCents) || 500000);
-    if (!cents) {
-      sp(vr, ctx, "vma_charge_bad", undefined, { draftOk: true });
-      return back(vr, "vma-charge", { t: t + 1 });
-    }
-    const g = keypad(vr, url("vma-charge-confirm", { c: cents, t }), { numDigits: 1, timeout: 8 });
-    sp(g, ctx, "vma_charge_readback", amountParts(cents), { draftOk: true });
-    // No key: the same amount is read back again, never a new amount (Abraham, Nov 18, 2026)
-    return back(vr, "vma-charge-confirm", { c: cents, t, r: 1 });
-  },
-
-  "vma-charge-confirm"(ctx, vr) {
-    if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
-    const c = Number(ctx.query.get("c"));
-    const t = Number(ctx.query.get("t") || 0);
-    const cd = ctx.body.Digits;
-    // Abraham, Nov 18, 2026: only 2 starts the amount over; a wrong key or no key reads the same amount back again
-    // (up to 3 times, then back to the voicemail menu), so the amount is never typed again by accident
-    const r = Number(ctx.query.get("r") || 0);
-    if (c && cd !== "1" && cd !== "2") {
-      if (!cd && r >= 3) return back(vr, "vma-box");
-      if (cd) sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
-      const g = keypad(vr, url("vma-charge-confirm", { c, t }), { numDigits: 1, timeout: 8 });
-      sp(g, ctx, "vma_charge_readback", amountParts(c), { draftOk: true });
-      return back(vr, "vma-charge-confirm", { c, t, r: r + 1 });
-    }
-    if (cd !== "1") return back(vr, "vma-charge", { t });
-    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-charge-go", { c }), method: "POST", actionOnEmptyResult: true });
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-charge-go"), method: "POST", actionOnEmptyResult: true });
     sp(g, ctx, "vma_charge_note", undefined, { draftOk: true });
-    return back(vr, "vma-charge-go", { c });
+    return back(vr, "vma-charge-go");
+  },
+
+  /** Older links to the removed amount steps: the charge from the start. */
+  "vma-charge-amount"(ctx, vr) {
+    return back(vr, "vma-charge");
+  },
+  "vma-charge-confirm"(ctx, vr) {
+    return back(vr, "vma-charge");
   },
 
   async "vma-charge-go"(ctx, vr) {
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
-    const c = Number(ctx.query.get("c"));
-    if (!c) return back(vr, "vma-box");
     // An order number is attached only if it is a real order
     const typed = (ctx.body.Digits || "").replace(/\D/g, "");
     const id = typed ? Number(typed) - 1000 : 0;
@@ -4627,21 +4598,19 @@ const handlers: Record<string, Handler> = {
         return back(vr, "vma-box");
       }
     }
-    const attempt = await startAttempt(order?.id ?? null, ctx.callSid, c, "custom");
-    await track(ctx.callSid, "vm_access", `Owner custom charge started: $${(c / 100).toFixed(2)}${order ? ` for order #${orderNumber(order.id)}` : ""}`, { attempt: attempt.id });
-    sp(vr, ctx, "pay_hold_secure", undefined, { draftOk: true });
+    const attempt = await startAttempt(order?.id ?? null, ctx.callSid, 0, "custom");
+    await track(ctx.callSid, "vm_access", `Owner custom charge started${order ? ` for order #${orderNumber(order.id)}` : ""} (the amount is typed on Sola's line)`, { attempt: attempt.id });
     const s = await getSettings();
-    const digits = buildSendDigits(s.solaPhonePayCustomDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: c, orderNumber: order ? orderNumber(order.id) : "" });
-    phonePayDirectDial(vr, { number: s.solaPhonePayNumber, digits, action: url("vma-charge-done", { a: attempt.id, c, o: order?.id ?? 0 }) });
+    const digits = buildSendDigits(s.solaPhonePayCustomDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: 0, orderNumber: order ? orderNumber(order.id) : "" });
+    phonePayDirectDial(vr, { number: s.solaPhonePayNumber, digits, action: url("vma-charge-done", { a: attempt.id, o: order?.id ?? 0 }) });
     return vr;
   },
 
   async "vma-charge-done"(ctx, vr) {
     if (ctx.session?.data.recording) await resumeRecording(ctx.callSid).catch(() => null);
     const a = Number(ctx.query.get("a"));
-    const c = Number(ctx.query.get("c"));
     const o = Number(ctx.query.get("o")) || null;
-    if (a && c) await matchCustomCharge(a, c, o, { madeBy: await customChargeMadeBy(ctx.session?.fromNumber ?? ctx.from) });
+    if (a) await matchCustomCharge(a, null, o, { madeBy: await customChargeMadeBy(ctx.session?.fromNumber ?? ctx.from) });
     sp(vr, ctx, "vma_charge_back", undefined, { draftOk: true });
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
     return back(vr, "vma-box");
