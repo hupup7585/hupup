@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { websiteHoursLines } from "@/lib/business-hours";
+import { customerServiceHours, websiteHoursLines } from "@/lib/business-hours";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
 import { BUSINESS_NAME_NB, CATALOG_LINE, keepName, whyLabel, whyRows, HOW_IT_WORKS_DELIVERY, WEBSITE_HOURS_NOTE, keepTimesTogether, noLonelyWord, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces, SERVICE_AREA_MAP_URL } from "@/lib/site-copy";
@@ -287,6 +287,12 @@ export default async function Home() {
                   </li>
                 );
               })}
+              {/* Abraham, Nov 25, 2026 (item 10 and 4:50 PM): customer service hours, from the same Hours page setting
+                  the phone rings by; the same on Chanukah and Chol Hamoed */}
+              <li className="py-3" data-hours-cs>
+                <span className="block text-sm font-bold uppercase tracking-wider opacity-70">Customer service</span>
+                <span className="block whitespace-pre-line font-semibold">{keepTimesTogether(customerServiceHours(settings))}</span>
+              </li>
             </ul>
           </div>
         </section>

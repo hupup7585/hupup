@@ -3,6 +3,7 @@ import { SETTING_DEFAULTS } from "@/lib/settings";
 import { TIME_ZONE, dayInfo, localISO, overrideFor, type CalendarSettings } from "@/lib/jewish-calendar";
 import { fixedFromISO } from "@/lib/hup-calendar/hebrew-date";
 import { holidaysOn } from "@/lib/hup-calendar/holidays";
+import { effectiveLine, loadHours, officeLines, scheduleOpenNow, scheduleWords } from "@/lib/hours-schedule";
 
 /**
  * Office hours (walk-ins and live calls), Abraham 2026-11-06. Eastern time. Uses the Jewish calendar for closed
@@ -10,7 +11,7 @@ import { holidaysOn } from "@/lib/hup-calendar/holidays";
  */
 
 export type HoursSettings = CalendarSettings &
-  Pick<Settings, "hoursMonThu" | "hoursFridayOpen" | "hoursSunday" | "hoursMotzeiOpen" | "hoursMotzeiCloseWinter" | "hoursMotzeiCloseSummer" | "hoursMotzeiSeason" | "hoursCholHamoed" | "hoursChanukah" | "hoursWebsiteNote">;
+  Pick<Settings, "hoursSchedules" | "hoursMonThu" | "hoursFridayOpen" | "hoursSunday" | "hoursMotzeiOpen" | "hoursMotzeiCloseWinter" | "hoursMotzeiCloseSummer" | "hoursMotzeiSeason" | "hoursCholHamoed" | "hoursChanukah" | "hoursWebsiteNote">;
 
 export function hoursDefaults(): HoursSettings {
   return { ...SETTING_DEFAULTS };
@@ -46,34 +47,22 @@ function lateWindow(iso: string): "cholHamoed" | "chanukah" | null {
   if (isChanukah(iso) && dow(iso) !== 5 && dow(iso) !== 6) return "chanukah";
   return null;
 }
-/** Is the office open (walk-ins and live calls) at this moment? */
+/**
+ * Is the office open (walk-ins and live calls) at this moment? Read from the Hours page (Abraham, Nov 25, 2026, 4:54 PM):
+ * the "Website and office hours" schedule (or its group). The Owner's own day on Business hours & holidays still wins:
+ * a closed day is closed, and a day with its own hours uses them.
+ */
 export function officeOpenNow(at: Date = new Date(), s: HoursSettings = hoursDefaults()): boolean {
   const iso = localISO(at);
-  const now = localMinutes(at);
-  const today = dayInfo(iso, s);
-
-  // Abraham, Nov 25, 2026, 3:44 PM: closed on Motzei Shabbes and Motzei Yom Tov (no reopening after Shabbes ends,
-  // and no late-night hours past midnight); the office stays closed until the next regular day's opening.
-
-  // The Owner's own hours for this day (admin "Holidays & hours") win over the calendar's defaults.
   const own = overrideFor(iso, s);
   if (own?.open && own.hours) {
     const w = range(own.hours);
-    if (w) return now >= w[0] && now < w[1];
+    if (w) {
+      const now = localMinutes(at);
+      return now >= w[0] && now < w[1];
+    }
   }
-
-  if (today.closed) return false; // Shabbes, Yom Tov and the night after them
-
-  let window: [number, number] | null;
-  const late = lateWindow(iso);
-  if (late === "cholHamoed") window = range(s.hoursCholHamoed);
-  else if (late === "chanukah") window = range(s.hoursChanukah);
-  else if (dow(iso) === 0) window = range(s.hoursSunday);
-  else if (dow(iso) === 5) window = [mins(s.hoursFridayOpen) ?? 630, 24 * 60];
-  else window = range(s.hoursMonThu);
-  if (!window || now < window[0] || now >= window[1]) return false;
-  if (today.closesAt && at >= today.closesAt) return false; // Erev Shabbes / Erev Yom Tov
-  return true;
+  return scheduleOpenNow(effectiveLine(loadHours(s), "office").schedule, at, s);
 }
 
 /**
@@ -146,10 +135,10 @@ export function websiteHoursLines(s: HoursSettings = hoursDefaults(), mutze: boo
     return `${ampm(a)} - ${ampm(b)}`;
   };
   void mutze;
+  void dash;
   return [
-    `Sunday: ${dash(s.hoursSunday)}`,
-    `Monday - Thursday: ${dash(s.hoursMonThu)}`,
-    `Friday: ${ampm(s.hoursFridayOpen)} - Chatzos`,
+    // From the Hours page (Nov 25, 2026, 4:54 PM): the website and office hours schedule, grouped the same way as before
+    ...officeLines(effectiveLine(loadHours(s), "office").schedule),
     // Abraham, Nov 19, 2026: "Take off the line, Shabbes closed" on the website (the phone's key 7 still says it)
     ...(shabbesLine ? ["Shabbes: Closed"] : []),
     // Abraham, Nov 25, 2026, 3:44 PM: closed on Motzei Shabbes; no Motzei line on the website or key 7
@@ -167,4 +156,13 @@ export function todayHours(at: Date = new Date(), s: HoursSettings = hoursDefaul
   if (info.closesAt) return `Today: ${ampm(s.hoursFridayOpen)} to ${t(info.closesAt)} (${dow(iso) === 5 ? "Erev Shabbes" : "Erev Yom Tov"})`;
   if (dow(iso) === 5) return `Today: from ${ampm(s.hoursFridayOpen)}`;
   return `Today: ${span(s.hoursMonThu)}`;
+}
+
+/**
+ * Customer service hours for the website (Abraham, Nov 25, 2026, item 10 and 4:50 PM): from the Hours page, the same
+ * schedule the phone rings by, e.g. "Sunday-Thursday 11 AM-2 PM and 7:30 PM-10 PM; Friday 11 AM-Chatzos". The same
+ * on Chanukah and Chol Hamoed (customer service keeps its weekday hours then).
+ */
+export function customerServiceHours(s: HoursSettings = hoursDefaults()): string {
+  return scheduleWords(effectiveLine(loadHours(s), "cs").schedule) || "Closed";
 }

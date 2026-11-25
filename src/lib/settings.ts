@@ -155,6 +155,8 @@ export const SETTING_DEFAULTS = {
   calendarOverrides: "",
   /* Office hours (walk-ins and live calls), Eastern time, "HH:MM-HH:MM" (24-hour). The automated phone system
      books 24/7 regardless. Items marked "to confirm" are Abraham's pending answers. */
+  /** Hours page (Abraham, Nov 25, 2026, 4:54 PM): every line's schedule, groups and date overrides, as JSON; empty = the decided defaults. */
+  hoursSchedules: "",
   hoursMonThu: "10:30-19:00",
   /** Friday opening; closing follows the Erev Shabbes rule (chatzos) until Abraham confirms. */
   hoursFridayOpen: "10:30",

@@ -102,6 +102,7 @@ export const NAV_GROUPS: Group[] = [
   {
     title: "Settings",
     items: [
+      ["/admin/hours", CalendarClock, "Hours", O], // Abraham, Nov 25, 2026, 4:54 PM: every line's hours in one place
       ["/admin/holidays", CalendarClock, "Business hours & holidays", O],
       ["/admin/settings", Settings, "General settings", O],
       ["/admin/status", Activity, "System status", O],

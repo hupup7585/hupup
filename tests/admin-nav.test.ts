@@ -17,7 +17,7 @@ describe("grouped admin menu", () => {
       "Phone system": ["Call log", "Voicemail", "Campaigns", "Hotline prompts", "Menu order", "Compliance", "Phone settings", "Music", "Sola PhonePay", "Card blocks"],
       Bookkeeping: ["Overview", "Income", "Invoices", "Expenses", "Bills I owe", "Sola fees", "Stripe fees", "Bank & card", "Sales tax", "Equipment", "Staff & 1099", "Mileage", "Reports", "All entries", "General ledger", "Settings"],
       Staff: ["Staff", "Tasks", "Activity"],
-      Settings: ["Business hours & holidays", "General settings", "System status", "API keys", "Staff screens (preview)"],
+      Settings: ["Hours", "Business hours & holidays", "General settings", "System status", "API keys", "Staff screens (preview)"],
     });
   });
 

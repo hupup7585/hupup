@@ -1189,7 +1189,12 @@ async function logCatalogRequest(ctx: Ctx, channel: "text" | "email", to: string
 /** Does this line ring now (office hours, after-hours switch, key 6 hours, Shabbes and Yom Tov)? */
 async function lineRingsNowFor(k: RingKey, settings: Awaited<ReturnType<typeof getSettings>>, at = new Date()) {
   const iso = localISO(at);
-  return lineRingsNow(k, at, settings, { officeOpen: officeOpenNow(at, settings), shabbosOrYomTov: isShabbosOrYomTov(iso), candleLighting: erevCandleLighting(iso, settings) });
+  // The Hours page (Abraham, Nov 25, 2026, 4:54 PM): each line's own schedule (or its group's) and its on/off switch
+  const { RING_KEY_LINE, effectiveLine, lineOpen, loadHours } = await import("@/lib/hours-schedule");
+  const hours = loadHours(settings);
+  const line = RING_KEY_LINE[k] ?? "office";
+  if (!effectiveLine(hours, line).on) return false; // switched off: this line goes to its voicemail
+  return lineRingsNow(k, at, settings, { officeOpen: line === "office" ? officeOpenNow(at, settings) : lineOpen(hours, line, at, settings), shabbosOrYomTov: isShabbosOrYomTov(iso), candleLighting: erevCandleLighting(iso, settings) });
 }
 
 /**
