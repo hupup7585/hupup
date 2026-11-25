@@ -549,10 +549,11 @@ async function isLaserBase(categoryId: number) {
 export const directoryLookupOn = (env: Record<string, string | undefined> = process.env) => env.VERCEL_ENV === "preview" || env.DIRECTORY_LOOKUP === "on";
 
 /** Box 25's live parts: "{Qnt} {item}" (singular for 1) and the date, or both dates after box 18 key 2. */
-function addedVars(a: { name: string; qty: number; date: string; date2?: string }) {
+export function addedVars(a: { name: string; qty: number; date: string; date2?: string }) {
+  // Abraham, Nov 25, 2026, 2:02 PM: the quantity and item name only; never the date (already confirmed) or the item number
   // An add-on named with its own count ("500 ocean balls") is said as named, with no count in front (Batch 3 item 4)
-  if (/^\d/.test(a.name.trim())) return { qty: "", item: a.name, date: a.date2 ? `${spokenDate(a.date)} and ${spokenDate(a.date2)}` : spokenDate(a.date) };
-  return { qty: a.qty, item: a.qty === 1 ? a.name : pluralName(a.name), date: a.date2 ? `${spokenDate(a.date)} and ${spokenDate(a.date2)}` : spokenDate(a.date) };
+  if (/^\d/.test(a.name.trim())) return { qty: "" as const, item: a.name };
+  return { qty: a.qty, item: a.qty === 1 ? a.name : pluralName(a.name) };
 }
 
 /**

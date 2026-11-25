@@ -60,7 +60,7 @@ describe("after the first jumping balloon of the call", () => {
     const add = await call("add", {}, `p=${balloon}&d=${DAY}&q=1`);
     expect(redirect(add)).toBe(`added-menu?o=${DAY}`);
     const box25 = said(await call("added-menu", {}, `o=${DAY}`));
-    expect(box25[0]).toBe("Successfully added to your cart: 1 Soft Hop for Wednesday, December sixteenth.");
+    expect(box25[0]).toBe("Successfully added to your cart: 1 Soft Hop.");
     expect(box25[1]).toBe(OFFER);
     expect(box25.join(" ")).not.toMatch(/Would you like|To skip, press pound/);
     expect(redirect(await call("after-add", { Digits: "9" }, `o=${DAY}`))).toBe(`ocean?d=${DAY}`);
@@ -76,7 +76,7 @@ describe("after the first jumping balloon of the call", () => {
   it("keys 1-3 add that pack on the balloon's date, then the added line; wrong key: not valid, the same menu; star: back", async () => {
     await call("add", {}, `p=${balloon}&d=${DAY}&q=1`);
     const r = await call("ocean-choice", { Digits: "3" }, `d=${DAY}`);
-    expect(said(r)[0]).toMatch(/^Successfully added to your cart: 700 ocean balls for /);
+    expect(said(r)[0]).toMatch(/^Successfully added to your cart: 700 ocean balls\.$/);
     expect(redirect(r)).toBe("added-menu?n=1");
     const items = await db.select().from(schema.orderItems).where((await import("drizzle-orm")).eq(schema.orderItems.orderId, h.session.orderId!));
     expect(items).toHaveLength(2);

@@ -37,7 +37,6 @@ export const SHARED_PIECES: { key: string; group: string; label: string; text: s
 export const PIECE_ALIAS: Record<string, string> = {
   "closed_day_intro#2": "piece:for",
   "box18_book#2": "piece:for",
-  "box25_added#2": "piece:for",
 };
 
 export const PROMPTS = {
@@ -179,7 +178,7 @@ export const PROMPTS = {
   // Jumping balloons (Abraham, Nov 19, 2026, approved): box 153 menu, box 154 when a balloon is chosen
   // Old-cart item added (Nov 19, 2026)
   // Box 25 for laser tag and paddle boats (Abraham, Nov 22, 2026): a second one while another is free that date
-  box25_added: { group: "Booking by item (key 1)", label: "Box 25: Successfully added to your cart (every item)", text: "Successfully added to your cart: {qty} {item} for {date}.", vars: ["qty", "item", "date"] },
+  box25_added: { group: "Booking by item (key 1)", label: "Box 25: Successfully added to your cart (every item)", text: "Successfully added to your cart: {qty} {item}.", vars: ["qty", "item"] }, // Nov 25, 2026, 2:02 PM: no date, no item number
   second_laser: { group: "Booking by item (key 1)", label: "Box 25, laser tag: To add another, press 1 (while another set is free)", text: "To add another, press 1." },
   second_paddle: { group: "Booking by item (key 1)", label: "Box 25, paddle boats: To add a second one, press 1", text: "To add a second one, press 1." },
   stay_on_line: { group: "Booking by item (key 1)", label: "Shared: Otherwise, stay on the line (add-on offers)", text: "Otherwise, stay on the line." },

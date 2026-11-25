@@ -55,7 +55,7 @@ describe("ocean balls after a jumping balloon", () => {
     expect(redirect(await call("after-add", { Digits: "9" }, `o=${DAY}`))).toBe(`ocean?d=${DAY}`);
     const r = await call("ocean-choice", { Digits: "2" }, `d=${DAY}`);
     expect(redirect(r)).toBe("added-menu?n=1");
-    expect(said(r)[0]).toMatch(/^Successfully added to your cart: 500 ocean balls for /); // no count in front of "500 ocean balls"
+    expect(said(r)[0]).toMatch(/^Successfully added to your cart: 500 ocean balls\.$/); // no count in front of "500 ocean balls"
     const order = h.session.orderId!;
     const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, order));
     const balls = await db.select().from(schema.products).where(eq(schema.products.name, "500 ocean balls"));

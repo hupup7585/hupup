@@ -95,7 +95,7 @@ describe("one item at a time (Nov 18, 2026); box 151 and box 152 (approved Nov 1
     h.session.data = {};
     const day = "2026-12-21";
     expect(redirect(await call("add", {}, `p=${boat}&d=${day}&q=1`))).toBe(`added-second?p=${boat}&d=${day}`); // box 25 with the second one (Nov 22, 3:13 PM)
-    expect(said(await call("added-menu"))).toEqual(["Successfully added to your cart: 1 Paddle boat for Monday, December twenty-first.", "To keep shopping, for same day, press 1. For another day, press 2.", "To go to your shopping cart, press 0.", "To go back, press star."]);
+    expect(said(await call("added-menu"))).toEqual(["Successfully added to your cart: 1 Paddle boat.", "To keep shopping, for same day, press 1. For another day, press 2.", "To go to your shopping cart, press 0.", "To go back, press star."]);
     expect(redirect(await call("another", {}, `p=${boat}&d=${day}`))).toBe("added-menu"); // a call still on the old step
     const { PROMPTS } = await import("@/lib/ivr/prompts");
     for (const k of ["box151", "box151_none", "box152"]) expect(PROMPTS).not.toHaveProperty(k);

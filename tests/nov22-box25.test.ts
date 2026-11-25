@@ -72,7 +72,7 @@ describe("box 25 for laser tag and paddle boats (Nov 22, 2026)", () => {
     h.session.data = {};
     expect(redirect(await call("add", {}, `p=${boat}&d=${D1}&q=1`))).toBe(`added-second?p=${boat}&d=${D1}`);
     const xml = await call("added-second", {}, `p=${boat}&d=${D1}`);
-    expect(said(xml)).toEqual(["Successfully added to your cart: 1 paddle boat for Tuesday, December twenty-second.", "To add a second one, press 1.", "Otherwise, stay on the line."]);
+    expect(said(xml)).toEqual(["Successfully added to your cart: 1 paddle boat.", "To add a second one, press 1.", "Otherwise, stay on the line."]);
     expect(xml).toMatch(/<Gather [^>]*timeout="4"/);
     expect(redirect(xml)).toBe("added-menu?n=1");
     expect(said(await call("added-menu", {}, "n=1"))).toEqual(["To keep shopping, for same day, press 1. For another day, press 2.", "To go to your shopping cart, press 0.", "To go back, press star."]);
@@ -81,7 +81,7 @@ describe("box 25 for laser tag and paddle boats (Nov 22, 2026)", () => {
     expect(redirect(await call("second-choice", { Digits: "1" }, `p=${boat}&d=${D1}`))).toBe(`add?p=${boat}&d=${D1}&q=1`);
     await call("add", {}, `p=${boat}&d=${D1}&q=1`);
     expect(redirect(await call("added-second", {}, `p=${boat}&d=${D1}`))).toBe("added-menu");
-    expect(said(await call("added-menu"))[0]).toBe("Successfully added to your cart: 1 paddle boat for Tuesday, December twenty-second.");
+    expect(said(await call("added-menu"))[0]).toBe("Successfully added to your cart: 1 paddle boat.");
   });
   it("laser tag: no second one when none is free; its own recording otherwise", async () => {
     h.session.orderId = null;
@@ -107,7 +107,7 @@ describe("box 18 (Abraham, Nov 22, 2026)", () => {
     await call("add", {}, `p=${boat}&d=${T}&q=1`);
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, h.session.orderId!));
     expect(o.spanDays).toBe(1.5);
-    expect(said(await call("added-menu"))[0]).toBe("Successfully added to your cart: 1 paddle boat for Tuesday, December twenty-ninth and Wednesday, December thirtieth.");
+    expect(said(await call("added-menu"))[0]).toBe("Successfully added to your cart: 1 paddle boat.");
   });
   it("the next day closed (Friday, then Shabbes): no second-day line and no key 2", async () => {
     h.session.orderId = null;

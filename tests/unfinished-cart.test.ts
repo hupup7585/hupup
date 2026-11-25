@@ -79,7 +79,7 @@ describe("unfinished phone order", () => {
     expect(redirect(added)).toBe("resume-added?d=2026-12-22");
     const menu = await call("resume-added", {}, "d=2026-12-22");
     expect(said(menu).slice(1)).toEqual(["To keep shopping, for same day, press 1. For another day, press 2.", "To go to your shopping cart, press 0.", "To go back, press star."]); // box 25 (Nov 22, 2026)
-    expect(said(menu)[0]).toMatch(/^Successfully added to your cart: 1 .+ for Tuesday, December twenty-second\.$/);
+    expect(said(menu)[0]).toMatch(/^Successfully added to your cart: 1 [^.]+\.$/);
     expect(redirect(menu)).toBe("resume-items"); // no key: the next old item
     expect(redirect(await call("resume-added-choice", { Digits: "0" }))).toBe("cart");
     expect(redirect(await call("resume-added-choice", { Digits: "1" }))).toBe("cats"); // same day: the categories menu (box 12a)
@@ -113,7 +113,7 @@ describe("unfinished phone order", () => {
     const r = await call("resume-items");
     // Ocean balls v2 (Nov 25, 2026, 14:08): the added line, then "To add ocean balls, press 9." in the same screen
     expect(redirect(r)).toBe("resume-added?d=2027-01-05&o=2027-01-05");
-    expect(said(await call("resume-added", {}, "d=2027-01-05&o=2027-01-05")).slice(0, 2)).toEqual(["Successfully added to your cart: 1 Castle for Tuesday, January fifth.", "To add ocean balls, press 9."]);
+    expect(said(await call("resume-added", {}, "d=2027-01-05&o=2027-01-05")).slice(0, 2)).toEqual(["Successfully added to your cart: 1 Castle.", "To add ocean balls, press 9."]);
     expect(redirect(await call("resume-added-choice", { Digits: "9" }, "d=2027-01-05&o=2027-01-05"))).toBe("ocean?d=2027-01-05&n=resume");
     expect(redirect(await call("ocean-choice", { Digits: "*" }, "d=2027-01-05&n=resume"))).toBe("resume-added?d=2027-01-05&o=2027-01-05");
   });

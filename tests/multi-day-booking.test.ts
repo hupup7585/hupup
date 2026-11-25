@@ -71,7 +71,7 @@ describe("key 1: date first, several days, one charge", () => {
     // Ocean balls v2 (Nov 25, 2026, 14:08): box 25 with "To add ocean balls, press 9." after the added line
     expect(said(addXml)).toEqual([]);
     expect(redirect(addXml)).toBe(`added-menu?o=${DAY1}`);
-    expect(said(await call("added-menu", {}, `o=${DAY1}`)).slice(0, 2)).toEqual(["Successfully added to your cart: 1 Castle for Tuesday, December first.", "To add ocean balls, press 9."]);
+    expect(said(await call("added-menu", {}, `o=${DAY1}`)).slice(0, 2)).toEqual(["Successfully added to your cart: 1 Castle.", "To add ocean balls, press 9."]);
     expect(said(await call("ocean", {}, `d=${DAY1}`))).toEqual(["To add 200 balls for $10, press 1.", "To add 500 balls for $15, press 2.", "To add 700 balls for $20, press 3.", "To go back, press star."]);
     expect(said(await call("added-menu", {}, "n=1"))[0]).toBe("To keep shopping, for same day, press 1. For another day, press 2."); // the added line is not said twice (Batch 3 item 4)
     expect(redirect(await call("after-add", { Digits: "1" }))).toBe("cats"); // same day: the categories menu (box 12a)
