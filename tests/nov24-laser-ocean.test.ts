@@ -156,9 +156,9 @@ describe("third laser pack half price (Abraham, Nov 24, 12:42 PM), the 3rd one a
   it("no maze: 6 guns $110 + 6 guns $110 + 6 guns $55 = $275", async () => {
     expect(await book("2027-05-05", [guns6, guns6, guns6])).toBe(27500);
   });
-  it("no maze: 6 guns $110 + 6 guns $110 + 4 guns $37.50 = $257.50 (the third added, not the cheapest)", async () => {
+  it("no maze: 6 guns $110 + 6 guns $110 + 4 guns $37.50 = $257.50 (the cheapest set is half, Nov 25, 2026, 5:06 PM)", async () => {
     expect(await book("2027-05-06", [guns6, guns6, guns4])).toBe(25750);
-    expect(await book("2027-05-10", [guns6, guns4, guns6])).toBe(11000 + 7500 + 5500); // third added = 6 guns
+    expect(await book("2027-05-10", [guns6, guns4, guns6])).toBe(11000 + 3750 + 11000); // 5:06 PM: the cheapest set is half, whatever the order
   });
   it("maze + 1 additional pack: no discount", async () => {
     expect(await book("2027-05-24", [maze6, ids.pack6])).toBe(27500);

@@ -152,3 +152,37 @@ describe("switch OFF", () => {
     }
   });
 });
+
+describe("5:06 PM: the half price always goes to the cheapest sets in each group", () => {
+  const guns4 = (key: number) => ({ key, name: "4 Laser Guns", cat: CAT, priceCents: 7500 });
+  const pack4 = (key: number) => ({ key, name: "Additional 4-Pack Laser Guns", cat: ADD, priceCents: 5000 });
+  const sum = (m: Map<number, number>) => [...m.values()].reduce((a, b) => a + b, 0);
+  it("1. no maze: two 6-gun sets + one 4-gun set = $110 + $110 + $37.50", async () => {
+    expect(prices(await laserAddonPrices(db, [guns6(1), guns6(2), guns4(3)], true), [1, 2, 3])).toEqual([11000, 11000, 3750]);
+  });
+  it("2. added in order 4-gun, 6-gun, 6-gun: the same $257.50", async () => {
+    const m = await laserAddonPrices(db, [guns4(1), guns6(2), guns6(3)], true);
+    expect(prices(m, [1, 2, 3])).toEqual([3750, 11000, 11000]);
+    expect(sum(m)).toBe(25750);
+  });
+  it("3. maze + two +6-packs + one +4-pack: $200 + $75 + $75 + $25", async () => {
+    expect(prices(await laserAddonPrices(db, [maze(1), pack6(2), pack4(3), pack6(4)], true), [1, 2, 3, 4])).toEqual([20000, 7500, 2500, 7500]);
+  });
+  it("4. six extra sets: the two cheapest are half", async () => {
+    const m = await laserAddonPrices(db, [maze(1), pack6(2), pack4(3), pack6(4), pack6(5), pack4(6), pack6(7)], true);
+    expect(prices(m, [2, 3, 4, 5, 6, 7])).toEqual([7500, 2500, 7500, 7500, 2500, 7500]);
+  });
+  it("5. three sets at the same price: one is half (the third added, as before)", async () => {
+    expect(prices(await laserAddonPrices(db, [guns6(1), guns6(2), guns6(3)], true), [1, 2, 3])).toEqual([11000, 11000, 5500]);
+  });
+  it("6. a set removed: which sets are half is worked out again", async () => {
+    const all = await laserAddonPrices(db, [guns6(1), guns4(2), guns6(3), guns6(4)], true);
+    expect(prices(all, [1, 2, 3, 4])).toEqual([11000, 3750, 11000, 11000]);
+    const without4 = await laserAddonPrices(db, [guns6(1), guns6(3), guns6(4)], true);
+    expect(prices(without4, [1, 3, 4])).toEqual([11000, 11000, 5500]);
+  });
+  it("full sets: the cheapest maze set is the half one", async () => {
+    const maze4 = (key: number) => ({ key, name: "Inflatable Maze with 4 Laser Guns", cat: CAT, priceCents: 17500 });
+    expect(prices(await laserAddonPrices(db, [maze4(1), maze(2), maze(3)], true), [1, 2, 3])).toEqual([8750, 20000, 20000]);
+  });
+});

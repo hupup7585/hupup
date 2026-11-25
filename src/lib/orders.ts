@@ -160,7 +160,8 @@ export async function laserThirdSetHalfOn(tx: { execute: typeof db.execute }): P
  * Laser tag line prices, in the order the lines were added (Nov 24, 2026: shared by saved orders, the booking screen's
  * live total and the phone's spoken price). Extra gun sets: the add-on price with a maze on the booking, else the
  * regular price of the same size set. "Laser tag: every third set half price" (Abraham, Nov 25, 2026, 4:03 PM): when
- * on, every 3rd full set (a maze with its guns) is half price, and every 3rd extra gun set is half price (with a maze:
+ * on, every 3rd full set (a maze with its guns) is half price, and every 3rd extra gun set is half price (5:06 PM: the
+ * cheapest sets in each group get the half price) (with a maze:
  * the add-on sets; without a maze: the guns-only sets and add-on sets); the two are counted apart and each line is
  * halved at most once, from its catalog price. Off: no third-set discount. Prices before tax.
  */
@@ -191,10 +192,18 @@ export async function laserAddonPrices(tx: { execute: typeof db.execute }, rows:
   for (const pl of plainSets) out.set(pl.key, pl.priceCents);
   for (const f of fullSets) out.set(f.key, f.priceCents);
   if (!(halfOn ?? (await laserThirdSetHalfOn(tx)))) return out;
-  const everyThird = (list: typeof rows) =>
-    [...list].sort((x, y) => x.key - y.key).forEach((a, i) => {
-      if (i % 3 === 2) out.set(a.key, Math.round((out.get(a.key) ?? a.priceCents) / 2));
-    });
+  // Abraham, Nov 25, 2026, 5:06 PM: for every 3 sets in a group, 1 is half price, and the half-price sets are always the
+  // cheapest in that group, whatever the order they were added (equal prices: the later-added ones, as before)
+  const everyThird = (list: typeof rows) => {
+    const n = Math.floor(list.length / 3);
+    const byAdded = [...list].sort((x, y) => x.key - y.key);
+    const third = (a: (typeof rows)[number]) => (byAdded.indexOf(a) % 3 === 2 ? 0 : 1); // equal prices: the 3rd, 6th... added
+    byAdded
+      .slice()
+      .sort((x, y) => (out.get(x.key) ?? x.priceCents) - (out.get(y.key) ?? y.priceCents) || third(x) - third(y) || y.key - x.key)
+      .slice(0, n)
+      .forEach((a) => out.set(a.key, Math.round((out.get(a.key) ?? a.priceCents) / 2)));
+  };
   everyThird([...addons, ...plainSets]); // extra gun sets
   everyThird(fullSets); // full sets, counted apart
   return out;
