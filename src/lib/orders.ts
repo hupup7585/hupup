@@ -46,14 +46,12 @@ export async function orderHasMaze(exec: { execute: typeof db.execute }, orderId
     WHERE oi.order_id = ${orderId} AND c.name ~* 'laser' AND c.name !~* 'add-ons' AND p.name ~* 'maze' LIMIT 1`);
   return r.rows.length > 0;
 }
-/** Remove the additional gun packs from a booking that no longer has a maze (Abraham, Nov 24, 2026). Returns how many lines. */
-export async function dropOrphanPacks(exec: { execute: typeof db.execute }, orderId: number): Promise<number> {
-  if (await orderHasMaze(exec, orderId)) return 0;
-  const r = await exec.execute(sql`
-    DELETE FROM order_items oi USING products p, categories c
-    WHERE oi.order_id = ${orderId} AND p.id = oi.product_id AND c.id = p.category_id AND c.name ~* '^laser tag add-ons$'
-    RETURNING oi.id`);
-  return r.rows.length;
+/**
+ * Abraham, Nov 25, 2026, 15:06: removing the maze no longer drops the extra gun sets. They are guns, and a guns-only
+ * booking keeps them at the no-maze price (every 3rd half). Kept as a function so callers stay the same; removes nothing.
+ */
+export async function dropOrphanPacks(_exec: { execute: typeof db.execute }, _orderId: number): Promise<number> {
+  return 0;
 }
 
 async function reserveInTx(
@@ -155,8 +153,10 @@ export const LASER_ADDONS_GROUP = "Laser tag add-ons";
 export async function laserAddonPrices(tx: { execute: typeof db.execute }, rows: { key: number; name: string; cat: string; priceCents: number }[]): Promise<Map<number, number>> {
   const out = new Map<number, number>();
   const addons = rows.filter((x) => x.cat === LASER_ADDONS_GROUP);
-  if (!addons.length) return out;
   const hasMaze = rows.some((x) => x.cat !== LASER_ADDONS_GROUP && /laser/i.test(x.cat) && /maze/i.test(x.name));
+  // Guns-only sets (6 or 4 laser guns, no maze) count as gun sets on a booking with no maze (Abraham, Nov 25, 2026, 15:06)
+  const plainSets = hasMaze ? [] : rows.filter((x) => x.cat !== LASER_ADDONS_GROUP && /laser/i.test(x.cat) && !/maze/i.test(x.name) && /\d+\s+laser guns/i.test(x.name));
+  if (!addons.length && !plainSets.length) return out;
   for (const a of addons) {
     let target = a.priceCents;
     if (!hasMaze) {
@@ -172,8 +172,10 @@ export async function laserAddonPrices(tx: { execute: typeof db.execute }, rows:
     }
     out.set(a.key, target);
   }
-  // Every 3rd extra gun set on a booking is half price (Abraham, Nov 25, 2026, 14:41), in the order they were added
-  const inOrder = [...addons].sort((x, y) => x.key - y.key);
+  for (const pl of plainSets) out.set(pl.key, pl.priceCents);
+  // Every 3rd gun set on a booking is half price, in the order added (Abraham, Nov 25, 2026, 14:41 and 15:06): with a
+  // maze, the extra sets; without a maze, every gun set (guns-only sets and extra sets)
+  const inOrder = [...addons, ...plainSets].sort((x, y) => x.key - y.key);
   inOrder.forEach((a, i) => {
     if (i % 3 === 2) out.set(a.key, Math.round((out.get(a.key) ?? a.priceCents) / 2));
   });

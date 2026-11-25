@@ -2697,6 +2697,29 @@ const handlers: Record<string, Handler> = {
     const free = await checkBookable(p.id, p.quantity, date, db, keptPickup(ctx, date));
     // Laser tag (Nov 22, 2026, 11:12 PM): "To add another" every time while another set is free; paddle boats: a second one
     if (!kind || free <= 0 || (kind === "paddle" && inCart !== 1)) return back(vr, "added-menu");
+    // Guns-only sets, no maze (Abraham, Nov 25, 2026, 15:06): the same lines as the extra sets after a maze
+    if (kind === "laser" && /\d+\s+laser guns/i.test(p.name) && !/maze/i.test(p.name)) {
+      const day = await dayOrder(ctx, date);
+      const { orderHasMaze } = await import("@/lib/orders");
+      if (day && !(await orderHasMaze(db, day.order.id))) {
+        const packIds = new Set((await addOnProducts(LASER_ADDONS_CATEGORY)).map((x) => x.id));
+        const gunSet = async (productId: number) => {
+          if (packIds.has(productId)) return true;
+          const [x] = await db.select({ name: products.name, categoryId: products.categoryId }).from(products).where(eq(products.id, productId));
+          return Boolean(x && (await isLaserBase(x.categoryId)) && !/maze/i.test(x.name) && /\d+\s+laser guns/i.test(x.name));
+        };
+        let sets = 0;
+        for (const i of day.items) if (await gunSet(i.productId)) sets += i.qty;
+        if (sets >= 3) return back(vr, "added-menu"); // after the third set: no more offers
+        const g = keypad(vr, url("second-choice", { p: p.id, d: date }), { timeout: 5 });
+        const a = ctx.session?.data.lastAdded;
+        if (a) sp(g, ctx, "box25_added", addedVars(a));
+        if (sets <= 1) sp(g, ctx, "laser_second_set");
+        else sp(g, ctx, "laser_third_set", { price: spokenMoney(await nextSetPrice(day.order.id, p.id)) });
+        sp(g, ctx, "stay_on_line");
+        return back(vr, "added-menu", { n: 1 }); // no key for 5 seconds: nothing added, on to the keep-shopping lines
+      }
+    }
     const g = keypad(vr, url("second-choice", { p: p.id, d: date }), { timeout: 4 });
     const a = ctx.session?.data.lastAdded;
     if (a) sp(g, ctx, "box25_added", addedVars(a));

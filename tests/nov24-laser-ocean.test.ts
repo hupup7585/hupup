@@ -110,7 +110,7 @@ describe("2 (revised). additional packs only with a maze; the offer repeats afte
     expect(await createOrderWithItems({ items: [{ productId: guns6, qty: 1 }, { productId: ids.pack6, qty: 1 }], eventDate: "2027-03-30", channel: "POS", status: "CONFIRMED" })).toMatchObject({ ok: false, reason: "needs_maze" });
     expect((await createOrderWithItems({ items: [{ productId: maze6, qty: 1 }, { productId: ids.pack6, qty: 2 }], eventDate: "2027-03-30", channel: "POS", status: "CONFIRMED" })).ok).toBe(true);
   });
-  it("removing the maze from the phone cart removes its additional packs", async () => {
+  it("Nov 25, 2026, 15:06: removing the maze keeps its additional packs (guns) at the no-maze price", async () => {
     const day = "2027-06-14";
     h.session.orderId = null;
     h.session.data = {};
@@ -124,7 +124,9 @@ describe("2 (revised). additional packs only with a maze; the offer repeats afte
     const mz = before.find((i) => i.productId === maze6)!;
     void mazeLine;
     await call("remove-qty-choice", { Digits: "1" }, `i=${mz.id}`);
-    expect(await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId))).toHaveLength(0);
+    const left = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
+    expect(left.map((l) => l.productId).sort()).toEqual([ids.pack6, ids.pack4].sort());
+    expect(left.find((l) => l.productId === ids.pack6)!.unitPriceCents).toBe(11000); // the regular six-gun price
   });
 });
 

@@ -33,6 +33,8 @@ const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/R
 /* Laser tag extra gun sets (Abraham, Nov 25, 2026, 14:06 and 14:41): after the 1st extra set "To add a second one,
  * press 1.", after the 2nd "To add a third gun set for half price, only {price}, press 1."; every 3rd set is half price. */
 let maze6 = 0;
+let guns6 = 0;
+let guns4 = 0;
 const ids = { pack6: 0, pack4: 0 };
 const SECOND = "To add a second one, press 1.";
 const STAY = "Otherwise, stay on the line.";
@@ -49,6 +51,9 @@ beforeAll(async () => {
     ])
     .returning();
   maze6 = m.id;
+  const plain = await db.select().from(schema.products).where(eq(schema.products.categoryId, laser.id));
+  guns6 = plain.find((x) => x.name === "6 Laser Guns")!.id;
+  guns4 = plain.find((x) => x.name === "4 Laser Guns")!.id;
   const [addons] = await db.select().from(schema.categories).where(eq(schema.categories.name, "Laser tag add-ons"));
   const [p6, p4] = await db
     .insert(schema.products)
@@ -124,5 +129,65 @@ describe("no maze: four-gun sets at the regular price", () => {
     // with a maze: the add-on price, the third half of it ($25 for the four-gun set)
     const withMaze = await laserAddonPrices(db, [{ key: 0, name: "Inflatable Maze with 6 Laser Guns", cat: "Laser Tag and Inflatable Mazes", priceCents: 20000 }, row(1), row(2), row(3)]);
     expect([withMaze.get(1), withMaze.get(2), withMaze.get(3)]).toEqual([5000, 5000, 2500]);
+  });
+});
+
+describe("Abraham 15:06: no maze, guns-only sets get the offers too; every 3rd gun set half", () => {
+  const start = () => {
+    h.session.orderId = null;
+    h.session.data = {};
+  };
+  it("three six-gun sets: second-one line, the second at $110, the third spoken 55 dollars and charged $55", async () => {
+    start();
+    const day = "2027-05-03";
+    expect(redirect(await call("add", {}, `p=${guns6}&d=${day}&q=1`))).toBe(`added-second?p=${guns6}&d=${day}`);
+    const one = await call("added-second", {}, `p=${guns6}&d=${day}`);
+    expect(said(one).slice(1)).toEqual([SECOND, STAY]);
+    expect(one).toMatch(/timeout="5"/);
+    expect(redirect(await call("second-choice", { Digits: "1" }, `p=${guns6}&d=${day}`))).toBe(`add?p=${guns6}&d=${day}&q=1`);
+    await call("add", {}, `p=${guns6}&d=${day}&q=1`);
+    expect(said(await call("added-second", {}, `p=${guns6}&d=${day}`)).slice(1)).toEqual(["To add a third gun set for half price, only 55 dollars, press 1.", STAY]);
+    await call("add", {}, `p=${guns6}&d=${day}&q=1`);
+    expect((await items(h.session.orderId!)).map((l) => l.unitPriceCents)).toEqual([11000, 11000, 5500]);
+    expect(redirect(await call("added-second", {}, `p=${guns6}&d=${day}`))).toBe("added-menu"); // after the third: no more offers
+  });
+  it("three four-gun sets: the third $37.50", async () => {
+    start();
+    const day = "2027-05-04";
+    await call("add", {}, `p=${guns4}&d=${day}&q=1`);
+    await call("add", {}, `p=${guns4}&d=${day}&q=1`);
+    expect(said(await call("added-second", {}, `p=${guns4}&d=${day}`))[1]).toBe("To add a third gun set for half price, only 37 dollars and 50 cents, press 1.");
+    await call("add", {}, `p=${guns4}&d=${day}&q=1`);
+    expect((await items(h.session.orderId!)).map((l) => l.unitPriceCents)).toEqual([7500, 7500, 3750]);
+  });
+  it("no key at each offer adds nothing; wrong key: not valid, the same line", async () => {
+    start();
+    const day = "2027-05-05";
+    await call("add", {}, `p=${guns6}&d=${day}&q=1`);
+    expect(redirect(await call("added-second", {}, `p=${guns6}&d=${day}`))).toBe("added-menu?n=1");
+    await call("add", {}, `p=${guns6}&d=${day}&q=1`);
+    expect(redirect(await call("added-second", {}, `p=${guns6}&d=${day}`))).toBe("added-menu?n=1");
+    expect(await items(h.session.orderId!)).toHaveLength(2);
+    const bad = await call("second-choice", { Digits: "7" }, `p=${guns6}&d=${day}`);
+    expect(said(bad)).toEqual(["Sorry, that is not a valid selection."]);
+    expect(redirect(bad)).toBe(`added-second?p=${guns6}&d=${day}`);
+  });
+  it("maze removed: the extra sets stay and are repriced to the no-maze prices (third half)", async () => {
+    start();
+    const day = "2027-05-06";
+    await call("add", {}, `p=${maze6}&d=${day}&q=1`);
+    await call("packs-choice", { Digits: "1" }, `d=${day}`);
+    await call("packs-choice", { Digits: "1" }, `d=${day}&k=1`);
+    await call("packs-choice", { Digits: "1" }, `d=${day}&k=1`);
+    const orderId = h.session.orderId!;
+    expect((await items(orderId)).map((l) => l.unitPriceCents)).toEqual([20000, 7500, 7500, 3750]);
+    const mazeLine = (await items(orderId))[0];
+    h.session.data = { ...h.session.data };
+    const lines = said(await call("remove"));
+    expect(lines.length).toBeGreaterThan(0);
+    await call("remove-choice", { Digits: "1" });
+    const left = await items(orderId);
+    expect(left.some((l) => l.id === mazeLine.id)).toBe(false);
+    expect(left.map((l) => l.unitPriceCents)).toEqual([11000, 11000, 5500]);
   });
 });

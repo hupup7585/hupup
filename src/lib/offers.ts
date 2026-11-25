@@ -54,6 +54,9 @@ const isRental = (l: Line) => (RENTAL.test(l.category) || ADDONS.test(l.category
 
 /** Laser tag third pack: half the price of the 3rd pack, counting packs in the order they were added. */
 export function laserThirdPackDiscount(ls: Line[]): number {
+  // Abraham, Nov 25, 2026, 15:06: with no maze, every 3rd gun set is already half price in the order price, the same
+  // result this offer gave; never both. With a maze this offer is unchanged (his double-discount answer is pending).
+  if (!ls.some((l) => LASER.test(l.category) && !ADDONS.test(l.category) && /maze/i.test(l.name ?? ""))) return 0;
   // Abraham, Nov 24, 2026: a pack is anything with guns: a maze with its guns (pack 1), only 6 or 4 guns, an additional
   // pack; lines in the order added (each laser item added is its own line); only the 3rd one is half its own price
   const packs: number[] = [];
