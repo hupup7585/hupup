@@ -693,6 +693,8 @@ export const voicemails = pgTable(
     audioOf: integer("audio_of"),
     /** A recorded note played before a forwarded message (R2 key) */
     noteKey: text("note_key"),
+    /** Box 34 delivery instructions (Nov 25, 2026): the booking this message belongs to */
+    orderId: integer("order_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("voicemails_box_idx").on(t.boxId, t.createdAt)],

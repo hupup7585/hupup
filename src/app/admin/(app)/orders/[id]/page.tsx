@@ -240,6 +240,26 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               </div>
             );
           })()}
+          {/* Box 34 (Abraham, Nov 25, 2026): the caller's recorded delivery instructions, kept with the booking */}
+          {await (async () => {
+            const { deliveryInstructionsFor } = await import("@/lib/voicemail");
+            const msgs = await deliveryInstructionsFor(o.id);
+            if (!msgs.length) return null;
+            return (
+              <div className="card p-5" data-delivery-instructions>
+                <h2 className="mb-1 font-bold">Delivery instructions</h2>
+                <p className="mb-2 text-sm text-muted">Recorded by the caller on the phone. Also in the Delivery instructions voicemail box.</p>
+                <ul className="space-y-3">
+                  {msgs.map((m) => (
+                    <li key={m.id}>
+                      <div className="text-sm text-muted">{inboxWhen(m.createdAt)} · {m.durationSec} seconds</div>
+                      <audio controls preload="none" className="mt-1 w-full" src={`/api/admin/voicemail/${m.id}/audio`} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })()}
           <div className="card p-5">
             <h2 className="mb-3 font-bold">Customer</h2>
             {customer ? (

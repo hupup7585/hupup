@@ -59,6 +59,48 @@ export async function boxForKey(key: string | null | undefined, name?: string): 
   return again;
 }
 
+/** The "Delivery instructions" box (Box 34, Abraham, Nov 25, 2026), made on first use with the Main box's alert recipients. */
+export async function deliveryInstructionsBox(): Promise<VoicemailBox> {
+  const [found] = await db.select().from(schema.voicemailBoxes).where(eq(schema.voicemailBoxes.extensionKey, "directions")).limit(1);
+  if (found) return found;
+  const main = await mainBox();
+  const [created] = await db
+    .insert(schema.voicemailBoxes)
+    .values({ name: "Delivery instructions", extensionKey: "directions", transcribe: false, maxLengthSec: 180, notifySms: [], notifyEmail: main.notifyEmail })
+    .onConflictDoNothing({ target: schema.voicemailBoxes.extensionKey })
+    .returning();
+  if (created) return created;
+  const [again] = await db.select().from(schema.voicemailBoxes).where(eq(schema.voicemailBoxes.extensionKey, "directions")).limit(1);
+  return again;
+}
+
+/**
+ * A delivery-instructions message (Box 34): recorded, not transcribed, saved with its booking (order number, name and
+ * address in the note), also when the caller hung up mid-message. Saved once per recording.
+ */
+export async function saveDeliveryInstructions(input: { orderId: number | null; callSid: string | null; from: string | null; recordingSid: string; recordingUrl: string; durationSec: number; ready: boolean }) {
+  if (!input.recordingSid || !input.recordingUrl) return null;
+  const box = await deliveryInstructionsBox();
+  let note: string | null = null;
+  if (input.orderId) {
+    const [o] = await db.select({ address: schema.orders.deliveryAddress, customerId: schema.orders.customerId }).from(schema.orders).where(eq(schema.orders.id, input.orderId)).limit(1);
+    const [c] = o?.customerId ? await db.select({ name: schema.customers.name }).from(schema.customers).where(eq(schema.customers.id, o.customerId)).limit(1) : [];
+    const { orderNumber } = await import("@/lib/orders");
+    note = [`Order #${orderNumber(input.orderId)}`, c?.name, o?.address].filter(Boolean).join(", ");
+  }
+  const [row] = await db
+    .insert(schema.voicemails)
+    .values({ boxId: box.id, orderId: input.orderId, callSid: input.callSid, fromNumber: input.from, recordingSid: input.recordingSid, recordingUrl: input.recordingUrl, durationSec: input.durationSec, transcriptionStatus: "off", state: "submitted", ready: input.ready, note })
+    .onConflictDoUpdate({ target: schema.voicemails.recordingSid, set: { durationSec: input.durationSec, ...(input.ready ? { ready: true } : {}), ...(input.orderId ? { orderId: input.orderId } : {}) } })
+    .returning();
+  return row ?? null;
+}
+
+/** The delivery-instructions messages of one booking (newest first), for the order page. */
+export async function deliveryInstructionsFor(orderId: number) {
+  return db.select().from(schema.voicemails).where(and(eq(schema.voicemails.orderId, orderId), isNull(schema.voicemails.deletedAt))).orderBy(desc(schema.voicemails.createdAt));
+}
+
 /** Note on the alert when the caller pressed # and then hung up without pressing 1 (Abraham, word for word). */
 export const HUNG_UP_UNCONFIRMED_NOTE = "The customer hung up without confirming or deleting this message.";
 

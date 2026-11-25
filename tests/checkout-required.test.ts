@@ -45,26 +45,23 @@ describe("required details", () => {
   });
 });
 
-describe("driver directions (optional)", () => {
-  it("asks, saves what the caller says, then goes on to the order (no email in the booking)", async () => {
-    const ask = await call("directions");
-    expect(said(ask)).toContain("Is there anything our delivery team should know, like a gate code, where to park, or where to set up? Please say it now.");
-    expect(said(ask)).toContain("To skip, press pound."); // the shared skip line (Nov 19, 2026)
-    expect(ask).toContain("/audio/tone.wav</Play></Gather>"); // the tone after the question (Abraham, Nov 17, 2026)
-    expect(redirect(ask)).toBe("finalize"); // nothing said: skipped
-    const saved = await call("directions-heard", { SpeechResult: "The gate code is 1234, park in the back" });
-    expect(h.session.data.directions).toBe("The gate code is 1234, park in the back");
-    expect(said(saved)).toContain("Thank you, we saved that for our delivery team.");
-    expect(redirect(saved)).toBe("finalize");
+describe("Box 34 delivery instructions (Abraham, Nov 21 and 24, 2026)", () => {
+  it("the menu word for word: 1 records, pound or silence skips, star back to the address, wrong key not valid", async () => {
+    const menu = await call("directions");
+    expect(said(menu)).toEqual(["To add any special delivery instructions, press 1. To skip, press pound. To go back, press star."]);
+    expect(redirect(menu)).toBe("finalize"); // silence: skip
+    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("finalize");
+    expect(redirect(await call("directions-choice", { Digits: "*" }))).toBe("addr-readback");
+    expect(redirect(await call("directions-choice", { Digits: "1" }))).toBe("directions-record");
+    const bad = await call("directions-choice", { Digits: "5" });
+    expect(said(bad)).toEqual(["Sorry, that is not a valid selection."]);
+    expect(redirect(bad)).toBe("directions");
   });
-  it("pound skips, nothing saved", async () => {
-    const r = await call("directions-heard", { Digits: "#" });
-    expect(h.session.data.directions).toBeUndefined();
-    expect(redirect(r)).toBe("finalize");
-  });
-  it("live line: the step waits until Abraham approves its two lines", async () => {
-    process.env.VERCEL_ENV = "production";
-    expect(redirect(await call("directions"))).toBe("finalize");
+  it("after key 1: the message line, the shared pound line, the tone, a recording (not transcribed) ending on pound", async () => {
+    const rec = await call("directions-record");
+    expect(said(rec)).toEqual(["Please leave a clear and detailed message with all your delivery instructions after the tone.", "When you are done, press pound."]);
+    expect(rec).toMatch(/tone\.wav<\/Play><Record [^>]*finishOnKey="#"/);
+    expect(rec).not.toContain("transcribe=");
   });
 });
 
@@ -73,6 +70,6 @@ describe("no email in the booking (Abraham, Nov 17, 2026)", () => {
     const src = (await import("node:fs")).readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(src).not.toContain('back(vr, "ask", { f: "email" })');
     expect(src).not.toContain("emailRequired: 1");
-    expect(redirect(await call("directions-heard", { Digits: "#" }))).toBe("finalize");
+    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("finalize");
   });
 });

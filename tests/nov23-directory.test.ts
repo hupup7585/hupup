@@ -64,10 +64,11 @@ describe("phone-number address lookup (approved screens, preview)", () => {
     ]);
     expect(redirect(await call("addr-found-choice", { Digits: "1" }, "m=one&n=1"))).toBe("addr-check?dir=1");
     expect(h.session.data).toMatchObject({ house: "10", street: "D A WIEDER BLVD", unit: "301", zip: "10950", dirPick: "10 D A Wieder Boulevard, unit 301" });
+    // Menu 2 (Nov 24, 2026, 20:56): one line right after the confirm
     const saved = await call("addr-check", {}, "dir=1");
-    expect(said(saved)).toEqual(["Thank you. Your delivery address has been saved."]);
-    expect(redirect(saved)).toBe("addr-price?ns=1");
-    expect(said(await call("addr-price", {}, "ns=1"))).toEqual(["Delivery to Monroe New York is 10 dollars."]); // no second saved line
+    expect(said(saved)).toEqual([]);
+    expect(redirect(saved)).toBe("addr-price");
+    expect(said(await call("addr-price"))).toEqual(["Your delivery address has been saved, delivery to Monroe New York is 10 dollars."]);
     expect(redirect(await call("addr-found-choice", { Digits: "2" }, "m=one&n=1"))).toBe("addr-phone");
     expect(h.session.data.name).toBe("Sample, Chaim"); // the order name from the directory (Nov 23, 2026)
     expect(redirect(await call("addr-found-choice", { Digits: "3" }, "m=one&n=1"))).toBe("ask?f=name"); // manually: the name first

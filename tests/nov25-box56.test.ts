@@ -25,6 +25,7 @@ import { reserveItem } from "@/lib/orders";
 
 const call = (action: string, body: Record<string, string> = {}, q = "") =>
   handleVoice({ action, query: new URLSearchParams(q), body: { CallSid: "CAb56", ...body }, callSid: "CAb56", from: "+18455550401" });
+const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/Redirect>/)?.[1].replace(/^.*\/api\/voice\//, "").replace(/&amp;/g, "&");
 const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&apos;/g, "'"));
 const P: Record<string, number> = {};
 let day = 10;
@@ -127,5 +128,33 @@ describe("box 56 on a call", () => {
     const f = readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(f).toMatch(/sp\(vr, ctx, "phonepay_intro", undefined, \{ draftOk: true \}\); \/\/ box 56's last line[^\n]*\n\s*return back\(vr, "phonepay-go"/);
     expect(PROMPTS.phonepay_intro.text).toBe("Thank you. Please hold for a moment while we connect you to our secure payment line.");
+  });
+});
+
+describe("Box 34 then box 56 (Abraham, Nov 24, 2026, 20:59 and 21:02)", () => {
+  it("key 1, a message, pound: the thank-you, the message on the order and in the Delivery instructions box, then box 56 with no pause", async () => {
+    const id = await cart(["castle"]);
+    const rec = await call("directions-record");
+    expect(rec).toContain(`directions-recorded?o=${id}`);
+    const done = await call("directions-recorded", { RecordingSid: "REdir1", RecordingUrl: "https://api.twilio.com/rec/REdir1", RecordingDuration: "12" }, `o=${id}`);
+    expect(said(done)).toEqual(["Thank you. We have saved your delivery instructions."]);
+    expect(done).toMatch(/<Redirect method="POST">[^<]*\/finalize<\/Redirect>/);
+    const { deliveryInstructionsFor, deliveryInstructionsBox } = await import("@/lib/voicemail");
+    const msgs = await deliveryInstructionsFor(id);
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toMatchObject({ boxId: (await deliveryInstructionsBox()).id, durationSec: 12, transcriptionStatus: "off" });
+    expect(msgs[0].note).toContain(`Order #${1000 + id}`);
+    const next = said(await call("finalize"));
+    expect(next[0]).toBe(`Your order number is ${String(1000 + id).split("").join(" ")}.`);
+  });
+  it("hang-up mid-message: what was recorded is still saved on the order", async () => {
+    const id = await cart(["slide"]);
+    await call("directions-rec-status", { RecordingStatus: "completed", RecordingSid: "REdir2", RecordingUrl: "https://api.twilio.com/rec/REdir2", RecordingDuration: "7" }, `o=${id}`);
+    const { deliveryInstructionsFor } = await import("@/lib/voicemail");
+    expect((await deliveryInstructionsFor(id))[0]).toMatchObject({ durationSec: 7, ready: true });
+  });
+  it("pound at the menu: straight to box 56", async () => {
+    await cart(["laser"]);
+    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("finalize");
   });
 });

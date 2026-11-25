@@ -576,13 +576,9 @@ async function unfinishedCart(ctx: Ctx): Promise<{ productId: number; name: stri
   return rows.filter((r) => !r.paid && r.date >= today).map(({ paid: _p, ...r }) => r).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/** The directions step plays once Abraham approves its two lines; on preview it runs for his test. */
-function directionsActive(ctx: Ctx, env: Record<string, string | undefined> = process.env) {
-  return env.VERCEL_ENV !== "production" || (!promptWaiting(ctx.prompts, "ask_directions") && !promptWaiting(ctx.prompts, "directions_saved"));
-}
 
 /** The address in steps (Abraham, Nov 17, 2026): on preview now; on the live line once every draft step is approved. */
-export const ADDRESS_STEP_DRAFTS: PromptKey[] = ["addr_house", "addr_unit", "addr_zip", "addr_zip_enter", "addr_zip_bad", "addr_outside", "addr_not_found", "addr_rb_intro", "addr_price"];
+export const ADDRESS_STEP_DRAFTS: PromptKey[] = ["addr_house", "addr_unit", "addr_zip", "addr_zip_enter", "addr_zip_bad", "addr_outside", "addr_not_found", "addr_rb_intro", "addr_saved_price"];
 function addrStepsActive(ctx: Ctx, env: Record<string, string | undefined> = process.env) {
   return env.VERCEL_ENV !== "production" || ADDRESS_STEP_DRAFTS.every((k) => !promptWaiting(ctx.prompts, k));
 }
@@ -2967,25 +2963,59 @@ const handlers: Record<string, Handler> = {
    * Directions for the driver (Abraham, Nov 15, 2026): optional, after the address. Pound (or nothing said) skips.
    * The wording is a draft: the step runs on preview only until Abraham approves the two lines.
    */
+  /**
+   * Box 34 (Abraham, Nov 21, 2026, 23:26 and 23:27): "To add any special delivery instructions, press 1. To skip, press
+   * pound. To go back, press star." Pound or silence skips; star = back to the address read-back; a wrong key = the
+   * shared line, then the menu again.
+   */
   directions(ctx, vr) {
-    if (!directionsActive(ctx)) return back(vr, "finalize"); // no email in the booking (Abraham, Nov 17, 2026)
-    const g = vr.gather({ input: ["speech", "dtmf"], finishOnKey: "", numDigits: 1, timeout: 6, speechTimeout: "auto", language: "en-US", speechModel: "phone_call", enhanced: true, action: url("directions-heard"), method: "POST", actionOnEmptyResult: true });
-    sp(g, ctx, "ask_directions", undefined, { draftOk: true });
-    halfPause(g);
-    sp(g, ctx, "skip_pound", undefined, { draftOk: true });
-    g.play(`${config.baseUrl()}/audio/tone.wav`); // the tone, then the caller speaks (Abraham, Nov 17, 2026)
-    return back(vr, "finalize"); // nothing said: skip
+    const g = keypad(vr, url("directions-choice"), { timeout: NO_KEY_SECONDS });
+    sp(g, ctx, "box34_menu");
+    return back(vr, "finalize"); // silence: skip
   },
 
-  async "directions-heard"(ctx, vr) {
-    if (ctx.body.Digits === "*") return back(vr, "type", { f: "directions" }); // type it on the keypad
-    const said = (ctx.body.SpeechResult || "").trim();
-    if (said && ctx.body.Digits !== "#") {
-      await updateSession(ctx.callSid, { data: { directions: said.slice(0, 500) } }, ctx.session);
-      await track(ctx.callSid, "said", `Delivery directions: ${said.slice(0, 200)}`, { field: "directions", value: said });
-      sp(vr, ctx, "directions_saved", undefined, { draftOk: true });
+  "directions-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (d === "1") return back(vr, "directions-record");
+    if (d === "#" || !d) return back(vr, "finalize");
+    if (d === "*") return back(vr, "addr-readback");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "directions");
+  },
+
+  /** After key 1: the message after the tone, pound when done (no hang-up option, Nov 24, 2026, 20:51). Recorded, not transcribed. */
+  async "directions-record"(ctx, vr) {
+    const o = (await callOrders(ctx))[0]?.order.id ?? ctx.session?.orderId ?? 0;
+    sp(vr, ctx, "box34_record");
+    sp(vr, ctx, "pound_done");
+    vr.play(`${config.baseUrl()}/audio/tone.wav`);
+    vr.record({ maxLength: 180, timeout: 10, playBeep: false, finishOnKey: "#", trim: "trim-silence", action: url("directions-recorded", { o }), method: "POST", recordingStatusCallback: url("directions-rec-status", { o }), recordingStatusCallbackMethod: "POST" });
+    return back(vr, "finalize"); // nothing recorded: on with checkout
+  },
+
+  /** Pound (or the caller hung up): the message is saved with the booking; then the thank-you and straight to box 56. */
+  async "directions-recorded"(ctx, vr) {
+    const o = Number(ctx.query.get("o")) || null;
+    const b = ctx.body;
+    const secs = Number(b.RecordingDuration || 0);
+    if (b.RecordingSid && b.RecordingUrl && secs > 0) {
+      const { saveDeliveryInstructions } = await import("@/lib/voicemail");
+      await saveDeliveryInstructions({ orderId: o, callSid: ctx.callSid, from: ctx.from ?? null, recordingSid: b.RecordingSid, recordingUrl: b.RecordingUrl, durationSec: secs, ready: false });
+      await updateSession(ctx.callSid, { data: { directions: `Recorded message (${secs} seconds)` } }, ctx.session);
+      await track(ctx.callSid, "step", `Box 34: delivery instructions recorded (${secs} seconds)`);
+      sp(vr, ctx, "box34_thanks");
     }
-    return back(vr, "finalize");
+    return back(vr, "finalize"); // Nov 24, 2026, 20:59: box 56 right after, no pause
+  },
+
+  /** Twilio: the recording file is ready (also after a hang-up mid-message): kept on the booking. */
+  async "directions-rec-status"(ctx, vr) {
+    const b = ctx.body;
+    if (b.RecordingStatus === "completed" && b.RecordingSid && b.RecordingUrl) {
+      const { saveDeliveryInstructions } = await import("@/lib/voicemail");
+      await saveDeliveryInstructions({ orderId: Number(ctx.query.get("o")) || null, callSid: ctx.callSid, from: ctx.from ?? null, recordingSid: b.RecordingSid, recordingUrl: b.RecordingUrl, durationSec: Number(b.RecordingDuration || 0), ready: true });
+    }
+    return vr;
   },
 
   /*
@@ -3376,11 +3406,8 @@ const handlers: Record<string, Handler> = {
     // Directory address match for an address entered by hand (Abraham, Nov 25, 2026): house number, street, unit and
     // zip all equal. A match uses that household's name; no new spoken line (the match-found wording is pending).
     if (ctx.query.get("dir") !== "1") await applyDirectoryMatch(ctx, { house: data.house, street: data.street, unit: data.unit ?? null, zip });
-    // From the lookup (Nov 23, 2026): the caller confirmed it: "Thank you. Your delivery address has been saved.", then step 7
-    if (ctx.query.get("dir") === "1") {
-      sp(vr, ctx, "addr_saved");
-      return back(vr, "addr-price", { ns: 1 });
-    }
+    // From the lookup (Nov 23, 2026): the caller confirmed it; Menu 2 (one line) right away
+    if (ctx.query.get("dir") === "1") return back(vr, "addr-price");
     await track(ctx.callSid, "said", `Address: ${placeAddress} (${quote.zone}, ${money(quote.feeCents)})`, { field: "address", value: placeAddress });
     return back(vr, "addr-readback");
   },
@@ -3436,7 +3463,7 @@ const handlers: Record<string, Handler> = {
     return back(vr, "addr-readback");
   },
 
-  /** Step 7 (Abraham, Nov 22, 2026, final): "Delivery to {town} New York is {price}." then the saved line, then box 34. */
+  /** Menu 2 (Abraham, Nov 24, 2026, 20:56): "Your delivery address has been saved, delivery to {town} is {price}." then box 34. */
   async "addr-price"(ctx, vr) {
     const d = ctx.session?.data ?? {};
     if (!d.address || !d.town) return back(vr, "addr-house");
@@ -3445,9 +3472,8 @@ const handlers: Record<string, Handler> = {
     const quote = await deliveryQuote(d.address, settings, fetch, first?.eventDate ?? new Date());
     if (quote.ok) {
       const cents = quote.kind ? deliveryFeeFor(quote.kind, settings, first?.eventDate ?? todayISO(), first?.offerNote ?? null) : quote.feeCents;
-      sp(vr, ctx, "addr_price", { town: townPhrase(d.town), price: spokenMoney(cents) });
+      sp(vr, ctx, "addr_saved_price", { town: townPhrase(d.town), price: spokenMoney(cents) });
     }
-    if (!ctx.query.get("ns")) sp(vr, ctx, "addr_saved"); // already said after a lookup
     return back(vr, "directions");
   },
 

@@ -83,7 +83,7 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(redirect(await call("addr-readback-choice", { Digits: "*" }))).toBe("addr-street"); // Nov 25, 2026: one step back
     expect(redirect(await call("addr-readback-choice", { Digits: "1" }))).toBe("addr-price");
     const price = await call("addr-price");
-    expect(said(price)).toEqual(["Delivery to Monroe New York is 10 dollars.", "Thank you. Your delivery address has been saved."]);
+    expect(said(price)).toEqual(["Your delivery address has been saved, delivery to Monroe New York is 10 dollars."]); // Menu 2, one line (Nov 24, 2026)
     expect(redirect(price)).toBe("directions");
     expect(redirect(await call("addr-readback-choice", { Digits: "2" }))).toBe("addr-house");
     expect(h.session.data.house).toBeUndefined();
