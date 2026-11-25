@@ -1,5 +1,6 @@
 import { handleVoice } from "@/lib/ivr/flow";
 import { readTwilioRequest, twiml } from "@/lib/http/twilio-request";
+import { twimlSummary } from "@/lib/ivr/twiml-log";
 
 export const dynamic = "force-dynamic";
 
@@ -14,5 +15,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ action:
     callSid: body.CallSid || "unknown",
     from: body.From || null,
   });
+  console.log(twimlSummary(action, xml)); // what the caller heard at this step (recording ids, spoken words)
   return twiml(xml);
 }

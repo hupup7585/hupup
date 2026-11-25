@@ -1,5 +1,5 @@
 import { promptRecordingLink } from "@/lib/signed-link";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { wordSlotsFor } from "@/lib/spoken-words";
 
@@ -708,7 +708,20 @@ export type PromptOverrides = Partial<Record<PromptKey, PromptOverride>>;
 
 export async function loadPromptOverrides(): Promise<PromptOverrides> {
   try {
-    const rows = await db.select().from(schema.voicePrompts);
+    const rows0 = await db.select().from(schema.voicePrompts);
+    // Nov 25, 2026 (stray numbers on the live line): a slot plays only a finished upload made FOR THAT SLOT and put on
+    // the line with "Use this one". Anything else (another slot's file, an unfinished upload) is ignored here.
+    const inUse = rows0.map((r) => r.recordingId).filter((x): x is number => Boolean(x));
+    const recs = inUse.length
+      ? await db.select({ id: schema.promptRecordings.id, key: schema.promptRecordings.promptKey, complete: schema.promptRecordings.complete, source: schema.promptRecordings.source }).from(schema.promptRecordings).where(inArray(schema.promptRecordings.id, inUse))
+      : [];
+    const okRec = new Map(recs.map((r) => [r.id, r]));
+    const rows = rows0.map((r) => {
+      const rec = r.recordingId ? okRec.get(r.recordingId) : undefined;
+      const good = Boolean(rec && rec.complete && rec.source === "upload" && rec.key === r.key);
+      if (r.recordingId && !good) console.warn(`[voice] slot ${r.key} points at recording #${r.recordingId}, which is not a finished upload for that slot: not played`);
+      return good ? r : { ...r, recordingId: null };
+    });
     const out: PromptOverrides = {};
     for (const r of rows) {
       if (r.key in PROMPTS) out[r.key as PromptKey] = { text: r.text, audioUrl: r.audioUrl, recordingId: r.recordingId, approvedAt: r.approvedAt };
