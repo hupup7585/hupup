@@ -1,7 +1,7 @@
 import { promptRecordingLink } from "@/lib/signed-link";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { wordSlotsFor } from "@/lib/spoken-words";
+import { pluralName, wordSlotsFor } from "@/lib/spoken-words";
 
 /**
  * Every sentence the hotline speaks. Defaults are warm, upbeat and short.
@@ -772,8 +772,14 @@ export const googleLiveOn = (overrides: PromptOverrides) => Boolean(EXTRAS.get(o
  */
 export type LinePiece = { url: string } | { say: string };
 /** What a word slot says in the live voice when it has no recording: "word:twenty five" -> "twenty five", "letter:y" -> "y". */
-export function slotSpoken(k: string): string {
+export function slotSpoken(k: string, items: { id: number; name: string }[] = []): string {
   if (k.startsWith("zip:")) return k.slice(4).split("").join(" ");
+  // An item's name slot with no recording: the item's name (Nov 25, 2026: it was said as its database id, "23")
+  const item = /^item:(\d+)(:plural)?$/.exec(k);
+  if (item) {
+    const it = items.find((i) => i.id === Number(item[1]));
+    if (it) return item[2] ? pluralName(it.name) : it.name;
+  }
   return k.replace(/^[a-z]+:/, "").replace(/^(\d+):plural$/, "$1").replace(/_/g, " ");
 }
 export function composeMixed(overrides: PromptOverrides, key: PromptKey, vars: Record<string, string | number> = {}): LinePiece[] | null {
@@ -821,7 +827,7 @@ export function composeMixed(overrides: PromptOverrides, key: PromptKey, vars: R
       if (words) words.forEach((w) => {
         const u = clip(w);
         if (u) u.forEach((url) => out.push({ url }));
-        else out.push({ say: slotSpoken(w) });
+        else out.push({ say: w.startsWith("item:") ? value : slotSpoken(w, x.items) }); // an item: its name as given, never its id
       });
       else if (value.trim()) out.push({ say: value });
     }
@@ -889,8 +895,8 @@ export function textPieces(overrides: PromptOverrides, text: string): LinePiece[
     if (id) out.push({ url: promptRecordingLink(id) });
     else {
       const last = out[out.length - 1];
-      if (last && "say" in last) last.say = `${last.say} ${slotSpoken(w)}`;
-      else out.push({ say: slotSpoken(w) });
+      if (last && "say" in last) last.say = `${last.say} ${slotSpoken(w, x.items)}`;
+      else out.push({ say: slotSpoken(w, x.items) });
     }
   }
   return out.some((p) => "url" in p) ? out : null;
