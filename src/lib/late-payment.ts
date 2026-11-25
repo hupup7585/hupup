@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { checkBookable, getUsage, pickupDateFor, usedOn } from "@/lib/availability";
+import { checkBookable, getUsage, pickupDateFor, usedOn, lastHeldDay } from "@/lib/availability";
 import { addDays } from "@/lib/dates";
 import { nearbyDays, nearestSize } from "@/lib/alternatives";
 import { getSettings } from "@/lib/settings";
@@ -272,7 +272,8 @@ export async function attentionItemsFree(orderId: number, exec: Pick<typeof db, 
   const [o] = await exec.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
   if (!o) return false;
   const items = await exec.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
-  const last = o.pickupDate && o.pickupDate > o.eventDate ? o.pickupDate : o.eventDate;
+  // Nov 24, 2026: the order holds its units from the event day through the day before pickup
+  const last = lastHeldDay(o.eventDate, o.pickupDate);
   const usage = await getUsage(o.eventDate, last, items.map((i) => i.productId), exec);
   for (const i of items) {
     const [p] = await exec.select().from(schema.products).where(eq(schema.products.id, i.productId)).limit(1);

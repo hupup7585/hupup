@@ -37,9 +37,11 @@ describe.skipIf(!hasDb)("reservations (Postgres)", async () => {
     for (const r of results) if (r.ok) created.push(r.orderId);
     expect(results.filter((r) => r.ok)).toHaveLength(1);
 
-    // Pickup day (Mar 11) is also taken, and the day before can't be booked either (its pickup is Mar 10).
-    expect(await checkBookable(p.id, 1, "2027-03-11")).toBe(0);
-    expect(await checkBookable(p.id, 1, "2027-03-09")).toBe(0);
+    // Nov 24, 2026: only Mar 10 is taken; its pickup day (Mar 11) is free again, and a Mar 9 booking (picked up the
+    // morning of Mar 10) fits too
+    expect(await checkBookable(p.id, 1, "2027-03-10")).toBe(0);
+    expect(await checkBookable(p.id, 1, "2027-03-11")).toBe(1);
+    expect(await checkBookable(p.id, 1, "2027-03-09")).toBe(1);
     expect(await checkBookable(p.id, 1, "2027-03-12")).toBe(1);
   });
 

@@ -6,10 +6,14 @@ import { calendarDefaults, nextOpenDay, type CalendarSettings } from "@/lib/jewi
 import { holidayFridayPickup, type HolidaySettings } from "@/lib/holiday-rentals";
 
 /**
- * Inventory rule (Abraham, Nov 8, 2026): bookings are whole rental days. A rented unit is OUT from its delivery day
- * (delivered 9:00 AM to 12:00 PM) through its pickup day (out the door by 9:00 AM), and on every day in between.
- * There is no pickup on Shabbes or Yom Tov, so a Friday booking is picked up Sunday and holds the unit Friday,
- * Shabbes and Sunday. A booking for day D needs a free unit on every day from D through its pickup day.
+ * Inventory rule (Abraham, Nov 8, 2026; changed Nov 24, 2026, 11:11 PM): bookings are whole rental days. A rented unit
+ * is OUT on its delivery day (delivered 9:00 AM to 12:00 PM) and on every day strictly between delivery and pickup.
+ * The pickup day itself is FREE for a new booking (Abraham, Nov 24, 2026: pickups are out the door by 9:00 AM and
+ * deliveries start at 9:00 AM, so the unit picked up that morning can go out again the same day).
+ * There is no pickup on Shabbes or Yom Tov, so a Friday booking is picked up Sunday and holds Friday and Shabbes; the
+ * unit is free for Sunday. A Chanukah or Chol Hamoed Friday rental picked up Saturday night holds Shabbes; free Sunday.
+ * A booking for day D needs a free unit on D and on every day strictly between D and its pickup day.
+ * The pickup day is still counted (kind "pickup") so the drivers see it, but it never lowers the bookable count.
  *
  * Orders that occupy inventory:
  *  - CONFIRMED, DELIVERED, NEEDS_ATTENTION      always (a late payment keeps its claim while staff sort it out)
@@ -24,9 +28,11 @@ export const ACTIVE_ORDER_SQL = sql`(
 export type Usage = {
   /** units out because the event (delivery) is that day */
   event: number;
-  /** units still out from the previous day's event (pickup day) */
+  /** units picked up that morning (shown for the drivers; NOT counted against stock, Nov 24, 2026) */
   pickup: number;
-  /** units in a HOLD (live phone cart) — subset of event+pickup */
+  /** units still out on a day strictly between their event day and their pickup day (counted) */
+  between?: number;
+  /** units in a HOLD (live phone cart) */
   held: number;
 };
 
@@ -52,9 +58,10 @@ export async function getUsage(
            SUM(CASE WHEN o.status = 'HOLD' THEN oi.qty ELSE 0 END)::int AS held
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
-    -- every day from delivery through pickup (a Friday booking holds Friday, Shabbes and Sunday)
+    -- every day from delivery through pickup; the pickup day is listed (for the drivers) but does not hold the unit
     CROSS JOIN LATERAL (
-      SELECT g::date AS day, CASE WHEN g::date = o.event_date THEN 'event' ELSE 'pickup' END AS kind
+      SELECT g::date AS day,
+             CASE WHEN g::date = o.event_date THEN 'event' WHEN g::date = o.pickup_date THEN 'pickup' ELSE 'between' END AS kind
       FROM generate_series(o.event_date::timestamp, greatest(o.pickup_date, o.event_date)::timestamp, interval '1 day') AS g
     ) AS d
     WHERE ${ACTIVE_ORDER_SQL}
@@ -65,19 +72,27 @@ export async function getUsage(
   const map: UsageMap = new Map();
   for (const r of res.rows as { product_id: number; day: string; kind: string; qty: number; held: number }[]) {
     const byDay = map.get(r.product_id) ?? new Map<string, Usage>();
-    const u = byDay.get(r.day) ?? { event: 0, pickup: 0, held: 0 };
+    const u = byDay.get(r.day) ?? { event: 0, pickup: 0, between: 0, held: 0 };
     if (r.kind === "event") u.event += r.qty;
-    else u.pickup += r.qty;
-    u.held += r.held;
+    else if (r.kind === "pickup") u.pickup += r.qty;
+    else u.between = (u.between ?? 0) + r.qty;
+    // a HOLD counts as held only on the days it holds the unit (not its pickup day)
+    if (r.kind !== "pickup") u.held += r.held;
     byDay.set(r.day, u);
     map.set(r.product_id, byDay);
   }
   return map;
 }
 
+/** Units that hold this day: delivered that day, or out on a day between delivery and pickup. Pickup-day units do not count. */
 export function usedOn(usage: UsageMap, productId: number, day: string): number {
   const u = usage.get(productId)?.get(day);
-  return u ? u.event + u.pickup : 0;
+  return u ? u.event + (u.between ?? 0) : 0;
+}
+
+/** The last day a booking holds its unit: the day before pickup (the event day itself when pickup is the next day or unset). */
+export function lastHeldDay(eventDate: string, pickupDate: string | null | undefined): string {
+  return pickupDate && pickupDate > eventDate ? addDays(pickupDate, -1) : eventDate;
 }
 
 /** Units free on a single calendar day. */
@@ -96,10 +111,14 @@ export function pickupDateFor(eventDate: string, cal: CalendarSettings = calenda
   return nextOpenDay(addDays(eventDate, 1), cal);
 }
 
-/** Units that can be booked for an event on `eventDate`: free on every day from delivery through pickup. */
+/**
+ * Units that can be booked for an event on `eventDate`: free on the event day and on every day strictly between it
+ * and the pickup day (Nov 24, 2026: the pickup day itself is not checked; a one-day rental checks only its event day).
+ */
 export function bookableQty(quantity: number, usage: UsageMap, productId: number, eventDate: string, pickupDate: string = addDays(eventDate, 1)): number {
   let free = quantity;
-  for (let d = eventDate; d <= pickupDate; d = addDays(d, 1)) free = Math.min(free, freeOnDay(quantity, usage, productId, d));
+  const last = lastHeldDay(eventDate, pickupDate);
+  for (let d = eventDate; d <= last; d = addDays(d, 1)) free = Math.min(free, freeOnDay(quantity, usage, productId, d));
   return free;
 }
 
@@ -161,7 +180,7 @@ export function applyLaserPools(usage: UsageMap, info: LaserPoolInfo): void {
     let n = 0;
     for (const [id, it] of info.items) if (it.pools.includes(pool)) {
       const u = original.get(id)?.get(day);
-      if (u) n += u.event + u.pickup;
+      if (u) n += u.event + (u.between ?? 0); // the pickup day frees the pool too (Nov 24, 2026)
     }
     return n;
   };
@@ -170,7 +189,7 @@ export function applyLaserPools(usage: UsageMap, info: LaserPoolInfo): void {
     for (const day of days) {
       const left = Math.min(...it.pools.map((pool) => info.sizes[pool] - usedIn(pool, day)));
       const used = Math.max(0, it.quantity - Math.max(0, left));
-      byDay.set(day, { event: used, pickup: 0, held: original.get(id)?.get(day)?.held ?? 0 });
+      byDay.set(day, { event: used, pickup: original.get(id)?.get(day)?.pickup ?? 0, between: 0, held: original.get(id)?.get(day)?.held ?? 0 });
     }
     usage.set(id, byDay);
   }
@@ -197,8 +216,8 @@ export async function checkBookable(productId: number, quantity: number, eventDa
     const merged = new Map<string, Usage>();
     for (const id of ids)
       for (const [day, u] of usage.get(id) ?? []) {
-        const m = merged.get(day) ?? { event: 0, pickup: 0, held: 0 };
-        merged.set(day, { event: m.event + u.event, pickup: m.pickup + u.pickup, held: m.held + u.held });
+        const m = merged.get(day) ?? { event: 0, pickup: 0, between: 0, held: 0 };
+        merged.set(day, { event: m.event + u.event, pickup: m.pickup + u.pickup, between: (m.between ?? 0) + (u.between ?? 0), held: m.held + u.held });
       }
     usage.set(productId, merged);
   }

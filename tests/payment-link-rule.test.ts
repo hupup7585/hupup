@@ -127,13 +127,13 @@ describe("expired link, item gone: the nearest options per item and per day (Abr
     expect(held.subtotalCents).toBe(30000); // the Laser tag set stays, held again
     const list = await removedWithOptions(sara.id);
     expect(list.map((r) => [r.name, r.eventDate])).toEqual([["Castle", day]]);
-    // Moshe's Castle is out the 22nd and 23rd, so a booking on the 21st (back on the 22nd) can't fit either:
-    // the nearest free days are the 20th and the 24th, the same the phone line offers
+    // Nov 24, 2026: Moshe's Castle holds only the 22nd (the 23rd is its pickup day, free again), so the nearest free
+    // days are the 21st and the 23rd, the same the phone line offers
     expect(list[0].options.map((o) => [o.kind, o.name, o.date])).toEqual([
       ["bigger", "Big Castle", day],
       ["smaller", "Small Castle", day],
-      ["before", "Castle", "2026-12-20"],
-      ["after", "Castle", "2026-12-24"],
+      ["before", "Castle", "2026-12-21"],
+      ["after", "Castle", "2026-12-23"],
     ]);
     // a made-up choice (not offered) is refused
     expect(await chooseLinkOption(sara.id, 0, mid.id, day)).toBe(false);

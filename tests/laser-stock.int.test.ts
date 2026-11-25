@@ -60,7 +60,16 @@ describe.skipIf(!hasDb)("shared laser stock (Postgres)", async () => {
     expect(await checkBookable(P.maze4, 1, d)).toBe(0); // one maze, already out
     expect(await checkBookable(P.maze6, 1, d)).toBe(0);
     expect(await checkBookable(P.only4, 7, d)).toBe(7); // four-packs untouched
-    expect(await checkBookable(P.only6, 6, "2031-03-12")).toBe(2); // out the next day too (pickup)
+    expect(await checkBookable(P.only6, 6, "2031-03-12")).toBe(6); // the next day is their pickup day: free again (Nov 24, 2026)
+  });
+
+  it("Nov 24, 2026: the maze rented Monday is bookable again Tuesday (its pickup day)", async () => {
+    const mon = "2031-06-09";
+    const r = await hold(P.maze6, mon);
+    expect(r.ok).toBe(true);
+    if (r.ok) created.push(r.orderId);
+    expect(await checkBookable(P.maze4, 1, mon)).toBe(0);
+    expect(await checkBookable(P.maze4, 1, "2031-06-10")).toBe(1);
   });
 
   it("two callers at once cannot both take the last six-pack", async () => {

@@ -57,7 +57,9 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
     })
     // A Delivery login sees only the stops assigned to it (checked here on the server, not in the browser)
     .filter(({ o, stop }) => staff.role !== "delivery" || isMyStop(o, stop, staff.userId))
-    .sort((a, b) => (a.o.deliveryTime || "99").localeCompare(b.o.deliveryTime || "99"));
+    // Pickups first (Abraham, Nov 24, 2026: out the door by 9:00 AM), so a unit picked up in the morning is back before
+    // it goes out again the same day; then the deliveries by time
+    .sort((a, b) => (a.stop === b.stop ? 0 : a.stop === "pickup" ? -1 : 1) || (a.o.deliveryTime || "99").localeCompare(b.o.deliveryTime || "99"));
 
   // Navigation (free Google Maps / Waze links): stops in the order shown, then back to stock
   const stockAddress = (await getSettings()).stockAddress.trim() || null;

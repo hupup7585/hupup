@@ -111,7 +111,7 @@ export default async function CalendarPage({
                       {p.name} <span className="font-normal text-muted">({p.quantity})</span>
                     </td>
                     {days.map((d) => {
-                      const u = usage.get(p.id)?.get(d) ?? { event: 0, pickup: 0, held: 0 };
+                      const u = usage.get(p.id)?.get(d) ?? { event: 0, pickup: 0, between: 0, held: 0 };
                       const free = freeOnDay(p.quantity, pooled, p.id, d);
                       const canBook = bookableQty(p.quantity, pooled, p.id, d);
                       let cls = "bg-[#E3F8EF] text-[#13895C]";
@@ -123,8 +123,9 @@ export default async function CalendarPage({
                         cls = "bg-[#FFE6E4] text-[#C83A2F]";
                         label = "Booked";
                       } else if (free === 0) {
-                        cls = "bg-[#FFF4D6] text-[#A87800]";
-                        label = "Pickup";
+                        // out on a day between delivery and pickup (Nov 24, 2026: the pickup day itself no longer blocks)
+                        cls = "bg-[#FFE6E4] text-[#C83A2F]";
+                        label = "Booked";
                       } else if (u.pickup > 0 && u.event === 0) {
                         cls = "bg-[#FFF4D6] text-[#A87800]";
                         label = `${free} · pickup`;
@@ -132,7 +133,7 @@ export default async function CalendarPage({
                         cls = "bg-[#FFE6E4] text-[#C83A2F]";
                         label = `${free} free`;
                       }
-                      const title = `${p.name} on ${dualDate(d)}: ${u.event} delivering, ${u.pickup} being picked up, ${free} free that day; ${canBook} bookable for an event this day (needs next day free for pickup).`;
+                      const title = `${p.name} on ${dualDate(d)}: ${u.event} delivering, ${u.pickup} being picked up (free again the same day), ${u.between ?? 0} still out, ${free} free that day; ${canBook} bookable for an event this day.`;
                       return (
                         <td key={d} className="border-b border-l border-line p-1">
                           <Link

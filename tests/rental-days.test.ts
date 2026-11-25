@@ -22,7 +22,7 @@ describe("whole rental days", () => {
     expect(pickupDateFor("2026-11-16")).toBe("2026-11-17"); // Monday -> Tuesday
   });
 
-  it("a Friday booking holds the unit Friday, Shabbes and Sunday, on the phone, website and staff booking alike", async () => {
+  it("a Friday booking holds the unit Friday and Shabbes; Sunday (its pickup day) is free again (Abraham, Nov 24, 2026)", async () => {
     const [cat] = await db.insert(schema.categories).values({ name: "Paddle Boats", sortOrder: 1, active: true }).returning();
     const [p] = await db.insert(schema.products).values({ categoryId: cat.id, name: "Paddle Boat", priceCents: 4500, quantity: 1, active: true, sortOrder: 1 }).returning();
     const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: FRI, pickupDate: SUN }).returning();
@@ -30,14 +30,32 @@ describe("whole rental days", () => {
     const usage = await getUsage("2026-11-12", "2026-11-17", [p.id]);
     const days = [...(usage.get(p.id)?.keys() ?? [])].sort();
     expect(days).toEqual([FRI, SHABBES, SUN]);
-    expect(await checkBookable(p.id, 1, SUN)).toBe(0); // Sunday: still out until the pickup
-    expect(await checkBookable(p.id, 1, "2026-11-12")).toBe(0); // Thursday: its pickup day (Friday) overlaps
-    expect(await checkBookable(p.id, 1, "2026-11-16")).toBe(1); // Monday: free again
+    expect(days).toEqual([FRI, SHABBES, SUN]); // Sunday is still listed (the pickup, for the drivers)
+    expect(await checkBookable(p.id, 1, SUN)).toBe(1); // Sunday: picked up in the morning, out again the same day
+    expect(await checkBookable(p.id, 1, "2026-11-12")).toBe(1); // Thursday: its own pickup on Friday morning is fine
+    expect(await checkBookable(p.id, 1, FRI)).toBe(0); // Friday itself is booked
+    expect(await checkBookable(p.id, 1, "2026-11-16")).toBe(1); // Monday: free
   });
 
-  it("a booking needs the unit free on every day from delivery through pickup", () => {
-    const usage = new Map([[1, new Map([[SHABBES, { event: 0, pickup: 1, held: 0 }]])]]);
+  it("a booking needs the unit free on every day from delivery up to (not including) its pickup day", () => {
+    const usage = new Map([[1, new Map([[SHABBES, { event: 0, pickup: 0, between: 1, held: 0 }]])]]);
     expect(bookableQty(1, usage, 1, FRI, SUN)).toBe(0); // only Shabbes is taken, and that still blocks it
+  });
+
+  it("Nov 24, 2026: a HOLD cart for Monday frees Tuesday the same way; a two-day rental Monday and Tuesday frees Wednesday", async () => {
+    const [cat] = await db.insert(schema.categories).values({ name: "Jumping Balloons", sortOrder: 2, active: true }).returning();
+    const [p] = await db.insert(schema.products).values({ categoryId: cat.id, name: "Castle", priceCents: 20000, quantity: 1, active: true, sortOrder: 1 }).returning();
+    // a live phone cart (HOLD) for Monday Nov 16, picked up Tuesday
+    const [held] = await db.insert(schema.orders).values({ status: "HOLD", channel: "PHONE", eventDate: "2026-11-16", pickupDate: "2026-11-17", holdExpiresAt: new Date(Date.now() + 10 * 60_000) }).returning();
+    await db.insert(schema.orderItems).values({ orderId: held.id, productId: p.id, qty: 1, unitPriceCents: 20000 });
+    expect(await checkBookable(p.id, 1, "2026-11-16")).toBe(0);
+    expect(await checkBookable(p.id, 1, "2026-11-17")).toBe(1);
+    // two-day rental Tuesday and Wednesday (Nov 17-18), pickup Thursday
+    const [two] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: "2026-11-17", pickupDate: "2026-11-19" }).returning();
+    await db.insert(schema.orderItems).values({ orderId: two.id, productId: p.id, qty: 1, unitPriceCents: 20000 });
+    expect(await checkBookable(p.id, 1, "2026-11-17")).toBe(0);
+    expect(await checkBookable(p.id, 1, "2026-11-18")).toBe(0);
+    expect(await checkBookable(p.id, 1, "2026-11-19")).toBe(1);
   });
 
   it("no delivery times: staff screens show the fixed windows; callers hear the window and the 9 AM pickup", () => {
