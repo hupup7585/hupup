@@ -842,6 +842,22 @@ async function packOffer(ctx: Ctx, date: string) {
   return packs.map((x, i) => ({ ...x, key: String(i + 1), free: free[i] }));
 }
 
+/**
+ * What the next extra gun set of this kind would cost on this booking (Abraham, Nov 25, 2026, 14:41): read from the
+ * catalog through the same price rule the order uses (add-on price with a maze, regular price without; every 3rd set
+ * half price). Before tax.
+ */
+async function nextSetPrice(orderId: number, productId: number): Promise<number> {
+  const { laserAddonPrices } = await import("@/lib/orders");
+  const r = await db.execute(sql`
+    SELECT oi.id AS key, p.name, c.name AS cat, p.price_cents FROM order_items oi JOIN products p ON p.id = oi.product_id JOIN categories c ON c.id = p.category_id
+    WHERE oi.order_id = ${orderId} ORDER BY oi.id`);
+  const rows = (r.rows as { key: number; name: string; cat: string; price_cents: number }[]).map((x) => ({ key: Number(x.key), name: x.name, cat: x.cat, priceCents: Number(x.price_cents) }));
+  const [p] = await db.select({ name: products.name, price: products.priceCents, cat: categories.name }).from(products).innerJoin(categories, eq(categories.id, products.categoryId)).where(eq(products.id, productId));
+  const next = { key: Number.MAX_SAFE_INTEGER, name: p.name, cat: p.cat, priceCents: p.price };
+  return (await laserAddonPrices(db, [...rows, next])).get(next.key) ?? p.price;
+}
+
 async function isBounceHouse(categoryId: number) {
   const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, categoryId));
   return Boolean(cat && ATTRACTIONS["1"].match.test(cat.name));
@@ -2750,9 +2766,27 @@ const handlers: Record<string, Handler> = {
   async packs(ctx, vr) {
     const d = ctx.query.get("d")!;
     const offer = (await packOffer(ctx, d)).slice(0, 2);
+    // Extra gun sets already on this day's booking (Abraham, Nov 25, 2026, 14:41): 1 = the second-one line, 2 = the
+    // third set at half price, 3 or more = no more offers
+    const day = await dayOrder(ctx, d);
+    const setLines = (day?.items ?? []).filter((i) => offer.some((x) => x.id === i.productId));
+    const sets = setLines.reduce((t, i) => t + i.qty, 0);
+    if (sets >= 3) return back(vr, "added-menu", { n: 1 });
+    if (sets >= 1) {
+      const { orderHasMaze } = await import("@/lib/orders");
+      if (!(await orderHasMaze(db, day!.order.id))) return back(vr, "added-menu", { n: 1 }); // extra sets need the maze
+      const kind = offer.find((x) => x.id === setLines.at(-1)!.productId);
+      if (!kind?.free) return back(vr, "added-menu", { n: 1 });
+      const g = keypad(vr, url("packs-choice", { d, k: kind.key }), { timeout: 5 });
+      if (sets === 1) sp(g, ctx, "laser_second_set");
+      else sp(g, ctx, "laser_third_set", { price: spokenMoney(await nextSetPrice(day!.order.id, kind.id)) });
+      sp(g, ctx, "stay_on_line");
+      backLine(g, ctx);
+      return back(vr, "added-menu", { n: 1 }); // no key for 5 seconds: nothing added, on to the keep-shopping lines
+    }
     const left = offer.filter((x) => x.free);
     if (!left.length) return back(vr, "added-menu", { n: 1 }); // no pack left for that date: no offer (the added line already played)
-    const g = keypad(vr, url("packs-choice", { d }), { timeout: 4 });
+    const g = keypad(vr, url("packs-choice", { d }), { timeout: 5 });
     if (left.length === offer.length) {
       if (promptWaiting(ctx.prompts, "laser_packs")) say(g, promptText(ctx.prompts, "laser_packs"));
       else sp(g, ctx, "laser_packs");
@@ -2764,17 +2798,19 @@ const handlers: Record<string, Handler> = {
     halfPause(g);
     sp(g, ctx, "skip_pound"); // the shared skip line (Nov 19, 2026)
     backLine(g, ctx);
-    return back(vr, "added-menu", { n: 1 }); // no key for 4 seconds: nothing added (Nov 22, 2026)
+    return back(vr, "added-menu", { n: 1 }); // no key: nothing added (Nov 22, 2026)
   },
 
   async "packs-choice"(ctx, vr) {
     const date = ctx.query.get("d")!;
+    const kq = ctx.query.get("k"); // the second-one or third-set line: 1 = one more of that kind
     const k = ctx.body.Digits ?? "";
-    if (k === "#") return back(vr, "added-menu", { n: 1 });
+    if (k === "#" && !kq) return back(vr, "added-menu", { n: 1 });
     if (k === "0") return back(vr, "cart");
     if (k === "*") return back(vr, "added-menu", { n: 1 });
+    if (!k) return back(vr, "added-menu", { n: 1 });
     const offer = (await packOffer(ctx, date)).slice(0, 2);
-    const pick = offer.find((x) => x.key === k && x.free); // only a pack that is still there
+    const pick = kq ? (k === "1" ? offer.find((x) => x.key === kq && x.free) : undefined) : offer.find((x) => x.key === k && x.free); // only a pack that is still there
     if (!pick) {
       sp(vr, ctx, "not_valid");
       return back(vr, "packs", { d: date });

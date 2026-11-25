@@ -172,6 +172,11 @@ export async function laserAddonPrices(tx: { execute: typeof db.execute }, rows:
     }
     out.set(a.key, target);
   }
+  // Every 3rd extra gun set on a booking is half price (Abraham, Nov 25, 2026, 14:41), in the order they were added
+  const inOrder = [...addons].sort((x, y) => x.key - y.key);
+  inOrder.forEach((a, i) => {
+    if (i % 3 === 2) out.set(a.key, Math.round((out.get(a.key) ?? a.priceCents) / 2));
+  });
   return out;
 }
 

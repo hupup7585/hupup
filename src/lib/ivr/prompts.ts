@@ -267,6 +267,9 @@ export const PROMPTS = {
   // Laser tag extra packs (Abraham, Nov 17, 2026): offered after a maze or guns, like ocean balls. Approved word for word.
   // Abraham, Nov 24, 2026: add ocean balls from the cart. DRAFT wording (Abraham approves the exact text, Hark records it)
   cart_add_balls: { group: "Cart", label: "Cart: add ocean balls (draft, waiting for Abraham's wording)", text: "To add ocean balls, press 5.", pending: true },
+  // Laser tag extra gun sets (Abraham, Nov 25, 2026, 14:06 and 14:41): after the 1st extra set, then after the 2nd
+  laser_second_set: { group: "Cart", label: "Box 25b: after the first extra gun set (key 1 = one more of the same)", text: "To add a second one, press 1." },
+  laser_third_set: { group: "Cart", label: "Box 25b: after the second extra gun set, the third at half price (the price is said between the two pieces)", text: "To add a third gun set for half price, only {price}, press 1.", vars: ["price"] },
   laser_packs: { group: "Cart", label: "Laser guns add-on (only right after an inflatable maze is added)", text: "Would you like to add more laser guns? To add a six-pack laser tag for $75, press 1. To add a four-pack laser tag for $50, press 2." }, // Nov 19, 2026: only after an inflatable maze; then the shared skip line
   added: { group: "Cart", label: "Item added to cart", text: "Woohoo! I added {items} to your cart for {date}. It is saved just for you while we are on the phone.", vars: ["items", "date"] },
   after_add: { group: "Cart", label: "After adding", text: "To keep shopping, press 1. To check out, press 9." },

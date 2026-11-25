@@ -202,7 +202,8 @@ describe("5. offers check (the three switches on)", () => {
     await reserveItem({ orderId: r.orderId, productId: ids.pack4, qty: 1, eventDate: "2027-04-05", channel: "POS", status: "CONFIRMED" });
     expect((await tens(r.orderId)).subtotalCents).toBe(30000);
     await reserveItem({ orderId: r.orderId, productId: ids.pack4, qty: 1, eventDate: "2027-04-05", channel: "POS", status: "CONFIRMED" });
-    expect((await tens(r.orderId)).subtotalCents).toBe(35000); // a 4th pack is full price
+    // Nov 25, 2026, 14:41: the 4th pack is the 3rd extra gun set, half price by its own rule ($25 off the four-gun set)
+    expect((await tens(r.orderId)).subtotalCents).toBe(32500);
     // two packs only: no offer
     const r2 = await reserveItem({ orderId: null, productId: maze6, qty: 1, eventDate: "2027-04-12", channel: "POS", status: "CONFIRMED" });
     if (!r2.ok) throw new Error("no order");
