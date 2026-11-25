@@ -55,14 +55,10 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(redirect(await call("addr"))).toBe("addr-house");
     expect(said(await call("addr-house"))).toEqual(["Now, with your keypad, please enter the house number.", "When you are done, press pound.", "To go back, press star."]);
     expect(redirect(await call("addr-house-heard", { Digits: "*" }))).toBe("ask?f=name");
-    // Street step (Abraham, Nov 24, 2026): house, unit, zip, then the street searched in that zip's list
-    expect(redirect(await call("addr-house-heard", { Digits: "12" }))).toBe("addr-unit");
-    expect(said(await call("addr-unit"))).toEqual(["Thanks, with your keypad, please enter the unit number.", "When you are done, press pound.", "If there is no unit number, press pound to skip.", "To go back, press star."]);
-    expect(redirect(await call("addr-unit-heard", { Digits: "*" }))).toBe("addr-house");
-    expect(redirect(await call("addr-unit-heard", { Digits: "", FinishedOnKey: "#" }))).toBe("addr-zip"); // pound with nothing typed: no unit
-    expect(h.session.data.unit).toBeUndefined();
+    // Nov 25, 2026: house number, zip, street (searched in that zip's list), then the unit
+    expect(redirect(await call("addr-house-heard", { Digits: "12" }))).toBe("addr-zip");
     expect(said(await call("addr-zip"))).toEqual(["For Monroe, New York, one zero nine five zero, press 1. For Highland Mills, New York, one zero nine three zero, press 2. For Chester, New York, one zero nine one eight, press 3. For Washingtonville, New York, one zero nine nine two, press 4. For Central Valley, New York, one zero nine one seven, press 5. For Harriman, New York, one zero nine two six, press 6. To enter a different zip code, press 7.", "To go back, press star."]);
-    expect(redirect(await call("addr-zip-choice", { Digits: "*" }))).toBe("addr-unit");
+    expect(redirect(await call("addr-zip-choice", { Digits: "*" }))).toBe("addr-house");
     expect(redirect(await call("addr-zip-choice", { Digits: "1" }))).toBe("addr-street");
     expect(said(await call("addr-street"))).toEqual(["To search for the street name by voice, press 1. To search it with your keypad, press 2.", "To go back, press star."]);
     expect(redirect(await call("addr-street-choice", { Digits: "*" }))).toBe("addr-zip");
@@ -75,12 +71,16 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
     expect(said(await call("ask", {}, "f=street&n=1"))).toEqual(["Sorry, I did not catch that. Let's try again."]);
     expect(redirect(await call("heard", { SpeechResult: "forest road" }, "f=street"))).toBe("addr-street-rb?m=v");
     expect(said(await call("addr-street-rb", {}, "m=v"))).toEqual(["I heard:", "Forest Road", "If that is correct, press 1. To try again, press 2."]);
-    expect(redirect(await call("addr-street-rb-choice", { Digits: "1" }, "m=v"))).toBe("addr-check");
+    expect(redirect(await call("addr-street-rb-choice", { Digits: "1" }, "m=v"))).toBe("addr-unit-ask");
     expect(h.session.data.street).toBe("Forest Road");
+    // Not in the directory: the unit question; 2 = no unit (flagged Unit not verified)
+    expect(said(await call("addr-unit-ask"))).toEqual(["If this address has a unit number, press 1. If not, press 2.", "To go back, press star."]);
+    expect(redirect(await call("addr-unit-ask-choice", { Digits: "2" }))).toBe("addr-check");
+    expect(h.session.data).toMatchObject({ unit: undefined, unitUnverified: true });
     expect(redirect(await call("addr-check"))).toBe("addr-readback");
     expect(h.session.data.address).toBe("12 Forest Road, Monroe, NY 10950"); // the postal town (the Kiryas Joel idea was withdrawn)
     expect(said(await call("addr-readback"))).toEqual(["Here is the address you entered.", "twelve", "Forest Road", "Monroe New York", "one zero nine five zero", "If that is correct, press 1. To try again, press 2.", "To go back, press star."]); // the shared Confirm ending (Hark audit 10)
-    expect(redirect(await call("addr-readback-choice", { Digits: "*" }))).toBe("addr-zip");
+    expect(redirect(await call("addr-readback-choice", { Digits: "*" }))).toBe("addr-street"); // Nov 25, 2026: one step back
     expect(redirect(await call("addr-readback-choice", { Digits: "1" }))).toBe("addr-price");
     const price = await call("addr-price");
     expect(said(price)).toEqual(["Delivery to Monroe New York is 10 dollars.", "Thank you. Your delivery address has been saved."]);
@@ -129,7 +129,7 @@ describe("address in steps (preview), the Nov 22, 2026 order", () => {
 });
 
 describe("zip menu keys 1 to 7 (Abraham, Nov 24, 2026)", () => {
-  it("each key reads back its own town, state and zip; 7 types another zip; star goes back to the unit step", async () => {
+  it("each key reads back its own town, state and zip; 7 types another zip; star goes back to the house number", async () => {
     const words = (z: string) => z.split("").map((d) => ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][Number(d)]).join(" ");
     const keys: [string, string, string][] = [
       ["1", "Monroe", "10950"],
@@ -150,7 +150,7 @@ describe("zip menu keys 1 to 7 (Abraham, Nov 24, 2026)", () => {
       expect(rb).toContain(words(zip));
     }
     expect(redirect(await call("addr-zip-choice", { Digits: "7" }))).toBe("addr-zip-enter");
-    expect(redirect(await call("addr-zip-choice", { Digits: "*" }))).toBe("addr-unit");
+    expect(redirect(await call("addr-zip-choice", { Digits: "*" }))).toBe("addr-house");
     const bad = await call("addr-zip-choice", { Digits: "8" });
     expect(said(bad)).toEqual(["Sorry, that is not a valid selection."]);
     expect(redirect(bad)).toBe("addr-zip");

@@ -37,7 +37,7 @@ beforeEach(() => {
 const steps: [string, string, RegExp, RegExp][] = [
   ["confirm", "f=name", /.+/, /^ask\?f=name$/],
   ["date-confirm", "d=2026-12-07", /.+/, /^date/],
-  ["addr-street-rb-choice", "m=v", /^addr-check$/, /^ask\?f=street$/],
+  ["addr-street-rb-choice", "m=v", /^addr-unit-ask$/, /^ask\?f=street$/],
   ["addr-readback-choice", "", /^addr-price$/, /^addr-house$/],
   ["phone-confirm", "", /^sms-consent$/, /^phone-enter$/],
 ];

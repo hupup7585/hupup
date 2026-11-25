@@ -70,14 +70,14 @@ describe("H2: speech to text starts recording as the tone ends", () => {
   });
 });
 
-describe("H3: unit, pound alone = no unit", () => {
-  it("the unit Gather reports an empty result; pound alone goes on to the zip menu; a timeout is the no-key rule", async () => {
+describe("H3: the unit step (Nov 25, 2026: no skip)", () => {
+  it("pound alone is a wrong key, then the unit question again; a timeout is the no-key rule; a unit goes on to the check", async () => {
     expect(await call("addr-unit")).toMatch(/<Gather [^>]*actionOnEmptyResult="true"/);
-    h.session.data = { ...h.session.data, unit: "5" };
-    expect(redirect(await call("addr-unit-heard", { Digits: "", FinishedOnKey: "#" }))).toBe("addr-zip");
-    expect(h.session.data.unit).toBeUndefined();
+    const pound = await call("addr-unit-heard", { Digits: "", FinishedOnKey: "#" });
+    expect(said(pound)).toEqual(["Sorry, that is not a valid selection."]);
+    expect(redirect(pound)).toBe("addr-unit");
     expect(redirect(await call("addr-unit-heard", { Digits: "" }))).toMatch(/^idle\?to=addr-unit/);
-    expect(redirect(await call("addr-unit-heard", { Digits: "12", FinishedOnKey: "#" }))).toBe("addr-zip");
+    expect(redirect(await call("addr-unit-heard", { Digits: "12", FinishedOnKey: "#" }))).toBe("addr-check");
     expect(h.session.data.unit).toBe("12");
   });
 });

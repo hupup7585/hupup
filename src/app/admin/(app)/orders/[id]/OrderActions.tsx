@@ -21,6 +21,7 @@ export default function OrderActions(props: {
   deliveryTime: string;
   notes: string;
   holdExpiresAt: string | null;
+  unitNotVerified?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<ActionResult | null>(null);
@@ -80,7 +81,14 @@ export default function OrderActions(props: {
 
       <form className="card space-y-3 p-5" action={(fd) => run(() => updateDetailsAction(props.orderId, fd))}>
         <h2 className="font-bold">Delivery details</h2>
-        <div><label className="label">Address</label><input name="deliveryAddress" defaultValue={props.deliveryAddress} className="input" /></div>
+        <div>
+          <label className="label flex items-center gap-2">
+            Address
+            {/* Nov 25, 2026: the caller said no unit and the directory has no household there; confirm before delivery */}
+            {props.unitNotVerified && <span data-unit-not-verified className="rounded bg-sun px-1.5 text-xs font-bold text-navy">Unit not verified</span>}
+          </label>
+          <input name="deliveryAddress" defaultValue={props.deliveryAddress} className="input" />
+        </div>
         <p className="text-sm text-muted">Delivery {DELIVERY_WINDOW} · pickup by {PICKUP_BY} (whole rental days)</p>
         <div><label className="label">Notes</label><textarea name="notes" defaultValue={props.notes} rows={3} className="input" /></div>
         <button className="btn-dark w-full" disabled={pending}>Save</button>

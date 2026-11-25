@@ -350,6 +350,25 @@ function box48(g: Gather, ctx: Ctx, e164: string) {
   backLine(g, ctx);
 }
 
+/**
+ * Name rules (Abraham, Nov 25, 2026): an address found in the directory uses that household's name (even when another
+ * family member calls); not found = the name the caller gave. The caller's own answer is kept to fall back to.
+ */
+async function applyDirectoryMatch(ctx: Ctx, a: { house: string; street: string; unit: string | null; zip: string }) {
+  const { matchDirectoryAddress, householdName } = await import("@/lib/directory");
+  const data = ctx.session?.data ?? {};
+  const callerName = data.dirMatchId ? data.callerName : data.name;
+  const hit = await matchDirectoryAddress(a);
+  const name = hit ? householdName(hit) : "";
+  if (hit && name) {
+    await updateSession(ctx.callSid, { data: { name, nameFromDirectory: true, dirMatchId: hit.id, callerName: callerName ?? undefined } }, ctx.session);
+    await track(ctx.callSid, "step", `Directory address match: household ${name}${callerName ? ` (the caller said ${callerName})` : ""}`);
+  } else if (data.dirMatchId) {
+    // The address changed and no longer matches: back to the caller's own name
+    await updateSession(ctx.callSid, { data: { name: callerName ?? undefined, nameFromDirectory: undefined, dirMatchId: undefined, callerName: undefined } }, ctx.session);
+  }
+}
+
 /** A +1 number read in three groups, the same way as the phone read-back ("eight four five, ..."). */
 function spokenPhone(e164: string) {
   const d = e164.replace(/\D/g, "").slice(-10);
@@ -3078,29 +3097,62 @@ const handlers: Record<string, Handler> = {
       return back(vr, "addr-house");
     }
     await updateSession(ctx.callSid, { data: { house: digits } }, ctx.session);
-    return back(vr, "addr-unit"); // then the unit and the zip; the street is searched in that zip's list (Nov 24, 2026)
+    return back(vr, "addr-zip"); // Nov 25, 2026: house number, zip, street (searched in the zip's list), then the unit
   },
 
-  /** Step 3: the unit number on the keypad; pound with nothing typed = no unit. */
+  /**
+   * The unit question (Abraham, Nov 25, 2026), after the street: an address with a household in the directory goes
+   * straight to the unit step (required). Not in the directory: "If this address has a unit number, press 1. If not,
+   * press 2." 1 = the unit step; 2 = no unit, the order is flagged "Unit not verified"; star = back to the street.
+   */
+  async "addr-unit-ask"(ctx, vr) {
+    const d = ctx.session?.data ?? {};
+    if (!d.house || !d.street) return back(vr, "addr-house");
+    const { directoryHasHouse } = await import("@/lib/directory");
+    if (await directoryHasHouse({ house: d.house, street: d.street, zip: d.zip })) return back(vr, "addr-unit");
+    const g = keypad(vr, url("addr-unit-ask-choice"));
+    sp(g, ctx, "addr_unit_ask");
+    backLine(g, ctx);
+    return repeatMenu(vr, ctx, "addr-unit-ask");
+  },
+
+  async "addr-unit-ask-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (d === "*") return back(vr, "addr-street"); // star: back to the street step
+    if (d === "1") return back(vr, "addr-unit", { a: 1 });
+    if (d === "2") {
+      await updateSession(ctx.callSid, { data: { unit: undefined, unitUnverified: true } }, ctx.session);
+      await track(ctx.callSid, "step", "Unit question: no unit (not in the directory), order flagged Unit not verified");
+      return back(vr, "addr-check");
+    }
+    sp(vr, ctx, "not_valid");
+    return back(vr, "addr-unit-ask");
+  },
+
+  /** The unit number on the keypad (Nov 25, 2026: required, no skip; pound with nothing typed is a wrong key). */
   "addr-unit"(ctx, vr) {
-    // actionOnEmptyResult: pound with nothing typed reaches us as "no unit" (Hark's audit H3, Nov 24, 2026); Twilio
-    // otherwise treats it as no input and the caller was stuck on this question
-    const g = vr.gather({ input: ["dtmf"], numDigits: 7, timeout: 10, finishOnKey: "#", actionOnEmptyResult: true, action: url("addr-unit-heard"), method: "POST" });
+    // actionOnEmptyResult: pound with nothing typed reaches us, so it gets the wrong-key line (not the no-key line)
+    const a = ctx.query.get("a") ?? undefined;
+    const g = vr.gather({ input: ["dtmf"], numDigits: 7, timeout: 10, finishOnKey: "#", actionOnEmptyResult: true, action: url("addr-unit-heard", { a }), method: "POST" });
     sp(g, ctx, "addr_unit");
     sp(g, ctx, "pound_done");
-    sp(g, ctx, "addr_unit_skip");
     backLine(g, ctx);
-    return repeatMenu(vr, ctx, "addr-unit");
+    return repeatMenu(vr, ctx, "addr-unit", { a });
   },
 
   async "addr-unit-heard"(ctx, vr) {
     const raw = ctx.body.Digits || "";
-    if (raw.includes("*")) return back(vr, "addr-house"); // star: one step back, the house number
-    // Nothing typed: pound alone = no unit (on to the zip menu); a real timeout = the no-key rule on this question
-    if (!raw.replace(/\D/g, "") && ctx.body.FinishedOnKey !== "#") return idleNoKey(vr, ctx, "addr-unit");
+    const a = ctx.query.get("a") ?? undefined;
+    if (raw.includes("*")) return back(vr, a ? "addr-unit-ask" : "addr-street"); // star: one step back
     const unit = raw.replace(/\D/g, "");
-    await updateSession(ctx.callSid, { data: { unit: unit || undefined } }, ctx.session);
-    return back(vr, "addr-zip");
+    if (!unit) {
+      // Pound with nothing typed: the wrong-key line, then the unit question again; a real timeout: the no-key rule
+      if (ctx.body.FinishedOnKey !== "#") return idleNoKey(vr, ctx, "addr-unit", { a });
+      sp(vr, ctx, "not_valid");
+      return back(vr, "addr-unit", { a });
+    }
+    await updateSession(ctx.callSid, { data: { unit, unitUnverified: undefined } }, ctx.session);
+    return back(vr, "addr-check");
   },
 
   "addr-zip"(ctx, vr) {
@@ -3112,7 +3164,7 @@ const handlers: Record<string, Handler> = {
 
   async "addr-zip-choice"(ctx, vr) {
     const d = ctx.body.Digits;
-    if (d === "*") return back(vr, "addr-unit"); // star: one step back
+    if (d === "*") return back(vr, "addr-house"); // star: one step back (Nov 25, 2026: the zip comes after the house number)
     // The zip menu, keys 1 to 7 (Abraham, Nov 24, 2026, matching the approved recording); Blooming Grove uses Monroe 10950
     const zip = ZIP_MENU_KEYS[d ?? ""];
     if (zip) {
@@ -3260,7 +3312,7 @@ const handlers: Record<string, Handler> = {
     if (d === "1" && street) {
       await track(ctx.callSid, keys ? "typed" : "said", `Street: ${street}`, { field: "street", value: street });
       await updateSession(ctx.callSid, { data: { street, heard: undefined, streetMatches: undefined } }, ctx.session);
-      return back(vr, "addr-check");
+      return back(vr, "addr-unit-ask"); // Nov 25, 2026: the unit after the street
     }
     sp(vr, ctx, "not_valid");
     return back(vr, "addr-street-rb", { m: keys ? "k" : "v" });
@@ -3288,6 +3340,9 @@ const handlers: Record<string, Handler> = {
     const placeTown = town;
     const placeAddress = address;
     await updateSession(ctx.callSid, { data: { address: placeAddress, town: placeTown, zip } }, ctx.session);
+    // Directory address match for an address entered by hand (Abraham, Nov 25, 2026): house number, street, unit and
+    // zip all equal. A match uses that household's name; no new spoken line (the match-found wording is pending).
+    if (ctx.query.get("dir") !== "1") await applyDirectoryMatch(ctx, { house: data.house, street: data.street, unit: data.unit ?? null, zip });
     // From the lookup (Nov 23, 2026): the caller confirmed it: "Thank you. Your delivery address has been saved.", then step 7
     if (ctx.query.get("dir") === "1") {
       sp(vr, ctx, "addr_saved");
@@ -3339,9 +3394,9 @@ const handlers: Record<string, Handler> = {
   async "addr-readback-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "addr-price");
-    if (d === "*") return back(vr, "addr-zip"); // star: one step back
+    if (d === "*") return back(vr, "addr-street"); // star: one step back
     if (d === "2") {
-      await updateSession(ctx.callSid, { data: { address: undefined, street: undefined, house: undefined, unit: undefined, zip: undefined, town: undefined } }, ctx.session);
+      await updateSession(ctx.callSid, { data: { address: undefined, street: undefined, house: undefined, unit: undefined, zip: undefined, town: undefined, unitUnverified: undefined } }, ctx.session);
       return back(vr, "addr-house"); // the address again, from the house number
     }
     sp(vr, ctx, "not_valid");
@@ -3622,6 +3677,7 @@ const handlers: Record<string, Handler> = {
         .set({
           customerId,
           deliveryAddress: data.address,
+          unitNotVerified: Boolean(data.unitUnverified), // Nov 25, 2026: staff confirm the unit before delivery
           ...(data.directions ? { notes: sql`COALESCE(${orders.notes}, '') || ${`Delivery directions (from the caller): ${data.directions}. `}` } : {}),
           status: "PENDING_PAYMENT",
           holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES),
@@ -4684,7 +4740,7 @@ const handlers: Record<string, Handler> = {
 type Field = "name" | "address" | "email" | "street" | "unit" | "directions";
 /** The step before a question, for star (Abraham, Nov 24, 2026: star = go back everywhere). */
 function prevStep(f: Field): [string, Record<string, string>] {
-  return f === "street" ? ["addr-street", {}] : f === "unit" ? ["addr-house", {}] : f === "address" ? ["ask", { f: "name" }] : ["cart", {}];
+  return f === "street" ? ["addr-street", {}] : f === "unit" ? ["addr-street", {}] : f === "address" ? ["ask", { f: "name" }] : ["cart", {}];
 }
 const FIELDS: Record<
   Field,
@@ -4702,7 +4758,7 @@ const FIELDS: Record<
     hints: "Forest Road, Garfield Road, Bakertown Road, Mountain Road, Acres Road, Quickway Road, Seven Springs Road, Schunnemunk Road, Larkin Drive, Satmar Drive, Van Buren Drive",
     normalize: (s) => titleCase(s.replace(/[.,!?;:]+$/g, "").trim()) || null,
     readBack: (v) => v,
-    next: "addr-check",
+    next: "addr-unit-ask",
   },
   unit: {
     prompt: "addr_unit",

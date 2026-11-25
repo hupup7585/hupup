@@ -41,6 +41,52 @@ export async function lookupByPhone(phone: string | null | undefined): Promise<D
   }
 }
 
+/**
+ * Directory address match (Abraham, Nov 25, 2026) for an address the caller entered by hand: house number, street,
+ * unit and zip must all be equal after normalizing (short forms written out; capitals, spaces, periods and commas
+ * ignored). Each apartment is its own household, matched only by its own unit; no unit matches only an entry with no
+ * unit. Two different households at the very same address and unit (pending Abraham) = no match.
+ */
+export async function matchDirectoryAddress(a: { house: string; street: string; unit?: string | null; zip: string }): Promise<DirectoryEntry | null> {
+  const { houseKey, streetKey, unitKey } = await import("@/lib/street-search");
+  const zip = a.zip.replace(/\D/g, "");
+  if (!zip || !houseKey(a.house) || !streetKey(a.street)) return null;
+  let rows: DirectoryEntry[] = [];
+  try {
+    rows = await db.select().from(schema.directoryEntries).where(eq(schema.directoryEntries.zip, zip));
+  } catch {
+    return null;
+  }
+  const hits = rows.filter((r) => houseKey(r.house) === houseKey(a.house) && streetKey(r.street) === streetKey(a.street) && unitKey(r.unit) === unitKey(a.unit));
+  const households = new Set(hits.map((r) => `${r.lastName.trim().toUpperCase()}|${r.firstName.trim().toUpperCase()}`));
+  return households.size === 1 ? hits[0] : null;
+}
+
+/** Is any household listed at this house number and street (any unit; the zip too when given)? (Nov 25, 2026, unit step) */
+export async function directoryHasHouse(a: { house: string; street: string; zip?: string | null }): Promise<boolean> {
+  const { houseKey, streetKey } = await import("@/lib/street-search");
+  if (!houseKey(a.house) || !streetKey(a.street)) return false;
+  const zip = a.zip?.replace(/\D/g, "");
+  let rows: DirectoryEntry[] = [];
+  try {
+    rows = zip ? await db.select().from(schema.directoryEntries).where(eq(schema.directoryEntries.zip, zip)) : await db.select().from(schema.directoryEntries);
+  } catch {
+    return false;
+  }
+  return rows.some((r) => houseKey(r.house) === houseKey(a.house) && streetKey(r.street) === streetKey(a.street));
+}
+
+/** The household name as the directory has it, last name first ("Schwartz, Avram"); last name only = just the last name. */
+export function householdName(e: { lastName: string; firstName: string }): string {
+  return [e.lastName.trim(), e.firstName.trim()].filter(Boolean).join(", ");
+}
+
+/** Entries with no unit (Abraham asked how many, Nov 25, 2026). */
+export async function entriesWithoutUnit(): Promise<number> {
+  const r = (await db.execute(sql`SELECT COUNT(*)::int AS n FROM directory_entries WHERE coalesce(trim(unit), '') = ''`)).rows[0] as { n: number } | undefined;
+  return r?.n ?? 0;
+}
+
 export type NewDirectoryEntry = { lastName: string; firstName: string; phone: string | null; house: string; street: string; unit: string | null; town: string; zip: string };
 
 /**

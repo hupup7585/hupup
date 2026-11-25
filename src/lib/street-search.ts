@@ -11,7 +11,33 @@ import { STREETS, findStreet } from "@/lib/streets";
 const SUFFIXES: Record<string, string> = {
   RD: "Road", DR: "Drive", CT: "Court", AVE: "Avenue", AV: "Avenue", LN: "Lane", ST: "Street", BLVD: "Boulevard", PKWY: "Parkway",
   CRES: "Crescent", PL: "Place", TER: "Terrace", TERR: "Terrace", CIR: "Circle", HWY: "Highway", TPKE: "Turnpike", TRL: "Trail", SQ: "Square", HTS: "Heights", EXT: "Extension",
+  CV: "Cove", WY: "Way", XING: "Crossing", RTE: "Route", RT: "Route", MT: "Mount", MTN: "Mountain", PT: "Point", BR: "Branch", HL: "Hill", HOLW: "Hollow", RDG: "Ridge", VW: "View", LK: "Lake", GRN: "Green", CTR: "Center", PK: "Park", RUN: "Run", ROW: "Row", PLZ: "Plaza", ALY: "Alley", CRK: "Creek", EST: "Estate", ESTS: "Estates", GDNS: "Gardens", GLN: "Glen", HBR: "Harbor", MDW: "Meadow", MDWS: "Meadows", ORCH: "Orchard", VLG: "Village", WDS: "Woods",
 };
+
+/**
+ * One street name for comparing (Abraham, Nov 25, 2026): short forms written out (St = Street, Rd = Road, ...), and
+ * capitals, spaces, periods and commas ignored. "D A Wieder Blvd." and "da wieder boulevard" give the same result.
+ */
+export function streetKey(street: string): string {
+  return street
+    .toUpperCase()
+    .replace(/[.,]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => (SUFFIXES[w] ?? w).toUpperCase())
+    .join("")
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+/** A unit for comparing: "Apt. 2B", "unit 2b", "#2B" and "2 B" are all "2B"; none = "". */
+export function unitKey(unit: string | null | undefined): string {
+  return (unit ?? "").toUpperCase().replace(/^\s*(APARTMENT|APT|UNIT|SUITE|STE|#)\.?\s*/, "").replace(/[^A-Z0-9]/g, "");
+}
+
+/** A house number for comparing: spaces and punctuation ignored, capitals the same ("12a" = "12 A"). */
+export function houseKey(house: string | null | undefined): string {
+  return (house ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
 
 /** The street as said aloud: from our list ("ACRES RD" = "Acres Road"), else the printed name with the short forms written out. */
 export function spokenStreet(printed: string): string {
@@ -42,7 +68,8 @@ export async function streetsForZip(zip: string | undefined | null): Promise<str
 }
 
 const letters = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-const TYPE_WORDS = new Set(Object.values(SUFFIXES).map((w) => w.toLowerCase()));
+// The road-type words callers often leave out (the voice search ignores them; not Hill, Lake, Park and the like)
+const TYPE_WORDS = new Set(["road", "drive", "court", "avenue", "lane", "street", "boulevard", "parkway", "crescent", "place", "terrace", "circle", "highway", "turnpike", "trail", "square", "way", "cove", "route", "extension"]);
 /** The name without "Road", "Drive" and the like (callers often leave them out). */
 const core = (s: string) => letters(s.split(/\s+/).filter((w) => !TYPE_WORDS.has(w.toLowerCase())).join(" ")) || letters(s);
 

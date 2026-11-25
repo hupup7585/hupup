@@ -116,6 +116,8 @@ export const orders = pgTable(
     /** Pickup day = eventDate + 1. */
     pickupDate: date("pickup_date", { mode: "string" }).notNull(),
     deliveryAddress: text("delivery_address"),
+    /** The caller said there is no unit and the directory has no household at that house (Nov 25, 2026): staff confirm before delivery */
+    unitNotVerified: boolean("unit_not_verified").notNull().default(false),
     /** Driver for the delivery and for the pickup (Abraham, Nov 12, 2026); a Delivery login sees only its own stops. */
     /** Items taken out of an expired payment link because someone else booked them (Abraham, Nov 13, 2026); the
      *  customer is offered the nearest options for each. Kept on the order the link opens. */
@@ -236,7 +238,10 @@ export type CallData = {
   spanDays?: Record<string, { after: string; days: number | null; both?: string }>;
   /** The ocean balls offer already played on this call (once per call, Nov 24, 2026) */
   oceanOffered?: boolean;
-  streetMatches?: string[]; // the street keypad search: the streets found (Nov 24, 2026)
+  streetMatches?: string[];
+  dirMatchId?: number; // the directory household matched by the address entered by hand (Nov 25, 2026)
+  callerName?: string;
+  unitUnverified?: boolean; // key 2 on the unit question: no unit, not in the directory (Nov 25, 2026) // the name the caller gave, kept when a directory household name is used // the street keypad search: the streets found (Nov 24, 2026)
   /** Phone-number lookup (Nov 23, 2026): the number looked up, and the address the caller picked (for the owner alert) */
   dirPhone?: string;
   dirPick?: string;

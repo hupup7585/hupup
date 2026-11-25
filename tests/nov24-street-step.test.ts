@@ -89,7 +89,7 @@ describe("key 1: voice search", () => {
     expect(said(await call("addr-street-rb", {}, "m=v"))).toEqual(["I heard:", "Smith Clove Road", "If that is correct, press 1. To try again, press 2."]);
     expect(redirect(await call("addr-street-rb-choice", { Digits: "2" }, "m=v"))).toBe("ask?f=street");
     expect(redirect(await call("heard", { SpeechResult: "oak wood terrace" }, "f=street"))).toBe("addr-street-rb?m=v");
-    expect(redirect(await call("addr-street-rb-choice", { Digits: "1" }, "m=v"))).toBe("addr-check");
+    expect(redirect(await call("addr-street-rb-choice", { Digits: "1" }, "m=v"))).toBe("addr-unit-ask"); // Nov 25, 2026: the unit after the street
     expect(h.session.data.street).toBe("Oakwood Terrace");
     expect(redirect(await call("addr-check"))).toBe("addr-readback");
     expect(h.session.data.address).toBe("12 Oakwood Terrace, 3, Highland Mills, NY 10930");
@@ -113,7 +113,7 @@ describe("key 2: keypad search, the first four letters", () => {
     expect(redirect(await call("addr-street-typed", { Digits: "666255*9" }))).toBe("addr-street-rb?m=k"); // o a k w
     expect(said(await call("addr-street-rb", {}, "m=k"))).toEqual(["You typed:", "Oakwood Terrace", "If that is correct, press 1. To try again, press 2."]);
     expect(redirect(await call("addr-street-rb-choice", { Digits: "2" }, "m=k"))).toBe("addr-street-keys");
-    expect(redirect(await call("addr-street-rb-choice", { Digits: "1" }, "m=k"))).toBe("addr-check");
+    expect(redirect(await call("addr-street-rb-choice", { Digits: "1" }, "m=k"))).toBe("addr-unit-ask");
     expect(h.session.data.street).toBe("Oakwood Terrace");
   });
   it("several matches: each street with its own key to press", async () => {
@@ -145,7 +145,7 @@ describe("star goes back", () => {
     expect(redirect(await call("heard", { Digits: "*" }, "f=street"))).toBe("addr-street");
     expect(redirect(await call("addr-street-typed", { Digits: "*" }))).toBe("addr-street");
     expect(redirect(await call("addr-street-rb-choice", { Digits: "*" }, "m=v"))).toBe("addr-street");
-    expect(redirect(await call("addr-unit-heard", { Digits: "*" }))).toBe("addr-house");
+    expect(redirect(await call("addr-unit-heard", { Digits: "*" }))).toBe("addr-street"); // Nov 25, 2026: the unit comes after the street
   });
 });
 

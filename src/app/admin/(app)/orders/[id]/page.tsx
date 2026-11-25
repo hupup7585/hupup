@@ -268,6 +268,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           due={due}
           hasPhone={Boolean(customer?.phone)}
           deliveryAddress={o.deliveryAddress ?? ""}
+          unitNotVerified={o.unitNotVerified}
           deliveryTime={o.deliveryTime ?? ""}
           notes={o.notes ?? ""}
           holdExpiresAt={o.holdExpiresAt?.toISOString() ?? null}
