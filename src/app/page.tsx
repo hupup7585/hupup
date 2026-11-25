@@ -335,10 +335,12 @@ export default async function Home() {
                     rel="noopener noreferrer"
                     aria-label={`${c.serviceArea.main}, plus nearby ${c.serviceArea.region} towns: open in Google Maps (opens in a new tab)`}
                     data-service-area-map
-                    className="block font-semibold hover:underline focus-visible:underline"
+                    className="group block cursor-pointer font-semibold"
                   >
-                    {c.serviceArea.main}
-                    <span className="block text-base font-medium underline underline-offset-4">Plus nearby {c.serviceArea.region} towns</span>
+                    {/* Abraham, Nov 25, 2026: one line at rest, under the town (same as phone and email); the second line
+                        gets a lighter line only while the mouse is on the link */}
+                    <span className="underline underline-offset-4">{c.serviceArea.main}</span>
+                    <span data-area-sub className="block text-base font-medium no-underline decoration-current/40 underline-offset-4 group-hover:underline group-focus-visible:underline">Plus nearby {c.serviceArea.region} towns</span>
                   </a>
                 </div>
               </li>

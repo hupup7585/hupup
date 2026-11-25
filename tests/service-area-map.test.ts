@@ -19,3 +19,14 @@ describe("service area map link", () => {
     }
   });
 });
+
+describe("contact service area link lines (Abraham, Nov 25, 2026)", () => {
+  it("the town is underlined like phone and email; the second line gets a lighter line only on hover", async () => {
+    const { readFileSync } = await import("node:fs");
+    const page = readFileSync("src/app/page.tsx", "utf8");
+    expect(page).toContain('<span className="underline underline-offset-4">{c.serviceArea.main}</span>');
+    const sub = page.match(/<span data-area-sub className="([^"]+)"/)?.[1] ?? "";
+    expect(sub.split(" ")).toEqual(expect.arrayContaining(["no-underline", "group-hover:underline", "decoration-current/40"]));
+    expect(page).toMatch(/className="group block cursor-pointer font-semibold"/);
+  });
+});
