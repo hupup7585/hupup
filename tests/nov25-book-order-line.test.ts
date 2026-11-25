@@ -54,3 +54,32 @@ describe("item 1: the bookings menu order line", () => {
     expect(lines).not.toContain(NEW);
   });
 });
+
+describe("item 2: customer service hours line 3c (Abraham, Yes, Nov 25, 2026, 3:25 PM)", () => {
+  const R3C = "Our customer service is open Sunday through Thursday, from 11 AM to 4 PM.";
+  it("slot text exact, own Admin slot", () => {
+    expect(PROMPTS.book_r3c.text).toBe(R3C);
+    expect(PROMPTS.book_r3c.label).toBe("Bookings menu, recording 3c: customer service hours");
+    expect(RETIRED_PROMPTS.has("book_r3c")).toBe(false);
+  });
+  it("plays right after 3a and before 3b, every time 3a plays; the rest in the order set in Admin", async () => {
+    for (let i = 0; i < 2; i++) {
+      const lines = said(await call("book"));
+      const a = lines.indexOf(PROMPTS.book_r3a.text);
+      expect(a).toBeGreaterThan(-1);
+      expect(lines[a + 1]).toBe(R3C);
+      expect(lines.indexOf(PROMPTS.book_r3b.text)).toBeGreaterThan(a + 1);
+      expect(lines.filter((l) => l === R3C)).toHaveLength(1);
+      expect(lines.at(-1)).toBe("To go back, press star.");
+    }
+  });
+  it("with the Owner's order (catalog, 1b, 2, 3a, 3b, star): 1, 1b, 2, 3a, 3c, 3b, star", async () => {
+    const { MENU_RECORDINGS } = await import("@/lib/ivr/menu-order");
+    expect(MENU_RECORDINGS.book.keys).not.toContain("book_r3c"); // played with 3a, so a saved order stays valid
+    const { saveSetting } = await import("@/lib/settings");
+    await saveSetting("menuOrders", JSON.stringify({ book: ["book_r1", "book_orders_only", "book_r2", "book_r3a", "book_r3b", "book_back"] }));
+    const lines = said(await call("book"));
+    expect(lines).toEqual([PROMPTS.book_r1.text, PROMPTS.book_r2.text, PROMPTS.book_r3a.text, R3C, PROMPTS.book_r3b.text, "To go back, press star."]); // 1b: not the first time (an item is in the cart)
+    await saveSetting("menuOrders", "");
+  });
+});

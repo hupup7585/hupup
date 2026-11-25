@@ -251,6 +251,7 @@ async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) =
     if (part === "balloon_items") await items?.(g);
     else if (part === "book_back") backLine(g, ctx);
     else sp(g, ctx, part);
+    if (part === "book_r3a") sp(g, ctx, "book_r3c"); // customer service hours, right after 3a every time (Nov 25, 2026)
   }
 }
 
