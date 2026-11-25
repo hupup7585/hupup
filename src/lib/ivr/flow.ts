@@ -244,6 +244,8 @@ function backLine(g: Gather, ctx: { prompts: PromptOverrides }) {
   sp(g, ctx, "book_back");
 }
 
+export const BOOK_R3C_LIVE = false;
+
 /** A menu made of several recordings, in the order the Owner set in Admin (src/lib/ivr/menu-order.ts). */
 async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) => void | Promise<void>, opts: { firstTime?: boolean } = {}) {
   for (const part of menuOrder(menu, (await getSettings()).menuOrders)) {
@@ -251,7 +253,9 @@ async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) =
     if (part === "balloon_items") await items?.(g);
     else if (part === "book_back") backLine(g, ctx);
     else sp(g, ctx, part);
-    if (part === "book_r3a") sp(g, ctx, "book_r3c"); // customer service hours, right after 3a every time (Nov 25, 2026)
+    // 3c (customer service hours) plays right after 3a once its new wording is in. Off (Abraham, Nov 25, 2026, 4:50 PM):
+    // the hours changed, so "11 AM to 4 PM" is wrong; the slot keeps its text and waits for new wording.
+    if (part === "book_r3a" && BOOK_R3C_LIVE) sp(g, ctx, "book_r3c");
   }
 }
 

@@ -21,6 +21,7 @@ export function notActiveReason(key: string, env: Record<string, string | undefi
   if (key === "catalog_email_info") return infoCatalogAutoreplyOn(env) ? null : "Plays once the info@ Catalog auto-reply is connected (Cloudflare Email Worker).";
   if (key === "terms_notice" || key === "msg_terms_link") return termsActive() ? null : "The Terms step is off on the live site until the final Terms are in.";
   if (key === "instr_balloons" || key === "instr_paddle") return "Waits for your script.";
+  if (key === "book_r3c") return "Waiting for new wording."; // the customer service hours changed (Nov 25, 2026, 4:50 PM)
   return null;
 }
 

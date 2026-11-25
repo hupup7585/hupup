@@ -191,7 +191,6 @@ describe("every key, office open", () => {
       "To receive our catalog by text or email, press 8.",
       "The fastest way to place an order is with our easy automated system.", // Nov 25, 2026, 2:02 PM
       "For information or questions, press 0 for customer service.",
-      "Our customer service is open Sunday through Thursday, from 11 AM to 4 PM.", // 3c, Nov 25, 2026, 3:25 PM
       "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.",
       "For schools, corporate events, and organizational bookings, press 9.",
       "To go back, press star.",
