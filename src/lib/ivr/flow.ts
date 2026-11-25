@@ -4626,7 +4626,7 @@ const handlers: Record<string, Handler> = {
       await updateSession(ctx.callSid, { data: { missed: "closed" } }, ctx.session); // dashboard: missed call
       return back(vr, "voicemail", { x: k }); // the extension's own box, with the approved greeting
     }
-    await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "forwarded" }, ctx.session);
+    await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "forwarded", data: { ringStart: Date.now() } }, ctx.session);
     sp(vr, ctx, "transfer_connecting");
     return dialTargets(vr, list, k, 0, ctx.session?.fromNumber ?? ctx.from);
   },
@@ -4668,11 +4668,27 @@ const handlers: Record<string, Handler> = {
     }
     const settings = await getSettings();
     const list = ringListFor(settings, k);
-    const next = Number(ctx.query.get("i") ?? -1) + 1;
+    const i = Number(ctx.query.get("i") ?? -1);
+    const next = i + 1;
     const steps = (list.mode === "simultaneous" ? 1 : list.targets.length) * ringAttempts(settings, k);
-    if (next > 0 && next < steps && (await lineRingsNowFor(k, settings))) return dialTargets(vr, list, k, next, ctx.session?.fromNumber ?? ctx.from);
+    // Customer service (Abraham, Nov 25, 2026, 4:14 PM): every call lasts its full ring time; a call that ends early
+    // (rejected, key 2, busy, failed) is waited out with the same ringing, then a new call
+    if (k === "4" && ctx.query.get("w") !== "1" && i >= 0 && list.targets.length) {
+      const ring = list.mode === "simultaneous" ? list.targets : [list.targets[i % list.targets.length]];
+      const perCall = Math.max(...ring.map((t) => t.ringSeconds));
+      const started = Number(ctx.session?.data.ringStart ?? 0);
+      const elapsed = started ? Math.floor((Date.now() - started) / 1000) : perCall;
+      if (elapsed < perCall) {
+        for (let sec = Math.max(0, elapsed); sec < perCall; sec++) vr.play(`${config.baseUrl()}/audio/${sec % 6 < 2 ? "ring-on-1s" : "ring-off-1s"}.wav`); // US ringing: 2 s on, 4 s off
+        return back(vr, "operator-done", { i, k, w: 1, r: rejected ? 1 : undefined });
+      }
+    }
+    if (next > 0 && next < steps && (await lineRingsNowFor(k, settings))) {
+      await updateSession(ctx.callSid, { data: { ringStart: Date.now() } }, ctx.session);
+      return dialTargets(vr, list, k, next, ctx.session?.fromNumber ?? ctx.from);
+    }
     // Abraham's missed-call line, then straight to the voicemail beep
-    await updateSession(ctx.callSid, { data: { missed: rejected ? "rejected" : "no_answer" } }, ctx.session); // dashboard: missed call
+    await updateSession(ctx.callSid, { data: { missed: rejected || ctx.query.get("r") === "1" ? "rejected" : "no_answer" } }, ctx.session); // dashboard: missed call
     return back(vr, "voicemail", { x: k }); // passed (2) or no answer on every number and round: the extension's voicemail
   },
 

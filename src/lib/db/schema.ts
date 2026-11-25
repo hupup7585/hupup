@@ -293,6 +293,8 @@ export type CallData = {
   lastKeyAt?: number;
   /** Staff pressed 2 on the announcement (Abraham): the caller goes to that extension's voicemail. */
   rejectedAt?: number;
+  /** When the current customer service ring call started (ms), to wait out its full ring time (Nov 25, 2026) */
+  ringStart?: number;
   /** Voicemail review menu: the latest recording on this call, its link, box and menu key */
   vmSid?: string;
   vmUrl?: string;

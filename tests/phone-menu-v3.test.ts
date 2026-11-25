@@ -243,7 +243,9 @@ describe("Nov 12 decisions: staff reject, caller ID, after hours, keypad pay, CA
     expect(next).toContain("<Dial"); // round 2, not voicemail
     expect(h.session.data.rejectedAt).toBeUndefined();
     await pass();
-    const last = await call("operator-done", { DialCallStatus: "completed" }, "i=2&k=4");
+    const waitOut = await call("operator-done", { DialCallStatus: "completed" }, "i=2&k=4");
+    expect(redirect(waitOut)).toBe("operator-done?i=2&k=4&w=1&r=1"); // customer service: the call is waited out to its 25 seconds (Nov 25, 2026)
+    const last = await call("operator-done", {}, "i=2&k=4&w=1&r=1");
     expect(redirect(last)).toBe("voicemail?x=4"); // after the third round
     expect(h.session.data.missed).toBe("rejected");
     // press 1 connects (empty response)
