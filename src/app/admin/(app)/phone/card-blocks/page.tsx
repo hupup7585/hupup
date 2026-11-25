@@ -15,7 +15,7 @@ export default async function CardBlocksPage() {
   await requireAdmin();
   const rows = await blockedNumbers();
   return (
-    <div className="mx-auto max-w-3xl" data-card-blocks>
+    <div className="w-full" data-card-blocks>
       <h1 className="text-2xl font-black sm:text-3xl">Card blocks</h1>
       <p className="mb-5 mt-1 text-muted">
         Phone numbers that can&rsquo;t pay by card on the phone after too many declines in 24 hours. These callers are offered the payment link instead. Unlock a number after

@@ -29,7 +29,7 @@ const SAMPLE_STOPS: { time: string; kind: string; customer: string; address: str
 
 export default function DesignPreview() {
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="w-full space-y-8">
       <PageHeader
         title="Staff screens (preview)"
         subtitle="Design preview with sample data only. Nothing on this page reads or changes real bookings."

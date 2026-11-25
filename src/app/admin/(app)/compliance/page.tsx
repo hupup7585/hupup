@@ -12,7 +12,7 @@ export default async function CompliancePage() {
   const owner = await isOwnerSession(session.userId);
   if (!owner) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="w-full">
         <h1 className="mb-1 text-2xl font-black sm:text-3xl">Report a compliance issue</h1>
         <p className="mb-5 text-muted">Report any suspected SMS compliance problem or unauthorized access to customer information right away. The owner is notified immediately.</p>
         <div className="card p-5"><ReportIssueForm /></div>
@@ -21,7 +21,7 @@ export default async function CompliancePage() {
   }
   const s = await complianceSnapshot();
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="w-full space-y-5">
       <div>
         <h1 className="mb-1 text-2xl font-black sm:text-3xl">SMS compliance</h1>
         <p className="text-muted">Last {s.days} days. Review at least every {REVIEW_INTERVAL_DAYS} days: system checks, employee access, consent records, opt-outs, and promotional messages.</p>

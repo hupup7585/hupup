@@ -29,7 +29,7 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
     api: Boolean(process.env.SOLA_API_KEY),
   };
   return (
-    <div className="mx-auto max-w-4xl" data-phonepay>
+    <div className="w-full" data-phonepay>
       <h1 className="text-2xl font-black sm:text-3xl">Sola PhonePay</h1>
       <p className="mb-4 mt-1 text-muted">
         Callers pay by card on the phone. After the order is read back, a caller who presses 1 is passed to Sola&rsquo;s secure PhonePay line, types the card on the keypad, and comes back to finish the order. We never hear, record or keep the card number. The payment is then found in Sola and the order is marked paid.

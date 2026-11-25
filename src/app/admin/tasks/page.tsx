@@ -30,7 +30,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const projects = await db.select().from(schema.taskProjects).orderBy(desc(schema.taskProjects.id));
   const views = VIEWS.filter(([k]) => staff.role !== "delivery" || k === "list" || k === "month" || k === "time");
   return (
-    <div className="mx-auto max-w-6xl" data-tasks>
+    <div className="w-full" data-tasks>
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Tasks</h1>
       <p className="mb-4 text-muted">{staff.role === "delivery" ? "Your tasks. Check them off as you go." : "Add, assign and check off jobs. No texts are sent for tasks."}</p>
       <nav className="mb-5 flex flex-wrap gap-2" aria-label="Task views">

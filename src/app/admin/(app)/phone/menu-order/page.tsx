@@ -19,7 +19,7 @@ export default async function MenuOrderPage() {
   await requireOwner();
   const s = await getSettings();
   return (
-    <div className="mx-auto max-w-3xl" data-menu-order>
+    <div className="w-full" data-menu-order>
       <h1 className="text-2xl font-black sm:text-3xl">Menu order</h1>
       <p className="mb-4 mt-1 text-muted">Some phone menus are made of several recordings. They play one after the other in the order below. Use the arrows to change the order. The words of each recording are changed in Hotline prompts.</p>
       {(Object.keys(MENU_RECORDINGS) as MenuId[]).map((menu) => {

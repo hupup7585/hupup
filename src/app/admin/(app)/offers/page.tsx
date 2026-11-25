@@ -8,7 +8,7 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const settings = await getSettings();
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="w-full">
       <h1 className="text-2xl font-black sm:text-3xl">Offers</h1>
       <p className="mb-5 mt-1 text-muted">Each offer is off until you switch it on. They never combine: a booking gets the one that saves the customer the most. They cover jumping balloons, laser tag and paddle boats.</p>
       {sp.ok && <p className="mb-4 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]">{sp.ok}</p>}

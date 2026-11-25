@@ -64,7 +64,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const pos = split.find((s) => s.channel === "POS");
 
   return (
-    <div className="mx-auto max-w-7xl" data-dashboard>
+    <div className="w-full" data-dashboard>
       {solaGaps.length > 0 && (
         // Nov 24, 2026: online payments off until both Sola settings are in Vercel
         <div role="alert" className="mb-4 rounded-xl border-2 border-[#b3261e] bg-[#ffe6e4] p-4 text-[#b3261e]" data-sola-warning>

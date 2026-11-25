@@ -28,7 +28,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
   const when = (d: Date) => dualDateTime(d);
 
   const shell = (children: React.ReactNode) => (
-    <div className="mx-auto max-w-4xl">
+    <div className="w-full">
       <h1 className="text-2xl font-black sm:text-3xl">API keys</h1>
       {/* Draft help line for Abraham's OK */}
       <p className="mb-4 mt-1 text-muted" data-keys-help>

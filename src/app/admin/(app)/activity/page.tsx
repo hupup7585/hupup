@@ -30,7 +30,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
     return s.length > 160 ? s.slice(0, 157) + "..." : s;
   };
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="w-full">
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Activity</h1>
       <p className="mb-5 text-muted">Who did what and when: sign-ins, bookings, consent, settings, staff and voicemail changes.</p>
       <form className="card mb-5 grid gap-3 p-4 sm:grid-cols-[1fr_1fr_auto_auto_auto]">

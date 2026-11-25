@@ -15,7 +15,7 @@ export default async function DeliverySettingsPage({ searchParams }: { searchPar
   const m = (await searchParams).m;
   const areas = savedAreas(settings.deliveryAreas);
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="w-full">
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Delivery settings</h1>
       <p className="mb-5 text-muted">Delivery area and fees, where the day&rsquo;s run starts, and the texts drivers can send.</p>
       {m && <p className="mb-4 rounded-lg bg-[#E7F1FB] p-3 text-sm font-semibold text-navy" data-areas-message>{m}</p>}

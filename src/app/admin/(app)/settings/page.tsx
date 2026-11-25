@@ -24,7 +24,7 @@ export default async function SettingsPage() {
   const base = config.baseUrl();
   const settings = await getSettings();
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="w-full">
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">General settings</h1>
       <p className="mb-5 text-muted">What&rsquo;s connected and working. The full list of what&rsquo;s waiting on an outside step is on <a className="underline" href="/admin/status">System status</a>.</p>
       <NotActive k="sms" />

@@ -15,7 +15,7 @@ export default async function StatementPage({ searchParams }: { searchParams: Pr
   const rows = name ? await statement(name) : [];
   const balance = rows.at(-1)?.balanceCents ?? 0;
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="w-full">
       <div className="no-print mb-4 flex gap-2"><a href="/admin/bookkeeping?tab=invoices" className="btn-ghost">← Invoices</a><PrintButton /></div>
       <article className="card bg-white p-8 print:p-0" data-statement>
         <header className="mb-6 flex justify-between gap-4 border-b border-line pb-4">

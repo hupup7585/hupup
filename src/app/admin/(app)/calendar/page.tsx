@@ -49,7 +49,7 @@ export default async function CalendarPage({
     "/admin/calendar?" + new URLSearchParams({ start, span: String(span), day: selected, ...Object.fromEntries(Object.entries(o).map(([k, v]) => [k, String(v)])) }).toString();
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       {staff.role !== "owner" && <StaffGreeting staff={staff} as="p" className="mb-3 text-xl font-black sm:text-2xl" />}
       {staff.role === "secretary" && <MyTasksCard staff={staff} />}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">

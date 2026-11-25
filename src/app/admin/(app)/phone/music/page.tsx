@@ -16,7 +16,7 @@ export default async function MusicPage() {
   const chosen = (place: MusicPlace) => String(s[MUSIC_PLACES[place].setting] ?? "").split(",").filter(Boolean);
   const mins = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="w-full">
       <h1 className="text-2xl font-black sm:text-3xl">Music</h1>
       <PayMusicWarning />
       <p className="mb-5 mt-1 text-muted">

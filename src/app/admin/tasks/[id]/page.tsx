@@ -33,7 +33,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
   const money = seesMoney(staff);
   const show = (k: string, v: unknown) => (k === "assignedTo" ? (v ? names.get(Number(v)) ?? `Number ${v}` : "Unassigned") : k === "status" ? STATUS_LABEL[String(v)] ?? v : k === "priority" ? PRIORITY_LABEL[String(v)] ?? v : v === null || v === "" ? "—" : String(v));
   return (
-    <div className="mx-auto max-w-4xl" data-task-detail>
+    <div className="w-full" data-task-detail>
       <Link href="/admin/tasks" className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-navy"><ArrowLeft className="h-4 w-4" aria-hidden /> All tasks</Link>
       <h1 className="mb-1 text-2xl font-black">{t.title}</h1>
       <p className={`mb-4 text-sm ${overdue ? "font-bold text-[#C83A2F]" : "text-muted"}`}>

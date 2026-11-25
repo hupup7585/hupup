@@ -32,7 +32,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
     ? await db.select({ id: schema.products.id, name: schema.products.name }).from(schema.products).where(and(eq(schema.products.active, true), isNotNull(schema.products.imageUrl))).orderBy(asc(schema.products.name))
     : [];
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="w-full space-y-5">
       <div>
         <h1 className="mb-1 text-2xl font-black sm:text-3xl">Campaigns</h1>
         <p className="text-muted">Seasonal promo texts. Only customers who signed up for promos get them, at most {PROMOS_PER_YEAR} a year each. Texts go out between 8 AM and 9 PM in the customer&rsquo;s time.</p>

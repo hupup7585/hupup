@@ -25,7 +25,7 @@ export default async function UnitsPage({ searchParams }: { searchParams: Promis
   const hist = open ? await unitHistory(open.unit.id) : null;
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="w-full">
       <h1 className="text-2xl font-black sm:text-3xl">Equipment units</h1>
       <p className="mb-4 mt-1 text-muted">
         Each physical unit has its own ID. An item&rsquo;s stock is the number of its Available units. A unit that is damaged, missing, under maintenance or unavailable can&rsquo;t be booked. Items with no units here keep the quantity typed in Catalog.

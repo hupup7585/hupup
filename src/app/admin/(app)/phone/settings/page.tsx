@@ -19,7 +19,7 @@ export default async function PhoneSettingsPage() {
   const base = config.baseUrl();
   const settings = await getSettings();
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="w-full">
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Phone settings</h1>
       <p className="mb-5 text-muted">Who rings for each main-menu key, how long each phone rings, call recording and caller blocking.</p>
       {(() => {

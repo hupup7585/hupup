@@ -35,7 +35,7 @@ export default async function SlotsPage({ searchParams }: { searchParams: Promis
   const custom = new Map((await customSlotList()).map((c) => [c.key, c]));
   const allUploaded = count("uploaded") === slots.length;
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="w-full">
       <Link href="/admin/phone/prompts" className="text-sm font-bold text-navy underline-offset-2 hover:underline">← Hotline prompts</Link>
       <h1 className="mb-1 mt-2 text-2xl font-black sm:text-3xl">Recording text list</h1>
       <p className="mb-4 text-muted">

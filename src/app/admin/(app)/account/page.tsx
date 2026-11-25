@@ -18,7 +18,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const sessions = me.userId ? await db.select({ id: schema.adminSessions.id }).from(schema.adminSessions).where(and(eq(schema.adminSessions.userId, me.userId), gt(schema.adminSessions.expiresAt, new Date()))) : [];
   const [u] = me.userId ? await db.select().from(schema.adminUsers).where(eq(schema.adminUsers.id, me.userId)).limit(1) : [];
   return (
-    <div className="mx-auto max-w-3xl" data-account>
+    <div className="w-full" data-account>
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">My account</h1>
       <p className="mb-5 text-muted">
         {me.name} · <span className="capitalize">{me.role}</span> · {formatPhone(me.phone)}{u?.username ? ` · username ${u.username}` : ""}

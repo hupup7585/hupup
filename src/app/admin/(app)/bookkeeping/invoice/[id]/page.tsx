@@ -46,12 +46,12 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
           <form action={I.manualStatusAction} className="flex flex-wrap items-center gap-1">
             <input type="hidden" name="id" value={doc.id} />
             <select name="status" defaultValue={doc.manualStatus ?? ""} className="input w-36 py-1 text-sm"><option value="">Normal</option><option value="disputed">Disputed</option><option value="written_off">Written off</option><option value="refunded">Refunded</option></select>
-            <input name="reason" placeholder="Why" className="input w-40 py-1 text-sm" />
+            <input name="reason" placeholder="Reason for the status" aria-label="Reason for the status" className="input w-48 py-1 text-sm" />
             <button className="text-sm font-bold text-navy">Set status</button>
           </form>
         )}
         {doc.status !== "void" && (
-          <form action={A.voidInvoiceAction} className="flex items-center gap-1"><input type="hidden" name="id" value={doc.id} /><input name="reason" placeholder="Why void" className="input w-32 py-1 text-sm" /><ConfirmSubmit message="Void this invoice? It stays on record as voided." className="text-sm font-bold text-[#C83A2F]">Void</ConfirmSubmit></form>
+          <form action={A.voidInvoiceAction} className="flex items-center gap-1"><input type="hidden" name="id" value={doc.id} /><input name="reason" placeholder="Reason to void" aria-label="Reason to void" className="input w-40 py-1 text-sm" /><ConfirmSubmit message="Void this invoice? It stays on record as voided." className="text-sm font-bold text-[#C83A2F]">Void</ConfirmSubmit></form>
         )}
       </div>
 

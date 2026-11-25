@@ -23,7 +23,7 @@ export default async function StaffPage() {
   await requireOwner();
   const [users, settings] = await Promise.all([db.select().from(schema.adminUsers).orderBy(asc(schema.adminUsers.name)), getSettings()]);
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="w-full space-y-6">
       <PageHeader title="Staff" subtitle="Accounts are deactivated, never deleted. Deactivating signs the person out everywhere." />
       <Section title="Your sign-in username">
         <OwnerUsernameForm initial={settings.ownerUsername} />

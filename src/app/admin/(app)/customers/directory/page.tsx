@@ -29,13 +29,13 @@ export default async function DirectoryPage() {
   const now = await directoryCount().catch(() => ({ rows: 0, phones: 0, shared: 0 }));
   const { STREETS } = await import("@/lib/streets");
   return (
-    <div className="mx-auto max-w-[1400px] space-y-5">
+    <div className="w-full space-y-5">
       <div>
         <Link href="/admin/customers" className="text-sm font-bold text-navy">
           &larr; Customers
         </Link>
         <h1 className="text-2xl font-black sm:text-3xl">Directory list</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted">The address lookup source for the phone line, kept apart from customer accounts. Owner only: never shown to Secretary or Delivery, never on the website.</p>
+        <p className="mt-1 text-sm text-muted">The address lookup source for the phone line, kept apart from customer accounts. Owner only: never shown to Secretary or Delivery, never on the website.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3" data-directory-count>

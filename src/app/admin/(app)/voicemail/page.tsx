@@ -29,7 +29,7 @@ export default async function VoicemailPage() {
   } catch (e) {
     console.error("[voicemail page]", e);
     return (
-      <div className="mx-auto max-w-4xl">
+      <div className="w-full">
         <h1 className="mb-3 text-2xl font-black sm:text-3xl">Voicemail</h1>
         <p className="card p-6 text-muted">Voicemail isn&rsquo;t available yet. It turns on once the database update for voicemail is applied (with the next approved release).</p>
       </div>
@@ -44,7 +44,7 @@ export default async function VoicemailPage() {
   const users = new Map((await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers)).map((u) => [u.id, u.name]));
   const boxes = new Map((await db.select({ id: schema.voicemailBoxes.id, name: schema.voicemailBoxes.name, isMain: schema.voicemailBoxes.isMain }).from(schema.voicemailBoxes)).map((b) => [b.id, b]));
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="w-full">
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Voicemail</h1>
       <p className="mb-5 text-muted">
         Messages left on the hotline, from every box (Main and each extension). {unheard ? <b>{unheard} new.</b> : "No new messages."}

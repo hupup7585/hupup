@@ -23,7 +23,7 @@ export default async function OrdersPage({
   const hidden = status === "ALL" && !sp.q ? await abandonedCartCount({ from: sp.from, to: sp.to }) : 0;
   const csv = new URLSearchParams(Object.entries(sp).filter(([, v]) => v) as [string, string][]).toString();
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black sm:text-3xl">All orders</h1>
         <div className="flex flex-wrap gap-2">

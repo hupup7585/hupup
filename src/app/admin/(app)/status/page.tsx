@@ -13,7 +13,7 @@ export default async function StatusPage() {
   await requireOwner();
   const [list, found, jobs] = await Promise.all([blockers(), scanForTestData(), recentJobRuns(30).catch(() => [])]);
   return (
-    <div className="mx-auto max-w-5xl" data-status>
+    <div className="w-full" data-status>
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">System status</h1>
       <p className="mb-5 text-muted">Everything that runs for real, and what&rsquo;s still waiting on an outside step. Nothing on this page changes any data.</p>
       <section className="card mb-5 p-5" data-backup>

@@ -29,7 +29,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const { q = "" } = await searchParams;
   const r = await searchEverything(q, { owner: staff.role === "owner" });
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="w-full">
       <SearchBar q={q} />
       {q.trim().length < 2 ? (
         <p className="text-muted">Type at least 2 letters: a name, phone number, email, address or order number.</p>

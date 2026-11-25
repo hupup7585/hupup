@@ -26,7 +26,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
   const files = await filesForMessages(msgs.map((m) => m.id));
   const current = threads.find((t) => t.contact_phone === phone);
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="w-full">
       {/* Abraham, Nov 24, 2026: the search bar at the top right of the page (any number, name or word) */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>

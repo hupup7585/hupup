@@ -5,17 +5,31 @@ import { METHODS } from "@/lib/books";
 
 export const money = (c: number) => (c < 0 ? `-${formatMoney(-c)}` : formatMoney(c));
 
-export function Field({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
+/** A labeled field; `hint` is a short line under it saying what to type (for a representative using the books). */
+export function Field({ label, children, wide, hint }: { label: string; children: React.ReactNode; wide?: boolean; hint?: string }) {
   return (
     <label className={`block min-w-0 text-sm ${wide ? "sm:col-span-2" : ""}`}>
       <span className="mb-1 block font-semibold text-muted">{label}</span>
       {children}
+      {hint && <span className="mt-1 block text-xs text-muted" data-field-hint>{hint}</span>}
     </label>
   );
 }
 
 export function Grid({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>;
+  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6">{children}</div>;
+}
+
+/** "How to use this page": numbered steps at the top of each Bookkeeping page. */
+export function Steps({ steps }: { steps: string[] }) {
+  return (
+    <section className="card mb-5 border-l-4 border-navy p-5" data-book-steps>
+      <h2 className="mb-2 text-base font-bold">How to use this page</h2>
+      <ol className="grid list-decimal gap-x-8 gap-y-1 pl-5 text-sm md:grid-cols-2 2xl:grid-cols-3">
+        {steps.map((s) => <li key={s}>{s}</li>)}
+      </ol>
+    </section>
+  );
 }
 
 export function Card({ title, children, note }: { title: string; children: React.ReactNode; note?: string }) {
@@ -32,7 +46,7 @@ export function Card({ title, children, note }: { title: string; children: React
 export function MethodSelect({ defaultValue }: { defaultValue?: string }) {
   return (
     <select name="method" defaultValue={defaultValue ?? ""} className="input">
-      <option value="">—</option>
+      <option value="">Choose how it was paid</option>
       {METHODS.map((m) => (
         <option key={m} value={m}>
           {m === "zelle" ? "Zelle" : m[0].toUpperCase() + m.slice(1)}
@@ -45,7 +59,7 @@ export function MethodSelect({ defaultValue }: { defaultValue?: string }) {
 export function CategorySelect({ categories, name = "category", defaultValue }: { categories: string[]; name?: string; defaultValue?: string }) {
   return (
     <select name={name} defaultValue={defaultValue ?? ""} className="input">
-      <option value="">—</option>
+      <option value="">Choose a category</option>
       {categories.map((c) => (
         <option key={c} value={c}>
           {c}

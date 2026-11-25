@@ -20,7 +20,7 @@ export default async function DiscountsPage({ searchParams }: { searchParams: Pr
   const off = rows.filter((r) => !r.active);
   const label = (r: (typeof rows)[number]) => discountNote({ kind: r.kind, amount_cents: r.amountCents, percent: r.percent }).replace("Customer discount: ", "");
   return (
-    <div className="mx-auto max-w-4xl" data-discounts>
+    <div className="w-full" data-discounts>
       <h1 className="text-2xl font-black sm:text-3xl">Discounts</h1>
       <p className="mb-5 mt-1 text-muted">
         A discount for one customer, by phone number. It comes off the rentals before sales tax, on every booking until you turn it off (or until the end date). It is never

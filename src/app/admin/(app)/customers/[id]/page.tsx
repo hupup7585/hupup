@@ -66,7 +66,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const showMoney = staff.role === "owner";
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="w-full">
       <Link href="/admin/customers" className="text-sm font-semibold text-navy hover:underline">← Customers</Link>
       <div className="mb-5 mt-1 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black sm:text-3xl">

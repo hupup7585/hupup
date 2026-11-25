@@ -75,7 +75,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
     db.select().from(schema.products).orderBy(asc(schema.products.sortOrder), asc(schema.products.id)),
   ]);
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="w-full">
       <h1 className="text-2xl font-black sm:text-3xl">Catalog</h1>
       <p className="mb-5 mt-1 text-muted">
         Categories with a phone key appear in the hotline menu automatically (“For Bounce Houses, press 1”). Items are read in phone-menu order (10 or more: item 10 is press 10). What callers get by email and text is on Catalog email & text.

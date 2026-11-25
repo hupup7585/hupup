@@ -21,7 +21,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
   const settings = await getSettings();
   const lock = bookingLock(calendarNow(), settings);
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="w-full">
       <h1 className="mb-5 text-2xl font-black sm:text-3xl">New booking</h1>
       {lock.locked && (
         <p className="card mb-5 border-2 border-[#C83A2F] p-4 font-semibold text-[#5C1A14]" data-booking-locked>

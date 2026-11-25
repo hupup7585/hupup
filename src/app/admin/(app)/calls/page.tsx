@@ -74,11 +74,11 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
   const journeys = journeySection.ok ? journeySection.value : new Map<string, JourneyEvent[]>();
   const tz = process.env.BUSINESS_TIMEZONE || "America/New_York";
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="w-full">
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Call log</h1>
       {!journeySection.ok && <SectionNotActive title="Call journeys" reason={journeySection.reason} />}
       <p className="mb-5 text-muted">Every call to the hotline. Callers who hung up with items in their cart are listed so you can call them back. Open &ldquo;Journey&rdquo; on a call to see every menu, key, item, date and answer, and where the caller hung up.</p>
-      <form className="mb-3 flex max-w-md gap-2" role="search" data-call-search>
+      <form className="mb-3 flex w-full gap-2" role="search" data-call-search>
         <input name="q" defaultValue={q} placeholder="Search a phone number or name" aria-label="Search calls" className="input" />
         <button className="btn-ghost">Search</button>
         {q && <Link href="/admin/calls" className="btn-ghost">Clear</Link>}

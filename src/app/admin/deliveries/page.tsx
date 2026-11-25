@@ -96,7 +96,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
           </form>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-4 py-6">
+      <main className="w-full px-4 py-6">
         {staff.role === "delivery" && <StaffGreeting staff={staff} as="p" className="mb-3 text-xl font-black sm:text-2xl" />}
         <PageHeader
           title="Deliveries"

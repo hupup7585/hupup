@@ -6,7 +6,7 @@ import { todayISO } from "@/lib/dates";
 import { getSettings } from "@/lib/settings";
 import { ACCOUNT_TYPES, ACCOUNT_TYPE_LABEL, accountDetail, glSetup, trialBalance } from "@/lib/gl";
 import * as G from "./gl-actions";
-import { Card, Field, Grid, Save, Table, money } from "./ui";
+import { Card, Field, Grid, Save, Steps, Table, money } from "./ui";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -32,6 +32,7 @@ export default async function Ledger({ asOf, accountId, from, to, owner }: { asO
         </p>
       )}
 
+      <Steps steps={["This page is for the accountant's double-entry books. Most daily work is done on the other Bookkeeping pages.", "First the Owner fills in Ledger setup and the Chart of accounts from the accountant.", "A journal entry needs lines where the debits equal the credits. It is saved as a draft and posts once approved.", "Trial balance checks that everything adds up; press an account code to see its full history."]} />
       <Card title="Ledger setup" note={owner ? "Owner only. Enter these from the accountant; nothing is filled in for you." : "Set by the Owner from the accountant."}>
         <form action={G.saveGlSetupAction} className="space-y-3">
           <Grid>
@@ -86,7 +87,7 @@ export default async function Ledger({ asOf, accountId, from, to, owner }: { asO
           <Save label="Add account" />
         </form>
         <Table
-          head={["Code", "Name", "Type", "Parent", "Active", ""]}
+          head={["Code", "Name", "Type", "Parent account", "In use", "Change"]}
           empty="No accounts yet. Enter the accountant's chart of accounts here."
           minWidth={760}
           rows={accounts.map((a) => [
@@ -141,7 +142,7 @@ export default async function Ledger({ asOf, accountId, from, to, owner }: { asO
 
       <Card title="Journal entries">
         <Table
-          head={["Number", "Date", "Memo", "Lines", "Amount", "Status", ""]}
+          head={["Entry number", "Date", "Memo (why)", "Lines", "Amount", "Status", "Change"]}
           empty="No journal entries yet."
           minWidth={900}
           rows={entries.map((e) => [
@@ -158,7 +159,7 @@ export default async function Ledger({ asOf, accountId, from, to, owner }: { asO
             e.status === "draft" || e.status === "pending" ? (
               <form key="p" action={G.postJournalAction}><input type="hidden" name="id" value={e.id} /><button className="text-xs font-bold text-navy">Approve and post</button></form>
             ) : e.status === "posted" ? (
-              <form key="r" action={G.reverseJournalAction} className="flex gap-1"><input type="hidden" name="id" value={e.id} /><input name="reason" placeholder="Why" className="input w-24 py-1 text-xs" /><ConfirmSubmit message="Reverse this journal entry? A reversing entry is added; the original is kept." className="text-xs font-bold text-[#C83A2F]">Reverse</ConfirmSubmit></form>
+              <form key="r" action={G.reverseJournalAction} className="flex gap-1"><input type="hidden" name="id" value={e.id} /><input name="reason" placeholder="Reason" aria-label="Reason" className="input w-32 py-1 text-xs" /><ConfirmSubmit message="Reverse this journal entry? A reversing entry is added; the original is kept." className="text-xs font-bold text-[#C83A2F]">Reverse</ConfirmSubmit></form>
             ) : "",
           ])}
         />

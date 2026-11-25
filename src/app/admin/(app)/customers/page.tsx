@@ -40,7 +40,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     ? ((await db.execute(sql`SELECT id, last_name, first_name, house, street, unit, phone FROM directory_entries WHERE ${phoneMatchSql(sql`phone`, digits)} ORDER BY ${phoneRankSql(sql`phone`, digits)}, last_name LIMIT 10`)).rows as { id: number; last_name: string; first_name: string; house: string; street: string; unit: string | null; phone: string }[])
     : [];
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="w-full">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-black sm:text-3xl">Customers</h1>
         {owner && (
