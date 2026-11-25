@@ -4,7 +4,8 @@ import { OWNER_FIRST_NAME } from "@/lib/config";
 /** "Good Morning" / "Good Afternoon" / "Good Evening" in the business time zone (Abraham: both words capitalized). */
 export function greetingFor(date = new Date(), tz = process.env.BUSINESS_TIMEZONE || "America/New_York") {
   const h = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: tz }).format(date));
-  return h < 12 ? "Good Morning" : h < 18 ? "Good Afternoon" : "Good Evening";
+  // Batch 4 item 8 (Nov 25, 2026): morning starts at 5 AM; midnight to 5 AM is still evening
+  return h >= 5 && h < 12 ? "Good Morning" : h >= 12 && h < 18 ? "Good Afternoon" : "Good Evening";
 }
 
 /** The signed-in staff member's first name. The Owner's account may still be named "Owner": that shows Abraham. */

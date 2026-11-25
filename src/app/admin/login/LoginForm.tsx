@@ -24,7 +24,7 @@ export default function LoginForm({ smsActive = true, emailActive = true, google
   const [via, setVia] = useState<"sms" | "email">("sms");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
-  const [trust, setTrust] = useState(false);
+  const [trust, setTrust] = useState(true); // Batch 4 item 14: on by default; untick on a shared computer
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(googleError);
   const [devCode, setDevCode] = useState<string | null>(null);
@@ -155,12 +155,7 @@ export default function LoginForm({ smsActive = true, emailActive = true, google
                 <GoogleMark /> Continue with Google
               </a>
             ) : (
-              <>
-                <button type="button" disabled data-google-button className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-line bg-white px-4 py-3 font-bold text-navy opacity-60">
-                  <GoogleMark /> Continue with Google
-                </button>
-                <p data-not-active="google-login" className="rounded-lg bg-[#FFF8E1] p-3 text-sm text-[#5C4600]"><b>Not active yet:</b> Google sign-in needs the free Google sign-in key set up. Use another way for now.</p>
-              </>
+              <p data-not-active="google-login" className="text-center text-sm text-muted">Google sign-in is not set up yet.</p>
             )}
             <p className="text-xs text-muted">Only a Google account the Owner saved on your staff account in Admin &gt; Staff.</p>
           </div>

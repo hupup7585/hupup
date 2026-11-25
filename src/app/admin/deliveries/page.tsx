@@ -123,7 +123,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
                   Starts and ends at stock: <span className="font-semibold text-navy">{stockAddress}</span>
                 </span>
               ) : (
-                <span>No stock address yet, so routes start from your location{staff.role === "owner" ? " (set it in Admin, Settings)" : ""}.</span>
+                <span>No stock address yet, so routes start from your location{staff.role === "owner" ? <> (<a className="font-semibold underline" href="/admin/delivery-settings#stock">set it in Delivery settings</a>)</> : ""}.</span>
               )}
             </p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">

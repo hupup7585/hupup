@@ -59,13 +59,17 @@ export function StaffRowActions({ userId, role, active, username, googleEmail }:
   const [pending, start] = useTransition();
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2" data-username-row>
-        <input className="input max-w-[12rem]" autoCapitalize="none" spellCheck={false} placeholder="Username" value={un} onChange={(e) => setUn(e.target.value)} aria-label="Username" />
-        <button type="button" className="btn-ghost" disabled={pending} onClick={() => start(async () => setMsg(await setUsernameAction(userId, un)))}>Save username</button>
-      </div>
+      {role === "owner" ? (
+        <p className="text-xs text-muted">The Owner&rsquo;s username is changed at the top of this page.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2" data-username-row>
+          <input className="input max-w-[12rem]" autoCapitalize="none" spellCheck={false} placeholder="Username" value={un} onChange={(e) => setUn(e.target.value)} aria-label="Username" />
+          <button type="button" className="btn-ghost" disabled={pending} onClick={() => start(async () => setMsg(await setUsernameAction(userId, un)))}>Save username</button>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2" data-google-email-row>
         <input className="input max-w-[16rem]" type="email" autoCapitalize="none" spellCheck={false} placeholder="Google email for sign-in" value={ge} onChange={(e) => setGe(e.target.value)} aria-label="Google email for sign-in" />
-        <button type="button" className="btn-ghost" disabled={pending} onClick={() => start(async () => setMsg(await setGoogleEmailAction(userId, ge)))}>{ge.trim() ? "Save Google email" : "Remove Google email"}</button>
+        <button type="button" className="btn-ghost" disabled={pending} onClick={() => { if (!ge.trim() && !window.confirm("Remove the Google email? This person can no longer sign in with Google.")) return; start(async () => setMsg(await setGoogleEmailAction(userId, ge))); }}>{ge.trim() ? "Save Google email" : "Remove Google email"}</button>
       </div>
       <div className="flex flex-wrap gap-2">
         {role !== "delivery" && (

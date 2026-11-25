@@ -173,7 +173,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             return (
               <form action={assignDriversAction.bind(null, o.id)} className="card p-5" data-drivers>
                 <h2 className="mb-3 font-bold">Drivers</h2>
-                {!drivers.length && <p className="mb-2 text-sm text-muted">No active Delivery logins yet. Add one in Staff.</p>}
+                {!drivers.length && <p className="mb-2 text-sm text-muted">No active Delivery logins yet. <a className="font-semibold underline" href="/admin/staff">Add one in Staff</a>.</p>}
                 <div className="grid gap-3 sm:grid-cols-2">
                   {pick("delivery", o.deliveryDriverId)}
                   {pick("pickup", o.pickupDriverId)}

@@ -13,7 +13,8 @@ describe("staff greeting", () => {
     expect(greetingFor(at("12:00"))).toBe("Good Afternoon");
     expect(greetingFor(at("17:59"))).toBe("Good Afternoon");
     expect(greetingFor(at("18:00"))).toBe("Good Evening");
-    expect(greetingFor(at("00:30"))).toBe("Good Morning");
+    expect(greetingFor(at("00:42"))).toBe("Good Evening"); // Batch 4 item 8: 12:42 AM is not morning
+    expect(greetingFor(at("05:00"))).toBe("Good Morning");
   });
 
   it("shows the signed-in staff member's first name; the Owner is Abraham", () => {
