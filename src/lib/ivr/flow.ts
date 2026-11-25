@@ -338,6 +338,18 @@ async function cartGone(vr: VR, ctx: Ctx) {
   return vr;
 }
 
+/**
+ * Box 48 (Abraham, Nov 25, 2026): "We have {number}." with the digits one at a time, then the existing box 144 ending
+ * "If that is correct, press 1. To enter a different number, press 2." (its recording), then the star line.
+ */
+function box48(g: Gather, ctx: Ctx, e164: string) {
+  sp(g, ctx, "phone_heard", { number: spokenPhone(e164) });
+  const ending = clipUrls(ctx.prompts, ["text_heard#2"]);
+  if (ending) ending.forEach((u) => g.play(u));
+  else say(g, (promptText(ctx.prompts, "text_heard", { number: "\u0000" }).split("\u0000")[1] ?? "").replace(/^[\s.]+/, ""));
+  backLine(g, ctx);
+}
+
 /** A +1 number read in three groups, the same way as the phone read-back ("eight four five, ..."). */
 function spokenPhone(e164: string) {
   const d = e164.replace(/\D/g, "").slice(-10);
@@ -3487,9 +3499,7 @@ const handlers: Record<string, Handler> = {
     }
     await updateSession(ctx.callSid, { data: { heard: e164 } }, ctx.session);
     const g = keypad(vr, url("phone-confirm"));
-    sp(g, ctx, "phone_heard", { number: `${spokenDigits(e164.slice(2, 5))}, ${spokenDigits(e164.slice(5, 8))}, ${spokenDigits(e164.slice(8))}` });
-    confirmEnd(g, ctx);
-    backLine(g, ctx);
+    box48(g, ctx, e164);
     return noInput(vr, ctx, "phone-confirm");
   },
 
@@ -3502,9 +3512,7 @@ const handlers: Record<string, Handler> = {
     if (d !== "1") {
       if (d) sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
       const g = keypad(vr, url("phone-confirm"));
-      sp(g, ctx, "phone_heard", { number: `${spokenDigits(heard.slice(2, 5))}, ${spokenDigits(heard.slice(5, 8))}, ${spokenDigits(heard.slice(8))}` });
-      confirmEnd(g, ctx);
-      backLine(g, ctx);
+      box48(g, ctx, heard);
       return noInput(vr, ctx, "phone-confirm");
     }
     await updateSession(ctx.callSid, { data: { phone: heard, heard: undefined } }, ctx.session);
@@ -3525,6 +3533,7 @@ const handlers: Record<string, Handler> = {
     if (!ctx.query.get("n")) {
       const customer = await customerByPhone(phone);
       if (customer?.smsOptOut) {
+        sp(vr, ctx, "consent_stopped"); // Nov 25, 2026: the opt-out line, as in the other two places
         await updateSession(ctx.callSid, { data: { smsConsent: "stopped" } }, ctx.session);
         return back(vr, "finalize");
       }

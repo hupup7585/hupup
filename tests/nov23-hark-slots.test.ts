@@ -93,15 +93,15 @@ describe("2. no 'press pound to continue': every confirm or read-back ends with 
     expect(redirect(await call("confirm", { Digits: "1" }, "f=name"))).toBe("addr");
   });
 
-  it("phone_heard: 1 confirms, 2 types it again, pound replays the same read-back, star back", async () => {
+  it("box 48 (Nov 25, 2026): We have {number}, the box 144 ending; 1 confirms, 2 enters it again, pound not valid, star back", async () => {
     h.session.data = {};
+    const BOX48_END = "If that is correct, press 1. To enter a different number, press 2.";
     const xml = await call("phone-heard", { Digits: "8455550123" });
-    expect(said(xml).slice(-2)).toEqual([ENDING, "To go back, press star."]);
-    expect(said(xml)[0]).toMatch(/^I have /);
+    expect(said(xml)).toEqual(["We have 8 4 5, 5 5 5, 0 1 2 3.", BOX48_END, "To go back, press star."]);
     expect(redirect(await call("phone-confirm", { Digits: "2" }))).toBe("phone-enter");
     const pound = await call("phone-confirm", { Digits: "#" });
     expect(said(pound)[0]).toBe("Sorry, that is not a valid selection.");
-    expect(said(pound)).toContain(ENDING);
+    expect(said(pound)).toContain(BOX48_END);
     expect(h.session.data.phone).toBeUndefined();
     expect(redirect(await call("phone-confirm", { Digits: "*" }))).toBe("phone");
     expect(redirect(await call("phone-confirm", { Digits: "1" }))).toBe("sms-consent");

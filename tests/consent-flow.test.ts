@@ -185,10 +185,11 @@ describe("transactional consent step (before the payment link)", () => {
     expect(xml).toContain("/api/voice/finalize");
     expect(h.session.data.smsConsent).toBe("existing");
   });
-  it("number that replied STOP: box 49 skipped, nothing said, nothing recorded", async () => {
+  it("number that replied STOP: box 49 skipped; the opt-out line (Nov 25, 2026); nothing recorded", async () => {
     h.customer = { id: 9, phone: "+18455550100", smsOptOut: true, marketingOptIn: false };
     const xml = await call("sms-consent");
-    expect(xml).not.toContain("<Say");
+    expect(xml).toContain("This number has opted out of our messages. To get messages again, text the word START to 8 4 5 4 1 5 7 5 8 5.");
+    expect(xml).not.toContain("text updates");
     expect(xml).toContain("/api/voice/finalize");
     expect(h.recorded).toHaveLength(0);
     expect(h.session.data.smsConsent).toBe("stopped");
@@ -411,5 +412,30 @@ describe("Terms on the phone: text the link (press 1)", () => {
     h.session.data.smsConsent = "yes";
     await call("tx-which-choice", { Digits: "1" }, "p=pay&o=7");
     expect(h.sms[0].body).toMatch(/https:\/\/hupup\.vercel\.app\/pay\/7\?t=/);
+  });
+});
+
+describe("the opt-out line (Abraham, Nov 24, 2026, 8:38 PM): a STOP number hears it in all three places", () => {
+  const STOPPED = "This number has opted out of our messages. To get messages again, text the word START to 8 4 5 4 1 5 7 5 8 5.";
+  it("the exact approved text", () => {
+    expect(PROMPTS.consent_stopped.text).toBe(STOPPED);
+  });
+  it("box 49, the payment link by text, and the promo sign-up", async () => {
+    h.customer = { id: 9, phone: "+18455550100", smsOptOut: true, marketingOptIn: false };
+    h.session.data = { phone: "+18455550100" };
+    expect(await call("sms-consent")).toContain(STOPPED);
+    h.session.data = {};
+    const pay = await call("tx-which-choice", { Digits: "1" }, "p=pay&o=7");
+    expect(pay).toContain(STOPPED);
+    h.promoResult = { sendConfirmation: false, reason: "opted_out" };
+    const promo = await call("promo-which-answer", { Digits: "1" });
+    expect(promo).toContain(STOPPED);
+  });
+  it("a number that never replied STOP never hears it", async () => {
+    h.customer = null;
+    h.session.data = { phone: "+18455550100" };
+    expect(await call("sms-consent")).not.toContain("opted out");
+    h.session.data = { smsConsent: "yes", phone: "+18455550100" };
+    expect(await call("tx-which-choice", { Digits: "1" }, "p=pay&o=7")).not.toContain("opted out");
   });
 });
