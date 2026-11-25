@@ -72,9 +72,17 @@ export async function getRecording(id: number) {
 }
 
 /** Make an uploaded recording the one that plays on its line. */
+/**
+ * Uploads made on an older line that a new line can use (Abraham, Nov 25, 2026, 1:28 PM): the laser tag instructions
+ * became three parts, so a file uploaded on the old single laser line can be chosen for any part. Nothing is moved
+ * or deleted; the upload stays where it was saved.
+ */
+export const EARLIER_LINE: Record<string, string> = { instr_laser_1: "instr_laser", instr_laser_2: "instr_laser", instr_laser_3: "instr_laser" };
+export const recordingKeysFor = (key: string) => [key, ...(EARLIER_LINE[key] ? [EARLIER_LINE[key]] : [])];
+
 export async function chooseRecording(key: string, id: number, userId: number | null) {
   const r = await getRecording(id);
-  if (!r || !r.complete || r.promptKey !== key || r.source !== "upload") throw new Error("That recording can't be used on this line.");
+  if (!r || !r.complete || !recordingKeysFor(key).includes(r.promptKey) || r.source !== "upload") throw new Error("That recording can't be used on this line.");
   await db
     .insert(schema.voicePrompts)
     .values({ key, recordingId: id, updatedBy: userId })

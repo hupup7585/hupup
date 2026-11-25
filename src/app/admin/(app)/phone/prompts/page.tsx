@@ -4,7 +4,7 @@ import { PROMPTS, loadPromptOverrides, promptArea, promptRecordable, type Prompt
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { promptRecordingLink } from "@/lib/signed-link";
-import { googleTtsReady, recordingsByKey } from "@/lib/prompt-recordings";
+import { googleTtsReady, recordingKeysFor, recordingsByKey } from "@/lib/prompt-recordings";
 import { allVersions } from "@/lib/prompt-versions";
 import { lineStatus } from "@/lib/prompt-status";
 import { inboxWhen } from "@/lib/inbox-format";
@@ -117,7 +117,7 @@ export default async function PromptsPage({ searchParams }: { searchParams: Prom
             <h2 className="mb-3 text-lg font-bold">{a}</h2>
             <div className="space-y-4">
               {ls.map((l) => {
-                const all = (recs.get(l.key) ?? []).map(view);
+                const all = recordingKeysFor(l.key).flatMap((k) => recs.get(k) ?? []).map(view); // + uploads on an earlier line (laser parts)
                 return (
                   <PromptEditor
                     key={l.key}

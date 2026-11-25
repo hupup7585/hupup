@@ -110,7 +110,7 @@ describe("key 2: instructions", () => {
   it("Nov 25, 2026, 1:08 PM: an entry whose script is pending rings customer service (the key 3 line), never the key 2 menu again", async () => {
     h.overrides = {};
     const three = redirect(await press("3"));
-    for (const t of ["1", "2", "3"]) {
+    for (const t of ["1", "3"]) { // laser tag (2) is approved and plays (Nov 25, 2026, 1:28 PM)
       const xml = text(await call("attraction", {}, { m: "i", t }));
       expect(xml).not.toContain("Here is how to enjoy");
       expect(redirect(xml)).toBe(three);
@@ -118,13 +118,13 @@ describe("key 2: instructions", () => {
     }
   });
   it("mixed: one script approved, two pending: each entry on its own", async () => {
-    h.overrides = { instr_laser: { approvedAt: new Date() } } as never;
-    expect(text(await call("attraction", {}, { m: "i", t: "2" }))).toContain("Here is how to enjoy your laser tag safely.");
+    h.overrides = {};
+    expect(text(await call("attraction", {}, { m: "i", t: "2" }))).toContain(P("instr_laser_1"));
     expect(redirect(text(await call("attraction", {}, { m: "i", t: "1" })))).toBe("ring?k=4");
     expect(redirect(text(await call("attraction", {}, { m: "i", t: "3" })))).toBe("ring?k=4");
     h.overrides = {};
   });
-  for (const [t, key] of [["1", "instr_balloons"], ["2", "instr_laser"], ["3", "instr_paddle"]] as const) {
+  for (const [t, key] of [["1", "instr_balloons"], ["2", "instr_laser_1"], ["3", "instr_paddle"]] as const) {
     it(`once approved in Admin, ${t} plays the ${key.replace("instr_", "")} instructions, then star again / 1 another / 2 main menu`, async () => {
       h.overrides = { [key]: { text: null, audioUrl: null, approvedAt: new Date() } };
       expect(redirect(await call("attraction-choice", { Digits: t }, { m: "i" }))).toBe(`attraction?m=i&t=${t}`);
@@ -138,7 +138,7 @@ describe("key 2: instructions", () => {
     });
   }
   it("each set of instructions covers setup, safe use, supervision and age, weather, and getting ready for pickup", () => {
-    for (const k of ["instr_balloons", "instr_laser", "instr_paddle"] as const) {
+    for (const k of ["instr_balloons", "instr_paddle"] as const) { // laser tag: Abraham's own approved three parts (Nov 25, 2026)
       for (const part of ["Setup:", "Safe use:", "Supervision:", "Weather:", "Getting ready for pickup:"]) expect(P(k)).toContain(part);
       expect(P(k)).toMatch(/age/);
     }
@@ -183,7 +183,7 @@ describe("key 4: learn about our rentals (was key 3)", () => {
     expect(P("learn_deliver")).toMatch(/We deliver/);
   });
   it("all key 2 and key 3 lines are editable on the Hotline prompts page", () => {
-    for (const k of ["attraction_choice", "attraction_menu_back", "attraction_after", "instr_intro", "instr_balloons", "instr_laser", "instr_paddle", "learn_intro", "learn_balloons", "learn_laser", "learn_paddle", "learn_items", "learn_deliver", "learn_none"] as const) {
+    for (const k of ["attraction_choice", "attraction_menu_back", "attraction_after", "instr_intro", "instr_balloons", "instr_laser_1", "instr_laser_2", "instr_laser_3", "instr_paddle", "learn_intro", "learn_balloons", "learn_laser", "learn_paddle", "learn_items", "learn_deliver", "learn_none"] as const) {
       expect(PROMPTS[k].group).toMatch(/^Key [26]:/); // key 3 is customer service; learn is key 6 (Nov 19, 2026)
       expect((PROMPTS[k] as { textOnly?: boolean }).textOnly).not.toBe(true);
     }

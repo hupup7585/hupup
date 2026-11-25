@@ -747,7 +747,8 @@ async function customerByPhone(phone: string) {
 /** The three types of attraction on keys 2 and 3 (Abraham W). */
 const ATTRACTIONS = {
   "1": { label: "jumping balloons", instr: "instr_balloons", learn: "learn_balloons", match: /balloon|bounce|jump|inflatable(?!.*maze)/i },
-  "2": { label: "laser tag", instr: "instr_laser", learn: "learn_laser", match: /laser/i },
+  // Laser tag (Abraham, Nov 25, 2026, 1:28 PM): three approved parts, played one after the other
+  "2": { label: "laser tag", instr: ["instr_laser_1", "instr_laser_2", "instr_laser_3"], learn: "learn_laser", match: /laser/i },
   "3": { label: "paddle boats", instr: "instr_paddle", learn: "learn_paddle", match: /paddle|boat/i },
 } as const;
 
@@ -1899,11 +1900,12 @@ const handlers: Record<string, Handler> = {
     if (m === "i") {
       // Abraham, Nov 25, 2026, 1:08 PM: an entry whose script still waits for approval rings customer service, the
       // same line as main menu key 3 (ring list, hold music, voicemail and after-hours); each entry on its own
-      if (promptWaiting(ctx.prompts, type.instr)) {
+      const parts = (typeof type.instr === "string" ? [type.instr] : type.instr) as readonly PromptKey[];
+      if (parts.some((k) => promptWaiting(ctx.prompts, k))) {
         await track(ctx.callSid, "step", `Key 2: ${type.label} instructions not ready yet; customer service`);
         return back(vr, "ring", { k: "4" });
       }
-      sp(g, ctx, type.instr);
+      for (const k of parts) sp(g, ctx, k);
       await track(ctx.callSid, "category_heard", `Heard the instructions for ${type.label}`, { category: type.label, kind: "instructions" });
     } else {
       sp(g, ctx, type.learn);
