@@ -130,8 +130,11 @@ export async function listOrders(f: { q?: string; status?: string; from?: string
     const { phoneQueryDigits } = await import("@/lib/phone-search");
     const pd = phoneQueryDigits(f.q);
     const phoneDigits = pd && pd.length >= 3 ? pd : digits.length >= 4 ? digits.replace(/^1(?=\d{10}$)/, "") : "";
-    conds.push(sql`(c.name ILIKE ${like} OR c.phone ILIKE ${like} OR o.delivery_address ILIKE ${like}
-      ${phoneDigits ? sql`OR regexp_replace(coalesce(c.phone, ''), '[^0-9]', '', 'g') LIKE ${`%${phoneDigits}%`}` : sql``}
+    const { phoneMatchSql } = await import("@/lib/phone-search-sql");
+    // Nov 25, 2026: phone digits match the start, the local start or the last 4 only (never the middle), on the customer's
+    // phone and the order's text number
+    conds.push(sql`(c.name ILIKE ${like} OR o.delivery_address ILIKE ${like}
+      ${phoneDigits ? sql`OR ${phoneMatchSql(sql`c.phone`, phoneDigits)} OR ${phoneMatchSql(sql`o.text_phone`, phoneDigits)}` : sql`OR c.phone ILIKE ${like}`}
       ${orderNo > 0 ? sql`OR o.id = ${orderNo}` : sql``})`);
   }
   const where = sql.join(conds.map((c) => sql`(${c})`), sql` AND `);
@@ -176,7 +179,8 @@ export async function recentCalls(limit = 100, q?: string) {
   const { phoneQueryDigits } = await import("@/lib/phone-search");
   const t = q?.trim() ?? "";
   const pd = phoneQueryDigits(t);
-  const where = !t ? sql`` : pd ? sql`WHERE regexp_replace(coalesce(s.from_number, ''), '[^0-9]', '', 'g') LIKE ${`%${pd}%`}` : sql`WHERE s.data->>'name' ILIKE ${`%${t}%`}`;
+  const { phoneMatchSql } = await import("@/lib/phone-search-sql");
+  const where = !t ? sql`` : pd ? sql`WHERE ${phoneMatchSql(sql`s.from_number`, pd)}` : sql`WHERE s.data->>'name' ILIKE ${`%${t}%`}`;
   return rows<Row & {
     call_sid: string; from_number: string | null; order_id: number | null; status: string; outcome: string;
     started_at: string; ended_at: string | null; customer_name: string | null; order_status: OrderStatus | null; subtotal_cents: number | null;

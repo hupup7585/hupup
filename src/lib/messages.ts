@@ -19,7 +19,9 @@ export type ThreadView = "conversations" | "catalog" | "all";
 
 export async function listThreads(q?: string, limit = 200, view: ThreadView = "all"): Promise<ThreadRow[]> {
   const like = q?.trim() ? `%${q.trim()}%` : null;
-  const digits = phoneQueryDigits(q) ?? (q?.replace(/\D/g, "") || ""); // however it is typed (Nov 24, 2026)
+  const pd = phoneQueryDigits(q); // however it is typed (Nov 24, 2026); start, local start or last 4 only (Nov 25, 2026)
+  const digits = pd && pd.length >= 3 ? pd : "";
+  const { phoneMatchSql, phoneRankSql } = await import("@/lib/phone-search-sql");
   const catalogOnly = sql`(
     EXISTS (SELECT 1 FROM messages m2 WHERE m2.contact_phone = l.contact_phone AND m2.direction = 'in' AND ${CATALOG_TEXT})
     AND NOT EXISTS (SELECT 1 FROM messages m2 WHERE m2.contact_phone = l.contact_phone AND m2.direction = 'in' AND NOT (${CATALOG_TEXT}))
@@ -39,8 +41,8 @@ export async function listThreads(q?: string, limit = 200, view: ThreadView = "a
            c.id AS customer_id, c.name AS customer_name
     FROM last l LEFT JOIN customers c ON c.phone = l.contact_phone
     WHERE ${viewWhere}
-    ${like ? sql`AND (c.name ILIKE ${like} OR l.last_body ILIKE ${like} ${digits.length >= 3 ? sql`OR l.contact_phone LIKE ${`%${digits}%`}` : sql``})` : sql``}
-    ORDER BY l.last_at DESC
+    ${like ? sql`AND (c.name ILIKE ${like} OR l.last_body ILIKE ${like} ${digits ? sql`OR ${phoneMatchSql(sql`l.contact_phone`, digits)}` : sql``})` : sql``}
+    ORDER BY ${digits ? sql`${phoneRankSql(sql`l.contact_phone`, digits)}, ` : sql``}l.last_at DESC
     LIMIT ${limit}`);
   return r.rows as ThreadRow[];
 }
