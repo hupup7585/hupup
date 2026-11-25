@@ -53,7 +53,7 @@ describe("key 1: booking by item", () => {
   it("categories from Admin, then the items, then the date (keys only), confirmed with the day name and day number", async () => {
     expect(said(await call("book"))).toEqual([
       "To receive our catalog by text or email, press 8.",
-      "Please note, orders can be placed only through our automated system.",
+      "The fastest way to place an order is with our easy automated system.", // Nov 25, 2026, 2:02 PM
       "For information or questions, press 0 for customer service.",
       "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.",
       "For schools, corporate events, and organizational bookings, press 9.",

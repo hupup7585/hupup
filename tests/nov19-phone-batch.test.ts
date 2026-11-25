@@ -52,7 +52,7 @@ describe("approved wording", () => {
     expect(PROMPTS.cart_empty.text).toBe("Your shopping cart is empty right now. Let's start shopping!");
     expect(PROMPTS.box156.text).toBe("The total of your order is {amount}. We are happy to let you know that a discount of {discount} has been applied to your order. Your new total is {newtotal}.");
     expect(PROMPTS.book_r1.text).toBe("To receive our catalog by text or email, press 8.");
-    expect(PROMPTS.book_orders_only.text).toBe("Please note, orders can be placed only through our automated system.");
+    expect(PROMPTS.book_orders_only.text).toBe("The fastest way to place an order is with our easy automated system."); // Nov 25, 2026, 2:02 PM
     expect(PROMPTS.not_valid.text).toBe("Sorry, that is not a valid selection.");
     // Nov 22, 2026: three fixed recordings per balloon; Wheel Thrill is 7211 (key 11), Bounce Blast 7212 (key 12)
     expect(PROMPTS.balloon_name_7211.text).toBe("For the Wheel Thrill,");

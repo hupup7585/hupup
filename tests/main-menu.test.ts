@@ -189,7 +189,7 @@ describe("every key, office open", () => {
     const book = await call("book");
     expect(saidIn(book)).toEqual([
       "To receive our catalog by text or email, press 8.",
-      "Please note, orders can be placed only through our automated system.",
+      "The fastest way to place an order is with our easy automated system.", // Nov 25, 2026, 2:02 PM
       "For information or questions, press 0 for customer service.",
       "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.",
       "For schools, corporate events, and organizational bookings, press 9.",

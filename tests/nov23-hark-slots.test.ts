@@ -142,7 +142,7 @@ describe("4. automated orders only: a slot, not in the call yet", () => {
     expect(PROMPTS.automated_only.text).toBe("Please note, orders can only be placed through our automated system.");
     expect((await slotsWithStatus()).find((s) => s.key === "automated_only")).toMatchObject({ text: PROMPTS.automated_only.text, status: "waiting" });
     const { lineStatus } = await import("@/lib/prompt-status");
-    expect(lineStatus("automated_only", {}).status).toBe("Not active yet");
+    expect(lineStatus("automated_only", {}).status).toBe("Not used"); // retired, Nov 25, 2026 (item 1)
     const { readFileSync } = await import("node:fs");
     expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).not.toContain('"automated_only"');
   });
