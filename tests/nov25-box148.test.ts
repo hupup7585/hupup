@@ -177,3 +177,12 @@ describe("Box 35 after payment (Abraham, Nov 25, 2026, 11:51)", () => {
     expect(c.email).toBe("sara@gmail.com");
   });
 });
+
+describe("back from the payment line (Abraham, Nov 25, 2026, 12:27)", () => {
+  it("no 'Thank you. Let us finish your order.' line: straight to the result; the line is retired in Admin", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).not.toContain('"phonepay_back"');
+    const { RETIRED_PROMPTS } = await import("@/lib/ivr/prompts");
+    expect(RETIRED_PROMPTS.has("phonepay_back")).toBe(true);
+  });
+});

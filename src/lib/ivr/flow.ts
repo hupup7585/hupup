@@ -67,7 +67,7 @@ import { PHONEPAY_NOT_REACHED, buildSendDigits, checkPhonePayTry, customChargeMa
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
-const PHONEPAY_PROMPTS = ["pay_hold_secure", "phonepay_back", "phonepay_paid", "phonepay_retry", "phonepay_retry_last", "phonepay_failed", "phonepay_unclear"] as const;
+const PHONEPAY_PROMPTS = ["pay_hold_secure", "phonepay_paid", "phonepay_retry", "phonepay_retry_last", "phonepay_failed", "phonepay_unclear"] as const;
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
 import { pluralName } from "@/lib/spoken-words";
 import { lastPhoneDate, normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
@@ -4284,7 +4284,7 @@ const handlers: Record<string, Handler> = {
       if (ctx.body.DialCallSid) await db.update(schema.phonepayAttempts).set({ payLegSid: ctx.body.DialCallSid }).where(eq(schema.phonepayAttempts.id, a));
       const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1);
       await endMainPayLeg(attempt?.payLegSid);
-      sp(vr, ctx, "phonepay_back", undefined, { draftOk: true });
+      // Abraham, Nov 25, 2026, 12:27: no line here; straight to the result (box 148, 58, 147 ...)
       const r = await checkPhonePayTry(o, a, attempt?.amountCents ?? group.due);
       await track(ctx.callSid, "step", `Card payment try ${attempt?.tryNumber ?? n}: ${r.result === "paid" ? "paid" : r.result === "wrong_amount" ? "wrong amount, voided" : r.result === "check_failed" ? "Sola could not be checked" : r.result === "unclear" ? "could not be confirmed (box 147)" : "no charge"}`, { attempt: a });
       if (r.result === "paid") return back(vr, "pay-approved", { o });
