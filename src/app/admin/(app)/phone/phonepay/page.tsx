@@ -6,6 +6,7 @@ import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { dualDateTime } from "@/lib/dual-date";
 import { savePhonePayAction } from "./actions";
+import PayMusicWarning from "@/components/PayMusicWarning";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Sola PhonePay · Hup Up Attractions", robots: { index: false } };
@@ -33,6 +34,7 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
         Callers pay by card on the phone. After the order is read back, a caller who presses 1 is passed to Sola&rsquo;s secure PhonePay line, types the card on the keypad, and comes back to finish the order. We never hear, record or keep the card number. The payment is then found in Sola and the order is marked paid.
       </p>
       {m && <p className="card mb-4 p-3 text-sm font-semibold" data-phonepay-message>{m}</p>}
+      <PayMusicWarning />
 
       <section className="card mb-5 p-5" data-phonepay-ready>
         <h2 className="mb-2 text-lg font-bold">Set up</h2>

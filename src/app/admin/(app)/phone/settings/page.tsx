@@ -1,3 +1,4 @@
+import { formatPhone } from "@/lib/phone";
 import { getSettings } from "@/lib/settings";
 import NotActive from "@/components/NotActive";
 import { config } from "@/lib/config";
@@ -78,7 +79,7 @@ export default async function PhoneSettingsPage() {
       </section>
       <section className="card mb-6 p-5" id="texting">
         <h2 className="mb-3 text-lg font-extrabold">Customer texts</h2>
-        <TextingForm everyone={!settings.smsTestOnly} />
+        <TextingForm everyone={!settings.smsTestOnly} testNumbers={String(settings.smsTestNumbers ?? "").split(/[\n,;]+/).filter(Boolean).map((n) => formatPhone(n)).join("\n")} forwardOn={Boolean(settings.smsForwardEnabled)} forwardPhone={settings.smsForwardPhone ? formatPhone(settings.smsForwardPhone) : ""} />
       </section>
       <section className="card mb-6 p-5" id="recording">
         <h2 className="mb-3 text-lg font-extrabold">Call recording</h2>

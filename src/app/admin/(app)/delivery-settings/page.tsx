@@ -4,7 +4,7 @@ import StockAddressForm from "../settings/StockAddressForm";
 import { DeliveryPricingForm } from "../settings/PricingForms";
 import { DELIVERY_TEMPLATES } from "@/lib/delivery-templates";
 import { PROMO_CENTS, deliveryPromoActive, priceFor, savedAreas, zoneFee } from "@/lib/delivery-areas";
-import { checkAddressAction, reloadMapAction, saveAreasAction, saveZonePricesAction } from "./area-actions";
+import { checkAddressAction, reloadMapAction, saveAreasAction, saveLocalStreetsAction, saveZonePricesAction } from "./area-actions";
 
 const usd = (c: number | string) => `$${(Number(c) / 100).toFixed(2)}`;
 
@@ -63,6 +63,14 @@ export default async function DeliverySettingsPage({ searchParams }: { searchPar
           </form>
         </div>
         {settings.deliveryAreasLoadedAt && <p className="mt-2 text-xs text-muted">Map last loaded {new Date(settings.deliveryAreasLoadedAt).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" })}.</p>}
+      </section>
+      <section className="card mb-6 p-5" id="streets" data-local-streets>
+        <h2 className="mb-1 text-lg font-extrabold">Kiryas Joel street list</h2>
+        <p className="mb-3 text-sm text-muted">One street per line. When a caller or staff member types a street that is close to one of these, the order page suggests the right spelling. It does not change any price.</p>
+        <form action={saveLocalStreetsAction} className="grid gap-2">
+          <textarea name="streets" rows={8} defaultValue={String(settings.localStreets ?? "")} className="input font-mono text-sm" />
+          <button className="btn-dark w-fit">Save streets</button>
+        </form>
       </section>
       <section className="card mb-6 p-5" id="fees">
         <h2 className="mb-3 text-lg font-extrabold">Town lists (used only until the map is loaded)</h2>

@@ -1,3 +1,4 @@
+import MailingAddressForm from "./MailingAddressForm";
 import { formatPhone } from "@/lib/phone";
 import { getSettings } from "@/lib/settings";
 import NotActive from "@/components/NotActive";
@@ -48,6 +49,10 @@ export default async function SettingsPage() {
       <section className="card mb-6 p-5" id="email-signature">
         <h2 className="mb-3 text-lg font-extrabold">Email signature</h2>
         <EmailSignatureForm initial={settings.emailSignature} fallback={EMAIL_SIGNATURE_DEFAULT} />
+      </section>
+      <section className="card mb-6 p-5" id="mailing-address">
+        <h2 className="mb-3 text-lg font-extrabold">Mailing address for promotional emails</h2>
+        <MailingAddressForm initial={String(settings.emailMailingAddress ?? "")} />
       </section>
       <section className="card mb-6 p-5" id="tax">
         <h2 className="mb-3 text-lg font-extrabold">Sales tax</h2>

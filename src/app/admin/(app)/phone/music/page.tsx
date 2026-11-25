@@ -5,6 +5,7 @@ import { getSettings } from "@/lib/settings";
 import { MUSIC_PLACES, type MusicPlace } from "@/lib/music";
 import ConfirmSubmit from "@/components/ConfirmSubmit";
 import MusicUpload from "./MusicUpload";
+import PayMusicWarning from "@/components/PayMusicWarning";
 import { savePlacesAction, trashTrackAction } from "./actions";
 
 /** Music (Abraham, Nov 17, 2026): upload songs, and choose the songs for each place. Owner only. */
@@ -17,6 +18,7 @@ export default async function MusicPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="text-2xl font-black sm:text-3xl">Music</h1>
+      <PayMusicWarning />
       <p className="mb-5 mt-1 text-muted">
         Songs play like a radio: callers waiting at the same time hear the same music, and when nobody is waiting it pauses and the next caller picks it up from there.
       </p>

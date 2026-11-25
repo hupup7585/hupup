@@ -73,3 +73,14 @@ export async function saveZonePricesAction(form: FormData) {
   revalidatePath("/admin", "layout");
   return back(promoOn ? "Saved. The free delivery promo is on for the dates shown." : "Saved.");
 }
+
+/** Batch 2 item 7 (Nov 25, 2026): the street list used to catch misspelled Kiryas Joel streets, one per line. */
+export async function saveLocalStreetsAction(form: FormData) {
+  const owner = await requireOwner();
+  const list = [...new Set(String(form.get("streets") ?? "").split(/\r?\n/).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 2000);
+  const before = (await getSettings()).localStreets;
+  await saveSetting("localStreets", list.join("\n"), owner.userId);
+  await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.local_streets_updated", entityType: "settings", entityId: "local_streets", before: { count: String(before ?? "").split("\n").filter(Boolean).length }, after: { count: list.length } });
+  revalidatePath("/admin/delivery-settings");
+  redirect(`/admin/delivery-settings?m=${encodeURIComponent(`Saved (${list.length} streets).`)}#streets`);
+}
