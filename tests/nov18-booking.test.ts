@@ -49,7 +49,7 @@ describe("box 150 and box 149 (approved Nov 18, 2026)", () => {
       "You entered Friday, December eleventh. If that is correct, press 1. To keep your rental for Mutze Shabbes, press 2. To enter a different date, press 3.", // approved Nov 24, 2026
       "To go back, press star.",
     ]);
-    expect(said(await call("date-ask", {}, `p=${castle}&d=${PLAIN_FRIDAY}`))[0]).toMatch(/^To book the .+ for Friday, November twenty-seventh press 1\.$/); // box 18 (Nov 22, 2026)
+    expect(said(await call("date-ask", {}, `p=${castle}&d=${PLAIN_FRIDAY}`))[0]).toMatch(/^To book the .+ for Friday, November twenty-seventh, press 1\.$/); // box 18 (Nov 22, 2026)
   });
   it("box 150: 2 = a different date", async () => {
     expect(redirect(await call("date-confirm", { Digits: "3" }, `p=${castle}&d=${CHANUKAH_FRIDAY}&f=1`))).toBe(`date?p=${castle}`);

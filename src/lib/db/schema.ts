@@ -278,7 +278,7 @@ export type CallData = {
   /** The number a payment link is texted to */
   txPhone?: string;
   /** The email steps are for a payment link (not the catalog), and the order */
-  emailFor?: "pay";
+  emailFor?: "pay" | "receipt";
   payOrder?: number;
   catLocal?: string;
   /** The catalog email letters came from speech to text (read back in the Google voice). */

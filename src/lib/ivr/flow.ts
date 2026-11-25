@@ -120,7 +120,7 @@ export function url(action: string, params: Record<string, string | number | und
 export const spokenSpelling = (text: string) => text.replace(/Chanukah/g, "Hanukkah").replace(/Chol Hamoed/g, "Hola moed");
 
 function say(target: VR | Gather, text: string) {
-  target.say(voice(), spokenSpelling(text));
+  target.say(voice(), spokenSpelling(text.trim())); // an empty first part (box 155 with no description) leaves no leading space
 }
 
 /** Speak a catalog prompt: uploaded recording if there is one, otherwise the (editable) text. */
@@ -1273,6 +1273,7 @@ async function payTextTo(ctx: Ctx, vr: VR, o: number, to: string, agreedNow = fa
 
 /** Star from the first email step: back to where the email steps started (key 8 menu, or box 141). */
 function emailHome(ctx: Ctx, vr: VR) {
+  if (ctx.session?.data.emailFor === "receipt") return back(vr, "receipt-email"); // box 35
   const o = ctx.session?.data.emailFor === "pay" ? ctx.session.data.payOrder : undefined;
   return o ? back(vr, "paylink", { o }) : back(vr, "catalog");
 }
@@ -1562,9 +1563,10 @@ const handlers: Record<string, Handler> = {
     // p = pay: the same email steps for a payment link (Abraham, Nov 17, 2026, box 145); p = cat: the catalog.
     // No p (start over inside the steps): keep what they are for.
     const p = ctx.query.get("p");
-    const forPay = p === "pay" || (p !== "cat" && ctx.session?.data.emailFor === "pay");
-    if (!forPay && infoCatalogAutoreplyOn()) sp(vr, ctx, "catalog_email_info");
-    await updateSession(ctx.callSid, { data: { catLocal: "", catDomain: "", ...(p === "pay" ? { emailFor: "pay" as const, payOrder: Number(ctx.query.get("o")) || ctx.session?.data.payOrder } : p === "cat" ? { emailFor: undefined } : {}) } }, ctx.session);
+    // p = rcpt: the receipt email at checkout (box 35, Nov 25, 2026)
+    const forCatalog = p === "cat" || (!p && !ctx.session?.data.emailFor);
+    if (forCatalog && infoCatalogAutoreplyOn()) sp(vr, ctx, "catalog_email_info");
+    await updateSession(ctx.callSid, { data: { catLocal: "", catDomain: "", ...(p === "pay" ? { emailFor: "pay" as const, payOrder: Number(ctx.query.get("o")) || ctx.session?.data.payOrder } : p === "rcpt" ? { emailFor: "receipt" as const } : p === "cat" ? { emailFor: undefined } : {}) } }, ctx.session);
     return back(vr, "catalog-part", { part: "local" });
   },
 
@@ -1740,27 +1742,84 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, sent ? "pay_link_sent" : "link_failed");
       return back(vr, "promo-consent");
     }
-    if (d === "1" && email) {
-      const r = await sendCatalogEmail(email);
-      await logCatalogRequest(ctx, "email", email, r.sent);
-      if (!r.sent) {
-        sp(vr, ctx, "went_wrong");
-        return back(vr, "catalog"); // the catalog choices again (text instead), not the main menu (audit L8)
-      }
-      // Box 109 (Abraham, Nov 22, 2026): star = the main menu; no key = the call ends
-      const g = keypad(vr, url("catalog-done"));
-      sp(g, ctx, "catalog_emailed");
-      halfPause(g);
-      sp(g, ctx, "catalog_main_star");
-      halfPause(g);
-      sp(g, ctx, "catalog_bye");
-      vr.hangup();
-      return vr;
+    if (d === "1" && email && ctx.session?.data.emailFor === "receipt") {
+      // Box 35 (Nov 25, 2026): the receipt email is kept with the booking; then box 56
+      await updateSession(ctx.callSid, { data: { email, emailFor: undefined } }, ctx.session);
+      await track(ctx.callSid, "said", `Receipt email: ${email}`, { field: "email", value: email });
+      return back(vr, "finalize");
     }
+    if (d === "1" && email) return back(vr, "catalog-save"); // box 108a first (Nov 25, 2026)
     if (d === "2") return back(vr, "catalog-email"); // try again: the email from the start
     if (d === "*") return back(vr, "catalog-ending");
     sp(vr, ctx, "not_valid");
     return back(vr, "catalog-final");
+  },
+
+  /** Box 108a (Abraham, Nov 25, 2026): save the email with the caller's phone number (used by box 102 key 3). */
+  "catalog-save"(ctx, vr) {
+    if (!catalogEmailOf(ctx)) return back(vr, "catalog-email");
+    const g = keypad(vr, url("catalog-save-choice"));
+    sp(g, ctx, "box108a_ask");
+    backLine(g, ctx);
+    return repeatMenu(vr, ctx, "catalog-save");
+  },
+
+  async "catalog-save-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    const email = catalogEmailOf(ctx);
+    if (!email) return back(vr, "catalog-email");
+    if (d === "1") {
+      const phone = toE164(ctx.session?.fromNumber ?? ctx.from);
+      if (phone) {
+        const found = await customerByPhone(phone);
+        if (found) await db.update(schema.customers).set({ email }).where(eq(schema.customers.id, found.id));
+        else await upsertCustomer(db, { name: "", phone, email });
+      }
+      await track(ctx.callSid, "step", `Box 108a: email saved with ${phone ?? "no caller number"}`);
+      sp(vr, ctx, "box108a_saved");
+      return back(vr, "catalog-send");
+    }
+    if (d === "#") return back(vr, "catalog-send");
+    if (d === "*") return back(vr, "catalog-final"); // one step back: the final check
+    sp(vr, ctx, "not_valid");
+    return back(vr, "catalog-save");
+  },
+
+  /** The catalog email goes out, then box 109. */
+  async "catalog-send"(ctx, vr) {
+    const email = catalogEmailOf(ctx);
+    if (!email) return back(vr, "catalog-email");
+    const r = await sendCatalogEmail(email);
+    await logCatalogRequest(ctx, "email", email, r.sent);
+    if (!r.sent) {
+      sp(vr, ctx, "went_wrong");
+      return back(vr, "catalog"); // the catalog choices again (text instead), not the main menu (audit L8)
+    }
+    // Box 109 (Abraham, Nov 22, 2026): star = the main menu; no key = the call ends
+    const g = keypad(vr, url("catalog-done"));
+    sp(g, ctx, "catalog_emailed");
+    halfPause(g);
+    sp(g, ctx, "catalog_main_star");
+    halfPause(g);
+    sp(g, ctx, "catalog_bye");
+    vr.hangup();
+    return vr;
+  },
+
+  /** Box 35 (Abraham, Nov 25, 2026): receipt by email. 1 = the email steps; pound or no answer after 1 minute = skip; star = box 34. */
+  "receipt-email"(ctx, vr) {
+    const g = keypad(vr, url("receipt-email-choice"));
+    sp(g, ctx, "box35_receipt");
+    return repeatMenu(vr, ctx, "receipt-email");
+  },
+
+  "receipt-email-choice"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (d === "1") return back(vr, "catalog-email", { p: "rcpt" });
+    if (d === "#") return back(vr, "finalize");
+    if (d === "*") return back(vr, "directions");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "receipt-email");
   },
 
   "catalog-done"(ctx, vr) {
@@ -2145,11 +2204,19 @@ const handlers: Record<string, Handler> = {
     if (d === "2") {
       await track(ctx.callSid, "item_details", `Heard the details of ${p.name}`, { item: p.name, productId: p.id });
       const sizes = balloonSizes(p.dimensions);
-      const description = (p.spokenDescription || p.description).trim().replace(/[.!\s]+$/, "");
-      // Box 155 is not approved yet: preview only. The live line reads the item's description, as before.
-      if (process.env.VERCEL_ENV !== "production" && sizes && description) {
+      // Box 155 (approved Nov 18, 2026): the Catalog description as its own sentence(s), then the sizes. No description:
+      // just the sizes sentence; no sizes: the description, then "To add it to your shopping cart, press 1."
+      let description = (p.spokenDescription || p.description).trim();
+      if (description && !/[.!?]$/.test(description)) description += ".";
+      if (description) description = description[0].toUpperCase() + description.slice(1);
+      if (sizes || description) {
         const g = keypad(vr, url("balloon-choice", { p: p.id }));
-        spPreviewDraft(g, ctx, "box155", { item: p.name, description, ...sizes });
+        if (sizes) sp(g, ctx, "box155", { description, item: p.name, ...sizes });
+        else {
+          say(g, description);
+          const tail = promptText(ctx.prompts, "box155", { description: "", item: "", length: "", width: "", height: "" }).match(/To add[^]*$/)?.[0];
+          if (tail) say(g, tail);
+        }
         sp(g, ctx, "cart_key");
         backLine(g, ctx); // the shared star line (Nov 19, 2026)
         return bookNoInput(vr, ctx, "balloon", { p: p.id });
@@ -3020,13 +3087,13 @@ const handlers: Record<string, Handler> = {
   directions(ctx, vr) {
     const g = keypad(vr, url("directions-choice"), { timeout: NO_KEY_SECONDS });
     sp(g, ctx, "box34_menu");
-    return back(vr, "finalize"); // silence: skip
+    return back(vr, "receipt-email"); // silence: skip; box 35 next (Nov 25, 2026)
   },
 
   "directions-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "directions-record");
-    if (d === "#" || !d) return back(vr, "finalize");
+    if (d === "#" || !d) return back(vr, "receipt-email"); // box 35
     if (d === "*") return back(vr, "addr-readback");
     sp(vr, ctx, "not_valid");
     return back(vr, "directions");
@@ -3039,7 +3106,7 @@ const handlers: Record<string, Handler> = {
     sp(vr, ctx, "pound_done");
     vr.play(`${config.baseUrl()}/audio/tone.wav`);
     vr.record({ maxLength: 180, timeout: 10, playBeep: false, finishOnKey: "#", trim: "trim-silence", action: url("directions-recorded", { o }), method: "POST", recordingStatusCallback: url("directions-rec-status", { o }), recordingStatusCallbackMethod: "POST" });
-    return back(vr, "finalize"); // nothing recorded: on with checkout
+    return back(vr, "receipt-email"); // nothing recorded: on with checkout (box 35)
   },
 
   /** Pound (or the caller hung up): the message is saved with the booking; then the thank-you and straight to box 56. */
@@ -3054,7 +3121,7 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "step", `Box 34: delivery instructions recorded (${secs} seconds)`);
       sp(vr, ctx, "box34_thanks");
     }
-    return back(vr, "finalize"); // Nov 24, 2026, 20:59: box 56 right after, no pause
+    return back(vr, "receipt-email"); // Nov 24, 2026, 20:59: no pause; box 35 (Nov 25, 2026), then box 56
   },
 
   /** Twilio: the recording file is ready (also after a hang-up mid-message): kept on the booking. */
@@ -3552,8 +3619,8 @@ const handlers: Record<string, Handler> = {
     if (quote && !quote.ok) {
       // Outside every zone on the price map: we don't deliver there; the caller is asked for another address
       await updateSession(ctx.callSid, { data: { heard: undefined } }, ctx.session);
-      sp(vr, ctx, "address_outside_area");
-      return back(vr, "ask", { f: "address" });
+      // Batch 2 item 6 (Abraham, Nov 25, 2026): the approved step 5 line (addr_outside) replaces the old one
+      return back(vr, "addr-outside");
     }
     const wasRequired = f === "email" && Boolean(ctx.session?.data.emailRequired);
     await updateSession(ctx.callSid, { data: { [f]: heard, heard: undefined, ...(wasRequired ? { emailRequired: undefined } : {}) } }, ctx.session);
@@ -3755,8 +3822,7 @@ const handlers: Record<string, Handler> = {
     // Delivery fee by the price map (Abraham, Nov 15, 2026); no price = never guessed
     const quote = await deliveryQuote(data.address, settings);
     if (!quote.ok) {
-      sp(vr, ctx, "address_outside_area");
-      return back(vr, "ask", { f: "address" });
+      return back(vr, "addr-outside"); // Batch 2 item 6: approved addr_outside line
     }
     const phone = data.phone || toE164(ctx.from);
     const customerId = await upsertCustomer(db, {

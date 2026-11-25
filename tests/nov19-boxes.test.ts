@@ -95,20 +95,31 @@ describe("box 154 and box 155", () => {
     expect(redirect(await call("balloon-choice", { Digits: "1" }, `p=${p}`))).toBe(`date?p=${p}`);
     expect(redirect(await call("balloon-choice", { Digits: "*" }, `p=${p}`))).toBe(`balloons?c=${cat}`);
   });
-  it("box 155 (not approved): on preview the draft with the Admin sizes; on the live line the description as before", async () => {
+  it("box 155 (Batch 2, Nov 25, 2026): the Catalog description, then the sizes, live and on preview", async () => {
     const p = ids["Blue Bounce"];
-    expect(said(await call("balloon-choice", { Digits: "2" }, `p=${p}`))).toEqual([
-      "The Blue Bounce is a bright castle with a slide. The dimensions are as follows: 15 feet long, 20 feet wide, and 12 feet tall. To add it to your shopping cart, press 1.",
+    const expected = [
+      "A bright castle with a slide. The Blue Bounce measures 15 feet long, 20 feet wide, and 12 feet tall. To add it to your shopping cart, press 1.",
       "To go to your shopping cart, press 0.",
       "To go back, press star.",
-    ]);
+    ];
+    expect(said(await call("balloon-choice", { Digits: "2" }, `p=${p}`))).toEqual(expected);
     process.env.VERCEL_ENV = "production";
     try {
-      const live = await call("balloon-choice", { Digits: "2" }, `p=${p}`);
-      expect(said(live)).toEqual(["a bright castle with a slide."]);
-      expect(redirect(live)).toBe(`balloon?p=${p}`);
+      expect(said(await call("balloon-choice", { Digits: "2" }, `p=${p}`))).toEqual(expected);
     } finally {
       delete process.env.VERCEL_ENV;
+    }
+  });
+  it("box 155 with no description skips that part; with no sizes skips the sizes sentence", async () => {
+    const p = ids["Blue Bounce"];
+    const [row] = await db.select().from(schema.products).where(eq(schema.products.id, p));
+    try {
+      await db.update(schema.products).set({ description: "", spokenDescription: "" }).where(eq(schema.products.id, p));
+      expect(said(await call("balloon-choice", { Digits: "2" }, `p=${p}`))[0]).toBe("The Blue Bounce measures 15 feet long, 20 feet wide, and 12 feet tall. To add it to your shopping cart, press 1.");
+      await db.update(schema.products).set({ description: row.description, spokenDescription: row.spokenDescription, dimensions: "" }).where(eq(schema.products.id, p));
+      expect(said(await call("balloon-choice", { Digits: "2" }, `p=${p}`)).slice(0, 2)).toEqual(["A bright castle with a slide.", "To add it to your shopping cart, press 1."]);
+    } finally {
+      await db.update(schema.products).set({ description: row.description, spokenDescription: row.spokenDescription, dimensions: row.dimensions }).where(eq(schema.products.id, p));
     }
   });
   it("sizes come from the Dimensions field; balloons never offer a second one", async () => {

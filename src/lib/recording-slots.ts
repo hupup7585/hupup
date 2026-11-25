@@ -40,7 +40,7 @@ export const NUMBER_CLIPS: readonly string[] = [
 export function pieces(text: string): string[] {
   return text
     .split(/\{[a-z0-9_]+\}/i)
-    .map((p) => p.trim())
+    .map((p) => p.trim().replace(/^[,;:]\s*/, "")) // a comma after a blank is a pause, not a word to record (Batch 2, Nov 25, 2026)
     .filter((p) => /[a-z]/i.test(p));
 }
 

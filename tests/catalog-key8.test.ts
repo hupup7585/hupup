@@ -27,6 +27,7 @@ vi.mock("@/lib/notify", () => ({
 }));
 
 import { db, schema } from "@/lib/db";
+import { eq } from "drizzle-orm";
 import { handleVoice } from "@/lib/ivr/flow";
 import { catalogEmail } from "@/lib/catalog-send";
 
@@ -35,6 +36,7 @@ const call = (action: string, body: Record<string, string> = {}, query = "", fro
   handleVoice({ action, query: new URLSearchParams(query), body: { CallSid: "CAcat", ...body }, callSid: "CAcat", from });
 const plain = (x: string) => x.replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/Redirect>/)?.[1].replace("https://hupup.example/api/voice/", "").replace(/&amp;/g, "&");
+const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&apos;/g, "'"));
 
 beforeAll(async () => {
   process.env.PUBLIC_BASE_URL = "https://hupup.example";
@@ -73,7 +75,12 @@ describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
     expect(plain(await call("catalog-ending"))).toContain("For at gmail dot com, press 1.");
     expect(redirect(await call("catalog-ending-choice", { Digits: "1" }))).toBe("catalog-final");
     expect(plain(await call("catalog-final"))).toContain("Your email address is y o s s i at gmail dot com.");
-    const done = plain(await call("catalog-final-choice", { Digits: "1" }));
+    // Box 108a (Batch 2, Nov 25, 2026): save with the phone number first, then the catalog goes out
+    expect(redirect(await call("catalog-final-choice", { Digits: "1" }))).toBe("catalog-save");
+    expect(said(await call("catalog-save"))[0]).toBe("To save this email address with your phone number, press 1. To skip, press pound.");
+    expect(h.emails).toHaveLength(0); // not sent before box 108a
+    expect(redirect(await call("catalog-save-choice", { Digits: "#" }))).toBe("catalog-send");
+    const done = plain(await call("catalog-send"));
     expect(done).toContain("We just emailed you our catalog!");
     expect(done).toContain("<Hangup/>");
     expect(h.emails).toHaveLength(1);
@@ -116,5 +123,36 @@ describe("key 8 email read-back (Abraham, Nov 14, 2026)", () => {
     expect(spokenEmail("yossi@gmail.com")).toBe("y o s s i at gmail dot com");
     expect(spokenEmail("k.weiss@kj.mail.net")).toBe("k dot w e i s s at kj dot mail dot net");
     expect(spokenEmail("yossi@gmail.com")).not.toMatch(/[,.]/);
+  });
+});
+
+describe("Batch 2 (Abraham, Nov 25, 2026): box 108a and box 35", () => {
+  it("box 108a: 1 saves the email with the caller's phone number, then the catalog goes out; star = the final check", async () => {
+    h.session.data = { catLocal: "dovid", catDomain: "gmail.com" };
+    expect(redirect(await call("catalog-save-choice", { Digits: "*" }))).toBe("catalog-final");
+    expect(redirect(await call("catalog-save-choice", { Digits: "5" }))).toBe("catalog-save");
+    const saved = await call("catalog-save-choice", { Digits: "1" }); // the number the call came from (the session)
+    expect(said(saved)).toEqual(["Thank you. Your email address has been saved."]);
+    expect(redirect(saved)).toBe("catalog-send");
+    const [c] = await db.select().from(schema.customers).where(eq(schema.customers.phone, OWNER));
+    expect(c.email).toBe("dovid@gmail.com");
+    expect(h.emails).toHaveLength(0);
+    expect(plain(await call("catalog-send"))).toContain("We just emailed you our catalog!");
+    expect(h.emails[0].to).toBe("dovid@gmail.com");
+  });
+  it("box 35: word for word; 1 = the email steps for the receipt, pound = box 56, star = box 34; the confirmed email is kept for the booking", async () => {
+    expect(said(await call("receipt-email"))).toEqual(["Almost done! To get your receipt by email, press 1. To skip, press pound. To go back, press star."]);
+    expect(redirect(await call("receipt-email-choice", { Digits: "#" }))).toBe("finalize");
+    expect(redirect(await call("receipt-email-choice", { Digits: "*" }))).toBe("directions");
+    expect(redirect(await call("receipt-email-choice", { Digits: "7" }))).toBe("receipt-email");
+    expect(redirect(await call("receipt-email-choice", { Digits: "1" }))).toBe("catalog-email?p=rcpt");
+    const start = plain(await call("catalog-email", {}, "p=rcpt"));
+    expect(start).not.toContain("info at hup up"); // the catalog tip never plays for a receipt
+    expect(h.session.data.emailFor).toBe("receipt");
+    h.session.data = { ...h.session.data, catLocal: "dovid", catDomain: "gmail.com" };
+    expect(redirect(await call("catalog-final-choice", { Digits: "1" }))).toBe("finalize");
+    expect(h.session.data.email).toBe("dovid@gmail.com");
+    expect(h.session.data.emailFor).toBeUndefined();
+    expect(h.emails).toHaveLength(0); // no catalog is sent
   });
 });

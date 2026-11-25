@@ -49,8 +49,8 @@ describe("Box 34 delivery instructions (Abraham, Nov 21 and 24, 2026)", () => {
   it("the menu word for word: 1 records, pound or silence skips, star back to the address, wrong key not valid", async () => {
     const menu = await call("directions");
     expect(said(menu)).toEqual(["To add any special delivery instructions, press 1. To skip, press pound. To go back, press star."]);
-    expect(redirect(menu)).toBe("finalize"); // silence: skip
-    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("finalize");
+    expect(redirect(menu)).toBe("receipt-email"); // silence: skip; box 35 next (Batch 2, Nov 25, 2026)
+    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("receipt-email");
     expect(redirect(await call("directions-choice", { Digits: "*" }))).toBe("addr-readback");
     expect(redirect(await call("directions-choice", { Digits: "1" }))).toBe("directions-record");
     const bad = await call("directions-choice", { Digits: "5" });
@@ -70,6 +70,7 @@ describe("no email in the booking (Abraham, Nov 17, 2026)", () => {
     const src = (await import("node:fs")).readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(src).not.toContain('back(vr, "ask", { f: "email" })');
     expect(src).not.toContain("emailRequired: 1");
-    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("finalize");
+    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("receipt-email"); // box 35 (receipt email is optional)
+    expect(redirect(await call("receipt-email-choice", { Digits: "#" }))).toBe("finalize");
   });
 });

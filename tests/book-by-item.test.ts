@@ -69,7 +69,7 @@ describe("key 1: booking by item", () => {
     expect(redirect(await call("date-heard", { Digits: "1201" }, `p=${medium}`))).toBe(`date-ask?p=${medium}&d=${TUE}`);
     // Box 18 (Abraham, Nov 22, 2026): the item is known; no cart option here
     const box18 = said(await call("date-ask", {}, `p=${medium}&d=${TUE}`));
-    expect(box18[0]).toMatch(/^To book the .+ for Tuesday, December first press 1\.$/);
+    expect(box18[0]).toMatch(/^To book the .+ for Tuesday, December first, press 1\.$/);
     expect(box18.slice(-2)).toEqual(["To choose a different date, press 3.", "To go back, press star."]);
     expect(redirect(await call("box18-choice", { Digits: "3" }, `p=${medium}&d=${TUE}&t=1`))).toBe(`date?p=${medium}`);
     expect(redirect(await call("box18-choice", { Digits: "1" }, `p=${medium}&d=${TUE}&t=1`))).toBe(`qty?p=${medium}&d=${TUE}`);
@@ -143,7 +143,7 @@ describe("a closed day (Abraham, Nov 20, 2026)", () => {
       const lines = said(offer);
       // Box 17 in pieces (Abraham, Nov 22, 2026): 1 books it, 2 another date, star back
       expect(lines[0]).toMatch(/^We are closed on Saturday, November twenty-eighth for .+\.$/);
-      expect(lines.slice(1)).toEqual(["You can get it the day before, on Friday, November twenty-seventh and keep it until Sunday, November twenty-ninth at 9:00 AM, for a total of 225 dollars.", "To book it, press 1.", "To pick another date, press 2.", "To go back, press star."]);
+      expect(lines.slice(1)).toEqual(["You can get it the day before, on Friday, November twenty-seventh, and keep it until Sunday, November twenty-ninth, at 9:00 AM, for a total of 225 dollars.", "To book it, press 1.", "To pick another date, press 2.", "To go back, press star."]);
       expect(redirect(await call("closed-offer-choice", { Digits: "1" }, `p=${medium}&d=2026-11-28`))).toBe(`qty?p=${medium}&d=2026-11-27`);
       expect(h.session.data.spanDays).toEqual({ "2026-11-27": { after: "2026-11-29", days: 1.5 } });
       expect(redirect(await call("closed-offer-choice", { Digits: "2" }, `p=${medium}&d=2026-11-28`))).toBe(`date?p=${medium}`);

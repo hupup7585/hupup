@@ -221,7 +221,7 @@ export const PROMPTS = {
   paddle_open: { group: "Booking by item (key 1)", label: "Paddle boat list: opening", text: "Here are our paddle boat packages." },
   box153: { group: "Booking by item (key 1)", label: "Box 153: jumping balloons menu (replaced by the new list, Nov 19)", text: "For Soft Hop, item seven two zero one, press 1. For Sunlight Spot, item seven two zero two, press 2. For Blue Bounce, item seven two zero three, press 3. For Ball Buster, item seven two zero four, press 4. For Rising Joy, item seven two zero five, press 5. For Family Fun, item seven two zero six, press 6. For Adventure Zone, item seven two zero seven, press 7. For Wide Slide, item seven two zero eight, press 8. For Amusing Obstacle, item seven two zero nine, press 9. For Mega Mountain, item seven two one zero, press 1 0. For Bounce Blast, item seven two one one, press 1 1. For Wheel Thrill, item seven two one two, press 1 2. To go back, press star." },
   box154: { group: "Booking by item (key 1)", label: "Box 154: jumping balloon chosen", text: "{item}, item {number}, {price}. To add it to your shopping cart, press 1. For description and dimensions, press 2.", vars: ["item", "number", "price"] },
-  box155: { group: "Booking by item (key 1)", label: "Box 155: balloon description and dimensions (NOT APPROVED yet)", text: "The {item} is {description}. The dimensions are as follows: {length} feet long, {width} feet wide, and {height} feet tall. To add it to your shopping cart, press 1.", vars: ["item", "description", "length", "width", "height"], pending: true },
+  box155: { group: "Booking by item (key 1)", label: "Box 155: balloon description (from the Catalog) and dimensions", text: "{description} The {item} measures {length} feet long, {width} feet wide, and {height} feet tall. To add it to your shopping cart, press 1.", vars: ["description", "item", "length", "width", "height"] }, // approved Nov 18, 2026
   // Box 156 (Abraham, Nov 19, 2026, approved): before payment, only when the customer has a discount from the Owner
   box156: { group: "Checkout", label: "Box 156: discount applied (only when the customer has a discount)", text: "The total of your order is {amount}. We are happy to let you know that a discount of {discount} has been applied to your order. Your new total is {newtotal}.", vars: ["amount", "discount", "newtotal"] },
   book_date_entered: { group: "Booking by item (key 1)", label: "Confirm the date", text: "You entered {date}.", vars: ["date"] }, // Nov 23, 2026: ends with the shared Confirm ending (no pound to continue)
@@ -336,6 +336,8 @@ export const PROMPTS = {
   box34_menu: { group: "Checkout", label: "Box 34: delivery instructions menu", text: "To add any special delivery instructions, press 1. To skip, press pound. To go back, press star." },
   box34_record: { group: "Checkout", label: "Box 34 after key 1: leave the message after the tone (then the shared pound_done line)", text: "Please leave a clear and detailed message with all your delivery instructions after the tone." },
   box34_thanks: { group: "Checkout", label: "Box 34 after pound: saved", text: "Thank you. We have saved your delivery instructions." },
+  // Box 35 (Abraham, Nov 25, 2026, Batch 2): receipt by email, after box 34 and before box 56
+  box35_receipt: { group: "Checkout", label: "Box 35: receipt by email (1 = the email steps, pound = skip, star = box 34)", text: "Almost done! To get your receipt by email, press 1. To skip, press pound. To go back, press star." },
   // Menu 2 (Abraham, Nov 24, 2026, 20:56): one line right after the address is confirmed; town and price are live parts
   addr_saved_price: { group: "Checkout", label: "Menu 2: address saved, delivery to {town} is {price}", text: "Your delivery address has been saved, delivery to {town} is {price}.", vars: ["town", "price"] },
   ask_directions: { group: "Checkout", label: "Ask for delivery directions (optional)", text: "Is there anything our delivery team should know, like a gate code, where to park, or where to set up? Please say it now.", pending: true },
@@ -423,12 +425,12 @@ export const PROMPTS = {
   // Abraham, Nov 20, 2026: a closed day with the day before and the day after both open (then the date prompt and back line)
   // Box 17, closed day (Abraham, Nov 22, 2026): played as recorded pieces with the live parts between them
   closed_day_intro: { group: "Date & quantity", label: "Box 17: We are closed on {date} for {reason}", text: "We are closed on {date} for {reason}.", vars: ["date", "reason"] },
-  closed_day_get: { group: "Date & quantity", label: "Box 17: get it the day before", text: "You can get it the day before, on {before} and keep it until {after} at 9:00 AM, for a total of {price}.", vars: ["before", "after", "price"] },
+  closed_day_get: { group: "Date & quantity", label: "Box 17: get it the day before", text: "You can get it the day before, on {before}, and keep it until {after}, at 9:00 AM, for a total of {price}.", vars: ["before", "after", "price"] },
   closed_book_it: { group: "Date & quantity", label: "Box 17: To book it, press 1", text: "To book it, press 1." },
   closed_pick_another: { group: "Date & quantity", label: "Box 17: To pick another date, press 2", text: "To pick another date, press 2." },
   // Box 18, confirm the date (Abraham, Nov 22, 2026): recorded pieces; off the line until the second-day rules are in
-  box18_book: { group: "Date & quantity", label: "Box 18: To book the {item} for {date} press 1", text: "To book the {item} for {date} press 1.", vars: ["item", "date"] },
-  box18_second: { group: "Date & quantity", label: "Box 18: To add it also for {weekday} for only {price} more, press 2", text: "To add it also for {weekday} for only {price} more, press 2.", vars: ["weekday", "price"] },
+  box18_book: { group: "Date & quantity", label: "Box 18: To book the {item} for {date} press 1", text: "To book the {item} for {date}, press 1.", vars: ["item", "date"] },
+  box18_second: { group: "Date & quantity", label: "Box 18: To add it also for {weekday} for only {price} more, press 2", text: "To add it also for {weekday}, for only {price} more, press 2.", vars: ["weekday", "price"] },
   box18_other_date: { group: "Date & quantity", label: "Box 18: To choose a different date, press 3", text: "To choose a different date, press 3." },
   address_outside_area: { group: "Checkout", label: "Address outside the delivery area", text: "Sorry, we only deliver in Kiryas Joel and nearby Orange County towns. Please say a delivery address in our area." },
   address_not_found: { group: "Checkout", label: "Address not found on the map", text: "Sorry, we could not find that address. Please say the full address again: the house number, the street, and the town.", pending: true },
@@ -604,6 +606,9 @@ export const PROMPTS = {
   catalog_ending: { group: "Catalog (key 8)", label: "Email: choose the ending", text: "Now choose the ending. For at gmail dot com, press 1. For at outlook dot com, press 2. For at yahoo dot com, press 3. For at icloud dot com, press 4. For a different ending, press 5." },
   catalog_domain: { group: "Catalog (key 8)", label: "Email: a different ending", text: "Please give us the ending, after the at symbol. To type it, start pressing keys now. To say it, wait for the tone. When you are finished, please press pound." },
   catalog_final: { group: "Catalog (key 8)", label: "Email: final check", text: "Your email address is {email}.", vars: ["email"] }, // Nov 23, 2026: ends with the shared Confirm ending (no pound to continue)
+  // Box 108a (Abraham, Nov 25, 2026, Batch 2): after the final check, before the catalog is sent
+  box108a_ask: { group: "Catalog (key 8)", label: "Box 108a: save the email with the phone number", text: "To save this email address with your phone number, press 1. To skip, press pound." },
+  box108a_saved: { group: "Catalog (key 8)", label: "Box 108a after key 1: saved", text: "Thank you. Your email address has been saved." },
   catalog_emailed: { group: "Catalog (key 8)", label: "Email: done", text: "We just emailed you our catalog! Check your inbox for a variety of attractions and endless fun for your entire family." },
   catalog_main_star: { group: "Catalog (key 8)", label: "Email: done, star for the main menu", text: "To go to the main menu, press star." },
   catalog_bye: { group: "Catalog (key 8)", label: "Email: done, goodbye", text: "Thank you for choosing Hup Up Attractions! Bye for now!" },
@@ -667,7 +672,7 @@ export const PROMPTS = {
 
 /** Old lines no longer played anywhere (kept so nothing is lost; shown as "Not used"). */
 // Hark's audit items 12 and 14 (Nov 24, 2026): lines no step plays any more were still shown as Live
-export const RETIRED_PROMPTS = new Set<string>(["book_note", "book_corporate", "box153", "no_input", "idle_warning", "only_some_left", "day_choice", "cart_cleared", "addr_rb_again", "type_email_symbols", "email_unclear", "thanks_order", "consent_unclear", "attraction_menu_back", "menu_category", "menu_empty", "retry_spoken", "addr_readback", "resume_added", "instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard", "cart_expired", "addr_unit_skip", "ask_directions", "directions_saved", "addr_price", "addr_saved", "vma_charge_amount", "vma_charge_readback", "vma_charge_bad"]);
+export const RETIRED_PROMPTS = new Set<string>(["book_note", "book_corporate", "box153", "no_input", "idle_warning", "only_some_left", "day_choice", "cart_cleared", "addr_rb_again", "type_email_symbols", "email_unclear", "thanks_order", "consent_unclear", "attraction_menu_back", "menu_category", "menu_empty", "retry_spoken", "addr_readback", "resume_added", "instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard", "cart_expired", "addr_unit_skip", "ask_directions", "directions_saved", "addr_price", "addr_saved", "vma_charge_amount", "vma_charge_readback", "vma_charge_bad", "address_outside_area"]);
 
 /** The extension (or part of the call) each group of lines belongs to, for the Admin filter. New groups fall into "Other". */
 export const PROMPT_AREAS: Record<string, string> = {
@@ -773,7 +778,7 @@ export function composeMixed(overrides: PromptOverrides, key: PromptKey, vars: R
     }
   } else {
     const template = overrides[key]?.text?.trim() || PROMPTS[key].text;
-    const parts = template.split(/(\{[a-z0-9_]+\})/i).map((p) => p.trim()).filter((p) => p && (/^\{/.test(p) || /[a-z]/i.test(p)));
+    const parts = template.split(/(\{[a-z0-9_]+\})/i).map((p) => p.trim().replace(/^[,;:]\s*/, "")).filter((p) => p && (/^\{/.test(p) || /[a-z]/i.test(p)));
     let piece = 0;
     for (let pi = 0; pi < parts.length; pi++) {
       const p = parts[pi];
@@ -819,7 +824,7 @@ export function composeClips(overrides: PromptOverrides, key: PromptKey, vars: R
     return ids.every(Boolean) ? ids.map((id) => promptRecordingLink(id)) : null;
   }
   const template = overrides[key]?.text?.trim() || PROMPTS[key].text;
-  const parts = template.split(/(\{[a-z0-9_]+\})/i).map((p) => p.trim()).filter((p) => p && (/^\{/.test(p) || /[a-z]/i.test(p)));
+  const parts = template.split(/(\{[a-z0-9_]+\})/i).map((p) => p.trim().replace(/^[,;:]\s*/, "")).filter((p) => p && (/^\{/.test(p) || /[a-z]/i.test(p)));
   const urls: string[] = [];
   let piece = 0;
   for (const p of parts) {

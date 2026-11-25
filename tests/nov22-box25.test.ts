@@ -101,7 +101,7 @@ describe("box 18 (Abraham, Nov 22, 2026)", () => {
     // Tuesday, December twenty-ninth; the next day (Wednesday) is open
     const T = "2026-12-29";
     const lines = said(await call("date-ask", {}, `p=${boat}&d=${T}`));
-    expect(lines).toEqual(["To book the paddle boat for Tuesday, December twenty-ninth press 1.", "To add it also for Wednesday for only 50 dollars more, press 2.", "To choose a different date, press 3.", "To go back, press star."]);
+    expect(lines).toEqual(["To book the paddle boat for Tuesday, December twenty-ninth, press 1.", "To add it also for Wednesday, for only 50 dollars more, press 2.", "To choose a different date, press 3.", "To go back, press star."]);
     expect(redirect(await call("box18-choice", { Digits: "2" }, `p=${boat}&d=${T}&t=1`))).toBe(`qty?p=${boat}&d=${T}`);
     expect(h.session.data.spanDays).toMatchObject({ [T]: { both: "2026-12-30", days: 1.5 } });
     await call("add", {}, `p=${boat}&d=${T}&q=1`);

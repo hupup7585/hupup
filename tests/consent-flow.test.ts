@@ -354,8 +354,8 @@ describe("checkout pricing, delivery area and terms (Abram's final decisions)", 
   it("an address outside the delivery area stops checkout and asks again", async () => {
     h.session.data.heard = "5 Main Street, Albany";
     const xml = await call("confirm", { Digits: "1" }, "f=address");
-    expect(xml).toContain("we only deliver in Kiryas Joel and nearby Orange County towns");
-    expect(xml).toContain("/api/voice/ask?f=address");
+    // Batch 2 item 6 (Nov 25, 2026): the approved step 5 screen (addr_outside) replaces the old line
+    expect(xml).toContain("/api/voice/addr-outside");
   });
   it("an in-area address continues", async () => {
     h.session.data.heard = "5 Main Street, Monroe";
