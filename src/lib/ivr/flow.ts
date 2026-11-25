@@ -65,7 +65,7 @@ import { PHONEPAY_NOT_REACHED, amountParts, buildSendDigits, checkPhonePayTry, c
 import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
-const PHONEPAY_PROMPTS = ["phonepay_intro", "phonepay_back", "phonepay_paid", "phonepay_retry", "phonepay_retry_last", "phonepay_failed", "phonepay_unclear"] as const;
+const PHONEPAY_PROMPTS = ["pay_hold_secure", "phonepay_back", "phonepay_paid", "phonepay_retry", "phonepay_retry_last", "phonepay_failed", "phonepay_unclear"] as const;
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
 import { pluralName } from "@/lib/spoken-words";
 import { lastPhoneDate, normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
@@ -3775,7 +3775,7 @@ const handlers: Record<string, Handler> = {
       if (keypadPayFor(caller, stripePhonePayMode(process.env, payCfg), process.env, payCfg.paymentTestNumbers) && PAY_PROMPTS.every((k) => stripePhonePayMode(process.env, payCfg) !== "live" || !promptWaiting(ctx.prompts, k)))
         return back(vr, "pay-keypad", { o: primary.id });
     } else if (phonePayOffered(caller, payCfg) && !(await isPhonePayBlocked(callerPhoneOf(ctx))) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k)))) {
-      sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true }); // box 56's last line: "Thank you. Please hold ..."
+      sp(vr, ctx, "pay_hold_secure", undefined, { draftOk: true }); // box 56's last line (Nov 25, 2026), then the payment line
       return back(vr, "phonepay-go", { o: primary.id, n: 1 });
     }
     // Card on the phone not offered to this caller: the payment link, by text or email (box 141)
@@ -3906,7 +3906,7 @@ const handlers: Record<string, Handler> = {
     // Watch Sola every second while the call to Sola is up (no time limit, Abraham, Nov 18, 2026)
     await startPayWatch(attempt.id);
     // Box 140 already told the caller they are being connected; later tries keep the "please hold" line
-    if (earlier.length) sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true });
+    if (earlier.length) sp(vr, ctx, "pay_hold_secure", undefined, { draftOk: true });
     // Straight from the hotline to Sola PhonePay (Abraham, Nov 17, 2026): PIN, the order amount (from the order, never
     // the caller) and 1, sent once PhonePay answers. Star brings the caller back at any time.
     const s = await getSettings();
@@ -4629,7 +4629,7 @@ const handlers: Record<string, Handler> = {
     }
     const attempt = await startAttempt(order?.id ?? null, ctx.callSid, c, "custom");
     await track(ctx.callSid, "vm_access", `Owner custom charge started: $${(c / 100).toFixed(2)}${order ? ` for order #${orderNumber(order.id)}` : ""}`, { attempt: attempt.id });
-    sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true });
+    sp(vr, ctx, "pay_hold_secure", undefined, { draftOk: true });
     const s = await getSettings();
     const digits = buildSendDigits(s.solaPhonePayCustomDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: c, orderNumber: order ? orderNumber(order.id) : "" });
     phonePayDirectDial(vr, { number: s.solaPhonePayNumber, digits, action: url("vma-charge-done", { a: attempt.id, c, o: order?.id ?? 0 }) });

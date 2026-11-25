@@ -81,7 +81,7 @@ describe("card payment on the phone line", () => {
     expect(x).not.toContain("<Sip");
     expect(x).toMatch(/<Number sendDigits="w+4321#w+80000#w+1">\+18334343354<\/Number>/);
     expect(x).toContain('record="do-not-record"');
-    expect(said(x)).not.toContain("Thank you. Please hold for a moment while we connect you to our secure payment line."); // box 140 already said it
+    expect(said(x).join(" ")).not.toContain("secure payment line. All card"); // the first try: box 56 already said the hold line
     const [a] = await db.select().from(schema.phonepayAttempts);
     expect(a).toMatchObject({ orderId, tryNumber: 1, amountCents: 80000 });
   });

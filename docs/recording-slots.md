@@ -366,7 +366,7 @@ Thank you for choosing Hup Up Attractions! |
 | pay_card_line | Box 140: card line (no key: the payment line; 0: a payment link) | To pay with a credit or debit card, please stay on the line to connect to our secure payment line. To get a payment link instead, press 0. |
 | pay_link_how | Box 141: payment link by text or email | To receive the payment link by text, press 1. To receive by email, press 2. |
 | pay_link_sent | Box 146: payment link sent | Done! We just sent you the payment link. To keep your booking, please complete your payment within the next ten minutes. Otherwise, the booking will be released. Thank you for choosing Hup Up Attractions! |
-| phonepay_intro | PhonePay connect | Thank you. Please hold for a moment while we connect you to our secure payment line. |
+| pay_hold_secure | Box 56: connecting to the secure payment line | We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you. |
 | phonepay_back | Back from the payment line | Thank you. Let us finish your order. |
 | phonepay_paid | Payment found | Your payment was received. You are all set! |
 | phonepay_third_decline | Third decline on a call (not active yet) | Not active yet: Abraham will send this line. |

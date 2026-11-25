@@ -47,7 +47,7 @@ describe("Sola PhonePay", () => {
     expect(easternToDate("11/16/2026 12:30:00 AM").toISOString()).toBe("2026-11-16T05:30:00.000Z");
   });
   it("the connect line is Abraham's exact wording, named PhonePay connect (approved; the audio waits for his OK)", () => {
-    expect(PROMPTS.phonepay_intro).toMatchObject({ label: "PhonePay connect", text: "Thank you. Please hold for a moment while we connect you to our secure payment line." });
+    expect(PROMPTS.pay_hold_secure.text).toBe("We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you.");
   });
 });
 

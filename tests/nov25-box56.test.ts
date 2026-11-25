@@ -123,12 +123,26 @@ describe("box 56 on a call", () => {
     await cart(["package", "boat"]);
     expect(said(await call("finalize"))[2]).toMatch(/^That includes 90 dollars for the paddle boat package, 60 dollars for the paddle boat, /);
   });
-  it("the hold line plays right before the secure payment line", async () => {
-    const { readFileSync } = await import("node:fs");
-    const f = readFileSync("src/lib/ivr/flow.ts", "utf8");
-    expect(f).toMatch(/sp\(vr, ctx, "phonepay_intro", undefined, \{ draftOk: true \}\); \/\/ box 56's last line[^\n]*\n\s*return back\(vr, "phonepay-go"/);
-    expect(PROMPTS.phonepay_intro.text).toBe("Thank you. Please hold for a moment while we connect you to our secure payment line.");
+  it("pay by card: the four lines in order, the new hold line last, then the call connects to the payment line", async () => {
+    const { saveSetting } = await import("@/lib/settings");
+    await saveSetting("solaPhonePayOn", true);
+    await saveSetting("solaPhonePayOwnerOnly", false);
+    process.env.SOLA_PHONEPAY_PIN = "4321"; // test calls only: nothing is dialed or charged here
+    const id = await cart(["castle", "boat"]);
+    const xml = await call("finalize");
+    const lines = said(xml);
+    expect(lines).toHaveLength(4);
+    expect(lines[0]).toBe(`Your order number is ${String(1000 + id).split("").join(" ")}.`);
+    expect(lines[1]).toMatch(/^Your total is /);
+    expect(lines[2]).toMatch(/^That includes 120 dollars for the jumping balloon, 60 dollars for the paddle boat, /);
+    expect(lines[3]).toBe(PROMPTS.pay_hold_secure.text);
+    expect(redirect(xml)).toBe(`phonepay-go?o=${id}&n=1`);
+    // the old wording is gone from the prompts and the slot list
+    const { allSlots } = await import("@/lib/recording-slots");
+    expect(JSON.stringify(PROMPTS) + JSON.stringify(allSlots())).not.toContain("Please hold for a moment");
+    expect(allSlots().find((x) => x.key === "pay_hold_secure")?.text).toBe(PROMPTS.pay_hold_secure.text);
   });
+
 });
 
 describe("Box 34 then box 56 (Abraham, Nov 24, 2026, 20:59 and 21:02)", () => {
