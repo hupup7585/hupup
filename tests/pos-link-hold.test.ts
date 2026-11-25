@@ -24,3 +24,12 @@ describe("two separate payment-link hold settings (Abraham, Nov 25, 2026)", () =
     expect(SETTING_DEFAULTS.adminLinkHoldMinutes).toBe("25");
   });
 });
+
+describe("Send payment link on an order's page (Abraham, Nov 25, 2026, 12:13)", () => {
+  it("holds with the Admin setting (25), not the phone one", () => {
+    const a = readFileSync("src/app/admin/(app)/orders/actions.ts", "utf8");
+    const fn = a.slice(a.indexOf("export async function sendPayLinkAction"), a.indexOf("export async function updateDetailsAction"));
+    expect(fn).toContain('minutesFromNow(await linkHoldMinutes("admin"))');
+    expect(fn).not.toContain('linkHoldMinutes("phone")');
+  });
+});

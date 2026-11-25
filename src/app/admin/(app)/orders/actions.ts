@@ -64,7 +64,7 @@ export async function sendPayLinkAction(orderId: number): Promise<ActionResult> 
   if (due <= 0) return { ok: false, message: "Nothing left to pay" };
   const link = payPageLink(orderId); // review-and-pay page: Terms box, then Sola
   if (full.order.status === "PENDING_PAYMENT") {
-    await setOrderStatus(orderId, "PENDING_PAYMENT", { holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")) /* as before: 10 (see note to Abraham) */ });
+    await setOrderStatus(orderId, "PENDING_PAYMENT", { holdExpiresAt: minutesFromNow(await linkHoldMinutes("admin")) /* Abraham, Nov 25, 2026, 12:13: Admin links hold 25, like New booking */ });
   }
   const r = await sendOrderText({
     phone,
