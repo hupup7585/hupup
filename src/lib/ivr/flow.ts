@@ -751,9 +751,6 @@ async function customerByPhone(phone: string) {
   return c ?? null;
 }
 
-/** Key 2 scripts (Nov 25, 2026, 12:55): key 2 rings customer service while any of these waits for approval. */
-const INSTRUCTION_SCRIPTS = ["instr_balloons", "instr_laser", "instr_paddle"] as const;
-
 /** The three types of attraction on keys 2 and 3 (Abraham W). */
 const ATTRACTIONS = {
   "1": { label: "jumping balloons", instr: "instr_balloons", learn: "learn_balloons", match: /balloon|bounce|jump|inflatable(?!.*maze)/i },
@@ -1423,10 +1420,7 @@ const handlers: Record<string, Handler> = {
       case "1":
         return back(vr, "book");
       case "2": // Abraham W: instructions for each type of attraction
-        // Abraham, Nov 25, 2026, 12:55: until all three instruction scripts are approved, key 2 goes to customer
-        // service, the same line as key 3 (ring list, hold music, voicemail); then the instruction menu again
-        if (INSTRUCTION_SCRIPTS.some((k) => promptWaiting(ctx.prompts, k))) return back(vr, "ring", { k: "4" });
-        return back(vr, "instructions");
+        return back(vr, "instructions"); // the key 2 menu always plays (Nov 25, 2026, 1:08 PM)
       case "3": // customer service: the line (ring list, voicemail, alerts) that was key 4
         return back(vr, "ring", { k: "4" });
       // Nov 19, 2026 (Hark for Abraham): 4 = issues during your rental, 5 = delivery and pickup, 6 = learn about our
@@ -1897,8 +1891,12 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("attraction-after", { m, t }));
     const type = ATTRACTIONS[t];
     if (m === "i") {
-      // A script still waiting for Abraham's OK never plays: straight back to the key 2 menu (no new wording)
-      if (promptWaiting(ctx.prompts, type.instr)) return back(vr, "instructions", { again: 1 });
+      // Abraham, Nov 25, 2026, 1:08 PM: an entry whose script still waits for approval rings customer service, the
+      // same line as main menu key 3 (ring list, hold music, voicemail and after-hours); each entry on its own
+      if (promptWaiting(ctx.prompts, type.instr)) {
+        await track(ctx.callSid, "step", `Key 2: ${type.label} instructions not ready yet; customer service`);
+        return back(vr, "ring", { k: "4" });
+      }
       sp(g, ctx, type.instr);
       await track(ctx.callSid, "category_heard", `Heard the instructions for ${type.label}`, { category: type.label, kind: "instructions" });
     } else {

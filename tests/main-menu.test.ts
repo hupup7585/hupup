@@ -122,7 +122,7 @@ describe("Abraham's start of the call and main menu (Nov 16, 2026)", () => {
 describe("every key, office open", () => {
   it("1 opens the bookings menu; 2 instructions; 6 learn about our rentals (Nov 19, 2026); 8 the catalog", async () => {
     expect(redirect(await press("1"))).toBe("book");
-    expect(redirect(await press("2"))).toBe("ring?k=4"); // Nov 25, 2026, 12:55: scripts pending: the key 3 line
+    expect(redirect(await press("2"))).toBe("instructions");
     expect(redirect(await press("6"))).toBe("learn");
     expect(redirect(await press("8"))).toBe("catalog");
   });
@@ -282,7 +282,7 @@ describe("every key, office closed", () => {
   it("1 books and 2 and 6 play their information 24/7; after hours every extension goes to voicemail (Abraham, Nov 12); 9 is voicemail", async () => {
     h.open = false;
     expect(redirect(await press("1"))).toBe("book");
-    expect(redirect(await press("2"))).toBe("ring?k=4"); // Nov 25, 2026, 12:55: scripts pending: the key 3 line
+    expect(redirect(await press("2"))).toBe("instructions");
     expect(redirect(await press("6"))).toBe("learn");
     expect(redirect(await press("3"))).toBe("ring?k=4");
     await saveSetting("ringAfterHours6", false); // key 6 is switched on live (Nov 14); here: the rule with every switch off
@@ -407,24 +407,10 @@ describe("Abraham's answers (Nov 16, 2026)", () => {
   });
 });
 
-describe("main menu key 2 while the instruction scripts are pending (Abraham, Nov 25, 2026, 12:55)", () => {
-  it("pending: key 2 rings the customer service line (same as key 3), never the key 2 menu", async () => {
-    const two = await press("2");
-    expect(redirect(two)).toBe(redirect(await press("3")));
-    expect(redirect(two)).toBe("ring?k=4");
-    expect(two).not.toContain("instructions");
-    expect(two).not.toContain("<Say");
-  });
-  it("all three approved: key 2 plays the instruction menu as before", async () => {
-    const at = new Date();
-    (globalThis as { __ov?: object }).__ov = { instr_balloons: { approvedAt: at }, instr_laser: { approvedAt: at }, instr_paddle: { approvedAt: at } };
-    try {
-      expect(redirect(await press("2"))).toBe("instructions");
-      (globalThis as { __ov?: object }).__ov = { instr_balloons: { approvedAt: at }, instr_laser: { approvedAt: at } }; // one still pending
-      expect(redirect(await press("2"))).toBe("ring?k=4");
-    } finally {
-      delete (globalThis as { __ov?: object }).__ov;
-    }
+describe("main menu key 2 (Abraham, Nov 25, 2026, 1:08 PM)", () => {
+  it("key 2 always plays the key 2 instructions menu, approved or not", async () => {
+    expect(redirect(await press("2"))).toBe("instructions");
+    expect(await call("instructions")).toContain("For jumping balloon instructions, press 1.");
   });
   it("keys 1, 3, 4, 5 and 0 unchanged", async () => {
     expect(redirect(await press("1"))).toBe("book");

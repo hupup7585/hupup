@@ -54,7 +54,7 @@ describe("main menu: every key goes through", () => {
 
   const routes: [string, string][] = [
     ["1", "book"],
-    ["2", "ring?k=4"], // Nov 25, 2026, 12:55: scripts pending: the customer service line (key 3)
+    ["2", "instructions"], // the key 2 menu always plays (Nov 25, 2026, 1:08 PM)
     ["3", "ring?k=4"],
     ["4", "ring?k=5"], // issues during your rental (Nov 19, 2026)
     ["5", "ring?k=6"], // delivery and pickup (Nov 19, 2026)
@@ -107,13 +107,22 @@ describe("key 2: instructions", () => {
     expect(gatherTo(xml)).toBe("attraction-choice?m=i");
     expect(redirect(await call("attraction-choice", { Digits: "*" }, { m: "i" }))).toBe("menu");
   });
-  it("scripts waiting for Abraham's OK never play: straight back to the key 2 menu", async () => {
+  it("Nov 25, 2026, 1:08 PM: an entry whose script is pending rings customer service (the key 3 line), never the key 2 menu again", async () => {
     h.overrides = {};
+    const three = redirect(await press("3"));
     for (const t of ["1", "2", "3"]) {
       const xml = text(await call("attraction", {}, { m: "i", t }));
-      expect(xml).not.toContain("Here's how to enjoy");
-      expect(redirect(xml)).toBe("instructions?again=1");
+      expect(xml).not.toContain("Here is how to enjoy");
+      expect(redirect(xml)).toBe(three);
+      expect(redirect(xml)).toBe("ring?k=4");
     }
+  });
+  it("mixed: one script approved, two pending: each entry on its own", async () => {
+    h.overrides = { instr_laser: { approvedAt: new Date() } } as never;
+    expect(text(await call("attraction", {}, { m: "i", t: "2" }))).toContain("Here is how to enjoy your laser tag safely.");
+    expect(redirect(text(await call("attraction", {}, { m: "i", t: "1" })))).toBe("ring?k=4");
+    expect(redirect(text(await call("attraction", {}, { m: "i", t: "3" })))).toBe("ring?k=4");
+    h.overrides = {};
   });
   for (const [t, key] of [["1", "instr_balloons"], ["2", "instr_laser"], ["3", "instr_paddle"]] as const) {
     it(`once approved in Admin, ${t} plays the ${key.replace("instr_", "")} instructions, then star again / 1 another / 2 main menu`, async () => {
@@ -181,7 +190,7 @@ describe("key 4: learn about our rentals (was key 3)", () => {
   });
   it("2 and 3 work when the office is closed too (recorded information, no one needs to answer)", async () => {
     h.open = false;
-    expect(redirect(await press("2"))).toBe("ring?k=4"); // scripts pending (Nov 25, 2026, 12:55): the key 3 line, with its own after-hours voicemail
+    expect(redirect(await press("2"))).toBe("instructions");
     expect(redirect(await press("6"))).toBe("learn");
     h.open = true;
   });
