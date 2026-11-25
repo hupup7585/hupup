@@ -1,12 +1,12 @@
 import type { Settings } from "@/lib/settings";
 import { SETTING_DEFAULTS } from "@/lib/settings";
-import { TIME_ZONE, addDaysISO, dayInfo, localISO, overrideFor, type CalendarSettings } from "@/lib/jewish-calendar";
+import { TIME_ZONE, dayInfo, localISO, overrideFor, type CalendarSettings } from "@/lib/jewish-calendar";
 import { fixedFromISO } from "@/lib/hup-calendar/hebrew-date";
 import { holidaysOn } from "@/lib/hup-calendar/holidays";
 
 /**
  * Office hours (walk-ins and live calls), Abraham 2026-11-06. Eastern time. Uses the Jewish calendar for closed
- * days, Erev Shabbes/Yom Tov early close and Motzei Shabbes. The automated phone system books 24/7 regardless.
+ * days and the Erev Shabbes/Yom Tov early close (closed Motzei Shabbes and Motzei Yom Tov, Nov 25, 2026). The automated phone system books 24/7 regardless.
  */
 
 export type HoursSettings = CalendarSettings &
@@ -46,25 +46,14 @@ function lateWindow(iso: string): "cholHamoed" | "chanukah" | null {
   if (isChanukah(iso) && dow(iso) !== 5 && dow(iso) !== 6) return "chanukah";
   return null;
 }
-function inDST(at: Date) {
-  const name = new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value;
-  return name === "EDT";
-}
-function motzeiCloseMinutes(at: Date, s: HoursSettings): number {
-  const summer = s.hoursMotzeiSeason === "dst" ? inDST(at) : s.hoursMotzeiSeason === "summer";
-  return mins(summer ? s.hoursMotzeiCloseSummer : s.hoursMotzeiCloseWinter) ?? 23 * 60 + 30;
-}
-
 /** Is the office open (walk-ins and live calls) at this moment? */
 export function officeOpenNow(at: Date = new Date(), s: HoursSettings = hoursDefaults()): boolean {
   const iso = localISO(at);
   const now = localMinutes(at);
   const today = dayInfo(iso, s);
 
-  // After midnight on Sunday: the end of a Motzei Shabbes set to close after 12:00 AM (the default summer close is midnight).
-  const yesterday = dayInfo(addDaysISO(iso, -1), s);
-  const close = motzeiCloseMinutes(at, s);
-  if (yesterday.reopensAt && close < 6 * 60 && now < close) return true;
+  // Abraham, Nov 25, 2026, 3:44 PM: closed on Motzei Shabbes and Motzei Yom Tov (no reopening after Shabbes ends,
+  // and no late-night hours past midnight); the office stays closed until the next regular day's opening.
 
   // The Owner's own hours for this day (admin "Holidays & hours") win over the calendar's defaults.
   const own = overrideFor(iso, s);
@@ -73,18 +62,7 @@ export function officeOpenNow(at: Date = new Date(), s: HoursSettings = hoursDef
     if (w) return now >= w[0] && now < w[1];
   }
 
-  if (today.closed) {
-    if (!today.reopensAt || at < today.reopensAt) return false;
-    // Motzei Shabbes / Motzei Yom Tov: opens N minutes after Shabbes ends ("tzeis+120"), at tzeis, or at a set time.
-    const after = s.hoursMotzeiOpen.trim().match(/^tzeis(?:\+(\d+))?$/);
-    if (after) {
-      if (at.getTime() < today.reopensAt.getTime() + Number(after[1] ?? 0) * 60_000) return false;
-    } else {
-      const open = mins(s.hoursMotzeiOpen);
-      if (open !== null && now < open) return false;
-    }
-    return close >= 6 * 60 ? now < close : true; // past-midnight close handled above
-  }
+  if (today.closed) return false; // Shabbes, Yom Tov and the night after them
 
   let window: [number, number] | null;
   const late = lateWindow(iso);
@@ -143,18 +121,14 @@ export function defaultDayText(iso: string, s: HoursSettings = hoursDefaults()):
  * "Mutze Shabbes", the way people say it in this community. `mutze` = true only for the phone.
  */
 export const siteMutze = (_env: Record<string, string | undefined> = process.env) => false;
-const mutzeName = (mutze: boolean) => (mutze ? "Mutze Shabbes" : "Motzei Shabbos");
 
 /** Hours as lines for the website. */
 export function hoursLines(s: HoursSettings = hoursDefaults(), mutze: boolean = siteMutze()): string[] {
-  const after = s.hoursMotzeiOpen.trim().match(/^tzeis(?:\+(\d+))?$/);
-  const n = after ? Number(after[1] ?? 0) : 0;
-  const motzeiOpen = after ? (n ? `from ${n % 60 === 0 ? `${n / 60} hour${n === 60 ? "" : "s"}` : `${n} minutes`} after Shabbes ends` : "when Shabbes ends") : `from ${ampm(s.hoursMotzeiOpen)}`;
+  void mutze;
   return [
     `Monday to Thursday: ${span(s.hoursMonThu)}`,
     `Friday: from ${ampm(s.hoursFridayOpen)} until midday (chatzos)`,
     "Saturday (Shabbes): Closed",
-    `Saturday night (${mutzeName(mutze)}): ${motzeiOpen} until ${ampm(s.hoursMotzeiCloseWinter)} in winter, ${ampm(s.hoursMotzeiCloseSummer)} in summer`,
     `Sunday: ${span(s.hoursSunday)}`,
     `Chol Hamoed: ${span(s.hoursCholHamoed)}`,
     `Chanukah: ${span(s.hoursChanukah)}`,
@@ -164,45 +138,30 @@ export function hoursLines(s: HoursSettings = hoursDefaults(), mutze: boolean = 
 
 /**
  * The website "Our Hours" card (Abraham): built from the same Admin Settings hours the phone line uses, so the two
- * can never differ. Same layout as Abraham's list: "Day: hours", with Motzei Shabbes on two lines.
+ * can never differ. Same layout as Abraham's list: "Day: hours", no Motzei line.
  */
 export function websiteHoursLines(s: HoursSettings = hoursDefaults(), mutze: boolean = siteMutze(), shabbesLine = false): string[] {
   const dash = (r: string) => {
     const [a, b] = r.split("-");
     return `${ampm(a)} - ${ampm(b)}`;
   };
-  const after = s.hoursMotzeiOpen.trim().match(/^tzeis(?:\+(\d+))?$/);
-  const n = after ? Number(after[1] ?? 0) : 0;
-  // Website: "Shabbos" (standard spelling, Abraham, Nov 19, 2026); the hotline reads "Shabbes"
-  const shab = mutze ? "Shabbes" : "Shabbos";
-  const motzeiOpen = after
-    ? n === 0
-      ? `When ${shab} ends`
-      : `${n % 60 === 0 ? `${n / 60} hour${n === 60 ? "" : "s"}` : `${n} minutes`} after ${shab}`
-    : ampm(s.hoursMotzeiOpen);
+  void mutze;
   return [
     `Sunday: ${dash(s.hoursSunday)}`,
     `Monday - Thursday: ${dash(s.hoursMonThu)}`,
     `Friday: ${ampm(s.hoursFridayOpen)} - Chatzos`,
     // Abraham, Nov 19, 2026: "Take off the line, Shabbes closed" on the website (the phone's key 7 still says it)
     ...(shabbesLine ? ["Shabbes: Closed"] : []),
-    `${mutzeName(mutze)}: Winter: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseWinter)}\nSummer: ${motzeiOpen} - ${ampm(s.hoursMotzeiCloseSummer)}`,
+    // Abraham, Nov 25, 2026, 3:44 PM: closed on Motzei Shabbes; no Motzei line on the website or key 7
   ];
 }
 
-/** Today's office hours as one line, e.g. "Today: 10:30 AM to 7:00 PM" or "Closed today (Shabbes). Open tonight from 7:22 PM to 11:00 PM." */
+/** Today's office hours as one line, e.g. "Today: 10:30 AM to 7:00 PM" or "Closed today (Shabbes)." */
 export function todayHours(at: Date = new Date(), s: HoursSettings = hoursDefaults()): string {
   const iso = localISO(at);
   const info = dayInfo(iso, s);
   const t = (d: Date) => d.toLocaleTimeString("en-US", { timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit" });
-  if (info.closed) {
-    if (!info.reopensAt) return `Closed today (${info.reason}).`;
-    const after = s.hoursMotzeiOpen.trim().match(/^tzeis(?:\+(\d+))?$/);
-    const opens = after ? new Date(info.reopensAt.getTime() + Number(after[1] ?? 0) * 60_000) : null;
-    const summer = s.hoursMotzeiSeason === "dst" ? inDST(at) : s.hoursMotzeiSeason === "summer";
-    const close = ampm(summer ? s.hoursMotzeiCloseSummer : s.hoursMotzeiCloseWinter);
-    return `Closed today (${info.reason}). Open tonight${opens ? ` from ${t(opens)}` : ""} until ${close}.`;
-  }
+  if (info.closed) return `Closed today (${info.reason}).`; // no Motzei hours (Abraham, Nov 25, 2026, 3:44 PM)
   if (isCholHamoed(iso)) return `Today (Chol Hamoed): ${span(s.hoursCholHamoed)}`;
   if (dow(iso) === 0) return `Today: ${span(s.hoursSunday)}`;
   if (info.closesAt) return `Today: ${ampm(s.hoursFridayOpen)} to ${t(info.closesAt)} (${dow(iso) === 5 ? "Erev Shabbes" : "Erev Yom Tov"})`;

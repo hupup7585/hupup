@@ -483,7 +483,7 @@ describe("website Hours (Abraham's simple list)", () => {
     const { websiteHoursLines, hoursDefaults } = await import("@/lib/business-hours");
     // The phone reads "Mutze Shabbes"; the website shows "Motzei Shabbos"
     const WEBSITE_HOURS = websiteHoursLines(hoursDefaults(), false);
-    expect(websiteHoursLines(hoursDefaults(), true)[3].startsWith("Mutze Shabbes: Winter:")).toBe(true);
+    expect(websiteHoursLines(hoursDefaults(), true).join(" ")).not.toMatch(/Mutze|Motzei/); // closed Motzei Shabbes (Nov 25, 2026)
     const { siteMutze } = await import("@/lib/business-hours");
     // Website: the standard spelling "Motzei Shabbos" everywhere; the hotline says "Mutze Shabbes" (Abraham, Nov 19, 2026)
     expect(siteMutze({ VERCEL_ENV: "production" })).toBe(false);
@@ -492,21 +492,16 @@ describe("website Hours (Abraham's simple list)", () => {
       "Sunday: 11:30 AM - 7:00 PM",
       "Monday - Thursday: 10:30 AM - 7:00 PM",
       "Friday: 10:30 AM - Chatzos",
-      "Motzei Shabbos: Winter: 2 hours after Shabbos - 11:00 PM\nSummer: 2 hours after Shabbos - 12:00 AM",
     ]);
     // A change in Admin Settings shows on the website too (the two can never differ)
     expect(websiteHoursLines({ ...hoursDefaults(), hoursMonThu: "10:00-20:00", hoursSunday: "12:00-18:30", hoursFridayOpen: "9:30", hoursMotzeiOpen: "tzeis+90", hoursMotzeiCloseWinter: "23:30", hoursMotzeiCloseSummer: "01:00" }, false)).toEqual([
       "Sunday: 12:00 PM - 6:30 PM",
       "Monday - Thursday: 10:00 AM - 8:00 PM",
       "Friday: 9:30 AM - Chatzos",
-      "Motzei Shabbos: Winter: 90 minutes after Shabbos - 11:30 PM\nSummer: 90 minutes after Shabbos - 1:00 AM",
     ]);
     expect(WEBSITE_HOURS_NOTE).toBe("Book by phone 24 hours."); // Abraham, Nov 19, 2026
-    // The card splits each line at the first ": " (day label, then hours), so Motzei Shabbes shows Abraham's two lines
-    const motzei = WEBSITE_HOURS[3];
     expect(WEBSITE_HOURS.join(" ")).not.toContain("Shabbes: Closed"); // taken off (Abraham, Nov 19, 2026)
-    expect(motzei.slice(0, motzei.indexOf(": "))).toBe("Motzei Shabbos");
-    expect(motzei.slice(motzei.indexOf(": ") + 2).split("\n")).toEqual(["Winter: 2 hours after Shabbos - 11:00 PM", "Summer: 2 hours after Shabbos - 12:00 AM"]);
+    expect(WEBSITE_HOURS).toHaveLength(3); // no Motzei Shabbos line: closed then (Abraham, Nov 25, 2026, 3:44 PM)
     const page = readFileSync("src/app/page.tsx", "utf8");
     const hours = page.slice(page.indexOf('id="hours"'), page.indexOf('id="contact"'));
     expect(hours).toContain("websiteHoursLines(settings).map(");

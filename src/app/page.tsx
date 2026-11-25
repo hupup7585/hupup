@@ -66,7 +66,7 @@ export default async function Home() {
         .map((name) => ({ "@type": "Place", name: `${name}, NY` })),
       { "@type": "AdministrativeArea", name: c.serviceArea.region.replace(", NY", ", New York") },
     ],
-    // Regular weekly hours (Friday closes at midday and Motzei Shabbes varies, so they're listed in the Hours section).
+    // Regular weekly hours (Friday closes at midday, so it is listed in the Hours section; closed Shabbes, Yom Tov and the night after them).
     openingHoursSpecification: [
       { "@type": "OpeningHoursSpecification", dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday"], opens: monOpen, closes: monClose },
       { "@type": "OpeningHoursSpecification", dayOfWeek: "Sunday", opens: sunOpen, closes: sunClose },

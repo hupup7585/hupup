@@ -16,7 +16,7 @@ describe("public website hours (Abraham, live bugs #1, #2, #4)", () => {
     const { readFileSync } = await import("node:fs");
     const { websiteHoursLines } = await import("@/lib/business-hours");
     const lines = websiteHoursLines();
-    expect(lines.join("\n")).toContain("Winter: 2 hours after Shabbos - 11:00 PM\nSummer: 2 hours after Shabbos - 12:00 AM");
+    expect(lines.join("\n")).not.toMatch(/Motzei|Winter|Summer/); // closed Motzei Shabbes (Abraham, Nov 25, 2026, 3:44 PM)
     expect(lines.join(" ")).not.toMatch(/Chanuk|Pesach|Sukkos|Purim|Yom Tov|Chol Hamoed|holiday/i);
     const page = readFileSync("src/app/page.tsx", "utf8");
     expect(page).not.toMatch(/calendarOverrides|holidaysOn|hoursWebsiteNote/);
