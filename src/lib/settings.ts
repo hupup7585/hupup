@@ -50,6 +50,10 @@ export const SETTING_DEFAULTS = {
   catalogEmailSubjectText: "",
   catalogEmailBodyText: "",
   musicPayConnect: "",
+  /** Batch 4 (Abraham, Nov 25, 2026): two separate payment-link holds. Links sent from the phone line: 10 minutes.
+   * Links staff send from Admin New booking: 25 minutes. The spoken and texted wording says these times. */
+  phoneLinkHoldMinutes: "10",
+  adminLinkHoldMinutes: "25",
   catalogTextPicture2: "",
   deliveryPromoStart: "",
   deliveryPromoEnd: "",
@@ -292,4 +296,11 @@ export async function saveSetting<K extends keyof Settings>(key: K, value: Setti
 
 export async function deleteSetting(key: string) {
   await db.delete(schema.appSettings).where(eq(schema.appSettings.key, key));
+}
+
+/** How long a payment link holds the rentals (Batch 4, Nov 25, 2026): "phone" (10) or "admin" New booking (25). */
+export async function linkHoldMinutes(kind: "phone" | "admin"): Promise<number> {
+  const s = (await getSettings()) as Record<string, unknown>;
+  const n = Math.floor(Number(s[kind === "phone" ? "phoneLinkHoldMinutes" : "adminLinkHoldMinutes"]));
+  return n >= 1 && n <= 240 ? n : kind === "phone" ? 10 : 25;
 }

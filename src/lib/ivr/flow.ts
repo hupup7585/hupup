@@ -87,6 +87,7 @@ import { startRecording } from "@/lib/call-recording";
 import { categoryProducts, itemFreeOn, nearestFreeDay } from "@/lib/alternatives";
 import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_ACCESS_KEY_GAP, VM_PIN_TRIES, callOutActive, callOutNumber, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinChangedByPhone, validPin } from "@/lib/vm-access";
 import { STT_HOLD_FILE, STT_MAX_WAITS, googleReadback, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
+import { linkHoldMinutes } from "@/lib/settings";
 
 const { categories, products, orders, orderItems } = schema;
 type VR = InstanceType<typeof twilio.twiml.VoiceResponse>;
@@ -1196,7 +1197,7 @@ async function deliverPayLink(ctx: Ctx, orderId: number, via: { phone?: string; 
     delivery: money(totals.deliveryFeeCents),
     tax: money(totals.taxCents),
     total: money(totals.totalCents),
-    minutes: PAYMENT_HOLD_MINUTES,
+    minutes: await linkHoldMinutes("phone"),
     link,
   });
   const customerId = group?.primary.customer?.id ?? null;
@@ -1210,7 +1211,7 @@ async function deliverPayLink(ctx: Ctx, orderId: number, via: { phone?: string; 
   }
   if (sent) {
     const ids = days.map((d) => d.order.id);
-    await db.update(orders).set({ holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES), linkOpenedAt: null, updatedAt: new Date() }).where(and(inArray(orders.id, ids), eq(orders.status, "PENDING_PAYMENT")));
+    await db.update(orders).set({ holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")), linkOpenedAt: null, updatedAt: new Date() }).where(and(inArray(orders.id, ids), eq(orders.status, "PENDING_PAYMENT")));
   }
   await track(ctx.callSid, "step", `Payment link ${sent ? "sent" : "could not be sent"} by ${via.phone ? "text" : "email"} (order #${num})`, { orderId, sent });
   return sent;
@@ -3870,7 +3871,7 @@ const handlers: Record<string, Handler> = {
           unitNotVerified: Boolean(data.unitUnverified), // Nov 25, 2026: staff confirm the unit before delivery
           ...(data.directions ? { notes: sql`COALESCE(${orders.notes}, '') || ${`Delivery directions (from the caller): ${data.directions}. `}` } : {}),
           status: "PENDING_PAYMENT",
-          holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES),
+          holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")),
           deliveryZone: t!.zone,
           deliveryFeeCents: t!.deliveryFeeCents,
           taxPercent: t!.taxPercent,
@@ -4020,7 +4021,7 @@ const handlers: Record<string, Handler> = {
     }
     // The rentals stay held for the whole payment
     const waiting = group.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id);
-    if (waiting.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES), updatedAt: new Date() }).where(inArray(orders.id, waiting));
+    if (waiting.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")), updatedAt: new Date() }).where(inArray(orders.id, waiting));
     // Never record card tones: pause a running call recording first (resumed when the caller comes back)
     if (ctx.session?.data.recording) {
       try {
@@ -4319,7 +4320,7 @@ const handlers: Record<string, Handler> = {
     // The rentals stay held for the whole payment (a fresh hold now; each try in the payment line renews it)
     const group = await getPaymentGroup(o);
     const waiting = group?.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id) ?? [];
-    if (waiting.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES), updatedAt: new Date() }).where(inArray(orders.id, waiting));
+    if (waiting.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")), updatedAt: new Date() }).where(inArray(orders.id, waiting));
     sp(vr, ctx, "pay_start", undefined, { draftOk: true });
     const dial = vr.dial({ action: url("pay-done", { o }), method: "POST", timeLimit: 900, answerOnBridge: true });
     dial.sip({ username: process.env.TWILIO_PAY_SIP_USERNAME, password: process.env.TWILIO_PAY_SIP_PASSWORD }, paySipUri(o, ctx.callSid));

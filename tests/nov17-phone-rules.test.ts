@@ -61,6 +61,6 @@ describe("payment link hold", () => {
     expect(PAYMENT_HOLD_MINUTES).toBe(10);
     expect(IDLE_MINUTES).toBe(4);
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
-    expect(flow).toContain("holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES), linkOpenedAt: null");
+    expect(flow).toContain('holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")), linkOpenedAt: null'); // the phone hold setting (10)
   });
 });

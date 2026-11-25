@@ -25,6 +25,7 @@ const TERMS_VIA = ["phone", "text", "email", "in_person"] as const;
 import { sendOrderText } from "@/lib/notify";
 import { BUSINESS_NAME } from "@/lib/config";
 import { dualDate, messageDate } from "@/lib/dual-date";
+import { linkHoldMinutes } from "@/lib/settings";
 
 export async function availabilityFor(date: string) {
   await requireAdmin();
@@ -134,6 +135,7 @@ export async function createBookingAction(input: {
 
   // Thursday to Sunday: only while the offer is on, and only for a Thursday (pickup Monday)
   const s = await getSettings();
+  const holdMin = await linkHoldMinutes("admin"); // Admin New booking link hold, its own setting (25)
   const thuSun = Boolean(input.thuSun) && Boolean(s.offerThuSunOn) && new Date(`${input.date}T12:00:00Z`).getUTCDay() === 4;
   const r = await createOrderWithItems({
     ...(thuSun ? { pickupDate: addDays(input.date, 4) } : {}),
@@ -141,7 +143,7 @@ export async function createBookingAction(input: {
     eventDate: input.date,
     channel: "POS",
     status,
-    holdExpiresAt: input.payment === "link" || input.payment === "card" ? minutesFromNow(POS_LINK_HOLD_MINUTES) /* New booking link (Abraham, Nov 13, 2026: 25 minutes) */ : null,
+    holdExpiresAt: input.payment === "link" || input.payment === "card" ? minutesFromNow(holdMin) /* New booking link (Abraham, Nov 13, 2026: 25 minutes) */ : null,
     customer: { name: input.name.trim(), phone, email: input.email.trim() || null, address: input.address.trim() || null },
     deliveryTime: input.deliveryTime || null,
     notes: input.notes || null,
@@ -199,7 +201,7 @@ export async function createBookingAction(input: {
       if (link) {
         cardUrl = link;
         cardCents = full!.order.totalCents ?? full!.order.subtotalCents;
-        message += ` Open the secure card page and enter the card. The order shows Paid as soon as Sola approves it (held for ${POS_LINK_HOLD_MINUTES} minutes).`;
+        message += ` Open the secure card page and enter the card. The order shows Paid as soon as Sola approves it (held for ${holdMin} minutes).`;
       } else message += " Card page not available: SOLA_PAYMENTSITE_NAME is missing in Vercel.";
     }
   } else if (input.payment === "link" && phone && !priced) {
@@ -211,13 +213,13 @@ export async function createBookingAction(input: {
       phone,
       email: input.email || null,
       subject: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} payment link`,
-      body: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} for ${messageDate(input.date)}: $${((full!.order.totalCents ?? full!.order.subtotalCents) / 100).toFixed(2)}. Pay securely within ${POS_LINK_HOLD_MINUTES} minutes to confirm: ${link}`,
+      body: `${BUSINESS_NAME} order #${orderNumber(r.orderId)} for ${messageDate(input.date)}: $${((full!.order.totalCents ?? full!.order.subtotalCents) / 100).toFixed(2)}. Pay securely within ${holdMin} minutes to confirm: ${link}`,
       orderId: r.orderId,
       customerId: full?.customer?.id ?? null,
       userId: session.userId ?? null,
       event: "staff_payment_link",
     });
-    message += sent.texted ? ` Payment link texted (held for ${POS_LINK_HOLD_MINUTES} minutes).` : sent.emailed ? ` No text consent: payment link emailed (held for ${POS_LINK_HOLD_MINUTES} minutes).` : ` Payment link not texted: ${sent.message}`;
+    message += sent.texted ? ` Payment link texted (held for ${holdMin} minutes).` : sent.emailed ? ` No text consent: payment link emailed (held for ${holdMin} minutes).` : ` Payment link not texted: ${sent.message}`;
   }
   // A number two directory entries share (Abraham, Nov 22, 2026): alert him right away
   await alertSharedPhoneOrder({ phone: phone ?? null, name: input.name, address: input.address, orderIds: [r.orderId], source: "staff" }).catch((e) => console.error("shared number alert", e));

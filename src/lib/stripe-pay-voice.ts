@@ -9,6 +9,7 @@ import { ensureGroupPriced } from "@/lib/order-pricing";
 import { loadPromptOverrides, promptText, type PromptKey, type PromptOverrides } from "@/lib/ivr/prompts";
 import { stripePhonePayMode, payConnector, payLast4, verifyPaySip } from "@/lib/phone-pay";
 import { paymentReceivedNotices, recordPaymentResult } from "@/lib/payment-result";
+import { linkHoldMinutes } from "@/lib/settings";
 
 /**
  * The payment subaccount's side of the call (Abraham, Nov 12, 2026): Twilio <Pay> with the Stripe Pay Connector.
@@ -45,7 +46,7 @@ async function payTwiml(vr: VR, orderId: number, sid: string, tries: number, pro
   const waiting = group.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id);
   await ensureGroupPriced(waiting);
   // The rentals stay held for the whole payment: every try starts a fresh hold (Abraham, Nov 12, 2026)
-  await db.update(schema.orders).set({ holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES), updatedAt: new Date() }).where(inArray(schema.orders.id, waiting));
+  await db.update(schema.orders).set({ holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")), updatedAt: new Date() }).where(inArray(schema.orders.id, waiting));
   const due = (await getPaymentGroup(orderId))!.due;
   if (due <= 0) {
     vr.hangup();

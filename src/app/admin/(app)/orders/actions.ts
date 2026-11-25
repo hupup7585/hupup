@@ -14,6 +14,7 @@ import { sendOrderText } from "@/lib/notify";
 import { parseMoneyToCents } from "@/lib/money";
 import { BUSINESS_NAME } from "@/lib/config";
 import { dualDate, messageDate } from "@/lib/dual-date";
+import { linkHoldMinutes } from "@/lib/settings";
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -63,7 +64,7 @@ export async function sendPayLinkAction(orderId: number): Promise<ActionResult> 
   if (due <= 0) return { ok: false, message: "Nothing left to pay" };
   const link = payPageLink(orderId); // review-and-pay page: Terms box, then Sola
   if (full.order.status === "PENDING_PAYMENT") {
-    await setOrderStatus(orderId, "PENDING_PAYMENT", { holdExpiresAt: minutesFromNow(PAYMENT_HOLD_MINUTES) });
+    await setOrderStatus(orderId, "PENDING_PAYMENT", { holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")) /* as before: 10 (see note to Abraham) */ });
   }
   const r = await sendOrderText({
     phone,
