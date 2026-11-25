@@ -120,7 +120,8 @@ export function url(action: string, params: Record<string, string | number | und
 export const spokenSpelling = (text: string) => text.replace(/Chanukah/g, "Hanukkah").replace(/Chol Hamoed/g, "Hola moed");
 
 function say(target: VR | Gather, text: string) {
-  target.say(voice(), spokenSpelling(text.trim())); // an empty first part (box 155 with no description) leaves no leading space
+  const t = text.replace(/[ \t]{2,}/g, " ").trim(); // an empty part (box 155 with no description, an add-on with no count) leaves no gap
+  if (t) target.say(voice(), spokenSpelling(t));
 }
 
 /** Speak a catalog prompt: uploaded recording if there is one, otherwise the (editable) text. */
@@ -528,6 +529,8 @@ export const directoryLookupOn = (env: Record<string, string | undefined> = proc
 
 /** Box 25's live parts: "{Qnt} {item}" (singular for 1) and the date, or both dates after box 18 key 2. */
 function addedVars(a: { name: string; qty: number; date: string; date2?: string }) {
+  // An add-on named with its own count ("500 ocean balls") is said as named, with no count in front (Batch 3 item 4)
+  if (/^\d/.test(a.name.trim())) return { qty: "", item: a.name, date: a.date2 ? `${spokenDate(a.date)} and ${spokenDate(a.date2)}` : spokenDate(a.date) };
   return { qty: a.qty, item: a.qty === 1 ? a.name : pluralName(a.name), date: a.date2 ? `${spokenDate(a.date)} and ${spokenDate(a.date2)}` : spokenDate(a.date) };
 }
 
@@ -1998,6 +2001,7 @@ const handlers: Record<string, Handler> = {
       const prod = await getProduct(l.p);
       if (prod && (await isBounceHouse(prod.categoryId)) && !ctx.session?.data.oceanOffered) {
         await updateSession(ctx.callSid, { data: { oceanOffered: true } }, ctx.session); // once per call (Nov 24, 2026)
+        sp(vr, ctx, "box25_added", addedVars({ name: l.name, qty: l.qty, date: l.d })); // Batch 3 item 4: the same order
         return back(vr, "ocean", { d: l.d, n: "resume" });
       }
       return back(vr, "resume-added", { d: l.d });
@@ -2018,8 +2022,10 @@ const handlers: Record<string, Handler> = {
    */
   "resume-added"(ctx, vr) {
     const d = ctx.query.get("d") ?? undefined;
-    const g = keypad(vr, url("resume-added-choice", { d }));
-    spAdded(g, ctx); // box 25 (Nov 22, 2026): every item, welcome back too
+    const n = ctx.query.get("n") ?? undefined;
+    const g = keypad(vr, url("resume-added-choice", { d, n }));
+    if (n) sp(g, ctx, "box25_keep"); // the added line already played (Batch 3 item 4)
+    else spAdded(g, ctx); // box 25 (Nov 22, 2026): every item, welcome back too
     sp(g, ctx, "cart_key");
     backLine(g, ctx);
     return back(vr, "resume-items");
@@ -2033,7 +2039,7 @@ const handlers: Record<string, Handler> = {
     if (k === "2") return back(vr, "date", { a: 1 }); // another day (a: back to box 25 on star, the categories after the date)
     if (k) {
       sp(vr, ctx, "not_valid");
-      return back(vr, "resume-added", { d: ctx.query.get("d") ?? undefined });
+      return back(vr, "resume-added", { d: ctx.query.get("d") ?? undefined, n: ctx.query.get("n") ?? undefined });
     }
     return back(vr, "resume-items");
   },
@@ -2405,6 +2411,7 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     const d = ctx.body.Digits;
     if (d === "*" || d === "3") return back(vr, "date", { p }); // star: one step back; 3: a different date
+    if (d === "2" && ctx.query.get("t") === "0") return back(vr, "date", { p }); // no second-day offer: 2 = a different date (Batch 3 item 26a)
     if (d === "1") {
       await clearSpan(ctx, date); // key 1: this date only, never stretched by an earlier key 2
       await chooseDay(ctx, date);
@@ -2612,11 +2619,15 @@ const handlers: Record<string, Handler> = {
     // Ocean balls only after the FIRST jumping balloon of the call (Abraham, Nov 24, 2026)
     if ((await isBounceHouse(p.categoryId)) && !ctx.session?.data.oceanOffered) {
       await updateSession(ctx.callSid, { data: { oceanOffered: true } }, ctx.session);
+      sp(vr, ctx, "box25_added", addedVars(lastAdded)); // Batch 3 item 4: the added line first, then the offer
       return back(vr, "ocean", { d: date });
     }
     // The extra gun packs after a maze (Abraham, Nov 24, 2026, revised: never after plain 6 or 4 guns), while a pack is
     // left for that date; the approved wording plays in the live voice until its recording is uploaded
-    if (await isMaze(p)) return back(vr, "packs", { d: date });
+    if (await isMaze(p)) {
+      sp(vr, ctx, "box25_added", addedVars(lastAdded)); // Batch 3 item 4: the added line first, then the offer
+      return back(vr, "packs", { d: date });
+    }
     // Box 25 for laser tag and paddle boats (Nov 22, 2026): the added line, then a second one while another is free
     if (await secondOneKind(p.categoryId)) return back(vr, "added-second", { p: p.id, d: date });
     return back(vr, "added-menu");
@@ -2670,13 +2681,13 @@ const handlers: Record<string, Handler> = {
    * to your shopping cart, press 0. To keep shopping, for same day, press 1. For another day, press 2."
    */
   "added-menu"(ctx, vr) {
-    const g = keypad(vr, url("after-add"));
+    const g = keypad(vr, url("after-add", { n: ctx.query.get("n") ?? undefined }));
     // Box 25 (Abraham, Nov 22, 2026): every item; n = the added line already played with the second-one offer
     if (ctx.query.get("n")) sp(g, ctx, "box25_keep");
     else spAdded(g, ctx);
     sp(g, ctx, "cart_key");
     backLine(g, ctx);
-    return noInput(vr, ctx, "cart");
+    return noInput(vr, ctx, "added-menu", { n: ctx.query.get("n") ?? undefined }); // no key: box 25 again (Batch 3 item 10)
   },
 
   async "after-add"(ctx, vr) {
@@ -2689,7 +2700,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "not_valid");
       return back(vr, "added-menu");
     }
-    return noInput(vr, ctx, "cart");
+    return noInput(vr, ctx, "added-menu", { n: ctx.query.get("n") ?? undefined }); // Batch 3 item 10
   },
 
   /** Extra laser gun packs after a maze or guns (Abraham, Nov 17, 2026): 1 = 6-pack $75, 2 = 4-pack $50, # skips. */
@@ -2697,7 +2708,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.query.get("d")!;
     const offer = (await packOffer(ctx, d)).slice(0, 2);
     const left = offer.filter((x) => x.free);
-    if (!left.length) return back(vr, "added-menu"); // no pack left for that date: no offer
+    if (!left.length) return back(vr, "added-menu", { n: 1 }); // no pack left for that date: no offer (the added line already played)
     const g = keypad(vr, url("packs-choice", { d }), { timeout: 4 });
     if (left.length === offer.length) {
       if (promptWaiting(ctx.prompts, "laser_packs")) say(g, promptText(ctx.prompts, "laser_packs"));
@@ -2710,15 +2721,15 @@ const handlers: Record<string, Handler> = {
     halfPause(g);
     sp(g, ctx, "skip_pound"); // the shared skip line (Nov 19, 2026)
     backLine(g, ctx);
-    return back(vr, "added-menu"); // no key for 4 seconds: nothing added (Nov 22, 2026)
+    return back(vr, "added-menu", { n: 1 }); // no key for 4 seconds: nothing added (Nov 22, 2026)
   },
 
   async "packs-choice"(ctx, vr) {
     const date = ctx.query.get("d")!;
     const k = ctx.body.Digits ?? "";
-    if (k === "#") return back(vr, "added-menu");
+    if (k === "#") return back(vr, "added-menu", { n: 1 });
     if (k === "0") return back(vr, "cart");
-    if (k === "*") return back(vr, "added-menu");
+    if (k === "*") return back(vr, "added-menu", { n: 1 });
     const offer = (await packOffer(ctx, date)).slice(0, 2);
     const pick = offer.find((x) => x.key === k && x.free); // only a pack that is still there
     if (!pick) {
@@ -2730,11 +2741,13 @@ const handlers: Record<string, Handler> = {
     if (r.ok) {
       await track(ctx.callSid, "item_added", `Added ${pick.name} for ${spokenDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
       const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), r.orderId])];
-      await updateSession(ctx.callSid, { data: { dayOrderIds: ids } }, ctx.session);
+      const lastAdded = { name: pick.name, qty: 1, date };
+      await updateSession(ctx.callSid, { data: { dayOrderIds: ids, lastAdded } }, ctx.session);
+      sp(vr, ctx, "box25_added", addedVars(lastAdded)); // Batch 3 item 4: the added line, then the offer again
       return back(vr, "packs", { d: date }); // the offer again after every pack (Abraham, Nov 24, 2026)
     }
     sp(vr, ctx, r.reason === "unavailable" ? "just_booked" : "went_wrong", { item: pick.name });
-    return back(vr, "added-menu");
+    return back(vr, "added-menu", { n: 1 });
   },
 
   /** Ocean balls after every jumping balloon (Abraham, Nov 17, 2026): 1 = 200 for $10, 2 = 500 for $15, 3 = 700 for $20, # skips. */
@@ -2747,13 +2760,13 @@ const handlers: Record<string, Handler> = {
     sp(g, ctx, "stay_on_line"); // Nov 22, 2026, 11:12 PM: doing nothing skips them (pound still skips too)
     backLine(g, ctx);
     // an add-on offer with no key for 4 seconds: nothing added, straight on (Nov 22, 2026)
-    return n === "resume" ? back(vr, "resume-added", { d }) : n === "cart" ? back(vr, "cart") : back(vr, "added-menu");
+    return n === "resume" ? back(vr, "resume-added", { d, n: 1 }) : n === "cart" ? back(vr, "cart") : back(vr, "added-menu", { n: 1 });
   },
 
   async "ocean-choice"(ctx, vr) {
     const date = ctx.query.get("d")!;
     const n = ctx.query.get("n") ?? undefined;
-    const next = () => (n === "resume" ? back(vr, "resume-added", { d: date }) : n === "cart" ? back(vr, "cart") : back(vr, "added-menu"));
+    const next = () => (n === "resume" ? back(vr, "resume-added", { d: date, n: 1 }) : n === "cart" ? back(vr, "cart") : back(vr, "added-menu", { n: 1 }));
     const k = ctx.body.Digits ?? "";
     if (k === "#" || k === "*") return next(); // star: one step back, the item-added line
     if (k === "0") return back(vr, "cart");
@@ -2769,7 +2782,9 @@ const handlers: Record<string, Handler> = {
     if (r.ok) {
       await track(ctx.callSid, "item_added", `Added ${pick.name} for ${spokenDate(date)}`, { item: pick.name, productId: pick.id, qty: 1, date, orderId: r.orderId });
       const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), r.orderId])];
-      await updateSession(ctx.callSid, { data: { dayOrderIds: ids } }, ctx.session);
+      const lastAdded = { name: pick.name, qty: 1, date };
+      await updateSession(ctx.callSid, { data: { dayOrderIds: ids, lastAdded } }, ctx.session);
+      sp(vr, ctx, "box25_added", addedVars(lastAdded)); // Batch 3 item 4: the added line for the add-on
     } else sp(vr, ctx, "went_wrong");
     return next(); // row 11 follows (Nov 19, 2026)
   },
@@ -2809,7 +2824,7 @@ const handlers: Record<string, Handler> = {
       if (addrStepsActive(ctx) && directoryLookupOn()) return back(vr, "addr-lookup");
       return back(vr, "ask", { f: "name" });
     }
-    if (d === "2") return c ? back(vr, "category", { c }) : back(vr, "book"); // keep shopping
+    if (d === "2") return c ? back(vr, "category", { c }) : back(vr, "cats"); // keep shopping: the categories menu (Batch 3 item 9, Nov 25, 2026)
     if (d === "3") return back(vr, "remove"); // remove an item (box 29b)
     if (d === "5" && cartBallsOn(ctx)) {
       const day = await cartBallsDay(ctx);
@@ -4410,7 +4425,9 @@ const handlers: Record<string, Handler> = {
 
   async goodbye(ctx, vr) {
     const id = ctx.session?.data.placedOrderId;
-    const full = id ? await getOrderWithItems(id) : null;
+    // Batch 3 item 2 (Abraham, Nov 25, 2026): the order goodbye lines only once the order is paid
+    const group = id ? await getPaymentGroup(id) : null;
+    const full = group && group.due <= 0 ? await getOrderWithItems(id!) : null;
     const several = full?.order.paymentGroupId ? (await db.select({ id: orders.id }).from(orders).where(eq(orders.paymentGroupId, full.order.paymentGroupId))).length > 1 : false;
     if (full && several) sp(vr, ctx, "goodbye_order_days");
     else if (full) sp(vr, ctx, "goodbye_order", { date: spokenDate(full.order.eventDate), pickup: spokenDate(full.order.pickupDate) });
@@ -4523,8 +4540,16 @@ const handlers: Record<string, Handler> = {
    * up or presses # to finish. Extension keys use their own box (x = the key); key 0, 9 and the rest use Main.
    */
   async voicemail(ctx, vr) {
-    const x = ctx.query.get("x");
-    const box = await vmBox(x);
+    let x = ctx.query.get("x");
+    let box = await vmBox(x);
+    if (!box.enabled && x) {
+      // Batch 3 item 26b (Nov 25, 2026): a switched-off extension box uses the Main box, with its greeting
+      const main = await mainBox();
+      if (main.enabled) {
+        box = main;
+        x = null;
+      }
+    }
     if (!box.enabled) {
       sp(vr, ctx, "operator_unavailable");
       return back(vr, "menu");

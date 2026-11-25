@@ -166,7 +166,8 @@ describe("phone: laser guns add-on only after a maze (Abraham, Nov 24, 2026 revi
     expect(redirect(r)).toBe(`packs?d=${day}`); // the offer again after every pack (Nov 24, 2026)
     const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, h.session.orderId!));
     expect(items.find((i) => i.productId === ids.pack6)?.unitPriceCents).toBe(7500);
-    expect(redirect(await call("packs-choice", { Digits: "#" }, `d=${day}`))).toBe("added-menu");
+    expect(said(r)[0]).toMatch(/^Successfully added to your cart: .+ for /); // Batch 3 item 4: the added line for the pack, then the offer
+    expect(redirect(await call("packs-choice", { Digits: "#" }, `d=${day}`))).toBe("added-menu?n=1");
   });
   it("the add-on price holds only while the maze is in the cart: without the maze the six-pack is the regular 6 guns price", async () => {
     const r1 = await reserveItem({ orderId: null, productId: maze6, qty: 1, eventDate: "2027-01-11", channel: "POS", status: "CONFIRMED" });

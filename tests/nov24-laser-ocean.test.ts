@@ -79,9 +79,9 @@ describe("2 (revised). additional packs only with a maze; the offer repeats afte
     expect(redirect(await call("packs-choice", { Digits: "1" }, `d=${day2}`))).toBe(`packs?d=${day2}`); // maze + 2 additional 6-packs
     const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, h.session.orderId!));
     expect(items.filter((i) => i.productId === ids.pack6).reduce((t, i) => t + i.qty, 0)).toBe(2);
-    expect(redirect(await call("packs-choice", { Digits: "#" }, `d=${day2}`))).toBe("added-menu");
-    expect(redirect(await call("packs-choice", { Digits: "*" }, `d=${day2}`))).toBe("added-menu");
-    expect(await call("packs", {}, `d=${day2}`)).toMatch(/<Redirect method="POST">[^<]*added-menu<\/Redirect>/); // no key for 4 seconds
+    expect(redirect(await call("packs-choice", { Digits: "#" }, `d=${day2}`))).toBe("added-menu?n=1"); // Batch 3 item 4: the added line already played
+    expect(redirect(await call("packs-choice", { Digits: "*" }, `d=${day2}`))).toBe("added-menu?n=1");
+    expect(await call("packs", {}, `d=${day2}`)).toMatch(/<Redirect method="POST">[^<]*added-menu\?n=1<\/Redirect>/); // no key for 4 seconds (Batch 3 item 4: no second added line)
   });
   it("only a pack still in stock is offered; none left: no offer", async () => {
     const day = "2027-03-08";

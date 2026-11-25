@@ -111,9 +111,9 @@ describe("unfinished phone order", () => {
     await db.insert(schema.orderItems).values({ orderId: hold.id, productId: castle, qty: 1, unitPriceCents: 20000 });
     h.session.data = { resumeAsked: 1, resumeLines: [{ p: castle, name: "Castle", qty: 1, d: "2027-01-05", holdId: hold.id, state: "free" }, { p: laser, name: "Laser tag set", qty: 1, d: "2027-01-05", holdId: null, state: "taken" }] };
     const r = await call("resume-items");
-    expect(said(r)).toEqual([]);
+    expect(said(r)).toEqual(["Successfully added to your cart: 1 Castle for Tuesday, January fifth."]); // Batch 3 item 4: the added line, then the offer
     expect(redirect(r)).toBe("ocean?d=2027-01-05&n=resume");
-    expect(redirect(await call("ocean-choice", { Digits: "#" }, "d=2027-01-05&n=resume"))).toBe("resume-added?d=2027-01-05");
+    expect(redirect(await call("ocean-choice", { Digits: "#" }, "d=2027-01-05&n=resume"))).toBe("resume-added?d=2027-01-05&n=1");
   });
   it("press 2 starts a new order", async () => {
     h.session.data = { resumeAsked: undefined };

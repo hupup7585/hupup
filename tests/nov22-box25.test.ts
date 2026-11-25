@@ -115,7 +115,7 @@ describe("box 18 (Abraham, Nov 22, 2026)", () => {
     const fri = "2027-01-08";
     const lines = said(await call("date-ask", {}, `p=${boat}&d=${fri}`));
     expect(lines.join(" ")).not.toContain("To add it also for");
-    expect(redirect(await call("box18-choice", { Digits: "2" }, `p=${boat}&d=${fri}&t=0`))).toBe(`date-ask?p=${boat}&d=${fri}`);
+    expect(redirect(await call("box18-choice", { Digits: "2" }, `p=${boat}&d=${fri}&t=0`))).toBe(`date?p=${boat}`); // Batch 3 item 26a: 2 acts like 3
   });
 });
 

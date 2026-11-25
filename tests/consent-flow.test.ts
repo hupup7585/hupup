@@ -98,7 +98,7 @@ vi.mock("@/lib/orders", async (orig) => ({
   // The payment link reads the reservation as priced at checkout (KJ: $10 delivery + 8.125% tax)
   getPaymentGroup: async () => {
     const o = { order: { id: 7, status: "PENDING_PAYMENT", eventDate: "2026-11-15", pickupDate: "2026-11-16", subtotalCents: 25000, deliveryFeeCents: 1000, taxCents: 2113, totalCents: 28113, paidCents: 0 }, items: [{ qty: 1, name: "Castle Bouncer" }], customer: { id: 42 } };
-    return { primary: o, orders: [o], due: 28113 };
+    return { primary: o, orders: [o], due: (globalThis as { __due?: number }).__due ?? 28113 };
   },
 }));
 
@@ -332,10 +332,22 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
     expect(xml).not.toContain("seasonal offers");
     expect(xml).toContain("/api/voice/goodbye");
   });
-  it("goodbye reads the delivery and pickup dates and hangs up", async () => {
+  it("goodbye reads the delivery and pickup dates and hangs up (paid order)", async () => {
+    h.session.data.placedOrderId = 7;
+    (globalThis as { __due?: number }).__due = 0;
+    try {
+      const xml = await call("goodbye");
+      expect(xml).toContain("Thanks so much for choosing Hup Up Attractions");
+      expect(xml).toContain("<Hangup/>");
+    } finally {
+      delete (globalThis as { __due?: number }).__due;
+    }
+  });
+  it("Batch 3 item 2: an unpaid order (payment link not paid yet) gets no order goodbye, just the hang-up", async () => {
     h.session.data.placedOrderId = 7;
     const xml = await call("goodbye");
-    expect(xml).toContain("Thanks so much for choosing Hup Up Attractions");
+    expect(xml).not.toContain("<Say");
+    expect(xml).not.toContain("<Play");
     expect(xml).toContain("<Hangup/>");
   });
 });
