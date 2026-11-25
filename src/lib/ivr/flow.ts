@@ -369,6 +369,39 @@ async function applyDirectoryMatch(ctx: Ctx, a: { house: string; street: string;
   }
 }
 
+/**
+ * Box 56 (Abraham, Nov 24, 2026, 21:02): "Your order number is {number}." "Your total is {total}." "That includes
+ * {amount} {type}, ... {delivery} for delivery, and {tax} sales tax." One amount and type clip per rental kind (its own
+ * subtotal; plural clip for more than one), no quantity. Every recorded piece plays; until the pieces and type clips
+ * are recorded, the line is said whole in the live voice.
+ */
+async function box56(vr: VR, ctx: Ctx, orderId: number, days: { order: { id: number }; items: { productId: number; qty: number; unitPriceCents: number; name: string }[] }[], subtotals: number[], totals: { deliveryFeeCents: number; taxCents: number; totalCents: number }) {
+  const { box56Groups, typeClip, typeSlotKey } = await import("@/lib/box56");
+  const ids = [...new Set(days.flatMap((d) => d.items.map((i) => i.productId)))];
+  const cats = ids.length ? await db.select({ id: products.id, cat: categories.name }).from(products).innerJoin(categories, eq(categories.id, products.categoryId)).where(inArray(products.id, ids)) : [];
+  const catOf = new Map(cats.map((c) => [c.id, c.cat]));
+  const groups = box56Groups(days.map((d, i) => ({ subtotalCents: subtotals[i] ?? 0, lines: d.items.map((it) => ({ categoryName: catOf.get(it.productId) ?? "", productName: it.name, qty: it.qty, cents: it.qty * it.unitPriceCents })) })));
+  sp(vr, ctx, "checkout_order_number", { number: spokenDigits(orderNumber(orderId)) });
+  sp(vr, ctx, "checkout_total", { total: spokenMoney(totals.totalCents) });
+  const piece = (n: number) => clipUrls(ctx.prompts, [`checkout_includes#${n}`]);
+  const parts = groups.map((g) => ({ amount: spokenMoney(g.cents), clip: typeClip(g), urls: clipUrls(ctx.prompts, [typeSlotKey(g.kind, g.count > 1)]) }));
+  const whole = `${promptText(ctx.prompts, "checkout_includes", { amount: "\u0000", type: "\u0001", delivery: spokenMoney(totals.deliveryFeeCents), tax: spokenMoney(totals.taxCents) })}`.replace("\u0000 \u0001", parts.map((p) => `${p.amount} ${p.clip}`).join(", "));
+  await track(ctx.callSid, "step", `Box 56: ${whole}`);
+  if (![1, 2, 3].some((n) => piece(n)) && !parts.some((p) => p.urls)) return say(vr, whole);
+  // Piece by piece: "That includes", each amount + type clip, the delivery amount, "for delivery, and", the tax, "sales tax."
+  const play = (urls: string[] | null, text: string) => (urls ? urls.forEach((u) => vr.play(u)) : say(vr, text));
+  const texts = promptText(ctx.prompts, "checkout_includes").split(/\{[a-z0-9_]+\}/i).map((t) => t.trim()).filter((t) => /[a-z]/i.test(t));
+  play(piece(1), texts[0] ?? "");
+  for (const p of parts) {
+    playText(vr, ctx, p.amount, "box 56 amount");
+    play(p.urls, p.clip);
+  }
+  playText(vr, ctx, spokenMoney(totals.deliveryFeeCents), "box 56 delivery");
+  play(piece(2), texts[1] ?? "");
+  playText(vr, ctx, spokenMoney(totals.taxCents), "box 56 tax");
+  play(piece(3), texts[2] ?? "");
+}
+
 /** A +1 number read in three groups, the same way as the phone read-back ("eight four five, ..."). */
 function spokenPhone(e164: string) {
   const d = e164.replace(/\D/g, "").slice(-10);
@@ -3700,9 +3733,9 @@ const handlers: Record<string, Handler> = {
     const sum = (k: "subtotalCents" | "deliveryFeeCents" | "taxCents" | "totalCents") => perDay.reduce((n, x) => n + x.t![k], 0);
     const totals = { subtotalCents: sum("subtotalCents"), deliveryFeeCents: sum("deliveryFeeCents"), taxCents: sum("taxCents"), totalCents: sum("totalCents") };
 
-    // Abraham, Nov 18, 2026: nothing before payment may sound finished. Only the total here; "You are all set" and the
-    // order number come after Sola approves the payment (box 148). Payment-link callers get the number by text.
-    sp(vr, ctx, "checkout_total", { total: spokenMoney(totals.totalCents), items: spokenMoney(totals.subtotalCents), delivery: spokenMoney(totals.deliveryFeeCents), tax: spokenMoney(totals.taxCents) });
+    // Box 56 (Abraham, Nov 24, 2026, 21:02): the order number (one digit at a time), the total, and the breakdown by
+    // rental type; no name. The hold line comes right before the secure payment line (below).
+    await box56(vr, ctx, primary.id, days, perDay.map((x) => x.t!.subtotalCents), totals);
     // Box 156 (Abraham, Nov 19, 2026): the customer is always told when the Owner's discount was used
     const disc = customerDiscountLine(perDay.map(({ o, t }) => ({ note: o.order.offerNote, discountCents: o.order.offerDiscountCents ?? 0, zone: t!.zone, feeCents: t!.deliveryFeeCents, subtotalCents: t!.subtotalCents })), settings);
     if (disc) sp(vr, ctx, "box156", { amount: spokenMoney(disc.beforeCents), discount: disc.spoken, newtotal: spokenMoney(totals.totalCents) });
@@ -3715,8 +3748,10 @@ const handlers: Record<string, Handler> = {
     if (payCfg.phoneCardProvider === "stripe") {
       if (keypadPayFor(caller, stripePhonePayMode(process.env, payCfg), process.env, payCfg.paymentTestNumbers) && PAY_PROMPTS.every((k) => stripePhonePayMode(process.env, payCfg) !== "live" || !promptWaiting(ctx.prompts, k)))
         return back(vr, "pay-keypad", { o: primary.id });
-    } else if (phonePayOffered(caller, payCfg) && !(await isPhonePayBlocked(callerPhoneOf(ctx))) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k))))
+    } else if (phonePayOffered(caller, payCfg) && !(await isPhonePayBlocked(callerPhoneOf(ctx))) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k)))) {
+      sp(vr, ctx, "phonepay_intro", undefined, { draftOk: true }); // box 56's last line: "Thank you. Please hold ..."
       return back(vr, "phonepay-go", { o: primary.id, n: 1 });
+    }
     // Card on the phone not offered to this caller: the payment link, by text or email (box 141)
     return back(vr, "paylink", { o: primary.id });
   },

@@ -1,6 +1,7 @@
 import { PIECE_ALIAS, PROMPTS, SHARED_PIECES, promptRecordable, type PromptDef, type PromptKey } from "@/lib/ivr/prompts";
 import { LETTERS, TOWN_PHRASES, WORDS, numberWords, pluralName, townSlotKey } from "@/lib/spoken-words";
 import { STREETS, UNIT_CODES, ZIP_CODES, streetSlotKey, unitSlotKey } from "@/lib/streets";
+import { TYPE_CLIPS, typeSlotKey, type RentalKind } from "@/lib/box56";
 export { LETTERS, WORDS, numberWords, ordinalWords, wordSlotsFor } from "@/lib/spoken-words";
 
 /**
@@ -66,6 +67,11 @@ export function allSlots(items: { id: number; name: string }[] = [], texts: Reco
   for (const z of ZIP_CODES) {
     const spoken = z.split("").map((d) => numberWords(Number(d))[0]).join(" ");
     out.push({ key: `zip:${z}`, kind: "word", group: "Address words", label: `Zip - ${spoken}`, text: spoken });
+  }
+  // Box 56 rental types (Abraham, Nov 24, 2026): eight clips, each with "for the"
+  for (const [kind, t] of Object.entries(TYPE_CLIPS)) {
+    out.push({ key: typeSlotKey(kind as RentalKind, false), kind: "word", group: "Box 56 rental types", label: `Box 56 type (one): ${t.one}`, text: t.one });
+    out.push({ key: typeSlotKey(kind as RentalKind, true), kind: "word", group: "Box 56 rental types", label: `Box 56 type (two or more): ${t.more}`, text: t.more });
   }
   for (const st of STREETS) out.push({ key: streetSlotKey(st.spoken), kind: "word", group: "Streets", label: `Street - ${st.spoken}`, text: st.spoken });
   for (const u of UNIT_CODES) {

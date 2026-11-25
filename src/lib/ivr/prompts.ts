@@ -426,7 +426,10 @@ export const PROMPTS = {
   box18_other_date: { group: "Date & quantity", label: "Box 18: To choose a different date, press 3", text: "To choose a different date, press 3." },
   address_outside_area: { group: "Checkout", label: "Address outside the delivery area", text: "Sorry, we only deliver in Kiryas Joel and nearby Orange County towns. Please say a delivery address in our area." },
   address_not_found: { group: "Checkout", label: "Address not found on the map", text: "Sorry, we could not find that address. Please say the full address again: the house number, the street, and the town.", pending: true },
-  checkout_total: { group: "Checkout", label: "Order total read-back", text: "Your total is {total}. That is {items} for the rentals, {delivery} for delivery, and {tax} sales tax.", vars: ["total", "items", "delivery", "tax"] },
+  // Box 56 (Abraham, Nov 24, 2026, 21:02, approved): order number, total, the breakdown by rental type, then the hold line
+  checkout_order_number: { group: "Checkout", label: "Box 56: Your order number is {number} (one digit at a time)", text: "Your order number is {number}.", vars: ["number"] },
+  checkout_total: { group: "Checkout", label: "Box 56: Your total is {total}", text: "Your total is {total}.", vars: ["total"] },
+  checkout_includes: { group: "Checkout", label: "Box 56: That includes {amount} {type} (once per rental type), {delivery} for delivery, and {tax} sales tax", text: "That includes {amount} {type}, {delivery} for delivery, and {tax} sales tax.", vars: ["amount", "type", "delivery", "tax"] },
   terms_notice: {
     group: "Checkout",
     label: "Terms notice (press #)",

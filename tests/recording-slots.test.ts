@@ -43,11 +43,11 @@ describe("recording slots", () => {
     expect(await isConfirmed("greeting")).toBe(false);
   });
   it("a line with changing parts is put together only when the Owner switch is on and every part is recorded", async () => {
-    const vars = { total: "15 dollars", items: "10 dollars", delivery: "5 dollars", tax: "0 dollars" };
+    const vars = { total: "15 dollars" }; // Box 56 (Nov 25, 2026): "Your total is {total}."
     expect(composeClips(await loadPromptOverrides(), "checkout_total", vars)).toBeNull(); // switch off
     await db.insert(schema.appSettings).values({ key: "achirdWholeLine", value: true });
     expect(composeClips(await loadPromptOverrides(), "checkout_total", vars)).toBeNull(); // nothing recorded yet
-    const keys = ["checkout_total#1", "checkout_total#2", "checkout_total#3", "checkout_total#4", "checkout_total#5", "word:fifteen", "word:ten", "word:five", "word:zero", "word:dollars"];
+    const keys = ["checkout_total#1", "word:fifteen", "word:dollars"];
     let id = 1000;
     for (const k of keys) {
       const [r] = await db.insert(schema.promptRecordings).values({ promptKey: k, source: "upload", fileName: "x.mp3", contentType: "audio/mpeg", sizeBytes: 1, complete: true }).returning();
@@ -55,8 +55,8 @@ describe("recording slots", () => {
       id++;
     }
     const clips = composeClips(await loadPromptOverrides(), "checkout_total", vars);
-    expect(clips).toHaveLength(5 + 2 + 2 + 2 + 2);
-    expect(id).toBe(1010);
+    expect(clips).toHaveLength(1 + 2);
+    expect(id).toBe(1003);
   });
   it("Nov 23, 2026: every recorded piece plays; only a piece with no recording is said by the live voice", async () => {
     const add = async (k: string) => {
