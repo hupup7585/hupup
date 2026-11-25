@@ -44,6 +44,11 @@ export function publicEmail(env: Record<string, string | undefined> = process.en
 export const config = {
   baseUrl: () => (process.env.PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, ""),
   /**
+   * The address in every customer link (Abraham, Nov 25, 2026): https://hupupattractions.com on the live site, never a
+   * vercel.app address. Twilio's callbacks keep using baseUrl. PUBLIC_SITE_URL overrides it.
+   */
+  siteUrl: () => (process.env.PUBLIC_SITE_URL || (process.env.VERCEL_ENV === "production" ? "https://hupupattractions.com" : process.env.PUBLIC_BASE_URL || "http://localhost:3000")).replace(/\/$/, ""),
+  /**
    * PUBLIC number shown on the website (display + tel: links only). Abram forwards it to the
    * Twilio hotline. The IVR, transfers and SMS sending use TWILIO_PHONE_NUMBER, never this.
    */

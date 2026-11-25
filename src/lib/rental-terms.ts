@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
+import { config } from "@/lib/config";
 import { TERMS_EFFECTIVE_DATE, TERMS_TEXT, TERMS_VERSION } from "@/lib/terms-content";
 
 /**
@@ -124,5 +125,5 @@ export function termsActive(env: Record<string, string | undefined> = process.en
 
 /** Customer-facing payment link: our review-and-pay page (Terms box) which then continues to Sola. */
 export function payPageLink(orderId: number): string {
-  return `${(process.env.PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "")}/pay/${orderId}?t=${payToken(orderId)}`;
+  return `${config.siteUrl()}/pay/${orderId}?t=${payToken(orderId)}`;
 }

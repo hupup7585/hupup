@@ -158,7 +158,7 @@ export async function needsConsentFooter(phone: string): Promise<boolean> {
 /** "Msg frequency varies. Msg and data rates may apply. Reply STOP to opt out, HELP for help. Terms: {link}" (Admin-editable). */
 export async function consentFooter(): Promise<string> {
   const { messageText } = await import("@/lib/ivr/prompts");
-  return messageText("msg_first_text_footer", { link: `${config.baseUrl()}/sms-terms` });
+  return messageText("msg_first_text_footer", { link: `${config.siteUrl()}/sms-terms` });
 }
 
 export function withOrderStopLine(body: string, needed: boolean): string {
@@ -280,7 +280,8 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   if (containsCardNumber(input.body)) {
     return { sent: false, blocked: "card_number", error: "Message looks like it contains a card number and was not sent." };
   }
-  // Never a test payment link from the live site (Hark's audit item 4, Nov 24, 2026): /paid?...&dev=1 skipped the card step
+  input = { ...input, body: withSiteLinks(input.body), ...(input.mediaUrls?.length ? { mediaUrls: input.mediaUrls.map((u) => withSiteLinks(u)) } : {}) };
+  // Never a test payment link (Hark's audit item 4, Nov 24, 2026): /paid?...&dev=1 skipped the card step
   if (containsTestPayLink(input.body)) {
     return { sent: false, blocked: "not_allowed", error: "Message contains a test payment link and was not sent." };
   }
@@ -437,9 +438,19 @@ async function cancelPending(phone: string, kinds: string[]): Promise<number> {
   return canceled;
 }
 
-/** A test payment link (/paid?...dev=1) in a message on Vercel (preview or live): never sent. */
-export function containsTestPayLink(body: string, env: Record<string, string | undefined> = process.env): boolean {
-  return Boolean(env.VERCEL) && /\/paid\?[^\s]*\bdev=1\b/.test(body);
+/** A test link (dev=1) in a message: never sent, anywhere (Abraham, Nov 25, 2026: one reached a customer). */
+export function containsTestPayLink(body: string, _env: Record<string, string | undefined> = process.env): boolean {
+  return /[?&]dev=1\b/.test(body);
+}
+
+/**
+ * Every customer link uses the real site address (Abraham, Nov 25, 2026): on the live site a vercel.app address in a
+ * text is replaced by https://hupupattractions.com (the same pages answer there).
+ */
+export function withSiteLinks(body: string, env: Record<string, string | undefined> = process.env): string {
+  if (env.VERCEL_ENV !== "production") return body;
+  const site = (env.PUBLIC_SITE_URL || "https://hupupattractions.com").replace(/\/$/, "");
+  return body.replace(/https?:\/\/[a-z0-9-]+\.vercel\.app/gi, site);
 }
 
 export const NO_TEXT_CONSENT = "No text consent; call or email.";
