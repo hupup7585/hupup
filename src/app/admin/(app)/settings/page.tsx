@@ -1,3 +1,4 @@
+import NameSpeedForm from "./NameSpeedForm";
 import LinkHoldForm from "./LinkHoldForm";
 import MailingAddressForm from "./MailingAddressForm";
 import { formatPhone } from "@/lib/phone";
@@ -50,6 +51,10 @@ export default async function SettingsPage() {
       <section className="card mb-6 p-5" id="email-signature">
         <h2 className="mb-3 text-lg font-extrabold">Email signature</h2>
         <EmailSignatureForm initial={settings.emailSignature} fallback={EMAIL_SIGNATURE_DEFAULT} />
+      </section>
+      <section className="card mb-6 p-5" id="name-speed">
+        <h2 className="mb-3 text-lg font-extrabold">Speed for spoken names</h2>
+        <NameSpeedForm rate={String(settings.nameSpeakingRate)} />
       </section>
       <section className="card mb-6 p-5" id="link-holds">
         <h2 className="mb-3 text-lg font-extrabold">How long a payment link holds the rentals</h2>

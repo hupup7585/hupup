@@ -52,6 +52,8 @@ export const SETTING_DEFAULTS = {
   musicPayConnect: "",
   /** Batch 4 (Abraham, Nov 25, 2026): two separate payment-link holds. Links sent from the phone line: 10 minutes.
    * Links staff send from Admin New booking: 25 minutes. The spoken and texted wording says these times. */
+  /** Abraham, Nov 25, 2026, 12:36: household names spoken live 10 percent faster (Google speaking rate). */
+  nameSpeakingRate: "1.1",
   phoneLinkHoldMinutes: "10",
   adminLinkHoldMinutes: "25",
   catalogTextPicture2: "",

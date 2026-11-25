@@ -108,3 +108,21 @@ export function verifyUnsubscribe(email: string | null, sig: string | null): boo
   const got = Buffer.from(sig);
   return want.length === got.length && timingSafeEqual(want, got);
 }
+
+/**
+ * Household names (Abraham, Nov 25, 2026, 12:36): spoken by Google at the Owner's name speed (default 1.1). The rate is
+ * part of what is signed, so no one can ask our server for other words or another speed.
+ */
+const signName = (text: string, rate: string) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`name-voice:${rate}:${text}`).digest("hex").slice(0, 32);
+export function nameVoiceLink(text: string, rate: number): string {
+  const r = rate.toFixed(2);
+  return `${config.baseUrl()}/api/voice-audio/name?t=${Buffer.from(text).toString("base64url")}&r=${r}&sig=${signName(text, r)}`;
+}
+export function verifyNameVoiceLink(t: string | null, r: string | null, sig: string | null): { text: string; rate: number } | null {
+  if (!t || !r || !sig) return null;
+  const text = Buffer.from(t, "base64url").toString("utf8");
+  const want = Buffer.from(signName(text, r));
+  const got = Buffer.from(sig);
+  const rate = Number(r);
+  return want.length === got.length && timingSafeEqual(want, got) && rate >= 0.5 && rate <= 2 ? { text, rate } : null;
+}

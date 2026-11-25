@@ -22,7 +22,8 @@ vi.mock("@/lib/delivery-areas", async (orig) => ({ ...(await orig<typeof import(
 import { handleVoice } from "@/lib/ivr/flow";
 
 const call = (action: string, body: Record<string, string> = {}, q = "") => handleVoice({ action, query: new URLSearchParams(q), body: { CallSid: "CAdir", ...body }, callSid: "CAdir", from: h.from });
-const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1].replace(/&apos;/g, "'"));
+// A name is said at the names speed inside <prosody> (Nov 25, 2026, 12:36): read its words too
+const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>(?:<prosody[^>]*>)?([^<]+)(?:<\/prosody>)?<\/Say>/g)].map((m) => m[1].replace(/&apos;/g, "'"));
 const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/Redirect>/)?.[1].replace(/^.*\/api\/voice\//, "").replace(/&amp;/g, "&");
 const STAR = "To go back, press star.";
 
@@ -79,9 +80,12 @@ describe("phone-number address lookup (approved screens, preview)", () => {
     expect(said(bad)).toEqual(["The phone number you entered is not valid. Please try again."]);
     expect(redirect(bad)).toBe("addr-phone");
     expect(said(await call("addr-phone-heard", { Digits: "8455550402" }))).toEqual(["Please hold a moment while we look up the address."]);
-    const lines = said(await call("addr-found"));
+    const found = await call("addr-found");
+    const lines = said(found);
     expect(lines[0]).toBe("Here is what we found for this phone number.");
-    expect(lines.slice(1, 9)).toEqual(["For Example, Moshe,", "twenty nine", "Dallas Drive", "unit", "zero zero one", "Monroe New York", "one zero nine five zero", "press 1."]);
+    // Nov 25, 2026, 12:36: "For" in the normal voice, then the name alone at the names speed (1.1 = 110%)
+    expect(found).toContain('<prosody rate="110%">Example, Moshe,</prosody>');
+    expect(lines.slice(1, 10)).toEqual(["For", "Example, Moshe,", "twenty nine", "Dallas Drive", "unit", "zero zero one", "Monroe New York", "one zero nine five zero", "press 1."]);
     expect(lines).toContain("Blooming Grove");
     expect(lines.slice(-2)).toEqual(["To try a different phone number, press 3. To enter the address manually, press 4.", STAR]); // slot B, one take
     expect(redirect(await call("addr-found-choice", { Digits: "2" }, "m=many&n=2"))).toBe("addr-check?dir=1");

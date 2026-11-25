@@ -71,7 +71,7 @@ const PHONEPAY_PROMPTS = ["pay_hold_secure", "phonepay_paid", "phonepay_retry", 
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
 import { pluralName } from "@/lib/spoken-words";
 import { lastPhoneDate, normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
-import { liveVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
+import { liveVoiceLink, nameVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
 import { FIRST_TIME_ONLY, menuOrder, type MenuId } from "./menu-order";
 import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
 import { CATALOG_ENDINGS, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
@@ -124,6 +124,20 @@ export const spokenSpelling = (text: string) => text.replace(/Chanukah/g, "Hanuk
 function say(target: VR | Gather, text: string) {
   const t = text.replace(/[ \t]{2,}/g, " ").trim(); // an empty part (box 155 with no description, an add-on with no count) leaves no gap
   if (t) target.say(voice(), spokenSpelling(t));
+}
+
+/**
+ * A household name said live (Abraham, Nov 25, 2026, 12:36): at the Owner's "Speed for spoken names" (default 1.1, 10
+ * percent faster). Only names use this speed. Google makes it in the hotline voice (Puck) through our signed link;
+ * without the Google key, the live voice says it with the same speed as SSML.
+ */
+async function sayName(target: VR | Gather, text: string) {
+  const t = text.trim();
+  if (!t) return;
+  const raw = Number((await getSettings()).nameSpeakingRate);
+  const rate = raw >= 0.5 && raw <= 2 ? raw : 1.1;
+  if (process.env.GOOGLE_TTS_API_KEY) return void target.play(nameVoiceLink(t, rate));
+  target.say(voice(), "").prosody({ rate: `${Math.round(rate * 100)}%` }, spokenSpelling(t));
 }
 
 /** Speak a catalog prompt: uploaded recording if there is one, otherwise the (editable) text. */
@@ -3252,18 +3266,23 @@ const handlers: Record<string, Handler> = {
       sp(g, ctx, "lookup_manual", { key: 2 });
     } else if (m === "one") {
       sp(g, ctx, "lookup_one");
-      say(g, `${name(list[0])}.`);
+      await sayName(g, `${name(list[0])}.`); // the name at the names speed (Nov 25, 2026, 12:36)
       read(list[0]);
       sp(g, ctx, "addr_rb_correct");
       sp(g, ctx, "lookup_try", { key: 2 });
       sp(g, ctx, "lookup_manual", { key: 3 });
     } else {
       sp(g, ctx, "lookup_many");
-      list.forEach((e, i) => {
-        sp(g, ctx, "lookup_for", { name: name(e) }); // "For" from its recording, the name said live
+      for (const [i, e] of list.entries()) {
+        // "For" from its recording (or the live voice), then the name at the names speed (Nov 25, 2026, 12:36)
+        const [before] = promptText(ctx.prompts, "lookup_for", { name: "\u0000" }).split("\u0000");
+        const forUrls = clipUrls(ctx.prompts, ["lookup_for#1"]);
+        if (forUrls) forUrls.forEach((u) => g.play(u));
+        else if (before.trim()) say(g, before);
+        await sayName(g, `${name(e)},`);
         read(e);
         sp(g, ctx, "lookup_press", { key: i + 1 });
-      });
+      }
       // Two families: slot B, one take (Nov 23, 2026); more families: the two lines with their own keys
       if (list.length === 2) sp(g, ctx, "lookup_many_options");
       else {

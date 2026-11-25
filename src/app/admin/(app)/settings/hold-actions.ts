@@ -22,3 +22,19 @@ export async function saveLinkHoldsAction(_prev: { ok?: boolean; message?: strin
     return { ok: false, message: "Not saved. Please try again." };
   }
 }
+
+/** Owner: "Speed for spoken names" (Abraham, Nov 25, 2026, 12:36). 1.0 = normal, 1.1 = 10 percent faster. Audited. */
+export async function saveNameSpeedAction(_prev: { ok?: boolean; message?: string } | null, form: FormData): Promise<{ ok?: boolean; message?: string }> {
+  const owner = await requireOwner();
+  const rate = Number(String(form.get("rate") ?? "").replace(",", "."));
+  if (!(rate >= 0.5 && rate <= 2)) return { ok: false, message: "Not saved. Use a number from 0.5 to 2 (1.1 is 10 percent faster)." };
+  try {
+    const before = (await getSettings()).nameSpeakingRate;
+    await saveSetting("nameSpeakingRate", String(Math.round(rate * 100) / 100), owner.userId);
+    await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.name_speed_updated", entityType: "settings", entityId: "name_speaking_rate", before: { rate: before }, after: { rate } });
+    revalidatePath("/admin/settings");
+    return { ok: true, message: "Saved" };
+  } catch {
+    return { ok: false, message: "Not saved. Please try again." };
+  }
+}
