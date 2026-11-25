@@ -115,8 +115,11 @@ export async function quoteBooking(input: { items: { productId: number; qty: num
   const byId = new Map(prods.map((p) => [p.id, p]));
   const { laserAddonPrices } = await import("@/lib/orders");
   const known = items.filter((i) => byId.has(i.productId));
-  const laser = await laserAddonPrices(db, known.map((i) => ({ key: i.productId, name: byId.get(i.productId)!.name, cat: byId.get(i.productId)!.cat, priceCents: byId.get(i.productId)!.priceCents })));
-  const lines = known.map((i, n) => ({ id: n + 1, productId: i.productId, qty: i.qty, unitPriceCents: laser.get(i.productId) ?? byId.get(i.productId)!.priceCents, category: byId.get(i.productId)!.cat }));
+  // Laser sets are one line each on the saved order (every third set half price), so they are priced one by one here too
+  const isLaser = (id: number) => /laser/i.test(byId.get(id)!.cat);
+  const units = known.flatMap((i) => (isLaser(i.productId) ? Array.from({ length: i.qty }, () => ({ productId: i.productId, qty: 1 })) : [i]));
+  const laser = await laserAddonPrices(db, units.map((i, n) => ({ key: n + 1, name: byId.get(i.productId)!.name, cat: byId.get(i.productId)!.cat, priceCents: byId.get(i.productId)!.priceCents })));
+  const lines = units.map((i, n) => ({ id: n + 1, productId: i.productId, qty: i.qty, unitPriceCents: laser.get(n + 1) ?? byId.get(i.productId)!.priceCents, category: byId.get(i.productId)!.cat }));
   const itemsCents = lines.reduce((t, l) => t + l.qty * l.unitPriceCents, 0);
   const { addDays, todayISO } = await import("@/lib/dates");
   const { pickupDateFor } = await import("@/lib/availability");

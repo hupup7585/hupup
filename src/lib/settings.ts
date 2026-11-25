@@ -24,8 +24,12 @@ export const SETTING_DEFAULTS = {
    * Eastern time; a blank date is open-ended): Kiryas Joel free, the nearby towns $10. The $20 zone keeps its price.
    */
   deliveryPromoOn: false,
+  /**
+   * Laser tag: every third set half price (Abraham, Nov 25, 2026, 4:03 PM; replaces the old laser offer
+   * switch). ON: every 3rd full set (maze + guns) and every 3rd extra gun set is half price, counted apart.
+   */
+  laserThirdSetHalfOn: true,
   /** Offers (Abraham, Nov 17, 2026), Owner on/off, all off until he switches them on. They never combine. */
-  offerLaserThirdPackOn: false,
   offerThuSunOn: false,
   offerFourthSundayOn: false,
   /**

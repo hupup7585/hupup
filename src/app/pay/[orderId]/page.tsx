@@ -1,4 +1,3 @@
-import { offerLineLabel } from "@/lib/offers";
 import { paymentsClosedLine } from "@/lib/payments-closed";
 import { notFound, redirect } from "next/navigation";
 import { PAYMENT_UNAVAILABLE, onlinePaymentReady, paymentLink } from "@/lib/sola";
@@ -97,13 +96,6 @@ export default async function PayPage({ params, searchParams }: { params: Promis
                   <span>{money(i.qty * i.unitPriceCents)}</span>
                 </li>
               ))}
-              {/* Abraham, Nov 24, 2026: "Third laser pack half price: -$X" */}
-              {day.order.offerDiscountCents > 0 && offerLineLabel(day.order.offerNote) && (
-                <li className="flex justify-between font-semibold" data-pay-offer>
-                  <span>{offerLineLabel(day.order.offerNote)}:</span>
-                  <span>-{money(day.order.offerDiscountCents)}</span>
-                </li>
-              )}
               {/* The Owner's customer discount is always shown to the customer (Abraham, Nov 19, 2026) */}
               {day.order.offerDiscountCents > 0 && /^Customer discount: /.test(day.order.offerNote ?? "") && (
                 <li className="flex justify-between font-semibold" data-pay-discount>

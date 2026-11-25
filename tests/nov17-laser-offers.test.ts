@@ -76,26 +76,22 @@ describe("one maze", () => {
   });
 });
 
-describe("laser tag third pack 50% off (Owner switch)", () => {
-  it("off: full price; on: maze with 6 guns $200 + 6-pack $75 + 6-pack $37.50", async () => {
+describe("laser tag: every third set half price (Owner switch, on; Nov 25, 2026, 4:03 PM)", () => {
+  it("maze with 6 guns $200 + 6-pack $75 + 6-pack $75; the 3rd extra set (a 4-pack) is $25", async () => {
     const r = await reserveItem({ orderId: null, productId: maze6, qty: 1, eventDate: "2026-12-14", channel: "POS", status: "CONFIRMED" });
     if (!r.ok) throw new Error("no order");
     await reserveItem({ orderId: r.orderId, productId: ids.pack6, qty: 2, eventDate: "2026-12-14", channel: "POS", status: "CONFIRMED" });
     let [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId));
     expect(o.subtotalCents).toBe(35000);
-    await saveSetting("offerLaserThirdPackOn", true);
-    await refreshOrderTotals(r.orderId);
-    [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId));
-    expect(o.subtotalCents).toBe(31250);
-    expect(o.offerNote).toBe(OFFER_NOTES.laser);
-    // a 4th pack does not get 50% off (only the 3rd)
+    expect(o.offerNote).toBeNull();
     await reserveItem({ orderId: r.orderId, productId: ids.pack4, qty: 1, eventDate: "2026-12-14", channel: "POS", status: "CONFIRMED" });
     [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId));
-    expect(o.subtotalCents).toBe(31250 + 5000);
-    await saveSetting("offerLaserThirdPackOn", false);
+    expect(o.subtotalCents).toBe(35000 + 2500);
+    await refreshOrderTotals(r.orderId);
+    [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId));
+    expect(o.subtotalCents).toBe(35000 + 2500); // halved once, never again
   });
   it("guns only count too: three 6 guns (no maze), the 3rd half off; additional packs need a maze (Nov 24, 2026)", async () => {
-    await saveSetting("offerLaserThirdPackOn", true);
     const r = await reserveItem({ orderId: null, productId: guns6, qty: 1, eventDate: "2026-12-21", channel: "POS", status: "CONFIRMED" });
     if (!r.ok) throw new Error("no order");
     expect(await reserveItem({ orderId: r.orderId, productId: ids.pack6, qty: 1, eventDate: "2026-12-21", channel: "POS", status: "CONFIRMED" })).toMatchObject({ ok: false, reason: "needs_maze" });
@@ -103,7 +99,6 @@ describe("laser tag third pack 50% off (Owner switch)", () => {
     await reserveItem({ orderId: r.orderId, productId: guns6, qty: 1, eventDate: "2026-12-21", channel: "POS", status: "CONFIRMED" });
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId));
     expect(o.subtotalCents).toBe(11000 + 11000 + 5500);
-    await saveSetting("offerLaserThirdPackOn", false);
   });
 });
 

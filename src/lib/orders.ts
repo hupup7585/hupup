@@ -133,6 +133,9 @@ async function reserveInTx(
       .update(orderItems)
       .set({ qty: existing.qty + opts.qty })
       .where(eq(orderItems.id, existing.id));
+  } else if (ownLine) {
+    // one line per laser set, so every third set can be priced on its own (Nov 25, 2026, 4:03 PM)
+    for (let n = 0; n < opts.qty; n++) await tx.insert(orderItems).values({ orderId, productId: p.id, qty: 1, unitPriceCents: p.price_cents });
   } else {
     await tx.insert(orderItems).values({ orderId, productId: p.id, qty: opts.qty, unitPriceCents: p.price_cents });
   }
@@ -146,17 +149,30 @@ async function reserveInTx(
  * (the "6 Laser Guns" / "4 Laser Guns" item); with a maze again, the add-on price comes back. Nothing else changes.
  */
 export const LASER_ADDONS_GROUP = "Laser tag add-ons";
+/** "Laser tag: every third set half price" (Admin > Offers; on unless the Owner turns it off). */
+export async function laserThirdSetHalfOn(tx: { execute: typeof db.execute }): Promise<boolean> {
+  const r = await tx.execute(sql`SELECT value FROM app_settings WHERE key = 'laserThirdSetHalfOn'`);
+  const v = (r.rows[0] as { value: unknown } | undefined)?.value;
+  return !(v === false || v === "false");
+}
+
 /**
- * The laser tag add-on packs' price: the add-on price with a maze on the booking, else the regular price of the same
- * size pack (Nov 24, 2026: shared by saved orders and the booking screen's live total).
+ * Laser tag line prices, in the order the lines were added (Nov 24, 2026: shared by saved orders, the booking screen's
+ * live total and the phone's spoken price). Extra gun sets: the add-on price with a maze on the booking, else the
+ * regular price of the same size set. "Laser tag: every third set half price" (Abraham, Nov 25, 2026, 4:03 PM): when
+ * on, every 3rd full set (a maze with its guns) is half price, and every 3rd extra gun set is half price (with a maze:
+ * the add-on sets; without a maze: the guns-only sets and add-on sets); the two are counted apart and each line is
+ * halved at most once, from its catalog price. Off: no third-set discount. Prices before tax.
  */
-export async function laserAddonPrices(tx: { execute: typeof db.execute }, rows: { key: number; name: string; cat: string; priceCents: number }[]): Promise<Map<number, number>> {
+export async function laserAddonPrices(tx: { execute: typeof db.execute }, rows: { key: number; name: string; cat: string; priceCents: number }[], halfOn?: boolean): Promise<Map<number, number>> {
   const out = new Map<number, number>();
+  const base = (x: { cat: string }) => x.cat !== LASER_ADDONS_GROUP && /laser/i.test(x.cat);
   const addons = rows.filter((x) => x.cat === LASER_ADDONS_GROUP);
-  const hasMaze = rows.some((x) => x.cat !== LASER_ADDONS_GROUP && /laser/i.test(x.cat) && /maze/i.test(x.name));
+  const fullSets = rows.filter((x) => base(x) && /maze/i.test(x.name));
+  const hasMaze = fullSets.length > 0;
   // Guns-only sets (6 or 4 laser guns, no maze) count as gun sets on a booking with no maze (Abraham, Nov 25, 2026, 15:06)
-  const plainSets = hasMaze ? [] : rows.filter((x) => x.cat !== LASER_ADDONS_GROUP && /laser/i.test(x.cat) && !/maze/i.test(x.name) && /\d+\s+laser guns/i.test(x.name));
-  if (!addons.length && !plainSets.length) return out;
+  const plainSets = hasMaze ? [] : rows.filter((x) => base(x) && !/maze/i.test(x.name) && /\d+\s+laser guns/i.test(x.name));
+  if (!addons.length && !plainSets.length && !fullSets.length) return out;
   for (const a of addons) {
     let target = a.priceCents;
     if (!hasMaze) {
@@ -173,12 +189,14 @@ export async function laserAddonPrices(tx: { execute: typeof db.execute }, rows:
     out.set(a.key, target);
   }
   for (const pl of plainSets) out.set(pl.key, pl.priceCents);
-  // Every 3rd gun set on a booking is half price, in the order added (Abraham, Nov 25, 2026, 14:41 and 15:06): with a
-  // maze, the extra sets; without a maze, every gun set (guns-only sets and extra sets)
-  const inOrder = [...addons, ...plainSets].sort((x, y) => x.key - y.key);
-  inOrder.forEach((a, i) => {
-    if (i % 3 === 2) out.set(a.key, Math.round((out.get(a.key) ?? a.priceCents) / 2));
-  });
+  for (const f of fullSets) out.set(f.key, f.priceCents);
+  if (!(halfOn ?? (await laserThirdSetHalfOn(tx)))) return out;
+  const everyThird = (list: typeof rows) =>
+    [...list].sort((x, y) => x.key - y.key).forEach((a, i) => {
+      if (i % 3 === 2) out.set(a.key, Math.round((out.get(a.key) ?? a.priceCents) / 2));
+    });
+  everyThird([...addons, ...plainSets]); // extra gun sets
+  everyThird(fullSets); // full sets, counted apart
   return out;
 }
 

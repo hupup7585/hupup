@@ -11,11 +11,11 @@ export async function saveOffersAction(fd: FormData) {
   const owner = await requireOwner();
   const s = await getSettings();
   const after = {
-    offerLaserThirdPackOn: fd.get("offerLaserThirdPackOn") === "on",
+    laserThirdSetHalfOn: fd.get("laserThirdSetHalfOn") === "on",
     offerThuSunOn: fd.get("offerThuSunOn") === "on",
     offerFourthSundayOn: fd.get("offerFourthSundayOn") === "on",
   };
-  const before = { offerLaserThirdPackOn: s.offerLaserThirdPackOn, offerThuSunOn: s.offerThuSunOn, offerFourthSundayOn: s.offerFourthSundayOn };
+  const before = { laserThirdSetHalfOn: s.laserThirdSetHalfOn, offerThuSunOn: s.offerThuSunOn, offerFourthSundayOn: s.offerFourthSundayOn };
   for (const [k, v] of Object.entries(after)) await saveSetting(k as keyof typeof after, v, owner.userId);
   await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.offers_updated", entityType: "settings", entityId: "offers", before, after });
   revalidatePath("/admin", "layout");

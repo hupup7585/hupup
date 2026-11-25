@@ -2700,7 +2700,7 @@ const handlers: Record<string, Handler> = {
     // Guns-only sets, no maze (Abraham, Nov 25, 2026, 15:06): the same lines as the extra sets after a maze
     if (kind === "laser" && /\d+\s+laser guns/i.test(p.name) && !/maze/i.test(p.name)) {
       const day = await dayOrder(ctx, date);
-      const { orderHasMaze } = await import("@/lib/orders");
+      const { orderHasMaze, laserThirdSetHalfOn } = await import("@/lib/orders");
       if (day && !(await orderHasMaze(db, day.order.id))) {
         const packIds = new Set((await addOnProducts(LASER_ADDONS_CATEGORY)).map((x) => x.id));
         const gunSet = async (productId: number) => {
@@ -2711,6 +2711,8 @@ const handlers: Record<string, Handler> = {
         let sets = 0;
         for (const i of day.items) if (await gunSet(i.productId)) sets += i.qty;
         if (sets >= 3) return back(vr, "added-menu"); // after the third set: no more offers
+        // "Laser tag: every third set half price" off (Abraham, Nov 25, 2026, 4:03 PM): no third-set line
+        if (sets >= 2 && !(await laserThirdSetHalfOn(db))) return back(vr, "added-menu");
         const g = keypad(vr, url("second-choice", { p: p.id, d: date }), { timeout: 5 });
         const a = ctx.session?.data.lastAdded;
         if (a) sp(g, ctx, "box25_added", addedVars(a));
@@ -2796,8 +2798,10 @@ const handlers: Record<string, Handler> = {
     const sets = setLines.reduce((t, i) => t + i.qty, 0);
     if (sets >= 3) return back(vr, "added-menu", { n: 1 });
     if (sets >= 1) {
-      const { orderHasMaze } = await import("@/lib/orders");
+      const { orderHasMaze, laserThirdSetHalfOn } = await import("@/lib/orders");
       if (!(await orderHasMaze(db, day!.order.id))) return back(vr, "added-menu", { n: 1 }); // extra sets need the maze
+      // "Laser tag: every third set half price" off (Abraham, Nov 25, 2026, 4:03 PM): no third-set line
+      if (sets >= 2 && !(await laserThirdSetHalfOn(db))) return back(vr, "added-menu", { n: 1 });
       const kind = offer.find((x) => x.id === setLines.at(-1)!.productId);
       if (!kind?.free) return back(vr, "added-menu", { n: 1 });
       const g = keypad(vr, url("packs-choice", { d, k: kind.key }), { timeout: 5 });

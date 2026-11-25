@@ -57,19 +57,17 @@ describe("customer discounts", () => {
     const b = await order([[maze, 1, 20000]], "2026-12-21");
     expect(b.subtotalCents).toBe(18000);
   });
-  it("never combined with an offer: the bigger saving applies", async () => {
-    await saveSetting("offerLaserThirdPackOn", true);
-    // maze + 2 packs: the third pack (50% of $75 = $37.50) beats 10% of $350 ($35)
-    const a = await order([[maze, 1, 20000], [pack, 2, 7500]]);
-    expect(a.offerNote).toBe(OFFER_NOTES.laser);
-    expect(a.subtotalCents).toBe(35000 - 3750);
-    // a $50 discount beats the third pack
+  it("the laser third-set price is in the item prices, not an offer (Nov 25, 2026, 4:03 PM): the customer discount still applies", async () => {
+    // maze + 2 extra packs: no third extra set yet, $350; 10% customer discount ($35)
+    const a = await order([[maze, 1, 20000], [pack, 1, 7500], [pack, 1, 7500]]);
+    expect(a.offerNote).toBe("Customer discount: 10% off");
+    expect(a.subtotalCents).toBe(35000 - 3500);
     await db.update(schema.customerDiscounts).set({ active: false });
     await db.insert(schema.customerDiscounts).values({ phone: PHONE, kind: "amount", amountCents: 5000 });
-    const b = await order([[maze, 1, 20000], [pack, 2, 7500]]);
+    const b = await order([[maze, 1, 20000], [pack, 1, 7500], [pack, 1, 7500]]);
     expect(b.offerNote).toBe("Customer discount: $50.00 off");
     expect(b.subtotalCents).toBe(30000);
-    await saveSetting("offerLaserThirdPackOn", false);
+    expect(OFFER_NOTES).not.toHaveProperty("laser");
   });
   it("turned off or past its end date: no discount", async () => {
     await db.update(schema.customerDiscounts).set({ active: false });

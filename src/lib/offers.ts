@@ -1,4 +1,3 @@
-import { laserPoolsFor } from "@/lib/availability";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { addDays } from "@/lib/dates";
@@ -7,19 +6,18 @@ import { addDays } from "@/lib/dates";
  * Offers (Abraham, Nov 17, 2026). Each is an Owner on/off switch, off until he turns it on; they never combine (the
  * one that saves the customer the most applies). They cover jumping balloons, laser tag and paddle boats.
  *
- *  - Laser tag, third pack 50% off: count every gun pack on the booking, the guns that come with a maze included
- *    (maze with 6 guns $200, another 6-pack $75, a third 6-pack $37.50). Only the 3rd pack, never every 3rd.
+ *  (Laser tag's every third set half price is its own switch, in the item prices: laserAddonPrices in orders.ts.)
  *  - Thursday to Sunday: one booking, delivered Thursday and picked up Monday, priced at 1.5 times the rental.
  *  - 4th Sunday free: 3 Sundays in a row booked, the 4th Sunday's rental is free (the cheapest item when the Sundays
  *    had different items). A Thursday to Sunday booking does not count as one of the Sundays. Delivery still has a
  *    minimum: $20 in Kiryas Joel, $30 in the nearby towns, $40 anywhere else in Orange County.
  */
-export type OfferSettings = { offerLaserThirdPackOn?: boolean | string; offerThuSunOn?: boolean | string; offerFourthSundayOn?: boolean | string };
+export type OfferSettings = { offerThuSunOn?: boolean | string; offerFourthSundayOn?: boolean | string };
 const on = (v: unknown) => v === true || v === "true";
 
 /** The three switches, read inside the same database transaction as the booking (all off when never set). */
 export async function offerSwitches(exec: Exec): Promise<OfferSettings> {
-  const r = await exec.execute(sql`SELECT key, value FROM app_settings WHERE key IN ('offerLaserThirdPackOn', 'offerThuSunOn', 'offerFourthSundayOn', 'holidayNoPromos', 'holidayPerDayChanukah', 'holidayPerDayCholHamoed', 'holidayFridayMutzeDays')`);
+  const r = await exec.execute(sql`SELECT key, value FROM app_settings WHERE key IN ('offerThuSunOn', 'offerFourthSundayOn', 'holidayNoPromos', 'holidayPerDayChanukah', 'holidayPerDayCholHamoed', 'holidayFridayMutzeDays')`);
   const out: Record<string, unknown> = {};
   for (const x of r.rows as { key: string; value: unknown }[]) out[x.key] = x.value;
   return out as OfferSettings;
@@ -27,15 +25,8 @@ export async function offerSwitches(exec: Exec): Promise<OfferSettings> {
 
 /** Delivery on a free 4th Sunday (Abraham, Nov 17, 2026). */
 export const FOURTH_SUNDAY_DELIVERY_CENTS = { local: 2000, area: 3000, outside: 4000 } as const;
-export const OFFER_NOTES = { laser: "Laser tag: third pack 50% off", thuSun: "Thursday to Sunday: 1.5 times the rental", fourthSunday: "4th Sunday free", friMutze: "Friday and Mutze Shabbes: one and a half days" } as const;
+export const OFFER_NOTES = { thuSun: "Thursday to Sunday: 1.5 times the rental", fourthSunday: "4th Sunday free", friMutze: "Friday and Mutze Shabbes: one and a half days" } as const;
 
-/** How an offer shows on the pay page, the order page and the booking screen (Abraham, Nov 24, 2026). Null = no line. */
-export function offerLineLabel(note: string | null | undefined): string | null {
-  if (note === OFFER_NOTES.laser) return "Third laser pack half price";
-  return null;
-}
-
-const LASER = /laser/i;
 const RENTAL = /balloon|bounce|jump|inflatable|laser|paddle|boat/i;
 const ADDONS = /^laser tag add-ons$/i;
 
@@ -51,22 +42,6 @@ async function lines(exec: Exec, orderId: number): Promise<Line[]> {
 
 /** Rental items the offers cover (not ocean balls or other extras; the laser tag add-on packs count as laser tag). */
 const isRental = (l: Line) => (RENTAL.test(l.category) || ADDONS.test(l.category)) && !/ocean/i.test(l.category);
-
-/** Laser tag third pack: half the price of the 3rd pack, counting packs in the order they were added. */
-export function laserThirdPackDiscount(ls: Line[]): number {
-  // Abraham, Nov 25, 2026, 15:06: with no maze, every 3rd gun set is already half price in the order price, the same
-  // result this offer gave; never both. With a maze this offer is unchanged (his double-discount answer is pending).
-  if (!ls.some((l) => LASER.test(l.category) && !ADDONS.test(l.category) && /maze/i.test(l.name ?? ""))) return 0;
-  // Abraham, Nov 24, 2026: a pack is anything with guns: a maze with its guns (pack 1), only 6 or 4 guns, an additional
-  // pack; lines in the order added (each laser item added is its own line); only the 3rd one is half its own price
-  const packs: number[] = [];
-  for (const l of ls) {
-    if (!(LASER.test(l.category) || ADDONS.test(l.category))) continue;
-    if (l.name !== undefined && !laserPoolsFor(l.name, l.category).length) continue; // a laser item with no guns
-    for (let i = 0; i < l.qty; i++) packs.push(l.unitPriceCents);
-  }
-  return packs.length >= 3 ? Math.round(packs[2] / 2) : 0;
-}
 
 const weekday = (iso: string) => new Date(`${iso}T12:00:00Z`).getUTCDay(); // 0 Sunday ... 4 Thursday
 
@@ -152,7 +127,6 @@ export async function bestOfferFor(
   const { discountCents, discountNote } = await import("@/lib/customer-discounts");
   const cd = await customerDiscount();
   if (cd) options.push({ discountCents: discountCents(cd, ls.reduce((t, l) => t + l.qty * l.unitPriceCents, 0)), note: discountNote(cd) });
-  if (on(s.offerLaserThirdPackOn)) options.push({ discountCents: laserThirdPackDiscount(ls), note: OFFER_NOTES.laser });
   if (on(s.offerFourthSundayOn)) options.push({ discountCents: await fourthSundayDiscount(exec, { id: o.id, customerId: o.customerId, eventDate: o.eventDate }, ls), note: OFFER_NOTES.fourthSunday });
   const best = options.filter((x) => x.discountCents > 0).sort((a, b) => b.discountCents - a.discountCents)[0];
   return best ?? { discountCents: 0, note: null };

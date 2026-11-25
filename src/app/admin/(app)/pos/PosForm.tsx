@@ -348,7 +348,7 @@ export default function PosForm(props: {
         <div className="space-y-1 border-t border-line pt-3 text-sm" data-pos-totals>
           <div className="flex justify-between"><span className="text-muted">Items</span><span className="font-semibold" data-pos-items>{money(quote?.itemsCents ?? total)}</span></div>
           {quote && quote.offerCents !== 0 && (
-            <div className="flex justify-between"><span className="text-muted">{/third pack 50% off/i.test(quote.offerNote ?? "") ? "Third laser pack half price:" : quote.offerNote}</span><span className="font-semibold">{quote.offerCents > 0 ? `−${money(quote.offerCents)}` : `+${money(-quote.offerCents)}`}</span></div>
+            <div className="flex justify-between"><span className="text-muted">{quote.offerNote}</span><span className="font-semibold">{quote.offerCents > 0 ? `−${money(quote.offerCents)}` : `+${money(-quote.offerCents)}`}</span></div>
           )}
           <div className="flex justify-between"><span className="text-muted">Delivery</span><span className="font-semibold" data-pos-delivery>{quote?.deliveryCents != null ? money(quote.deliveryCents) : "—"}</span></div>
           <div className="flex justify-between"><span className="text-muted">Sales tax{quote?.taxPercent != null ? ` (${quote.taxPercent}%)` : ""}</span><span className="font-semibold" data-pos-tax>{quote?.taxCents != null ? money(quote.taxCents) : "—"}</span></div>
