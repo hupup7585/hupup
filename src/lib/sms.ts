@@ -453,6 +453,15 @@ export function withSiteLinks(body: string, env: Record<string, string | undefin
   return body.replace(/https?:\/\/[a-z0-9-]+\.vercel\.app/gi, site);
 }
 
+/**
+ * One check for every customer text and email (item 7, Abraham Nov 25, 2026): vercel.app addresses become the real site
+ * on the live site, and a message holding a test link (dev=1) is never sent.
+ */
+export function customerSafe(body: string, env: Record<string, string | undefined> = process.env): { body: string; blocked: boolean } {
+  const out = withSiteLinks(body, env);
+  return { body: out, blocked: containsTestPayLink(out, env) };
+}
+
 export const NO_TEXT_CONSENT = "No text consent; call or email.";
 /** SMS v3: the exact note on every texting screen until Twilio approves texting. */
 export const TEXTING_NOT_ACTIVE = "Not active yet: waiting for Twilio A2P approval";

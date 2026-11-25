@@ -43,6 +43,16 @@ export type EmailAttachment = { filename: string; content: string /* base64 */ }
 export type SentKind = "code" | "catalog" | "auto";
 
 export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string>; record?: boolean; promo?: boolean; noThanks?: boolean; bodyHtml?: string | null; kind?: SentKind; button?: { label: string; url: string } | null } = {}): Promise<SendResult> {
+  // Item 7 (Nov 25, 2026): never the dev domain or a test link in a customer email
+  {
+    const { customerSafe } = await import("@/lib/sms");
+    const t = customerSafe(text);
+    const h = opts.bodyHtml ? customerSafe(opts.bodyHtml) : null;
+    const b = opts.button ? customerSafe(opts.button.url) : null;
+    if (t.blocked || h?.blocked || b?.blocked) return { sent: false, error: "Email contains a test payment link and was not sent." };
+    text = t.body;
+    opts = { ...opts, bodyHtml: h ? h.body : opts.bodyHtml, button: opts.button && b ? { ...opts.button, url: b.body } : opts.button };
+  }
   if (!config.resendConfigured()) {
     if (config.isProd()) return { sent: false, error: "Email (Resend) is not configured" };
     console.log(`[dev EMAIL to ${to}] ${subject}\n${text}${opts.button ? `\n[button: ${opts.button.label} ${opts.button.url}]` : ""}${attachments.length ? `\n[attachments: ${attachments.map((a) => a.filename).join(", ")}]` : ""}`);
@@ -61,11 +71,11 @@ export async function sendEmail(to: string, subject: string, text: string, attac
       const [gone] = await db.select().from(schema.emailUnsubscribes).where(eq(schema.emailUnsubscribes.email, to.trim().toLowerCase())).limit(1);
       if (gone) return { sent: false, error: "This address unsubscribed from promotional emails." };
       const { unsubscribeLink } = await import("@/lib/signed-link");
-      promo = { address: String(s?.emailMailingAddress ?? ""), unsubscribeUrl: unsubscribeLink(to.trim(), config.baseUrl()) };
+      promo = { address: String(s?.emailMailingAddress ?? ""), unsubscribeUrl: unsubscribeLink(to.trim(), config.siteUrl()) };
       opts = { ...opts, headers: { ...(opts.headers ?? {}), "List-Unsubscribe": `<${promo.unsubscribeUrl.replace("/unsubscribe?", "/api/unsubscribe?")}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } };
     }
     const { cleanEmailHtml } = await import("@/lib/email-format");
-    const branded = brandedEmail(text, { baseUrl: config.baseUrl(), signature: s?.emailSignature ?? null, promo, noThanks: opts.noThanks, bodyHtml: opts.bodyHtml ? cleanEmailHtml(opts.bodyHtml) : null, button: opts.button ?? null });
+    const branded = brandedEmail(text, { baseUrl: config.siteUrl(), signature: s?.emailSignature ?? null, promo, noThanks: opts.noThanks, bodyHtml: opts.bodyHtml ? cleanEmailHtml(opts.bodyHtml) : null, button: opts.button ?? null });
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },

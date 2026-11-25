@@ -3838,7 +3838,7 @@ const handlers: Record<string, Handler> = {
       // Text the Terms link (only with order-text consent from this call or before).
       const phone = ctx.session?.data.phone ?? toE164(ctx.from);
       const consented = ctx.session?.data.smsConsent === "yes" || ctx.session?.data.smsConsent === "existing" || (phone ? (await consentState(phone)).transactional?.action === "opt_in" : false);
-      const r = phone && consented ? await sendSms(phone, promptText(ctx.prompts, "msg_terms_link", { link: `${config.baseUrl()}/terms` }), { kind: "transactional", event: "terms_link", orderId: order.order.id, callSid: ctx.callSid }) : null;
+      const r = phone && consented ? await sendSms(phone, promptText(ctx.prompts, "msg_terms_link", { link: `${config.siteUrl()}/terms` }), { kind: "transactional", event: "terms_link", orderId: order.order.id, callSid: ctx.callSid }) : null;
       sp(vr, ctx, r?.sent ? "terms_link_sent" : "terms_link_no_text");
       return back(vr, "terms", { n: ctx.query.get("n") ?? undefined });
     }

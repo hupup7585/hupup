@@ -60,7 +60,7 @@ export function paymentLink(o: {
   if (o.name) params.set("xName", o.name);
   if (o.email) params.set("xEmail", o.email);
   if (o.phone) params.set("xBillPhone", o.phone);
-  params.set("xRedirectURL", `${config.baseUrl()}/paid?invoice=${invoiceFor(o.orderId)}`);
+  params.set("xRedirectURL", `${config.siteUrl()}/paid?invoice=${invoiceFor(o.orderId)}`); // the real site, never vercel.app (item 7)
   if (!site) {
     if (!devPaymentFallbackAllowed()) {
       console.error(`[sola] SOLA_PAYMENTSITE_NAME is not set: no payment link for ${invoiceFor(o.orderId)}`);

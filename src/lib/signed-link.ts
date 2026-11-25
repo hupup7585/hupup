@@ -35,7 +35,7 @@ export function verifyPromptRecordingLink(id: number, sig: string | null): boole
 const signInvoice = (id: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`invoice:${id}`).digest("hex").slice(0, 32);
 
 export function invoiceCustomerLink(id: number): string {
-  return `${config.baseUrl()}/invoice/${id}?t=${signInvoice(id)}`;
+  return `${config.siteUrl()}/invoice/${id}?t=${signInvoice(id)}`; // the real site address (item 7, Nov 25, 2026)
 }
 
 export function verifyInvoiceLink(id: number, t: string | null | undefined): boolean {
