@@ -4202,12 +4202,12 @@ const handlers: Record<string, Handler> = {
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "promo-consent");
     const number = spokenDigits(orderNumber(o));
-    const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: 6 });
+    const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: 5 }); // 5 seconds (Nov 25, 2026, 12:22)
     if (ctx.query.get("st")) sp(g, ctx, "checkout_order_number", { number });
     else if (!ctx.query.get("r")) sp(g, ctx, "phonepay_approved", { number });
     sp(g, ctx, "phonepay_approved_star");
     if (await orderTextsAgreed(ctx, o)) sp(g, ctx, "phonepay_approved_text");
-    else spPreviewDraft(g, ctx, "phonepay_approved_join");
+    else sp(g, ctx, "pay_approved_optin"); // approved Nov 25, 2026, 12:22
     sp(g, ctx, "phonepay_approved_bye");
     return back(vr, "receipt-email", { o }); // no key: box 35, the receipt by email (Abraham, Nov 25, 2026, 11:51)
   },
@@ -4220,9 +4220,22 @@ const handlers: Record<string, Handler> = {
       // Agreed to order texts: a different number (box 143, then the read-back). Not agreed: pressing 1 signs up for this
       // order's texts, to the number they choose (box 142, then the read-back) (Abraham, Nov 25, 2026, 00:34)
       if (await orderTextsAgreed(ctx, Number(o))) return back(vr, "tx-enter", { p: "conf", o });
-      await updateSession(ctx.callSid, { data: { textJoin: true } }, ctx.session);
-      return back(vr, "tx-which", { p: "conf", o });
+      // Not signed up (Abraham, Nov 25, 2026, 12:22): key 1 signs up the calling number for this order's texts (the same
+      // consent record as box 49 key 1), the box 49 thank-you lines, the confirmation text, then box 35
+      const phone = toE164(ctx.session?.fromNumber ?? ctx.from);
+      if (phone && !(await customerByPhone(phone))?.smsOptOut) {
+        await recordPhoneConsent(ctx, "transactional", "opt_in", phone, "pay_approved_optin");
+        await updateSession(ctx.callSid, { data: { smsConsent: "yes" } }, ctx.session);
+        await setOrderTextPhone(Number(o), phone);
+        sp(vr, ctx, "consent_tx_thanks", { number: spokenPhone(phone) });
+        const { confirmationText } = await import("@/lib/payment-result");
+        const body = await confirmationText(Number(o));
+        const r = body ? await sendMessage({ to: phone, body, kind: "transactional", event: "confirmation_resend", orderId: Number(o), callSid: ctx.callSid }) : null;
+        await track(ctx.callSid, "step", `Box 148: signed up ${phone} for this order's texts${r?.sent ? "; confirmation texted" : ""}`, { to: phone });
+      } else if (phone) sp(vr, ctx, "consent_stopped");
+      return back(vr, "receipt-email", { o });
     }
+    if (d === "#") return back(vr, "receipt-email", { o }); // pound: no texts, on to box 35
     if (d) {
       sp(vr, ctx, "not_valid");
       return back(vr, "pay-approved", { o, r: 1 });

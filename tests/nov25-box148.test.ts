@@ -82,13 +82,22 @@ describe("box 148", () => {
     ]);
     expect(said(x).join(" ")).not.toMatch(/Sara|Klein|We will text your confirmation/);
   });
-  it("live line: the draft line waits for approval", async () => {
+  it("not signed up for order texts: the approved line, live too (Nov 25, 2026, 12:22); no key and pound send nothing", async () => {
     process.env.VERCEL_ENV = "production";
     try {
-      expect(said(await call("pay-approved", {}, `o=${orderId}`)).join(" ")).not.toContain("order updates by text");
+      const x = said(await call("pay-approved", {}, `o=${orderId}`));
+      expect(x).toContain("To receive your confirmation and order updates by text, press 1.");
+      expect(x.join(" ")).not.toContain("We will text your confirmation");
     } finally {
       delete process.env.VERCEL_ENV;
     }
+    expect(await call("pay-approved", {}, `o=${orderId}`)).toMatch(/timeout="5"/);
+    expect(redirect(await call("pay-approved-choice", {}, `o=${orderId}`))).toBe(`receipt-email?o=${orderId}`);
+    expect(redirect(await call("pay-approved-choice", { Digits: "#" }, `o=${orderId}`))).toBe(`receipt-email?o=${orderId}`);
+    expect(h.sent).toHaveLength(0);
+    expect(await db.select().from(schema.smsConsents).where(eq(schema.smsConsents.phone, CALLER))).toHaveLength(0);
+    const { allSlots } = await import("@/lib/recording-slots");
+    expect(new Map(allSlots().map((x) => [x.key, x.text])).get("pay_approved_optin")).toBe("To receive your confirmation and order updates by text, press 1.");
   });
   it("star replays the order number and the rest; a wrong key replays the rest; no key goes on", async () => {
     expect(redirect(await call("pay-approved-choice", { Digits: "*" }, `o=${orderId}`))).toBe(`pay-approved?o=${orderId}&st=1`);
@@ -101,9 +110,10 @@ describe("box 148", () => {
     expect(said(await call("pay-approved", {}, `o=${orderId}&r=1`))[0]).toBe("To hear it again, press star.");
     expect(redirect(await call("pay-approved-choice", {}, `o=${orderId}`))).toBe(`receipt-email?o=${orderId}`); // no key: box 35 (Nov 25, 2026, 11:51)
   });
-  it("not agreed, key 1: box 142 (which number); the chosen number signs up, gets the confirmation and becomes the order's text number", async () => {
-    expect(redirect(await call("pay-approved-choice", { Digits: "1" }, `o=${orderId}`))).toBe(`tx-which?p=conf&o=${orderId}`);
-    await call("tx-which-choice", { Digits: "1" }, `p=conf&o=${orderId}`); // the number calling
+  it("not signed up, key 1: the calling number signs up, hears the box 49 thank-you, gets the confirmation, then box 35", async () => {
+    const r = await call("pay-approved-choice", { Digits: "1" }, `o=${orderId}`);
+    expect(said(r)[0]).toMatch(/^Thank you\. You will get text updates about your reservation, to .+\. Message and data rates may apply\.$/);
+    expect(redirect(r)).toBe(`receipt-email?o=${orderId}`);
     expect(h.sent.map((m) => m.to)).toEqual([CALLER]);
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
     expect(o.textPhone).toBe(CALLER);
