@@ -7,6 +7,7 @@ import { inboxWhen } from "@/lib/inbox-format";
 import { StatusBadge } from "@/components/StatusBadge";
 import DualDate from "@/components/DualDate";
 import SearchBar from "@/components/SearchBar";
+import { orderPath } from "@/lib/order-path";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Search · Hup Up Attractions", robots: { index: false } };
@@ -38,7 +39,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         <>
           <Section title="Orders" n={r.orders.length}>
             {r.orders.map(({ order: o, name, phone }) => (
-              <li key={o.id}><Link href={`/admin/orders/${o.id}`} className={row}>
+              <li key={o.id}><Link href={orderPath(o.id)} className={row}>
                 <span className="w-32 shrink-0 font-bold">Order number {orderNumber(o.id)}</span>
                 <span className="min-w-0 flex-1 truncate">{name ?? "No name"}{phone ? ` · ${formatPhone(phone)}` : ""}{o.deliveryAddress ? ` · ${o.deliveryAddress}` : ""}</span>
                 <span className="shrink-0 text-muted"><DualDate iso={o.eventDate} style="short" /></span>

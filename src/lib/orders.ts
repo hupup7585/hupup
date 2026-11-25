@@ -4,6 +4,7 @@ import { addDays } from "@/lib/dates";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
 import { getSettings } from "@/lib/settings";
 import type { Channel, OrderStatus } from "@/lib/db/schema";
+import { orderPath } from "@/lib/order-path";
 
 const { orders, orderItems, products, customers } = schema;
 
@@ -507,7 +508,7 @@ async function underpaidAlert(orderId: number, paidCents: number, owedCents: num
   await sendEmail(
     to,
     `${BUSINESS_NAME}: order #${n} paid less than the total`,
-    [`Order #${n} received a payment, but the total paid is $${(paidCents / 100).toFixed(2)} of $${(owedCents / 100).toFixed(2)}.`, `Method: ${method}${ref ? `, reference ${ref}` : ""}.`, "", "The order was NOT confirmed. It is marked Needs attention.", `${config.baseUrl()}/admin/orders/${orderId}`].join("\n"),
+    [`Order #${n} received a payment, but the total paid is $${(paidCents / 100).toFixed(2)} of $${(owedCents / 100).toFixed(2)}.`, `Method: ${method}${ref ? `, reference ${ref}` : ""}.`, "", "The order was NOT confirmed. It is marked Needs attention.", `${config.baseUrl()}${orderPath(orderId)}`].join("\n"),
   );
 }
 

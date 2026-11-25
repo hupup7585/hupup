@@ -423,7 +423,7 @@ describe("Terms on the phone: text the link (press 1)", () => {
   it("payment text links to the review-and-pay page (Terms box), not straight to Sola", async () => {
     h.session.data.smsConsent = "yes";
     await call("tx-which-choice", { Digits: "1" }, "p=pay&o=7");
-    expect(h.sms[0].body).toMatch(/https:\/\/hupup\.vercel\.app\/pay\/7\?t=/);
+    expect(h.sms[0].body).toMatch(/https:\/\/hupup\.vercel\.app\/pay\/1007\?t=/);
   });
 });
 

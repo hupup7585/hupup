@@ -41,7 +41,7 @@ describe("customer links", () => {
   });
   it("the payment link and the rewrite use the real site address on the live site", () => {
     live();
-    expect(payPageLink(77)).toMatch(/^https:\/\/hupupattractions\.com\/pay\/77\?t=/);
+    expect(payPageLink(77)).toMatch(/^https:\/\/hupupattractions\.com\/pay\/1077\?t=/); // the order number people see (Batch 4 item 2)
     expect(withSiteLinks("see https://hupup-abc123-hup-up.vercel.app/terms")).toBe("see https://hupupattractions.com/terms");
   });
   it("a dev=1 link is refused even off Vercel", async () => {

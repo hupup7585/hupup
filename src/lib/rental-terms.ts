@@ -125,5 +125,5 @@ export function termsActive(env: Record<string, string | undefined> = process.en
 
 /** Customer-facing payment link: our review-and-pay page (Terms box) which then continues to Sola. */
 export function payPageLink(orderId: number): string {
-  return `${config.siteUrl()}/pay/${orderId}?t=${payToken(orderId)}`;
+  return `${config.siteUrl()}/pay/${1000 + orderId}?t=${payToken(orderId)}`; // the order number people see (Batch 4 item 2)
 }

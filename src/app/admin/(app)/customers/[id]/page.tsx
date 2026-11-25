@@ -16,6 +16,8 @@ import DualDate from "@/components/DualDate";
 import { dualDateTime, localISO } from "@/lib/dual-date";
 import { SOURCE_LABEL, customerConsent, senderNames } from "@/lib/customer-consent";
 import { alertDateTime, textingActive } from "@/lib/voicemail";
+import { orderPath } from "@/lib/order-path";
+import { payState } from "@/lib/pay-label";
 
 export const dynamic = "force-dynamic";
 
@@ -104,12 +106,12 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           <ul className="divide-y divide-line">
             {orders.map((o) => (
               <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                <Link href={`/admin/orders/${o.id}`} className="flex items-center gap-2 font-semibold hover:underline">
+                <Link href={orderPath(o.id)} className="flex items-center gap-2 font-semibold hover:underline">
                   {orderNumber(o.id)} <StatusBadge status={o.status} />
                 </Link>
                 <span className="text-sm text-muted">
                   <DualDate iso={o.eventDate} /> · {o.channel === "PHONE" ? "Booked by phone" : "Booked in person"}
-                  {showMoney && ` · ${formatMoney(o.subtotalCents)} (paid ${formatMoney(o.paidCents)})`}
+                  {showMoney && ` · ${payState(o).label}`}
                 </span>
               </li>
             ))}

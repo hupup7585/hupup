@@ -5,6 +5,7 @@ import { requireOwner } from "@/lib/auth";
 import { parseMoneyToCents } from "@/lib/money";
 import { sendDisputeEvidence } from "@/lib/stripe-ops";
 import { RefundError, refundOrder } from "@/lib/refunds";
+import { orderPath } from "@/lib/order-path";
 
 type R = { ok: boolean; message: string };
 
@@ -27,7 +28,7 @@ export async function disputeEvidenceAction(orderId: number, disputeRowId: numbe
   const s = await requireOwner();
   try {
     await sendDisputeEvidence(disputeRowId, s.userId);
-    revalidatePath(`/admin/orders/${orderId}`);
+    revalidatePath(orderPath(orderId));
     return { ok: true, message: "Proof sent to Stripe." };
   } catch (e) {
     return { ok: false, message: (e as Error).message };

@@ -7,6 +7,7 @@ import { formatPhone } from "@/lib/phone";
 import { dualDateTime } from "@/lib/dual-date";
 import { savePhonePayAction } from "./actions";
 import PayMusicWarning from "@/components/PayMusicWarning";
+import { orderPath } from "@/lib/order-path";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Sola PhonePay · Hup Up Attractions", robots: { index: false } };
@@ -123,7 +124,7 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
                 <tr key={a.id}>
                   <td className="td">{dualDateTime(a.startedAt)}</td>
                   <td className="td">
-                    {a.orderId ? <a className="underline" href={`/admin/orders/${a.orderId}`}>Order number {orderNumber(a.orderId)}</a> : "No order number"}
+                    {a.orderId ? <a className="underline" href={orderPath(a.orderId)}>Order number {orderNumber(a.orderId)}</a> : "No order number"}
                     {a.kind === "custom" && <span className="block text-xs text-muted">Custom charge (owner)</span>}
                   </td>
                   <td className="td">{a.kind === "custom" ? "" : `${a.tryNumber} of 6`}</td>

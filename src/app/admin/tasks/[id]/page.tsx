@@ -8,6 +8,7 @@ import { formatMoney } from "@/lib/money";
 import DualDate from "@/components/DualDate";
 import { PRIORITY_LABEL, STATUS_LABEL, canAccess, getTask, isOverdue, laborCents, minutesOf, seesMoney, staffList } from "@/lib/tasks";
 import { addSubtaskAction, logHoursAction, setStatusAction, startTimerAction, stopTimerAction, updateTaskAction } from "../actions";
+import { orderPath } from "@/lib/order-path";
 
 const FIELD_LABEL: Record<string, string> = { title: "Title", notes: "Notes", dueDate: "Deadline", dueTime: "Time", priority: "Priority", status: "Status", assignedTo: "Assigned to", orderId: "Booking", projectId: "Project" };
 
@@ -67,7 +68,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
             </>
           )}
           {!edit && t.notes && <p className="text-sm sm:col-span-2">{t.notes}</p>}
-          {t.orderId && <p className="text-sm sm:col-span-2">Booking: <Link className="font-bold text-navy underline" href={`/admin/orders/${t.orderId}`}>Booking number {t.orderId}</Link></p>}
+          {t.orderId && <p className="text-sm sm:col-span-2">Booking: <Link className="font-bold text-navy underline" href={orderPath(t.orderId)}>Booking number {1000 + Number(t.orderId)}</Link></p>}
           <div><button className="btn-dark">Save</button></div>
         </form>
       </section>

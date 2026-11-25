@@ -12,6 +12,7 @@ import { STAFF_CONSENT_VERSION } from "@/lib/sms-consent-copy";
 import { promoConfirmRequestSms, smsTermsV2Active, staffDisclosure } from "@/lib/sms-terms-v2";
 import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import { sendMessage } from "@/lib/sms";
+import { orderPath } from "@/lib/order-path";
 
 export type ConsentActionResult = { ok: boolean; message: string };
 
@@ -52,7 +53,7 @@ export async function recordStaffConsentAction(orderId: number, form: { scope: C
       entityId: String(full!.customer!.id),
       after: { orderId, result: r.reason },
     });
-    revalidatePath(`/admin/orders/${orderId}`);
+    revalidatePath(orderPath(orderId));
     const why: Record<string, string> = {
       pending_created: "Confirmation text sent. The customer is signed up for promotional texts only after they reply YES to it.",
       already_pending: "A confirmation text is already waiting for the customer's YES reply.",
@@ -96,7 +97,7 @@ export async function recordStaffConsentAction(orderId: number, form: { scope: C
     ip: (h.get("x-forwarded-for") || "").split(",")[0].trim() || null,
     userAgent: h.get("user-agent")?.slice(0, 500) ?? null,
   });
-  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath(orderPath(orderId));
   const label = form.scope === "marketing" ? "promotional texts" : "order texts";
   return { ok: true, message: form.response === "clear_yes" ? `Recorded: customer agreed to ${label}.` : `Recorded: no consent for ${label}.` };
 }

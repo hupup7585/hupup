@@ -5,6 +5,7 @@ import { sendEmail } from "@/lib/notify";
 import { orderNumber } from "@/lib/orders";
 import { recordAutoMoneyOut } from "@/lib/books";
 import { StripeError, stripeApi, stripeKey } from "@/lib/stripe";
+import { orderPath } from "@/lib/order-path";
 
 /**
  * Refunds from Admin (Abraham, Nov 13, 2026). Owner only. Stripe phone payments (STRIPE_REFUNDS_KEY, by the saved
@@ -109,7 +110,7 @@ async function solaRefund(ref: string, amount: number, fetcher: typeof fetch = f
 async function alertOwner(o: Ord, amount: number, reason: string) {
   const owner = process.env.ADMIN_EMAIL;
   if (!owner) return;
-  await sendEmail(owner, `Refund failed on order #${orderNumber(o.id)}`, `A refund of ${money(amount)} on order #${orderNumber(o.id)} didn't go through.\n\nReason: ${reason}\n\nNothing was refunded. Open the order: ${config.baseUrl()}/admin/orders/${o.id}`).catch(() => null);
+  await sendEmail(owner, `Refund failed on order #${orderNumber(o.id)}`, `A refund of ${money(amount)} on order #${orderNumber(o.id)} didn't go through.\n\nReason: ${reason}\n\nNothing was refunded. Open the order: ${config.baseUrl()}${orderPath(o.id)}`).catch(() => null);
 }
 
 /**

@@ -18,6 +18,7 @@ import DualDate, { HebrewDay } from "@/components/DualDate";
 import { dualDate } from "@/lib/dual-date";
 import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
 import { dayHolidays } from "@/lib/hup-calendar/day-names";
+import { orderPath } from "@/lib/order-path";
 
 export default async function CalendarPage({
   searchParams,
@@ -176,7 +177,7 @@ export default async function CalendarPage({
               </h2>
               {list.length === 0 && <p className="text-sm text-muted">None.</p>}
               {list.map((r) => (
-                <Link key={r.id} href={`/admin/orders/${r.id}`} className="mb-2 flex items-start gap-3 rounded-xl bg-bg p-3 hover:bg-[#ECF1F9]">
+                <Link key={r.id} href={orderPath(r.id)} className="mb-2 flex items-start gap-3 rounded-xl bg-bg p-3 hover:bg-[#ECF1F9]">
                   <b className="min-w-14 whitespace-nowrap">{kind === "delivery" ? "9–12" : `By ${PICKUP_BY}`}</b>
                   <span className="min-w-0 flex-1">
                     <span className="font-semibold">{r.items}</span>

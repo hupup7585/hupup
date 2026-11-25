@@ -59,6 +59,7 @@ import {
   shouldAskMarketing,
   wordingVersion,
 } from "@/lib/sms-consent";
+import { orderPath } from "@/lib/order-path";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
 import { stripePhonePayMode, keypadPayFor, keypadPayOn, paySipUri } from "@/lib/phone-pay";
 import { blockIfTooManyCalls, isPhonePayBlocked, phonePayLimits, startPayWatch, startSolaListen } from "@/lib/phonepay-watch";
@@ -4270,7 +4271,7 @@ const handlers: Record<string, Handler> = {
     const due = (await getPaymentGroup(o))?.due ?? 0;
     const tellOwner = async (subject: string, text: string) => {
       const to = config.adminEmail();
-      if (to) await sendEmail(to, subject, `${text}\n\n${config.baseUrl()}/admin/orders/${o}`).catch(() => null);
+      if (to) await sendEmail(to, subject, `${text}\n\n${config.baseUrl()}${orderPath(o)}`).catch(() => null);
     };
     const max = phonePayLimits(await getSettings()).triesPerCall;
     if (n >= max) {

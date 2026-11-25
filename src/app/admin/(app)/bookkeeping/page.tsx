@@ -37,6 +37,7 @@ import { Card, CategorySelect, Field, FileInput, Grid, MethodSelect, Save, Stat,
 export const metadata = { title: "Bookkeeping | Hup Up Attractions" };
 import { BOOK_TABS, bookTabLabel } from "@/lib/bookkeeping-tabs";
 import { orderNumber } from "@/lib/orders";
+import { orderPath } from "@/lib/order-path";
 
 export const dynamic = "force-dynamic";
 
@@ -187,7 +188,7 @@ function EntryRows({ entries, tab }: { entries: (typeof schema.bookEntries.$infe
         <>{e.method ?? "—"}{e.checkNo ? ` number ${e.checkNo}` : ""}</>,
         <b>{money(e.amountCents)}</b>,
         e.rentalCents || e.deliveryCents || e.taxCents || e.tipCents ? <span className="text-xs text-muted">rental {money(e.rentalCents)} · delivery {money(e.deliveryCents)} · tax {money(e.taxCents)} · tip {money(e.tipCents)}</span> : "",
-        e.orderId ? <Link className="text-navy underline" href={`/admin/orders/${e.orderId}`}>Booking number {e.orderId}</Link> : "—",
+        e.orderId ? <Link className="text-navy underline" href={orderPath(e.orderId)}>Booking number {1000 + Number(e.orderId)}</Link> : "—",
         e.fileId ? <a className="text-navy underline" href={`/admin/bookkeeping/files/${e.fileId}`} target="_blank">View</a> : "—",
         e.correctsId ? <span className="text-xs text-muted">corrects entry number {e.correctsId}</span> : (
           <form action={A.reverseEntryAction} className="flex gap-1">
@@ -458,7 +459,7 @@ async function Processor({ from, to, pct, fixed }: { from: string; to: string; p
         <Table
           head={["Date", "Booking", "Sola ref", "Payment", "Est. fee", "Net deposit"]}
           empty="No Sola payments in this range."
-          rows={v.rows.map((r) => [r.date, r.orderId ? <Link className="text-navy underline" href={`/admin/orders/${r.orderId}`}>Booking number {r.orderId}</Link> : "—", r.ref ?? "—", money(r.grossCents), money(r.feeCents), <b>{money(r.netCents)}</b>])}
+          rows={v.rows.map((r) => [r.date, r.orderId ? <Link className="text-navy underline" href={orderPath(r.orderId)}>Booking number {1000 + Number(r.orderId)}</Link> : "—", r.ref ?? "—", money(r.grossCents), money(r.feeCents), <b>{money(r.netCents)}</b>])}
         />
       </Card>
     </>
@@ -493,7 +494,7 @@ async function StripeFees({ from, to }: { from: string; to: string }) {
         <Table
           head={["Date", "Type", "Booking", "Amount", "Stripe fee", "Net"]}
           empty="No Stripe lines in this range."
-          rows={lines.map((l) => [when(l.happenedAt), l.type.replace(/_/g, " "), l.orderId ? <Link className="text-navy underline" href={`/admin/orders/${l.orderId}`}>Order number {orderNumber(l.orderId)}</Link> : "—", money(l.amountCents), money(l.feeCents), <b>{money(l.netCents)}</b>])}
+          rows={lines.map((l) => [when(l.happenedAt), l.type.replace(/_/g, " "), l.orderId ? <Link className="text-navy underline" href={orderPath(l.orderId)}>Order number {orderNumber(l.orderId)}</Link> : "—", money(l.amountCents), money(l.feeCents), <b>{money(l.netCents)}</b>])}
         />
       </Card>
       <Card title="Payouts to the bank" note="Match each payout to the deposit on the bank statement.">

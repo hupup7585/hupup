@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/auth";
 import { assignDriver } from "@/lib/drivers";
+import { orderPath } from "@/lib/order-path";
 
 /** Owner and Secretary: set the delivery and pickup drivers of an order (blank = not assigned). */
 export async function assignDriversAction(orderId: number, form: FormData) {
@@ -11,6 +12,6 @@ export async function assignDriversAction(orderId: number, form: FormData) {
     const v = String(form.get(stop) ?? "");
     await assignDriver(orderId, stop, v ? Number(v) : null, s.userId);
   }
-  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath(orderPath(orderId));
   revalidatePath("/admin/deliveries");
 }

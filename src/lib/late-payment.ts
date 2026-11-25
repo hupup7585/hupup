@@ -7,6 +7,7 @@ import { getSettings } from "@/lib/settings";
 import { ensurePriced } from "@/lib/order-pricing";
 import { config } from "@/lib/config";
 import { sendEmail } from "@/lib/notify";
+import { orderPath } from "@/lib/order-path";
 
 /*
  * Payment links and late payments (Abraham, Nov 13, 2026).
@@ -256,7 +257,7 @@ export async function handleLatePayment(orderId: number, cents: number, method: 
         (stillFree
           ? "The items were still free on those days, so the order was confirmed by itself. Nothing else to do."
           : "Some items are no longer free on those days (another customer booked them). The order is not confirmed and is marked Needs staff attention. Please call the customer about another date or item, or a refund.") +
-        `\n\n${config.baseUrl()}/admin/orders/${orderId}`,
+        `\n\n${config.baseUrl()}${orderPath(orderId)}`,
     ).catch((e) => console.error("[late payment] owner email failed:", e));
   if (!stillFree && (LATE_EMAIL_APPROVED || env.VERCEL_ENV !== "production")) {
     const full = await getOrderWithItems(orderId);

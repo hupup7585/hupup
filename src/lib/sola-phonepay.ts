@@ -3,6 +3,7 @@ import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
+import { orderPath } from "@/lib/order-path";
 
 /**
  * Pay by card on the phone through Sola PhonePay (Abraham, Nov 14, 2026). Replaces Stripe as the main phone payment;
@@ -263,7 +264,7 @@ export async function matchPhonePay(orderId: number, attemptId: number, dueCents
   const to = config.adminEmail();
   if (to) {
     const { sendEmail } = await import("@/lib/notify");
-    await sendEmail(to, `Hup Up Attractions: phone payment not confirmed, order #${num}`, `A caller paid by phone through Sola PhonePay for order #${num} ($${(dueCents / 100).toFixed(2)}), but ${why}.\n\nThe order is Payment pending and the customer was sent the secure payment link. A callback task is in Admin > Tasks.\n\n${config.baseUrl()}/admin/orders/${orderId}`).catch(() => null);
+    await sendEmail(to, `Hup Up Attractions: phone payment not confirmed, order #${num}`, `A caller paid by phone through Sola PhonePay for order #${num} ($${(dueCents / 100).toFixed(2)}), but ${why}.\n\nThe order is Payment pending and the customer was sent the secure payment link. A callback task is in Admin > Tasks.\n\n${config.baseUrl()}${orderPath(orderId)}`).catch(() => null);
   }
   return { paid: false, reason };
 }
@@ -377,7 +378,7 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
     const to = config.adminEmail();
     if (!to) return;
     const { sendEmail } = await import("@/lib/notify");
-    await sendEmail(to, subject, `${text}\n\n${config.baseUrl()}/admin/orders/${orderId}`).catch(() => null);
+    await sendEmail(to, subject, `${text}\n\n${config.baseUrl()}${orderPath(orderId)}`).catch(() => null);
   };
   // Never guess (Abraham, Nov 18, 2026). Not certain = two or more charges of exactly this amount in this try's window,
   // or one charge without this caller's phone in Invoice while another caller was paying the same amount at the same

@@ -3,6 +3,7 @@ import { AlertTriangle, Circle, CircleCheck } from "lucide-react";
 import DualDate from "@/components/DualDate";
 import { PRIORITY_LABEL, STATUS_LABEL, isOverdue, type Task } from "@/lib/tasks";
 import { setStatusAction } from "./actions";
+import { orderPath } from "@/lib/order-path";
 
 /** One task in a list: checkbox, title, deadline (with the Yiddish day and parsha), status, priority, assignee. */
 export default function TaskLine({ t, names, back, subCount }: { t: Task; names: Map<number, string>; back: string; subCount?: [number, number] }) {
@@ -33,7 +34,7 @@ export default function TaskLine({ t, names, back, subCount }: { t: Task; names:
           <span>{STATUS_LABEL[t.status]}</span>
           <span className={t.priority === "high" ? "font-bold text-[#C83A2F]" : ""}>{PRIORITY_LABEL[t.priority]} priority</span>
           <span>{t.assignedTo ? names.get(t.assignedTo) ?? "Staff" : "Unassigned"}</span>
-          {t.orderId && <Link className="underline" href={`/admin/orders/${t.orderId}`}>Booking number {t.orderId}</Link>}
+          {t.orderId && <Link className="underline" href={orderPath(t.orderId)}>Booking number {1000 + Number(t.orderId)}</Link>}
           {subCount && subCount[0] > 0 && <span>{subCount[1]}/{subCount[0]} subtasks done</span>}
         </div>
       </div>

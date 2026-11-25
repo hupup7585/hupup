@@ -10,6 +10,7 @@ import { applyRefund } from "@/lib/refunds";
 export { refundOrder, refundStatus, refundsFor } from "@/lib/refunds";
 import { inboxWhen } from "@/lib/inbox-format";
 import { PROMPTS, fill } from "@/lib/ivr/prompts";
+import { orderPath } from "@/lib/order-path";
 
 /* Stripe refunds, fees and payouts, disputes (Abraham, Nov 12, 2026). Nothing is ever deleted. */
 
@@ -100,7 +101,7 @@ export async function handleStripeEvent(event: { type: string; data: { object: R
         await sendEmail(
           owner,
           `Dispute on ${o ? `order #${orderNumber(o.id)}` : "a Stripe payment"}: ${money(d.amount)}`,
-          `A customer disputed a Stripe phone payment.\n\nOrder: ${o ? `#${orderNumber(o.id)} (${config.baseUrl()}/admin/orders/${o.id})` : "not matched"}\nAmount: ${money(d.amount)}\nReason: ${d.reason.replace(/_/g, " ")}\n${due ? `Send proof by: ${inboxWhen(due)}\n` : ""}\nOpen the order in Admin and press "Send proof to Stripe".`,
+          `A customer disputed a Stripe phone payment.\n\nOrder: ${o ? `#${orderNumber(o.id)} (${config.baseUrl()}${orderPath(o.id)})` : "not matched"}\nAmount: ${money(d.amount)}\nReason: ${d.reason.replace(/_/g, " ")}\n${due ? `Send proof by: ${inboxWhen(due)}\n` : ""}\nOpen the order in Admin and press "Send proof to Stripe".`,
         ).catch((e) => console.error("dispute alert failed", e));
       }
     }

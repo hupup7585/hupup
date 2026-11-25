@@ -11,6 +11,7 @@ import { requestPromoConfirmation } from "@/lib/sms-reenroll";
 import { promoConfirmRequestSms } from "@/lib/sms-terms-v2";
 import { TEXTING_NOT_ACTIVE, sendMessage } from "@/lib/sms";
 import { STAFF_PROMO_STEP1, staffPromoStep2, staffPromoVisible } from "@/lib/staff-promo";
+import { orderPath } from "@/lib/order-path";
 
 export type StaffPromoResult = { ok: boolean; sent: boolean; message: string };
 
@@ -51,7 +52,7 @@ export async function staffPromoSignupAction(
     entityId: cust ? String(cust.id) : to,
     after: { orderId, staffName: staff.name, numberUsed: to, which: usedCustomer ? "customer" : "different", result: r.reason, textSent: delivered, at: logStamp() },
   });
-  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath(orderPath(orderId));
   const why: Record<string, string> = {
     pending_created: `Confirmation text sent to ${formatPhone(to)}. Read Step 3 to the customer.`,
     already_pending: `A confirmation text is already waiting for a YES from ${formatPhone(to)}. Nothing new was sent.`,

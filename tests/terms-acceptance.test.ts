@@ -50,7 +50,7 @@ describe("(a) payment link: unchecked 'I agree' box required before payment", ()
   });
   it("payment texts point to the review-and-pay page", () => {
     process.env.PUBLIC_BASE_URL = "https://hupup.vercel.app";
-    expect(payPageLink(7)).toBe(`https://hupup.vercel.app/pay/7?t=${payToken(7)}`);
+    expect(payPageLink(7)).toBe(`https://hupup.vercel.app/pay/1007?t=${payToken(7)}`);
     for (const f of ["src/lib/ivr/flow.ts", "src/app/admin/(app)/orders/actions.ts", "src/app/admin/(app)/pos/actions.ts"]) expect(readFileSync(f, "utf8"), f).toContain("payPageLink(");
   });
 });

@@ -2,6 +2,7 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { sendEmail } from "@/lib/notify";
+import { orderPath } from "@/lib/order-path";
 
 /*
  * Delivery statuses (Abraham, Nov 15, 2026): Booked, Out for delivery, Delivered, Out for pickup, Picked up,
@@ -62,7 +63,7 @@ export async function recordStage(orderId: number, stop: Stop, stage: Stage, use
       await sendEmail(
         to,
         `Hup Up Attractions: problem on the ${stop} for order #${orderNumber(orderId)}`,
-        `${who ?? "A driver"} reported a problem on the ${stop} for order #${orderNumber(orderId)}${o?.deliveryAddress ? ` (${o.deliveryAddress})` : ""}:\n\n${clean}\n\n${config.baseUrl()}/admin/orders/${orderId}`,
+        `${who ?? "A driver"} reported a problem on the ${stop} for order #${orderNumber(orderId)}${o?.deliveryAddress ? ` (${o.deliveryAddress})` : ""}:\n\n${clean}\n\n${config.baseUrl()}${orderPath(orderId)}`,
       ).catch(() => null);
   }
 }

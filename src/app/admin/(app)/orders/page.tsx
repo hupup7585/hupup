@@ -8,6 +8,8 @@ import { orderNumber } from "@/lib/orders";
 import { StatusBadge, STATUS_LABEL } from "@/components/StatusBadge";
 import { ORDER_STATUSES } from "@/lib/db/schema";
 import DualDate from "@/components/DualDate";
+import { orderPath } from "@/lib/order-path";
+import { payState } from "@/lib/pay-label";
 
 export default async function OrdersPage({
   searchParams,
@@ -57,7 +59,7 @@ export default async function OrdersPage({
           <tbody>
             {list.map((o) => (
               <tr key={o.id} className="hover:bg-bg">
-                <td className="td font-bold"><Link className="text-navy underline-offset-2 hover:underline" href={`/admin/orders/${o.id}`}>{orderNumber(o.id)}</Link></td>
+                <td className="td font-bold"><Link className="text-navy underline-offset-2 hover:underline" href={orderPath(o.id)}>{orderNumber(o.id)}</Link></td>
                 <td className="td">
                   {o.customer_name ?? <span className="text-muted">Caller in progress</span>}
                   <div className="text-xs text-muted">{formatPhone(o.customer_phone)}</div>
@@ -68,7 +70,7 @@ export default async function OrdersPage({
                 <td className="td">{o.channel === "PHONE" ? "Phone" : "In person"}</td>
                 <td className="td font-bold">{formatMoney(o.total_cents ?? o.subtotal_cents)}</td>
                 <td className={`td ${o.paid_cents >= (o.total_cents ?? o.subtotal_cents) && o.subtotal_cents > 0 ? "text-mint font-bold" : "text-muted"}`}>
-                  {formatMoney(o.paid_cents)}
+                  {payState({ totalCents: o.total_cents, subtotalCents: o.subtotal_cents, paidCents: o.paid_cents, paymentResult: o.payment_result }).state}
                   {o.refunded_cents > 0 && (
                     <div data-refund-status className="text-xs font-bold text-coral-dark">{o.refunded_cents >= o.paid_cents ? "Refunded" : "Partly refunded"} {formatMoney(o.refunded_cents)}</div>
                   )}

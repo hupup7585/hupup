@@ -9,6 +9,7 @@ import DualDate, { HebrewDay } from "@/components/DualDate";
 import { englishDate } from "@/lib/dual-date";
 import { DELIVERY_WINDOW, PICKUP_BY } from "@/lib/rental-days";
 import MonthCalendar from "./MonthCalendar";
+import { orderPath } from "@/lib/order-path";
 
 type P = { id: number; categoryId: number; name: string; priceCents: number; quantity: number };
 
@@ -369,7 +370,7 @@ export default function PosForm(props: {
         {result && (
           <p className={`rounded-xl p-3 text-sm font-semibold ${result.ok ? "bg-mint/15 text-[#13895C]" : "bg-coral/10 text-coral-dark"}`}>
             {result.message}{" "}
-            {result.orderId && <Link className="underline" href={`/admin/orders/${result.orderId}`}>Open order</Link>}
+            {result.orderId && <Link className="underline" href={orderPath(result.orderId)}>Open order</Link>}
             {result.cardUrl && (
               <a href={result.cardUrl} target="_blank" rel="noopener noreferrer" className="btn mt-3 block w-full py-3 text-center" data-pos-card-page>
                 Open the secure card page ({money(result.cardCents ?? 0)})

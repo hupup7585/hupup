@@ -2,6 +2,7 @@ import { BUSINESS_NAME, config } from "@/lib/config";
 import { dualDate } from "@/lib/dual-date";
 import { formatPhone } from "@/lib/phone";
 import { orderNumber, type getOrderWithItems } from "@/lib/orders";
+import { orderPath } from "@/lib/order-path";
 
 type Full = NonNullable<Awaited<ReturnType<typeof getOrderWithItems>>>;
 const money = (c: number | null | undefined) => `$${((c ?? 0) / 100).toFixed(2)}`;
@@ -35,7 +36,7 @@ export function businessOrderEmail(full: Full, paidCents: number): { subject: st
     `Paid now: ${money(paidCents)}`,
     ...(o.notes ? ["", `Notes: ${o.notes}`] : []),
     "",
-    `Open the order: ${config.baseUrl()}/admin/orders/${o.id}`,
+    `Open the order: ${config.baseUrl()}${orderPath(o.id)}`,
   ];
   return { subject: `${BUSINESS_NAME}: new paid order #${num} for ${dualDate(o.eventDate, "short")}`, text: lines.join("\n") };
 }

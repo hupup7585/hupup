@@ -22,6 +22,8 @@ import CallsCard from "./CallsCard";
 import JourneyCard from "./JourneyCard";
 import { journeyStats } from "@/lib/call-journey";
 import { solaMissing } from "@/lib/sola";
+import { orderPath } from "@/lib/order-path";
+import { payState } from "@/lib/pay-label";
 
 const RANGES = { week: "This week", month: "This month", year: "This year" } as const;
 type Range = keyof typeof RANGES;
@@ -188,12 +190,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <tbody>
               {upcoming.map((o) => (
                 <tr key={o.id} className="hover:bg-bg">
-                  <td className="td font-bold"><Link href={`/admin/orders/${o.id}`}>{orderNumber(o.id)}</Link></td>
+                  <td className="td font-bold"><Link href={orderPath(o.id)}>{orderNumber(o.id)}</Link></td>
                   <td className="td">{o.customer_name ?? "—"}<div className="text-xs text-muted">{formatPhone(o.customer_phone)}</div></td>
                   <td className="td whitespace-nowrap"><DualDate yi iso={o.event_date} style="short" /> <span className="text-muted">→ pickup <DualDate yi iso={o.pickup_date} style="short" /></span></td>
                   <td className="td">{o.items}</td>
                   <td className="td">{o.channel === "PHONE" ? "Phone" : "In person"}</td>
-                  <td className="td font-bold">{formatMoney(o.subtotal_cents)}</td>
+                  <td className="td font-bold">{formatMoney(o.total_cents ?? o.subtotal_cents)}<div className={`text-xs font-normal ${payState({ totalCents: o.total_cents, subtotalCents: o.subtotal_cents, paidCents: o.paid_cents, paymentResult: o.payment_result }).declined ? "font-bold text-coral-dark" : "text-muted"}`}>{payState({ totalCents: o.total_cents, subtotalCents: o.subtotal_cents, paidCents: o.paid_cents, paymentResult: o.payment_result }).state}</div></td>
                   <td className="td"><StatusBadge status={o.status} /></td>
                 </tr>
               ))}

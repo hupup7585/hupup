@@ -12,6 +12,7 @@ import SectionNotActive from "@/components/SectionNotActive";
 import { safeSection } from "@/lib/safe-section";
 import CallYiddishDay from "@/components/CallYiddishDay";
 import { callJourneys, type JourneyEvent } from "@/lib/call-journey";
+import { orderPath } from "@/lib/order-path";
 
 const KIND_STYLE: Record<string, string> = {
   step: "bg-bg text-muted",
@@ -108,7 +109,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
                   <td className="td"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${cls}`}>{label}</span></td>
                   <td className="td">
                     {c.order_id ? (
-                      <Link href={`/admin/orders/${c.order_id}`} className="flex items-center gap-2">
+                      <Link href={orderPath(c.order_id)} className="flex items-center gap-2">
                         <b className="text-navy underline-offset-2 hover:underline">Order number {orderNumber(c.order_id)}</b>
                         {c.order_status && <StatusBadge status={c.order_status} />}
                         {c.subtotal_cents ? <span className="text-muted">{formatMoney(c.subtotal_cents)}</span> : null}

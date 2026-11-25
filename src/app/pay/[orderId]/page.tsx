@@ -11,6 +11,7 @@ import { smsNumberDisplay } from "@/lib/sms-number";
 import DualDate from "@/components/DualDate";
 import { LINK_TEXT, holdEnded, holdForCardPage, keepHoldWhileActive, linkOptionsActive, linkRulesActive, removedWithOptions } from "@/lib/late-payment";
 import { checkAgainAction, chooseOptionAction } from "./actions";
+import { orderIdFromParam } from "@/lib/order-path";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Review and pay | Hup Up Attractions", robots: { index: false } };
@@ -21,7 +22,7 @@ const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 export default async function PayPage({ params, searchParams }: { params: Promise<{ orderId: string }>; searchParams: Promise<{ t?: string; held?: string }> }) {
   const { orderId } = await params;
   const { t, held } = await searchParams;
-  const id = Number(orderId);
+  const id = orderIdFromParam(orderId); // the order number (1077) or an older id link (77)
   if (!Number.isInteger(id) || !verifyPayToken(id, t)) notFound();
   // Every link charges items + delivery + tax: price any order not priced yet (made in Admin, or older ones)
   const before = await getPaymentGroup(id);

@@ -5,6 +5,7 @@ import { UNIT_STATUSES } from "@/lib/db/schema";
 import { UNIT_STATUS_LABEL, listUnits, unitHistory } from "@/lib/units";
 import { dualDateTime } from "@/lib/dual-date";
 import { addUnitAction, unitStatusAction } from "./actions";
+import { orderPath } from "@/lib/order-path";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Equipment units · Hup Up Attractions", robots: { index: false } };
@@ -75,7 +76,7 @@ export default async function UnitsPage({ searchParams }: { searchParams: Promis
               <li key={h.id}>{dualDateTime(h.at)}: {h.fromStatus ? `${UNIT_STATUS_LABEL[h.fromStatus as keyof typeof UNIT_STATUS_LABEL]} to ` : ""}{UNIT_STATUS_LABEL[h.toStatus as keyof typeof UNIT_STATUS_LABEL]}{h.reason ? `, ${h.reason}` : ""}</li>
             ))}
           </ul>
-          {hist.orderIds.length > 0 && <p className="mt-3 text-sm">Orders: {hist.orderIds.map((id) => <a key={id} className="mr-2 underline" href={`/admin/orders/${id}`}>Order number {1000 + id}</a>)}</p>}
+          {hist.orderIds.length > 0 && <p className="mt-3 text-sm">Orders: {hist.orderIds.map((id) => <a key={id} className="mr-2 underline" href={orderPath(id)}>Order number {1000 + id}</a>)}</p>}
         </section>
       )}
 

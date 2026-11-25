@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { confirmAttentionOrder } from "@/lib/late-payment";
+import { orderPath } from "@/lib/order-path";
 
 /** Owner or Secretary: confirm a late-paid order once its items are free again (re-checked on the server). */
 export async function confirmAttentionAction(orderId: number) {
@@ -11,5 +12,5 @@ export async function confirmAttentionAction(orderId: number) {
   const ok = await confirmAttentionOrder(orderId);
   if (ok) await (await import("@/lib/status-history")).explainStatus(orderId, "CONFIRMED", "Confirmed by staff after checking the items are free again", s.userId);
   await db.insert(schema.auditLog).values({ userId: s.userId, action: ok ? "order.attention_confirmed" : "order.attention_still_taken", entityType: "order", entityId: String(orderId) });
-  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath(orderPath(orderId));
 }

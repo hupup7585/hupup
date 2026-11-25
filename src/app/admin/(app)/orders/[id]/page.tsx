@@ -29,11 +29,13 @@ import { STATUS_LABEL, statusHistory } from "@/lib/status-history";
 import { paymentSourceLabel } from "@/lib/sola-phonepay";
 import { filesForOrder } from "@/lib/message-files";
 import MessageFiles from "@/components/staff/MessageFiles";
+import { orderIdFromParam } from "@/lib/order-path";
+import { payState } from "@/lib/pay-label";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const staff = await requireAdmin();
-  const full = await getOrderWithItems(Number(id));
+  const full = await getOrderWithItems(orderIdFromParam(id)); // the order number (1031) or an older id link (31)
   if (!full) notFound();
   const { order: o, items, customer } = full;
   const due = (o.totalCents ?? o.subtotalCents) - o.paidCents;
@@ -93,7 +95,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   })())}
                 </>
               )}
-              <div className="text-sm text-muted">Paid {formatMoney(o.paidCents)}{o.paymentMethod ? ` (${paymentSourceLabel(o.paymentMethod)})` : ""}{o.solaRefNum ? ` · Sola ref ${o.solaRefNum}` : ""}</div>
+              <div className={`text-sm ${payState(o).declined ? "font-bold text-coral-dark" : "text-muted"}`} data-pay-state>{o.paidCents > 0 ? `Paid ${formatMoney(o.paidCents)}` : payState(o).state}{o.paymentMethod ? ` (${paymentSourceLabel(o.paymentMethod)})` : ""}{o.solaRefNum ? ` · Sola ref ${o.solaRefNum}` : ""}</div>
               {o.paymentResult && (
                 <div data-payment-result className={`text-sm ${o.paymentResult === "declined" ? "font-bold text-coral-dark" : "text-[#13895C] font-semibold"}`}>
                   {paymentResultLabel(o)}

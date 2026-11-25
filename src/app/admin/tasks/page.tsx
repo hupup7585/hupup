@@ -9,6 +9,7 @@ import DualDate, { HebrewDay } from "@/components/DualDate";
 import { PRIORITY_LABEL, STATUS_LABEL, canCreate, isOverdue, laborCents, minutesOf, projectProfit, seesMoney, staffList, visibleTasks, type Task } from "@/lib/tasks";
 import { createTaskAction, saveProjectAction, saveRateAction } from "./actions";
 import TaskLine from "./TaskLine";
+import { orderPath } from "@/lib/order-path";
 
 type SP = { view?: string; status?: string; mine?: string; m?: string; msg?: string; err?: string; project?: string };
 
@@ -209,7 +210,7 @@ async function ProjectsView({ staff, projects }: { staff: Awaited<ReturnType<typ
                   <tr key={p.id}>
                     <td className="td"><Link className="font-bold text-navy underline" href={`/admin/tasks?project=${p.id}&status=all`}>{p.name}</Link>{p.status === "closed" && <span className="ml-2 text-xs text-muted">closed</span>}</td>
                     <td className="td">{c ? `${c.d}/${c.n} done` : "—"}</td>
-                    <td className="td">{p.orderIds.length ? p.orderIds.map((o) => <Link key={o} className="mr-1 underline" href={`/admin/orders/${o}`}>{o}</Link>) : "—"}</td>
+                    <td className="td">{p.orderIds.length ? p.orderIds.map((o) => <Link key={o} className="mr-1 underline" href={orderPath(o)}>{o}</Link>) : "—"}</td>
                     {money && (
                       <>
                         <td className="td">{formatMoney(profits[i].incomeCents)}</td>
