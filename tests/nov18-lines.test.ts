@@ -25,7 +25,7 @@ describe("approved lines", () => {
     expect(PROMPTS.back_to_menu.text).toBe("To go back, press star.");
     // Nov 19, 2026: the star line is one shared recording, played after each menu; no menu line holds it any more
     expect(PROMPTS.book_back.text).toBe("To go back, press star.");
-    for (const p of Object.entries(PROMPTS)) if (p[0] !== "book_back" && p[0] !== "back_to_menu" && p[0] !== "box153" && p[0] !== "box34_menu") // box 34: approved with its own star line (Nov 21, 2026) expect(p[1].text, p[0]).not.toContain("To go back, press star.");
+    for (const p of Object.entries(PROMPTS)) if (p[0] !== "book_back" && p[0] !== "back_to_menu" && p[0] !== "box153" && p[0] !== "box34_menu" /* box 34: approved with its own star line (Nov 21, 2026) */) expect(p[1].text, p[0]).not.toContain("To go back, press star.");
     const all = Object.values(PROMPTS).map((p) => p.text).join("\n");
     expect(all).not.toContain("For the main menu, press star.");
     expect(all).not.toContain("To go back to the main menu, press star.");
