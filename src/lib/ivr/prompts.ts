@@ -79,6 +79,11 @@ export const PROMPTS = {
   book_r3a: { group: "Booking by item (key 1)", label: "Bookings menu, recording 3a (customer service)", text: "For information or questions, press 0 for customer service." },
   // Abraham, Yes, Nov 25, 2026, 3:25 PM: plays right after 3a every time (and as line 2 of the key 0 after-hours set)
   book_r3c: { group: "Booking by item (key 1)", label: "Bookings menu, recording 3c: customer service hours", text: "Our customer service is open Sunday through Thursday, from 11 AM to 4 PM." },
+  // Bookings menu key 0 outside customer service hours (Abraham: wording y 3:21 PM, order y 3:27 PM, Nov 25, 2026);
+  // line 2 is book_r3c (waits for new wording since 4:50 PM)
+  after_hours_closed: { group: "Booking by item (key 1)", label: "Bookings key 0 after hours, line 1: customer service closed", text: "Our customer service is currently closed." },
+  after_hours_auto: { group: "Booking by item (key 1)", label: "Bookings key 0 after hours, line 3: use the automated system (key 1)", text: "For the best availability and fastest booking, please use our easy automated system to ensure your booking today. To get started, press 1." },
+  after_hours_message: { group: "Booking by item (key 1)", label: "Bookings key 0 after hours, line 4: leave a message", text: "Otherwise, leave a message after the tone, and a customer service representative will return your call on the next open day, and will help you find the best available options for your needs." },
   book_r3b: { group: "Booking by item (key 1)", label: "Bookings menu, recording 3b (schools and organizations)", text: "For schools, corporate events, and organizational bookings, press 9." },
   book_note: { group: "Booking by item (key 1)", label: "Bookings menu: first line (replaced by recording 1, Nov 19)", text: "Please note, orders can be placed only through our automated system. For information or questions, press 0 for customer service." },
   book_corporate: { group: "Booking by item (key 1)", label: "Bookings menu key 9 (replaced by recording 3, Nov 19)", text: "For schools, corporate events, and organizational bookings, press 9." },

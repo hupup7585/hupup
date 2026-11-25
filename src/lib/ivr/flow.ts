@@ -1187,14 +1187,16 @@ async function logCatalogRequest(ctx: Ctx, channel: "text" | "email", to: string
 }
 
 /** Does this line ring now (office hours, after-hours switch, key 6 hours, Shabbes and Yom Tov)? */
-async function lineRingsNowFor(k: RingKey, settings: Awaited<ReturnType<typeof getSettings>>, at = new Date()) {
+async function lineRingsNowFor(k: RingKey, settings: Awaited<ReturnType<typeof getSettings>>, at = new Date(), opts: { hoursOnly?: boolean } = {}) {
   const iso = localISO(at);
   // The Hours page (Abraham, Nov 25, 2026, 4:54 PM): each line's own schedule (or its group's) and its on/off switch
   const { RING_KEY_LINE, effectiveLine, lineOpen, loadHours } = await import("@/lib/hours-schedule");
   const hours = loadHours(settings);
   const line = RING_KEY_LINE[k] ?? "office";
   if (!effectiveLine(hours, line).on) return false; // switched off: this line goes to its voicemail
-  return lineRingsNow(k, at, settings, { officeOpen: line === "office" ? officeOpenNow(at, settings) : lineOpen(hours, line, at, settings), shabbosOrYomTov: isShabbosOrYomTov(iso), candleLighting: erevCandleLighting(iso, settings) });
+  const inHours = line === "office" ? officeOpenNow(at, settings) : lineOpen(hours, line, at, settings);
+  if (opts.hoursOnly) return inHours && !isShabbosOrYomTov(iso); // bookings key 0: the line's own hours only (no after-hours ringing)
+  return lineRingsNow(k, at, settings, { officeOpen: inHours, shabbosOrYomTov: isShabbosOrYomTov(iso), candleLighting: erevCandleLighting(iso, settings) });
 }
 
 /**
@@ -2112,6 +2114,34 @@ const handlers: Record<string, Handler> = {
   },
 
   /**
+   * Bookings menu key 0 outside customer service hours (Abraham, Nov 25, 2026, item 4): "Our customer service is
+   * currently closed." (the hours line, book_r3c, joins here once its new wording is in), "...To get started, press 1.",
+   * "Otherwise, leave a message after the tone, ..." then the tone and the message into the customer service box (its
+   * own greeting does not play). Keys while they play: 1 the categories menu, star the bookings menu, any other key not
+   * valid then the set again. No key: the tone.
+   */
+  async "cs-closed"(ctx, vr) {
+    await track(ctx.callSid, "step", "Bookings key 0: customer service closed (after-hours set)");
+    const g = keypad(vr, url("cs-closed-key"), { timeout: 1 });
+    sp(g, ctx, "after_hours_closed");
+    if (BOOK_R3C_LIVE) sp(g, ctx, "book_r3c");
+    sp(g, ctx, "after_hours_auto");
+    sp(g, ctx, "after_hours_message");
+    const box = await vmBox("4");
+    await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail", data: { vmEntry: "4", missed: "closed" } }, ctx.session);
+    return vmRecord(vr, box, "4");
+  },
+
+  async "cs-closed-key"(ctx, vr) {
+    const d = ctx.body.Digits;
+    if (!d) return back(vr, "cs-closed");
+    if (d === "1") return back(vr, "cats");
+    if (d === "*") return back(vr, "book");
+    sp(vr, ctx, "not_valid");
+    return back(vr, "cs-closed");
+  },
+
+  /**
    * The categories menu (box 12a, Abraham, Nov 22, 2026): bookings recording 2 (the three categories), the shared cart
    * line, the shared star line. After "same day" on item added, and star in any item list. Star = the bookings menu.
    */
@@ -2140,7 +2170,8 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits; // keys only (Abraham)
     if (!d) return (await callOrders(ctx)).length ? idleNoKey(vr, ctx, "book") : repeatMenu(vr, ctx, "book");
     if (d === "*") return back(vr, "menu"); // star goes back one step
-    if (d === "0") return back(vr, "ring", { k: "4" }); // customer service (main menu key 3's line)
+    // customer service (main menu key 3's line), only in its hours; outside them the after-hours set (Nov 25, 2026, item 4)
+    if (d === "0") return (await lineRingsNowFor("4", await getSettings(), new Date(), { hoursOnly: true })) ? back(vr, "ring", { k: "4" }) : back(vr, "cs-closed");
     if (d === "9") return back(vr, "ring", { k: "8" }); // schools, corporate events and organizations
     if (d === "8") return back(vr, "catalog"); // the catalog, also from the bookings menu (Nov 19, 2026)
     const cat = (await phoneCategories())[Number(d) - 1];
