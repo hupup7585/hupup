@@ -1562,6 +1562,9 @@ export const phonepayAttempts = pgTable(
     helperEndedAt: timestamp("helper_ended_at", { withTimezone: true }),
     /** Music path (Nov 23, 2026): when the call to Sola joined the waiting caller (null = never joined) */
     bridgedAt: timestamp("bridged_at", { withTimezone: true }),
+    /** Connect timing (Nov 25, 2026): the hold line started in the pay queue, and when it finished */
+    holdStartedAt: timestamp("hold_started_at", { withTimezone: true }),
+    holdDoneAt: timestamp("hold_done_at", { withTimezone: true }),
   },
   (t) => [index("phonepay_attempts_started_idx").on(t.startedAt)],
 );

@@ -652,6 +652,13 @@
       "when": 1795730000000,
       "tag": "0092_delivery_instructions",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1795740000000,
+      "tag": "0093_pay_hold_timing",
+      "breakpoints": true
     }
   ]
 }

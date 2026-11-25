@@ -33,6 +33,7 @@ import { handleVoice } from "@/lib/ivr/flow";
 const call = (action: string, body: Record<string, string> = {}, q = "", sid = "CAcaller") =>
   handleVoice({ action, query: new URLSearchParams(q), body: { CallSid: sid, ...body }, callSid: sid, from: "+18457990925" });
 let orderId = 0;
+const flush = () => new Promise((r) => setTimeout(r, 30));
 
 beforeAll(async () => {
   Object.assign(process.env, { PUBLIC_BASE_URL: "https://hupup.example", SOLA_PHONEPAY_PIN: "4321", TWILIO_PHONE_NUMBER: "+18454157585", SOLA_API_KEY: "k" });
@@ -50,7 +51,8 @@ describe("payment line with music", () => {
     const [t] = await db.insert(schema.musicTracks).values({ name: "Song", pieces: 2, pieceSeconds: 8, durationSec: 16, complete: true }).returning();
     await saveSetting("musicPayConnect", String(t.id));
     const x = await call("phonepay-go", {}, `o=${orderId}&c=1`);
-    expect(x).toMatch(/<Enqueue [^>]*waitUrl="https:\/\/hupup\.example\/api\/voice\/music\?place=pay"[^>]*>pay-CAcaller<\/Enqueue>/);
+    await flush(); // a retry starts the call to Sola during the hold line (Nov 25, 2026)
+    expect(x).toMatch(/<Enqueue [^>]*waitUrl="https:\/\/hupup\.example\/api\/voice\/music\?place=pay&amp;a=\d+"[^>]*>pay-CAcaller<\/Enqueue>/);
     expect(x).not.toContain("4321"); // the merchant code is never in the caller's call
     expect(h.created[0]).toMatchObject({ to: "+18334343354", from: "+18454157585" });
     const a = (await db.select().from(schema.phonepayAttempts)).at(-1)!;
@@ -58,7 +60,8 @@ describe("payment line with music", () => {
     // the call to Sola: the key tones, then it joins the caller's queue
     const leg = await call("pay-leg", {}, `a=${a.id}`, "CAsola");
     expect(leg).toMatch(/<Play digits="w+4321#w+80000#w+1"\/>/);
-    expect(leg).toMatch(/<Queue url="https:\/\/hupup\.example\/api\/voice\/pay-leg-joined\?a=\d+" method="POST">pay-CAcaller<\/Queue>/);
+    const join = await call("pay-leg-wait", {}, `a=${a.id}`, "CAsola"); // no hold line in the queue: joins right away
+    expect(join).toMatch(/<Queue url="https:\/\/hupup\.example\/api\/voice\/pay-leg-joined\?a=\d+" method="POST">pay-CAcaller<\/Queue>/);
     // the music the caller hears comes piece by piece
     expect(await call("music", {}, "place=pay")).toContain(`/api/music/music/${t.id}/0.wav`);
     // Sola never answered: one redial first (Nov 23, 2026), then the waiting caller is moved on (backup number)
@@ -73,6 +76,7 @@ describe("payment line with music", () => {
   it("Nov 23, 2026 bug: the call to Sola ends after 7 seconds without joining: redial once, then the try-again menu right away", async () => {
     h.updated.length = 0;
     const x = await call("phonepay-go", {}, `o=${orderId}&c=1`);
+    await flush();
     expect(x).toContain("<Enqueue");
     const a = (await db.select().from(schema.phonepayAttempts)).at(-1)!;
     const before = h.created.length;
@@ -87,6 +91,7 @@ describe("payment line with music", () => {
   it("joined: nothing moves the caller when the call to Sola ends", async () => {
     h.updated.length = 0;
     await call("phonepay-go", {}, `o=${orderId}&c=1`);
+    await flush();
     const a = (await db.select().from(schema.phonepayAttempts)).at(-1)!;
     await call("pay-leg-joined", {}, `a=${a.id}`, "CAcaller");
     const before = h.created.length;
@@ -97,3 +102,64 @@ describe("payment line with music", () => {
     expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).not.toMatch(/endPayLeg\(/); // main account only
   });
 });
+
+describe("connect timing (Abraham, Nov 25, 2026): Sola is called before the hold line; the line is never cut", () => {
+  const HOLD = "We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you.";
+  const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1]);
+  let o2 = 0;
+  beforeAll(async () => {
+    const [o] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2026-12-03", pickupDate: "2026-12-04", subtotalCents: 50000, totalCents: 50000 }).returning();
+    o2 = o.id;
+  });
+  it("key 0 at box 140: nothing is dialed (the payment link)", async () => {
+    const before = h.created.length;
+    const x = await call("phonepay-option", { Digits: "0" }, `o=${o2}`);
+    expect(x).toContain(`paylink?o=${o2}`);
+    expect(h.created.length).toBe(before);
+    expect(x).not.toContain("<Dial");
+  });
+  it("first try, no key: the call to Sola starts before the hold line, which plays first in the pay queue", async () => {
+    const before = h.created.length;
+    const x = await call("phonepay-go", {}, `o=${o2}&c=1`);
+    expect(h.created.length).toBe(before + 1); // Sola is already being called when the caller's reply goes out
+    expect(said(x)).toEqual([]); // the hold line is not in this reply: it plays inside the queue
+    expect(x).toContain("<Enqueue");
+    const a = (await db.select().from(schema.phonepayAttempts)).at(-1)!;
+    const first = await call("music", {}, `place=pay&a=${a.id}`);
+    expect(said(first)).toEqual([HOLD]);
+    expect(first).not.toContain("/api/music/");
+  });
+  it("the hold line is never cut: Sola waits (1-second pauses) until it ends, then joins; the music seconds are logged", async () => {
+    const a = (await db.select().from(schema.phonepayAttempts)).at(-1)!;
+    const waiting = await call("pay-leg-wait", {}, `a=${a.id}`, "CAsola");
+    expect(waiting).toContain('<Pause length="1"/>');
+    expect(waiting).not.toContain("<Queue");
+    expect(waiting).toContain(`pay-leg-wait?a=${a.id}&amp;n=1`);
+    // the line finished: the next music request marks it done and plays music
+    const next = await call("music", {}, `place=pay&a=${a.id}`);
+    expect(next).toContain("/api/music/");
+    const ready = await call("pay-leg-wait", {}, `a=${a.id}&n=1`, "CAsola");
+    expect(ready).toContain("<Queue");
+    await call("pay-leg-joined", {}, `a=${a.id}`, "CAcaller");
+    const [after] = await db.select().from(schema.phonepayAttempts).where((await import("drizzle-orm")).eq(schema.phonepayAttempts.id, a.id));
+    expect(after.holdDoneAt).toBeTruthy();
+    expect(after.bridgedAt).toBeTruthy();
+    const steps = await db.select().from(schema.callEvents);
+    const logged = steps.find((e) => /seconds of music after the hold line/.test(e.label));
+    expect(logged?.label).toMatch(/^Payment line joined: \d+ seconds of music after the hold line/);
+  });
+  it("a retry: the caller is queued at once (the hold line plays) while the call to Sola starts after the 3-second wait", async () => {
+    const before = h.created.length;
+    const x = await call("phonepay-go", {}, `o=${o2}`);
+    expect(x).toContain("<Enqueue");
+    expect(said(x)).toEqual([]);
+    expect(x).not.toContain("box 140");
+    await flush();
+    expect(h.created.length).toBe(before + 1);
+    const a = (await db.select().from(schema.phonepayAttempts)).at(-1)!;
+    expect(said(await call("music", {}, `place=pay&a=${a.id}`))).toEqual([HOLD]);
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toContain("waitMs: process.env.VITEST ? 0 : 3000");
+  });
+});
+

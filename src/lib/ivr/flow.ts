@@ -402,6 +402,12 @@ async function box56(vr: VR, ctx: Ctx, orderId: number, days: { order: { id: num
   play(piece(3), texts[2] ?? "");
 }
 
+/** The call to Sola can be placed (Twilio and the hotline number are set). */
+async function payLegPossible() {
+  const { getTwilio } = await import("@/lib/twilio-client");
+  return Boolean(getTwilio() && process.env.TWILIO_PHONE_NUMBER);
+}
+
 /** A +1 number read in three groups, the same way as the phone read-back ("eight four five, ..."). */
 function spokenPhone(e164: string) {
   const d = e164.replace(/\D/g, "").slice(-10);
@@ -1253,6 +1259,18 @@ const handlers: Record<string, Handler> = {
    */
   async music(ctx, vr) {
     const place = ctx.query.get("place") === "pay" ? "pay" : "staff";
+    // Payment connect (Abraham, Nov 25, 2026): the hold line is the first thing in the pay queue; the next request (it
+    // finished playing) marks it done, so the call to Sola joins only after the whole line, never mid-sentence
+    const a = place === "pay" ? Number(ctx.query.get("a")) || 0 : 0;
+    if (a) {
+      const [att] = await db.select({ s: schema.phonepayAttempts.holdStartedAt, d: schema.phonepayAttempts.holdDoneAt }).from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1);
+      if (att && !att.s) {
+        await db.update(schema.phonepayAttempts).set({ holdStartedAt: new Date() }).where(eq(schema.phonepayAttempts.id, a));
+        sp(vr, ctx, "pay_hold_secure", undefined, { draftOk: true });
+        return vr;
+      }
+      if (att && !att.d) await db.update(schema.phonepayAttempts).set({ holdDoneAt: new Date() }).where(eq(schema.phonepayAttempts.id, a));
+    }
     const piece = await nextPiece(place);
     if (piece) vr.play(piece.url);
     else vr.pause({ length: 8 }); // no music chosen for this place: quiet
@@ -3906,19 +3924,40 @@ const handlers: Record<string, Handler> = {
     // Watch Sola every second while the call to Sola is up (no time limit, Abraham, Nov 18, 2026)
     await startPayWatch(attempt.id);
     // Box 140 already told the caller they are being connected; later tries keep the "please hold" line
-    // The hold line right before the payment line: after box 140 on the first try, and before every retry (no box 140)
-    sp(vr, ctx, "pay_hold_secure", undefined, { draftOk: true });
     // Straight from the hotline to Sola PhonePay (Abraham, Nov 17, 2026): PIN, the order amount (from the order, never
     // the caller) and 1, sent once PhonePay answers. Star brings the caller back at any time.
     const s = await getSettings();
     const digits = buildSendDigits(s.solaPhonePayDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: group.due, orderNumber: orderNumber(o) });
     // Music while connecting (Abraham, Nov 17, 2026): when songs are chosen for the payment line, the caller waits with
-    // them while a separate call enters the merchant code and amount, then joins the caller to Sola
-    // A retry waits 3 seconds before calling Sola again (Nov 23, 2026: Sola dropped a call made right after the first)
-    if ((await placeTracks("pay")).length && (await startPayLegWithMusic({ callerSid: ctx.callSid, number: s.solaPhonePayNumber, attemptId: attempt.id, baseUrl: config.baseUrl(), waitMs: earlier.length && !process.env.VITEST ? 3000 : 0 }))) {
-      vr.enqueue({ waitUrl: url("music", { place: "pay" }), waitUrlMethod: "POST", action: url("phonepay-done", { o, a: attempt.id }), method: "POST" }, payQueueName(ctx.callSid));
+    // them while a separate call enters the merchant code and amount, then joins the caller to Sola.
+    // Connect timing (Abraham, Nov 25, 2026): the call to Sola starts BEFORE the hold line; the caller is put in the pay
+    // queue right away and hears the hold line there first (music route), then music until Sola joins (never cutting
+    // the line). A retry keeps its 3-second wait before calling Sola again (Nov 23, 2026), overlapped with the line.
+    const musicPath = (await placeTracks("pay")).length > 0;
+    const enqueue = () => {
+      vr.enqueue({ waitUrl: url("music", { place: "pay", a: attempt.id }), waitUrlMethod: "POST", action: url("phonepay-done", { o, a: attempt.id }), method: "POST" }, payQueueName(ctx.callSid));
       return vr;
+    };
+    const legInput = { callerSid: ctx.callSid, number: s.solaPhonePayNumber, attemptId: attempt.id, baseUrl: config.baseUrl() };
+    if (musicPath && !earlier.length && (await startPayLegWithMusic({ ...legInput, waitMs: 0 }))) {
+      await track(ctx.callSid, "step", `Card payment try ${n}: call to Sola started before the hold line`, { attempt: attempt.id });
+      return enqueue();
     }
+    if (musicPath && earlier.length && (await payLegPossible())) {
+      const callerSid = ctx.callSid;
+      const done = url("phonepay-done", { o, a: attempt.id, nr: 1 });
+      runLater(async () => {
+        const ok = await startPayLegWithMusic({ ...legInput, waitMs: process.env.VITEST ? 0 : 3000 });
+        if (ok) return;
+        // Sola could not be called: the waiting caller goes on (the backup number), never left in the queue
+        const { getTwilio } = await import("@/lib/twilio-client");
+        await getTwilio()?.calls(callerSid).update({ url: done, method: "POST" }).catch(() => null);
+      });
+      await track(ctx.callSid, "step", `Card payment try ${n}: call to Sola starts after the 3-second wait, during the hold line`, { attempt: attempt.id });
+      return enqueue();
+    }
+    // The direct way (no songs for the payment line): the hold line, then the dial
+    sp(vr, ctx, "pay_hold_secure", undefined, { draftOk: true });
     // Sola hang-up helper (option a, once the Owner turns it on after the real test call): Sola's voice is what we send
     // to the caller on this call
     if (s.solaListenOn) startSolaListen(vr, attempt.id, "outbound", s);
@@ -3940,6 +3979,23 @@ const handlers: Record<string, Handler> = {
     // Sola hang-up helper (option a): on this call Sola is who answered, so Sola's voice is the incoming audio
     if (s.solaListenOn) startSolaListen(vr, a, "inbound", s);
     vr.play({ digits }); // the key tones go to Sola only; the caller is still on hold with the music
+    return back(vr, "pay-leg-wait", { a: attempt.id });
+  },
+
+  /** The call to Sola is ready: join the waiting caller once the hold line has finished (checked every second). */
+  async "pay-leg-wait"(ctx, vr) {
+    const a = Number(ctx.query.get("a"));
+    const n = Number(ctx.query.get("n") || 0);
+    const [attempt] = a ? await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1) : [];
+    if (!attempt) {
+      vr.hangup();
+      return vr;
+    }
+    // Still in the hold line (an older try with no line in the queue joins right away; at most 60 seconds of waiting)
+    if (attempt.holdStartedAt && !attempt.holdDoneAt && n < 60) {
+      vr.pause({ length: 1 });
+      return back(vr, "pay-leg-wait", { a, n: n + 1 });
+    }
     const dial = vr.dial({ record: "do-not-record", timeLimit: 900 });
     // The queue's url runs for the waiting caller right as the two calls join: that marks the try as joined
     dial.queue({ url: url("pay-leg-joined", { a: attempt.id }), method: "POST" }, payQueueName(attempt.callSid));
@@ -3949,7 +4005,14 @@ const handlers: Record<string, Handler> = {
   /** The call to Sola just joined the waiting caller (nothing is played). */
   async "pay-leg-joined"(ctx, vr) {
     const a = Number(ctx.query.get("a"));
-    if (a) await db.update(schema.phonepayAttempts).set({ bridgedAt: new Date() }).where(eq(schema.phonepayAttempts.id, a));
+    if (!a) return vr;
+    const now = new Date();
+    const [attempt] = await db.update(schema.phonepayAttempts).set({ bridgedAt: now }).where(eq(schema.phonepayAttempts.id, a)).returning();
+    // Abraham, Nov 25, 2026: how long the caller heard music after the hold line (target: 5 seconds at most)
+    if (attempt?.holdDoneAt) {
+      const secs = Math.max(0, Math.round((now.getTime() - attempt.holdDoneAt.getTime()) / 1000));
+      await track(attempt.callSid, "step", `Payment line joined: ${secs} seconds of music after the hold line (try ${attempt.tryNumber ?? "?"})`, { attempt: a, musicSeconds: secs });
+    }
     return vr;
   },
 
