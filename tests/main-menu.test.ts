@@ -19,7 +19,7 @@ vi.mock("@/lib/ivr/session", () => ({
   updateSession: async (_sid: string, patch: Record<string, unknown> & { data?: Record<string, unknown> }) => Object.assign(h.session, patch, patch.data ? { data: { ...h.session.data, ...patch.data } } : {}), // merges data like the real session
 }));
 vi.mock("@/lib/jewish-calendar", async (orig) => ({ ...(await orig<typeof import("@/lib/jewish-calendar")>()), isShabbosOrYomTov: () => false })); // ringing rules: weekday (Phone Menu v3)
-vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
+vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => (globalThis as { __ov?: object }).__ov ?? {} }));
 vi.mock("@/lib/business-hours", async (orig) => ({ ...(await orig<typeof import("@/lib/business-hours")>()), officeOpenNow: () => h.open, lateHoursToday: () => null }));
 vi.mock("@/lib/notify", () => ({ sendSms: async () => ({ sent: true }), sendEmail: async () => ({ sent: true }) }));
 
@@ -122,7 +122,7 @@ describe("Abraham's start of the call and main menu (Nov 16, 2026)", () => {
 describe("every key, office open", () => {
   it("1 opens the bookings menu; 2 instructions; 6 learn about our rentals (Nov 19, 2026); 8 the catalog", async () => {
     expect(redirect(await press("1"))).toBe("book");
-    expect(redirect(await press("2"))).toBe("instructions");
+    expect(redirect(await press("2"))).toBe("ring?k=4"); // Nov 25, 2026, 12:55: scripts pending: the key 3 line
     expect(redirect(await press("6"))).toBe("learn");
     expect(redirect(await press("8"))).toBe("catalog");
   });
@@ -282,7 +282,7 @@ describe("every key, office closed", () => {
   it("1 books and 2 and 6 play their information 24/7; after hours every extension goes to voicemail (Abraham, Nov 12); 9 is voicemail", async () => {
     h.open = false;
     expect(redirect(await press("1"))).toBe("book");
-    expect(redirect(await press("2"))).toBe("instructions");
+    expect(redirect(await press("2"))).toBe("ring?k=4"); // Nov 25, 2026, 12:55: scripts pending: the key 3 line
     expect(redirect(await press("6"))).toBe("learn");
     expect(redirect(await press("3"))).toBe("ring?k=4");
     await saveSetting("ringAfterHours6", false); // key 6 is switched on live (Nov 14); here: the rule with every switch off
@@ -404,5 +404,33 @@ describe("Abraham's answers (Nov 16, 2026)", () => {
     const { allSlots } = await import("@/lib/recording-slots");
     const s = allSlots();
     for (const k of ["product_intro", "product_options", "product_default_desc", "phonepay_choice", "phonepay_not_found", "tz_ask", "tz_pick", "tz_saved"]) expect(s.some((x) => x.key === k || x.key.startsWith(`${k}#`)), k).toBe(false);
+  });
+});
+
+describe("main menu key 2 while the instruction scripts are pending (Abraham, Nov 25, 2026, 12:55)", () => {
+  it("pending: key 2 rings the customer service line (same as key 3), never the key 2 menu", async () => {
+    const two = await press("2");
+    expect(redirect(two)).toBe(redirect(await press("3")));
+    expect(redirect(two)).toBe("ring?k=4");
+    expect(two).not.toContain("instructions");
+    expect(two).not.toContain("<Say");
+  });
+  it("all three approved: key 2 plays the instruction menu as before", async () => {
+    const at = new Date();
+    (globalThis as { __ov?: object }).__ov = { instr_balloons: { approvedAt: at }, instr_laser: { approvedAt: at }, instr_paddle: { approvedAt: at } };
+    try {
+      expect(redirect(await press("2"))).toBe("instructions");
+      (globalThis as { __ov?: object }).__ov = { instr_balloons: { approvedAt: at }, instr_laser: { approvedAt: at } }; // one still pending
+      expect(redirect(await press("2"))).toBe("ring?k=4");
+    } finally {
+      delete (globalThis as { __ov?: object }).__ov;
+    }
+  });
+  it("keys 1, 3, 4, 5 and 0 unchanged", async () => {
+    expect(redirect(await press("1"))).toBe("book");
+    expect(redirect(await press("3"))).toBe("ring?k=4");
+    expect(redirect(await press("4"))).toBe("ring?k=5");
+    expect(redirect(await press("5"))).toBe("ring?k=6");
+    expect(redirect(await press("0"))).toBe("ring?k=0");
   });
 });

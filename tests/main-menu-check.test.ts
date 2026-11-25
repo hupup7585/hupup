@@ -54,7 +54,7 @@ describe("main menu: every key goes through", () => {
 
   const routes: [string, string][] = [
     ["1", "book"],
-    ["2", "instructions"],
+    ["2", "ring?k=4"], // Nov 25, 2026, 12:55: scripts pending: the customer service line (key 3)
     ["3", "ring?k=4"],
     ["4", "ring?k=5"], // issues during your rental (Nov 19, 2026)
     ["5", "ring?k=6"], // delivery and pickup (Nov 19, 2026)
@@ -181,7 +181,7 @@ describe("key 4: learn about our rentals (was key 3)", () => {
   });
   it("2 and 3 work when the office is closed too (recorded information, no one needs to answer)", async () => {
     h.open = false;
-    expect(redirect(await press("2"))).toBe("instructions");
+    expect(redirect(await press("2"))).toBe("ring?k=4"); // scripts pending (Nov 25, 2026, 12:55): the key 3 line, with its own after-hours voicemail
     expect(redirect(await press("6"))).toBe("learn");
     h.open = true;
   });
