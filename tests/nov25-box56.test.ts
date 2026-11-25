@@ -156,7 +156,7 @@ describe("Box 34 then box 56 (Abraham, Nov 24, 2026, 20:59 and 21:02)", () => {
     expect(rec).toContain(`directions-recorded?o=${id}`);
     const done = await call("directions-recorded", { RecordingSid: "REdir1", RecordingUrl: "https://api.twilio.com/rec/REdir1", RecordingDuration: "12" }, `o=${id}`);
     expect(said(done)).toEqual(["Thank you. We have saved your delivery instructions."]);
-    expect(done).toMatch(/<Redirect method="POST">[^<]*\/receipt-email<\/Redirect>/); // box 35 (Batch 2, Nov 25, 2026), then box 56
+    expect(done).toMatch(/<Redirect method="POST">[^<]*\/finalize<\/Redirect>/); // box 56 right after (Box 35 is after payment)
     const { deliveryInstructionsFor, deliveryInstructionsBox } = await import("@/lib/voicemail");
     const msgs = await deliveryInstructionsFor(id);
     expect(msgs).toHaveLength(1);
@@ -173,7 +173,6 @@ describe("Box 34 then box 56 (Abraham, Nov 24, 2026, 20:59 and 21:02)", () => {
   });
   it("pound at the menu: box 35, then pound there: box 56", async () => {
     await cart(["laser"]);
-    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("receipt-email");
-    expect(redirect(await call("receipt-email-choice", { Digits: "#" }))).toBe("finalize");
+    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("finalize");
   });
 });

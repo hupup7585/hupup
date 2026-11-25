@@ -336,8 +336,8 @@ export const PROMPTS = {
   box34_menu: { group: "Checkout", label: "Box 34: delivery instructions menu", text: "To add any special delivery instructions, press 1. To skip, press pound. To go back, press star." },
   box34_record: { group: "Checkout", label: "Box 34 after key 1: leave the message after the tone (then the shared pound_done line)", text: "Please leave a clear and detailed message with all your delivery instructions after the tone." },
   box34_thanks: { group: "Checkout", label: "Box 34 after pound: saved", text: "Thank you. We have saved your delivery instructions." },
-  // Box 35 (Abraham, Nov 25, 2026, Batch 2): receipt by email, after box 34 and before box 56
-  box35_receipt: { group: "Checkout", label: "Box 35: receipt by email (1 = the email steps, pound = skip, star = box 34)", text: "Almost done! To get your receipt by email, press 1. To skip, press pound. To go back, press star." },
+  // Box 35 (Abraham, Nov 25, 2026, 11:51): after a paid phone card payment, right after box 148 (no star on this screen)
+  box35_receipt: { group: "Pay by card (Sola PhonePay)", label: "Box 35: receipt by email, after the payment is approved (1 = the email steps, pound = skip)", text: "To receive a receipt by email, press 1. To skip, press pound." },
   // Menu 2 (Abraham, Nov 24, 2026, 20:56): one line right after the address is confirmed; town and price are live parts
   addr_saved_price: { group: "Checkout", label: "Menu 2: address saved, delivery to {town} is {price}", text: "Your delivery address has been saved, delivery to {town} is {price}.", vars: ["town", "price"] },
   ask_directions: { group: "Checkout", label: "Ask for delivery directions (optional)", text: "Is there anything our delivery team should know, like a gate code, where to park, or where to set up? Please say it now.", pending: true },

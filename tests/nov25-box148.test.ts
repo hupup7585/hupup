@@ -4,6 +4,11 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   session: { callSid: "CA148", fromNumber: "+18455550501", orderId: null as number | null, data: {} as Record<string, unknown>, status: "in_progress", outcome: "checked_out", startedAt: new Date() },
   sent: [] as { to: string; body: string }[],
+  receipts: [] as { to: string; orderId: number }[],
+}));
+vi.mock("@/lib/phone-receipt", () => ({
+  RECEIPT_APPROVED: true,
+  sendPhoneReceipt: async (to: string, input: { orderId: number }) => (h.receipts.push({ to, orderId: input.orderId }), { sent: true }),
 }));
 vi.mock("@/lib/db", async () => {
   const { createMemoryDb } = await import("./helpers/memory-db");
@@ -94,7 +99,7 @@ describe("box 148", () => {
     expect(said(bad)).toEqual(["Sorry, that is not a valid selection."]);
     expect(redirect(bad)).toBe(`pay-approved?o=${orderId}&r=1`);
     expect(said(await call("pay-approved", {}, `o=${orderId}&r=1`))[0]).toBe("To hear it again, press star.");
-    expect(redirect(await call("pay-approved-choice", {}, `o=${orderId}`))).toBe("promo-consent");
+    expect(redirect(await call("pay-approved-choice", {}, `o=${orderId}`))).toBe(`receipt-email?o=${orderId}`); // no key: box 35 (Nov 25, 2026, 11:51)
   });
   it("not agreed, key 1: box 142 (which number); the chosen number signs up, gets the confirmation and becomes the order's text number", async () => {
     expect(redirect(await call("pay-approved-choice", { Digits: "1" }, `o=${orderId}`))).toBe(`tx-which?p=conf&o=${orderId}`);
@@ -124,5 +129,41 @@ describe("box 148", () => {
     const full = await getOrderWithItems(orderId);
     await sendOrderText({ phone: orderTextPhone(full!.order, full!.customer)!, subject: "x", body: "Your driver is on the way.", orderId, event: "delivery_on_the_way" });
     expect(h.sent.map((m) => m.to)).toEqual(["+18455550777"]);
+  });
+});
+
+describe("Box 35 after payment (Abraham, Nov 25, 2026, 11:51)", () => {
+  it("the exact text; plays after the approved payment (box 148 no key), never with money still due", async () => {
+    expect(PROMPTS.box35_receipt.text).toBe("To receive a receipt by email, press 1. To skip, press pound.");
+    const { allSlots } = await import("@/lib/recording-slots");
+    expect(new Map(allSlots().map((x) => [x.key, x.text])).get("box35_receipt")).toBe("To receive a receipt by email, press 1. To skip, press pound.");
+    expect(Object.values(PROMPTS).some((p) => p.text.includes("Almost done! To get your receipt"))).toBe(false);
+    expect(redirect(await call("pay-approved", {}, `o=${orderId}`))).toBe(`receipt-email?o=${orderId}`);
+    const box = await call("receipt-email", {}, `o=${orderId}`);
+    expect(said(box)).toEqual(["To receive a receipt by email, press 1. To skip, press pound."]);
+    expect(box).not.toContain("press star");
+    const [unpaid] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", customerId, eventDate: "2026-12-09", pickupDate: "2026-12-10", subtotalCents: 20000, totalCents: 21625, paidCents: 0 }).returning();
+    expect(redirect(await call("receipt-email", {}, `o=${unpaid.id}`))).toBe("promo-consent");
+  });
+  it("pound skips to the goodbye; a wrong key: not valid, then box 35 again", async () => {
+    expect(redirect(await call("receipt-email-choice", { Digits: "#" }, `o=${orderId}`))).toBe("promo-consent");
+    const bad = await call("receipt-email-choice", { Digits: "*" }, `o=${orderId}`);
+    expect(said(bad)).toEqual(["Sorry, that is not a valid selection."]);
+    expect(redirect(bad)).toBe(`receipt-email?o=${orderId}`);
+  });
+  it("after the box 148 different-number step: box 35", async () => {
+    await optIn(CALLER);
+    await call("tx-heard", { Digits: "8455550888" }, `p=conf&o=${orderId}`);
+    expect(redirect(await call("tx-confirm", { Digits: "1" }, `p=conf&o=${orderId}`))).toBe(`receipt-email?o=${orderId}`);
+  });
+  it("key 1: the email steps, and the receipt goes to the entered email; a customer with no email gets it saved", async () => {
+    h.receipts.length = 0;
+    expect(redirect(await call("receipt-email-choice", { Digits: "1" }, `o=${orderId}`))).toBe(`catalog-email?p=rcpt&o=${orderId}`);
+    await call("catalog-email", {}, `p=rcpt&o=${orderId}`);
+    h.session.data = { ...h.session.data, catLocal: "sara", catDomain: "gmail.com" };
+    expect(redirect(await call("catalog-final-choice", { Digits: "1" }))).toBe("promo-consent");
+    expect(h.receipts).toEqual([{ to: "sara@gmail.com", orderId }]);
+    const [c] = await db.select().from(schema.customers).where(eq(schema.customers.id, customerId));
+    expect(c.email).toBe("sara@gmail.com");
   });
 });

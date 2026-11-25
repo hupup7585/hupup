@@ -140,19 +140,4 @@ describe("Batch 2 (Abraham, Nov 25, 2026): box 108a and box 35", () => {
     expect(plain(await call("catalog-send"))).toContain("We just emailed you our catalog!");
     expect(h.emails[0].to).toBe("dovid@gmail.com");
   });
-  it("box 35: word for word; 1 = the email steps for the receipt, pound = box 56, star = box 34; the confirmed email is kept for the booking", async () => {
-    expect(said(await call("receipt-email"))).toEqual(["Almost done! To get your receipt by email, press 1. To skip, press pound. To go back, press star."]);
-    expect(redirect(await call("receipt-email-choice", { Digits: "#" }))).toBe("finalize");
-    expect(redirect(await call("receipt-email-choice", { Digits: "*" }))).toBe("directions");
-    expect(redirect(await call("receipt-email-choice", { Digits: "7" }))).toBe("receipt-email");
-    expect(redirect(await call("receipt-email-choice", { Digits: "1" }))).toBe("catalog-email?p=rcpt");
-    const start = plain(await call("catalog-email", {}, "p=rcpt"));
-    expect(start).not.toContain("info at hup up"); // the catalog tip never plays for a receipt
-    expect(h.session.data.emailFor).toBe("receipt");
-    h.session.data = { ...h.session.data, catLocal: "dovid", catDomain: "gmail.com" };
-    expect(redirect(await call("catalog-final-choice", { Digits: "1" }))).toBe("finalize");
-    expect(h.session.data.email).toBe("dovid@gmail.com");
-    expect(h.session.data.emailFor).toBeUndefined();
-    expect(h.emails).toHaveLength(0); // no catalog is sent
-  });
 });

@@ -1236,7 +1236,7 @@ async function txSend(ctx: Ctx, vr: VR, p: "cat" | "pay" | "conf", to: string) {
       const blocked = (await customerByPhone(to))?.smsOptOut;
       if (blocked) {
         sp(vr, ctx, "consent_stopped");
-        return back(vr, "promo-consent");
+        return back(vr, "receipt-email", { o }); // box 35
       }
       await recordPhoneConsent(ctx, "transactional", "opt_in", to, joined ? "phonepay_approved_join" : "phonepay_approved_text");
       await setOrderTextPhone(o, to);
@@ -1245,6 +1245,7 @@ async function txSend(ctx: Ctx, vr: VR, p: "cat" | "pay" | "conf", to: string) {
       const body = await confirmationText(o);
       const r = body ? await sendMessage({ to, body, kind: "transactional", event: "confirmation_resend", orderId: o, callSid: ctx.callSid }) : null;
       await track(ctx.callSid, "step", `Box 148: the order's text number is now ${to}${r?.sent ? "; confirmation texted" : ""}${joined ? " (signed up for this order's texts)" : ""}`, { to });
+      return back(vr, "receipt-email", { o }); // box 35 after the different-number step
     }
     return back(vr, "promo-consent");
   }
@@ -1278,7 +1279,7 @@ async function payTextTo(ctx: Ctx, vr: VR, o: number, to: string, agreedNow = fa
 
 /** Star from the first email step: back to where the email steps started (key 8 menu, or box 141). */
 function emailHome(ctx: Ctx, vr: VR) {
-  if (ctx.session?.data.emailFor === "receipt") return back(vr, "receipt-email"); // box 35
+  if (ctx.session?.data.emailFor === "receipt") return back(vr, "receipt-email", { o: ctx.session.data.payOrder }); // box 35
   const o = ctx.session?.data.emailFor === "pay" ? ctx.session.data.payOrder : undefined;
   return o ? back(vr, "paylink", { o }) : back(vr, "catalog");
 }
@@ -1571,7 +1572,7 @@ const handlers: Record<string, Handler> = {
     // p = rcpt: the receipt email at checkout (box 35, Nov 25, 2026)
     const forCatalog = p === "cat" || (!p && !ctx.session?.data.emailFor);
     if (forCatalog && infoCatalogAutoreplyOn()) sp(vr, ctx, "catalog_email_info");
-    await updateSession(ctx.callSid, { data: { catLocal: "", catDomain: "", ...(p === "pay" ? { emailFor: "pay" as const, payOrder: Number(ctx.query.get("o")) || ctx.session?.data.payOrder } : p === "rcpt" ? { emailFor: "receipt" as const } : p === "cat" ? { emailFor: undefined } : {}) } }, ctx.session);
+    await updateSession(ctx.callSid, { data: { catLocal: "", catDomain: "", ...(p === "pay" ? { emailFor: "pay" as const, payOrder: Number(ctx.query.get("o")) || ctx.session?.data.payOrder } : p === "rcpt" ? { emailFor: "receipt" as const, payOrder: Number(ctx.query.get("o")) || ctx.session?.data.payOrder } : p === "cat" ? { emailFor: undefined } : {}) } }, ctx.session);
     return back(vr, "catalog-part", { part: "local" });
   },
 
@@ -1748,10 +1749,19 @@ const handlers: Record<string, Handler> = {
       return back(vr, "promo-consent");
     }
     if (d === "1" && email && ctx.session?.data.emailFor === "receipt") {
-      // Box 35 (Nov 25, 2026): the receipt email is kept with the booking; then box 56
-      await updateSession(ctx.callSid, { data: { email, emailFor: undefined } }, ctx.session);
-      await track(ctx.callSid, "said", `Receipt email: ${email}`, { field: "email", value: email });
-      return back(vr, "finalize");
+      // Box 35 (Nov 25, 2026, 11:51): the receipt goes to this email; a customer with no email gets it saved
+      const o = ctx.session.data.payOrder ?? 0;
+      await updateSession(ctx.callSid, { data: { emailFor: undefined } }, ctx.session);
+      const group = o ? await getPaymentGroup(o) : null;
+      if (group && group.due <= 0) {
+        const c = group.primary.customer;
+        if (c?.id && !c.email) await db.update(schema.customers).set({ email }).where(eq(schema.customers.id, c.id));
+        const { sendPhoneReceipt } = await import("@/lib/phone-receipt");
+        const paidCents = group.orders.reduce((t, x) => t + (x.order.paidCents ?? 0), 0);
+        const r = await sendPhoneReceipt(email, { orderId: o, paidAt: group.primary.order.paymentResultAt ?? new Date(), amountCents: paidCents, last4: group.primary.order.cardLast4 ?? null, name: c?.name }).catch(() => ({ sent: false }));
+        await track(ctx.callSid, "step", `Box 35: receipt ${r.sent ? "emailed" : "could not be emailed"} to ${email}`, { field: "email", value: email });
+      }
+      return back(vr, "promo-consent");
     }
     if (d === "1" && email) return back(vr, "catalog-save"); // box 108a first (Nov 25, 2026)
     if (d === "2") return back(vr, "catalog-email"); // try again: the email from the start
@@ -1811,20 +1821,27 @@ const handlers: Record<string, Handler> = {
     return vr;
   },
 
-  /** Box 35 (Abraham, Nov 25, 2026): receipt by email. 1 = the email steps; pound or no answer after 1 minute = skip; star = box 34. */
-  "receipt-email"(ctx, vr) {
-    const g = keypad(vr, url("receipt-email-choice"));
+  /**
+   * Box 35 (Abraham, Nov 25, 2026, 11:51): after a paid phone card payment (box 148). 1 = the email steps (box 102), and
+   * the receipt goes to that email; pound = skip. No star (nothing to go back to). Never before payment.
+   */
+  async "receipt-email"(ctx, vr) {
+    const o = Number(ctx.query.get("o")) || ctx.session?.data.payOrder || 0;
+    const group = o ? await getPaymentGroup(o) : null;
+    if (!group || group.due > 0) return back(vr, "promo-consent"); // only once paid
+    const g = keypad(vr, url("receipt-email-choice", { o }));
     sp(g, ctx, "box35_receipt");
-    return repeatMenu(vr, ctx, "receipt-email");
+    return repeatMenu(vr, ctx, "receipt-email", { o });
   },
 
-  "receipt-email-choice"(ctx, vr) {
+  async "receipt-email-choice"(ctx, vr) {
+    const o = ctx.query.get("o") ?? undefined;
     const d = ctx.body.Digits;
-    if (d === "1") return back(vr, "catalog-email", { p: "rcpt" });
-    if (d === "#") return back(vr, "finalize");
-    if (d === "*") return back(vr, "directions");
+    if (d === "1") return back(vr, "catalog-email", { p: "rcpt", o });
+    if (d === "#") return back(vr, "promo-consent"); // skip: on to the normal goodbye
+    if (!d) return repeatMenu(vr, ctx, "receipt-email", { o });
     sp(vr, ctx, "not_valid");
-    return back(vr, "receipt-email");
+    return back(vr, "receipt-email", { o });
   },
 
   "catalog-done"(ctx, vr) {
@@ -3104,13 +3121,13 @@ const handlers: Record<string, Handler> = {
   directions(ctx, vr) {
     const g = keypad(vr, url("directions-choice"), { timeout: NO_KEY_SECONDS });
     sp(g, ctx, "box34_menu");
-    return back(vr, "receipt-email"); // silence: skip; box 35 next (Nov 25, 2026)
+    return back(vr, "finalize"); // silence: skip; box 56 next (Box 35 moved after payment, Nov 25, 2026, 11:51)
   },
 
   "directions-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "directions-record");
-    if (d === "#" || !d) return back(vr, "receipt-email"); // box 35
+    if (d === "#" || !d) return back(vr, "finalize");
     if (d === "*") return back(vr, "addr-readback");
     sp(vr, ctx, "not_valid");
     return back(vr, "directions");
@@ -3123,7 +3140,7 @@ const handlers: Record<string, Handler> = {
     sp(vr, ctx, "pound_done");
     vr.play(`${config.baseUrl()}/audio/tone.wav`);
     vr.record({ maxLength: 180, timeout: 10, playBeep: false, finishOnKey: "#", trim: "trim-silence", action: url("directions-recorded", { o }), method: "POST", recordingStatusCallback: url("directions-rec-status", { o }), recordingStatusCallbackMethod: "POST" });
-    return back(vr, "receipt-email"); // nothing recorded: on with checkout (box 35)
+    return back(vr, "finalize"); // nothing recorded: on with checkout
   },
 
   /** Pound (or the caller hung up): the message is saved with the booking; then the thank-you and straight to box 56. */
@@ -3138,7 +3155,7 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "step", `Box 34: delivery instructions recorded (${secs} seconds)`);
       sp(vr, ctx, "box34_thanks");
     }
-    return back(vr, "receipt-email"); // Nov 24, 2026, 20:59: no pause; box 35 (Nov 25, 2026), then box 56
+    return back(vr, "finalize"); // Nov 24, 2026, 20:59: box 56 right after, no pause
   },
 
   /** Twilio: the recording file is ready (also after a hang-up mid-message): kept on the booking. */
@@ -4186,7 +4203,7 @@ const handlers: Record<string, Handler> = {
     if (await orderTextsAgreed(ctx, o)) sp(g, ctx, "phonepay_approved_text");
     else spPreviewDraft(g, ctx, "phonepay_approved_join");
     sp(g, ctx, "phonepay_approved_bye");
-    return back(vr, "promo-consent"); // no key: on with the call, as before
+    return back(vr, "receipt-email", { o }); // no key: box 35, the receipt by email (Abraham, Nov 25, 2026, 11:51)
   },
 
   async "pay-approved-choice"(ctx, vr) {
@@ -4204,7 +4221,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "not_valid");
       return back(vr, "pay-approved", { o, r: 1 });
     }
-    return back(vr, "promo-consent");
+    return back(vr, "receipt-email", { o }); // box 35
   },
 
   /** Before the first card try: 0 = a payment link (box 141) instead; any other key = the shared line, then box 140 again. */
