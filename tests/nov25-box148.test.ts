@@ -186,3 +186,25 @@ describe("back from the payment line (Abraham, Nov 25, 2026, 12:27)", () => {
     expect(RETIRED_PROMPTS.has("phonepay_back")).toBe(true);
   });
 });
+
+describe("item 11 (Abraham, Nov 25, 2026, 4:42 PM): what is live and what waits", () => {
+  it("every approved slot word for word; the dates line is a slot, held (not played) until Abraham approves the exact words", async () => {
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    expect(PROMPTS.phonepay_approved.text).toBe("Thank you! Your payment was approved, and your booking is confirmed. Your order number is {number}.");
+    expect(PROMPTS.phonepay_approved_star.text).toBe("To hear it again, press star.");
+    expect(PROMPTS.phonepay_approved_text.text).toBe("We will text your confirmation to the number you are calling from. To send it to a different number, press 1.");
+    expect(PROMPTS.phonepay_approved_bye.text).toBe("We look forward to serving you again. Thank you for choosing Hup Up Attractions!");
+    expect(PROMPTS.pay_approved_dates.text).toBe("We will deliver on {date} and pick up on {pickup}.");
+    expect(PROMPTS.pay_hold_secure.text).toBe("We will now connect you to our secure payment line. All card information is processed securely and directly by our provider, to ensure your card details remain private and protected. This may take a few moments. Please stay on the line while we connect you. Once your payment has been processed, please remain on the line to receive your booking confirmation.");
+    expect(PROMPTS.pay_card_line.text).toBe("If you would like to pay by credit or debit card, please stay on the line. To receive a payment link instead, press 0.");
+    expect(PROMPTS.phonepay_retry.text).toBe("We are sorry, your card did not go through. To try again, press 1.");
+    expect(PROMPTS.phonepay_retry_last.text).toBe("We are sorry, your card did not go through. You have one more chance. To try again, press 1.");
+    expect(PROMPTS.phonepay_failed.text).toBe("We are sorry, we were not able to process your card at this time. Please call us back later to complete your order, or you can contact customer service at extension 3 from the main menu. Thank you for calling Hup Up Attractions. Goodbye.");
+    const { lineStatus } = await import("@/lib/prompt-status");
+    expect(lineStatus("pay_approved_dates", {})).toEqual({ status: "Not active yet", reason: "Waiting for Abraham's OK on the exact words." });
+    const x = await call("pay-approved", {}, `o=${orderId}`);
+    expect(said(x).join(" ")).not.toContain("We will deliver on");
+    const star = await call("pay-approved", {}, `o=${orderId}&st=1`);
+    expect(said(star).join(" ")).not.toContain("We will deliver on");
+  });
+});
