@@ -336,6 +336,8 @@ export const PROMPTS = {
   box34_menu: { group: "Checkout", label: "Box 34: delivery instructions menu", text: "To add any special delivery instructions, press 1. To skip, press pound. To go back, press star." },
   box34_record: { group: "Checkout", label: "Box 34 after key 1: leave the message after the tone (then the shared pound_done line)", text: "Please leave a clear and detailed message with all your delivery instructions after the tone." },
   box34_thanks: { group: "Checkout", label: "Box 34 after pound: saved", text: "Thank you. We have saved your delivery instructions." },
+  // Abraham, Nov 25, 2026, 12:08: its own short line after box 34, right before box 56 (not part of box 35)
+  almost_done: { group: "Checkout", label: "After box 34, right before box 56", text: "Almost done!" },
   // Box 35 (Abraham, Nov 25, 2026, 11:51): after a paid phone card payment, right after box 148 (no star on this screen)
   box35_receipt: { group: "Pay by card (Sola PhonePay)", label: "Box 35: receipt by email, after the payment is approved (1 = the email steps, pound = skip)", text: "To receive a receipt by email, press 1. To skip, press pound." },
   // Menu 2 (Abraham, Nov 24, 2026, 20:56): one line right after the address is confirmed; town and price are live parts

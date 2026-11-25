@@ -48,7 +48,7 @@ describe("required details", () => {
 describe("Box 34 delivery instructions (Abraham, Nov 21 and 24, 2026)", () => {
   it("the menu word for word: 1 records, pound or silence skips, star back to the address, wrong key not valid", async () => {
     const menu = await call("directions");
-    expect(said(menu)).toEqual(["To add any special delivery instructions, press 1. To skip, press pound. To go back, press star."]);
+    expect(said(menu)).toEqual(["To add any special delivery instructions, press 1. To skip, press pound. To go back, press star.", "Almost done!"]); // no key: "Almost done!", then box 56 (Nov 25, 2026, 12:08)
     expect(redirect(menu)).toBe("finalize"); // silence: skip; box 56 (Box 35 is after payment, Nov 25, 2026, 11:51)
     expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("finalize");
     expect(redirect(await call("directions-choice", { Digits: "*" }))).toBe("addr-readback");
@@ -59,7 +59,7 @@ describe("Box 34 delivery instructions (Abraham, Nov 21 and 24, 2026)", () => {
   });
   it("after key 1: the message line, the shared pound line, the tone, a recording (not transcribed) ending on pound", async () => {
     const rec = await call("directions-record");
-    expect(said(rec)).toEqual(["Please leave a clear and detailed message with all your delivery instructions after the tone.", "When you are done, press pound."]);
+    expect(said(rec)).toEqual(["Please leave a clear and detailed message with all your delivery instructions after the tone.", "When you are done, press pound.", "Almost done!"]); // nothing recorded: on to box 56
     expect(rec).toMatch(/tone\.wav<\/Play><Record [^>]*finishOnKey="#"/);
     expect(rec).not.toContain("transcribe=");
   });

@@ -3121,13 +3121,17 @@ const handlers: Record<string, Handler> = {
   directions(ctx, vr) {
     const g = keypad(vr, url("directions-choice"), { timeout: NO_KEY_SECONDS });
     sp(g, ctx, "box34_menu");
+    sp(vr, ctx, "almost_done"); // Nov 25, 2026, 12:08: "Almost done!" then box 56, no pause
     return back(vr, "finalize"); // silence: skip; box 56 next (Box 35 moved after payment, Nov 25, 2026, 11:51)
   },
 
   "directions-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "directions-record");
-    if (d === "#" || !d) return back(vr, "finalize");
+    if (d === "#" || !d) {
+      sp(vr, ctx, "almost_done"); // then box 56, no pause (Nov 25, 2026, 12:08)
+      return back(vr, "finalize");
+    }
     if (d === "*") return back(vr, "addr-readback");
     sp(vr, ctx, "not_valid");
     return back(vr, "directions");
@@ -3140,6 +3144,7 @@ const handlers: Record<string, Handler> = {
     sp(vr, ctx, "pound_done");
     vr.play(`${config.baseUrl()}/audio/tone.wav`);
     vr.record({ maxLength: 180, timeout: 10, playBeep: false, finishOnKey: "#", trim: "trim-silence", action: url("directions-recorded", { o }), method: "POST", recordingStatusCallback: url("directions-rec-status", { o }), recordingStatusCallbackMethod: "POST" });
+    sp(vr, ctx, "almost_done");
     return back(vr, "finalize"); // nothing recorded: on with checkout
   },
 
@@ -3155,6 +3160,7 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "step", `Box 34: delivery instructions recorded (${secs} seconds)`);
       sp(vr, ctx, "box34_thanks");
     }
+    sp(vr, ctx, "almost_done"); // after the thank-you (Nov 25, 2026, 12:08)
     return back(vr, "finalize"); // Nov 24, 2026, 20:59: box 56 right after, no pause
   },
 

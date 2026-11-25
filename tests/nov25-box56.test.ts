@@ -155,7 +155,7 @@ describe("Box 34 then box 56 (Abraham, Nov 24, 2026, 20:59 and 21:02)", () => {
     const rec = await call("directions-record");
     expect(rec).toContain(`directions-recorded?o=${id}`);
     const done = await call("directions-recorded", { RecordingSid: "REdir1", RecordingUrl: "https://api.twilio.com/rec/REdir1", RecordingDuration: "12" }, `o=${id}`);
-    expect(said(done)).toEqual(["Thank you. We have saved your delivery instructions."]);
+    expect(said(done)).toEqual(["Thank you. We have saved your delivery instructions.", "Almost done!"]); // then box 56, no pause (Nov 25, 2026, 12:08)
     expect(done).toMatch(/<Redirect method="POST">[^<]*\/finalize<\/Redirect>/); // box 56 right after (Box 35 is after payment)
     const { deliveryInstructionsFor, deliveryInstructionsBox } = await import("@/lib/voicemail");
     const msgs = await deliveryInstructionsFor(id);
@@ -173,6 +173,12 @@ describe("Box 34 then box 56 (Abraham, Nov 24, 2026, 20:59 and 21:02)", () => {
   });
   it("pound at the menu: box 35, then pound there: box 56", async () => {
     await cart(["laser"]);
-    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("finalize");
+    const skip = await call("directions-choice", { Digits: "#" });
+    expect(said(skip)).toEqual(["Almost done!"]); // Nov 25, 2026, 12:08: after Box 34, then box 56
+    expect(redirect(skip)).toBe("finalize");
+    expect(skip).not.toContain("pause-500ms"); // no pause before box 56
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    expect(PROMPTS.almost_done.text).toBe("Almost done!");
+    expect(PROMPTS.box35_receipt.text).toBe("To receive a receipt by email, press 1. To skip, press pound."); // unchanged, no "Almost done!"
   });
 });
