@@ -843,7 +843,7 @@ export const PROMPTS = {
   catalog_text_enter: { group: "Catalog (key 8)", label: "Text: enter a number", text: "Please enter the 10-digit phone number, then press pound." },
   catalog_text_heard: { group: "Catalog (key 8)", label: "Text: read the number back", text: "I have {number}.", vars: ["number"] }, // Nov 23, 2026: ends with the shared Confirm ending (no pound to continue)
   catalog_texted: { group: "Catalog (key 8)", label: "Text: done", text: "Done! We just texted you our catalog. Thank you for choosing Hup Up Attractions!" },
-  catalog_text_not_yet: { group: "Catalog (key 8)", label: "Text: not available yet", text: "Sorry, we cannot send it by text just yet. Let us send it by email instead." },
+  catalog_text_not_yet: { group: "Catalog (key 8)", label: "Text: the text could not be sent (email instead)", text: "Sorry, we cannot send it by text just yet. Let us send it by email instead." },
   catalog_email_info: { group: "Catalog (key 8)", label: "Email: send us an empty email (plays once the info@ auto-reply is on)", text: "You can also send us an empty email to info at hup up attractions dot com, with the subject Catalog, and we will send it right back to you." },
   catalog_email_local: { group: "Catalog (key 8)", label: "Email step 1: the first part", text: "Please enter the first part of your email address, up to the at symbol. To type it, start pressing keys on your keypad now. To say it, wait for the tone, then say it letter by letter. When you are finished, please press pound." },
   // Box 103 (Abraham, Nov 22, 2026; recorded by Hark, 10 percent faster): every time a caller types an email on the keypad

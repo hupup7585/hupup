@@ -99,16 +99,21 @@ describe("key 8: catalog (Abraham, Phone Menu v3)", () => {
     expect(redirect(await call("catalog-ending-choice", { Digits: "*" }))).toBe("catalog-got?part=local");
     expect(redirect(await call("catalog-ending-choice", { Digits: "5" }))).toBe("catalog-part?part=domain");
   });
-  it("text: until Twilio approves texting, the phone offers email instead; no promo sign-up ever", async () => {
-    const prev = process.env.VERCEL_ENV;
-    process.env.VERCEL_ENV = "production"; // live site, texting not approved
+  // Twilio approved texting (A2P 10DLC, Nov 15, 2026); the gate is off (Abraham, Nov 26, 2026). The full send on the
+  // live site is in tests/nov26-catalog-text-live.test.ts
+  it("text: 1 goes to the text steps (never the 'not yet' line); no promo sign-up ever", async () => {
     const xml = plain(await call("catalog-choice", { Digits: "1" }));
-    expect(xml).toContain("Sorry, we cannot send it by text just yet. Let us send it by email instead.");
-    expect(redirect(xml)).toBe("catalog-email?p=cat");
-    expect(h.sms).toHaveLength(0);
-    process.env.VERCEL_ENV = prev;
+    expect(redirect(xml)).toBe("tx-which?p=cat");
+    expect(xml).not.toContain("just yet");
     expect((await db.select().from(schema.smsConsents)).filter((r) => r.scope === "marketing")).toHaveLength(0);
     expect((await db.select().from(schema.smsReenrollRequests))).toHaveLength(0);
+  });
+  it("Admin: the key 8 text lines no longer say they wait for Twilio", async () => {
+    const { lineStatus } = await import("@/lib/prompt-status");
+    for (const k of ["catalog_texted", "catalog_text_which", "catalog_text_enter", "msg_catalog_text"] as const) expect(lineStatus(k, {}).reason ?? "").not.toMatch(/Twilio/);
+    expect(lineStatus("catalog_texted", {}).status).toBe("Live");
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).not.toContain("catalogTextReady");
   });
   it("the catalog lists Admin's categories and items in order", async () => {
     const { text } = await catalogEmail();

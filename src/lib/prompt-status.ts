@@ -7,7 +7,6 @@ import { termsActive } from "@/lib/rental-terms";
 /** Live, Waiting for approval, Not active yet (with the reason), or Not used (an old line kept for the record). */
 export type LineStatus = { status: "Live" | "Waiting for approval" | "Not active yet" | "Not used"; reason?: string };
 
-const TEXTING = "Waits for Twilio to approve texting.";
 
 /** Why a line can't play yet, even when its wording is fine (features that are switched off). */
 export function notActiveReason(key: string, env: Record<string, string | undefined> = process.env): string | null {
@@ -17,8 +16,7 @@ export function notActiveReason(key: string, env: Record<string, string | undefi
   if (key.startsWith("vma_")) return "Staff voicemail access by phone runs on preview only until you approve it and the call-back price.";
   if (key === "spoken_readback") return "Waits for your OK on speech to text and its price.";
   if (key === "recording_notice") return "Call recording is off.";
-  if (key.startsWith("catalog_text") || key === "catalog_texted") return TEXTING;
-  if (key === "msg_catalog_text") return SMS_CATALOG_REPLY_ON ? null : "Texting CATALOG and catalog texts wait for Twilio to approve texting.";
+  if (key === "msg_catalog_text") return SMS_CATALOG_REPLY_ON ? null : "Texting CATALOG replies are switched off.";
   if (key === "catalog_email_info") return infoCatalogAutoreplyOn(env) ? null : "Plays once the info@ Catalog auto-reply is connected (Cloudflare Email Worker).";
   if (key === "terms_notice" || key === "msg_terms_link") return termsActive() ? null : "The Terms step is off on the live site until the final Terms are in.";
   if (key === "instr_balloons" || key === "instr_paddle") return "Waits for your script.";

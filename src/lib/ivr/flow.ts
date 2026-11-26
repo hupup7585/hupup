@@ -77,7 +77,7 @@ import { EMPTY_EDITOR, activeKey, applyLayout, layoutIdFor, parseEditor, type Ed
 import { GO_TO_SCREENS, SCREENS, screenForChoice } from "./screens";
 import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
 import { CATALOG_ENDINGS, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
-import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState, textingActive } from "@/lib/voicemail";
+import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState } from "@/lib/voicemail";
 import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staffAnnouncement, type RingKey } from "./routing";
 import { calendarNow } from "@/lib/clock";
 import { bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
@@ -1323,8 +1323,6 @@ const catalogEmailOf = (ctx: Ctx) => {
   const d = ctx.session?.data.catDomain ?? "";
   return validLocal(l) && validDomain(d) ? `${l}@${d}`.toLowerCase() : null;
 };
-/** Texts really go out (Twilio approved), or this isn't the live site. */
-const catalogTextReady = () => textingActive() || process.env.VERCEL_ENV !== "production";
 
 async function catalogSendText(ctx: Ctx, vr: VR, to: string) {
   // Two messages when the Owner has set the pictures: picture 1 with the words, then picture 2 alone (Nov 17, 2026)
@@ -1669,11 +1667,8 @@ const handlers: Record<string, Handler> = {
   async "catalog-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "*") return back(vr, "menu");
-    if (d === "1") {
-      if (catalogTextReady()) return back(vr, "tx-which", { p: "cat" });
-      sp(vr, ctx, "catalog_text_not_yet");
-      return back(vr, "catalog-email", { p: "cat" });
-    }
+    // Texting is approved (Twilio A2P, Nov 15, 2026; Abraham, Nov 26, 2026): text always offered; "not yet" only if a send fails
+    if (d === "1") return back(vr, "tx-which", { p: "cat" });
     if (d === "2") return back(vr, "catalog-email", { p: "cat" });
     sp(vr, ctx, "not_valid");
     return back(vr, "catalog");
@@ -4223,11 +4218,7 @@ const handlers: Record<string, Handler> = {
     const o = Number(ctx.query.get("o"));
     if (!o) return back(vr, "goodbye");
     const d = ctx.body.Digits;
-    if (d === "1") {
-      if (catalogTextReady()) return back(vr, "tx-which", { p: "pay", o });
-      sp(vr, ctx, "catalog_text_not_yet"); // "Sorry, we cannot send it by text just yet. Let us send it by email instead."
-      return back(vr, "catalog-email", { p: "pay", o });
-    }
+    if (d === "1") return back(vr, "tx-which", { p: "pay", o }); // texting approved (Nov 15, 2026)
     if (d === "2") return back(vr, "catalog-email", { p: "pay", o });
     sp(vr, ctx, "not_valid");
     return back(vr, "paylink", { o });
