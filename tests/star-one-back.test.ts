@@ -6,7 +6,8 @@ describe("star key", () => {
   const f = readFileSync("src/lib/ivr/flow.ts", "utf8");
   const step = (name: string) => f.slice(f.indexOf(`"${name}"(ctx`), f.indexOf("\n  },", f.indexOf(`"${name}"(ctx`)));
   it("the closest options go back to same date or nearest date; near-choice back to booked", () => {
-    expect(step("nearest-choice")).toContain('if (d === "*") return starToCategory(vr, Number(p));');
+    expect(step("nearest-choice")).toContain('return date ? back(vr, "booked", { p, d: date })'); // Nov 25, 2026, 8:08 PM: back to the item taken menu
+    expect(step("taken-size-choice")).toContain('return back(vr, "booked", { p, d: date })');
     expect(step("taken-choice")).toContain('if (d === "*") return starToCategory(vr, p);');
     expect(step("after-add")).toContain('if (d === "*") return back(vr, "book");');
     expect(step("catalog-done")).toContain('return back(vr, "menu");'); // box 109: star = the main menu (Nov 22, 2026)

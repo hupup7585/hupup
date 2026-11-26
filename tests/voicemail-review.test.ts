@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   open: true,
 }));
 vi.mock("@/lib/business-hours", async (orig) => ({ ...(await orig<typeof import("@/lib/business-hours")>()), officeOpenNow: () => h.open }));
+vi.mock("@/lib/hours-schedule", async (orig) => ({ ...(await orig<typeof import("@/lib/hours-schedule")>()), lineOpen: () => h.open })); // each line follows the test's open/closed (Hours page, Nov 25, 2026)
 vi.mock("@/lib/db", async () => {
   const { createMemoryDb } = await import("./helpers/memory-db");
   const m = await createMemoryDb();

@@ -84,7 +84,7 @@ import { PROMPTS, clipUrls, composeClips, composeMixed, fill, textPieces, type L
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
-import { categoryProducts, itemFreeOn, nearestFreeDay } from "@/lib/alternatives";
+import { categoryProducts, itemFreeOn, nearestFreeDay, nearestSize } from "@/lib/alternatives";
 import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_ACCESS_KEY_GAP, VM_PIN_TRIES, callOutActive, callOutNumber, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinChangedByPhone, validPin } from "@/lib/vm-access";
 import { STT_HOLD_FILE, STT_MAX_WAITS, googleReadback, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
 import { linkHoldMinutes } from "@/lib/settings";
@@ -296,6 +296,40 @@ function spPreviewDraft(target: VR | Gather, ctx: { prompts: PromptOverrides }, 
   if (process.env.VERCEL_ENV === "production" && promptWaiting(ctx.prompts, key)) return;
   if (promptWaiting(ctx.prompts, key)) say(target, promptText(ctx.prompts, key, vars));
   else sp(target, ctx, key, vars);
+}
+
+/**
+ * A line waiting for Abraham's OK that must still work now (item taken offers, Nov 25, 2026, 8:08 PM): its exact text in
+ * the live voice until approved, then the slot (and its recording) like every line.
+ */
+function heldLine(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptKey, vars?: Record<string, string | number>) {
+  if (promptWaiting(ctx.prompts, key)) say(target, promptText(ctx.prompts, key, vars));
+  else sp(target, ctx, key, vars);
+}
+
+/** The open day next to a date (closed days skipped), within today and the 3-month limit; null past the limits. */
+function openDayNear(date: string, dir: 1 | -1, cal: Awaited<ReturnType<typeof getSettings>>): string | null {
+  const today = todayISO();
+  const last = lastPhoneDate(today);
+  for (let i = 1; i <= 10; i++) {
+    const x = addDays(date, dir * i);
+    if (x < today || x > last) return null;
+    if (checkEventDate(x, cal).ok) return x;
+  }
+  return null;
+}
+
+/** Item taken, key 2: the open day before and after if free; else the nearest free dates before and after. */
+async function takenDays(p: { id: number; quantity: number }, date: string, cal: Awaited<ReturnType<typeof getSettings>>) {
+  const today = todayISO();
+  const last = lastPhoneDate(today);
+  const b = openDayNear(date, -1, cal);
+  const a = openDayNear(date, 1, cal);
+  const [okB, okA] = await Promise.all([b ? itemFreeOn(p, b, cal) : false, a ? itemFreeOn(p, a, cal) : false]);
+  if (okB || okA) return { near: true, before: okB ? b : null, after: okA ? a : null };
+  const inRange = (x: string | null) => (x && x >= today && x <= last ? x : null);
+  const [before, after] = await Promise.all([nearestFreeDay(p, date, -1, cal, 1), nearestFreeDay(p, date, 1, cal, 1)]);
+  return { near: false, before: inRange(before), after: inRange(after) };
 }
 
 /** Speech (plus optional keypad) gather tuned for phone audio. */
@@ -2568,13 +2602,7 @@ const handlers: Record<string, Handler> = {
     const p = Number(ctx.query.get("p"));
     const date = ctx.query.get("d")!;
     const d = ctx.body.Digits;
-    if (d === "1") {
-      // the closest available items: the same category, only what is free on that date
-      const prod = await getProduct(p);
-      if (!prod) return back(vr, "book");
-      await chooseDay(ctx, date);
-      return back(vr, "category", { c: prod.categoryId, f: date });
-    }
+    if (d === "1") return back(vr, "taken-size", { p, d: date });
     if (d === "2") return back(vr, "nearest-date", { p, d: date });
     if (d === "0") return back(vr, "cart");
     if (d === "*") return starToCategory(vr, p); // star: one menu back, the item's list
@@ -2583,43 +2611,87 @@ const handlers: Record<string, Handler> = {
   },
 
   /**
-   * Key 2 on item taken: the nearest available date for this item (before or after, the closer one; today to three
-   * months ahead). The line for it waits for Abraham's wording (preview only); until then, the date prompt.
+   * Item taken, key 1 (Abraham, Nov 25, 2026, 8:08 PM): the next size down and the next size up in the same category
+   * (Admin size order), each only if free on that date; one side only when the other has nothing; neither: the
+   * category list of what is free that day, as before. 1 = size down, 2 = size up, then quantity and add as usual.
+   */
+  async "taken-size"(ctx, vr) {
+    const p = await getProduct(Number(ctx.query.get("p")));
+    const date = ctx.query.get("d")!;
+    if (!p) return back(vr, "book");
+    const cal = await getSettings();
+    const [dn, up] = await Promise.all([nearestSize(p, date, -1, cal), nearestSize(p, date, 1, cal)]);
+    if (!dn && !up) {
+      await chooseDay(ctx, date);
+      return back(vr, "category", { c: p.categoryId, f: date });
+    }
+    const g = keypad(vr, url("taken-size-choice", { p: p.id, d: date, dn: dn?.id, up: up?.id }));
+    if (dn) heldLine(g, ctx, "taken_size_down", { item: dn.name });
+    if (up) heldLine(g, ctx, "taken_size_up", { item: up.name });
+    sp(g, ctx, "cart_key");
+    backLine(g, ctx);
+    return bookNoInput(vr, ctx, "taken-size", { p: p.id, d: date });
+  },
+
+  async "taken-size-choice"(ctx, vr) {
+    const p = ctx.query.get("p")!;
+    const date = ctx.query.get("d")!;
+    const pick = ({ "1": ctx.query.get("dn"), "2": ctx.query.get("up") } as Record<string, string | null>)[ctx.body.Digits ?? ""];
+    if (pick) {
+      await chooseDay(ctx, date);
+      return back(vr, "qty", { p: pick, d: date });
+    }
+    if (ctx.body.Digits === "0") return back(vr, "cart");
+    if (ctx.body.Digits === "*") return back(vr, "booked", { p, d: date }); // star: back to the item taken menu
+    if (!ctx.body.Digits) return bookNoInput(vr, ctx, "taken-size", { p, d: date });
+    sp(vr, ctx, "not_valid");
+    return back(vr, "taken-size", { p, d: date });
+  },
+
+  /**
+   * Item taken, key 2 (Abraham, Nov 25, 2026, 8:08 PM): the same item the open day before and the open day after the
+   * chosen date (closed days skipped), each only if free; if neither, the nearest free date before and after (today to
+   * three months ahead). 1 = the earlier date, 2 = the later one, then quantity and add as usual. Nothing free at all:
+   * the date prompt.
    */
   async "nearest-date"(ctx, vr) {
     const p = await getProduct(Number(ctx.query.get("p")));
     const date = ctx.query.get("d")!;
     if (!p) return back(vr, "book");
     const cal = await getSettings();
-    const today = todayISO();
-    const last = lastPhoneDate(today);
-    const ok = (x: string | null) => (x && x >= today && x <= last ? x : null);
-    const [after, before] = await Promise.all([nearestFreeDay(p, date, 1, cal, 1), nearestFreeDay(p, date, -1, cal, 1)]);
-    const a = ok(after);
-    const b = ok(before);
-    const dist = (x: string) => Math.abs(Date.parse(x) - Date.parse(date));
-    const near = a && b ? (dist(b) < dist(a) ? b : a) : (a ?? b);
-    const showDraft = near && !(process.env.VERCEL_ENV === "production" && promptWaiting(ctx.prompts, "nearest_date"));
-    const g = keypad(vr, url("nearest-choice", { p: p.id, n: showDraft ? near : undefined, d: date }), { numDigits: 4, timeout: showDraft ? 4 : 8, finishOnKey: "#" });
-    if (showDraft) spPreviewDraft(g, ctx, "nearest_date", { item: p.name, date: spokenDate(near) });
-    sp(g, ctx, "book_date_prompt");
+    const opts = await takenDays(p, date, cal);
+    if (!opts.before && !opts.after) {
+      const g = keypad(vr, url("date-heard", { p: p.id }), { numDigits: 4, timeout: 8, finishOnKey: "#" });
+      sp(g, ctx, "book_date_prompt");
+      backLine(g, ctx);
+      return bookNoInput(vr, ctx, "nearest-date", { p: p.id, d: date });
+    }
+    const g = keypad(vr, url("nearest-choice", { p: p.id, d: date, b: opts.before ?? undefined, a: opts.after ?? undefined }));
+    if (opts.near) {
+      if (opts.before) heldLine(g, ctx, "taken_day_before", { item: p.name, date: spokenDate(opts.before) });
+      if (opts.after) heldLine(g, ctx, opts.before ? "taken_day_after" : "taken_day_after_only", { item: p.name, date: spokenDate(opts.after) });
+    } else {
+      if (opts.before) heldLine(g, ctx, "taken_nearest_before", { date: spokenDate(opts.before) });
+      if (opts.after) heldLine(g, ctx, "taken_nearest_after", { date: spokenDate(opts.after) });
+    }
+    sp(g, ctx, "cart_key");
     backLine(g, ctx);
     return bookNoInput(vr, ctx, "nearest-date", { p: p.id, d: date });
   },
 
   async "nearest-choice"(ctx, vr) {
     const p = ctx.query.get("p")!;
-    const near = ctx.query.get("n");
-    const d = (ctx.body.Digits ?? "").replace(/#/g, "");
-    if (d === "1" && near) {
-      await chooseDay(ctx, near);
-      return back(vr, "qty", { p, d: near });
+    const date = ctx.query.get("d") ?? undefined;
+    const pick = ({ "1": ctx.query.get("b"), "2": ctx.query.get("a") } as Record<string, string | null>)[ctx.body.Digits ?? ""];
+    if (pick) {
+      await chooseDay(ctx, pick);
+      return back(vr, "qty", { p, d: pick });
     }
-    if (d === "*") return starToCategory(vr, Number(p));
-    // No key: the same offer again, so "available on {date}, press 1" is not lost (Hark's audit L2, Nov 24, 2026)
-    if (!d) return bookNoInput(vr, ctx, "nearest-date", { p, d: ctx.query.get("d") ?? undefined });
-    ctx.query.set("p", p);
-    return handlers["date-heard"](ctx, vr); // a new date
+    if (ctx.body.Digits === "0") return back(vr, "cart");
+    if (ctx.body.Digits === "*") return date ? back(vr, "booked", { p, d: date }) : starToCategory(vr, Number(p)); // star: the item taken menu
+    if (!ctx.body.Digits) return bookNoInput(vr, ctx, "nearest-date", { p, d: date });
+    sp(vr, ctx, "not_valid");
+    return back(vr, "nearest-date", { p, d: date });
   },
 
   // Old screens (removed Nov 20, 2026): a call already in one of them goes to the item taken prompt

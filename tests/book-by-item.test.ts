@@ -16,6 +16,7 @@ vi.mock("@/lib/ivr/session", () => ({
 }));
 vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
 vi.mock("@/lib/business-hours", async (orig) => ({ ...(await orig<typeof import("@/lib/business-hours")>()), officeOpenNow: () => true, lateHoursToday: () => null }));
+vi.mock("@/lib/hours-schedule", async (orig) => ({ ...(await orig<typeof import("@/lib/hours-schedule")>()), lineOpen: () => true })); // each line follows the test's open/closed (Hours page, Nov 25, 2026)
 vi.mock("@/lib/dates", async (orig) => ({ ...(await orig<typeof import("@/lib/dates")>()), todayISO: () => "2026-11-09" }));
 
 import { db, schema } from "@/lib/db";
@@ -93,10 +94,12 @@ describe("key 1: booking by item", () => {
       "To go back, press star.",
     ]);
     h.session.data = {};
-    expect(redirect(await call("taken-choice", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`category?c=${catId}&f=${TUE}`);
+    // Nov 25, 2026, 8:08 PM: key 1 offers the next size down and up first (tests/nov26-item-taken.test.ts)
+    expect(redirect(await call("taken-choice", { Digits: "1" }, `p=${medium}&d=${TUE}`))).toBe(`taken-size?p=${medium}&d=${TUE}`);
+    const sizes = await call("taken-size", {}, `p=${medium}&d=${TUE}`);
+    expect(said(sizes).slice(0, 2)).toEqual(["For the next size down, the Small Castle, press 1.", "For the next size up, the Large Castle, press 2."]);
+    expect(redirect(await call("taken-size-choice", { Digits: "2" }, `p=${medium}&d=${TUE}&dn=${small}&up=${large}`))).toBe(`qty?p=${large}&d=${TUE}`);
     expect(h.session.data.day).toBe(TUE);
-    // only the free items: the Medium Castle is not in the list for that date
-    expect(redirect(await call("category-choice", { Digits: "2" }, `c=${catId}&f=${TUE}`))).toBe(`qty?p=${large}&d=${TUE}`);
     expect(redirect(await call("taken-choice", { Digits: "2" }, `p=${medium}&d=${TUE}`))).toBe(`nearest-date?p=${medium}&d=${TUE}`);
     expect(redirect(await call("taken-choice", { Digits: "0" }, `p=${medium}&d=${TUE}`))).toBe("cart");
     // old screens send a call still in them to the one prompt
@@ -154,19 +157,16 @@ describe("a closed day (Abraham, Nov 20, 2026)", () => {
 });
 
 describe("item taken, key 2 (Nov 20, 2026)", () => {
-  it("the nearest available date: the draft line on preview (1 books it), then the date prompt and the back line; live: the date prompt only", async () => {
+  it("Nov 25, 2026, 8:08 PM: the day before and after (live too, in the live voice until the wording is approved); 1 books it", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-20T15:00:00Z"));
+    process.env.VERCEL_ENV = "production";
     try {
       const xml = await call("nearest-date", {}, `p=${medium}&d=2026-12-01`);
       const lines = said(xml);
-      expect(lines[0]).toMatch(/^The Medium Castle is available on .+\. To book it for that date, press 1\. Otherwise, please pick another date\.$/);
-      expect(lines.slice(-2)[1]).toBe("To go back, press star.");
-      const near = xml.match(/nearest-choice\?p=\d+&amp;n=([0-9-]+)/)![1];
-      expect(redirect(await call("nearest-choice", { Digits: "1" }, `p=${medium}&n=${near}`))).toBe(`qty?p=${medium}&d=${near}`);
-      process.env.VERCEL_ENV = "production";
-      const live = said(await call("nearest-date", {}, `p=${medium}&d=2026-12-01`));
-      expect(live[0]).toMatch(/^Using your keypad, please enter your event date/);
+      expect(lines[0]).toMatch(/^The Medium Castle is available on Monday, November thirtieth, the day before\. To choose that day, press 1\.$/);
+      expect(lines.at(-1)).toBe("To go back, press star.");
+      expect(redirect(await call("nearest-choice", { Digits: "1" }, `p=${medium}&d=2026-12-01&b=2026-11-30`))).toBe(`qty?p=${medium}&d=2026-11-30`);
     } finally {
       delete process.env.VERCEL_ENV;
       vi.useRealTimers();
