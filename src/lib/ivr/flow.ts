@@ -312,8 +312,10 @@ async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) =
   // The bookings menu as one recording (Nov 26, 2026), when chosen and the lines are its lines in its order
   if (menu === "book") {
     const parts = order.map((x) => (x === "book_back" ? "star" : x));
-    const id = opts.firstTime === false ? "book_again" : "book";
-    if (ctx.prompts[`whole_${id}` as PromptKey]?.recordingId && MENU_COMBOS[id].join("|") === parts.join("|")) return menuRun(g, ctx, id, parts);
+    // the line 1b now plays every time (Nov 26, 2026), so the first-visit combined recording fits coming back too
+    for (const id of opts.firstTime === false ? ["book_again", "book"] : ["book"]) {
+      if (ctx.prompts[`whole_${id}` as PromptKey]?.recordingId && MENU_COMBOS[id].join("|") === parts.join("|")) return menuRun(g, ctx, id, parts);
+    }
   }
   // The bookings menu's order, on/off and added lines from Admin > Phone > Screens (nothing saved: as built)
   const lay = menu === "book" ? editorOf(ctx).e.layouts.book : undefined;

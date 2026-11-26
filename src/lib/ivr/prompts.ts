@@ -266,7 +266,7 @@ export const PROMPTS = {
   book_r1: { group: "Booking by item (key 1)", label: "Bookings menu, recording 1", text: "To receive our catalog by text or email, press 8." },
   // Abraham, Nov 19, 2026: its own recording, played only the first time the caller reaches the bookings menu
   // Abraham, y, Nov 25, 2026, 2:02 PM: the second line of the bookings menu, first time only
-  book_orders_only: { group: "Booking by item (key 1)", label: "Bookings menu, recording 1b: fastest way to order (first time only)", text: "The fastest way to place an order is with our easy automated system." },
+  book_orders_only: { group: "Booking by item (key 1)", label: "Bookings menu, recording 1b: fastest way to order (every time)", text: "The fastest way to place an order is with our easy automated system." },
   book_r2: { group: "Booking by item (key 1)", label: "Bookings menu, recording 2", text: "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3." },
   book_r3a: { group: "Booking by item (key 1)", label: "Bookings menu, recording 3a (customer service)", text: "For information or questions, press 0 for customer service." },
   // Abraham, Nov 26, 2026: right after 3a in the bookings menu only, from its uploaded recording (no Google voice)

@@ -33,7 +33,7 @@ beforeAll(async () => {
 describe("item 1: the bookings menu order line", () => {
   it("slot text and label; automated_only retired and played nowhere", async () => {
     expect(PROMPTS.book_orders_only.text).toBe(NEW);
-    expect(PROMPTS.book_orders_only.label).toBe("Bookings menu, recording 1b: fastest way to order (first time only)");
+    expect(PROMPTS.book_orders_only.label).toBe("Bookings menu, recording 1b: fastest way to order (every time)");
     expect(RETIRED_PROMPTS.has("automated_only")).toBe(true);
     const { lineStatus } = await import("@/lib/prompt-status");
     expect(lineStatus("automated_only", {}).status).toBe("Not used");
@@ -46,13 +46,14 @@ describe("item 1: the bookings menu order line", () => {
     expect(lines[lines.indexOf(PROMPTS.book_r1.text) + 1]).toBe(NEW);
     expect(xml).not.toContain(OLD);
   });
-  it("back in the bookings menu with something in the cart (the same first-time rule as before): not played", async () => {
+  it("back in the bookings menu with something in the cart: played again (Abraham, Nov 26, 2026: every time)", async () => {
     const [c] = await db.insert(schema.categories).values({ name: "Jumping Balloons", ivrDigit: 1, sortOrder: 1, active: true }).returning();
     const [p] = await db.insert(schema.products).values({ categoryId: c.id, name: "Royal Castle", priceCents: 20000, quantity: 3, active: true }).returning();
     await call("add", {}, { p: String(p.id), d: "2027-03-15", q: "1" });
     const lines = said(await call("book"));
     expect(lines).toContain(PROMPTS.book_r1.text);
-    expect(lines).not.toContain(NEW);
+    expect(lines[lines.indexOf(PROMPTS.book_r1.text) + 1]).toBe(NEW);
+    expect(PROMPTS.book_orders_only.text).toBe(NEW); // no wording change
   });
 });
 

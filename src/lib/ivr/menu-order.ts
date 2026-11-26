@@ -12,7 +12,8 @@ export const MENU_RECORDINGS = {
 
 export type MenuId = keyof typeof MENU_RECORDINGS;
 /** Recordings that play only the first time the caller reaches that menu (not when coming back to add more). */
-export const FIRST_TIME_ONLY = new Set<string>(["book_orders_only"]);
+// Abraham, Nov 26, 2026: book_orders_only plays every time the bookings menu plays (no longer first visit only)
+export const FIRST_TIME_ONLY = new Set<string>([]);
 
 /** "balloon_items" is the list of balloons itself (one entry per balloon), not a single recording. */
 export type MenuPart = PromptKey | "balloon_items";
