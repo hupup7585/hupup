@@ -80,7 +80,7 @@ import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staf
 import { calendarNow } from "@/lib/clock";
 import { bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
 import { matchBlock, parseBlockList } from "./caller-filter";
-import { PROMPTS, clipUrls, composeClips, composeMixed, fill, textPieces, type LinePiece, googleLiveOn, liveClips, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
+import { MENU_COMBOS, PROMPTS, clipUrls, composeClips, composeMixed, fill, textPieces, type LinePiece, googleLiveOn, liveClips, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
 import { decodeMultitap, titleCase } from "./multitap";
 import { startRecording } from "@/lib/call-recording";
@@ -244,14 +244,36 @@ function backLine(g: Gather, ctx: { prompts: PromptOverrides }) {
   sp(g, ctx, "book_back");
 }
 
+/**
+ * A menu's fixed lines (Abraham, Nov 26, 2026): the whole-menu recording (slot whole_<id>) when one is chosen in
+ * Admin and these are exactly its lines; else each line on its own, as before ("star" = the shared go-back line with
+ * its half pause, "pause" = a half pause).
+ */
+function menuRun(g: Gather, ctx: { prompts: PromptOverrides }, id: string, parts: readonly string[]) {
+  const whole = `whole_${id}` as PromptKey;
+  const combo = MENU_COMBOS[id];
+  if (combo && ctx.prompts[whole]?.recordingId && combo.join("|") === parts.join("|")) return void sp(g, ctx, whole);
+  for (const part of parts) {
+    if (part === "star") backLine(g, ctx);
+    else if (part === "pause") halfPause(g);
+    else sp(g, ctx, part as PromptKey);
+  }
+}
+
 export const BOOK_R3C_LIVE = false;
 /** Box 148's dates line (Nov 25, 2026, 4:43 PM): off until Abraham approves the exact words (5:50 PM). */
 export const PAY_DATES_LIVE = false;
 
 /** A menu made of several recordings, in the order the Owner set in Admin (src/lib/ivr/menu-order.ts). */
 async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) => void | Promise<void>, opts: { firstTime?: boolean } = {}) {
-  for (const part of menuOrder(menu, (await getSettings()).menuOrders)) {
-    if (FIRST_TIME_ONLY.has(part) && opts.firstTime === false) continue;
+  const order = menuOrder(menu, (await getSettings()).menuOrders).filter((part) => !(FIRST_TIME_ONLY.has(part) && opts.firstTime === false));
+  // The bookings menu as one recording (Nov 26, 2026), when chosen and the lines are its lines in its order
+  if (menu === "book" && !BOOK_R3C_LIVE) {
+    const parts = order.map((x) => (x === "book_back" ? "star" : x));
+    const id = opts.firstTime === false ? "book_again" : "book";
+    if (ctx.prompts[`whole_${id}` as PromptKey]?.recordingId && MENU_COMBOS[id].join("|") === parts.join("|")) return menuRun(g, ctx, id, parts);
+  }
+  for (const part of order) {
     if (part === "balloon_items") await items?.(g);
     else if (part === "book_back") backLine(g, ctx);
     else sp(g, ctx, part);
@@ -797,13 +819,11 @@ const ATTRACTIONS = {
 function attractionMenu(ctx: Ctx, vr: VR, m: "i" | "l") {
   const g = keypad(vr, url("attraction-choice", { m }));
   if (m === "i") {
-    sp(g, ctx, "instr_menu"); // Abraham, Phone Menu v3, word for word (recorded information, day and night)
-    backLine(g, ctx); // the shared star line (Nov 19, 2026)
+    menuRun(g, ctx, "instr_menu", ["instr_menu", "star"]);
     return repeatMenu(vr, ctx, "instructions", { again: 1 });
   }
   if (!ctx.query.get("again")) sp(g, ctx, "learn_intro");
-  sp(g, ctx, "attraction_choice");
-  backLine(g, ctx); // Nov 20, 2026: the one shared back line
+  menuRun(g, ctx, "attraction_choice", ["attraction_choice", "star"]);
   return repeatMenu(vr, ctx, "learn", { again: 1 });
 }
 
@@ -1539,8 +1559,7 @@ const handlers: Record<string, Handler> = {
 
   catalog(ctx, vr) {
     const g = keypad(vr, url("catalog-choice"));
-    sp(g, ctx, "catalog_menu");
-    backLine(g, ctx); // the shared star line (Nov 19, 2026)
+    menuRun(g, ctx, "catalog_menu", ["catalog_menu", "star"]);
     return repeatMenu(vr, ctx, "catalog");
   },
 
@@ -1570,8 +1589,7 @@ const handlers: Record<string, Handler> = {
     const p = txPurpose(ctx);
     const o = ctx.query.get("o") ?? undefined;
     const g = keypad(vr, url("tx-which-choice", { p, o }));
-    sp(g, ctx, "text_which");
-    backLine(g, ctx);
+    menuRun(g, ctx, "text_which", ["text_which", "star"]);
     return repeatMenu(vr, ctx, "tx-which", { p, o });
   },
 
@@ -1779,8 +1797,7 @@ const handlers: Record<string, Handler> = {
 
   "catalog-ending"(ctx, vr) {
     const g = keypad(vr, url("catalog-ending-choice"));
-    sp(g, ctx, "catalog_ending");
-    backLine(g, ctx);
+    menuRun(g, ctx, "catalog_ending", ["catalog_ending", "star"]);
     return repeatMenu(vr, ctx, "catalog-ending");
   },
 
@@ -1844,8 +1861,7 @@ const handlers: Record<string, Handler> = {
   "catalog-save"(ctx, vr) {
     if (!catalogEmailOf(ctx)) return back(vr, "catalog-email");
     const g = keypad(vr, url("catalog-save-choice"));
-    sp(g, ctx, "box108a_ask");
-    backLine(g, ctx);
+    menuRun(g, ctx, "box108a_ask", ["box108a_ask", "star"]);
     return repeatMenu(vr, ctx, "catalog-save");
   },
 
@@ -1882,11 +1898,7 @@ const handlers: Record<string, Handler> = {
     }
     // Box 109 (Abraham, Nov 22, 2026): star = the main menu; no key = the call ends
     const g = keypad(vr, url("catalog-done"));
-    sp(g, ctx, "catalog_emailed");
-    halfPause(g);
-    sp(g, ctx, "catalog_main_star");
-    halfPause(g);
-    sp(g, ctx, "catalog_bye");
+    menuRun(g, ctx, "catalog_emailed", ["catalog_emailed", "pause", "catalog_main_star", "pause", "catalog_bye"]);
     vr.hangup();
     return vr;
   },
@@ -2125,8 +2137,7 @@ const handlers: Record<string, Handler> = {
       if (o) sp(g, ctx, "ocean_offer"); // the first balloon of the call (Nov 25, 2026, 14:08)
       sp(g, ctx, "box25_keep");
     }
-    sp(g, ctx, "cart_key");
-    backLine(g, ctx);
+    menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
     return back(vr, "resume-items");
   },
 
@@ -2160,10 +2171,7 @@ const handlers: Record<string, Handler> = {
   async "cs-closed"(ctx, vr) {
     await track(ctx.callSid, "step", "Bookings key 0: customer service closed (after-hours set)");
     const g = keypad(vr, url("cs-closed-key"), { timeout: 1 });
-    sp(g, ctx, "after_hours_closed");
-    if (BOOK_R3C_LIVE) sp(g, ctx, "book_r3c");
-    sp(g, ctx, "after_hours_auto");
-    sp(g, ctx, "after_hours_message");
+    menuRun(g, ctx, "after_hours_closed", BOOK_R3C_LIVE ? ["after_hours_closed", "book_r3c", "after_hours_auto", "after_hours_message"] : ["after_hours_closed", "after_hours_auto", "after_hours_message"]);
     const box = await vmBox("4");
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail", data: { vmEntry: "4", missed: "closed" } }, ctx.session);
     return vmRecord(vr, box, "4");
@@ -2184,9 +2192,7 @@ const handlers: Record<string, Handler> = {
    */
   cats(ctx, vr) {
     const g = keypad(vr, url("cats-choice"));
-    sp(g, ctx, "book_r2");
-    sp(g, ctx, "cart_key");
-    backLine(g, ctx);
+    menuRun(g, ctx, "book_r2", ["book_r2", "cart_key", "star"]);
     return bookNoInput(vr, ctx, "cats");
   },
 
@@ -2240,8 +2246,7 @@ const handlers: Record<string, Handler> = {
         if (x.line) sp(g, ctx, x.line);
         else sp(g, ctx, "category_item", { item: x.p.name, key: x.key });
       }
-      sp(g, ctx, "cart_key");
-      backLine(g, ctx);
+      menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
       return bookNoInput(vr, ctx, "category", { c, f: f ?? undefined });
     }
     // 10 or more items (Abraham, Nov 17, 2026): two-key choices (10, 11, 12) work; a single key acts after a short wait
@@ -2250,8 +2255,7 @@ const handlers: Record<string, Handler> = {
     else sp(g, ctx, "book_category_list", { category: cat.spokenName || cat.name });
     sp(g, ctx, "cart_key"); // Abraham (Phone Menu v3): the cart line before the items and again after them
     items.forEach((p, i) => sp(g, ctx, "category_item", { item: p.name, key: i + 1 }));
-    sp(g, ctx, "cart_key");
-    backLine(g, ctx); // star goes back one step (to the bookings menu)
+    menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
     return bookNoInput(vr, ctx, "category", { c, f: f ?? undefined });
   },
 
@@ -2321,8 +2325,7 @@ const handlers: Record<string, Handler> = {
     // the whole item recording ("item seven two zero one") for "item {number}" when it is uploaded (Nov 24, 2026)
     const bn = balloonEntry(p.name)?.number;
     sp(g, ctx, "box154", { item: p.name, number: digitWords(bn ?? ""), price: spokenMoney(p.priceCents), ...(bn ? { "@number": `balloon_num_${bn}` } : {}) });
-    sp(g, ctx, "cart_key");
-    backLine(g, ctx); // the shared star line (Nov 19, 2026)
+    menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
     return bookNoInput(vr, ctx, "balloon", { p: p.id });
   },
 
@@ -2353,8 +2356,7 @@ const handlers: Record<string, Handler> = {
           const tail = promptText(ctx.prompts, "box155", { description: "", item: "", length: "", width: "", height: "" }).match(/To add[^]*$/)?.[0];
           if (tail) say(g, tail);
         }
-        sp(g, ctx, "cart_key");
-        backLine(g, ctx); // the shared star line (Nov 19, 2026)
+        menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
         return bookNoInput(vr, ctx, "balloon", { p: p.id });
       }
       if (p.spokenDescription || p.description) say(vr, p.spokenDescription || p.description);
@@ -2392,9 +2394,7 @@ const handlers: Record<string, Handler> = {
       sp(g, ctx, "product_intro", { item: p.name, price: spokenMoney(p.priceCents) });
       await track(ctx.callSid, "item_heard", `Listened to ${p.name}`, { item: p.name, productId: p.id });
     }
-    sp(g, ctx, "product_options");
-    sp(g, ctx, "cart_key");
-    backLine(g, ctx); // the shared star line (Nov 19, 2026)
+    menuRun(g, ctx, "product_options", ["product_options", "cart_key", "star"]);
     return noInput(vr, ctx, "product", { p: p.id, again: 1 });
   },
 
@@ -2426,8 +2426,7 @@ const handlers: Record<string, Handler> = {
     const a = ctx.query.get("a") ?? undefined; // "another day" from box 25 or welcome back (Hark's audit H1, Nov 24, 2026)
     // Pound after the digits finishes the date (audit M3): it is never read as part of the date
     const g = keypad(vr, url("date-heard", { p, a }), { numDigits: 4, timeout: 8, finishOnKey: "#" });
-    sp(g, ctx, "book_date_prompt");
-    backLine(g, ctx);
+    menuRun(g, ctx, "book_date_prompt", ["book_date_prompt", "star"]);
     return bookNoInput(vr, ctx, "date", { p, a });
   },
 
@@ -2479,9 +2478,7 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("closed-offer-choice", { p, d: date }));
     sp(g, ctx, "closed_day_intro", { date: spokenDate(date), reason: day.reasonEn ?? day.reason ?? "a holiday" });
     sp(g, ctx, "closed_day_get", { before: spokenDate(offer.before), after: spokenDate(offer.after), price: spokenMoney(Math.round(prod.priceCents * offer.days)) });
-    sp(g, ctx, "closed_book_it");
-    sp(g, ctx, "closed_pick_another");
-    backLine(g, ctx);
+    menuRun(g, ctx, "closed_book_it", ["closed_book_it", "closed_pick_another", "star"]);
     return bookNoInput(vr, ctx, "closed-offer", { p, d: date });
   },
 
@@ -2525,8 +2522,7 @@ const handlers: Record<string, Handler> = {
       const g = keypad(vr, url("box18-choice", { p, d: date, t: two ? 1 : 0 }));
       sp(g, ctx, "box18_book", { item: prod.name, date: spokenDate(date) });
       if (two) sp(g, ctx, "box18_second", { weekday: spokenDate(two.next).split(",")[0], price: spokenMoney(two.moreCents) });
-      sp(g, ctx, "box18_other_date");
-      backLine(g, ctx);
+      menuRun(g, ctx, "box18_other_date", ["box18_other_date", "star"]);
       return bookNoInput(vr, ctx, "date-ask", { p, d: date, a: ctx.query.get("a") ?? undefined });
     }
     const g = keypad(vr, url("date-confirm", { p, d: date, a: ctx.query.get("a") ?? undefined }));
@@ -2593,8 +2589,7 @@ const handlers: Record<string, Handler> = {
     if (!p) return back(vr, "menu");
     const g = keypad(vr, url("taken-choice", { p: p.id, d: date }));
     sp(g, ctx, "item_taken", { item: p.name, date: spokenDate(date), category: await singularCategory(p.categoryId) });
-    sp(g, ctx, "cart_key");
-    backLine(g, ctx);
+    menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
     return bookNoInput(vr, ctx, "booked", { p: p.id, d: date });
   },
 
@@ -2628,8 +2623,7 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("taken-size-choice", { p: p.id, d: date, dn: dn?.id, up: up?.id }));
     if (dn) heldLine(g, ctx, "taken_size_down", { item: dn.name });
     if (up) heldLine(g, ctx, "taken_size_up", { item: up.name });
-    sp(g, ctx, "cart_key");
-    backLine(g, ctx);
+    menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
     return bookNoInput(vr, ctx, "taken-size", { p: p.id, d: date });
   },
 
@@ -2662,8 +2656,7 @@ const handlers: Record<string, Handler> = {
     const opts = await takenDays(p, date, cal);
     if (!opts.before && !opts.after) {
       const g = keypad(vr, url("date-heard", { p: p.id }), { numDigits: 4, timeout: 8, finishOnKey: "#" });
-      sp(g, ctx, "book_date_prompt");
-      backLine(g, ctx);
+      menuRun(g, ctx, "book_date_prompt", ["book_date_prompt", "star"]);
       return bookNoInput(vr, ctx, "nearest-date", { p: p.id, d: date });
     }
     const g = keypad(vr, url("nearest-choice", { p: p.id, d: date, b: opts.before ?? undefined, a: opts.after ?? undefined }));
@@ -2674,8 +2667,7 @@ const handlers: Record<string, Handler> = {
       if (opts.before) heldLine(g, ctx, "taken_nearest_before", { date: spokenDate(opts.before) });
       if (opts.after) heldLine(g, ctx, "taken_nearest_after", { date: spokenDate(opts.after) });
     }
-    sp(g, ctx, "cart_key");
-    backLine(g, ctx);
+    menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
     return bookNoInput(vr, ctx, "nearest-date", { p: p.id, d: date });
   },
 
@@ -2885,8 +2877,7 @@ const handlers: Record<string, Handler> = {
       if (o) sp(g, ctx, "ocean_offer"); // right after the added line, once per call
       sp(g, ctx, "box25_keep");
     }
-    sp(g, ctx, "cart_key");
-    backLine(g, ctx);
+    menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
     return noInput(vr, ctx, "added-menu", { n, o }); // no key: box 25 again (Batch 3 item 10)
   },
 
@@ -2925,8 +2916,7 @@ const handlers: Record<string, Handler> = {
       const g = keypad(vr, url("packs-choice", { d, k: kind.key }), { timeout: 5 });
       if (sets === 1) sp(g, ctx, "laser_second_set");
       else sp(g, ctx, "laser_third_set", { price: spokenMoney(await nextSetPrice(day!.order.id, kind.id)) });
-      sp(g, ctx, "stay_on_line");
-      backLine(g, ctx);
+      menuRun(g, ctx, "stay_on_line", ["stay_on_line", "star"]);
       return back(vr, "added-menu", { n: 1 }); // no key for 5 seconds: nothing added, on to the keep-shopping lines
     }
     const left = offer.filter((x) => x.free);
@@ -2941,8 +2931,7 @@ const handlers: Record<string, Handler> = {
       say(g, [parts[0], ...left.map((x) => parts[Number(x.key)])].filter(Boolean).join(" "));
     }
     halfPause(g);
-    sp(g, ctx, "skip_pound"); // the shared skip line (Nov 19, 2026)
-    backLine(g, ctx);
+    menuRun(g, ctx, "skip_pound", ["skip_pound", "star"]);
     return back(vr, "added-menu", { n: 1 }); // no key: nothing added (Nov 22, 2026)
   },
 
@@ -2983,10 +2972,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.query.get("d")!;
     const n = ctx.query.get("n") ?? undefined;
     const g = keypad(vr, url("ocean-choice", { d, n }));
-    sp(g, ctx, "ocean_200");
-    sp(g, ctx, "ocean_500");
-    sp(g, ctx, "ocean_700");
-    backLine(g, ctx);
+    menuRun(g, ctx, "ocean_200", ["ocean_200", "ocean_500", "ocean_700", "star"]);
     return noInput(vr, ctx, "ocean", { d, n }); // the system-wide no-key rule
   },
 
@@ -3113,8 +3099,7 @@ const handlers: Record<string, Handler> = {
     if (!l) return back(vr, "cart");
     const g = keypad(vr, url("remove-qty-choice", { i: l.itemId }), { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS });
     sp(g, ctx, "remove_qty", { qty: l.qty, item: pluralName(l.name) });
-    sp(g, ctx, "remove_enter");
-    backLine(g, ctx);
+    menuRun(g, ctx, "remove_enter", ["remove_enter", "star"]);
     return noInput(vr, ctx, "remove-qty", { i: l.itemId });
   },
 
@@ -3401,9 +3386,7 @@ const handlers: Record<string, Handler> = {
   /** Lookup screen 1: 1 = the number calling, 2 = a different phone number, 3 = enter the address manually. */
   "addr-lookup"(ctx, vr) {
     const g = keypad(vr, url("addr-lookup-choice"));
-    sp(g, ctx, "lookup_intro");
-    sp(g, ctx, "lookup_options");
-    backLine(g, ctx);
+    menuRun(g, ctx, "lookup_intro", ["lookup_intro", "lookup_options", "star"]);
     return repeatMenu(vr, ctx, "addr-lookup");
   },
 
@@ -3424,9 +3407,7 @@ const handlers: Record<string, Handler> = {
   /** A different phone number: 10 digits, starting with the area code; pound when done. */
   "addr-phone"(ctx, vr) {
     const g = keypad(vr, url("addr-phone-heard"), { numDigits: 11, timeout: NO_KEY_SECONDS, finishOnKey: "#" });
-    sp(g, ctx, "lookup_phone_enter");
-    sp(g, ctx, "pound_done");
-    backLine(g, ctx);
+    menuRun(g, ctx, "lookup_phone_enter", ["lookup_phone_enter", "pound_done", "star"]);
     return repeatMenu(vr, ctx, "addr-phone");
   },
 
@@ -3517,9 +3498,7 @@ const handlers: Record<string, Handler> = {
   // Address steps 2 to 4 (Abraham, Nov 22, 2026, final): keypad only, the shared pound line, then the shared star line
   "addr-house"(ctx, vr) {
     const g = keypad(vr, url("addr-house-heard"), { numDigits: 7, timeout: 10, finishOnKey: "#" });
-    sp(g, ctx, "addr_house");
-    sp(g, ctx, "pound_done");
-    backLine(g, ctx);
+    menuRun(g, ctx, "addr_house", ["addr_house", "pound_done", "star"]);
     return repeatMenu(vr, ctx, "addr-house");
   },
 
@@ -3545,8 +3524,7 @@ const handlers: Record<string, Handler> = {
     const { directoryHasHouse } = await import("@/lib/directory");
     if (await directoryHasHouse({ house: d.house, street: d.street, zip: d.zip })) return back(vr, "addr-unit");
     const g = keypad(vr, url("addr-unit-ask-choice"));
-    sp(g, ctx, "addr_unit_ask");
-    backLine(g, ctx);
+    menuRun(g, ctx, "addr_unit_ask", ["addr_unit_ask", "star"]);
     return repeatMenu(vr, ctx, "addr-unit-ask");
   },
 
@@ -3568,9 +3546,7 @@ const handlers: Record<string, Handler> = {
     // actionOnEmptyResult: pound with nothing typed reaches us, so it gets the wrong-key line (not the no-key line)
     const a = ctx.query.get("a") ?? undefined;
     const g = vr.gather({ input: ["dtmf"], numDigits: 7, timeout: 10, finishOnKey: "#", actionOnEmptyResult: true, action: url("addr-unit-heard", { a }), method: "POST" });
-    sp(g, ctx, "addr_unit");
-    sp(g, ctx, "pound_done");
-    backLine(g, ctx);
+    menuRun(g, ctx, "addr_unit", ["addr_unit", "pound_done", "star"]);
     return repeatMenu(vr, ctx, "addr-unit", { a });
   },
 
@@ -3591,8 +3567,7 @@ const handlers: Record<string, Handler> = {
 
   "addr-zip"(ctx, vr) {
     const g = keypad(vr, url("addr-zip-choice"));
-    sp(g, ctx, "addr_zip");
-    backLine(g, ctx);
+    menuRun(g, ctx, "addr_zip", ["addr_zip", "star"]);
     return repeatMenu(vr, ctx, "addr-zip");
   },
 
@@ -3631,8 +3606,7 @@ const handlers: Record<string, Handler> = {
    */
   "addr-street"(ctx, vr) {
     const g = keypad(vr, url("addr-street-choice"));
-    sp(g, ctx, "addr_street_menu");
-    backLine(g, ctx);
+    menuRun(g, ctx, "addr_street_menu", ["addr_street_menu", "star"]);
     return repeatMenu(vr, ctx, "addr-street");
   },
 
@@ -3786,8 +3760,7 @@ const handlers: Record<string, Handler> = {
   /** Step 5 outside the service area (Abraham, Nov 22, 2026, approved): 1 = a different zip code; the star line. */
   "addr-outside"(ctx, vr) {
     const g = keypad(vr, url("addr-outside-choice"));
-    sp(g, ctx, "addr_outside");
-    backLine(g, ctx);
+    menuRun(g, ctx, "addr_outside", ["addr_outside", "star"]);
     return repeatMenu(vr, ctx, "addr-outside");
   },
 
@@ -4426,10 +4399,9 @@ const handlers: Record<string, Handler> = {
       const days = group.orders.map((x) => x.order); // sorted by date
       sp(g, ctx, "pay_approved_dates", { date: spokenDate(days[0].eventDate), pickup: spokenDate(days.map((x) => x.pickupDate).sort().at(-1)!) });
     }
-    sp(g, ctx, "phonepay_approved_star");
-    if (await orderTextsAgreed(ctx, o)) sp(g, ctx, "phonepay_approved_text");
-    else sp(g, ctx, "pay_approved_optin"); // approved Nov 25, 2026, 12:22
-    sp(g, ctx, "phonepay_approved_bye");
+    // approved Nov 25, 2026, 12:22 (pay_approved_optin for callers not signed up for order texts)
+    if (await orderTextsAgreed(ctx, o)) menuRun(g, ctx, "pay_approved_text", ["phonepay_approved_star", "phonepay_approved_text", "phonepay_approved_bye"]);
+    else menuRun(g, ctx, "pay_approved_optin", ["phonepay_approved_star", "pay_approved_optin", "phonepay_approved_bye"]);
     return back(vr, "receipt-email", { o }); // no key: box 35, the receipt by email (Abraham, Nov 25, 2026, 11:51)
   },
 
@@ -4607,9 +4579,7 @@ const handlers: Record<string, Handler> = {
       if (caller && !shouldAskMarketing(await consentState(caller), await customerByPhone(caller))) return back(vr, "goodbye");
     }
     const g = keypad(vr, url("promo-consent-answer"), { numDigits: 1, timeout: 6 });
-    sp(g, ctx, "promo_ask");
-    halfPause(g);
-    sp(g, ctx, "skip_pound");
+    menuRun(g, ctx, "promo_ask", ["promo_ask", "pause", "skip_pound"]);
     return back(vr, "promo-consent-answer"); // nothing pressed = skip
   },
 

@@ -39,7 +39,194 @@ export const PIECE_ALIAS: Record<string, string> = {
   "box18_book#2": "piece:for",
 };
 
+/**
+ * Whole menus (Abraham, Nov 26, 2026): one recording for a menu's fixed lines, in this order ("star" = the shared
+ * go-back line). It plays instead of the separate lines once a recording is chosen for its slot (whole_<id>) and the
+ * menu's lines that call are exactly these; dates, prices, names and totals still play on their own. The separate
+ * line slots stay as they are.
+ */
+export const MENU_COMBOS: Record<string, readonly string[]> = {
+  "instr_menu": [
+    "instr_menu",
+    "star"
+  ],
+  "attraction_choice": [
+    "attraction_choice",
+    "star"
+  ],
+  "catalog_menu": [
+    "catalog_menu",
+    "star"
+  ],
+  "text_which": [
+    "text_which",
+    "star"
+  ],
+  "catalog_ending": [
+    "catalog_ending",
+    "star"
+  ],
+  "box108a_ask": [
+    "box108a_ask",
+    "star"
+  ],
+  "catalog_emailed": [
+    "catalog_emailed",
+    "pause",
+    "catalog_main_star",
+    "pause",
+    "catalog_bye"
+  ],
+  "cart_key": [
+    "cart_key",
+    "star"
+  ],
+  "book_r2": [
+    "book_r2",
+    "cart_key",
+    "star"
+  ],
+  "product_options": [
+    "product_options",
+    "cart_key",
+    "star"
+  ],
+  "book_date_prompt": [
+    "book_date_prompt",
+    "star"
+  ],
+  "closed_book_it": [
+    "closed_book_it",
+    "closed_pick_another",
+    "star"
+  ],
+  "box18_other_date": [
+    "box18_other_date",
+    "star"
+  ],
+  "stay_on_line": [
+    "stay_on_line",
+    "star"
+  ],
+  "skip_pound": [
+    "skip_pound",
+    "star"
+  ],
+  "ocean_200": [
+    "ocean_200",
+    "ocean_500",
+    "ocean_700",
+    "star"
+  ],
+  "remove_enter": [
+    "remove_enter",
+    "star"
+  ],
+  "lookup_intro": [
+    "lookup_intro",
+    "lookup_options",
+    "star"
+  ],
+  "lookup_phone_enter": [
+    "lookup_phone_enter",
+    "pound_done",
+    "star"
+  ],
+  "addr_house": [
+    "addr_house",
+    "pound_done",
+    "star"
+  ],
+  "addr_unit_ask": [
+    "addr_unit_ask",
+    "star"
+  ],
+  "addr_unit": [
+    "addr_unit",
+    "pound_done",
+    "star"
+  ],
+  "addr_zip": [
+    "addr_zip",
+    "star"
+  ],
+  "addr_street_menu": [
+    "addr_street_menu",
+    "star"
+  ],
+  "addr_outside": [
+    "addr_outside",
+    "star"
+  ],
+  "promo_ask": [
+    "promo_ask",
+    "pause",
+    "skip_pound"
+  ],
+  "book": [
+    "book_r1",
+    "book_orders_only",
+    "book_r3a",
+    "book_r2",
+    "book_r3b",
+    "star"
+  ],
+  "book_again": [
+    "book_r1",
+    "book_r3a",
+    "book_r2",
+    "book_r3b",
+    "star"
+  ],
+  "after_hours_closed": [
+    "after_hours_closed",
+    "after_hours_auto",
+    "after_hours_message"
+  ],
+  "pay_approved_text": [
+    "phonepay_approved_star",
+    "phonepay_approved_text",
+    "phonepay_approved_bye"
+  ],
+  "pay_approved_optin": [
+    "phonepay_approved_star",
+    "pay_approved_optin",
+    "phonepay_approved_bye"
+  ]
+};
+
 export const PROMPTS = {
+  whole_instr_menu: { group: "Whole menus (one recording each)", label: "Whole menu: Key 2 menu (instructions) (plays instead of its separate lines once a recording is chosen)", text: "For jumping balloon instructions, press 1. For laser tag, press 2. For paddle boats, press 3. To go back, press star." },
+  whole_attraction_choice: { group: "Whole menus (one recording each)", label: "Whole menu: Key 6 menu (learn about our rentals) (plays instead of its separate lines once a recording is chosen)", text: "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3. To go back, press star." },
+  whole_catalog_menu: { group: "Whole menus (one recording each)", label: "Whole menu: Key 8 catalog menu (plays instead of its separate lines once a recording is chosen)", text: "To receive our catalog by text, press 1. To get it by email, press 2. To go back, press star." },
+  whole_text_which: { group: "Whole menus (one recording each)", label: "Whole menu: Which number to text (plays instead of its separate lines once a recording is chosen)", text: "To text it to the number you are calling from, press 1. To enter a different number, press 2. To go back, press star." },
+  whole_catalog_ending: { group: "Whole menus (one recording each)", label: "Whole menu: Catalog sent: ending menu (plays instead of its separate lines once a recording is chosen)", text: "Now choose the ending. For at gmail dot com, press 1. For at outlook dot com, press 2. For at yahoo dot com, press 3. For at icloud dot com, press 4. For a different ending, press 5. To go back, press star." },
+  whole_box108a_ask: { group: "Whole menus (one recording each)", label: "Whole menu: Box 108a: save the email (plays instead of its separate lines once a recording is chosen)", text: "To save this email address with your phone number, press 1. To skip, press pound. To go back, press star." },
+  whole_catalog_emailed: { group: "Whole menus (one recording each)", label: "Whole menu: Box 109: catalog emailed, ending (plays instead of its separate lines once a recording is chosen)", text: "We just emailed you our catalog! Check your inbox for a variety of attractions and endless fun for your entire family. To go to the main menu, press star. Thank you for choosing Hup Up Attractions! Bye for now!" },
+  whole_cart_key: { group: "Whole menus (one recording each)", label: "Whole menu: Shared ending: shopping cart (0) and go back (star), after item lists and offers (plays instead of its separate lines once a recording is chosen)", text: "To go to your shopping cart, press 0. To go back, press star." },
+  whole_book_r2: { group: "Whole menus (one recording each)", label: "Whole menu: Box 12a: the categories menu (plays instead of its separate lines once a recording is chosen)", text: "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3. To go to your shopping cart, press 0. To go back, press star." },
+  whole_product_options: { group: "Whole menus (one recording each)", label: "Whole menu: An item's menu (plays instead of its separate lines once a recording is chosen)", text: "To hear more about it, press 1. To add it to your cart, press 2. To go to your shopping cart, press 0. To go back, press star." },
+  whole_book_date_prompt: { group: "Whole menus (one recording each)", label: "Whole menu: The date prompt (plays instead of its separate lines once a recording is chosen)", text: "Using your keypad, please enter your event date: two digits for the month, then two digits for the day. For example, for March fifth, press 0, 3, 0, 5. To go back, press star." },
+  whole_closed_book_it: { group: "Whole menus (one recording each)", label: "Whole menu: Box 17: closed day options (plays instead of its separate lines once a recording is chosen)", text: "To book it, press 1. To pick another date, press 2. To go back, press star." },
+  whole_box18_other_date: { group: "Whole menus (one recording each)", label: "Whole menu: Box 18: other date and go back (plays instead of its separate lines once a recording is chosen)", text: "To choose a different date, press 3. To go back, press star." },
+  whole_stay_on_line: { group: "Whole menus (one recording each)", label: "Whole menu: Laser gun sets: stay on the line and go back (plays instead of its separate lines once a recording is chosen)", text: "Otherwise, stay on the line. To go back, press star." },
+  whole_skip_pound: { group: "Whole menus (one recording each)", label: "Whole menu: Laser packs: skip and go back (plays instead of its separate lines once a recording is chosen)", text: "To skip, press pound. To go back, press star." },
+  whole_ocean_200: { group: "Whole menus (one recording each)", label: "Whole menu: Ocean balls amounts menu (plays instead of its separate lines once a recording is chosen)", text: "To add 200 balls for $10, press 1. To add 500 balls for $15, press 2. To add 700 balls for $20, press 3. To go back, press star." },
+  whole_remove_enter: { group: "Whole menus (one recording each)", label: "Whole menu: Remove an item: how many (plays instead of its separate lines once a recording is chosen)", text: "Using your keypad, please enter the amount you would like to remove. To go back, press star." },
+  whole_lookup_intro: { group: "Whole menus (one recording each)", label: "Whole menu: Address lookup menu (plays instead of its separate lines once a recording is chosen)", text: "Next, we need the delivery address. To look it up with the number you are calling from, press 1. To look it up with a different phone number, press 2. To enter the address manually, press 3. To go back, press star." },
+  whole_lookup_phone_enter: { group: "Whole menus (one recording each)", label: "Whole menu: Lookup: enter the phone number (plays instead of its separate lines once a recording is chosen)", text: "Please enter a 10-digit phone number, starting with the area code. When you are done, press pound. To go back, press star." },
+  whole_addr_house: { group: "Whole menus (one recording each)", label: "Whole menu: Address: house number (plays instead of its separate lines once a recording is chosen)", text: "Now, with your keypad, please enter the house number. When you are done, press pound. To go back, press star." },
+  whole_addr_unit_ask: { group: "Whole menus (one recording each)", label: "Whole menu: Address: unit question (plays instead of its separate lines once a recording is chosen)", text: "If this address has a unit number, press 1. If not, press 2. To go back, press star." },
+  whole_addr_unit: { group: "Whole menus (one recording each)", label: "Whole menu: Address: unit number (plays instead of its separate lines once a recording is chosen)", text: "Thanks, with your keypad, please enter the unit number. When you are done, press pound. To go back, press star." },
+  whole_addr_zip: { group: "Whole menus (one recording each)", label: "Whole menu: Address: zip menu (plays instead of its separate lines once a recording is chosen)", text: "For Monroe, New York, one zero nine five zero, press 1. For Highland Mills, New York, one zero nine three zero, press 2. For Chester, New York, one zero nine one eight, press 3. For Washingtonville, New York, one zero nine nine two, press 4. For Central Valley, New York, one zero nine one seven, press 5. For Harriman, New York, one zero nine two six, press 6. To enter a different zip code, press 7. To go back, press star." },
+  whole_addr_street_menu: { group: "Whole menus (one recording each)", label: "Whole menu: Address: street menu (plays instead of its separate lines once a recording is chosen)", text: "To search for the street name by voice, press 1. To search it with your keypad, press 2. To go back, press star." },
+  whole_addr_outside: { group: "Whole menus (one recording each)", label: "Whole menu: Address outside the area (plays instead of its separate lines once a recording is chosen)", text: "We are sorry, we do not deliver to this area. We deliver only in Orange County, New York. To enter a different zip code, press 1. To go back, press star." },
+  whole_promo_ask: { group: "Whole menus (one recording each)", label: "Whole menu: Promotional texts question (plays instead of its separate lines once a recording is chosen)", text: "To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1. To skip, press pound." },
+  whole_book: { group: "Whole menus (one recording each)", label: "Whole menu: Bookings menu (first time) (plays instead of its separate lines once a recording is chosen)", text: "To receive our catalog by text or email, press 8. The fastest way to place an order is with our easy automated system. For information or questions, press 0 for customer service. For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3. For schools, corporate events, and organizational bookings, press 9. To go back, press star." },
+  whole_book_again: { group: "Whole menus (one recording each)", label: "Whole menu: Bookings menu (coming back, without line 1b) (plays instead of its separate lines once a recording is chosen)", text: "To receive our catalog by text or email, press 8. For information or questions, press 0 for customer service. For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3. For schools, corporate events, and organizational bookings, press 9. To go back, press star." },
+  whole_after_hours_closed: { group: "Whole menus (one recording each)", label: "Whole menu: Bookings key 0 after hours (lines 1, 3, 4) (plays instead of its separate lines once a recording is chosen)", text: "Our customer service is currently closed. For the best availability and fastest booking, please use our easy automated system to ensure your booking today. To get started, press 1. Otherwise, leave a message after the tone, and a customer service representative will return your call on the next open day, and will help you find the best available options for your needs." },
+  whole_pay_approved_text: { group: "Whole menus (one recording each)", label: "Whole menu: Box 148 ending (signed up for order texts) (plays instead of its separate lines once a recording is chosen)", text: "To hear it again, press star. We will text your confirmation to the number you are calling from. To send it to a different number, press 1. We look forward to serving you again. Thank you for choosing Hup Up Attractions!" },
+  whole_pay_approved_optin: { group: "Whole menus (one recording each)", label: "Whole menu: Box 148 ending (not signed up for order texts) (plays instead of its separate lines once a recording is chosen)", text: "To hear it again, press star. To receive your confirmation and order updates by text, press 1. We look forward to serving you again. Thank you for choosing Hup Up Attractions!" },
   // Welcome & main menu
   // Start of the call (Abraham, Nov 16, 2026): separate prompts, in this order. Greeting (always), call recording
   // notice (only when call recording is on), office closed (only when closed), catalog offer (always), main menu.
@@ -713,6 +900,7 @@ export const RETIRED_PROMPTS = new Set<string>(["book_note", "book_corporate", "
 /** The extension (or part of the call) each group of lines belongs to, for the Admin filter. New groups fall into "Other". */
 export const PROMPT_AREAS: Record<string, string> = {
   "Welcome & main menu": "Main menu",
+  "Whole menus (one recording each)": "Whole menus (one recording each)",
   "Errors & retries": "Wrong key, hold and timeouts",
   "Booking by item (key 1)": "Key 1: Bookings",
   Browsing: "Key 1: Bookings",
