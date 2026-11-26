@@ -147,6 +147,7 @@ const BOOKS: Record<string, Explanation> = {
     calculation: "A reminder shows when today is on or after the due date minus this many days.",
     example: "With 7, a $450.00 insurance bill due March 15 shows under Reminders from March 8.",
     ifChanged: "A bigger number shows reminders earlier; a smaller number shows them later. Due dates themselves do not change.",
+    askAccountant: true,
   },
   bookOpeningCashCents: {
     what: "The money in the business bank account on the day the books start, in cents. 1250000 means $12,500.00.",
@@ -155,6 +156,7 @@ const BOOKS: Record<string, Explanation> = {
     calculation: "Cash on any later day = this opening amount + money received − money paid out since the opening date.",
     example: "Opening cash $12,500.00, then $3,000.00 of rentals paid and $800.00 of bills paid: the balance sheet shows $14,700.00 cash.",
     ifChanged: "Every balance sheet and cash figure moves by the same difference. Set it once, from the bank statement, and ask your accountant before changing it later.",
+    askAccountant: true,
   },
   bookOpeningDate: {
     what: "The day the books start. Money before this date is not counted; the opening cash above is the balance on this day.",
@@ -163,6 +165,7 @@ const BOOKS: Record<string, Explanation> = {
     calculation: "Reports add up money received and paid from this date onward.",
     example: "Opening date January 1 with $12,500.00: a $200.00 payment on December 30 is not counted; one on January 2 is.",
     ifChanged: "Moving the date adds or removes earlier money from every report, so the opening cash must match the new date. Ask your accountant first.",
+    askAccountant: true,
   },
   glChartApprovedBy: {
     what: "The name of the accountant who approved the list of bookkeeping accounts (the chart of accounts: income, expenses, bank, and so on).",
@@ -215,6 +218,7 @@ const BOOKS: Record<string, Explanation> = {
     calculation: "An entry needs approval when its total is equal to or more than this amount.",
     example: "With 50000 ($500.00): a $120.00 correction posts at once; a $750.00 correction waits for a second person.",
     ifChanged: "A lower amount means more entries wait for approval; a higher amount lets bigger entries post without a second look.",
+    askAccountant: true,
   },
 };
 
@@ -264,6 +268,7 @@ const OTHER: Record<string, Explanation> = {
     what: "The delivery fee for Kiryas Joel, in cents. 1000 means $10.00.",
     where: "Customers booking a Kiryas Joel address: on the phone order total, the payment link, the receipt and the staff New booking screen.",
     ifChanged: "New orders use the new fee. Orders already placed keep the fee they were given. Sales tax is worked out on the fee too.",
+    askAccountant: true,
   },
   deliveryFeeAreaCents: {
     what: "The delivery fee for the nearby towns (for example Monroe and Highland Mills), in cents. 1500 means $15.00.",

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { desc, inArray } from "drizzle-orm";
+import { desc, inArray, lte, sql } from "drizzle-orm";
 import { requireOwner } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { configDefs } from "@/lib/config-registry";
@@ -26,7 +26,14 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
   const live = (await getSettings()) as Record<string, unknown>;
   const q = (sp.q ?? "").trim().toLowerCase();
   const defs = configDefs().filter((d) => !q || `${d.key} ${d.label} ${d.help} ${d.group}`.toLowerCase().includes(q));
-  const versions = defs.length ? await db.select().from(schema.configVersions).where(inArray(schema.configVersions.key, defs.map((d) => d.key))).orderBy(desc(schema.configVersions.id)) : [];
+  // Only the newest 10 versions of each setting (Hark's review L7); the page shows 10 and the history stays complete
+  const ranked = db
+    .select({ id: schema.configVersions.id, rn: sql<number>`row_number() over (partition by ${schema.configVersions.key} order by ${schema.configVersions.id} desc)`.as("rn") })
+    .from(schema.configVersions)
+    .where(inArray(schema.configVersions.key, defs.length ? defs.map((d) => d.key) : [""]))
+    .as("ranked");
+  const newest = defs.length ? (await db.select({ id: ranked.id }).from(ranked).where(lte(ranked.rn, 10))).map((r) => r.id) : [];
+  const versions = newest.length ? await db.select().from(schema.configVersions).where(inArray(schema.configVersions.id, newest)).orderBy(desc(schema.configVersions.id)) : [];
   const byKey = new Map<string, typeof versions>();
   for (const v of versions) byKey.set(v.key, [...(byKey.get(v.key) ?? []), v]);
   const groups = [...new Set(defs.map((d) => d.group))].sort();

@@ -405,6 +405,8 @@ export function makeVmHandlers(h: VmHelpers): Record<string, (ctx: Ctx, vr: VR) 
     },
     async "vm-fwd-list"(ctx, vr) {
       const pr = { b: q(ctx, "b"), m: q(ctx, "m"), v: q(ctx, "v"), t: q(ctx, "t") };
+      // no box (an old or broken link, Hark's review M9): back to the voicemail main menu, not "something went wrong"
+      if (!Number(pr.b)) return h.back(vr, signedIn(ctx) ? "vm-main" : "vm-bye", { s: 1 });
       const g = keys(vr, "vm-fwd-pick", pr);
       if (pr.t === "mail") {
         (await staffEmails()).forEach((s, i) => h.sp(g, ctx, "vm_for_key", { name: s.name, key: i + 1 }));
@@ -414,6 +416,7 @@ export function makeVmHandlers(h: VmHelpers): Record<string, (ctx: Ctx, vr: VR) 
     },
     async "vm-fwd-pick"(ctx, vr) {
       const pr = { b: q(ctx, "b"), m: q(ctx, "m"), v: q(ctx, "v"), t: q(ctx, "t") };
+      if (!Number(pr.b)) return h.back(vr, signedIn(ctx) ? "vm-main" : "vm-bye", { s: 1 });
       const d = ctx.body.Digits ?? "";
       if (d === "*") return h.back(vr, "vm-fwd", pr);
       const i = Number(d) - 1;

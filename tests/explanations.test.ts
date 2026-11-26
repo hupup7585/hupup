@@ -42,6 +42,12 @@ describe("bookkeeping settings get the deeper explanation", () => {
   it("money examples use dollar amounts", () => {
     for (const k of ["solaFeePercent", "solaFeeCents", "bookOpeningCashCents", "glApprovalThresholdCents", "salesTaxPercent", "glAccountingMethod"]) expect(CONFIG_EXPLANATIONS[k].example, k).toMatch(/\$\d/);
   });
+  it("every explanation that mentions tax or the accountant carries the accountant note (Hark's review L4)", () => {
+    for (const [k, e] of Object.entries(CONFIG_EXPLANATIONS)) {
+      const t = Object.values(e).filter((v) => typeof v === "string").join(" ");
+      if (/\btax\b|accountant/i.test(t)) expect(e.askAccountant, k).toBe(true);
+    }
+  });
   it("tax-related settings say to ask the accountant", () => {
     for (const k of ["salesTaxPercent", "glAccountingMethod", "glFiscalYearStartMonth", "glChartApprovedBy"]) expect(CONFIG_EXPLANATIONS[k].askAccountant, k).toBe(true);
   });

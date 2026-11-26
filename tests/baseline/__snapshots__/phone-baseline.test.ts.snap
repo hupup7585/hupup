@@ -186,7 +186,7 @@ exports[`baseline: every phone step as it plays today > cs-closed-key 1`] = `"<?
 
 exports[`baseline: every phone step as it plays today > date 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="4" timeout="8" finishOnKey="#" action="https://hupup.example/api/voice/date-heard" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Using your keypad, please enter your event date: two digits for the month, then two digits for the day. For example, for March fifth, press 0, 3, 0, 5.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=date</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > date-ask 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Oops, something went wrong on our end. Please call back in a few minutes. Sorry about that!</Say><Hangup/></Response>"`;
+exports[`baseline: every phone step as it plays today > date-ask 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/date</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > date-confirm 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/date-ask?d=null</Redirect></Response>"`;
 
@@ -680,9 +680,9 @@ exports[`baseline: every phone step as it plays today > vm-fwd-do 1`] = `"<?xml 
 
 exports[`baseline: every phone step as it plays today > vm-fwd-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-fwd</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > vm-fwd-list 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Oops, something went wrong on our end. Please call back in a few minutes. Sorry about that!</Say><Hangup/></Response>"`;
+exports[`baseline: every phone step as it plays today > vm-fwd-list 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-bye?s=1</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > vm-fwd-pick 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Oops, something went wrong on our end. Please call back in a few minutes. Sorry about that!</Say><Hangup/></Response>"`;
+exports[`baseline: every phone step as it plays today > vm-fwd-pick 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-bye?s=1</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > vm-grec-done 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-greet</Redirect></Response>"`;
 

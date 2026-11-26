@@ -58,3 +58,11 @@ describe("baseline: every phone step as it plays today", () => {
     });
   }
 });
+
+describe("no phone step crashes when opened on its own (Hark's review M9)", () => {
+  it("none of the baseline steps answers with the 'something went wrong' line", async () => {
+    const { readFileSync } = await import("node:fs");
+    const snap = readFileSync("tests/baseline/__snapshots__/phone-baseline.test.ts.snap", "utf8");
+    expect(snap).not.toContain("something went wrong on our end");
+  });
+});

@@ -2658,7 +2658,9 @@ const handlers: Record<string, Handler> = {
   /** "You entered Tuesday, March 5th. If that is correct, press pound to continue. To enter a different date, press 1." */
   async "date-ask"(ctx, vr) {
     const p = ctx.query.get("p") ?? undefined;
-    const date = ctx.query.get("d")!;
+    const date = ctx.query.get("d") ?? "";
+    // No date (an old or broken link, Hark's review M9): ask for the date again instead of "something went wrong"
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return back(vr, "date", { p });
     // Box 150 (Abraham, Nov 18, 2026): a Friday in Chanukah or Chol Hamoed can be kept for Mutze Shabbes
     if (friMutzeOffered(date, (await getSettings()) as never)) {
       const g = keypad(vr, url("date-confirm", { p, d: date, f: 1, a: ctx.query.get("a") ?? undefined }));
