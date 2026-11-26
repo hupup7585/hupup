@@ -21,6 +21,11 @@ export const metadata = { title: "Review and pay | Hup Up Attractions", robots: 
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
+/** Hark's review L5: the minutes this order's own hold really has left (not today's setting), at least 1. */
+function minutesLeft(until: Date, now = Date.now()) {
+  return Math.max(1, Math.ceil((until.getTime() - now) / 60000));
+}
+
 /** Review-and-pay page (from the payment text). Terms must be accepted with an unchecked box before Sola. */
 export default async function PayPage({ params, searchParams }: { params: Promise<{ orderId: string }>; searchParams: Promise<{ t?: string; held?: string }> }) {
   // The payment page reads the database anyway: the time-sensitive jobs get a chance to run, after the page
@@ -159,7 +164,7 @@ export default async function PayPage({ params, searchParams }: { params: Promis
             <p className="mt-3 text-sm" data-link-gone>{LINK_TEXT.goneCall}</p>
           </section>
         )}
-        {rules && held && due > 0 && <p data-held-again className="mt-4 rounded-lg bg-[#e5f4e4] px-3 py-2 text-sm font-semibold">{LINK_TEXT.heldAgain(await linkHoldMinutes(o.channel === "POS" ? "admin" : "phone"))}</p>}
+        {rules && held && due > 0 && <p data-held-again className="mt-4 rounded-lg bg-[#e5f4e4] px-3 py-2 text-sm font-semibold">{LINK_TEXT.heldAgain(o.holdExpiresAt ? minutesLeft(o.holdExpiresAt) : await linkHoldMinutes(o.channel === "POS" ? "admin" : "phone"))}</p>}
         {rules && o.status === "PENDING_PAYMENT" && due > 0 && <p data-card-note className="mt-3 text-sm">{LINK_TEXT.cardNote}</p>}
         <div className="mt-6">
           {o.status === "PENDING_PAYMENT" && due > 0 ? <PayForm orderId={id} token={t!} consent={{ transactionalText: webConsentCopy().transactional, marketingText: webConsentCopy().marketing, smsNumber: smsNumberDisplay() }} /> : removed.length ? null : <p className="font-semibold">This order is not waiting for payment. Questions? Call (845) 777-7585.</p>}

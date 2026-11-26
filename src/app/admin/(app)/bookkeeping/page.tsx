@@ -792,7 +792,7 @@ async function SettingsTab({ categories, pct, fixed, days, openingCash, openingD
             <Field label="Sola rate (%)" hint="For example 2.9."><input name="solaFeePercent" defaultValue={pct} className="input" /></Field>
             <Field label="Sola fee per payment ($)" hint="For example 0.30."><input name="solaFeeFixed" defaultValue={((Number(fixed) || 0) / 100).toFixed(2)} className="input" /></Field>
             <Field label="Remind me this many days before" hint="How early bills show under Reminders."><input name="bookReminderDays" type="number" defaultValue={days} className="input" /></Field>
-            <Field label="Opening cash balance ($)" hint="The bank balance on the opening date."><input name="openingCash" defaultValue={((Number(openingCash) || 0) / 100).toFixed(2)} className="input" /></Field>
+            <Field label="Opening cash balance ($)" hint="The bank balance on the opening date. If the account was overdrawn, type it with a minus, for example -250.00."><input name="openingCash" defaultValue={((Number(openingCash) || 0) / 100).toFixed(2)} className="input" /></Field>
             <Field label="Opening balance date" hint="The day you started these books."><input type="date" name="openingDate" defaultValue={openingDate} className="input" /></Field>
           </Grid>
           <Save />

@@ -20,7 +20,7 @@ const show = (v: unknown) => (v === true ? "On" : v === false ? "Off" : String(v
  * live value, default, explanation and where it is used. Changes are drafts until published; every change is kept
  * (history and Undo). Structured values link to their own pages. Feature switches show what is still set in code.
  */
-export default async function ConfigPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string; q?: string; k?: string }> }) {
+export default async function ConfigPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string; q?: string; k?: string; v?: string; r?: string }> }) {
   await requireOwner();
   const sp = await searchParams;
   const live = (await getSettings()) as Record<string, unknown>;
@@ -57,9 +57,12 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
                 const hist = byKey.get(d.key) ?? [];
                 const draft = hist.find((v) => v.status === "draft");
                 const lastLive = hist.find((v) => v.status === "live");
-                const current = String((draft ? unwrap(draft.value) : live[d.key]) ?? "");
+                // A value that was just rejected stays in the box so it can be fixed (Hark's review L2)
+                const rejected = sp.err && sp.k === d.key && sp.v !== undefined ? sp.v : null;
+                const current = rejected ?? String((draft ? unwrap(draft.value) : live[d.key]) ?? "");
                 return (
-                  <div key={d.key} id={d.key} className="rounded-xl border border-line p-3" data-config-key={d.key}>
+                  <div key={d.key} id={d.key} className={`scroll-mt-24 rounded-xl border p-3 ${rejected !== null ? "border-[#C83A2F]" : "border-line"}`} data-config-key={d.key}>
+                    {rejected !== null && <p className="mb-2 text-sm font-semibold text-[#C83A2F]" role="alert" data-config-error>{sp.err}</p>}
                     <div className="flex flex-wrap items-baseline gap-2">
                       <span className="font-bold">{d.label}</span>
                       <span className="rounded-full bg-mint/20 px-2 text-xs font-bold text-[#13895C]">Live: {show(live[d.key])}</span>
@@ -105,7 +108,7 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
                         ) : (
                           <input name="value" defaultValue={current} className="input w-auto min-w-[10rem]" inputMode={d.type === "int" || d.type === "number" ? "decimal" : undefined} />
                         )}
-                        <input name="reason" required minLength={3} className="input w-auto min-w-[12rem]" placeholder="Reason (kept in the history)" />
+                        <input name="reason" required minLength={3} defaultValue={rejected !== null ? (sp.r ?? "") : ""} className="input w-auto min-w-[12rem]" placeholder="Reason (kept in the history)" />
                         <button className="btn-dark">Save draft</button>
                       </form>
                     )}

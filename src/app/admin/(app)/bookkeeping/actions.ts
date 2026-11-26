@@ -299,8 +299,10 @@ export async function saveBookSettingsAction(f: FormData) {
     await saveSetting("solaFeePercent", pct, userId);
     await saveSetting("solaFeeCents", String(fixed), userId);
     await saveSetting("bookReminderDays", String(days), userId);
-    const opening = parseMoney(s(f, "openingCash") || "0");
-    if (opening === null) throw new BooksError("Enter the opening cash balance, for example 2500.00.");
+    // Hark's review L9: an overdrawn account starts below zero: -250.00 or (250.00)
+    const typedOpening = s(f, "openingCash").trim().replace(/^\((.*)\)$/, "-$1");
+    const opening = parseMoney(typedOpening || "0");
+    if (opening === null) throw new BooksError("Enter the opening cash balance, for example 2500.00 (or -250.00 if the account was overdrawn).");
     const openingDate = isoDate(s(f, "openingDate")) ?? "";
     await saveSetting("bookOpeningCashCents", String(opening), userId);
     await saveSetting("bookOpeningDate", openingDate, userId);

@@ -6,8 +6,11 @@ import { requireOwner } from "@/lib/auth";
 import { ConfigError, discardDraft, publishDraft, saveDraft, undoLast } from "@/lib/config-versions";
 import type { OkCode } from "./messages";
 
+/** The link mark that jumps to one setting's box on the page */
+const ANCHOR = "\u0023";
+
 /** All settings (Admin handoff Phase 2): Owner only; every action logged. Saved or Not saved, with the reason. */
-async function run(key: string, fn: (userId: number | null) => Promise<unknown>, done: OkCode) {
+async function run(key: string, fn: (userId: number | null) => Promise<unknown>, done: OkCode, typed?: { value: string; reason: string }) {
   const owner = await requireOwner();
   let msg = "";
   let ok = true;
@@ -22,13 +25,16 @@ async function run(key: string, fn: (userId: number | null) => Promise<unknown>,
   revalidatePath("/", "layout");
   revalidatePath("/admin", "layout");
   // Success is a message code, never free text in the address (Hark's review L11)
-  redirect(ok ? `/admin/config?ok=${done}&k=${encodeURIComponent(key)}` : `/admin/config?err=${encodeURIComponent(msg)}&k=${encodeURIComponent(key)}`);
+  // Hark's review L2: back to the same setting (not the top of the page), and a rejected value stays typed in the box
+  const keep = !ok && typed ? `&v=${encodeURIComponent(typed.value.slice(0, 1000))}&r=${encodeURIComponent(typed.reason.slice(0, 300))}` : "";
+  const at = `${ANCHOR}${encodeURIComponent(key)}`; // the setting's own place on the page
+  redirect(ok ? `/admin/config?ok=${done}&k=${encodeURIComponent(key)}${at}` : `/admin/config?err=${encodeURIComponent(msg)}&k=${encodeURIComponent(key)}${keep}${at}`);
 }
 
 export async function saveDraftAction(f: FormData) {
   const key = String(f.get("key") ?? "");
   const raw = f.get("type") === "bool" ? (f.get("value") === "on" ? "on" : "off") : String(f.get("value") ?? "");
-  await run(key, (u) => saveDraft(key, raw, u, String(f.get("reason") ?? "")), "draft");
+  await run(key, (u) => saveDraft(key, raw, u, String(f.get("reason") ?? "")), "draft", { value: raw, reason: String(f.get("reason") ?? "") });
 }
 export async function publishAction(f: FormData) {
   const key = String(f.get("key") ?? "");
