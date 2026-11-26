@@ -4475,6 +4475,7 @@ const handlers: Record<string, Handler> = {
     if (PAY_DATES_LIVE && !ctx.query.get("r")) {
       const days = group.orders.map((x) => x.order); // sorted by date
       sp(g, ctx, "pay_approved_dates", { date: spokenDate(days[0].eventDate), pickup: spokenDate(days.map((x) => x.pickupDate).sort().at(-1)!) });
+      sp(g, ctx, "pay_approved_pickup_note"); // Abraham, Nov 26, 2026, 01:28 ET: only with the dates line
     }
     // approved Nov 25, 2026, 12:22 (pay_approved_optin for callers not signed up for order texts)
     if (await orderTextsAgreed(ctx, o)) menuRun(g, ctx, "pay_approved_text", ["phonepay_approved_star", "phonepay_approved_text", "phonepay_approved_bye"]);

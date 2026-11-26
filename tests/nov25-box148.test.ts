@@ -77,6 +77,7 @@ describe("box 148", () => {
     expect(said(x)).toEqual([
       `Thank you! Your payment was approved, and your booking is confirmed. Your order number is ${digits()}.`,
       "We will deliver on Monday, December seventh and pick up on Tuesday, December eighth.", // approved Nov 26, 2026, 01:25 ET
+      "Please put the rental outside the door by 9 AM on the pickup day.", // approved Nov 26, 2026, 01:28 ET
       "To hear it again, press star.",
       "To receive your confirmation and order updates by text, press 1.",
       "We look forward to serving you again. Thank you for choosing Hup Up Attractions!",
@@ -105,7 +106,8 @@ describe("box 148", () => {
     const again = said(await call("pay-approved", {}, `o=${orderId}&st=1`));
     expect(again[0]).toBe(`Your order number is ${digits()}.`);
     expect(again[1]).toBe("We will deliver on Monday, December seventh and pick up on Tuesday, December eighth.");
-    expect(again[2]).toBe("To hear it again, press star.");
+    expect(again[2]).toBe("Please put the rental outside the door by 9 AM on the pickup day.");
+    expect(again[3]).toBe("To hear it again, press star.");
     const bad = await call("pay-approved-choice", { Digits: "5" }, `o=${orderId}`);
     expect(said(bad)).toEqual(["Sorry, that is not a valid selection."]);
     expect(redirect(bad)).toBe(`pay-approved?o=${orderId}&r=1`);
@@ -125,7 +127,7 @@ describe("box 148", () => {
   it("agreed: B2 plays; key 1 = a different number, which then receives every later order update text", async () => {
     await optIn(CALLER);
     const x = said(await call("pay-approved", {}, `o=${orderId}`));
-    expect(x[3]).toBe("We will text your confirmation to the number you are calling from. To send it to a different number, press 1."); // after the number, the dates and the star line
+    expect(x[4]).toBe("We will text your confirmation to the number you are calling from. To send it to a different number, press 1."); // after the number, the dates and the star line
     expect(redirect(await call("pay-approved-choice", { Digits: "1" }, `o=${orderId}`))).toBe(`tx-enter?p=conf&o=${orderId}`);
     await call("tx-heard", { Digits: "8455550777" }, `p=conf&o=${orderId}`);
     await call("tx-confirm", { Digits: "1" }, `p=conf&o=${orderId}`);
@@ -209,8 +211,25 @@ describe("item 11 (Abraham, Nov 25, 2026, 4:42 PM): what is live and what waits"
     const num = x.findIndex((l) => l.startsWith("Thank you! Your payment was approved"));
     expect(num).toBeGreaterThan(-1);
     expect(x[num + 1]).toBe(DATES); // right after the order number
+    expect(x[num + 2]).toBe("Please put the rental outside the door by 9 AM on the pickup day."); // then the pickup note (its own slot, Nov 26, 2026, 01:28 ET)
+    expect(PROMPTS.pay_approved_pickup_note.text).toBe("Please put the rental outside the door by 9 AM on the pickup day.");
     const star = said(await call("pay-approved", {}, `o=${orderId}&st=1`));
-    expect(star[star.findIndex((l) => l.startsWith("Your order number is")) + 1]).toBe(DATES); // star: the number and the dates again
-    expect(said(await call("pay-approved", {}, `o=${orderId}&r=1`)).join(" ")).not.toContain("We will deliver on"); // after a wrong key: the rest only
+    const at = star.findIndex((l) => l.startsWith("Your order number is"));
+    expect(star.slice(at + 1, at + 3)).toEqual([DATES, "Please put the rental outside the door by 9 AM on the pickup day."]); // star: the number, the dates and the note again
+    const rest = said(await call("pay-approved", {}, `o=${orderId}&r=1`)).join(" ");
+    expect(rest).not.toContain("We will deliver on"); // after a wrong key: the rest only
+    expect(rest).not.toContain("outside the door"); // the note only plays with the dates line
+  });
+});
+
+describe("the pickup note (Abraham, Nov 26, 2026, 01:28 ET)", () => {
+  it("its own Admin slot with the exact text (Google voice until a recording is uploaded); its recording plays once chosen", async () => {
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    expect(PROMPTS.pay_approved_pickup_note.text).toBe("Please put the rental outside the door by 9 AM on the pickup day.");
+    const { allSlots } = await import("@/lib/recording-slots");
+    expect(new Map(allSlots().map((x) => [x.key, x.text])).get("pay_approved_pickup_note")).toBe("Please put the rental outside the door by 9 AM on the pickup day.");
+    const lines = said(await call("pay-approved", {}, `o=${orderId}`));
+    expect(lines.filter((l) => l === "Please put the rental outside the door by 9 AM on the pickup day.")).toHaveLength(1);
+    expect(lines.indexOf("Please put the rental outside the door by 9 AM on the pickup day.")).toBe(lines.findIndex((l) => l.startsWith("We will deliver on")) + 1);
   });
 });

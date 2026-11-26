@@ -719,6 +719,7 @@ export const SCREENS: Record<string, ScreenInfo> = {
       "checkout_order_number",
       "phonepay_approved",
       "pay_approved_dates",
+      "pay_approved_pickup_note",
       "phonepay_approved_star",
       "phonepay_approved_text",
       "phonepay_approved_bye",
@@ -742,13 +743,10 @@ export const SCREENS: Record<string, ScreenInfo> = {
   "promo-consent": {
     "choice": "promo-consent-answer",
     "lines": [
-      "promo_ask",
-      "skip_pound"
+      "paid_promo_offer"
     ],
     "keys": "1",
-    "combos": [
-      "promo_ask"
-    ]
+    "combos": []
   },
   "promo-which": {
     "choice": "promo-which-answer",
