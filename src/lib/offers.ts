@@ -123,11 +123,32 @@ export async function bestOfferFor(
   // Thursday to Sunday is its own price (1.5 times), never combined with the others (a customer discount included)
   if (on(s.offerThuSunOn) && isThuSun({ eventDate: o.eventDate, pickupDate: o.pickupDate })) return { discountCents: thuSunAdjustment(ls), note: OFFER_NOTES.thuSun };
   const options: { discountCents: number; note: string }[] = [];
+  // Laser tag's third set at half price never stacks with a customer discount or the 4th Sunday (Abraham, Nov 26,
+  // 2026): those are worked out on the full catalog prices, and only a bigger saving than the half price replaces it
+  const half = await laserHalfSaving(exec, ls);
+  const full = half.cents > 0 ? ls.map((l) => ({ ...l, unitPriceCents: half.full.get(l.id) ?? l.unitPriceCents })) : ls;
   // A customer discount (Abraham, Nov 18, 2026) is one more choice: never combined, the bigger saving applies
   const { discountCents, discountNote } = await import("@/lib/customer-discounts");
   const cd = await customerDiscount();
-  if (cd) options.push({ discountCents: discountCents(cd, ls.reduce((t, l) => t + l.qty * l.unitPriceCents, 0)), note: discountNote(cd) });
-  if (on(s.offerFourthSundayOn)) options.push({ discountCents: await fourthSundayDiscount(exec, { id: o.id, customerId: o.customerId, eventDate: o.eventDate }, ls), note: OFFER_NOTES.fourthSunday });
-  const best = options.filter((x) => x.discountCents > 0).sort((a, b) => b.discountCents - a.discountCents)[0];
-  return best ?? { discountCents: 0, note: null };
+  if (cd) options.push({ discountCents: discountCents(cd, full.reduce((t, l) => t + l.qty * l.unitPriceCents, 0)), note: discountNote(cd) });
+  if (on(s.offerFourthSundayOn)) options.push({ discountCents: await fourthSundayDiscount(exec, { id: o.id, customerId: o.customerId, eventDate: o.eventDate }, full), note: OFFER_NOTES.fourthSunday });
+  const best = options.filter((x) => x.discountCents > half.cents).sort((a, b) => b.discountCents - a.discountCents)[0];
+  // The lines keep their half price, so the offer takes off only what it saves beyond it (the same total either way)
+  return best ? { discountCents: best.discountCents - half.cents, note: best.note } : { discountCents: 0, note: null };
+}
+
+/** What the laser third-set half price takes off these lines, and each laser line's price without it. */
+async function laserHalfSaving(exec: Exec, ls: Line[]): Promise<{ cents: number; full: Map<number, number> }> {
+  const laser = ls.filter((l) => /laser/i.test(l.category));
+  if (!laser.length) return { cents: 0, full: new Map() };
+  const r = await exec.execute(sql`SELECT id, name, price_cents FROM products WHERE id IN (${sql.join(laser.map((l) => sql`${l.productId}`), sql`, `)})`);
+  const cat = new Map((r.rows as { id: number; name: string; price_cents: number }[]).map((x) => [Number(x.id), { name: String(x.name), price: Number(x.price_cents) }]));
+  const { laserAddonPrices } = await import("@/lib/orders");
+  const full = await laserAddonPrices(exec, laser.map((l) => ({ key: l.id, name: cat.get(l.productId)?.name ?? l.name ?? "", cat: l.category, priceCents: cat.get(l.productId)?.price ?? l.unitPriceCents })), false);
+  let cents = 0;
+  for (const l of laser) {
+    const f = full.get(l.id);
+    if (f !== undefined && f > l.unitPriceCents) cents += (f - l.unitPriceCents) * l.qty;
+  }
+  return { cents, full };
 }

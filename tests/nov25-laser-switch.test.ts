@@ -76,8 +76,8 @@ describe("switch ON (prices before tax)", () => {
     const m = await laserAddonPrices(db, [1, 2, 3, 4, 5, 6].map(maze), true);
     expect(prices(m, [1, 2, 3, 4, 5, 6])).toEqual([20000, 20000, 10000, 20000, 20000, 10000]);
   });
-  it("maze + 3 extra six-gun sets: the 3rd extra is $37.50, the maze full price", async () => {
-    expect(prices(await laserAddonPrices(db, [maze(1), pack6(2), pack6(3), pack6(4)], true), [1, 2, 3, 4])).toEqual([20000, 7500, 7500, 3750]);
+  it("maze + extra six-gun sets: the maze's guns are the first set (Nov 26, 2026), so the 2nd extra (the 3rd set) is $37.50", async () => {
+    expect(prices(await laserAddonPrices(db, [maze(1), pack6(2), pack6(3), pack6(4)], true), [1, 2, 3, 4])).toEqual([20000, 7500, 3750, 7500]);
   });
   it("no maze, 3 six-gun sets: $110 + $110 + $55", async () => {
     expect(prices(await laserAddonPrices(db, [guns6(1), guns6(2), guns6(3)], true), [1, 2, 3])).toEqual([11000, 11000, 5500]);
@@ -131,44 +131,48 @@ describe("switch OFF", () => {
       h.session.orderId = null;
       h.session.data = {};
       await call("add", {}, `p=${ids.maze}&d=${day}&q=1`);
-      await call("packs-choice", { Digits: "1" }, `d=${day}`);
-      await call("packs-choice", { Digits: "1" }, `d=${day}`);
-      const after2 = await call("packs", {}, `d=${day}`);
-      expect(said(after2).join(" ")).not.toMatch(/half price/i);
-      expect(redirect(after2)).toBe("added-menu?n=1");
+      const to = redirect(await call("after-add", { Digits: "9" }, `z=${day}:6`))!; // the second set
+      expect(to).toBe(`add?p=${ids.pack6}&d=${day}&q=1`);
+      expect(redirect(await call("add", {}, to.split("?")[1]))).toBe(`added-menu?z=${day}%3A6`);
+      const after2 = await call("added-menu", {}, `z=${day}:6`);
+      expect(said(after2).join(" ")).not.toMatch(/half price|press 9/i);
       const lines = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, h.session.orderId!)).orderBy(schema.orderItems.id);
-      expect(lines.map((l) => l.unitPriceCents)).toEqual([20000, 7500, 7500]);
+      expect(lines.map((l) => l.unitPriceCents)).toEqual([20000, 7500]);
+      expect(redirect(await call("after-add", { Digits: "9" }, `z=${day}:6`))).toBe(`added-menu?z=${day}%3A6`); // 9 adds nothing: not valid
+      expect((await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, h.session.orderId!))).length).toBe(2);
 
       const day2 = "2027-06-15";
       h.session.orderId = null;
       h.session.data = {};
       await call("add", {}, `p=${ids.guns6}&d=${day2}&q=1`);
       await call("add", {}, `p=${ids.guns6}&d=${day2}&q=1`);
-      const second = await call("added-second", {}, `p=${ids.guns6}&d=${day2}`);
-      expect(said(second).join(" ")).not.toMatch(/half price/i);
-      expect(redirect(second)).toBe("added-menu");
+      expect(redirect(await call("added-second", {}, `p=${ids.guns6}&d=${day2}`))).toBe(`added-menu?z=${day2}%3A6`); // the old step: on to box 25
+      const second = await call("added-menu", {}, `z=${day2}:6`);
+      expect(said(second).join(" ")).not.toMatch(/half price|press 9/i);
     } finally {
       await saveSetting("laserThirdSetHalfOn", true);
     }
   });
 });
 
-describe("5:06 PM: the half price always goes to the cheapest sets in each group", () => {
+// Nov 26, 2026 (key 9 offer): gun sets are halved in the order added (the third set), so the price spoken is the price
+// charged; full sets (mazes) keep the 5:06 PM cheapest rule
+describe("gun sets: the set added third is the half one; full sets: the cheapest", () => {
   const guns4 = (key: number) => ({ key, name: "4 Laser Guns", cat: CAT, priceCents: 7500 });
   const pack4 = (key: number) => ({ key, name: "Additional 4-Pack Laser Guns", cat: ADD, priceCents: 5000 });
   const sum = (m: Map<number, number>) => [...m.values()].reduce((a, b) => a + b, 0);
   it("1. no maze: two 6-gun sets + one 4-gun set = $110 + $110 + $37.50", async () => {
     expect(prices(await laserAddonPrices(db, [guns6(1), guns6(2), guns4(3)], true), [1, 2, 3])).toEqual([11000, 11000, 3750]);
   });
-  it("2. added in order 4-gun, 6-gun, 6-gun: the same $257.50", async () => {
+  it("2. added in order 4-gun, 6-gun, 6-gun: the third added (a 6-gun set) is half, $240", async () => {
     const m = await laserAddonPrices(db, [guns4(1), guns6(2), guns6(3)], true);
-    expect(prices(m, [1, 2, 3])).toEqual([3750, 11000, 11000]);
-    expect(sum(m)).toBe(25750);
+    expect(prices(m, [1, 2, 3])).toEqual([7500, 11000, 5500]);
+    expect(sum(m)).toBe(24000);
   });
   it("3. maze + two +6-packs + one +4-pack: $200 + $75 + $75 + $25", async () => {
     expect(prices(await laserAddonPrices(db, [maze(1), pack6(2), pack4(3), pack6(4)], true), [1, 2, 3, 4])).toEqual([20000, 7500, 2500, 7500]);
   });
-  it("4. six extra sets: the two cheapest are half", async () => {
+  it("4. maze + six extra sets: the 3rd and 6th sets are half", async () => {
     const m = await laserAddonPrices(db, [maze(1), pack6(2), pack4(3), pack6(4), pack6(5), pack4(6), pack6(7)], true);
     expect(prices(m, [2, 3, 4, 5, 6, 7])).toEqual([7500, 2500, 7500, 7500, 2500, 7500]);
   });
@@ -177,7 +181,7 @@ describe("5:06 PM: the half price always goes to the cheapest sets in each group
   });
   it("6. a set removed: which sets are half is worked out again", async () => {
     const all = await laserAddonPrices(db, [guns6(1), guns4(2), guns6(3), guns6(4)], true);
-    expect(prices(all, [1, 2, 3, 4])).toEqual([11000, 3750, 11000, 11000]);
+    expect(prices(all, [1, 2, 3, 4])).toEqual([11000, 7500, 5500, 11000]);
     const without4 = await laserAddonPrices(db, [guns6(1), guns6(3), guns6(4)], true);
     expect(prices(without4, [1, 3, 4])).toEqual([11000, 11000, 5500]);
   });

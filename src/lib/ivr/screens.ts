@@ -370,22 +370,6 @@ export const SCREENS: Record<string, ScreenInfo> = {
       "cart_key"
     ]
   },
-  "packs": {
-    "choice": "packs-choice",
-    "lines": [
-      "laser_second_set",
-      "laser_third_set",
-      "laser_packs",
-      "stay_on_line",
-      "skip_pound",
-      "book_back"
-    ],
-    "keys": "01",
-    "combos": [
-      "stay_on_line",
-      "skip_pound"
-    ]
-  },
   "ocean": {
     "choice": "ocean-choice",
     "lines": [

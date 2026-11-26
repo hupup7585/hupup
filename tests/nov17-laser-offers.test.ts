@@ -77,19 +77,19 @@ describe("one maze", () => {
 });
 
 describe("laser tag: every third set half price (Owner switch, on; Nov 25, 2026, 4:03 PM)", () => {
-  it("maze with 6 guns $200 + 6-pack $75 + 6-pack $75; the 3rd extra set (a 4-pack) is $25", async () => {
+  it("maze with 6 guns $200 + 6-pack $75 + 6-pack $37.50 (the maze's guns are the first set, Nov 26, 2026); a 4th set (4-pack) $50", async () => {
     const r = await reserveItem({ orderId: null, productId: maze6, qty: 1, eventDate: "2026-12-14", channel: "POS", status: "CONFIRMED" });
     if (!r.ok) throw new Error("no order");
     await reserveItem({ orderId: r.orderId, productId: ids.pack6, qty: 2, eventDate: "2026-12-14", channel: "POS", status: "CONFIRMED" });
     let [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId));
-    expect(o.subtotalCents).toBe(35000);
+    expect(o.subtotalCents).toBe(31250);
     expect(o.offerNote).toBeNull();
     await reserveItem({ orderId: r.orderId, productId: ids.pack4, qty: 1, eventDate: "2026-12-14", channel: "POS", status: "CONFIRMED" });
     [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId));
-    expect(o.subtotalCents).toBe(35000 + 2500);
+    expect(o.subtotalCents).toBe(31250 + 5000);
     await refreshOrderTotals(r.orderId);
     [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId));
-    expect(o.subtotalCents).toBe(35000 + 2500); // halved once, never again
+    expect(o.subtotalCents).toBe(31250 + 5000); // halved once, never again
   });
   it("guns only count too: three 6 guns (no maze), the 3rd half off; additional packs need a maze (Nov 24, 2026)", async () => {
     const r = await reserveItem({ orderId: null, productId: guns6, qty: 1, eventDate: "2026-12-21", channel: "POS", status: "CONFIRMED" });
@@ -146,23 +146,13 @@ describe("4th Sunday free (Owner switch)", () => {
 });
 
 describe("phone: laser guns add-on only after a maze (Abraham, Nov 24, 2026 revised), repeating after every pack", () => {
-  it("after plain laser guns: no offer; after a maze: the question, the shared skip line, the back line", async () => {
+  it("after a maze or plain guns: box 25 with the key 9 offer of the same size (Nov 26, 2026, replaces the packs question)", async () => {
     const day = "2026-12-28";
     h.session.orderId = null;
     h.session.data = {};
-    expect(redirect(await call("add", {}, `p=${guns6}&d=${day}&q=1`))).not.toBe(`packs?d=${day}`); // plain guns: no offer (Nov 24, 2026)
-    expect(redirect(await call("add", {}, `p=${maze6}&d=${day}&q=1`))).toBe(`packs?d=${day}`);
-    expect(said(await call("packs", {}, `d=${day}`))).toEqual([
-      "Would you like to add more laser guns? To add a six-pack laser tag for $75, press 1. To add a four-pack laser tag for $50, press 2.",
-      "To skip, press pound.",
-      "To go back, press star.",
-    ]);
-    const r = await call("packs-choice", { Digits: "1" }, `d=${day}`);
-    expect(redirect(r)).toBe(`packs?d=${day}`); // the offer again after every pack (Nov 24, 2026)
-    const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, h.session.orderId!));
-    expect(items.find((i) => i.productId === ids.pack6)?.unitPriceCents).toBe(7500);
-    expect(said(r)[0]).toMatch(/^Successfully added to your cart: .+\.$/); // Batch 3 item 4: the added line for the pack, then the offer
-    expect(redirect(await call("packs-choice", { Digits: "#" }, `d=${day}`))).toBe("added-menu?n=1");
+    expect(redirect(await call("add", {}, `p=${maze6}&d=${day}&q=1`))).toBe(`added-menu?z=${day}%3A6`);
+    expect(said(await call("added-menu", {}, `z=${day}:6`))[1]).toBe("To add a second six-pack of laser guns for $75, press 9.");
+    expect(redirect(await call("packs", {}, `d=${day}`))).toBe(`added-menu?z=${day}%3A6`); // the old step goes on to box 25
   });
   it("the add-on price holds only while the maze is in the cart: without the maze the six-pack is the regular 6 guns price", async () => {
     const r1 = await reserveItem({ orderId: null, productId: maze6, qty: 1, eventDate: "2027-01-11", channel: "POS", status: "CONFIRMED" });

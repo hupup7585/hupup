@@ -88,7 +88,7 @@ describe("box 25 for laser tag and paddle boats (Nov 22, 2026)", () => {
     h.session.orderId = null;
     h.session.data = {};
     await call("add", {}, `p=${guns}&d=${D2}&q=1`);
-    expect(redirect(await call("added-second", {}, `p=${guns}&d=${D2}`))).toBe("added-menu"); // only one set
+    expect(redirect(await call("added-second", {}, `p=${guns}&d=${D2}`))).toMatch(/^added-menu\?z=/); // laser tag: box 25 with the key 9 offer (Nov 26, 2026)
     const { PROMPTS } = await import("@/lib/ivr/prompts");
     expect(PROMPTS.second_laser.text).toBe("To add another, press 1."); // Nov 22, 2026, 11:12 PM
     expect(PROMPTS.second_paddle.text).toBe("To add a second one, press 1.");

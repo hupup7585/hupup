@@ -65,41 +65,16 @@ beforeAll(async () => {
 const tens = async (orderId: number) => (await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)))[0];
 
 describe("2 (revised). additional packs only with a maze; the offer repeats after every pack", () => {
-  it("after a maze: the offer; key 1 adds a six-pack and the offer plays again; pound goes on. After plain guns: no offer", async () => {
-    const day = "2027-03-01";
-    h.session.orderId = null;
-    h.session.data = {};
-    expect(redirect(await call("add", {}, `p=${guns6}&d=${day}&q=1`))).not.toBe(`packs?d=${day}`); // plain 6 guns: no offer
-    h.session.orderId = null;
-    h.session.data = {};
+  // Nov 26, 2026: the packs question after a maze is replaced by the key 9 offer in box 25 (tests/nov26-laser-key9.test.ts)
+  it("after a maze: box 25 offers a second six-pack on key 9; 9 adds it and the third is offered at half price", async () => {
     const day2 = "2027-03-02";
-    expect(redirect(await call("add", {}, `p=${maze6}&d=${day2}&q=1`))).toBe(`packs?d=${day2}`);
-    expect(said(await call("packs", {}, `d=${day2}`))[0]).toBe("Would you like to add more laser guns? To add a six-pack laser tag for $75, press 1. To add a four-pack laser tag for $50, press 2.");
-    expect(redirect(await call("packs-choice", { Digits: "1" }, `d=${day2}`))).toBe(`packs?d=${day2}`);
-    expect(redirect(await call("packs-choice", { Digits: "1" }, `d=${day2}`))).toBe(`packs?d=${day2}`); // maze + 2 additional 6-packs
-    const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, h.session.orderId!));
-    expect(items.filter((i) => i.productId === ids.pack6).reduce((t, i) => t + i.qty, 0)).toBe(2);
-    expect(redirect(await call("packs-choice", { Digits: "#" }, `d=${day2}`))).toBe("added-menu?n=1"); // Batch 3 item 4: the added line already played
-    expect(redirect(await call("packs-choice", { Digits: "*" }, `d=${day2}`))).toBe("added-menu?n=1");
-    expect(await call("packs", {}, `d=${day2}`)).toMatch(/<Redirect method="POST">[^<]*added-menu\?n=1<\/Redirect>/); // no key for 4 seconds (Batch 3 item 4: no second added line)
-  });
-  it("only a pack still in stock is offered; none left: no offer", async () => {
-    const day = "2027-03-08";
     h.session.orderId = null;
     h.session.data = {};
-    await db.update(schema.products).set({ quantity: 1 }).where(eq(schema.products.id, ids.pack4));
-    await db.update(schema.products).set({ quantity: 1 }).where(eq(schema.products.id, guns6));
-    await db.update(schema.products).set({ quantity: 1 }).where(eq(schema.products.id, ids.pack6));
-    await call("add", {}, `p=${maze6}&d=${day}&q=1`); // the maze takes the only six-pack
-    const lines = said(await call("packs", {}, `d=${day}`));
-    expect(lines[0]).toBe("Would you like to add more laser guns? To add a four-pack laser tag for $50, press 2.");
-    const wrong = await call("packs-choice", { Digits: "1" }, `d=${day}`);
-    expect(said(wrong)[0]).toBe("Sorry, that is not a valid selection.");
-    await call("packs-choice", { Digits: "2" }, `d=${day}`); // the only four-pack
-    expect(await call("packs", {}, `d=${day}`)).toContain("added-menu"); // nothing left: straight on
-    await db.update(schema.products).set({ quantity: 10 }).where(eq(schema.products.id, ids.pack4));
-    await db.update(schema.products).set({ quantity: 10 }).where(eq(schema.products.id, ids.pack6));
-    await db.update(schema.products).set({ quantity: 3 }).where(eq(schema.products.id, guns6));
+    expect(redirect(await call("add", {}, `p=${maze6}&d=${day2}&q=1`))).toBe(`added-menu?z=${day2}%3A6`);
+    expect(said(await call("added-menu", {}, `z=${day2}:6`))[1]).toBe("To add a second six-pack of laser guns for $75, press 9.");
+    expect(redirect(await call("after-add", { Digits: "9" }, `z=${day2}:6`))).toBe(`add?p=${ids.pack6}&d=${day2}&q=1`);
+    await call("add", {}, `p=${ids.pack6}&d=${day2}&q=1`);
+    expect(said(await call("added-menu", {}, `z=${day2}:6`))[1]).toBe("To add a third six-pack of laser guns for half price, only $37.50, press 9.");
   });
   it("plain 6 guns + an additional 6-pack is refused (server side), on the phone and the staff screen", async () => {
     const r = await reserveItem({ orderId: null, productId: guns6, qty: 1, eventDate: "2027-03-29", channel: "POS", status: "CONFIRMED" });
@@ -115,8 +90,8 @@ describe("2 (revised). additional packs only with a maze; the offer repeats afte
     h.session.orderId = null;
     h.session.data = {};
     await call("add", {}, `p=${maze6}&d=${day}&q=1`);
-    await call("packs-choice", { Digits: "1" }, `d=${day}`);
-    await call("packs-choice", { Digits: "2" }, `d=${day}`);
+    await call("add", {}, `p=${ids.pack6}&d=${day}&q=1`);
+    await call("add", {}, `p=${ids.pack4}&d=${day}&q=1`);
     const orderId = h.session.orderId!;
     const [mazeLine] = await db.select().from(schema.orderItems).where(eq(schema.orderItems.productId, maze6));
     const before = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
@@ -147,18 +122,18 @@ describe("third laser pack half price (Abraham, Nov 24, 12:42 PM), the 3rd one a
     await db.update(schema.products).set({ quantity: 6 }).where(eq(schema.products.id, guns6));
   });
   // Nov 25, 2026, 4:03 PM: the maze is a full set, counted apart from the extra gun sets
-  it("maze with 6 $200 + 6-pack $75 + 6-pack $75 = $350 (only two extra sets)", async () => {
-    expect(await book("2027-05-03", [maze6, ids.pack6, ids.pack6])).toBe(35000);
+  it("maze with 6 $200 + 6-pack $75 + 6-pack $37.50 = $312.50 (the maze's guns are the first set, Nov 26, 2026)", async () => {
+    expect(await book("2027-05-03", [maze6, ids.pack6, ids.pack6])).toBe(31250);
   });
-  it("maze with 6 $200 + 6-pack $75 + 4-pack $50 + 4-pack $25 = $350 (the 3rd extra set half)", async () => {
+  it("maze with 6 $200 + 6-pack $75 + 4-pack $25 (the 3rd set) + 4-pack $50 = $350", async () => {
     expect(await book("2027-05-17", [maze6, ids.pack6, ids.pack4, ids.pack4])).toBe(35000);
   });
   it("no maze: 6 guns $110 + 6 guns $110 + 6 guns $55 = $275", async () => {
     expect(await book("2027-05-05", [guns6, guns6, guns6])).toBe(27500);
   });
-  it("no maze: 6 guns $110 + 6 guns $110 + 4 guns $37.50 = $257.50 (the cheapest set is half, Nov 25, 2026, 5:06 PM)", async () => {
+  it("no maze: 6 guns $110 + 6 guns $110 + 4 guns $37.50 = $257.50 (the set added third is half, Nov 26, 2026)", async () => {
     expect(await book("2027-05-06", [guns6, guns6, guns4])).toBe(25750);
-    expect(await book("2027-05-10", [guns6, guns4, guns6])).toBe(11000 + 3750 + 11000); // 5:06 PM: the cheapest set is half, whatever the order
+    expect(await book("2027-05-10", [guns6, guns4, guns6])).toBe(11000 + 7500 + 5500); // the third added, as the phone says
   });
   it("maze + 1 additional pack: no discount", async () => {
     expect(await book("2027-05-24", [maze6, ids.pack6])).toBe(27500);
@@ -196,14 +171,14 @@ describe("4. ocean balls from the cart (Nov 25, 2026, 14:08: key 9, live)", () =
 });
 
 describe("5. offers check (the three switches on)", () => {
-  it("laser every third set half price: maze with 6 $200 + 6-pack $75 + 4-pack $50 = $325; a third extra set (4-pack) $25", async () => {
+  it("laser every third set half price: maze with 6 $200 + 6-pack $75 + 4-pack $25 (the third set, Nov 26, 2026) = $300; a 4th set full price", async () => {
     const r = await reserveItem({ orderId: null, productId: maze6, qty: 1, eventDate: "2027-04-05", channel: "POS", status: "CONFIRMED" });
     if (!r.ok) throw new Error("no order");
     await reserveItem({ orderId: r.orderId, productId: ids.pack6, qty: 1, eventDate: "2027-04-05", channel: "POS", status: "CONFIRMED" });
     await reserveItem({ orderId: r.orderId, productId: ids.pack4, qty: 1, eventDate: "2027-04-05", channel: "POS", status: "CONFIRMED" });
-    expect((await tens(r.orderId)).subtotalCents).toBe(32500);
+    expect((await tens(r.orderId)).subtotalCents).toBe(30000);
     await reserveItem({ orderId: r.orderId, productId: ids.pack4, qty: 1, eventDate: "2027-04-05", channel: "POS", status: "CONFIRMED" });
-    // the 3rd extra gun set is half price ($25 off the four-gun set)
+    // the 4th set: full price
     expect((await tens(r.orderId)).subtotalCents).toBe(35000);
     // two packs only: no offer
     const r2 = await reserveItem({ orderId: null, productId: maze6, qty: 1, eventDate: "2027-04-12", channel: "POS", status: "CONFIRMED" });

@@ -962,6 +962,62 @@ async function nextSetPrice(orderId: number, productId: number): Promise<number>
   return (await laserAddonPrices(db, [...rows, next])).get(next.key) ?? p.price;
 }
 
+/** A laser set on a booking line (Nov 26, 2026): a maze with its guns, guns only, or an extra pack; its size (6 or 4). */
+async function laserSetOf(productId: number): Promise<{ maze: boolean; size: 6 | 4 | null } | null> {
+  const [x] = await db.select({ name: products.name, cat: categories.name }).from(products).innerJoin(categories, eq(categories.id, products.categoryId)).where(eq(products.id, productId));
+  if (!x) return null;
+  const size = /\b6\b|six/i.test(x.name) ? 6 : /\b4\b|four/i.test(x.name) ? 4 : null;
+  if (x.cat === LASER_ADDONS_CATEGORY) return { maze: false, size };
+  if (!/laser/i.test(x.cat)) return null;
+  if (/maze/i.test(x.name)) return { maze: true, size };
+  return /\d+\s+laser guns/i.test(x.name) ? { maze: false, size } : null;
+}
+
+/** The extra set of a size: the extra pack with a maze on the booking, else the guns-only set of that size. */
+async function extraSetProduct(maze: boolean, size: 6 | 4) {
+  const list = maze
+    ? (await addOnProducts(LASER_ADDONS_CATEGORY)).filter((x) => new RegExp(`\\b${size}\\s*-?\\s*pack`, "i").test(x.name))
+    : (await db.select({ id: products.id, name: products.name, cat: categories.name }).from(products).innerJoin(categories, eq(categories.id, products.categoryId)).where(eq(products.active, true)).orderBy(asc(products.id))).filter(
+        (x) => x.cat !== LASER_ADDONS_CATEGORY && /laser/i.test(x.cat) && !/maze/i.test(x.name) && new RegExp(`^\\s*${size}\\s+laser guns`, "i").test(x.name),
+      );
+  return list[0] ? await getProduct(list[0].id) : null;
+}
+
+/**
+ * Key 9 "add another laser set" (Abraham, Nov 26, 2026): after any laser set, the same size again ("second" at the
+ * catalog price, "third" at half price with the Owner's half-price switch on), else the other size with the sold-out
+ * line, else nothing. Every laser set on that day's booking counts (the maze's own guns are the first); at most 3.
+ * Offered only when the price in the line is the price the booking will charge.
+ */
+async function laserSetOffer(ctx: Ctx, date: string, size: 6 | 4): Promise<{ key: PromptKey; productId: number } | null> {
+  const day = await dayOrder(ctx, date);
+  if (!day) return null;
+  let sets = 0;
+  let maze = false;
+  for (const i of day.items) {
+    const x = await laserSetOf(i.productId);
+    if (!x) continue;
+    sets += i.qty;
+    if (x.maze) maze = true;
+  }
+  if (sets < 1 || sets >= 3) return null; // the cap: 3 sets
+  const ord = sets === 1 ? "second" : "third";
+  const { laserThirdSetHalfOn } = await import("@/lib/orders");
+  if (ord === "third" && !(await laserThirdSetHalfOn(db))) return null; // the half-price switch off: no third-set line
+  const free = async (x: Awaited<ReturnType<typeof extraSetProduct>>) => Boolean(x && (await checkBookable(x.id, x.quantity, date, db, keptPickup(ctx, date))) > 0);
+  const pre = maze ? "maze" : "nomaze";
+  const same = await extraSetProduct(maze, size);
+  const other = await extraSetProduct(maze, size === 6 ? 4 : 6);
+  let key: PromptKey;
+  let prod: NonNullable<typeof same>;
+  if (same && (await free(same))) [key, prod] = [`lset_${pre}_${ord}_${size}` as PromptKey, same];
+  else if (other && (await free(other))) [key, prod] = [`lset_${pre}_${ord}_no${size}` as PromptKey, other];
+  else return null; // both sizes gone for that day: no offer
+  const spoken = /\$(\d+(?:\.\d\d)?)[^$]*$/.exec(promptText(ctx.prompts, key))?.[1];
+  if (!spoken || Math.round(Number(spoken) * 100) !== (await nextSetPrice(day.order.id, prod.id))) return null; // never a wrong price
+  return { key, productId: prod.id };
+}
+
 async function isBounceHouse(categoryId: number) {
   const [cat] = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, categoryId));
   return Boolean(cat && ATTRACTIONS["1"].match.test(cat.name));
@@ -2823,12 +2879,10 @@ const handlers: Record<string, Handler> = {
       // Ocean balls v2 (Nov 25, 2026, 14:08): box 25 with "To add ocean balls, press 9." after the added line
       return back(vr, "added-menu", { o: date });
     }
-    // The extra gun packs after a maze (Abraham, Nov 24, 2026, revised: never after plain 6 or 4 guns), while a pack is
-    // left for that date; the approved wording plays in the live voice until its recording is uploaded
-    if (await isMaze(p)) {
-      sp(vr, ctx, "box25_added", addedVars(lastAdded)); // Batch 3 item 4: the added line first, then the offer
-      return back(vr, "packs", { d: date });
-    }
+    // Key 9 "add another laser set" (Abraham, Nov 26, 2026): after every laser set (maze with 6 or 4 guns, guns only,
+    // or an extra set added with 9), box 25 with the offer before the keep-shopping lines
+    const set = await laserSetOf(p.id);
+    if (set?.size) return back(vr, "added-menu", { z: `${date}:${set.size}` });
     // Box 25 for laser tag and paddle boats (Nov 22, 2026): the added line, then a second one while another is free
     if (await secondOneKind(p.categoryId)) return back(vr, "added-second", { p: p.id, d: date });
     return back(vr, "added-menu");
@@ -2844,6 +2898,9 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     if (!p) return back(vr, "added-menu");
     const kind = await secondOneKind(p.categoryId);
+    // Laser tag: the key 9 offer (Nov 26, 2026) replaced "To add another" and the second and third set lines
+    const set = kind === "laser" ? await laserSetOf(p.id) : null;
+    if (set?.size) return back(vr, "added-menu", { z: `${date}:${set.size}` });
     const inCart = (await cartLines(ctx)).filter((l) => l.date === date && l.name === p.name).reduce((t, l) => t + l.qty, 0);
     const free = await checkBookable(p.id, p.quantity, date, db, keptPickup(ctx, date));
     // Laser tag (Nov 22, 2026, 11:12 PM): "To add another" every time while another set is free; paddle boats: a second one
@@ -2906,20 +2963,23 @@ const handlers: Record<string, Handler> = {
    * Row 11, every time an item is added (Abraham, Nov 19, 2026): "This item was successfully added to your cart. To go
    * to your shopping cart, press 0. To keep shopping, for same day, press 1. For another day, press 2."
    */
-  "added-menu"(ctx, vr) {
+  async "added-menu"(ctx, vr) {
     const n = ctx.query.get("n") ?? undefined;
     const o = ctx.query.get("o") ?? undefined; // the first balloon's date: the ocean balls offer (Nov 25, 2026, 14:08)
-    const g = keypad(vr, url("after-add", { n, o }));
+    const z = ctx.query.get("z") ?? undefined; // a laser set's date and size: the key 9 offer (Nov 26, 2026)
+    const offer = z ? await laserSetOffer(ctx, z.split(":")[0], Number(z.split(":")[1]) === 4 ? 4 : 6) : null;
+    const g = keypad(vr, url("after-add", { n, o, z: offer ? z : undefined }));
     // Box 25 (Abraham, Nov 22, 2026): every item; n = the added line already played with the second-one offer
     if (n) sp(g, ctx, "box25_keep");
     else {
       const a = ctx.session?.data.lastAdded;
       if (a) sp(g, ctx, "box25_added", addedVars(a));
       if (o) sp(g, ctx, "ocean_offer"); // right after the added line, once per call
+      if (offer) sp(g, ctx, offer.key); // before the same-day and another-day lines
       sp(g, ctx, "box25_keep");
     }
     menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
-    return noInput(vr, ctx, "added-menu", { n, o }); // no key: box 25 again (Batch 3 item 10)
+    return noInput(vr, ctx, "added-menu", { n, o, z: offer ? z : undefined }); // no key: box 25 again (Batch 3 item 10)
   },
 
   async "after-add"(ctx, vr) {
@@ -2930,50 +2990,28 @@ const handlers: Record<string, Handler> = {
     if (d === "0") return back(vr, "cart");
     const o = ctx.query.get("o") ?? undefined;
     if (d === "9" && o) return back(vr, "ocean", { d: o }); // the ocean balls amounts (Nov 25, 2026, 14:08)
+    const z = ctx.query.get("z") ?? undefined;
+    if (d === "9" && z) {
+      // The offered set, checked again (stock and price) and added to the same day's booking; box 25 then offers the next
+      const [date, size] = z.split(":");
+      const offer = await laserSetOffer(ctx, date, Number(size) === 4 ? 4 : 6);
+      if (offer) return back(vr, "add", { p: offer.productId, d: date, q: 1 });
+    }
     if (d) {
       sp(vr, ctx, "not_valid");
-      return back(vr, "added-menu", { o });
+      return back(vr, "added-menu", { o, z });
     }
-    return noInput(vr, ctx, "added-menu", { n: ctx.query.get("n") ?? undefined, o }); // Batch 3 item 10
+    return noInput(vr, ctx, "added-menu", { n: ctx.query.get("n") ?? undefined, o, z }); // Batch 3 item 10
   },
 
   /** Extra laser gun packs after a maze or guns (Abraham, Nov 17, 2026): 1 = 6-pack $75, 2 = 4-pack $50, # skips. */
+  /** Old step (extra gun packs after a maze): replaced by the key 9 offer in box 25 (Nov 26, 2026). */
   async packs(ctx, vr) {
     const d = ctx.query.get("d")!;
-    const offer = (await packOffer(ctx, d)).slice(0, 2);
-    // Extra gun sets already on this day's booking (Abraham, Nov 25, 2026, 14:41): 1 = the second-one line, 2 = the
-    // third set at half price, 3 or more = no more offers
-    const day = await dayOrder(ctx, d);
-    const setLines = (day?.items ?? []).filter((i) => offer.some((x) => x.id === i.productId));
-    const sets = setLines.reduce((t, i) => t + i.qty, 0);
-    if (sets >= 3) return back(vr, "added-menu", { n: 1 });
-    if (sets >= 1) {
-      const { orderHasMaze, laserThirdSetHalfOn } = await import("@/lib/orders");
-      if (!(await orderHasMaze(db, day!.order.id))) return back(vr, "added-menu", { n: 1 }); // extra sets need the maze
-      // "Laser tag: every third set half price" off (Abraham, Nov 25, 2026, 4:03 PM): no third-set line
-      if (sets >= 2 && !(await laserThirdSetHalfOn(db))) return back(vr, "added-menu", { n: 1 });
-      const kind = offer.find((x) => x.id === setLines.at(-1)!.productId);
-      if (!kind?.free) return back(vr, "added-menu", { n: 1 });
-      const g = keypad(vr, url("packs-choice", { d, k: kind.key }), { timeout: 5 });
-      if (sets === 1) sp(g, ctx, "laser_second_set");
-      else sp(g, ctx, "laser_third_set", { price: spokenMoney(await nextSetPrice(day!.order.id, kind.id)) });
-      menuRun(g, ctx, "stay_on_line", ["stay_on_line", "star"]);
-      return back(vr, "added-menu", { n: 1 }); // no key for 5 seconds: nothing added, on to the keep-shopping lines
-    }
-    const left = offer.filter((x) => x.free);
-    if (!left.length) return back(vr, "added-menu", { n: 1 }); // no pack left for that date: no offer (the added line already played)
-    const g = keypad(vr, url("packs-choice", { d }), { timeout: 5 });
-    if (left.length === offer.length) {
-      if (promptWaiting(ctx.prompts, "laser_packs")) say(g, promptText(ctx.prompts, "laser_packs"));
-      else sp(g, ctx, "laser_packs");
-    } else {
-      // Only one kind left: the question and only that kind's sentence (split at the sentence)
-      const parts = promptText(ctx.prompts, "laser_packs").match(/[^.?!]+[.?!]/g)?.map((x) => x.trim()) ?? [];
-      say(g, [parts[0], ...left.map((x) => parts[Number(x.key)])].filter(Boolean).join(" "));
-    }
-    halfPause(g);
-    menuRun(g, ctx, "skip_pound", ["skip_pound", "star"]);
-    return back(vr, "added-menu", { n: 1 }); // no key: nothing added (Nov 22, 2026)
+    const last = ctx.session?.data.lastAdded;
+    const lastId = last ? (await db.select({ id: products.id }).from(products).where(eq(products.name, last.name)).limit(1))[0]?.id : undefined;
+    const set = lastId ? await laserSetOf(lastId) : null;
+    return back(vr, "added-menu", set?.size ? { z: `${d}:${set.size}` } : { n: 1 });
   },
 
   async "packs-choice"(ctx, vr) {
