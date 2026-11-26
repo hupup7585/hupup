@@ -11,6 +11,7 @@ import { RING_KEYS, RING_KEY_LABELS } from "@/lib/ivr/routing";
 import { KEY_ACTIONS, defaultLayout, layoutIdFor, parseEditor, type KeyDef, type Line } from "@/lib/ivr/menu-editor";
 import { GO_TO_SCREENS, SCREENS, screenArea, screenLabel } from "@/lib/ivr/screens";
 import { SCREEN_EXPLANATIONS } from "@/lib/ivr/screen-explanations";
+import { previewScreen } from "@/lib/ivr/screen-preview";
 import { addLineAction, moveLineAction, removeKeyAction, removeLineAction, setKeyAction, toggleLineAction } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
   const s = SCREENS[id];
   if (!s) notFound();
   const sp = await searchParams;
+  const preview = await previewScreen(id).catch(() => null); // Test this screen: a preview call, nothing saved
   const [row] = await db.select({ value: schema.appSettings.value }).from(schema.appSettings).where(eq(schema.appSettings.key, "screenEditor")).limit(1);
   const e = parseEditor(row?.value);
   const slots = allSlots(await catalogItems(), {}, await customSlots()).filter((x) => x.kind === "line");
@@ -121,6 +123,26 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
           <div><dt className="inline font-semibold">If you change it: </dt><dd className="inline text-muted">{SCREEN_EXPLANATIONS[id].ifChanged}</dd></div>
         </dl>
       )}
+      <details className="card my-3 p-4" data-screen-test>
+        <summary className="cursor-pointer font-bold">Test this screen</summary>
+        {preview ? (
+          <>
+            <p className="mt-2 text-sm text-muted">Exactly what a caller gets on this screen right now, with the live recordings, Admin keys and timing. Run as a preview: nothing is saved and nothing shows in the call log.</p>
+            <ol className="mt-2 grid gap-1 text-sm" data-screen-test-steps>
+              {preview.steps.map((x, i) => <li key={i} className="whitespace-pre-wrap">{x.text}</li>)}
+            </ol>
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer text-muted">The phone instructions sent to Twilio (for checking)</summary>
+              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-bg p-2">{preview.xml}</pre>
+            </details>
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-muted">
+            This screen depends on what the caller did before (a cart, an order or an earlier answer), so it cannot be run on its own here. Its lines, in play order, are listed
+            below with their keys; the wait is on Phone timing. A test call on the preview site shows it in full.
+          </p>
+        )}
+      </details>
       {sp.ok && <p className="my-3 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]" role="status">{sp.ok === "1" ? "Saved, live now." : sp.ok}</p>}
       {sp.err && <p className="my-3 rounded-xl bg-[#FFE6E4] p-3 font-semibold text-[#C83A2F]" role="alert">{sp.err}</p>}
 

@@ -1,4 +1,5 @@
 import { asc, eq, sql } from "drizzle-orm";
+import { isPreviewCall } from "@/lib/ivr/preview";
 import { db, schema } from "@/lib/db";
 
 /**
@@ -113,7 +114,7 @@ function clean(v: unknown, allowPhone: boolean): unknown {
 }
 
 export async function track(callSid: string | null | undefined, kind: JourneyKind, label: string, detail: Record<string, unknown> = {}, step?: string) {
-  if (!callSid) return;
+  if (!callSid || isPreviewCall(callSid)) return; // Admin preview: never in the call journey
   try {
     const allowPhone = !!step && PHONE_STEPS.has(step);
     await db.insert(schema.callEvents).values({ callSid, kind, label: redactDigits(label, allowPhone).slice(0, 300), detail: clean(detail, allowPhone) as Record<string, unknown>, step: step ?? null });
@@ -124,7 +125,7 @@ export async function track(callSid: string | null | undefined, kind: JourneyKin
 
 /** One webhook = one step: the menu or question reached, plus the key pressed or words said there. */
 export async function trackStep(callSid: string, action: string, body: Record<string, string | undefined>, query: URLSearchParams) {
-  if (NOT_CALLER_STEPS.has(action)) return;
+  if (NOT_CALLER_STEPS.has(action) || isPreviewCall(callSid)) return;
   const detail: Record<string, unknown> = {};
   if (body.Digits) detail.key = body.Digits;
   if (body.SpeechResult) detail.said = body.SpeechResult;
