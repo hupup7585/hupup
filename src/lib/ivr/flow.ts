@@ -5421,6 +5421,9 @@ async function ownKey(ctx: Ctx, vr: VR, screen: string, k: KeyDef) {
   }
 }
 
+/** Every phone step's name (the baseline snapshot test and the Admin screen inventory read it). */
+export const handlerNames = () => Object.keys(handlers);
+
 export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Promise<string> {
   const vr = new twilio.twiml.VoiceResponse();
   const prompts = await loadPromptOverrides();

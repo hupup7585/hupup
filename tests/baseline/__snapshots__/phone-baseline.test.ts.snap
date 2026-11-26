@@ -1,0 +1,815 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`baseline: every phone step as it plays today > add 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > added-menu 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/after-add" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To keep shopping, for same day, press 1. For another day, press 2.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go to your shopping cart, press 0.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=added-menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > added-rest 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/added-menu?n=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > added-second 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/added-menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/addr-house</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-check 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/addr-house</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-found 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/addr-found-choice?m=none&amp;n=0" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">We could not find an address for this phone number.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To try a different phone number, press 1.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To enter the address manually, press 2.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=addr-found</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-found-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/addr-found</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-house 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="7" timeout="10" finishOnKey="#" action="https://hupup.example/api/voice/addr-house-heard" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Now, with your keypad, please enter the house number.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">When you are done, press pound.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=addr-house</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-house-heard 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/addr-house</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-lookup 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/addr-lookup-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Next, we need the delivery address.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To look it up with the number you are calling from, press 1. To look it up with a different phone number, press 2. To enter the address manually, press 3.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=addr-lookup</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-lookup-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/addr-lookup</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-outside 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/addr-outside-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">We are sorry, we do not deliver to this area. We deliver only in Orange County, New York. To enter a different zip code, press 1.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=addr-outside</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-outside-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/addr-outside</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-phone 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="11" timeout="5" finishOnKey="#" action="https://hupup.example/api/voice/addr-phone-heard" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Please enter a 10-digit phone number, starting with the area code.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">When you are done, press pound.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=addr-phone</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-phone-heard 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">The phone number you entered is not valid. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/addr-phone</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-price 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/addr-house</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-readback 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/addr-house</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-readback-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/addr-readback</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-street 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/addr-street-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To search for the street name by voice, press 1. To search it with your keypad, press 2.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=addr-street</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-street-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/addr-street</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-street-keys 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" finishOnKey="#" timeout="15" action="https://hupup.example/api/voice/addr-street-typed" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Please enter the first four letters of the street name, then press pound.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Press 2 once for A, twice for B, three times for C, and so on for all keys. If two letters in a row use the same key, press star between them. To type a number, press the key one more time. To go back, press star twice. Press 0 once for a space, and twice for number 0. Press 1 once for number 1, twice for a dot, three times for a dash, and four times for an underscore. When you are finished, press the pound key.</Say><Play>https://hupup.example/audio/tone.wav</Play></Gather><Redirect method="POST">https://hupup.example/api/voice/addr-street-typed</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-street-none 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/addr-street-none-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">We could not find a street that starts with those letters. To try again, press 1. To search by voice, press 2.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=addr-street-none</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-street-none-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/addr-street-none</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-street-pick 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/addr-street</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-street-pick-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/addr-street-pick</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-street-rb 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/addr-street</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-street-rb-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/addr-street-rb?m=v</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-street-typed 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, I did not catch that. Let's try again.</Say><Redirect method="POST">https://hupup.example/api/voice/addr-street-keys?again=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-unit 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="7" timeout="10" finishOnKey="#" actionOnEmptyResult="true" action="https://hupup.example/api/voice/addr-unit-heard" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Thanks, with your keypad, please enter the unit number.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">When you are done, press pound.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=addr-unit</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-unit-ask 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/addr-house</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-unit-ask-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/addr-unit-ask</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-unit-heard 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=addr-unit</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-zip 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/addr-zip-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For Monroe, New York, one zero nine five zero, press 1. For Highland Mills, New York, one zero nine three zero, press 2. For Chester, New York, one zero nine one eight, press 3. For Washingtonville, New York, one zero nine nine two, press 4. For Central Valley, New York, one zero nine one seven, press 5. For Harriman, New York, one zero nine two six, press 6. To enter a different zip code, press 7.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=addr-zip</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-zip-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/addr-zip</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-zip-enter 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="6" timeout="10" finishOnKey="#" action="https://hupup.example/api/voice/addr-zip-heard" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Please enter the 5-digit zip code. When you are finished, please press pound.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=addr-zip-enter</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > addr-zip-heard 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/addr-zip-enter?bad=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > after-add 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=added-menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > altdates 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/booked?p=null&amp;d=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > another 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/added-menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > ask 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > attraction 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/attraction-after?m=i&amp;t=*" method="POST"/><Redirect method="POST">https://hupup.example/api/voice/ring?k=4</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > attraction-after 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=attraction-options&amp;q=m%3Di%26t%3D1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > attraction-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=instructions&amp;q=again%3D1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > attraction-options 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/attraction-after?m=i&amp;t=*" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To hear this again, press the star key. To choose another attraction, press 1. To go back to the main menu, press 2.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=attraction-options&amp;q=m%3Di%26t%3D1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > balloon 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/book</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > balloon-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/book</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > balloon-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=balloons</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > balloon-key2 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/balloon-pick?c=null&amp;k=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > balloon-pick 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/balloons?c=0</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > balloons 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/balloon-key?c=null" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Here are our jumping balloons. Please note, our jumping balloons are not for water use.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go to your shopping cart, press 0.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=balloons</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > book 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/book-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To receive our catalog by text or email, press 8.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">The fastest way to place an order is with our easy automated system.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For information or questions, press 0 for customer service.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For schools, corporate events, and organizational bookings, press 9.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=book</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > book-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=book</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > booked 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > booked-closest 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/booked?p=null&amp;d=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > booked-near 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/booked?p=null&amp;d=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > booked-same 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/booked?p=null&amp;d=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > box18-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/date-ask?p=null&amp;d=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > call-recording 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response/>"`;
+
+exports[`baseline: every phone step as it plays today > cart 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Your shopping cart is empty right now. Let's start shopping!</Say><Redirect method="POST">https://hupup.example/api/voice/book</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > cart-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=cart</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/catalog-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To receive our catalog by text, press 1. To get it by email, press 2.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=catalog</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/catalog</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-done 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-email 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/catalog-part?part=local</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-ending 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/catalog-ending-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Now choose the ending. For at gmail dot com, press 1. For at outlook dot com, press 2. For at yahoo dot com, press 3. For at icloud dot com, press 4. For a different ending, press 5.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=catalog-ending</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-ending-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/catalog-ending</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-final 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/catalog-email</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-final-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/catalog-final</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-got 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, I did not catch that. Let's try again.</Say><Redirect method="POST">https://hupup.example/api/voice/catalog-part?part=local</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-got-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/catalog-got?part=local</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/catalog-part?part=local</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-part 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="3" finishOnKey="" action="https://hupup.example/api/voice/catalog-key?part=local" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Please enter the first part of your email address, up to the at symbol. To type it, start pressing keys on your keypad now. To say it, wait for the tone, then say it letter by letter. When you are finished, please press pound.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To type it with your keypad, press 9.</Say></Gather><Play>https://hupup.example/audio/tone.wav</Play><Gather input="speech dtmf" finishOnKey="#" timeout="6" speechTimeout="auto" language="en-US" hints="a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, dot, underscore, dash" action="https://hupup.example/api/voice/catalog-said?part=local" method="POST"/><Redirect method="POST">https://hupup.example/api/voice/idle?to=catalog-part&amp;q=part%3Dlocal</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-said 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/catalog-part?part=local</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-save 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/catalog-email</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-save-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/catalog-email</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-send 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/catalog-email</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-stt-check 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/catalog-said?part=local</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-stt-recorded 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/catalog-said?part=local&amp;empty=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-text 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/tx-which?p=cat</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-type 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" finishOnKey="#" timeout="20" action="https://hupup.example/api/voice/catalog-typed?part=local" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Press 2 once for A, twice for B, three times for C, and so on for all keys. If two letters in a row use the same key, press star between them. To type a number, press the key one more time. To go back, press star twice. Press 0 once for a space, and twice for number 0. Press 1 once for number 1, twice for a dot, three times for a dash, and four times for an underscore. When you are finished, press the pound key.</Say><Play>https://hupup.example/audio/tone.wav</Play></Gather><Redirect method="POST">https://hupup.example/api/voice/catalog-typed?part=local</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > catalog-typed 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/catalog-got?part=local</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > category 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, nothing is available in that section right now. Please check again later.</Say><Redirect method="POST">https://hupup.example/api/voice/book</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > category-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=category&amp;q=c%3D0</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > cats 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/cats-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go to your shopping cart, press 0.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=cats</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > cats-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=cats</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > closed-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Record maxLength="120" playBeep="true" finishOnKey="#" timeout="6" action="https://hupup.example/api/voice/vm-recorded?b=2&amp;x=closed&amp;t=*" method="POST" recordingStatusCallback="https://hupup.example/api/voice/vm-recording?b=2&amp;t=*" recordingStatusCallbackEvent="completed" recordingStatusCallbackMethod="POST" transcribe="false"/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > closed-offer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/date?p=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > closed-offer-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=closed-offer</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > confirm 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/ask?f=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > cs-closed 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="1" finishOnKey="" action="https://hupup.example/api/voice/cs-closed-key" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Our customer service is currently closed.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For the best availability and fastest booking, please use our easy automated system to ensure your booking today. To get started, press 1.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Otherwise, leave a message after the tone, and a customer service representative will return your call on the next open day, and will help you find the best available options for your needs.</Say></Gather><Record maxLength="120" playBeep="true" finishOnKey="#" timeout="6" action="https://hupup.example/api/voice/vm-recorded?b=3&amp;x=4&amp;t=*" method="POST" recordingStatusCallback="https://hupup.example/api/voice/vm-recording?b=3&amp;t=*" recordingStatusCallbackEvent="completed" recordingStatusCallbackMethod="POST" transcribe="false"/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > cs-closed-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/cs-closed</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > date 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="4" timeout="8" finishOnKey="#" action="https://hupup.example/api/voice/date-heard" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Using your keypad, please enter your event date: two digits for the month, then two digits for the day. For example, for March fifth, press 0, 3, 0, 5.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=date</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > date-ask 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Oops, something went wrong on our end. Please call back in a few minutes. Sorry about that!</Say><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > date-confirm 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/date-ask?d=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > date-heard 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=date</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > directions 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/directions-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To add any special delivery instructions, press 1. To skip, press pound. To go back, press star.</Say></Gather><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Almost done!</Say><Redirect method="POST">https://hupup.example/api/voice/finalize</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > directions-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Almost done!</Say><Redirect method="POST">https://hupup.example/api/voice/finalize</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > directions-rec-status 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response/>"`;
+
+exports[`baseline: every phone step as it plays today > directions-record 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Please leave a clear and detailed message with all your delivery instructions after the tone.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">When you are done, press pound.</Say><Play>https://hupup.example/audio/tone.wav</Play><Record maxLength="180" timeout="10" playBeep="false" finishOnKey="#" trim="trim-silence" action="https://hupup.example/api/voice/directions-recorded?o=0" method="POST" recordingStatusCallback="https://hupup.example/api/voice/directions-rec-status?o=0" recordingStatusCallbackMethod="POST"/><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Almost done!</Say><Redirect method="POST">https://hupup.example/api/voice/finalize</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > directions-recorded 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Almost done!</Say><Redirect method="POST">https://hupup.example/api/voice/finalize</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > finalize 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > goodbye 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > heard 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/ask?f=null&amp;n=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > hours 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Our customer service is open Sunday through Thursday, from 11 AM to 2 PM, and at night from 7:30 PM to 10:30 PM. Friday, from 10:30 AM till chatzos.</Say><Play>https://hupup.example/audio/pause-750ms.wav</Play><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > idle 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">We did not get your choice. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/menu?nk=1799859595000</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > idle-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > incoming 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu?first=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > instructions 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/attraction-choice?m=i" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For jumping balloon instructions, press 1. For laser tag, press 2. For paddle boats, press 3.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=instructions&amp;q=again%3D1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > learn 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/attraction-choice?m=l" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">We would love to tell you about our rentals.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=learn&amp;q=again%3D1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > menu 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" finishOnKey="" timeout="3" action="https://hupup.example/api/voice/menu-choice?t0=1799859600000" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">If you know your desired extension, you may press it at any time.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For reservations and bookings, press 1.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For instructions and guidance on using our rental equipment, press 2.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For customer service and general inquiries, press 3.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For questions or assistance with any issues during your rental, press 4.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For delivery and pickup information, press 5.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To learn more about our rental attractions and the services we offer, press 6.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To hear our hours of operation, press 7.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To receive our catalog by text or email, press 8.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For feedback and comments, press 9.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To speak with an operator, press 0.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To hear this menu again, press the star key.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Thank you for choosing Hup Up Attractions!</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/no-key?to=menu&amp;np=1&amp;t0=1799859600000</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > menu-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/no-key?to=menu&amp;np=1&amp;t0=1799859600000</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > music 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Pause length="8"/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > nearest-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=nearest-date</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > nearest-date 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/book</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > no-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu?np=0&amp;t0=1799859600000</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > ocean 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/ocean-choice?d=null" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To add 200 balls for $10, press 1.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To add 500 balls for $15, press 2.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To add 700 balls for $20, press 3.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=ocean</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > ocean-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=ocean</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > operator 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/ring?k=0</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > operator-done 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/voicemail?x=0</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > packs 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/added-menu?n=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > packs-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/added-menu?n=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-approved 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/promo-consent</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-approved-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/receipt-email</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-choice-answer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-consent 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="8" finishOnKey="" action="https://hupup.example/api/voice/pay-consent-answer" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To receive text updates to your phone number, about your reservation, press 1.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/pay-consent-answer</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-consent-answer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/paylink</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-done 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-keypad 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-leg 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-leg-joined 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response/>"`;
+
+exports[`baseline: every phone step as it plays today > pay-leg-status 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response/>"`;
+
+exports[`baseline: every phone step as it plays today > pay-leg-wait 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > paylink 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > paylink-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > phone 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/phone-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">We will text your secure payment link to the number you are calling from, ending in 0, 1, 0, 0. Press 1 to use this number, or 2 to enter a different one.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=phone</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > phone-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=phone</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > phone-confirm 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/phone-enter</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > phone-enter 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="11" timeout="10" finishOnKey="#" action="https://hupup.example/api/voice/phone-heard" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sure thing! Please type your 10 digit cell phone number, starting with the area code.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">When you are finished, please press pound.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=phone-enter</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > phone-heard 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Hmm, that does not look like a 10 digit number. Let us try again.</Say><Redirect method="POST">https://hupup.example/api/voice/phone-enter</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > phonepay-done 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > phonepay-go 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/promo-consent</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > phonepay-option 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > phonepay-retry 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="1" finishOnKey="" action="https://hupup.example/api/voice/phonepay-retry-answer?o=0&amp;n=1&amp;d=1" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">We are sorry, your card did not go through. To try again, press 1.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/phonepay-go?o=0</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > phonepay-retry-answer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/phonepay-retry?o=0&amp;n=1&amp;r=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > product 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > product-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > promo-confirm 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > promo-consent 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > promo-consent-answer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > promo-enter 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="11" timeout="10" finishOnKey="#" action="https://hupup.example/api/voice/promo-heard?t=*" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Please enter the 10-digit phone number. When you are finished, please press pound.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/promo-heard?t=*</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > promo-heard 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that number did not work. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/promo-enter?t=*</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > promo-which 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="6" finishOnKey="" action="https://hupup.example/api/voice/promo-which-answer" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To get texts at the number you are calling from, press 1. To use a different phone number, press 2.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > promo-which-answer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > qty 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > readback 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/ask?f=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > receipt-email 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/promo-consent</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > receipt-email-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=receipt-email</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > record-start 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu?first=1&amp;gr=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > remove 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Your shopping cart is empty right now. Let's start shopping!</Say><Redirect method="POST">https://hupup.example/api/voice/book</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > remove-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=remove</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > remove-qty 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/cart</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > remove-qty-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/cart</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > resume 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/book</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > resume-added 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/resume-added-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To keep shopping, for same day, press 1. For another day, press 2.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go to your shopping cart, press 0.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/resume-items</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > resume-added-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/resume-items</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > resume-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/book</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > resume-items 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/book</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > resume-pick 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/resume-items</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > ring 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sure thing! Hang tight while I connect you to our team.</Say><Dial callerId="+18455550100" timeout="25" action="https://hupup.example/api/voice/operator-done?i=0&amp;k=0" method="POST"><Number url="https://hupup.example/api/voice/whisper?k=0" method="POST">+18452135239</Number></Dial></Response>"`;
+
+exports[`baseline: every phone step as it plays today > second-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/added-second?p=null&amp;d=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > sms-consent 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/phone</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > sms-consent-answer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/phone</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > soldout-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > speech-partial 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response/>"`;
+
+exports[`baseline: every phone step as it plays today > stt-check 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/heard?f=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > stt-recorded 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/heard?f=null&amp;empty=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > taken-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/booked?p=0&amp;d=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > taken-size 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/book</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > taken-size-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=taken-size</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > terms 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="8" finishOnKey="" action="https://hupup.example/api/voice/terms-answer" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">By pressing #, you agree to our Terms and Conditions. To review them, go to hupupattractions.com/terms. To get the link by text message, press 1. To continue, press #.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/terms-answer</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > terms-answer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > the inventory of phone steps 1`] = `
+[
+  "add",
+  "added-menu",
+  "added-rest",
+  "added-second",
+  "addr",
+  "addr-check",
+  "addr-found",
+  "addr-found-choice",
+  "addr-house",
+  "addr-house-heard",
+  "addr-lookup",
+  "addr-lookup-choice",
+  "addr-outside",
+  "addr-outside-choice",
+  "addr-phone",
+  "addr-phone-heard",
+  "addr-price",
+  "addr-readback",
+  "addr-readback-choice",
+  "addr-street",
+  "addr-street-choice",
+  "addr-street-keys",
+  "addr-street-none",
+  "addr-street-none-choice",
+  "addr-street-pick",
+  "addr-street-pick-choice",
+  "addr-street-rb",
+  "addr-street-rb-choice",
+  "addr-street-typed",
+  "addr-unit",
+  "addr-unit-ask",
+  "addr-unit-ask-choice",
+  "addr-unit-heard",
+  "addr-zip",
+  "addr-zip-choice",
+  "addr-zip-enter",
+  "addr-zip-heard",
+  "after-add",
+  "altdates",
+  "another",
+  "ask",
+  "attraction",
+  "attraction-after",
+  "attraction-choice",
+  "attraction-options",
+  "balloon",
+  "balloon-choice",
+  "balloon-key",
+  "balloon-key2",
+  "balloon-pick",
+  "balloons",
+  "book",
+  "book-choice",
+  "booked",
+  "booked-closest",
+  "booked-near",
+  "booked-same",
+  "box18-choice",
+  "call-recording",
+  "cart",
+  "cart-choice",
+  "catalog",
+  "catalog-choice",
+  "catalog-done",
+  "catalog-email",
+  "catalog-ending",
+  "catalog-ending-choice",
+  "catalog-final",
+  "catalog-final-choice",
+  "catalog-got",
+  "catalog-got-choice",
+  "catalog-key",
+  "catalog-part",
+  "catalog-said",
+  "catalog-save",
+  "catalog-save-choice",
+  "catalog-send",
+  "catalog-stt-check",
+  "catalog-stt-recorded",
+  "catalog-text",
+  "catalog-type",
+  "catalog-typed",
+  "category",
+  "category-choice",
+  "cats",
+  "cats-choice",
+  "closed-key",
+  "closed-offer",
+  "closed-offer-choice",
+  "confirm",
+  "cs-closed",
+  "cs-closed-key",
+  "date",
+  "date-ask",
+  "date-confirm",
+  "date-heard",
+  "directions",
+  "directions-choice",
+  "directions-rec-status",
+  "directions-record",
+  "directions-recorded",
+  "finalize",
+  "goodbye",
+  "heard",
+  "hours",
+  "idle",
+  "idle-key",
+  "incoming",
+  "instructions",
+  "learn",
+  "menu",
+  "menu-choice",
+  "music",
+  "nearest-choice",
+  "nearest-date",
+  "no-key",
+  "ocean",
+  "ocean-choice",
+  "operator",
+  "operator-done",
+  "packs",
+  "packs-choice",
+  "pay-approved",
+  "pay-approved-choice",
+  "pay-choice",
+  "pay-choice-answer",
+  "pay-consent",
+  "pay-consent-answer",
+  "pay-done",
+  "pay-keypad",
+  "pay-leg",
+  "pay-leg-joined",
+  "pay-leg-status",
+  "pay-leg-wait",
+  "paylink",
+  "paylink-choice",
+  "phone",
+  "phone-choice",
+  "phone-confirm",
+  "phone-enter",
+  "phone-heard",
+  "phonepay-done",
+  "phonepay-go",
+  "phonepay-option",
+  "phonepay-retry",
+  "phonepay-retry-answer",
+  "product",
+  "product-choice",
+  "promo-confirm",
+  "promo-consent",
+  "promo-consent-answer",
+  "promo-enter",
+  "promo-heard",
+  "promo-which",
+  "promo-which-answer",
+  "qty",
+  "readback",
+  "receipt-email",
+  "receipt-email-choice",
+  "record-start",
+  "remove",
+  "remove-choice",
+  "remove-qty",
+  "remove-qty-choice",
+  "resume",
+  "resume-added",
+  "resume-added-choice",
+  "resume-choice",
+  "resume-items",
+  "resume-pick",
+  "ring",
+  "second-choice",
+  "sms-consent",
+  "sms-consent-answer",
+  "soldout-choice",
+  "speech-partial",
+  "stt-check",
+  "stt-recorded",
+  "taken-choice",
+  "taken-size",
+  "taken-size-choice",
+  "terms",
+  "terms-answer",
+  "tx-confirm",
+  "tx-enter",
+  "tx-heard",
+  "tx-heard-again",
+  "tx-which",
+  "tx-which-choice",
+  "type",
+  "typed",
+  "vm-act",
+  "vm-after",
+  "vm-bye",
+  "vm-erase",
+  "vm-erase-key",
+  "vm-fwd",
+  "vm-fwd-do",
+  "vm-fwd-key",
+  "vm-fwd-list",
+  "vm-fwd-pick",
+  "vm-grec-done",
+  "vm-greet",
+  "vm-greet-key",
+  "vm-greeting-key",
+  "vm-grev",
+  "vm-grev-key",
+  "vm-list",
+  "vm-main",
+  "vm-main-key",
+  "vm-msg",
+  "vm-none",
+  "vm-none-choice",
+  "vm-note",
+  "vm-note-done",
+  "vm-note-key",
+  "vm-np",
+  "vm-np-save",
+  "vm-np2",
+  "vm-num",
+  "vm-num-heard",
+  "vm-option",
+  "vm-options",
+  "vm-opts",
+  "vm-opts-key",
+  "vm-pass",
+  "vm-pass-heard",
+  "vm-pause",
+  "vm-pause-key",
+  "vm-piece",
+  "vm-pkey",
+  "vm-rec-done",
+  "vm-rec-key",
+  "vm-rec-review",
+  "vm-recorded",
+  "vm-recording",
+  "vm-reply",
+  "vm-reply-key",
+  "vm-sbox",
+  "vm-sbox-key",
+  "vm-send",
+  "vm-send-key",
+  "vm-shared",
+  "vm-shared-key",
+  "vm-start",
+  "vm-transcription",
+  "vma-box",
+  "vma-box-choice",
+  "vma-charge",
+  "vma-charge-amount",
+  "vma-charge-confirm",
+  "vma-charge-done",
+  "vma-charge-go",
+  "vma-choice",
+  "vma-newpin",
+  "vma-newpin-again",
+  "vma-newpin-save",
+  "vma-options",
+  "vma-out",
+  "vma-out-dial",
+  "vma-pin",
+  "vma-pin-check",
+  "vma-play",
+  "voicemail",
+  "voicemail-done",
+  "voicemail-offer",
+  "whisper",
+  "whisper-accept",
+]
+`;
+
+exports[`baseline: every phone step as it plays today > tx-confirm 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/tx-heard-again?p=cat</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > tx-enter 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="11" timeout="10" finishOnKey="#" action="https://hupup.example/api/voice/tx-heard?p=cat" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Please enter the 10-digit phone number. When you are finished, please press pound.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=tx-enter&amp;q=p%3Dcat</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > tx-heard 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/tx-enter?p=cat</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > tx-heard-again 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/tx-enter?p=cat</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > tx-which 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/tx-which-choice?p=cat" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To text it to the number you are calling from, press 1. To enter a different number, press 2.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=tx-which&amp;q=p%3Dcat</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > tx-which-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/tx-which?p=cat</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > type 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" finishOnKey="#" timeout="15" action="https://hupup.example/api/voice/typed?f=null" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Press 2 once for A, twice for B, three times for C, and so on for all keys. If two letters in a row use the same key, press star between them. To type a number, press the key one more time. To go back, press star twice. Press 0 once for a space, and twice for number 0. Press 1 once for number 1, twice for a dot, three times for a dash, and four times for an underscore. When you are finished, press the pound key.</Say><Play>https://hupup.example/audio/tone.wav</Play></Gather><Redirect method="POST">https://hupup.example/api/voice/typed?f=null</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > typed 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, I did not catch that. Let's try again.</Say><Redirect method="POST">https://hupup.example/api/voice/type?f=null&amp;again=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-act 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-after?b=0&amp;m=new&amp;v=*</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-after 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/vm-act" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To replay, press 4. For the date and number, press 5. To forward, press 6. To erase, press 7. To reply, press 8. To save, press 9. To keep it as new, press pound.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/vm-after?r=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-bye 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Goodbye.</Say><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-erase 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/vm-erase-key" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To erase this message forever, press 7 again.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/vm-erase?r=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-erase-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-erase?b=0&amp;m=deleted&amp;v=*</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-fwd 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/vm-fwd-key" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To forward to another voicemail box, press 1. To forward by email, press 2.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/vm-fwd?r=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-fwd-do 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-after?b=0</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-fwd-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-fwd</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-fwd-list 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Oops, something went wrong on our end. Please call back in a few minutes. Sorry about that!</Say><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-fwd-pick 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Oops, something went wrong on our end. Please call back in a few minutes. Sorry about that!</Say><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-grec-done 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-greet</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-greet 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-start</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-greet-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-start</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-greeting-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Record maxLength="120" playBeep="true" finishOnKey="#" timeout="6" action="https://hupup.example/api/voice/vm-recorded?b=1&amp;t=*" method="POST" recordingStatusCallback="https://hupup.example/api/voice/vm-recording?b=1&amp;t=*" recordingStatusCallbackEvent="completed" recordingStatusCallbackMethod="POST" transcribe="false"/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-grev 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/vm-grev-key" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To keep it, press 1. To listen to it, press 2. To record it again, press 3.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/vm-grev?r=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-grev-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-main?s=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-list 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-start</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-main 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-start</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-main-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-start</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-msg 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-start</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-none 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="6" finishOnKey="" action="https://hupup.example/api/voice/vm-none-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">We did not receive a message. To try again, press 3. Otherwise, you may hang up.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=vm-none</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-none-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-none</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-note 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="4" finishOnKey="" action="https://hupup.example/api/voice/vm-note-key" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To add a recorded note before the message, press 1. Otherwise, stay on the line.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/vm-fwd-do</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-note-done 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-fwd-do</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-note-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-fwd-do</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-np 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="9" timeout="5" finishOnKey="#" action="https://hupup.example/api/voice/vm-np2" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Please enter a new password of 4 to 8 digits, then press pound.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/vm-np?r=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-np-save 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">The passwords did not match. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-np</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-np2 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">The passwords did not match. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-np</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-num 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="6" timeout="5" finishOnKey="#" action="https://hupup.example/api/voice/vm-num-heard" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Please enter your box number, then press pound.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/vm-num?r=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-num-heard 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-num</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-option 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-none</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-options 1`] = `
+"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="6" finishOnKey="" action="https://hupup.example/api/voice/vm-option" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Thank you!
+To send your message, press 1.
+To listen to it, press 2.
+To delete and re-record, press 3.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=vm-options</Redirect></Response>"
+`;
+
+exports[`baseline: every phone step as it plays today > vm-opts 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-start</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-opts-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-start</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-pass 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-num</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-pass-heard 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-num</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-pause 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="30" finishOnKey="" action="https://hupup.example/api/voice/vm-pause-key" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Paused. To continue, press 2.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/vm-pause?r=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-pause-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-pause</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-piece 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-list?b=0</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-pkey 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-piece?b=0&amp;m=new&amp;v=*&amp;p=0</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-rec-done 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-main?s=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-rec-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-rec-review</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-rec-review 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/vm-rec-key" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To send it, press 1. To listen to it, press 2. To record it again, press 3.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/vm-rec-review?r=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-recorded 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-none?b=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-recording 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response/>"`;
+
+exports[`baseline: every phone step as it plays today > vm-reply 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/vm-reply-key" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To reply with a voice message, press 1. To call the caller back, press 2.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/vm-reply?r=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-reply-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-reply</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-sbox 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-start</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-sbox-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-sbox?b=0&amp;s=1</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-send 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-start</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-send-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-send</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-shared 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-start</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-shared-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vm-shared</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-start 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-num</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vm-transcription 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response/>"`;
+
+exports[`baseline: every phone step as it plays today > vma-box 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-box-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-charge 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-charge-amount 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-charge</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-charge-confirm 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-charge</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-charge-done 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">You are back in the owner menu.</Say><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-charge-go 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-newpin 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-newpin-again 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-newpin-save 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-options 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-out 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-out-dial 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-pin 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vm-start</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-pin-check 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that password is not right. Please try again.</Say><Redirect method="POST">https://hupup.example/api/voice/vma-pin?t=*</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > vma-play 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/vma-pin</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > voicemail 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="1" finishOnKey="#" actionOnEmptyResult="true" action="https://hupup.example/api/voice/vm-greeting-key?g=vm_greeting" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">We apologize that we are unable to answer your call. Our team is assisting other customers right now. Please feel free to leave a message after the tone and we will get back to you as soon as possible. When you are finished, you may hang up or press the pound key.</Say></Gather><Record maxLength="120" playBeep="true" finishOnKey="#" timeout="6" action="https://hupup.example/api/voice/vm-recorded?b=1&amp;t=*" method="POST" recordingStatusCallback="https://hupup.example/api/voice/vm-recording?b=1&amp;t=*" recordingStatusCallbackEvent="completed" recordingStatusCallbackMethod="POST" transcribe="false"/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > voicemail-done 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > voicemail-offer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > whisper 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="8" action="https://hupup.example/api/voice/whisper-accept" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Call from Hup Up Attractions, extension 0, Operator. Press 1 to accept, or press 2 to reject.</Say></Gather><Gather input="dtmf" numDigits="1" timeout="6" action="https://hupup.example/api/voice/whisper-accept" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Call from Hup Up Attractions, extension 0, Operator. Press 1 to accept, or press 2 to reject.</Say></Gather><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > whisper-accept 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;

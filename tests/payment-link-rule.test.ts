@@ -85,6 +85,24 @@ describe("payment link rule", () => {
     await holdAgain([pos], pos, now);
     expect(Math.round(((await get(pos)).holdExpiresAt!.getTime() - now.getTime()) / MIN)).toBe(25);
   });
+  it("handoff fix (Nov 26, 2026): Check availability again uses the Admin hold settings, not fixed minutes", async () => {
+    const { saveSetting } = await import("@/lib/settings");
+    await saveSetting("adminLinkHoldMinutes" as never, "40" as never);
+    await saveSetting("phoneLinkHoldMinutes" as never, "15" as never);
+    try {
+      const { mk } = await setup(2);
+      const pos = await mk(-1, "POS", true);
+      const phone = await mk(-1, "PHONE", true);
+      const now = new Date();
+      await holdAgain([pos], pos, now);
+      await holdAgain([phone], phone, now);
+      expect(Math.round(((await get(pos)).holdExpiresAt!.getTime() - now.getTime()) / MIN)).toBe(40);
+      expect(Math.round(((await get(phone)).holdExpiresAt!.getTime() - now.getTime()) / MIN)).toBe(15);
+    } finally {
+      await saveSetting("adminLinkHoldMinutes" as never, "25" as never);
+      await saveSetting("phoneLinkHoldMinutes" as never, "10" as never);
+    }
+  });
   it("friendly draft wording, item or items", () => {
     expect(LINK_TEXT.expiredTitle).toBe("This payment link has expired");
     expect(LINK_TEXT.expiredBody(1)).toBe("Your item was back into stock so other customers could book. Tap below to check if it's still free for your date.");

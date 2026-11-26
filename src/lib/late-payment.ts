@@ -69,6 +69,10 @@ export async function holdForCardPage(orderIds: number[], now = new Date()) {
  * the same moment. `primaryId` is the order the link opens; the removed items are kept on it.
  */
 export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now = new Date()): Promise<{ held: number[]; removed: number }> {
+  // The Admin hold settings (handoff, Nov 26, 2026: "Check availability again" used fixed 25 and 10 minutes; the
+  // settings' defaults are the same 25 and 10, so nothing changes until the Owner changes them)
+  const { linkHoldMinutes } = await import("@/lib/settings");
+  const holdFor = { admin: await linkHoldMinutes("admin"), phone: await linkHoldMinutes("phone") };
   return db.transaction(async (tx) => {
     const rows = await tx.select().from(schema.orders).where(inArray(schema.orders.id, orderIds));
     const ended = rows.filter((o) => holdEnded(o, now));
@@ -89,7 +93,7 @@ export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now
         .update(schema.orders)
         .set({
           status: "PENDING_PAYMENT",
-          holdExpiresAt: inMinutes(o.channel === "POS" ? 25 : 10, now),
+          holdExpiresAt: inMinutes(o.channel === "POS" ? holdFor.admin : holdFor.phone, now),
           subtotalCents: sql`COALESCE((SELECT SUM(qty * unit_price_cents) FROM order_items WHERE order_id = ${o.id}), 0)`,
           totalCents: null, // re-priced below
           updatedAt: now,
