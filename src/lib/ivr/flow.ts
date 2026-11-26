@@ -74,6 +74,7 @@ import { pluralName } from "@/lib/spoken-words";
 import { lastPhoneDate, normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { liveVoiceLink, nameVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
 import { FIRST_TIME_ONLY, menuOrder, type MenuId } from "./menu-order";
+import { isPreviewCall } from "./preview";
 import { EMPTY_EDITOR, activeKey, applyLayout, wholeFits, layoutIdFor, parseEditor, type Editor, type KeyDef } from "./menu-editor";
 import { GO_TO_SCREENS, SCREENS, screenForChoice } from "./screens";
 import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
@@ -5641,11 +5642,14 @@ async function ownKey(ctx: Ctx, vr: VR, screen: string, k: KeyDef) {
 /** Every phone step's name (the baseline snapshot test and the Admin screen inventory read it). */
 export const handlerNames = () => Object.keys(handlers);
 
-export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Promise<string> {
+export async function handleVoice(raw: Omit<Ctx, "session" | "prompts"> & { editorOverride?: Editor }): Promise<string> {
+  const { editorOverride, ...input } = raw;
   const vr = new twilio.twiml.VoiceResponse();
   TIMING.set(vr, timerValues((await getSettings()) as Record<string, unknown>)); // Phase 3: every wait from Admin
   const prompts = await loadPromptOverrides();
-  EDITOR.set(prompts, await loadEditor());
+  const loaded = await loadEditor();
+  // Test this screen, Draft column (Hark's review item 8): only a preview call may use another set of screens
+  EDITOR.set(prompts, editorOverride && isPreviewCall(input.callSid) ? { ...loaded, e: editorOverride } : loaded);
   const ctx = { ...input, prompts };
   const handler = handlers[ctx.action];
   if (!handler) {

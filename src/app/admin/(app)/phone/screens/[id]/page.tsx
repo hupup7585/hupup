@@ -12,7 +12,7 @@ import { RING_KEYS, RING_KEY_LABELS } from "@/lib/ivr/routing";
 import { KEY_ACTIONS, PROTECTED_REASON, applyLayout, defaultLayout, isProtectedScreen, protectedKeys, layoutIdFor, parseEditor, type KeyDef, type Line } from "@/lib/ivr/menu-editor";
 import { GO_TO_SCREENS, SCREENS, screenArea, screenLabel } from "@/lib/ivr/screens";
 import { SCREEN_EXPLANATIONS } from "@/lib/ivr/screen-explanations";
-import { previewScreen } from "@/lib/ivr/screen-preview";
+import { changedSteps, previewScreen } from "@/lib/ivr/screen-preview";
 import { editingEditor } from "@/lib/screen-drafts";
 import DraftBanner from "../DraftBanner";
 import { addLineAction, moveLineAction, removeKeyAction, removeLineAction, setKeyAction, toggleLineAction } from "../actions";
@@ -29,7 +29,9 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
   const s = SCREENS[id];
   if (!s) notFound();
   const sp = await searchParams;
-  const preview = await previewScreen(id).catch(() => null); // Test this screen: a preview call, nothing saved
+  const { draftEditor } = await import("@/lib/screen-drafts");
+  const preview = await previewScreen(id, await draftEditor()).catch(() => null); // Test this screen: a preview call, nothing saved
+  const diff = preview?.draft ? changedSteps(preview.steps, preview.draft.steps) : null;
   const e = await editingEditor(); // the draft when there is one (draft first, Phase 3)
   const overrides = await loadPromptOverrides(); // to tell whether a combined recording still fits its lines
   // Keys whose target no longer works (Hark's review item 4): an archived item, a removed recording ...
@@ -136,9 +138,27 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
         {preview ? (
           <>
             <p className="mt-2 text-sm text-muted">Exactly what a caller gets on this screen right now, with the live recordings, Admin keys and timing. Run as a preview: nothing is saved and nothing shows in the call log.</p>
-            <ol className="mt-2 grid gap-1 text-sm" data-screen-test-steps>
-              {preview.steps.map((x, i) => <li key={i} className="whitespace-pre-wrap">{x.text}</li>)}
-            </ol>
+            {preview.draft && diff ? (
+              <div className="mt-2 grid gap-3 md:grid-cols-2" data-screen-test-compare>
+                <div>
+                  <h3 className="text-sm font-bold">Live (what callers hear now)</h3>
+                  <ol className="mt-1 grid gap-1 text-sm" data-screen-test-steps>
+                    {preview.steps.map((x, i) => <li key={i} className={`whitespace-pre-wrap ${diff.onlyA.has(i) ? "rounded bg-[#FFE6E4] line-through" : ""}`}>{x.text}</li>)}
+                  </ol>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold">Draft (after you publish)</h3>
+                  <ol className="mt-1 grid gap-1 text-sm" data-screen-test-draft>
+                    {preview.draft.steps.map((x, i) => <li key={i} className={`whitespace-pre-wrap ${diff.onlyB.has(i) ? "rounded bg-[#E3F6EC] font-semibold" : ""}`}>{x.text}</li>)}
+                  </ol>
+                </div>
+                <p className="text-xs text-muted md:col-span-2">Red, crossed out: only in Live (gone after publishing). Green: new in the Draft.</p>
+              </div>
+            ) : (
+              <ol className="mt-2 grid gap-1 text-sm" data-screen-test-steps>
+                {preview.steps.map((x, i) => <li key={i} className="whitespace-pre-wrap">{x.text}</li>)}
+              </ol>
+            )}
             <details className="mt-2 text-xs">
               <summary className="cursor-pointer text-muted">The phone instructions sent to Twilio (for checking)</summary>
               <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-bg p-2">{preview.xml}</pre>

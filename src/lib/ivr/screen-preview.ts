@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { handleVoice } from "@/lib/ivr/flow";
 import { GO_TO_SCREENS } from "@/lib/ivr/screens";
 import { PREVIEW_PREFIX } from "@/lib/ivr/preview";
+import type { Editor } from "@/lib/ivr/menu-editor";
 
 /**
  * Test this screen (Admin handoff Phase 3, section 6, Nov 26, 2026): the exact phone instructions a caller would get
@@ -39,10 +40,25 @@ export function describeTwiml(xml: string): PreviewStep[] {
   return out;
 }
 
-/** Run a fresh-start screen as a preview call (nothing saved). Null when the screen cannot start fresh. */
-export async function previewScreen(id: string): Promise<{ xml: string; steps: PreviewStep[] } | null> {
+/**
+ * Run a fresh-start screen as a preview call (nothing saved). Null when the screen cannot start fresh. With a draft,
+ * the same screen is run a second time with the draft screens (Hark's review item 8), so Live and Draft can be shown
+ * side by side; changed lines are marked.
+ */
+export async function previewScreen(id: string, draft?: Editor | null): Promise<{ xml: string; steps: PreviewStep[]; draft?: { xml: string; steps: PreviewStep[] } } | null> {
   if (!LIVE_PREVIEW_SCREENS.includes(id)) return null;
-  const sid = `${PREVIEW_PREFIX}${randomUUID()}`;
-  const xml = await handleVoice({ action: id, query: new URLSearchParams(), body: { CallSid: sid }, callSid: sid, from: "" });
-  return { xml, steps: describeTwiml(xml) };
+  const run = async (editorOverride?: Editor) => {
+    const sid = `${PREVIEW_PREFIX}${randomUUID()}`;
+    const xml = await handleVoice({ action: id, query: new URLSearchParams(), body: { CallSid: sid }, callSid: sid, from: "", ...(editorOverride ? { editorOverride } : {}) });
+    return { xml, steps: describeTwiml(xml) };
+  };
+  const live = await run();
+  return draft ? { ...live, draft: await run(draft) } : live;
+}
+
+/** Which lines differ between two previews (shown marked in each column). */
+export function changedSteps(a: PreviewStep[], b: PreviewStep[]): { onlyA: Set<number>; onlyB: Set<number> } {
+  const ta = a.map((s) => s.text.trim());
+  const tb = b.map((s) => s.text.trim());
+  return { onlyA: new Set(ta.flatMap((t, i) => (tb.includes(t) ? [] : [i]))), onlyB: new Set(tb.flatMap((t, i) => (ta.includes(t) ? [] : [i]))) };
 }
