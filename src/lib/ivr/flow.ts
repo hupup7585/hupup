@@ -74,7 +74,7 @@ import { pluralName } from "@/lib/spoken-words";
 import { lastPhoneDate, normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { liveVoiceLink, nameVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
 import { FIRST_TIME_ONLY, menuOrder, type MenuId } from "./menu-order";
-import { EMPTY_EDITOR, activeKey, applyLayout, layoutIdFor, parseEditor, type Editor, type KeyDef } from "./menu-editor";
+import { EMPTY_EDITOR, activeKey, applyLayout, wholeFits, layoutIdFor, parseEditor, type Editor, type KeyDef } from "./menu-editor";
 import { GO_TO_SCREENS, SCREENS, screenForChoice } from "./screens";
 import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
 import { CATALOG_ENDINGS, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
@@ -288,9 +288,12 @@ const LAST_GATHER = new WeakMap<VR, Gather>();
 function menuRun(g: Gather, ctx: { prompts: PromptOverrides }, id: string, parts: readonly string[]) {
   const whole = `whole_${id}` as PromptKey;
   const combo = MENU_COMBOS[id];
-  if (combo && ctx.prompts[whole]?.recordingId && combo.join("|") === parts.join("|")) return void sp(g, ctx, whole);
   // The Owner's order, on/off and added lines for this menu (Admin > Phone > Screens), else exactly as built
-  for (const part of applyLayout(editorOf(ctx).e.layouts[layoutIdFor(id)], parts)) {
+  const run = applyLayout(editorOf(ctx).e.layouts[layoutIdFor(id)], parts);
+  // Hark's review 2, item 1: the combined recording only when what would play is exactly its lines (every line on,
+  // none moved or added) and those lines still have the words and recordings it was made for
+  if (combo && wholeFits(id, parts, editorOf(ctx).e.layouts[layoutIdFor(id)], ctx.prompts)) return void sp(g, ctx, whole);
+  for (const part of run) {
     if (part === "star") backLine(g, ctx);
     else if (part === "pause") halfPause(g);
     else playRef(g, ctx, part);
@@ -318,7 +321,7 @@ async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) =
     const parts = order.map((x) => (x === "book_back" ? "star" : x));
     // the line 1b now plays every time (Nov 26, 2026), so the first-visit combined recording fits coming back too
     for (const id of opts.firstTime === false ? ["book_again", "book"] : ["book"]) {
-      if (ctx.prompts[`whole_${id}` as PromptKey]?.recordingId && MENU_COMBOS[id].join("|") === parts.join("|")) return menuRun(g, ctx, id, parts);
+      if (wholeFits(id, parts, editorOf(ctx).e.layouts.book, ctx.prompts)) return menuRun(g, ctx, id, parts);
     }
   }
   // The bookings menu's order, on/off and added lines from Admin > Phone > Screens (nothing saved: as built)

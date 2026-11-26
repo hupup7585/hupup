@@ -570,6 +570,9 @@ export const voicePrompts = pgTable("voice_prompts", {
   audioUrl: text("audio_url"),
   /** The uploaded recording that plays now (Abraham, Phone Recordings); null = the Google voice. */
   recordingId: integer("recording_id"),
+  /** A combined (whole-menu) recording: the fingerprint of its lines when it was put on the line (Hark's review 2,
+   *  item 1). If the lines change later (words or recordings), the separate lines play instead. */
+  lineSet: text("line_set"),
   /** Owner's OK for a line marked "Waiting for approval" (until then it never plays). */
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   approvedBy: integer("approved_by"),

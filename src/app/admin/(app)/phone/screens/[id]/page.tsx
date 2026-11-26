@@ -6,9 +6,9 @@ import { db, schema } from "@/lib/db";
 import { allSlots } from "@/lib/recording-slots";
 import { customSlots } from "@/lib/custom-slots";
 import { catalogItems } from "@/lib/slot-status";
-import { PROMPTS, promptArea } from "@/lib/ivr/prompts";
+import { MENU_COMBOS, PROMPTS, loadPromptOverrides, promptArea, wholeCurrent } from "@/lib/ivr/prompts";
 import { RING_KEYS, RING_KEY_LABELS } from "@/lib/ivr/routing";
-import { KEY_ACTIONS, PROTECTED_REASON, defaultLayout, isProtectedScreen, protectedKeys, layoutIdFor, parseEditor, type KeyDef, type Line } from "@/lib/ivr/menu-editor";
+import { KEY_ACTIONS, PROTECTED_REASON, applyLayout, defaultLayout, isProtectedScreen, protectedKeys, layoutIdFor, parseEditor, type KeyDef, type Line } from "@/lib/ivr/menu-editor";
 import { GO_TO_SCREENS, SCREENS, screenArea, screenLabel } from "@/lib/ivr/screens";
 import { SCREEN_EXPLANATIONS } from "@/lib/ivr/screen-explanations";
 import { previewScreen } from "@/lib/ivr/screen-preview";
@@ -30,6 +30,7 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
   const sp = await searchParams;
   const preview = await previewScreen(id).catch(() => null); // Test this screen: a preview call, nothing saved
   const e = await editingEditor(); // the draft when there is one (draft first, Phase 3)
+  const overrides = await loadPromptOverrides(); // to tell whether a combined recording still fits its lines
   const slots = allSlots(await catalogItems(), {}, await customSlots()).filter((x) => x.kind === "line");
   const recorded = new Set((await db.select({ key: schema.voicePrompts.key, rec: schema.voicePrompts.recordingId }).from(schema.voicePrompts)).filter((r) => r.rec).map((r) => r.key));
   const info = (ref: string): Info => {
@@ -170,7 +171,13 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
               {combos.map((c) => (
                 <span key={c} className="mr-3">
                   <Link className="text-navy underline" href={`/admin/phone/prompts?q=whole_${c}`}>{(PROMPTS as Record<string, { label: string }>)[`whole_${c}`]?.label ?? `whole_${c}`}</Link>{" "}
-                  {recorded.has(`whole_${c}`) ? <b className="text-[#13895C]">in use (plays instead of the lines above)</b> : <span className="text-muted">not in use</span>}
+                  {!recorded.has(`whole_${c}`) ? (
+                    <span className="text-muted">not in use</span>
+                  ) : applyLayout(e.layouts[l], MENU_COMBOS[c] ?? []).join("|") === (MENU_COMBOS[c] ?? []).join("|") && wholeCurrent(c, overrides) ? (
+                    <b className="text-[#13895C]">in use (plays instead of the lines above)</b>
+                  ) : (
+                    <b className="text-[#C83A2F]" data-combo-outdated>Combined recording out of date: separate lines play</b>
+                  )}
                 </span>
               ))}
             </div>

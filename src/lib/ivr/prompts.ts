@@ -951,7 +951,31 @@ export const PROMPT_AREAS: Record<string, string> = {
 export const promptArea = (group: string) => PROMPT_AREAS[group] ?? "Other";
 
 export type PromptKey = keyof typeof PROMPTS;
-export type PromptOverride = { text: string | null; audioUrl: string | null; recordingId?: number | null; approvedAt?: Date | null; googleRecordingId?: number | null };
+export type PromptOverride = { text: string | null; audioUrl: string | null; recordingId?: number | null; approvedAt?: Date | null; googleRecordingId?: number | null; lineSet?: string | null };
+
+/**
+ * The fingerprint of a combined recording's lines (Hark's review 2, item 1): each line in order with its approved
+ * words and its recording. Saved when the combined recording is put on the line; if it no longer matches, the lines
+ * changed and the separate lines play instead.
+ */
+export function lineSetFingerprint(id: string, overrides: PromptOverrides): string {
+  const parts = MENU_COMBOS[id] ?? [];
+  const desc = parts.map((ref) => {
+    if (!(ref in PROMPTS)) return ref;
+    const o = overrides[ref as PromptKey];
+    return `${ref}=${(o?.text?.trim() || PROMPTS[ref as PromptKey].text).replace(/\s+/g, " ")}#${o?.recordingId ?? ""}`;
+  });
+  let h = 5381;
+  const str = desc.join("|");
+  for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+  return `v1:${parts.length}:${h.toString(36)}`;
+}
+
+/** Is the combined recording still made for these lines? An older one with no fingerprint keeps playing (as before). */
+export function wholeCurrent(id: string, overrides: PromptOverrides): boolean {
+  const saved = overrides[`whole_${id}` as PromptKey]?.lineSet;
+  return !saved || saved === lineSetFingerprint(id, overrides);
+}
 export type PromptOverrides = Partial<Record<PromptKey, PromptOverride>>;
 
 export async function loadPromptOverrides(): Promise<PromptOverrides> {
@@ -972,7 +996,7 @@ export async function loadPromptOverrides(): Promise<PromptOverrides> {
     });
     const out: PromptOverrides = {};
     for (const r of rows) {
-      if (r.key in PROMPTS) out[r.key as PromptKey] = { text: r.text, audioUrl: r.audioUrl, recordingId: r.recordingId, approvedAt: r.approvedAt };
+      if (r.key in PROMPTS) out[r.key as PromptKey] = { text: r.text, audioUrl: r.audioUrl, recordingId: r.recordingId, approvedAt: r.approvedAt, lineSet: r.lineSet ?? null };
     }
     // Google voice recordings made when a wording was approved: played instead of the live voice, but only while the
     // wording is still exactly the one recorded (an edit falls back to the live voice until it's recorded again)

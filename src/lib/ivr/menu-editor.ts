@@ -1,4 +1,4 @@
-import { MENU_COMBOS } from "@/lib/ivr/prompts";
+import { MENU_COMBOS, wholeCurrent, type PromptKey, type PromptOverrides } from "@/lib/ivr/prompts";
 import { SCREENS } from "@/lib/ivr/screens";
 
 /**
@@ -189,4 +189,16 @@ export function setKey(e: Editor, screen: string, def: KeyDef): Editor | { error
 }
 export function removeKey(e: Editor, screen: string, key: string): Editor {
   return { ...e, keys: { ...e.keys, [screen]: (e.keys[screen] ?? []).filter((k) => k.key !== key) } };
+}
+
+/**
+ * Does the combined recording whole_<id> fit (Hark's review 2, item 1)? Only when it is on the line, these parts are
+ * exactly its lines, the layout from Admin leaves them exactly so (every line on, none moved, none added), and the
+ * lines still have the words and recordings it was made for. Otherwise the separate lines play.
+ */
+export function wholeFits(id: string, parts: readonly string[], layout: Line[] | undefined, overrides: PromptOverrides): boolean {
+  const combo = MENU_COMBOS[id];
+  if (!combo || !overrides[`whole_${id}` as PromptKey]?.recordingId) return false;
+  const want = combo.join("|");
+  return parts.join("|") === want && applyLayout(layout, parts).join("|") === want && wholeCurrent(id, overrides);
 }

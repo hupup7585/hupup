@@ -83,15 +83,21 @@ export const recordingKeysFor = (key: string) => [key, ...(EARLIER_LINE[key] ? [
 export async function chooseRecording(key: string, id: number, userId: number | null) {
   const r = await getRecording(id);
   if (!r || !r.complete || !recordingKeysFor(key).includes(r.promptKey) || r.source !== "upload") throw new Error("That recording can't be used on this line.");
+  // A combined recording remembers the lines it was made for (Hark's review 2, item 1)
+  let lineSet: string | null = null;
+  if (key.startsWith("whole_")) {
+    const { lineSetFingerprint, loadPromptOverrides } = await import("@/lib/ivr/prompts");
+    lineSet = lineSetFingerprint(key.slice("whole_".length), await loadPromptOverrides());
+  }
   await db
     .insert(schema.voicePrompts)
-    .values({ key, recordingId: id, updatedBy: userId })
-    .onConflictDoUpdate({ target: schema.voicePrompts.key, set: { recordingId: id, updatedAt: new Date(), updatedBy: userId } });
+    .values({ key, recordingId: id, updatedBy: userId, lineSet })
+    .onConflictDoUpdate({ target: schema.voicePrompts.key, set: { recordingId: id, updatedAt: new Date(), updatedBy: userId, lineSet } });
 }
 
 /** Back to the Google voice. The uploads stay saved. */
 export async function chooseGoogleVoice(key: string, userId: number | null) {
-  await db.update(schema.voicePrompts).set({ recordingId: null, updatedAt: new Date(), updatedBy: userId }).where(eq(schema.voicePrompts.key, key));
+  await db.update(schema.voicePrompts).set({ recordingId: null, lineSet: null, updatedAt: new Date(), updatedBy: userId }).where(eq(schema.voicePrompts.key, key));
 }
 
 /** Every recording, newest first, grouped by line. */

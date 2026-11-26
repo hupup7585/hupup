@@ -708,6 +708,13 @@
       "when": 1795810000000,
       "tag": "0100_link_hold_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1795820000000,
+      "tag": "0101_voice_prompt_line_set",
+      "breakpoints": true
     }
   ]
 }
