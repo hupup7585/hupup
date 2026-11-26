@@ -1,3 +1,5 @@
+import { VM_LOCK_MINUTES, VM_PIN_TRIES } from "@/lib/vm-access";
+import { PIECE_SECONDS } from "@/lib/vm-audio";
 import Link from "next/link";
 import { requireOwner } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
@@ -38,6 +40,24 @@ export default async function PhoneTimingPage() {
           </div>
         ))}
       </div>
+      <section className="card mt-5 p-4" data-timers-locked>
+        <h2 className="font-bold">Fixed for safety (not changed here)</h2>
+        <ul className="mt-1 list-disc pl-5 text-sm text-muted">
+          <li>Voicemail password by phone: {VM_PIN_TRIES} wrong tries, then the box locks for {VM_LOCK_MINUTES} minutes. This stops someone guessing a password; a lower number would lock out real staff, a higher one would make guessing easier.</li>
+          <li>Voicemail playback is sent in pieces of {PIECE_SECONDS} seconds, so long messages start playing quickly. This is a technical setting of the phone service, not a wait the caller notices.</li>
+        </ul>
+      </section>
+      <section className="card mt-5 p-4" data-timers-not-built>
+        <h2 className="font-bold">Not built yet (Needs Claude to connect)</h2>
+        <ul className="mt-1 list-disc pl-5 text-sm text-muted">
+          <li>What happens after the main menu plays its last time with no key (hang up, the operator, voicemail or a line).</li>
+          <li>A different no-key wait for one screen only.</li>
+          <li>How many wrong keys in a row, and what happens then.</li>
+          <li>Speech: the quiet that ends an answer for each question, speech or keypad per question, and a keypad fallback.</li>
+          <li>The quiet that ends a message, set for each voicemail box.</li>
+          <li>Pause lengths between lines, and a pause line on Phone screens.</li>
+        </ul>
+      </section>
     </div>
   );
 }

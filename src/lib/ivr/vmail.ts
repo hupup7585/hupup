@@ -1,3 +1,4 @@
+import type { TimerKey } from "@/lib/ivr/timers";
 import type twilio from "twilio";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -53,9 +54,9 @@ export type VmHelpers = {
   backLine: (g: Gather, ctx: Ctx) => void;
   when: (d: Date) => { date: string; time: string };
   update: (callSid: string, patch: { data: Record<string, unknown> }, s: CallSession | null) => Promise<unknown>;
+  /** The Admin phone timers (Phone timing page; Hark's review item 5) */
+  timer: (vr: VR, key: TimerKey) => number;
 };
-
-const NO_KEY = 5;
 const digitsSpoken = (n: string) => {
   const d = n.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
   return d.length === 10 ? `${d.slice(0, 3).split("").join(" ")}, ${d.slice(3, 6).split("").join(" ")}, ${d.slice(6).split("").join(" ")}` : d.split("").join(" ");
@@ -67,7 +68,7 @@ export function makeVmHandlers(h: VmHelpers): Record<string, (ctx: Ctx, vr: VR) 
   const signedIn = (ctx: Ctx) => vmAccessActive() && ownBox(ctx) > 0;
   const user = (ctx: Ctx) => (Number(data(ctx).vmMineUser) || null) as number | null;
   const keys = (vr: VR, action: string, params: Params = {}, opts: { finishOnKey?: string; numDigits?: number; timeout?: number } = {}) =>
-    vr.gather({ input: ["dtmf"], numDigits: opts.numDigits ?? 1, timeout: opts.timeout ?? NO_KEY, finishOnKey: opts.finishOnKey ?? "", action: h.url(action, params), method: "POST" });
+    vr.gather({ input: ["dtmf"], numDigits: opts.numDigits ?? 1, timeout: opts.timeout ?? h.timer(vr, "timerVmNoKey"), finishOnKey: opts.finishOnKey ?? "", action: h.url(action, params), method: "POST" });
   /** No key for 5 seconds: the screen once more, then the main menu (Abraham, Nov 23, 2026). */
   const noKey = (vr: VR, ctx: Ctx, action: string, params: Params = {}) => (ctx.query.get("r") ? h.back(vr, signedIn(ctx) ? "vm-main" : "vm-bye", { s: 1 }) : h.back(vr, action, { ...params, r: 1 }));
   const wrong = (vr: VR, ctx: Ctx, action: string, params: Params = {}) => {
@@ -111,7 +112,7 @@ export function makeVmHandlers(h: VmHelpers): Record<string, (ctx: Ctx, vr: VR) 
     h.backLine(g, ctx);
   }
 
-  async function startRecording(vr: VR, ctx: Ctx, prompt: PromptKey, done: string, params: Params, maxLength = 180) {
+  async function startRecording(vr: VR, ctx: Ctx, prompt: PromptKey, done: string, params: Params, maxLength = h.timer(vr, "timerVmGreetingMax")) {
     h.sp(vr, ctx, prompt);
     vr.record({ action: h.url(done, params), method: "POST", maxLength, playBeep: true, finishOnKey: "#", trim: "trim-silence" });
     return vr;
@@ -275,7 +276,7 @@ export function makeVmHandlers(h: VmHelpers): Record<string, (ctx: Ctx, vr: VR) 
       if (!v) return h.back(vr, "vm-list", { b, m });
       const total = await ensurePieces(v);
       const p = num(ctx, "p");
-      const g = keys(vr, "vm-pkey", { b, m, v: v.id, p, n: total }, { timeout: 1 });
+      const g = keys(vr, "vm-pkey", { b, m, v: v.id, p, n: total }, { timeout: h.timer(vr, "timerVmPlaybackKey") });
       if (total > 0) {
         if (p >= total) return h.back(vr, "vm-after", { b, m, v: v.id });
         g.play(r2AudioLink(pieceKey(v.audioOf ?? v.id, p)));
@@ -307,7 +308,7 @@ export function makeVmHandlers(h: VmHelpers): Record<string, (ctx: Ctx, vr: VR) 
     },
     "vm-pause"(ctx, vr) {
       const pr = { b: q(ctx, "b"), m: q(ctx, "m"), v: q(ctx, "v"), p: q(ctx, "p") };
-      const g = keys(vr, "vm-pause-key", pr, { timeout: 30 });
+      const g = keys(vr, "vm-pause-key", pr, { timeout: h.timer(vr, "timerVmPauseKey") });
       h.sp(g, ctx, "vm_paused");
       return noKey(vr, ctx, "vm-pause", pr);
     },
@@ -426,7 +427,7 @@ export function makeVmHandlers(h: VmHelpers): Record<string, (ctx: Ctx, vr: VR) 
     },
     "vm-note"(ctx, vr) {
       const pr = { b: q(ctx, "b"), m: q(ctx, "m"), v: q(ctx, "v"), t: q(ctx, "t"), to: q(ctx, "to") };
-      const g = keys(vr, "vm-note-key", pr, { timeout: 4 });
+      const g = keys(vr, "vm-note-key", pr, { timeout: h.timer(vr, "timerVmNoteKey") });
       h.sp(g, ctx, "vm_note_offer");
       return h.back(vr, "vm-fwd-do", pr); // stay on the line: no note
     },

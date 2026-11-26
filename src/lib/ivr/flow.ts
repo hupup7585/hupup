@@ -425,7 +425,7 @@ function speech(vr: VR, action: string, hints: string, opts: { dtmf?: boolean; n
     speechModel: "phone_call",
     enhanced: true,
     speechTimeout: "auto",
-    timeout: 7,
+    timeout: T(vr, "timerSpeechWait"),
     hints,
     profanityFilter: false,
     actionOnEmptyResult: true,
@@ -735,7 +735,7 @@ async function hotlineClosed(ctx: Ctx, vr: VR, n = 0): Promise<VR | null> {
   await updateSession(ctx.callSid, { outcome: "voicemail", data: { missed: "closed" } }, ctx.session);
   // Shabbes (candle lighting until 2 minutes after Rabbeinu Tam) and Yom Tov: the closed message, the tone, the general
   // voicemail; no key works (pound skips the message to the tone, as in every voicemail greeting)
-  const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 1, finishOnKey: "#", actionOnEmptyResult: true, action: url("closed-key", { n: n || undefined }), method: "POST" });
+  const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: T(vr, "timerClosedKey"), finishOnKey: "#", actionOnEmptyResult: true, action: url("closed-key", { n: n || undefined }), method: "POST" });
   sp(g, ctx, closedKey, vars, { draftOk: true });
   return vmRecord(vr, await vmBox("9"), "closed");
 }
@@ -1641,7 +1641,7 @@ type Handler = (ctx: Ctx, vr: VR) => Promise<VR> | VR;
 
 const handlers: Record<string, Handler> = {
   // Full voicemail by phone (Abraham, Nov 23, 2026): star 7 4 from the general voicemail
-  ...makeVmHandlers({ sp, say, back, url, backLine, when: vmaWhen, update: (sid, patch, s) => updateSession(sid, patch, s) }),
+  ...makeVmHandlers({ sp, say, back, url, backLine, when: vmaWhen, update: (sid, patch, s) => updateSession(sid, patch, s), timer: (vr, key) => T(vr, key) }),
   /**
    * Music while a caller waits (Abraham, Nov 17, 2026): one piece at a time, like a radio (src/lib/music.ts). Used as
    * the wait music of a queue: Twilio asks again for the next piece when one ends. place = staff | pay.
@@ -1662,7 +1662,7 @@ const handlers: Record<string, Handler> = {
     }
     const piece = await nextPiece(place);
     if (piece) vr.play(piece.url);
-    else vr.pause({ length: 8 }); // no music chosen for this place: quiet
+    else vr.pause({ length: T(vr, "timerNoMusicPause") }); // no music chosen for this place: quiet
     return vr;
   },
 
@@ -1961,16 +1961,16 @@ const handlers: Record<string, Handler> = {
   "catalog-part"(ctx, vr) {
     const part = ctx.query.get("part") === "domain" ? "domain" : "local";
     const add = ctx.query.get("add") ?? undefined;
-    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 3, finishOnKey: "", action: url("catalog-key", { part, add }), method: "POST" });
+    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: T(vr, "timerCatalogKey"), finishOnKey: "", action: url("catalog-key", { part, add }), method: "POST" });
     sp(g, ctx, part === "domain" ? "catalog_domain" : "catalog_email_local");
     sp(g, ctx, "type_hint"); // Abraham, Nov 24, 2026: every typing step: "To type it with your keypad, press 9."
     vr.play(`${config.baseUrl()}/audio/tone.wav`);
     if (sttActive()) {
       // Speech to text (preview only): record the spoken letters, Google types them up while the soft clip plays
-      vr.record({ maxLength: 15, timeout: 3, playBeep: false, finishOnKey: "#", trim: "trim-silence", action: url("catalog-stt-recorded", { part, add }), method: "POST" });
+      vr.record({ maxLength: T(vr, "timerCatalogRecordMax"), timeout: T(vr, "timerCatalogRecordSilence"), playBeep: false, finishOnKey: "#", trim: "trim-silence", action: url("catalog-stt-recorded", { part, add }), method: "POST" });
       return vr;
     }
-    const s = vr.gather({ input: ["speech", "dtmf"], finishOnKey: "#", timeout: 6, speechTimeout: "auto", language: "en-US", hints: "a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, dot, underscore, dash", action: url("catalog-said", { part, add }), method: "POST" });
+    const s = vr.gather({ input: ["speech", "dtmf"], finishOnKey: "#", timeout: T(vr, "timerCatalogSpeech"), speechTimeout: "auto", language: "en-US", hints: "a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, dot, underscore, dash", action: url("catalog-said", { part, add }), method: "POST" });
     void s;
     return repeatMenu(vr, ctx, "catalog-part", { part, add });
   },
@@ -2460,7 +2460,7 @@ const handlers: Record<string, Handler> = {
    */
   async "cs-closed"(ctx, vr) {
     await track(ctx.callSid, "step", "Bookings key 0: customer service closed (after-hours set)");
-    const g = keypad(vr, url("cs-closed-key"), { timeout: 1 });
+    const g = keypad(vr, url("cs-closed-key"), { timeout: T(vr, "timerCsClosedKey") });
     menuRun(g, ctx, "after_hours_closed", ["after_hours_closed", "after_hours_auto", "after_hours_message"]); // the hours line: bookings menu only (Nov 26, 2026)
     const box = await vmBox("4");
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail", data: { vmEntry: "4", missed: "closed" } }, ctx.session);
@@ -3116,7 +3116,7 @@ const handlers: Record<string, Handler> = {
         if (sets >= 3) return back(vr, "added-menu"); // after the third set: no more offers
         // "Laser tag: every third set half price" off (Abraham, Nov 25, 2026, 4:03 PM): no third-set line
         if (sets >= 2 && !(await laserThirdSetHalfOn(db))) return back(vr, "added-menu");
-        const g = keypad(vr, url("second-choice", { p: p.id, d: date }), { timeout: 5 });
+        const g = keypad(vr, url("second-choice", { p: p.id, d: date }), { timeout: T(vr, "timerSecondOffer") });
         const a = ctx.session?.data.lastAdded;
         if (a) sp(g, ctx, "box25_added", addedVars(a));
         if (sets <= 1) sp(g, ctx, "laser_second_set");
@@ -3125,7 +3125,7 @@ const handlers: Record<string, Handler> = {
         return back(vr, "added-menu", { n: 1 }); // no key for 5 seconds: nothing added, on to the keep-shopping lines
       }
     }
-    const g = keypad(vr, url("second-choice", { p: p.id, d: date }), { timeout: 4 });
+    const g = keypad(vr, url("second-choice", { p: p.id, d: date }), { timeout: T(vr, "timerSecondOfferAgain") });
     const a = ctx.session?.data.lastAdded;
     if (a) sp(g, ctx, "box25_added", addedVars(a));
     sp(g, ctx, kind === "laser" ? "second_laser" : "second_paddle");
@@ -3422,10 +3422,10 @@ const handlers: Record<string, Handler> = {
       // Speech to text: the question with a moment for a key (star or 9 to type, pound to skip email), then the tone
       // and the recording starts the moment the tone ends (Hark's audit H2, Nov 24, 2026: with the tone inside the
       // key window, the first second of the answer was lost and short names came back empty)
-      const k = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 1, finishOnKey: "", action: url("heard", { f, n }), method: "POST" });
+      const k = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: T(vr, "timerHeardKey"), finishOnKey: "", action: url("heard", { f, n }), method: "POST" });
       question(k, false);
       vr.play(tone);
-      vr.record({ maxLength: T(vr, "timerSpokenMax"), timeout: 3, playBeep: false, finishOnKey: "#*9", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
+      vr.record({ maxLength: T(vr, "timerSpokenMax"), timeout: T(vr, "timerSpokenSilence"), playBeep: false, finishOnKey: "#*9", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
       return vr;
     }
     // Say it, or press star to type it on the keypad (Abraham L). finishOnKey "" so star and # arrive as keys.
@@ -4483,7 +4483,7 @@ const handlers: Record<string, Handler> = {
     const earlier = await db.select().from(schema.phonepayAttempts).where(and(eq(schema.phonepayAttempts.callSid, ctx.callSid), eq(schema.phonepayAttempts.orderId, o)));
     // Box 140 (Abraham, Nov 17, 2026): card on the call is the default; 0 = a payment link (text or email) instead
     if (!earlier.length && ctx.query.get("c") !== "1") {
-      const g = keypad(vr, url("phonepay-option", { o }), { numDigits: 1, timeout: 5 });
+      const g = keypad(vr, url("phonepay-option", { o }), { numDigits: 1, timeout: T(vr, "timerPhonePayOption") });
       sp(g, ctx, "pay_card_line");
       return back(vr, "phonepay-go", { o, c: 1 }); // no key: straight on to the payment line
     }
@@ -4829,7 +4829,7 @@ const handlers: Record<string, Handler> = {
     if (!unclear) {
       // Declined (Abraham's test call, Nov 24, 2026 bug): the line plays once, then the caller goes straight back to Sola
       // PhonePay for the same order and amount. It used to wait for key 1 and replay the line again and again.
-      const g = keypad(vr, url("phonepay-retry-answer", { o, n, d: 1 }), { numDigits: 1, timeout: 1 });
+      const g = keypad(vr, url("phonepay-retry-answer", { o, n, d: 1 }), { numDigits: 1, timeout: T(vr, "timerPhonePayRetry") });
       sp(g, ctx, n === max - 1 ? "phonepay_retry_last" : "phonepay_retry", undefined, { draftOk: true });
       await track(ctx.callSid, "step", `Card try ${n} did not go through: declined line played once; back to the payment line`);
       return back(vr, "phonepay-go", { o });

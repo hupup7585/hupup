@@ -988,6 +988,82 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "lib/ivr/flow.ts",
   "lib/ivr/timers.ts"
  ],
+ "timerSpeechWait": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerSpokenSilence": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerHeardKey": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerClosedKey": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerCsClosedKey": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerNoMusicPause": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerCatalogKey": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerCatalogRecordMax": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerCatalogRecordSilence": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerCatalogSpeech": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerSecondOffer": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerSecondOfferAgain": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerPhonePayOption": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerPhonePayRetry": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
+ "timerVmNoKey": [
+  "lib/ivr/timers.ts",
+  "lib/ivr/vmail.ts"
+ ],
+ "timerVmPlaybackKey": [
+  "lib/ivr/timers.ts",
+  "lib/ivr/vmail.ts"
+ ],
+ "timerVmPauseKey": [
+  "lib/ivr/timers.ts",
+  "lib/ivr/vmail.ts"
+ ],
+ "timerVmNoteKey": [
+  "lib/ivr/timers.ts",
+  "lib/ivr/vmail.ts"
+ ],
+ "timerVmGreetingMax": [
+  "lib/ivr/timers.ts",
+  "lib/ivr/vmail.ts"
+ ],
  "timerStaffMenus": [
   "lib/ivr/flow.ts",
   "lib/ivr/timers.ts"
