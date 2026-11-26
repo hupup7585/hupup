@@ -1,6 +1,6 @@
 import { requireOwner } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
-import { LINE_IDS, LINE_LABEL, effectiveLine, formatDateOverrides, formatWindows, loadHours, recordedHoursWarnings, scheduleWords, type Schedule } from "@/lib/hours-schedule";
+import { LINE_IDS, LINE_LABEL, effectiveLine, formatDateOverrides, formatWindows, loadHours, recordedHoursWarnings, scheduleWords, seasonAt, timeWords, type Schedule } from "@/lib/hours-schedule";
 import { addGroupAction, removeFromGroupAction, saveScheduleAction } from "./actions";
 
 export const metadata = { title: "Hours | Hup Up Attractions" };
@@ -102,6 +102,7 @@ function ScheduleForm({ schedule, on, line, group }: { schedule: Schedule; on: b
           </label>
         ))}
       </div>
+      {schedule.fridaySeason && <FridaySeasonFields schedule={schedule} />}
       <div className="grid gap-3 sm:grid-cols-2">
         {(["chanukah", "cholHamoed"] as const).map((k) => (
           <fieldset key={k} className="rounded-xl border border-line p-3">
@@ -120,5 +121,31 @@ function ScheduleForm({ schedule, on, line, group }: { schedule: Schedule; on: b
       </label>
       <button className="btn-dark w-fit">Save</button>
     </form>
+  );
+}
+
+/** The Operator's Friday closing by season (Abraham, Nov 26, 2026): editable, with the one in effect today. */
+function FridaySeasonFields({ schedule }: { schedule: Schedule }) {
+  const fs = schedule.fridaySeason!;
+  const now = seasonAt(new Date());
+  return (
+    <fieldset className="rounded-xl border border-line p-3" data-friday-season>
+      <legend className="px-1 text-sm font-semibold">Friday closing by season (Friday ends at &ldquo;Season closing&rdquo;)</legend>
+      <input type="hidden" name="season" value="1" />
+      <div className="grid gap-3 sm:grid-cols-2">
+        {(["winter", "summer"] as const).map((k) => (
+          <label key={k} className="block">
+            <span className="label">
+              {k === "winter" ? "Winter closing" : "Summer closing"}
+              {now === k && <b className="ml-2 rounded-full bg-mint/20 px-2 py-0.5 text-xs text-[#13895C]" data-season-now={k}>In effect today</b>}
+            </span>
+            <input name={`${k}Close`} defaultValue={fs[k]} className="input" />
+            <span className="mt-1 block text-xs text-muted">
+              {k === "winter" ? "From the first Sunday of November (standard time)." : "From the second Sunday of March (daylight saving time)."} Now: {timeWords(fs[k])}.
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }

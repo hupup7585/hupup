@@ -24,9 +24,18 @@ export async function saveScheduleAction(fd: FormData) {
   const group = String(fd.get("group") ?? "");
   const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday night"];
   const days = {} as Schedule["days"];
+  // The Operator's Friday closing by season (Abraham, Nov 26, 2026): a Friday may end at "Season closing"
+  const season = fd.get("season") === "1";
+  let fridaySeason: Schedule["fridaySeason"];
+  if (season) {
+    const t = (k: string) => parseWindows(`00:00-${String(fd.get(k) ?? "").trim()}`)?.[0]?.to ?? null;
+    const winter = t("winterClose"), summer = t("summerClose");
+    if (!winter || !summer) return back(`err=${encodeURIComponent("Friday closing by season: these times are not clear. Example: 15:00 or 3 PM.")}`);
+    fridaySeason = { winter, summer };
+  }
   for (let d = 0; d <= 6; d++) {
-    const ws = parseWindows(String(fd.get(`day${d}`) ?? ""), d === 5);
-    if (!ws) return back(`err=${encodeURIComponent(`${names[d]}: these hours are not clear. Example: 11:00-14:00, 19:30-22:00${d === 5 ? " (Friday may end at Chatzos: 11:00-Chatzos)" : ""}, or Closed.`)}`);
+    const ws = parseWindows(String(fd.get(`day${d}`) ?? ""), d === 5, d === 5 && season);
+    if (!ws) return back(`err=${encodeURIComponent(`${names[d]}: these hours are not clear. Example: 11:00-14:00, 19:30-22:00${d === 5 ? (season ? " (Friday may end at Season closing: 09:30-Season closing, or Chatzos)" : " (Friday may end at Chatzos: 11:00-Chatzos)") : ""}, or Closed.`)}`);
     days[String(d) as "0"] = { closed: ws.length === 0, windows: ws };
   }
   const holiday = (k: "chanukah" | "cholHamoed", label: string) => {
@@ -39,7 +48,7 @@ export async function saveScheduleAction(fd: FormData) {
   if (typeof chanukah === "string" || typeof cholHamoed === "string") return back(`err=${encodeURIComponent(`${typeof chanukah === "string" ? "Chanukah" : "Chol Hamoed"}: these hours are not clear. Example: 09:00-22:30, or tick Same as weekday.`)}`);
   const o = parseDateOverrides(String(fd.get("overrides") ?? ""));
   if (o.error) return back(`err=${encodeURIComponent(o.error)}`);
-  const schedule: Schedule = { days, chanukah, cholHamoed, overrides: o.list };
+  const schedule: Schedule = { days, chanukah, cholHamoed, overrides: o.list, ...(fridaySeason ? { fridaySeason } : {}) };
   const on = fd.get("on") === "on" || line === "office";
   const after = setSchedule(data, group ? { group } : isLine(line) ? { line } : {}, schedule, on);
   await store(data, after, owner.userId, "settings.hours_saved");

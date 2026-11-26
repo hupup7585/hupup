@@ -24,14 +24,39 @@ export const LINE_LABEL: Record<LineId, string> = {
 /** Which schedule each ring line follows (ring key = the internal key used by the phone line). */
 export const RING_KEY_LINE: Record<string, LineId> = { "4": "cs", "5": "problems", "6": "delivery", "0": "operator", "8": "schools", "2": "office" };
 
-export type Win = { from: string; to: string }; // "HH:MM"; `to` may be "chatzos" (Friday)
+export type Win = { from: string; to: string }; // "HH:MM"; `to` may be "chatzos" or "season" (Friday)
 export type Day = { closed: boolean; windows: Win[] };
 export type HolidayRule = { same: boolean; windows: Win[] };
 export type DateOverride = { from: string; to: string; closed: boolean; windows: Win[]; note?: string };
-export type Schedule = { days: Record<"0" | "1" | "2" | "3" | "4" | "5" | "6", Day>; chanukah: HolidayRule; cholHamoed: HolidayRule; overrides: DateOverride[] };
+/**
+ * A Friday that ends at a set time by season (Abraham, Nov 26, 2026, the Operator): winter = Eastern Standard Time
+ * (from the first Sunday of November), summer = Eastern Daylight Time (from the second Sunday of March), by the real
+ * America/New_York clock rules. A Friday window ending at "season" closes at the time in effect that day.
+ */
+export type FridaySeason = { winter: string; summer: string };
+export type Schedule = { days: Record<"0" | "1" | "2" | "3" | "4" | "5" | "6", Day>; chanukah: HolidayRule; cholHamoed: HolidayRule; overrides: DateOverride[]; fridaySeason?: FridaySeason };
 export type LineEntry = { schedule: Schedule; on: boolean };
 export type Group = { id: string; name: string; members: LineId[]; schedule: Schedule; on: boolean };
-export type HoursData = { lines: Record<LineId, LineEntry>; groups: Group[] };
+export type HoursData = { lines: Record<LineId, LineEntry>; groups: Group[]; operatorFridaySeason?: boolean };
+
+/** The Operator's Friday closing by season (Abraham, Nov 26, 2026): 3:00 PM in winter, 4:00 PM in summer. */
+export const OPERATOR_FRIDAY_SEASON: FridaySeason = { winter: "15:00", summer: "16:00" };
+
+/** "winter" while New York is on standard time (EST), "summer" on daylight time (EDT), at this moment. */
+export function seasonAt(at: Date): "winter" | "summer" {
+  const jan = new Date(Date.UTC(at.getUTCFullYear(), 0, 1));
+  const offset = (d: Date) => {
+    const p = new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, timeZoneName: "longOffset" }).formatToParts(d).find((x) => x.type === "timeZoneName")?.value ?? "";
+    const r = /GMT([+-])(\d{2}):?(\d{2})?/.exec(p);
+    return r ? (r[1] === "-" ? -1 : 1) * (Number(r[2]) * 60 + Number(r[3] ?? 0)) : 0;
+  };
+  return offset(at) > offset(jan) ? "summer" : "winter";
+}
+
+/** The closing time a "season" Friday window has on that day. */
+export function seasonClose(sch: Pick<Schedule, "fridaySeason">, at: Date): string | null {
+  return sch.fridaySeason ? sch.fridaySeason[seasonAt(at)] : null;
+}
 
 type HoursInput = CalendarSettings & { hoursSchedules?: string; hoursMonThu?: string; hoursSunday?: string; hoursFridayOpen?: string; hoursCholHamoed?: string; hoursChanukah?: string };
 
@@ -88,6 +113,16 @@ export function loadHours(s: HoursInput): HoursData {
     const e = saved.lines?.[id];
     if (e && validSchedule(e.schedule)) lines[id] = { schedule: e.schedule, on: e.on !== false };
   }
+  // The Operator's Friday ends by season, not at Chatzos (Abraham, Nov 26, 2026): once, on the saved hours; the opening
+  // time and every other line stay as they are. After that the Owner's own choice on the Hours page is kept.
+  if (!saved.operatorFridaySeason) {
+    const op = lines.operator.schedule;
+    const fri = op.days["5"];
+    lines.operator = {
+      ...lines.operator,
+      schedule: { ...op, fridaySeason: { ...OPERATOR_FRIDAY_SEASON }, days: { ...op.days, "5": { ...fri, windows: fri.windows.map((w) => (w.to.trim().toLowerCase() === "chatzos" ? { ...w, to: "season" } : w)) } } },
+    };
+  }
   const seen = new Set<LineId>();
   const groups: Group[] = [];
   for (const g of saved.groups ?? []) {
@@ -96,7 +131,7 @@ export function loadHours(s: HoursInput): HoursData {
     members.forEach((m) => seen.add(m));
     if (members.length) groups.push({ id: String(g.id), name: String(g.name || "Group"), members, schedule: g.schedule, on: g.on !== false });
   }
-  return { lines, groups };
+  return { lines, groups, operatorFridaySeason: true };
 }
 
 function validSchedule(x: unknown): x is Schedule {
@@ -132,13 +167,19 @@ export function scheduleOpenNow(sch: Schedule, at: Date, s: CalendarSettings): b
   const inWindows = (ws: Win[]) =>
     ws.some((w) => {
       const from = mins(w.from);
-      const chatzos = w.to.trim().toLowerCase() === "chatzos";
-      const to = chatzos ? 24 * 60 : mins(w.to);
+      const end = w.to.trim().toLowerCase();
+      const chatzos = end === "chatzos";
+      // A season Friday (the Operator): 3 PM in winter, 4 PM in summer; always before candle lighting in Monroe, NY,
+      // so the Erev Shabbes Chatzos close does not cut it short
+      const season = end === "season" ? seasonClose(sch, at) : null;
+      const to = chatzos ? 24 * 60 : end === "season" ? (season ? mins(season) : null) : mins(w.to);
       if (from === null || to === null || now < from || now >= to) return false;
       if (chatzos && !info.closesAt) return false; // chatzos is only known on a day that closes early (Friday, Erev Yom Tov)
+      if (season) seasonal = true;
       return true;
     });
-  const cutoff = () => !(info.closesAt && at >= info.closesAt); // never past the Erev close (chatzos or candle lighting)
+  let seasonal = false;
+  const cutoff = () => seasonal || !(info.closesAt && at >= info.closesAt); // never past the Erev close (chatzos or candle lighting)
   // Admin's own day (Business hours & holidays): closed closes every line; own hours apply to the office hours only
   const own = overrideFor(iso, s);
   if (own && !own.open) return false;
@@ -170,6 +211,7 @@ export function lineOpen(data: HoursData, id: LineId, at: Date, s: CalendarSetti
 /** Times in plain words: "11 AM", "7:30 PM", "Chatzos". */
 export function timeWords(hhmm: string): string {
   if (hhmm.trim().toLowerCase() === "chatzos") return "Chatzos";
+  if (hhmm.trim().toLowerCase() === "season") return "the season's closing time";
   const m = mins(hhmm);
   if (m === null) return hhmm;
   const h = Math.floor(m / 60) % 24, mm = m % 60;
@@ -212,6 +254,7 @@ export function officeLines(sch: Schedule): string[] {
 /** "10:30 AM", "7:00 PM", "Chatzos" (the website's existing style). */
 function dashTime(hhmm: string) {
   if (hhmm.trim().toLowerCase() === "chatzos") return "Chatzos";
+  if (hhmm.trim().toLowerCase() === "season") return "Season closing";
   const m = mins(hhmm);
   if (m === null) return hhmm;
   const h = Math.floor(m / 60) % 24, mm = m % 60;
@@ -230,11 +273,19 @@ export function recordedHoursWarnings(data: HoursData): string[] {
 /* ---------- Admin: reading the Hours page form, groups ---------- */
 
 /** "11:00-14:00, 19:30-22:00", "11 AM - 2 PM and 7:30 PM - 10 PM", "11:00-chatzos" or "Closed" -> windows (null = unclear). */
-export function parseWindows(text: string, allowChatzos = false): Win[] | null {
+export function parseWindows(text: string, allowChatzos = false, allowSeason = false): Win[] | null {
   const t = text.trim();
   if (!t || /^closed$/i.test(t)) return [];
   const out: Win[] = [];
   for (const piece of t.split(/,|;|\band\b/i).map((x) => x.trim()).filter(Boolean)) {
+    const se = /^(.+?)\s*(?:-|–|—|to)\s*season(?:\s+closing)?$/i.exec(piece);
+    if (se) {
+      if (!allowSeason) return null;
+      const start = norm(`${se[1]}-23:59`);
+      if (!start) return null;
+      out.push({ from: start.split("-")[0], to: "season" });
+      continue;
+    }
     const ch = /^(.+?)\s*(?:-|–|—|to)\s*chatzos$/i.exec(piece);
     if (ch) {
       if (!allowChatzos) return null;
@@ -269,7 +320,7 @@ function norm(input: string): string | null {
   return `${f(a)}-${f(b)}`;
 }
 /** Windows back to the text the form shows. */
-export const formatWindows = (ws: Win[]) => (ws.length ? ws.map((w) => `${w.from}-${w.to === "chatzos" ? "Chatzos" : w.to}`).join(", ") : "Closed");
+export const formatWindows = (ws: Win[]) => (ws.length ? ws.map((w) => `${w.from}-${w.to === "chatzos" ? "Chatzos" : w.to === "season" ? "Season closing" : w.to}`).join(", ") : "Closed");
 
 /** Date overrides, one per line: "2026-12-24 closed Day off", "2026-12-24 to 2026-12-26 11:00-14:00 Busy week". */
 export function parseDateOverrides(text: string): { list: DateOverride[]; error: string | null } {
