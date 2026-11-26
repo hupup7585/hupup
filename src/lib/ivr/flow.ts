@@ -91,6 +91,7 @@ import { categoryProducts, itemFreeOn, nearestFreeDay, nearestSize } from "@/lib
 import { BOX_BY_NUMBER, CALLBACK_CALLER_ID, VM_ACCESS_KEYS, VM_ACCESS_KEY_GAP, VM_PIN_TRIES, callOutActive, callOutNumber, callbackNumber, checkVmPin, lockVmAccess, logVmAccess, vmAccessActive, vmLockedUntil, vmPinChangedByPhone, validPin } from "@/lib/vm-access";
 import { STT_HOLD_FILE, STT_MAX_WAITS, googleReadback, runLater, sttActive, transcribeAnswer } from "@/lib/speech-to-text";
 import { linkHoldMinutes } from "@/lib/settings";
+import { PHONE_TIMERS, timerValues, type TimerKey } from "@/lib/ivr/timers";
 
 const { categories, products, orders, orderItems } = schema;
 type VR = InstanceType<typeof twilio.twiml.VoiceResponse>;
@@ -335,11 +336,17 @@ function pause(target: VR | Gather, seconds = 1) {
   target.pause({ length: seconds });
 }
 
+/** Phone timing (Admin handoff Phase 3): the waits for this request, from Admin; defaults equal the old constants. */
+const TIMING = new WeakMap<object, Record<TimerKey, number>>();
+function T(vr: VR, key: TimerKey): number {
+  return TIMING.get(vr)?.[key] ?? PHONE_TIMERS.find((t) => t.key === key)!.default;
+}
+
 function keypad(vr: VR, action: string, opts: { numDigits?: number; timeout?: number; finishOnKey?: string } = {}) {
   const g = vr.gather({
     input: ["dtmf"],
     numDigits: opts.numDigits ?? 1,
-    timeout: opts.timeout ?? NO_KEY_SECONDS,
+    timeout: opts.timeout ?? T(vr, "timerNoKey"),
     finishOnKey: opts.finishOnKey ?? "",
     action,
     method: "POST",
@@ -1286,7 +1293,7 @@ function vmRecord(vr: VR, box: { id: number; maxLengthSec: number; transcribe: b
     maxLength: Math.min(Math.max(box.maxLengthSec, 10), 600),
     playBeep: true,
     finishOnKey: "#",
-    timeout: 6,
+    timeout: T(vr, "timerVoicemailSilence"),
     action: url("vm-recorded", { b: box.id, x: x ?? undefined, t: box.transcribe ? 1 : 0 }),
     method: "POST",
     recordingStatusCallback: url("vm-recording", { b: box.id, t: box.transcribe ? 1 : 0 }),
@@ -1598,7 +1605,7 @@ const handlers: Record<string, Handler> = {
       input: ["dtmf"],
       numDigits: 1,
       finishOnKey: "",
-      timeout: MENU_WAIT_SECONDS, // Abraham: 3 seconds after the last line, then the menu plays again
+      timeout: T(vr, "timerMenuWait"), // Abraham: 3 seconds after the last line, then the menu plays again
       action: url("menu-choice", { np: ctx.query.get("np") || undefined, t0: ctx.query.get("t0") || Date.now() }),
       method: "POST",
     });
@@ -1665,7 +1672,7 @@ const handlers: Record<string, Handler> = {
     const np = Number(ctx.query.get("np") || 0);
     const t0 = Number(ctx.query.get("t0")) || Date.now();
     if (await cartSilence(ctx)) return (await disconnectCheckDue(t0)) ? disconnectCheck(vr, ctx) : toStep(vr, ctx, { np, t0 });
-    if (np >= MENU_PLAYS_BEFORE_END && Date.now() - t0 >= MENU_MIN_SECONDS * 1000) {
+    if (np >= T(vr, "timerMenuPlays") && Date.now() - t0 >= T(vr, "timerMenuMinSeconds") * 1000) {
       sp(vr, ctx, "no_input_final");
       await silentGoodbye(vr, ctx);
       vr.hangup(); // a voicemail waiting for 1, 2 or 3 is kept when the call ends
@@ -1680,14 +1687,14 @@ const handlers: Record<string, Handler> = {
    * finished playing (never mid-play), with the goodbye line.
    */
   async idle(ctx, vr) {
-    const nk = Number(ctx.query.get("nk")) || Date.now() - NO_KEY_SECONDS * 1000;
+    const nk = Number(ctx.query.get("nk")) || Date.now() - T(vr, "timerNoKey") * 1000;
     // Items in the cart (Abraham, Nov 26, 2026): no 1-minute end; after the Admin silence time, the disconnect check
     if (await cartSilence(ctx)) {
       if (await disconnectCheckDue(nk)) return disconnectCheck(vr, ctx);
       sp(vr, ctx, "no_choice");
       return toStep(vr, ctx, { nk });
     }
-    if (Date.now() - nk >= NO_KEY_END_MS) {
+    if (Date.now() - nk >= T(vr, "timerNoKeyEnd") * 1000) {
       sp(vr, ctx, "no_input_final");
       await silentGoodbye(vr, ctx);
       vr.hangup();
@@ -1760,7 +1767,7 @@ const handlers: Record<string, Handler> = {
   "tx-enter"(ctx, vr) {
     const p = txPurpose(ctx);
     const o = ctx.query.get("o") ?? undefined;
-    const g = keypad(vr, url("tx-heard", { p, o }), { numDigits: 11, timeout: 10, finishOnKey: "#" });
+    const g = keypad(vr, url("tx-heard", { p, o }), { numDigits: 11, timeout: T(vr, "timerPhoneDigits"), finishOnKey: "#" });
     sp(g, ctx, "text_enter");
     return repeatMenu(vr, ctx, "tx-enter", { p, o });
   },
@@ -1856,7 +1863,7 @@ const handlers: Record<string, Handler> = {
   "catalog-type"(ctx, vr) {
     const part = ctx.query.get("part") === "domain" ? "domain" : "local";
     const add = ctx.query.get("add") ?? undefined;
-    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 20, action: url("catalog-typed", { part, add }), method: "POST" });
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: T(vr, "timerEmailSpelling"), action: url("catalog-typed", { part, add }), method: "POST" });
     sp(g, ctx, "type_instructions");
     g.play(`${config.baseUrl()}/audio/tone.wav`);
     return back(vr, "catalog-typed", { part, add });
@@ -2400,7 +2407,7 @@ const handlers: Record<string, Handler> = {
       return bookNoInput(vr, ctx, "category", { c, f: f ?? undefined });
     }
     // 10 or more items (Abraham, Nov 17, 2026): two-key choices (10, 11, 12) work; a single key acts after a short wait
-    const g = keypad(vr, url("category-choice", { c, f: f ?? undefined }), items.length > 9 ? { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS } : {});
+    const g = keypad(vr, url("category-choice", { c, f: f ?? undefined }), items.length > 9 ? { numDigits: 2, timeout: T(vr, "timerTwoDigit") } : {});
     if (/paddle/i.test(cat.name)) sp(g, ctx, "paddle_open"); // Nov 22, 2026: "Here are our paddle boat packages."
     else sp(g, ctx, "book_category_list", { category: cat.spokenName || cat.name });
     sp(g, ctx, "cart_key"); // Abraham (Phone Menu v3): the cart line before the items and again after them
@@ -2440,7 +2447,7 @@ const handlers: Record<string, Handler> = {
     if (d === "0") return back(vr, "cart", { c, f }); // "To go to your shopping cart, press 0."
     // 1: wait 2 seconds for a second digit (10, 11, 12); pound skips the wait; nothing = Soft Hop
     if (d === "1") {
-      vr.gather({ input: ["dtmf"], numDigits: 1, timeout: BALLOON_SECOND_DIGIT_SECONDS, finishOnKey: "#", action: url("balloon-key2", { c, f }), method: "POST", actionOnEmptyResult: true });
+      vr.gather({ input: ["dtmf"], numDigits: 1, timeout: T(vr, "timerBalloonDigit"), finishOnKey: "#", action: url("balloon-key2", { c, f }), method: "POST", actionOnEmptyResult: true });
       return back(vr, "balloon-pick", { c, f, k: "1" });
     }
     return back(vr, "balloon-pick", { c, f, k: d });
@@ -2575,7 +2582,7 @@ const handlers: Record<string, Handler> = {
     const p = ctx.query.get("p") ?? undefined;
     const a = ctx.query.get("a") ?? undefined; // "another day" from box 25 or welcome back (Hark's audit H1, Nov 24, 2026)
     // Pound after the digits finishes the date (audit M3): it is never read as part of the date
-    const g = keypad(vr, url("date-heard", { p, a }), { numDigits: 4, timeout: 8, finishOnKey: "#" });
+    const g = keypad(vr, url("date-heard", { p, a }), { numDigits: 4, timeout: T(vr, "timerDateDigits"), finishOnKey: "#" });
     menuRun(g, ctx, "book_date_prompt", ["book_date_prompt", "star"]);
     return bookNoInput(vr, ctx, "date", { p, a });
   },
@@ -2805,7 +2812,7 @@ const handlers: Record<string, Handler> = {
     const cal = await getSettings();
     const opts = await takenDays(p, date, cal);
     if (!opts.before && !opts.after) {
-      const g = keypad(vr, url("date-heard", { p: p.id }), { numDigits: 4, timeout: 8, finishOnKey: "#" });
+      const g = keypad(vr, url("date-heard", { p: p.id }), { numDigits: 4, timeout: T(vr, "timerDateDigits"), finishOnKey: "#" });
       menuRun(g, ctx, "book_date_prompt", ["book_date_prompt", "star"]);
       return bookNoInput(vr, ctx, "nearest-date", { p: p.id, d: date });
     }
@@ -3201,7 +3208,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "cart_empty");
       return back(vr, "book");
     }
-    const g = keypad(vr, url("remove-choice"), lines.length > 9 ? { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS } : {});
+    const g = keypad(vr, url("remove-choice"), lines.length > 9 ? { numDigits: 2, timeout: T(vr, "timerTwoDigit") } : {});
     if (lines.length === 1) sp(g, ctx, "remove_count_one"); // "one, item" (Nov 22, 2026)
     else sp(g, ctx, "remove_count", { amount: lines.length });
     // Abraham, Nov 22, 2026: the date only when the same item is in the cart for two different days
@@ -3229,7 +3236,7 @@ const handlers: Record<string, Handler> = {
   async "remove-qty"(ctx, vr) {
     const l = (await cartLines(ctx)).find((x) => x.itemId === Number(ctx.query.get("i")));
     if (!l) return back(vr, "cart");
-    const g = keypad(vr, url("remove-qty-choice", { i: l.itemId }), { numDigits: 2, timeout: MULTI_KEY_WAIT_SECONDS });
+    const g = keypad(vr, url("remove-qty-choice", { i: l.itemId }), { numDigits: 2, timeout: T(vr, "timerTwoDigit") });
     sp(g, ctx, "remove_qty", { qty: l.qty, item: pluralName(l.name) });
     menuRun(g, ctx, "remove_enter", ["remove_enter", "star"]);
     return noInput(vr, ctx, "remove-qty", { i: l.itemId });
@@ -3283,7 +3290,7 @@ const handlers: Record<string, Handler> = {
       const k = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 1, finishOnKey: "", action: url("heard", { f, n }), method: "POST" });
       question(k, false);
       vr.play(tone);
-      vr.record({ maxLength: 20, timeout: 3, playBeep: false, finishOnKey: "#*9", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
+      vr.record({ maxLength: T(vr, "timerSpokenMax"), timeout: 3, playBeep: false, finishOnKey: "#*9", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
       return vr;
     }
     // Say it, or press star to type it on the keypad (Abraham L). finishOnKey "" so star and # arrive as keys.
@@ -3307,7 +3314,7 @@ const handlers: Record<string, Handler> = {
   type(ctx, vr) {
     const f = ctx.query.get("f") as Field;
     if (f === "street") return back(vr, "addr-street-keys"); // the street keypad search (Nov 24, 2026)
-    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 15, action: url("typed", { f }), method: "POST" });
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: T(vr, "timerSpelling"), action: url("typed", { f }), method: "POST" });
     // Abraham, Nov 24, 2026: after 9, the directions (type_instructions) and a short beep, then keys; a key pressed during
     // the directions stops them and is the first typed key (Twilio's Gather)
     if (!ctx.query.get("again")) sp(g, ctx, "type_instructions");
@@ -3446,7 +3453,7 @@ const handlers: Record<string, Handler> = {
    * shared line, then the menu again.
    */
   directions(ctx, vr) {
-    const g = keypad(vr, url("directions-choice"), { timeout: NO_KEY_SECONDS });
+    const g = keypad(vr, url("directions-choice"), { timeout: T(vr, "timerNoKey") });
     sp(g, ctx, "box34_menu");
     sp(vr, ctx, "almost_done"); // Nov 25, 2026, 12:08: "Almost done!" then box 56, no pause
     return back(vr, "finalize"); // silence: skip; box 56 next (Box 35 moved after payment, Nov 25, 2026, 11:51)
@@ -3470,7 +3477,7 @@ const handlers: Record<string, Handler> = {
     sp(vr, ctx, "box34_record");
     sp(vr, ctx, "pound_done");
     vr.play(`${config.baseUrl()}/audio/tone.wav`);
-    vr.record({ maxLength: 180, timeout: 10, playBeep: false, finishOnKey: "#", trim: "trim-silence", action: url("directions-recorded", { o }), method: "POST", recordingStatusCallback: url("directions-rec-status", { o }), recordingStatusCallbackMethod: "POST" });
+    vr.record({ maxLength: T(vr, "timerDirectionsMax"), timeout: T(vr, "timerDirectionsSilence"), playBeep: false, finishOnKey: "#", trim: "trim-silence", action: url("directions-recorded", { o }), method: "POST", recordingStatusCallback: url("directions-rec-status", { o }), recordingStatusCallbackMethod: "POST" });
     sp(vr, ctx, "almost_done");
     return back(vr, "finalize"); // nothing recorded: on with checkout
   },
@@ -3538,7 +3545,7 @@ const handlers: Record<string, Handler> = {
 
   /** A different phone number: 10 digits, starting with the area code; pound when done. */
   "addr-phone"(ctx, vr) {
-    const g = keypad(vr, url("addr-phone-heard"), { numDigits: 11, timeout: NO_KEY_SECONDS, finishOnKey: "#" });
+    const g = keypad(vr, url("addr-phone-heard"), { numDigits: 11, timeout: T(vr, "timerNoKey"), finishOnKey: "#" });
     menuRun(g, ctx, "lookup_phone_enter", ["lookup_phone_enter", "pound_done", "star"]);
     return repeatMenu(vr, ctx, "addr-phone");
   },
@@ -3629,7 +3636,7 @@ const handlers: Record<string, Handler> = {
 
   // Address steps 2 to 4 (Abraham, Nov 22, 2026, final): keypad only, the shared pound line, then the shared star line
   "addr-house"(ctx, vr) {
-    const g = keypad(vr, url("addr-house-heard"), { numDigits: 7, timeout: 10, finishOnKey: "#" });
+    const g = keypad(vr, url("addr-house-heard"), { numDigits: 7, timeout: T(vr, "timerAddressDigits"), finishOnKey: "#" });
     menuRun(g, ctx, "addr_house", ["addr_house", "pound_done", "star"]);
     return repeatMenu(vr, ctx, "addr-house");
   },
@@ -3677,7 +3684,7 @@ const handlers: Record<string, Handler> = {
   "addr-unit"(ctx, vr) {
     // actionOnEmptyResult: pound with nothing typed reaches us, so it gets the wrong-key line (not the no-key line)
     const a = ctx.query.get("a") ?? undefined;
-    const g = vr.gather({ input: ["dtmf"], numDigits: 7, timeout: 10, finishOnKey: "#", actionOnEmptyResult: true, action: url("addr-unit-heard", { a }), method: "POST" });
+    const g = vr.gather({ input: ["dtmf"], numDigits: 7, timeout: T(vr, "timerAddressDigits"), finishOnKey: "#", actionOnEmptyResult: true, action: url("addr-unit-heard", { a }), method: "POST" });
     menuRun(g, ctx, "addr_unit", ["addr_unit", "pound_done", "star"]);
     return repeatMenu(vr, ctx, "addr-unit", { a });
   },
@@ -3718,7 +3725,7 @@ const handlers: Record<string, Handler> = {
   },
 
   "addr-zip-enter"(ctx, vr) {
-    const g = keypad(vr, url("addr-zip-heard"), { numDigits: 6, timeout: 10, finishOnKey: "#" });
+    const g = keypad(vr, url("addr-zip-heard"), { numDigits: 6, timeout: T(vr, "timerAddressDigits"), finishOnKey: "#" });
     if (ctx.query.get("bad")) sp(g, ctx, "addr_zip_bad"); // Nov 23, 2026: the invalid line, then the entry prompt again
     sp(g, ctx, "addr_zip_enter");
     return repeatMenu(vr, ctx, "addr-zip-enter", { bad: ctx.query.get("bad") ?? undefined });
@@ -3753,7 +3760,7 @@ const handlers: Record<string, Handler> = {
 
   /** Keypad search: the first four letters (multi-tap), then pound. Star alone = back to the street menu. */
   "addr-street-keys"(ctx, vr) {
-    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 15, action: url("addr-street-typed"), method: "POST" });
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: T(vr, "timerSpelling"), action: url("addr-street-typed"), method: "POST" });
     if (!ctx.query.get("again")) {
       spPreviewDraft(g, ctx, "street_keys_intro"); // draft: preview only until Abraham approves the wording
       sp(g, ctx, "type_instructions");
@@ -4003,7 +4010,7 @@ const handlers: Record<string, Handler> = {
   /* ---- Terms: "By pressing #, you agree to our Terms and Conditions..." (logged with time, phone, order, version) ---- */
 
   terms(ctx, vr) {
-    const g = keypad(vr, url("terms-answer", { n: ctx.query.get("n") ?? undefined }), { timeout: 8 });
+    const g = keypad(vr, url("terms-answer", { n: ctx.query.get("n") ?? undefined }), { timeout: T(vr, "timerCheckoutAnswer") });
     say(g, promptText(ctx.prompts, "terms_notice"));
     backLine(g, ctx);
     return back(vr, "terms-answer", { n: ctx.query.get("n") ?? undefined });
@@ -4075,7 +4082,7 @@ const handlers: Record<string, Handler> = {
   },
 
   "phone-enter"(ctx, vr) {
-    const g = keypad(vr, url("phone-heard"), { numDigits: 11, timeout: 10, finishOnKey: "#" }); // 10 digits + pound (audit M2)
+    const g = keypad(vr, url("phone-heard"), { numDigits: 11, timeout: T(vr, "timerPhoneDigits"), finishOnKey: "#" }); // 10 digits + pound (audit M2)
     sp(g, ctx, "phone_enter");
     spPreviewDraft(g, ctx, "press_pound_done");
     return noInput(vr, ctx, "phone-enter");
@@ -4132,7 +4139,7 @@ const handlers: Record<string, Handler> = {
         return back(vr, "finalize");
       }
     }
-    const g = keypad(vr, url("sms-consent-answer", { n: ctx.query.get("n") ?? undefined }), { timeout: 8 });
+    const g = keypad(vr, url("sms-consent-answer", { n: ctx.query.get("n") ?? undefined }), { timeout: T(vr, "timerCheckoutAnswer") });
     sp(g, ctx, "consent_transactional");
     return back(vr, "sms-consent-answer", { none: 1 }); // no key: no texts, on with checkout
   },
@@ -4279,7 +4286,7 @@ const handlers: Record<string, Handler> = {
   /** Texts need the caller's OK for order texts first (the approved consent line); no means the email steps. */
   "pay-consent"(ctx, vr) {
     const o = ctx.query.get("o") ?? undefined;
-    const g = keypad(vr, url("pay-consent-answer", { o, n: ctx.query.get("n") ?? undefined }), { timeout: 8 });
+    const g = keypad(vr, url("pay-consent-answer", { o, n: ctx.query.get("n") ?? undefined }), { timeout: T(vr, "timerCheckoutAnswer") });
     if (Number(ctx.query.get("n") || 0) > 0) sp(g, ctx, "no_choice"); // Nov 22, 2026: the system-wide no-choice line
     sp(g, ctx, "consent_transactional");
     return back(vr, "pay-consent-answer", { o, n: ctx.query.get("n") ?? undefined });
@@ -4307,7 +4314,7 @@ const handlers: Record<string, Handler> = {
   "pay-choice"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     if (!o) return back(vr, "goodbye");
-    const g = keypad(vr, url("pay-choice-answer", { o }), { numDigits: 1, timeout: 8 });
+    const g = keypad(vr, url("pay-choice-answer", { o }), { numDigits: 1, timeout: T(vr, "timerCheckoutAnswer") });
     sp(g, ctx, "phonepay_choice", undefined, { draftOk: true });
     return back(vr, "pay-choice-answer", { o, none: 1 });
   },
@@ -4519,7 +4526,7 @@ const handlers: Record<string, Handler> = {
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "promo-consent");
     const number = spokenDigits(orderNumber(o));
-    const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: PAID_WAIT_SECONDS });
+    const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
     sp(g, ctx, "phonepay_approved", { number });
     if (PAY_DATES_LIVE) {
       const days = group.orders.map((x) => x.order); // sorted by date: the first delivery and the last pickup
@@ -4543,7 +4550,7 @@ const handlers: Record<string, Handler> = {
   async "pay-approved-text"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     if (!o || !(await getPaymentGroup(o))) return back(vr, "promo-consent");
-    const g = keypad(vr, url("pay-approved-text-choice", { o }), { numDigits: 1, timeout: PAID_WAIT_SECONDS });
+    const g = keypad(vr, url("pay-approved-text-choice", { o }), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
     sp(g, ctx, (await orderTextsAgreed(ctx, o)) ? "phonepay_approved_text" : "pay_approved_optin");
     return back(vr, "receipt-email", { o }); // no key: box 35, the receipt by email
   },
@@ -4669,7 +4676,7 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "step", `Card try ${n} did not go through: declined line played once; back to the payment line`);
       return back(vr, "phonepay-go", { o });
     }
-    const g = keypad(vr, url("phonepay-retry-answer", { o, n, r: asked, u: 1 }), { numDigits: 1, timeout: 8 });
+    const g = keypad(vr, url("phonepay-retry-answer", { o, n, r: asked, u: 1 }), { numDigits: 1, timeout: T(vr, "timerCheckoutAnswer") });
     sp(g, ctx, "phonepay_unclear", undefined, { draftOk: true });
     return back(vr, "phonepay-retry", { o, n, r: asked + 1, u: 1 });
   },
@@ -4728,7 +4735,7 @@ const handlers: Record<string, Handler> = {
     if (customer?.smsOptOut) return back(vr, "goodbye");
     // Already gets promotions: skipped while the Admin switch is on (the default; Abraham has not decided, Nov 26, 2026)
     if (customer?.marketingOptIn && (await getSettings()).paidPromoSkipOptedIn) return back(vr, "goodbye");
-    const g = keypad(vr, url("promo-consent-answer"), { numDigits: 1, timeout: PAID_WAIT_SECONDS });
+    const g = keypad(vr, url("promo-consent-answer"), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
     sp(g, ctx, "paid_promo_offer");
     return back(vr, "goodbye"); // no key in about 3 seconds: skip, no change
   },
@@ -4756,7 +4763,7 @@ const handlers: Record<string, Handler> = {
   },
 
   "promo-which"(ctx, vr) {
-    const g = keypad(vr, url("promo-which-answer"), { numDigits: 1, timeout: 6 });
+    const g = keypad(vr, url("promo-which-answer"), { numDigits: 1, timeout: T(vr, "timerPromoSteps") });
     sp(g, ctx, "promo_which");
     return back(vr, "goodbye"); // nothing pressed: skip and end the call normally
   },
@@ -4778,7 +4785,7 @@ const handlers: Record<string, Handler> = {
 
   "promo-enter"(ctx, vr) {
     const tries = Number(ctx.query.get("t") || 0);
-    const g = keypad(vr, url("promo-heard", { t: tries }), { numDigits: 11, timeout: 10, finishOnKey: "#" }); // 10 digits + pound (audit M2)
+    const g = keypad(vr, url("promo-heard", { t: tries }), { numDigits: 11, timeout: T(vr, "timerPhoneDigits"), finishOnKey: "#" }); // 10 digits + pound (audit M2)
     sp(g, ctx, "text_enter"); // box 143, the same line in every flow that texts the caller
     vr.redirect({ method: "POST" }, url("promo-heard", { t: tries })); // nothing typed counts as a try
     return vr;
@@ -4793,7 +4800,7 @@ const handlers: Record<string, Handler> = {
       return back(vr, "promo-enter", { t: tries + 1 });
     }
     await updateSession(ctx.callSid, { data: { promoHeard: e164 } }, ctx.session);
-    const g = keypad(vr, url("promo-confirm"), { numDigits: 1, timeout: 6 });
+    const g = keypad(vr, url("promo-confirm"), { numDigits: 1, timeout: T(vr, "timerPromoSteps") });
     sp(g, ctx, "text_heard", { number: readBack(e164) }); // box 144: 1 correct, 2 a different number
     return back(vr, "goodbye");
   },
@@ -4807,7 +4814,7 @@ const handlers: Record<string, Handler> = {
     if (ctx.body.Digits === "2") return back(vr, "promo-enter");
     if (ctx.body.Digits && heard) {
       sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
-      const g = keypad(vr, url("promo-confirm"), { numDigits: 1, timeout: 6 });
+      const g = keypad(vr, url("promo-confirm"), { numDigits: 1, timeout: T(vr, "timerPromoSteps") });
       sp(g, ctx, "text_heard", { number: readBack(heard) });
     }
     return back(vr, "goodbye");
@@ -4912,9 +4919,9 @@ const handlers: Record<string, Handler> = {
       withNumber: promptText(ctx.prompts, "staff_whisper"),
       noNumber: promptText(ctx.prompts, "staff_whisper_no_number"),
     });
-    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, action: url("whisper-accept"), method: "POST" });
+    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: T(vr, "timerStaffAccept"), action: url("whisper-accept"), method: "POST" });
     say(g, text);
-    const again = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 6, action: url("whisper-accept"), method: "POST" });
+    const again = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: T(vr, "timerStaffAcceptAgain"), action: url("whisper-accept"), method: "POST" });
     say(again, text);
     vr.hangup(); // no answer from the staff member (or their voicemail): this leg ends and routing moves on
     return vr;
@@ -5004,7 +5011,7 @@ const handlers: Record<string, Handler> = {
     }
     // No password set yet: the default 1234 works (Abraham, Nov 16, 2026), so there is no "no password" refusal
     const t = Number(ctx.query.get("t") || 0);
-    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-pin-check", { t }), method: "POST" });
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: T(vr, "timerStaffDigits"), action: url("vma-pin-check", { t }), method: "POST" });
     sp(g, ctx, "vma_pin");
     vr.hangup(); // no password entered
     return vr;
@@ -5044,7 +5051,7 @@ const handlers: Record<string, Handler> = {
       vr.hangup();
       return vr;
     }
-    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, finishOnKey: "", action: url("vma-box-choice"), method: "POST" });
+    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: T(vr, "timerStaffMenus"), finishOnKey: "", action: url("vma-box-choice"), method: "POST" });
     spCallOut(g, ctx, "vma_box", "To call a customer, press 0.");
     return back(vr, "vma-box", { n: n + 1 });
   },
@@ -5076,7 +5083,7 @@ const handlers: Record<string, Handler> = {
     const list = await vmaMessages(b);
     const v = list[i];
     if (!v) {
-      const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, finishOnKey: "", action: url("vma-box"), method: "POST" });
+      const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: T(vr, "timerStaffMenus"), finishOnKey: "", action: url("vma-box"), method: "POST" });
       sp(g, ctx, "vma_end", undefined, { draftOk: true });
       vr.hangup();
       return vr;
@@ -5095,7 +5102,7 @@ const handlers: Record<string, Handler> = {
       vr.hangup();
       return vr;
     }
-    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: 8, finishOnKey: "", action: url("vma-choice", p), method: "POST" });
+    const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: T(vr, "timerStaffMenus"), finishOnKey: "", action: url("vma-choice", p), method: "POST" });
     spCallOut(g, ctx, "vma_options", "To call this person back, press 4.");
     return back(vr, "vma-options", { ...p, n: n + 1 });
   },
@@ -5125,7 +5132,7 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "vm_access", `Called back ${to} from voicemail by phone (message ${v.id})`, { voicemailId: v.id, to });
       sp(vr, ctx, "vma_calling", undefined, { draftOk: true });
       // Shows (845) 777-7585; after the call, back to this message's options
-      vr.dial({ callerId: CALLBACK_CALLER_ID, action: url("vma-options", { b, i, v: v.id }), method: "POST", timeout: 30 }, to);
+      vr.dial({ callerId: CALLBACK_CALLER_ID, action: url("vma-options", { b, i, v: v.id }), method: "POST", timeout: T(vr, "timerCallbackRing") }, to);
       return vr;
     }
     sp(vr, ctx, "not_valid");
@@ -5135,7 +5142,7 @@ const handlers: Record<string, Handler> = {
   /** Change the password by phone (Abraham, Nov 15, 2026): new password twice, then the Owner is emailed. */
   "vma-newpin"(ctx, vr) {
     if (!vmaSignedIn(ctx)) return back(vr, "vma-pin");
-    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-newpin-again"), method: "POST" });
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: T(vr, "timerStaffDigits"), action: url("vma-newpin-again"), method: "POST" });
     sp(g, ctx, "vma_newpin", undefined, { draftOk: true });
     return back(vr, "vma-box");
   },
@@ -5149,7 +5156,7 @@ const handlers: Record<string, Handler> = {
     }
     // only a scrambled (hashed) copy is kept between the two entries
     await updateSession(ctx.callSid, { data: { vmaNewPin: await bcrypt.hash(pin, 8) } }, ctx.session);
-    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-newpin-save"), method: "POST" });
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: T(vr, "timerStaffDigits"), action: url("vma-newpin-save"), method: "POST" });
     sp(g, ctx, "vma_newpin_again", undefined, { draftOk: true });
     return back(vr, "vma-box");
   },
@@ -5182,7 +5189,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "not_valid"); // PhonePay is switched off (or not set up): this key does nothing
       return back(vr, "vma-box");
     }
-    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-charge-go"), method: "POST", actionOnEmptyResult: true });
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: T(vr, "timerStaffDigits"), action: url("vma-charge-go"), method: "POST", actionOnEmptyResult: true });
     sp(g, ctx, "vma_charge_note", undefined, { draftOk: true });
     return back(vr, "vma-charge-go");
   },
@@ -5233,7 +5240,7 @@ const handlers: Record<string, Handler> = {
     if (!callOutActive()) return back(vr, "vma-box");
     const n = Number(ctx.query.get("n") || 0);
     if (n >= 3) return back(vr, "vma-box");
-    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: 10, action: url("vma-out-dial"), method: "POST" });
+    const g = vr.gather({ input: ["dtmf"], finishOnKey: "#", timeout: T(vr, "timerStaffDigits"), action: url("vma-out-dial"), method: "POST" });
     sp(g, ctx, "vma_out_enter");
     return back(vr, "vma-out", { n: n + 1 });
   },
@@ -5248,7 +5255,7 @@ const handlers: Record<string, Handler> = {
     }
     await track(ctx.callSid, "vm_access", `Called out to ${to} from voicemail by phone`, { to });
     // Shows (845) 777-7585; after the call, back to the box menu
-    vr.dial({ callerId: CALLBACK_CALLER_ID, action: url("vma-box"), method: "POST", timeout: 30 }, to);
+    vr.dial({ callerId: CALLBACK_CALLER_ID, action: url("vma-box"), method: "POST", timeout: T(vr, "timerCallbackRing") }, to);
     return vr;
   },
 
@@ -5289,7 +5296,7 @@ const handlers: Record<string, Handler> = {
    * Abraham: repeats until the caller presses a valid key or hangs up (hanging up keeps the message).
    */
   "vm-options"(ctx, vr) {
-    const g = keypad(vr, url("vm-option"), { numDigits: 1, timeout: 6 });
+    const g = keypad(vr, url("vm-option"), { numDigits: 1, timeout: T(vr, "timerVoicemailOptions") });
     sp(g, ctx, "vm_options");
     repeatMenu(vr, ctx, "vm-options"); // 3 plays and 20 seconds, then the call ends (the message is kept)
     return vr;
@@ -5299,7 +5306,7 @@ const handlers: Record<string, Handler> = {
   "vm-none"(ctx, vr) {
     const b = ctx.query.get("b") ?? undefined;
     const x = ctx.query.get("x") ?? undefined;
-    const g = keypad(vr, url("vm-none-choice", { b, x }), { numDigits: 1, timeout: 6 });
+    const g = keypad(vr, url("vm-none-choice", { b, x }), { numDigits: 1, timeout: T(vr, "timerVoicemailOptions") });
     sp(g, ctx, "vm_none_retry");
     repeatMenu(vr, ctx, "vm-none", { b, x });
     return vr;
@@ -5489,6 +5496,7 @@ export const handlerNames = () => Object.keys(handlers);
 
 export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Promise<string> {
   const vr = new twilio.twiml.VoiceResponse();
+  TIMING.set(vr, timerValues((await getSettings()) as Record<string, unknown>)); // Phase 3: every wait from Admin
   const prompts = await loadPromptOverrides();
   EDITOR.set(prompts, await loadEditor());
   const ctx = { ...input, prompts };

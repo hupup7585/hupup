@@ -14,7 +14,8 @@ function files(dir: string): string[] {
 // Not shown in Admin on purpose: no part of the system reads them (kept so old saved values do not break)
 const UNUSED = ["smsHelpReplyEnabled", "smsHelpText", "supportPhone", "phonePayDeclinesPerDay", "operatorAcceptText"];
 // Saved by a name built from the key (ringName0, ringName2 ...) or from the music place
-const DYNAMIC = /^(ring[A-Za-z]+\d|music[A-Z])/;
+// Phone timing (Phase 3): generated from src/lib/ivr/timers.ts and edited on Phone timing and All settings
+const DYNAMIC = /^(ring[A-Za-z]+\d|music[A-Z]|timer[A-Z])/;
 
 describe("everything editable", () => {
   it("every setting has an Admin field (or is listed above with the reason)", () => {

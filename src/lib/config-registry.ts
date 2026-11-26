@@ -1,6 +1,7 @@
 import { SETTING_DEFAULTS } from "@/lib/settings";
 import { CONFIG_USAGE } from "@/lib/config-usage.generated";
 import { CONFIG_EXPLANATIONS, type Explanation } from "@/lib/config-explanations";
+import { PHONE_TIMERS } from "@/lib/ivr/timers";
 
 /**
  * Admin handoff Phase 2 (Abraham, Nov 26, 2026): one typed registry of every Admin setting. Each entry has a plain
@@ -63,6 +64,8 @@ const META: Record<string, Partial<ConfigDef>> = {
   disconnectCheckSeconds: { label: "Disconnect check: seconds to wait for a key", group: "Phone: after payment", type: "int", min: 1, max: 15 },
   holidayMutzeAloneDays: { label: "Mutze Shabbes alone: days charged", group: "Offers and discounts", type: "number", min: 0.5, max: 3 },
 };
+
+for (const t of PHONE_TIMERS) META[t.key] = { label: t.label, group: "Phone: timing", type: "int", min: t.min, max: t.max };
 
 /** Words in a key that tell its group, when META does not. */
 const GROUP_BY_WORD: [RegExp, string][] = [

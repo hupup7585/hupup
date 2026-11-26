@@ -1,3 +1,5 @@
+import { PHONE_TIMERS } from "@/lib/ivr/timers";
+
 /**
  * Plain-English explanation of every Admin setting (Abraham, Nov 26, 2026, 3:19 AM build rule): what it does, where the
  * caller or customer meets it, and what happens if it is changed. The current value is shown beside it on the page.
@@ -21,6 +23,8 @@ export type Explanation = {
   /** Tax question: ask the accountant; this is not tax advice. */
   askAccountant?: boolean;
 };
+
+const TIMERS: Record<string, Explanation> = Object.fromEntries(PHONE_TIMERS.map((t) => [t.key, { what: t.what, where: t.where, ifChanged: `${t.ifChanged} Allowed from ${t.min} to ${t.max}; the starting value was ${t.default}.` }]));
 
 const ACCOUNTANT = "This is a tax and bookkeeping question: ask your accountant before changing it. This page does not give tax advice.";
 
@@ -641,7 +645,7 @@ const OTHER: Record<string, Explanation> = {
   holidayMutzeAloneDays: { what: "How many rental days are charged for Motzei Shabbes alone.", where: "Customers booking only Saturday night.", ifChanged: "The price for that booking changes on new orders." },
 };
 
-export const CONFIG_EXPLANATIONS: Record<string, Explanation> = { ...OTHER, ...RING, ...BOOKS };
+export const CONFIG_EXPLANATIONS: Record<string, Explanation> = { ...OTHER, ...RING, ...BOOKS, ...TIMERS };
 
 /** Plain-English helpers for the page. */
 export const ACCOUNTANT_NOTE = ACCOUNTANT;

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME } from "@/lib/config";
+import { TIMER_DEFAULTS } from "@/lib/ivr/timers";
 
 /** Admin-editable settings with defaults. Stored in app_settings (key -> jsonb). */
 export const SETTING_DEFAULTS = {
@@ -278,6 +279,8 @@ export const SETTING_DEFAULTS = {
   /** Disconnect ending (Abraham, Nov 26, 2026): minutes of silence with items in the cart before the disconnect check, and seconds to wait for a key. */
   /** Line 7 before every automatic hang-up on a silent call, also with an empty cart (Abraham, Nov 26, 2026, 09:53 ET). */
   disconnectGoodbyeOn: true,
+  /** Phone timing (Admin handoff Phase 3): every wait on the phone line, defaults equal to the old built-in values. */
+  ...TIMER_DEFAULTS,
   disconnectSilenceMinutes: "3",
   disconnectCheckSeconds: "3",
 } as const;

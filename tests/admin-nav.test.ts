@@ -14,7 +14,7 @@ describe("grouped admin menu", () => {
       Inbox: ["Email", "SMS"], // Inbox: info@ (Abraham, Nov 12, 2026; Owner only)
       "Orders & bookings": ["Calendar", "Orders", "New booking", "Customers", "Directory list", "Catalog", "Catalog email & text", "Offers", "Discounts", "Equipment units"],
       Deliveries: ["Deliveries", "Delivery settings"],
-      "Phone system": ["Call log", "Voicemail", "Campaigns", "Hotline prompts", "Phone screens", "Menu order", "Compliance", "Phone settings", "Music", "Sola PhonePay", "Card blocks"],
+      "Phone system": ["Call log", "Voicemail", "Campaigns", "Hotline prompts", "Phone screens", "Menu order", "Compliance", "Phone settings", "Phone timing", "Music", "Sola PhonePay", "Card blocks"],
       Bookkeeping: ["Overview", "Income", "Invoices", "Expenses", "Bills I owe", "Sola fees", "Stripe fees", "Bank & card", "Sales tax", "Equipment", "Staff & 1099", "Mileage", "Reports", "All entries", "General ledger", "Settings"],
       Staff: ["Staff", "Tasks", "Activity"],
       Settings: ["Hours", "Business hours & holidays", "General settings", "All settings", "System status", "API keys", "Staff screens (preview)"],

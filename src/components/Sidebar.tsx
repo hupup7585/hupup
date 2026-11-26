@@ -86,6 +86,7 @@ export const NAV_GROUPS: Group[] = [
       ["/admin/phone/menu-order", ListOrdered, "Menu order", O], // Nov 19, 2026: the order of each menu's recordings
       ["/admin/compliance", ShieldCheck, "Compliance", OS],
       ["/admin/phone/settings", PhoneForwarded, "Phone settings", O],
+      ["/admin/phone/timing", Gauge, "Phone timing", O], // every wait on the phone line (Phase 3, Nov 26, 2026)
       ["/admin/phone/music", Music, "Music", O], // Abraham, Nov 17, 2026: songs for waiting and payment
       ["/admin/phone/phonepay", CreditCard, "Sola PhonePay", O], // card payments by phone (Abraham, Nov 14, 2026)
       ["/admin/phone/card-blocks", CreditCard, "Card blocks", OS], // numbers blocked after too many declines (Nov 17, 2026)
