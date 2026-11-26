@@ -12,12 +12,12 @@ import { addDays } from "@/lib/dates";
  *    had different items). A Thursday to Sunday booking does not count as one of the Sundays. Delivery still has a
  *    minimum: $20 in Kiryas Joel, $30 in the nearby towns, $40 anywhere else in Orange County.
  */
-export type OfferSettings = { offerThuSunOn?: boolean | string; offerFourthSundayOn?: boolean | string };
+export type OfferSettings = { offerThuSunOn?: boolean | string; offerFourthSundayOn?: boolean | string; offersStacking?: string };
 const on = (v: unknown) => v === true || v === "true";
 
 /** The three switches, read inside the same database transaction as the booking (all off when never set). */
 export async function offerSwitches(exec: Exec): Promise<OfferSettings> {
-  const r = await exec.execute(sql`SELECT key, value FROM app_settings WHERE key IN ('offerThuSunOn', 'offerFourthSundayOn', 'holidayNoPromos', 'holidayPerDayChanukah', 'holidayPerDayCholHamoed', 'holidayFridayMutzeDays')`);
+  const r = await exec.execute(sql`SELECT key, value FROM app_settings WHERE key IN ('offerThuSunOn', 'offerFourthSundayOn', 'holidayNoPromos', 'holidayPerDayChanukah', 'holidayPerDayCholHamoed', 'holidayFridayMutzeDays', 'offersStacking')`);
   const out: Record<string, unknown> = {};
   for (const x of r.rows as { key: string; value: unknown }[]) out[x.key] = x.value;
   return out as OfferSettings;
@@ -132,6 +132,15 @@ export async function bestOfferFor(
   const cd = await customerDiscount();
   if (cd) options.push({ discountCents: discountCents(cd, full.reduce((t, l) => t + l.qty * l.unitPriceCents, 0)), note: discountNote(cd) });
   if (on(s.offerFourthSundayOn)) options.push({ discountCents: await fourthSundayDiscount(exec, { id: o.id, customerId: o.customerId, eventDate: o.eventDate }, full), note: OFFER_NOTES.fourthSunday });
+  // How offers combine (Admin handoff, Abraham, Nov 26, 2026): "best" (the default, as always) = only the biggest
+  // saving; "add" = the customer discount and the 4th Sunday both apply, on top of the laser half price, never more
+  // than the rentals cost
+  if (s.offersStacking === "add" && options.length) {
+    const rentals = ls.filter(isRental).reduce((t, l) => t + l.qty * l.unitPriceCents, 0);
+    const sum = options.reduce((t, x) => t + Math.max(0, x.discountCents), 0);
+    const kept = options.filter((x) => x.discountCents > 0);
+    return kept.length ? { discountCents: Math.min(sum, rentals), note: kept.map((x) => x.note).join(" + ") } : { discountCents: 0, note: null };
+  }
   const best = options.filter((x) => x.discountCents > half.cents).sort((a, b) => b.discountCents - a.discountCents)[0];
   // The lines keep their half price, so the offer takes off only what it saves beyond it (the same total either way)
   return best ? { discountCents: best.discountCents - half.cents, note: best.note } : { discountCents: 0, note: null };

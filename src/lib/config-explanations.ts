@@ -629,6 +629,12 @@ const OTHER: Record<string, Explanation> = {
     where: "Callers hearing a menu.",
     ifChanged: "Edited on the Menu order page; callers hear the new order.",
   },
+  offersStacking: {
+    what: "What happens when an order qualifies for more than one saving (a customer discount and the 4th Sunday free). \"best\": only the biggest saving applies (how it has always worked). \"add\": both apply together, on top of the laser tag half price, and the discount is never more than the rentals cost.",
+    where: "Customers: the discount on the order total on the phone, the payment link, the receipt and New booking. Thursday to Sunday, holiday weeks and closed-day prices never combine with anything, either way.",
+    ifChanged: "New orders are priced with the new rule; orders already placed keep their price.",
+    example: "A $300.00 order with a 10 percent customer discount ($30.00) that also gets a 4th Sunday worth $75.00: best takes off $75.00; add takes off $105.00.",
+  },
   paidPromoSkipOptedIn: {
     what: "After a card payment, skips Line 8 (the seasonal offers by text question) for a caller whose number already gets promotional texts.",
     where: "Callers who just paid by card on the phone, right before the last goodbye line.",

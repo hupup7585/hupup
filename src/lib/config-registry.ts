@@ -53,6 +53,7 @@ const EXACT: Record<string, Spec> = {
   adminLinkHoldMinutes: { mode: "edit", label: "Payment link hold, Admin New booking (minutes)", group: "Payments", type: "int", min: 1, max: 240 },
   nameSpeakingRate: { mode: "edit", label: "Speaking rate for names", group: "Phone: voice", type: "number", min: 0.5, max: 2 },
   paidPromoSkipOptedIn: { mode: "edit", label: "After payment, Line 8: skip it for callers who already get promotions", group: "Phone: after payment", type: "bool" },
+  offersStacking: { mode: "edit", label: "How offers combine", group: "Offers and discounts", type: "choice", choices: ["best", "add"] },
   disconnectSilenceMinutes: { mode: "edit", label: "Disconnect check: minutes of silence with items in the cart", group: "Phone: after payment", type: "int", min: 1, max: 10 },
   disconnectCheckSeconds: { mode: "edit", label: "Disconnect check: seconds to wait for a key", group: "Phone: after payment", type: "int", min: 1, max: 15 },
 

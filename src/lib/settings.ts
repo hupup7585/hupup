@@ -277,6 +277,8 @@ export const SETTING_DEFAULTS = {
   /** Line 8 after payment (Abraham, Nov 26, 2026; his answer is still open): skip the question for a caller who already gets promotions. */
   paidPromoSkipOptedIn: true,
   /** Disconnect ending (Abraham, Nov 26, 2026): minutes of silence with items in the cart before the disconnect check, and seconds to wait for a key. */
+  /** How offers combine (Admin handoff Phase 4, Nov 26, 2026): "best" = only the biggest saving (as always); "add" = they add up. */
+  offersStacking: "best",
   /** Phone timing (Admin handoff Phase 3): every wait on the phone line, defaults equal to the old built-in values. */
   ...TIMER_DEFAULTS,
   disconnectSilenceMinutes: "3",

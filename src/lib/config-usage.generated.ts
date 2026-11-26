@@ -881,6 +881,9 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/phone/settings/page.tsx",
   "lib/ivr/flow.ts"
  ],
+ "offersStacking": [
+  "lib/offers.ts"
+ ],
  "disconnectSilenceMinutes": [
   "app/admin/(app)/phone/settings/after-pay-actions.ts",
   "app/admin/(app)/phone/settings/page.tsx",
