@@ -59,6 +59,9 @@ export async function saveScreenDraft(screen: string, before: Editor, after: Edi
 export async function publishScreens(userId: number | null, reason: string) {
   const why = reason.trim();
   if (why.length < 3) throw new ScreenDraftError("Write a short reason for the change (it is kept in the history).");
+  // What keys may point at (items, recordings), read before the transaction (Hark's review item 4)
+  const { brokenKeys, loadKeyTargets } = await import("@/lib/screen-keys");
+  const targets = await loadKeyTargets();
   return inTx(async (tx) => {
     const draft = await raw(DRAFT_KEY, tx);
     if (!draft || typeof draft !== "object") throw new ScreenDraftError("There are no draft changes to publish.");
@@ -68,6 +71,9 @@ export async function publishScreens(userId: number | null, reason: string) {
     const { protectedKeyProblems, PROTECTED_REASON } = await import("@/lib/ivr/menu-editor");
     const bad = protectedKeyProblems(draft as never);
     if (bad.length) throw new ScreenDraftError(`Not published. ${PROTECTED_REASON} Remove these keys first: ${bad.join(", ")}.`);
+    // Hark's review item 4: every key's target is checked again (an item archived since, a recording removed ...)
+    const broken = brokenKeys(draft as never, targets);
+    if (broken.length) throw new ScreenDraftError(`Not published. These keys do not work: ${broken.map((b) => `${b.screen} key ${b.key} (${b.problem})`).join("; ")}`);
     await writeSettingValue(tx, LIVE_KEY, draft, userId);
     await writeSettingValue(tx, DRAFT_KEY, null, userId);
     await tx.update(schema.configVersions).set({ status: "replaced" }).where(and(eq(schema.configVersions.key, LIVE_KEY), eq(schema.configVersions.status, "live")));

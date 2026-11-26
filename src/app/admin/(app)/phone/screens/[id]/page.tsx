@@ -31,6 +31,9 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
   const preview = await previewScreen(id).catch(() => null); // Test this screen: a preview call, nothing saved
   const e = await editingEditor(); // the draft when there is one (draft first, Phase 3)
   const overrides = await loadPromptOverrides(); // to tell whether a combined recording still fits its lines
+  // Keys whose target no longer works (Hark's review item 4): an archived item, a removed recording ...
+  const { brokenKeys, loadKeyTargets } = await import("@/lib/screen-keys");
+  const broken = brokenKeys({ ...e, keys: { [id]: e.keys[id] ?? [] } }, await loadKeyTargets());
   const slots = allSlots(await catalogItems(), {}, await customSlots()).filter((x) => x.kind === "line");
   const recorded = new Set((await db.select({ key: schema.voicePrompts.key, rec: schema.voicePrompts.recordingId }).from(schema.voicePrompts)).filter((r) => r.rec).map((r) => r.key));
   const info = (ref: string): Info => {
@@ -197,6 +200,12 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
       {s.choice && (
         <section className="card my-5 p-5" data-screen-keys>
           <h2 className="mb-1 text-lg font-black">Keys</h2>
+          {broken.length > 0 && (
+            <div className="mb-3 rounded-xl border-2 border-[#C83A2F] bg-[#FFE6E4] p-3 text-sm font-semibold text-[#5C1A14]" data-broken-keys>
+              These keys do not work and stop the screens from being published until fixed:
+              <ul className="mt-1 list-disc pl-5">{broken.map((b) => <li key={b.key}>Key {b.key}: {b.problem}</li>)}</ul>
+            </div>
+          )}
           <p className="mb-3 text-sm text-muted">Star (go back) and pound (skip) stay as built. A key this screen does not use yet works only once its line is added and turned on.</p>
           <table className="mb-4 w-full text-sm">
             <thead><tr><th className="th">Key</th><th className="th">Now</th><th className="th"></th></tr></thead>

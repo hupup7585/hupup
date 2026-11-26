@@ -1,3 +1,4 @@
+import { NO_CONTRACTIONS_MESSAGE, hasContraction } from "@/lib/no-contractions";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Slot } from "@/lib/recording-slots";
@@ -79,7 +80,7 @@ function check(input: NewSlot, existing: { key: string; group: string }[]): { ok
   const plays = clean(input.plays ?? "");
   if (!name || !group || !text || !lookup) return { ok: false, message: "Fill in the slot name, the group, the exact text and the lookup key." };
   if (name.length > 120 || group.length > 60 || text.length > 1200 || lookup.length > 120 || plays.length > 200) return { ok: false, message: "Something is too long. Keep the name under 120 letters and the text under 1,200." };
-  if (/\b\w+'(t|s|re|ll|ve|d|m)\b/i.test(text) && !/\blet's\b/i.test(text)) return { ok: false, message: "No contractions in a prompt. Please write the words in full." };
+  if (hasContraction(text)) return { ok: false, message: NO_CONTRACTIONS_MESSAGE };
   const key = slotKeyFor(group, lookup);
   if (!key) return { ok: false, message: `The lookup key "${lookup}" does not fit the group ${group} (for example: a street's spoken name, zip 10930, unit 301, number 25, letter A).` };
   const dup = existing.find((e) => e.key === key);

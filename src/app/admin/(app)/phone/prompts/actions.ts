@@ -11,6 +11,11 @@ import { approvePrompt, getRecording, makeGoogleRecording, saveRecordingChunk, s
 /** Edit (Abraham, Nov 13, 2026): saves a new draft "Waiting for approval"; the live wording keeps playing. */
 export async function savePromptAction(key: string, text: string): Promise<{ ok: boolean; message: string }> {
   const s = await requireOwner();
+  // Spoken lines: no contractions, straight or curly apostrophes (Hark's review item 12); texts and emails are not spoken
+  const { PROMPTS } = await import("@/lib/ivr/prompts");
+  const def = (PROMPTS as Record<string, { message?: boolean }>)[key];
+  const { hasContraction, NO_CONTRACTIONS_MESSAGE } = await import("@/lib/no-contractions");
+  if (def && !def.message && hasContraction(text)) return { ok: false, message: NO_CONTRACTIONS_MESSAGE };
   try {
     await saveDraft(key, text, s.userId);
   } catch (e) {

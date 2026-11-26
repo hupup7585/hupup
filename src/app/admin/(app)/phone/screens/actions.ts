@@ -86,8 +86,10 @@ export async function setKeyAction(fd: FormData) {
     : type === "forward" ? { type, phone: v("phone") }
     : type === "item" ? { type, productId: Number(v("productId")) }
     : { type: "back" };
-  if (type === "text" && !("text" in action && action.text)) return back(screen, "err=Type the text to send.");
-  if (type === "forward" && !/\d{10}/.test(v("phone").replace(/\D/g, ""))) return back(screen, "err=Type the 10-digit phone number to forward to.");
+  // Every target must be real (Hark's review item 4): screen, extension, box, item, number and recordings
+  const { keyTargetProblem, loadKeyTargets } = await import("@/lib/screen-keys");
+  const problem = keyTargetProblem(action, await loadKeyTargets());
+  if (problem) return back(screen, `err=${encodeURIComponent(`Not saved. ${problem}`)}`);
   const e = await read();
   const r = setKey(e, screen, { key: v("key"), on: fd.get("on") === "on", line: v("line") || undefined, action });
   if ("error" in r) return back(screen, `err=${encodeURIComponent(r.error)}`);
