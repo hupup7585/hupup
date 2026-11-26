@@ -11,7 +11,7 @@ the baseline below: with no Admin setting changed, every phone step must play ex
 | Phone screens that wait for a key (Admin > Phone screens) | 86 | `src/lib/ivr/screens.ts` |
 | Recording slots defined | 485 (81 retired, kept for the record) | `src/lib/ivr/prompts.ts` |
 | Combined (whole-menu) recording slots | 32 | `whole_*` in `prompts.ts`, incl. `whole_stay_on_line`, `whole_skip_pound`, `whole_cart_key` |
-| Business settings with defaults | 157 | `SETTING_DEFAULTS` in `src/lib/settings.ts` |
+| Business settings with defaults | 157 at the Phase 1 baseline; 206 on Nov 26, 2026 (count them with `Object.keys(SETTING_DEFAULTS).length`, never a text search) | `SETTING_DEFAULTS` in `src/lib/settings.ts` |
 | Admin pages | 53 | `src/app/admin` |
 | Database tables | 89 | `src/lib/db/schema.ts` |
 
