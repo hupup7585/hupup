@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { configDefs } from "@/lib/config-registry";
 import { SETTING_DEFAULTS } from "@/lib/settings";
 
 /* Batch 2 item 7 (Abraham, Nov 25, 2026): every setting the system uses can be changed in Admin. */
@@ -20,7 +21,9 @@ const DYNAMIC = /^(ring[A-Za-z]+\d|music[A-Z]|timer[A-Z])/;
 describe("everything editable", () => {
   it("every setting has an Admin field (or is listed above with the reason)", () => {
     const admin = [...files("src/app/admin"), ...files("src/components")].map((f) => readFileSync(f, "utf8")).join("\n");
-    const missing = Object.keys(SETTING_DEFAULTS).filter((k) => !UNUSED.includes(k) && !DYNAMIC.test(k) && !new RegExp(`\\b${k}\\b`).test(admin));
+    // A setting marked editable in the registry is edited (draft first) on All settings, which lists every setting
+    const editable = new Set(configDefs().filter((d) => d.mode === "edit").map((d) => d.key));
+    const missing = Object.keys(SETTING_DEFAULTS).filter((k) => !UNUSED.includes(k) && !DYNAMIC.test(k) && !editable.has(k) && !new RegExp(`\\b${k}\\b`).test(admin));
     expect(missing).toEqual([]);
   });
   // (the generated where-used list and the explanations file name every setting, so they are left out)
