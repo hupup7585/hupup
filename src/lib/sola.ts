@@ -1,3 +1,4 @@
+import type { Prefill } from "@/lib/pay-prefill";
 import crypto from "node:crypto";
 import { config } from "@/lib/config";
 import { orderNumber } from "@/lib/orders";
@@ -51,15 +52,29 @@ export function paymentLink(o: {
   name?: string | null;
   email?: string | null;
   phone?: string | null;
+  /** Payment link prefill (Abraham, Nov 26, 2026, 13:25 ET): everything the order already has (src/lib/pay-prefill.ts). */
+  prefill?: Prefill;
 }): string | null {
   const site = process.env.SOLA_PAYMENTSITE_NAME;
   const params = new URLSearchParams({
     xAmount: (o.amountCents / 100).toFixed(2),
     xInvoice: invoiceFor(o.orderId),
   });
-  if (o.name) params.set("xName", o.name);
-  if (o.email) params.set("xEmail", o.email);
-  if (o.phone) params.set("xBillPhone", o.phone);
+  const f = o.prefill ?? {};
+  const name = f.name ?? o.name;
+  const email = f.email ?? o.email;
+  const phone = f.phone ?? o.phone;
+  if (name) params.set("xName", name);
+  if (email) params.set("xEmail", email);
+  if (phone) params.set("xBillPhone", phone);
+  // Billing and delivery fields on the secure page (filled in, still editable there); never card data
+  const both: [string, string | undefined][] = [["FirstName", f.firstName], ["LastName", f.lastName], ["Street", f.street], ["City", f.city], ["State", f.state], ["Zip", f.zip]];
+  for (const [k, v] of both) if (v) {
+    params.set(`xBill${k}`, v);
+    params.set(`xShip${k}`, v);
+  }
+  if (phone) params.set("xShipPhone", phone);
+  if (f.description) params.set("xDescription", f.description);
   params.set("xRedirectURL", `${config.siteUrl()}/paid?invoice=${invoiceFor(o.orderId)}`); // the real site, never vercel.app (item 7)
   if (!site) {
     if (!devPaymentFallbackAllowed()) {

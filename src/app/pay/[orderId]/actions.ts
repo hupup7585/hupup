@@ -1,9 +1,10 @@
 "use server";
+import { prefillFor } from "@/lib/pay-prefill";
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { config } from "@/lib/config";
-import { getPaymentGroup } from "@/lib/orders";
+import { getPaymentGroup, orderNumber } from "@/lib/orders";
 import { ensureGroupPriced } from "@/lib/order-pricing";
 import { PAYMENT_UNAVAILABLE, onlinePaymentReady, paymentLink } from "@/lib/sola";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, verifyPayToken } from "@/lib/rental-terms";
@@ -66,7 +67,7 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
   });
   // 10 minutes to finish on the secure card page (Sola can't tell us about typing there)
   if (linkRulesActive()) await holdForCardPage(group.orders.map((d) => d.order.id));
-  const link = paymentLink({ orderId: full.order.id, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone: full.customer?.phone });
+  const link = paymentLink({ orderId: full.order.id, amountCents: due, prefill: prefillFor(full, group.orders, `#${orderNumber(full.order.id)}`) });
   if (!link) return { error: PAYMENT_UNAVAILABLE };
   redirect(link);
 }

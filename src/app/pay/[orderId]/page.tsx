@@ -1,3 +1,4 @@
+import { prefillFor } from "@/lib/pay-prefill";
 import { paymentsClosedLine } from "@/lib/payments-closed";
 import { notFound, redirect } from "next/navigation";
 import { PAYMENT_UNAVAILABLE, onlinePaymentReady, paymentLink } from "@/lib/sola";
@@ -75,7 +76,7 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   // Live site while the Terms are still a draft: no Terms box, straight to the secure payment page (as before)
   if (!termsActive() && o.status === "PENDING_PAYMENT" && due > 0) {
     if (rules) await holdForCardPage(group.orders.map((d) => d.order.id)); // straight to the card page: 10 minutes there
-    const link = paymentLink({ orderId: o.id, amountCents: due, name: full.customer?.name, email: full.customer?.email, phone: full.customer?.phone });
+    const link = paymentLink({ orderId: o.id, amountCents: due, prefill: prefillFor(full, group.orders, `#${orderNumber(o.id)}`) });
     if (link) redirect(link);
   }
   return (

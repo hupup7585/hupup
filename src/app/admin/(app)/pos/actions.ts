@@ -197,7 +197,8 @@ export async function createBookingAction(input: {
     else {
       const { paymentLink } = await import("@/lib/sola");
       const full = await getOrderWithItems(r.orderId);
-      const link = paymentLink({ orderId: r.orderId, amountCents: full!.order.totalCents ?? full!.order.subtotalCents, name: full?.customer?.name, email: full?.customer?.email, phone: full?.customer?.phone });
+      const { prefillFor } = await import("@/lib/pay-prefill");
+      const link = paymentLink({ orderId: r.orderId, amountCents: full!.order.totalCents ?? full!.order.subtotalCents, prefill: prefillFor(full!, [full!], `#${orderNumber(r.orderId)}`) });
       if (link) {
         cardUrl = link;
         cardCents = full!.order.totalCents ?? full!.order.subtotalCents;
