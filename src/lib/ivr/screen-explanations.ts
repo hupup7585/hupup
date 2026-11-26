@@ -22,7 +22,7 @@ const S: Record<string, [what: string, where: string, ifChanged?: string]> = {
   "catalog-save": ["Offers to save the email address with the caller's phone number (key 1), or skip (pound).", "After the catalog email address is confirmed."],
   "catalog-send": ["Sends the catalog email and tells the caller it was sent (or that something went wrong).", "At the end of the catalog by email steps."],
   "receipt-email": ["Offers a receipt by email (key 1) or skip (pound).", "Near the end of checkout."],
-  "attraction": ["Lists the rentals in the chosen section and lets the caller pick one to hear about.", "Main menu key 3 (learn about our rentals), after choosing a section."],
+  "attraction": ["Lists the rentals in the chosen section and lets the caller pick one to hear about.", "Main menu key 6 (learn about our rentals), after choosing a section."],
   "attraction-options": ["After hearing about a rental: star to hear it again, key 1 for another rental, key 2 for the main menu.", "Learn about our rentals, after a description."],
   "book": ["The bookings menu: jumping balloons (key 1), laser tag (key 2), paddle boats (key 3), the catalog (key 8), customer service (key 0) and schools and organizations (key 9).", "Main menu key 1."],
   "resume": ["Welcome back: offers to check whether last call's cart is still available.", "A caller who left items in the cart on an earlier call, right after choosing to book."],
@@ -43,7 +43,7 @@ const S: Record<string, [what: string, where: string, ifChanged?: string]> = {
   "added-second": ["Confirms the item was added and offers to add a second one (key 1).", "Right after adding laser tag or paddle boats to the cart."],
   "added-menu": ["Confirms the item was added: key 1 keep shopping for the same day, key 2 another day, key 9 ocean balls or another laser set when offered, key 0 the cart.", "Right after adding an item to the cart."],
   "ocean": ["Offers ocean balls for the ball pit (key 1 for 200, key 2 for 500, and so on) or skip.", "After adding a ball pit rental."],
-  "cart": ["Reads the shopping cart by day and the total: key 1 check out, key 2 keep shopping, key 3 remove an item, key 4 empty the cart and start over, key 9 add ocean balls when offered.", "Bookings menu key 0, or from any shopping step."],
+  "cart": ["Reads the shopping cart by day and the total: key 1 check out, key 2 keep shopping, key 3 remove an item, key 4 empty the cart and start over, key 9 add ocean balls when offered.", "Key 0 right after an item is added, or the shopping steps that offer the cart. (Key 0 on the bookings menu rings customer service.)"],
   "remove": ["Lists the cart items with a number each; the caller presses the number of the item to remove.", "In the shopping cart, after pressing 3 to remove an item."],
   "remove-qty": ["Asks how many of that item to remove.", "After choosing an item to remove that has more than one."],
   "ask": ["Asks the caller to say a detail (for example their name); key 9 types it on the keypad instead.", "During checkout, for each spoken detail."],
@@ -94,7 +94,7 @@ const S: Record<string, [what: string, where: string, ifChanged?: string]> = {
   "vm-options": ["After leaving a voicemail: key 1 send, key 2 listen, key 3 delete and record again.", "Any caller leaving a voicemail."],
   "vm-none": ["Says no message was recorded: key 3 to try again.", "When a caller left the voicemail silent."],
   "instructions": ["Equipment instructions: jumping balloons (key 1), laser tag (key 2), paddle boats (key 3).", "Main menu key 2."],
-  "learn": ["Learn about our rentals: choose a section to hear about.", "Main menu key 3."],
+  "learn": ["Learn about our rentals: choose a section to hear about.", "Main menu key 6."],
   "hours": ["Plays the customer service hours, including Friday.", "Main menu key 7."],
 };
 

@@ -20,8 +20,6 @@ export async function saveAfterPayAction(form: FormData) {
   else {
     const before = await getSettings();
     const skip = form.get("paidPromoSkipOptedIn") === "on";
-    const goodbye = form.get("disconnectGoodbyeOn") === "on";
-    await saveSetting("disconnectGoodbyeOn", goodbye, owner.userId);
     await saveSetting("paidPromoSkipOptedIn", skip, owner.userId);
     await saveSetting("disconnectSilenceMinutes", String(minutes), owner.userId);
     await saveSetting("disconnectCheckSeconds", String(seconds), owner.userId);
@@ -30,8 +28,8 @@ export async function saveAfterPayAction(form: FormData) {
       action: "settings.after_payment_updated",
       entityType: "settings",
       entityId: "after_payment",
-      before: { disconnectGoodbyeOn: before.disconnectGoodbyeOn, paidPromoSkipOptedIn: before.paidPromoSkipOptedIn, disconnectSilenceMinutes: before.disconnectSilenceMinutes, disconnectCheckSeconds: before.disconnectCheckSeconds },
-      after: { disconnectGoodbyeOn: goodbye, paidPromoSkipOptedIn: skip, disconnectSilenceMinutes: String(minutes), disconnectCheckSeconds: String(seconds) },
+      before: { paidPromoSkipOptedIn: before.paidPromoSkipOptedIn, disconnectSilenceMinutes: before.disconnectSilenceMinutes, disconnectCheckSeconds: before.disconnectCheckSeconds },
+      after: { paidPromoSkipOptedIn: skip, disconnectSilenceMinutes: String(minutes), disconnectCheckSeconds: String(seconds) },
     });
     revalidatePath("/admin/phone/settings");
   }

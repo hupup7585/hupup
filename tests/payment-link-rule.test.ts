@@ -155,8 +155,13 @@ describe("expired link, item gone: the nearest options per item and per day (Abr
     ]);
     // a made-up choice (not offered) is refused
     expect(await chooseLinkOption(sara.id, 0, mid.id, day)).toBe(false);
-    // same day, a size bigger: added to the same order and re-priced
+    // same day, a size bigger: added to the same order and re-priced; held for the Admin phone hold (Hark's review H7)
+    const { saveSetting } = await import("@/lib/settings");
+    await saveSetting("phoneLinkHoldMinutes" as never, "15" as never);
+    const before = Date.now();
     expect(await chooseLinkOption(sara.id, 0, big.id, day)).toBe(true);
+    expect(Math.round(((await get(sara.id)).holdExpiresAt!.getTime() - before) / MIN)).toBe(15);
+    await saveSetting("phoneLinkHoldMinutes" as never, "10" as never);
     const lines = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, sara.id));
     expect(lines.map((l) => l.productId).sort()).toEqual([big.id, laser.id].sort());
     expect((await get(sara.id)).subtotalCents).toBe(55000);

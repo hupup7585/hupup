@@ -185,14 +185,15 @@ describe("disconnect ending: items in the cart, silent", () => {
     expect(x).not.toContain("<Hangup/>");
     expect(redirect(x)).toMatch(/^cart\?nk=/);
   });
-  it("after 3 minutes: the disconnect check; no key in 3 seconds = Line 7 and the call ends", async () => {
+  it("after 3 minutes: the disconnect check; no key in 3 seconds = the disconnect line and the call ends (never Line 7)", async () => {
     withCart();
     const x = await call("idle", {}, `to=cart&nk=${ago(181_000)}`);
-    expect(said(x)).toEqual([CHECK, LINE7]);
+    expect(said(x)).toEqual([CHECK, PROMPTS.no_input_final.text]); // Abraham, 12:27 ET: the disconnect line only, never Line 7
     expect(gather(x)).toContain('timeout="3"');
     expect(gather(x)).toContain('finishOnKey=""');
     expect(x.indexOf(CHECK)).toBeLessThan(x.indexOf("</Gather>"));
-    expect(x.indexOf(LINE7)).toBeGreaterThan(x.indexOf("</Gather>"));
+    expect(x.indexOf(PROMPTS.no_input_final.text)).toBeGreaterThan(x.indexOf("</Gather>"));
+    expect(said(x)).not.toContain(LINE7);
     expect(x.trim().endsWith("<Hangup/></Response>")).toBe(true);
   });
   it("any key returns the caller to the exact step they were on", async () => {
@@ -206,7 +207,7 @@ describe("disconnect ending: items in the cart, silent", () => {
   it("the main menu with items in the cart: the same check after 3 minutes instead of the 3-play end", async () => {
     withCart();
     expect(said(await call("no-key", {}, `to=menu&np=3&t0=${ago(60_000)}`))).not.toContain(LINE7);
-    expect(said(await call("no-key", {}, `to=menu&np=5&t0=${ago(181_000)}`))).toEqual([CHECK, LINE7]);
+    expect(said(await call("no-key", {}, `to=menu&np=5&t0=${ago(181_000)}`))).toEqual([CHECK, PROMPTS.no_input_final.text]);
   });
   it("the 3 minutes and the 3 seconds come from Admin", async () => {
     withCart();
@@ -217,29 +218,25 @@ describe("disconnect ending: items in the cart, silent", () => {
     await saveSetting("disconnectSilenceMinutes", "3", null);
     await saveSetting("disconnectCheckSeconds", "3", null);
   });
-  it("empty cart: today's timing (1 minute), no disconnect check; Line 7 right before the hang-up (Abraham, 09:53 ET)", async () => {
+  it("empty cart: today's timing (1 minute), no disconnect check, the disconnect line only, never Line 7 (Abraham, 12:27 ET)", async () => {
     h.session.data = {};
     const early = await call("idle", {}, `to=book&nk=${ago(30_000)}`);
     expect(said(early)).toEqual(["We did not get your choice. Please try again."]);
     expect(early).not.toContain("<Hangup/>");
     const end = await call("idle", {}, `to=book&nk=${ago(61_000)}`);
-    expect(said(end)).not.toContain(CHECK);
-    expect(said(end)).toEqual([PROMPTS.no_input_final.text, LINE7]);
-    expect(end.trim().endsWith(`${LINE7}</Say><Hangup/></Response>`)).toBe(true);
+    expect(said(end)).toEqual([PROMPTS.no_input_final.text]);
+    expect(end).toContain("<Hangup/>");
   });
-  it("a caller who never ordered, silent on the main menu: Line 7 before the hang-up; the 3-play timing is unchanged", async () => {
+  it("a caller who never ordered, silent on the main menu: the disconnect line only; the 3-play timing is unchanged", async () => {
     h.session.data = {};
     expect(await call("no-key", {}, `to=menu&np=2&t0=${ago(60_000)}`)).not.toContain("<Hangup/>");
     const end = await call("no-key", {}, `to=menu&np=3&t0=${ago(21_000)}`);
-    expect(said(end)).toEqual([PROMPTS.no_input_final.text, LINE7]);
-    expect(end).toContain("<Hangup/>");
-  });
-  it("the Admin switch (on by default) turns Line 7 off on those hang-ups; the timing stays the same", async () => {
-    h.session.data = {};
-    await saveSetting("disconnectGoodbyeOn", false, null);
-    const end = await call("idle", {}, `to=book&nk=${ago(61_000)}`);
     expect(said(end)).toEqual([PROMPTS.no_input_final.text]);
     expect(end).toContain("<Hangup/>");
-    await saveSetting("disconnectGoodbyeOn", true, null);
+  });
+  it("Line 7 plays only at the end of a paid call (after Line 8), never on a silent or dropped call", () => {
+    const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
+    expect(flow.match(/"disconnect_goodbye"/g)).toHaveLength(1);
+    expect(flow).toMatch(/async goodbye\(ctx, vr\)[\s\S]{0,400}group\.due <= 0\) sp\(vr, ctx, "disconnect_goodbye"\)/);
   });
 });

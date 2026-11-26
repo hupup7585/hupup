@@ -147,7 +147,7 @@ describe("section 4: the unit step (no skip) and the unit question", () => {
     expect(redirect(q)).toMatch(/^idle\?to=addr-unit-ask/);
     const noKey = await call("idle", {}, `to=addr-unit-ask&nk=${Date.now()}`);
     expect(said(noKey)).toEqual(["We did not get your choice. Please try again."]);
-    // Items in the cart (Abraham, Nov 26, 2026): no 1-minute end; after 3 minutes, the disconnect check, then Line 7
+    // Items in the cart (Abraham, Nov 26, 2026): no 1-minute end; after 3 minutes, the disconnect check, then the disconnect line
     const minute = await call("idle", {}, `to=addr-unit-ask&nk=${Date.now() - NO_KEY_END_MS - 1000}`);
     expect(minute).not.toContain("<Hangup/>");
     const end = await call("idle", {}, `to=addr-unit-ask&nk=${Date.now() - 181_000}`);

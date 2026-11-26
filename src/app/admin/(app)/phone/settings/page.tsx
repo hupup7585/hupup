@@ -88,17 +88,13 @@ export default async function PhoneSettingsPage({ searchParams }: { searchParams
         <p className="mb-3 text-sm text-muted">
           After a card payment the caller hears Lines 1 to 5, then the offers question (Line 8), then the goodbye (Line 7), and the call ends. A caller with
           items in the cart who presses nothing for the minutes below hears &ldquo;It sounds like we got disconnected. To continue, press any key.&rdquo; Any key
-          returns them to the same step; with no key in the seconds below, the goodbye plays and the call ends. An empty cart keeps the usual timing.
+          returns them to the same step; with no key in the seconds below, the disconnect line plays and the call ends. An empty cart keeps the usual timing.
         </p>
         {ap && <p className={`mb-3 rounded-xl p-3 text-sm font-semibold ${ap.startsWith("Saved") ? "bg-mint/15 text-[#13895C]" : "bg-[#FFE6E4] text-[#C83A2F]"}`} role="status">{ap}</p>}
         <form action={saveAfterPayAction} className="grid gap-3 text-sm">
           <label className="flex items-start gap-2">
             <input type="checkbox" name="paidPromoSkipOptedIn" defaultChecked={Boolean(settings.paidPromoSkipOptedIn)} />
             <span>Skip the offers question (Line 8) for callers who already get promotional texts. Now: {settings.paidPromoSkipOptedIn ? "on" : "off"}.</span>
-          </label>
-          <label className="flex items-start gap-2">
-            <input type="checkbox" name="disconnectGoodbyeOn" defaultChecked={Boolean(settings.disconnectGoodbyeOn)} />
-            <span>Play the goodbye (Line 7) before every automatic hang-up on a silent call, also for callers who never ordered. Now: {settings.disconnectGoodbyeOn ? "on" : "off"}.</span>
           </label>
           <label className="grid gap-1">
             <span className="font-semibold">Minutes of silence with items in the cart before the disconnect check (now {settings.disconnectSilenceMinutes})</span>

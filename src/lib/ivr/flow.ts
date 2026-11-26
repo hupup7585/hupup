@@ -472,7 +472,8 @@ function repeatMenu(vr: VR, ctx: Ctx, action: string, params: Record<string, str
  */
 async function cartGone(vr: VR, ctx: Ctx) {
   await track(ctx.callSid, "step", "Cart hold ran out (no keys pressed): call ended");
-  await silentGoodbye(vr, ctx);
+  // Abraham, Nov 26, 2026, 12:27 ET: every silent or dropped call ends with the disconnect line only (never Line 7)
+  sp(vr, ctx, "no_input_final");
   vr.hangup();
   return vr;
 }
@@ -597,16 +598,9 @@ function toStep(vr: VR, ctx: Ctx, extra: Record<string, string | number | undefi
 /*
  * Disconnect ending (Abraham, Nov 26, 2026, 08:56 to 09:49 ET): a caller with items in the cart who presses nothing for
  * the Admin silence time (3 minutes) hears "It sounds like we got disconnected. To continue, press any key." Any key:
- * back to the exact step. No key within the Admin wait (3 seconds): Line 7, the disconnect goodbye, and the call ends.
- * An empty cart keeps the usual no-key timing, with Line 7 added before the hang-up (silentGoodbye).
+ * back to the exact step. No key within the Admin wait (3 seconds): the disconnect line and the call ends. An empty
+ * cart keeps the usual no-key timing. Line 7 plays only at the end of a paid call (Abraham, Nov 26, 2026, 12:27 ET).
  */
-/**
- * Line 7 before every automatic hang-up on a silent call, also for callers who never ordered (Abraham, Nov 26, 2026,
- * 09:53 ET). The silence timing is unchanged; only the line is added. Admin switch, on by default.
- */
-async function silentGoodbye(vr: VR, ctx: Ctx) {
-  if ((await getSettings()).disconnectGoodbyeOn) sp(vr, ctx, "disconnect_goodbye");
-}
 async function cartSilence(ctx: Ctx) {
   return (await callOrders(ctx)).length > 0;
 }
@@ -623,7 +617,7 @@ async function disconnectCheck(vr: VR, ctx: Ctx) {
   await track(ctx.callSid, "step", "Disconnect check: no key with items in the cart");
   const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: wait, finishOnKey: "", action: url("disconnect-key", { to: ctx.query.get("to") || "menu", q: ctx.query.get("q") || undefined }), method: "POST" });
   sp(g, ctx, "disconnect_check");
-  sp(vr, ctx, "disconnect_goodbye");
+  sp(vr, ctx, "no_input_final"); // no key: the disconnect line only, then the call ends (Abraham, 12:27 ET)
   vr.hangup();
   return vr;
 }
@@ -1676,7 +1670,6 @@ const handlers: Record<string, Handler> = {
     if (await cartSilence(ctx)) return (await disconnectCheckDue(t0)) ? disconnectCheck(vr, ctx) : toStep(vr, ctx, { np, t0 });
     if (np >= T(vr, "timerMenuPlays") && Date.now() - t0 >= T(vr, "timerMenuMinSeconds") * 1000) {
       sp(vr, ctx, "no_input_final");
-      await silentGoodbye(vr, ctx);
       vr.hangup(); // a voicemail waiting for 1, 2 or 3 is kept when the call ends
       return vr;
     }
@@ -1698,7 +1691,6 @@ const handlers: Record<string, Handler> = {
     }
     if (Date.now() - nk >= T(vr, "timerNoKeyEnd") * 1000) {
       sp(vr, ctx, "no_input_final");
-      await silentGoodbye(vr, ctx);
       vr.hangup();
       return vr;
     }

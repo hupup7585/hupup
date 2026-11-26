@@ -30,17 +30,26 @@ const ACCOUNTANT = "This is a tax and bookkeeping question: ask your accountant 
 
 /* ---------- Ring lists (main-menu keys 0, 2, 4, 5, 6 and 8) ---------- */
 const LINE_NAMES: Record<string, string> = {
-  "0": "Operator (key 0, speak to someone)",
-  "2": "Equipment Instructions and Guidance (key 2)",
-  "4": "Customer Service (key 4)",
-  "5": "Rental Issues (key 5)",
-  "6": "Delivery and Pickup (key 6)",
-  "8": "Schools, Corporate Events and Organizations (key 8)",
+  "0": "the Operator line (extension 0)",
+  "2": "the Equipment Instructions and Guidance line (extension 2)",
+  "4": "the Customer Service line (extension 3)",
+  "5": "the Rental Issues line (extension 4)",
+  "6": "the Delivery and Pickup line (extension 5)",
+  "8": "the Schools, Corporate Events and Organizations line",
+};
+/** Who reaches each line (Hark's review M3, Nov 26, 2026: the keys callers really press, from the call flow). */
+const REACHED_BY: Record<string, string> = {
+  "0": "A caller who presses 0 on the main menu",
+  "2": "A caller sent here by a key set in Admin (no built-in key rings this line now; main-menu key 2 plays the instructions menu)",
+  "4": "A caller who presses 3 on the main menu, or 0 on the bookings menu during customer service hours",
+  "5": "A caller who presses 4 on the main menu",
+  "6": "A caller who presses 5 on the main menu",
+  "8": "A caller who presses 9 on the bookings menu",
 };
 
 function ringFamily(k: string): Record<string, Explanation> {
   const line = LINE_NAMES[k];
-  const caller = `A caller who presses ${k} on the main menu`;
+  const caller = REACHED_BY[k];
   const out: Record<string, Explanation> = {
     [`ringAttempts${k}`]: {
       what: `How many times the phone line goes through the whole ring list for ${line} before the caller is sent to that line's voicemail.`,
@@ -54,22 +63,22 @@ function ringFamily(k: string): Record<string, Explanation> {
     },
     [`ringAfterFrom${k}`]: {
       what: `The earliest time of day (Eastern time, 24-hour clock, for example 08:00) that ${line} rings after hours. Blank means no limit.`,
-      where: `Used only when "rings after hours" is on for this line, for callers who press ${k} outside office hours.`,
+      where: `Used only when "rings after hours" is on for this line. ${caller}, outside office hours.`,
       ifChanged: "A call before this time goes to voicemail instead of ringing staff. Leave it blank to ring at any after-hours time.",
     },
     [`ringAfterTo${k}`]: {
       what: `The latest time of day (Eastern time, 24-hour clock, for example 22:30) that ${line} rings after hours. Blank means no limit.`,
-      where: `Used only when "rings after hours" is on for this line, for callers who press ${k} late in the evening.`,
+      where: `Used only when "rings after hours" is on for this line. ${caller}, late in the evening.`,
       ifChanged: "A call after this time goes to voicemail instead of ringing staff.",
     },
     [`ringErevTo${k}`]: {
       what: `On Friday and Erev Yom Tov, the latest time of day (Eastern time, 24-hour clock) that ${line} rings. Blank means the normal rule.`,
-      where: `Callers who press ${k} on a Friday or Erev Yom Tov afternoon.`,
-      ifChanged: "Ringing stops at this time or at the minutes-before-candle-lighting limit below, whichever comes first; later callers go to voicemail.",
+      where: `${caller}, on a Friday or Erev Yom Tov afternoon.`,
+      ifChanged: "Today the phone uses the later of this time and the minutes-before-candle-lighting limit below (which one should win is being confirmed with the Owner); after that, callers go to voicemail.",
     },
     [`ringErevBefore${k}`]: {
       what: `On Friday and Erev Yom Tov, how many minutes before candle lighting ${line} stops ringing. 0 means no extra limit.`,
-      where: `Callers who press ${k} close to Shabbes or Yom Tov.`,
+      where: `${caller}, close to Shabbes or Yom Tov.`,
       ifChanged: "A bigger number stops ringing earlier in the afternoon. For example, 60 stops ringing one hour before candle lighting.",
     },
     [`ringAnnounce${k}`]: {
@@ -619,11 +628,6 @@ const OTHER: Record<string, Explanation> = {
     what: "After a card payment, skips Line 8 (the seasonal offers by text question) for a caller whose number already gets promotional texts.",
     where: "Callers who just paid by card on the phone, right before the last goodbye line.",
     ifChanged: "Off: every paying caller hears the offers question, even if already signed up. A number that replied STOP never hears it either way.",
-  },
-  disconnectGoodbyeOn: {
-    what: "Plays Line 7 (\"We look forward serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!\") right before the phone hangs up on a caller who stopped pressing keys, including callers who never ordered.",
-    where: "Callers who stay silent until the phone ends the call: after the usual disconnect line on a menu, and when a cart's hold runs out.",
-    ifChanged: "Off: those calls end exactly as before, without Line 7. The silence timing is the same either way. Callers with items in the cart who are silent for the minutes below always hear Line 7 after the disconnect check.",
   },
   disconnectSilenceMinutes: {
     what: "How many minutes a caller with items in the cart can stay silent (no key pressed) before the phone asks whether the call got disconnected.",

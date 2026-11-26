@@ -5,7 +5,7 @@ import { getSettings } from "@/lib/settings";
 import { configDefs } from "@/lib/config-registry";
 import { ACCOUNTANT_NOTE } from "@/lib/config-explanations";
 import { db, schema } from "@/lib/db";
-import { FEATURE_SWITCHES } from "@/lib/feature-switches";
+import { featureSwitches } from "@/lib/feature-switches";
 import { unwrap } from "@/lib/config-versions";
 import { discardAction, publishAction, saveDraftAction, undoAction } from "./actions";
 import { OK_MESSAGES } from "./messages";
@@ -138,7 +138,7 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
         <table className="w-full text-sm">
           <thead><tr><th className="th">Feature</th><th className="th">Now</th><th className="th">Switch here</th><th className="th">Waits for</th></tr></thead>
           <tbody>
-            {FEATURE_SWITCHES.map((f) => (
+            {featureSwitches(live).map((f) => (
               <tr key={f.id} data-switch={f.id}>
                 <td className="td font-semibold">{f.label}</td>
                 <td className="td">{f.state}</td>

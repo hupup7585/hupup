@@ -700,7 +700,7 @@ export const SCREENS: Record<string, ScreenInfo> = {
     "lines": [
       "phonepay_choice"
     ],
-    "keys": "1",
+    "keys": "12",
     "combos": []
   },
   "phonepay-go": {

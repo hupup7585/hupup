@@ -68,3 +68,26 @@ describe("every phone screen is explained", () => {
     expect(readFileSync("src/app/admin/(app)/phone/screens/page.tsx", "utf8")).toContain("data-screen-what");
   });
 });
+
+describe("Hark's review M3: key numbers in explanations match the call flow", () => {
+  const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
+  const menu = flow.slice(flow.indexOf('async "menu-choice"'), flow.indexOf('async "menu-choice"') + 2500);
+  const ringFor = (key: string) => menu.match(new RegExp(`case "${key}":[^\\n]*\\n\\s*return back\\(vr, "ring", \\{ k: "(\\d)" \\}\\)`))?.[1];
+  it("main-menu keys 3, 4 and 5 ring lines 4, 5 and 6, and the explanations say so", () => {
+    for (const [press, line] of [["3", "4"], ["4", "5"], ["5", "6"]]) {
+      expect(ringFor(press), press).toBe(line);
+      expect(CONFIG_EXPLANATIONS[`ringTargets${line}`].where).toContain(`presses ${press} on the main menu`);
+    }
+    expect(CONFIG_EXPLANATIONS.ringTargets8.where).toContain("9 on the bookings menu");
+    expect(flow).toContain('if (d === "9") return back(vr, "ring", { k: "8" })');
+  });
+  it("learn about rentals is main-menu key 6; the cart is not bookings key 0", () => {
+    expect(menu).toMatch(/case "6":\s*return back\(vr, "learn"\)/);
+    expect(SCREEN_EXPLANATIONS.learn.where).toContain("key 6");
+    expect(SCREEN_EXPLANATIONS.attraction.where).toContain("key 6");
+    expect(SCREEN_EXPLANATIONS.cart.where).not.toMatch(/^Bookings menu key 0/);
+  });
+  it("pay-choice lists both keys that work (L6)", () => {
+    expect(SCREENS["pay-choice"].keys).toBe("12");
+  });
+});

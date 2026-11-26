@@ -67,7 +67,7 @@ describe("the registry: an explicit entry for every setting", () => {
     for (const v of ["0", "241", "abc", "2.5", "0x10", "1e2", " "]) expect(validateConfig(hold, v).ok, v).toBe(false);
     expect(validateConfig(configDef("nameSpeakingRate")!, "1.25")).toEqual({ ok: true, value: "1.25" });
     expect(validateConfig(configDef("timerNoKey")!, "31").ok).toBe(false);
-    expect(validateConfig(configDef("disconnectGoodbyeOn")!, "off")).toEqual({ ok: true, value: false });
+    expect(validateConfig(configDef("paidPromoSkipOptedIn")!, "off")).toEqual({ ok: true, value: false });
   });
 });
 
@@ -154,5 +154,17 @@ describe("Admin page, permissions and switches", () => {
     for (const id of ["join_invite", "stripe_phone_pay", "live_refunds", "vm_call_out", "hebrew_dates", "directory_lookup", "pay_dates"]) expect(ids).toContain(id);
     expect(FEATURE_SWITCHES.find((f) => f.id === "join_invite")?.state).toBe("Off");
     expect(readFileSync("src/app/admin/(app)/config/page.tsx", "utf8")).toContain("Needs Claude to connect");
+  });
+});
+
+describe("Hark's review M10: the feature switch list", () => {
+  it("lists the held features and switch settings, in plain words, with real states", async () => {
+    const { featureSwitches, MODE_WORDS } = await import("@/lib/feature-switches");
+    const list = featureSwitches();
+    const ids = list.map((f) => f.id);
+    for (const id of ["vm_access", "speech_to_text", "phone_receipt", "invoice_email", "link_wording", "options_wording", "late_email", "sms_catalog_reply", "website_catalog_form", "new_email", "call_recording", "google_voice", "sola_phonepay", "sola_listen", "delivery_promo", "achird_whole_line"]) expect(ids, id).toContain(id);
+    for (const f of list) expect(Object.keys(MODE_WORDS).filter((k) => k.includes("_"))).not.toContain(f.state); // no code words
+    expect(list.find((f) => f.id === "stripe_phone_pay")?.state).toBe("Off");
+    expect(featureSwitches({ ...(await import("@/lib/settings")).SETTING_DEFAULTS, phoneCardProvider: "stripe" }).find((f) => f.id === "stripe_phone_pay")?.state).toBe("Owner test numbers only");
   });
 });

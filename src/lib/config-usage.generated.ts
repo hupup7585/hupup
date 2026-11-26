@@ -52,7 +52,8 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "deliveryPromoOn": [
   "app/admin/(app)/delivery-settings/area-actions.ts",
   "app/admin/(app)/delivery-settings/page.tsx",
-  "lib/delivery-areas.ts"
+  "lib/delivery-areas.ts",
+  "lib/feature-switches.ts"
  ],
  "laserThirdSetHalfOn": [
   "app/admin/(app)/offers/actions.ts",
@@ -184,6 +185,7 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "solaPhonePayOn": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
+  "lib/feature-switches.ts",
   "lib/sola-phonepay.ts",
   "lib/stripe-pay-voice.ts"
  ],
@@ -252,6 +254,7 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "solaListenOn": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
+  "lib/feature-switches.ts",
   "lib/ivr/flow.ts",
   "lib/phonepay-watch.ts"
  ],
@@ -312,6 +315,7 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "phoneCardProvider": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
+  "lib/feature-switches.ts",
   "lib/ivr/flow.ts",
   "lib/phone-pay.ts"
  ],
@@ -323,12 +327,14 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "achirdWholeLine": [
   "app/admin/(app)/phone/prompts/slots/actions.ts",
   "app/admin/(app)/phone/prompts/slots/page.tsx",
+  "lib/feature-switches.ts",
   "lib/ivr/prompts.ts"
  ],
  "googleLiveVoice": [
   "app/admin/(app)/phone/prompts/slots/actions.ts",
   "app/admin/(app)/phone/prompts/slots/page.tsx",
   "app/api/voice-audio/live/route.ts",
+  "lib/feature-switches.ts",
   "lib/ivr/prompts.ts"
  ],
  "smsTestOnly": [
@@ -803,6 +809,7 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/phone/settings/page.tsx",
   "app/admin/(app)/settings/RecordingForm.tsx",
   "app/admin/(app)/settings/recording-actions.ts",
+  "lib/feature-switches.ts",
   "lib/ivr/flow.ts",
   "lib/system-status.ts"
  ],
@@ -870,11 +877,6 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "lib/site-content.ts"
  ],
  "paidPromoSkipOptedIn": [
-  "app/admin/(app)/phone/settings/after-pay-actions.ts",
-  "app/admin/(app)/phone/settings/page.tsx",
-  "lib/ivr/flow.ts"
- ],
- "disconnectGoodbyeOn": [
   "app/admin/(app)/phone/settings/after-pay-actions.ts",
   "app/admin/(app)/phone/settings/page.tsx",
   "lib/ivr/flow.ts"

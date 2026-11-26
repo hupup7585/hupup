@@ -3,7 +3,7 @@ import { db, schema } from "@/lib/db";
 import { checkBookable, getUsage, pickupDateFor, usedOn, lastHeldDay } from "@/lib/availability";
 import { addDays } from "@/lib/dates";
 import { nearbyDays, nearestSize } from "@/lib/alternatives";
-import { getSettings } from "@/lib/settings";
+import { getSettings, linkHoldMinutes } from "@/lib/settings";
 import { ensurePriced } from "@/lib/order-pricing";
 import { config } from "@/lib/config";
 import { sendEmail } from "@/lib/notify";
@@ -170,11 +170,14 @@ export async function chooseLinkOption(primaryId: number, index: number, product
   const cal = await getSettings();
   const pickup = pickupDateFor(date, cal);
   const touched = new Set<number>();
+  // The Admin hold settings (Hark's review H7, Nov 26, 2026): not fixed 25 and 10 minutes
+  const holdFor = { phone: await linkHoldMinutes("phone"), admin: await linkHoldMinutes("admin") };
   const ok = await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`);
     const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, productId)).limit(1);
     const [primary] = await tx.select().from(schema.orders).where(eq(schema.orders.id, primaryId)).limit(1);
     if (!p?.active || !primary) return false;
+    const holdMin = primary.channel === "POS" ? holdFor.admin : holdFor.phone;
     if ((await checkBookable(p.id, p.quantity, date, tx, pickup)) < entry.qty) return false;
     const groupIds = primary.paymentGroupId
       ? (await tx.select({ id: schema.orders.id }).from(schema.orders).where(eq(schema.orders.paymentGroupId, primary.paymentGroupId))).map((r) => r.id)
@@ -195,7 +198,7 @@ export async function chooseLinkOption(primaryId: number, index: number, product
       if (!primary.paymentGroupId) await tx.update(schema.orders).set({ paymentGroupId: gid }).where(eq(schema.orders.id, primary.id));
       const [created] = await tx
         .insert(schema.orders)
-        .values({ status: "PENDING_PAYMENT", channel: primary.channel, eventDate: date, pickupDate: pickup, customerId: primary.customerId, deliveryAddress: primary.deliveryAddress, paymentGroupId: gid, holdExpiresAt: inMinutes(primary.channel === "POS" ? 25 : 10, now), callSid: primary.callSid })
+        .values({ status: "PENDING_PAYMENT", channel: primary.channel, eventDate: date, pickupDate: pickup, customerId: primary.customerId, deliveryAddress: primary.deliveryAddress, paymentGroupId: gid, holdExpiresAt: inMinutes(holdMin, now), callSid: primary.callSid })
         .returning();
       target = created;
     }
@@ -206,7 +209,7 @@ export async function chooseLinkOption(primaryId: number, index: number, product
       .update(schema.orders)
       .set({
         status: "PENDING_PAYMENT",
-        holdExpiresAt: inMinutes(primary.channel === "POS" ? 25 : 10, now),
+        holdExpiresAt: inMinutes(holdMin, now),
         subtotalCents: sql`COALESCE((SELECT SUM(qty * unit_price_cents) FROM order_items WHERE order_id = ${target.id}), 0)`,
         totalCents: null,
         updatedAt: now,
