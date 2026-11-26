@@ -32,7 +32,7 @@ import { handleVoice } from "@/lib/ivr/flow";
 import { PROMPTS } from "@/lib/ivr/prompts";
 import { PROMO_ENROLLED_SMS } from "@/lib/sms-terms-v2";
 
-const ASK = "To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1. To skip, press pound.";
+const ASK = "Would you like to receive our seasonal offers by text? You will get up to 5 messages a year. To sign up, press 1. To skip, press pound."; // Line 8 (Abraham, Nov 26, 2026, 09:38 ET)
 let PHONE = "+18455550188";
 const call = (action: string, body: Record<string, string> = {}) => handleVoice({ action, query: new URLSearchParams(), body: { CallSid: "CApromo", ...body }, callSid: "CApromo", from: PHONE });
 const plain = (x: string) => x.replace(/&apos;/g, "'").replace(/&amp;/g, "&");
@@ -62,16 +62,16 @@ beforeEach(async () => {
 describe("the slot", () => {
   it("paid_promo_offer: the exact approved text, its own Admin slot (Google voice until a recording is uploaded)", () => {
     expect(PROMPTS.paid_promo_offer.text).toBe(ASK);
-    expect(PROMPTS.paid_promo_offer.label).toContain("After a paid order");
+    expect(PROMPTS.paid_promo_offer.label).toContain("After payment, Line 8");
     expect("pending" in PROMPTS.paid_promo_offer).toBe(false);
   });
 });
 
 describe("after a paid order", () => {
-  it("asks the question (keys only, 5 seconds), then the thank-you and goodbye", async () => {
+  it("asks the question (keys only, about 3 seconds), then Line 7", async () => {
     const xml = await call("promo-consent");
     expect(said(xml)).toEqual([ASK]);
-    expect(xml).toMatch(/<Gather [^>]*input="dtmf"[^>]*timeout="5"/);
+    expect(xml).toMatch(/<Gather [^>]*input="dtmf"[^>]*timeout="3"/);
     expect(redirect(xml)).toBe("goodbye");
   });
   it("its recording plays once uploaded", async () => {

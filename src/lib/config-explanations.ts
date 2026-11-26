@@ -611,6 +611,21 @@ const OTHER: Record<string, Explanation> = {
     where: "Callers hearing a menu.",
     ifChanged: "Edited on the Menu order page; callers hear the new order.",
   },
+  paidPromoSkipOptedIn: {
+    what: "After a card payment, skips Line 8 (the seasonal offers by text question) for a caller whose number already gets promotional texts.",
+    where: "Callers who just paid by card on the phone, right before the last goodbye line.",
+    ifChanged: "Off: every paying caller hears the offers question, even if already signed up. A number that replied STOP never hears it either way.",
+  },
+  disconnectSilenceMinutes: {
+    what: "How many minutes a caller with items in the cart can stay silent (no key pressed) before the phone asks whether the call got disconnected.",
+    where: "Callers in the middle of a booking with items in the cart. Callers with an empty cart keep the usual timing.",
+    ifChanged: "A bigger number waits longer before asking; a smaller number asks sooner. Allowed from 1 to 10 minutes.",
+  },
+  disconnectCheckSeconds: {
+    what: "How many seconds the phone waits for a key after asking \"It sounds like we got disconnected. To continue, press any key.\"",
+    where: "Callers with items in the cart who stayed silent for the minutes above.",
+    ifChanged: "Any key in this time returns the caller to the exact step they were on. With no key, the goodbye line plays and the call ends. Allowed from 1 to 15 seconds.",
+  },
   holidayPerDayChanukah: { what: "Chanukah rentals are charged one price per booking day, picked up the next morning.", where: "Customers booking during Chanukah.", ifChanged: "Off: normal pricing during Chanukah." },
   holidayPerDayCholHamoed: { what: "Chol Hamoed rentals are charged one price per booking day, picked up the next morning.", where: "Customers booking during Chol Hamoed.", ifChanged: "Off: normal pricing during Chol Hamoed." },
   holidayNoPromos: { what: "No offers or discounts during Chanukah and Chol Hamoed weeks.", where: "Customers booking those weeks.", ifChanged: "Off: offers can apply those weeks." },

@@ -202,6 +202,8 @@ exports[`baseline: every phone step as it plays today > directions-record 1`] = 
 
 exports[`baseline: every phone step as it plays today > directions-recorded 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Almost done!</Say><Redirect method="POST">https://hupup.example/api/voice/finalize</Redirect></Response>"`;
 
+exports[`baseline: every phone step as it plays today > disconnect-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
+
 exports[`baseline: every phone step as it plays today > finalize 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
 
 exports[`baseline: every phone step as it plays today > goodbye 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
@@ -246,7 +248,11 @@ exports[`baseline: every phone step as it plays today > packs-choice 1`] = `"<?x
 
 exports[`baseline: every phone step as it plays today > pay-approved 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/promo-consent</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > pay-approved-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/receipt-email</Redirect></Response>"`;
+exports[`baseline: every phone step as it plays today > pay-approved-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/pay-approved-text</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-approved-text 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/promo-consent</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-approved-text-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/receipt-email</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > pay-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
 
@@ -469,6 +475,7 @@ exports[`baseline: every phone step as it plays today > the inventory of phone s
   "directions-rec-status",
   "directions-record",
   "directions-recorded",
+  "disconnect-key",
   "finalize",
   "goodbye",
   "heard",
@@ -492,6 +499,8 @@ exports[`baseline: every phone step as it plays today > the inventory of phone s
   "packs-choice",
   "pay-approved",
   "pay-approved-choice",
+  "pay-approved-text",
+  "pay-approved-text-choice",
   "pay-choice",
   "pay-choice-answer",
   "pay-consent",

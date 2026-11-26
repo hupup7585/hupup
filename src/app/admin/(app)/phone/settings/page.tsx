@@ -12,10 +12,12 @@ import { PROMPTS } from "@/lib/ivr/prompts";
 import { RING_KEYS, afterHoursWindow, RING_KEY_LABELS, isLoopNumber, last4, ringListFor, routeSummary, routeTargets } from "@/lib/ivr/routing";
 import { toE164 } from "@/lib/phone";
 import { phonePayStatus } from "@/lib/phone-pay";
+import { saveAfterPayAction } from "./after-pay-actions";
 
 /** Phone System → Phone settings: ring lists (extensions, call routing, ring times), recording, caller blocking, Twilio setup. Owner only. */
-export default async function PhoneSettingsPage() {
+export default async function PhoneSettingsPage({ searchParams }: { searchParams?: Promise<{ ap?: string }> }) {
   await requireOwner();
+  const ap = (await searchParams)?.ap;
   const base = config.baseUrl();
   const settings = await getSettings();
   return (
@@ -80,6 +82,30 @@ export default async function PhoneSettingsPage() {
       <section className="card mb-6 p-5" id="texting">
         <h2 className="mb-3 text-lg font-extrabold">Customer texts</h2>
         <TextingForm everyone={!settings.smsTestOnly} testNumbers={String(settings.smsTestNumbers ?? "").split(/[\n,;]+/).filter(Boolean).map((n) => formatPhone(n)).join("\n")} forwardOn={Boolean(settings.smsForwardEnabled)} forwardPhone={settings.smsForwardPhone ? formatPhone(settings.smsForwardPhone) : ""} />
+      </section>
+      <section className="card mb-6 p-5" id="after-payment" data-after-payment>
+        <h2 className="mb-1 text-lg font-extrabold">After payment and the disconnect check</h2>
+        <p className="mb-3 text-sm text-muted">
+          After a card payment the caller hears Lines 1 to 5, then the offers question (Line 8), then the goodbye (Line 7), and the call ends. A caller with
+          items in the cart who presses nothing for the minutes below hears &ldquo;It sounds like we got disconnected. To continue, press any key.&rdquo; Any key
+          returns them to the same step; with no key in the seconds below, the goodbye plays and the call ends. An empty cart keeps the usual timing.
+        </p>
+        {ap && <p className={`mb-3 rounded-xl p-3 text-sm font-semibold ${ap.startsWith("Saved") ? "bg-mint/15 text-[#13895C]" : "bg-[#FFE6E4] text-[#C83A2F]"}`} role="status">{ap}</p>}
+        <form action={saveAfterPayAction} className="grid gap-3 text-sm">
+          <label className="flex items-start gap-2">
+            <input type="checkbox" name="paidPromoSkipOptedIn" defaultChecked={Boolean(settings.paidPromoSkipOptedIn)} />
+            <span>Skip the offers question (Line 8) for callers who already get promotional texts. Now: {settings.paidPromoSkipOptedIn ? "on" : "off"}.</span>
+          </label>
+          <label className="grid gap-1">
+            <span className="font-semibold">Minutes of silence with items in the cart before the disconnect check (now {settings.disconnectSilenceMinutes})</span>
+            <input name="disconnectSilenceMinutes" defaultValue={settings.disconnectSilenceMinutes} inputMode="numeric" className="input w-28" />
+          </label>
+          <label className="grid gap-1">
+            <span className="font-semibold">Seconds to wait for a key after the disconnect check (now {settings.disconnectCheckSeconds})</span>
+            <input name="disconnectCheckSeconds" defaultValue={settings.disconnectCheckSeconds} inputMode="numeric" className="input w-28" />
+          </label>
+          <button className="btn-dark w-fit">Save</button>
+        </form>
       </section>
       <section className="card mb-6 p-5" id="recording">
         <h2 className="mb-3 text-lg font-extrabold">Call recording</h2>

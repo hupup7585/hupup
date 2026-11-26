@@ -299,12 +299,13 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
     expect(xml).not.toContain("We just sent a text");
     expect(xml).toContain("/api/voice/goodbye");
   });
-  it("goodbye reads the delivery and pickup dates and hangs up (paid order)", async () => {
+  it("a paid order ends with Line 7 and hangs up (Abraham, Nov 26, 2026: goodbye_order no longer plays)", async () => {
     h.session.data.placedOrderId = 7;
     (globalThis as { __due?: number }).__due = 0;
     try {
       const xml = await call("goodbye");
-      expect(xml).toContain("Thanks so much for choosing Hup Up Attractions");
+      expect(xml).toContain("We look forward to serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!");
+      expect(xml).not.toContain("Have an amazing party");
       expect(xml).toContain("<Hangup/>");
     } finally {
       delete (globalThis as { __due?: number }).__due;

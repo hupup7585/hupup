@@ -100,15 +100,16 @@ describe("rental kind from today's Catalog data (no new field)", () => {
 });
 
 describe("box 56 on a call", () => {
-  it("2 jumping balloons and 1 paddle boat: order number, total, breakdown, hold line; amounts equal the order in Admin", async () => {
+  it("2 jumping balloons and 1 paddle boat: total, breakdown, hold line (no order number before payment); amounts equal the order in Admin", async () => {
     const id = await cart(["castle", "slide", "boat"]);
     const xml = await call("finalize");
     const lines = said(xml);
     const [o] = await db.select().from(schema.orders).where((await import("drizzle-orm")).eq(schema.orders.id, id));
     const digits = String(1000 + id).split("").join(" ");
     const money = (c: number) => `${Math.floor(c / 100)} dollars${c % 100 ? ` and ${c % 100} cents` : ""}`;
-    expect(lines.slice(0, 3)).toEqual([
-      `Your order number is ${digits}.`,
+    // The order number is spoken only after the payment is approved (Abraham, Nov 26, 2026): not in box 56
+    expect(lines.join(" ")).not.toContain(`Your order number is ${digits}`);
+    expect(lines.slice(0, 2)).toEqual([
       `Your total is ${money(o.totalCents!)}.`,
       `That includes 240 dollars for the jumping balloons, 60 dollars for the paddle boat, ${money(o.deliveryFeeCents)} for delivery, and ${money(o.taxCents)} sales tax.`,
     ]);
@@ -116,18 +117,18 @@ describe("box 56 on a call", () => {
     // Abraham, Nov 25, 2026, 14:09: each amount is before tax (240 + 60 = the rentals before tax); one tax for the order
     expect(24000 + 6000).toBe(o.subtotalCents);
     expect(o.taxCents).toBeGreaterThan(0);
-    expect(lines[2].match(/sales tax/g)).toHaveLength(1);
+    expect(lines[1].match(/sales tax/g)).toHaveLength(1);
     expect(lines.join(" ")).not.toMatch(/You are all set|Sara/);
   });
   it("1 laser tag set: singular", async () => {
     await cart(["laser"]);
-    expect(said(await call("finalize"))[2]).toMatch(/^That includes 300 dollars for the laser tag set, /);
+    expect(said(await call("finalize"))[1]).toMatch(/^That includes 300 dollars for the laser tag set, /);
   });
   it("the package item: for the paddle boat package; a plain boat keeps for the paddle boat", async () => {
     await cart(["package", "boat"]);
-    expect(said(await call("finalize"))[2]).toMatch(/^That includes 90 dollars for the paddle boat package, 60 dollars for the paddle boat, /);
+    expect(said(await call("finalize"))[1]).toMatch(/^That includes 90 dollars for the paddle boat package, 60 dollars for the paddle boat, /);
   });
-  it("pay by card (Nov 24, 2026): the three box 56 lines, then box 140 (on the next step), then the hold line, then the payment line", async () => {
+  it("pay by card (Nov 24, 2026): the box 56 lines (no order number before payment), then box 140 (on the next step), then the hold line, then the payment line", async () => {
     const { saveSetting } = await import("@/lib/settings");
     await saveSetting("solaPhonePayOn", true);
     await saveSetting("solaPhonePayOwnerOnly", false);
@@ -135,10 +136,9 @@ describe("box 56 on a call", () => {
     const id = await cart(["castle", "boat"]);
     const xml = await call("finalize");
     const lines = said(xml);
-    expect(lines).toHaveLength(3);
-    expect(lines[0]).toBe(`Your order number is ${String(1000 + id).split("").join(" ")}.`);
-    expect(lines[1]).toMatch(/^Your total is /);
-    expect(lines[2]).toMatch(/^That includes 120 dollars for the jumping balloon, 60 dollars for the paddle boat, /);
+    expect(lines).toHaveLength(2); // no order number before payment (Nov 26, 2026)
+    expect(lines[0]).toMatch(/^Your total is /);
+    expect(lines[1]).toMatch(/^That includes 120 dollars for the jumping balloon, 60 dollars for the paddle boat, /);
     expect(redirect(xml)).toBe(`phonepay-go?o=${id}&n=1`);
     const box140 = await call("phonepay-go", {}, `o=${id}&n=1`);
     expect(said(box140)).toEqual([PROMPTS.pay_card_line.text]);
@@ -167,7 +167,7 @@ describe("Box 34 then box 56 (Abraham, Nov 24, 2026, 20:59 and 21:02)", () => {
     expect(msgs[0]).toMatchObject({ boxId: (await deliveryInstructionsBox()).id, durationSec: 12, transcriptionStatus: "off" });
     expect(msgs[0].note).toContain(`Order #${1000 + id}`);
     const next = said(await call("finalize"));
-    expect(next[0]).toBe(`Your order number is ${String(1000 + id).split("").join(" ")}.`);
+    expect(next[0]).toMatch(/^Your total is /); // the order number is spoken only after payment (Nov 26, 2026)
   });
   it("hang-up mid-message: what was recorded is still saved on the order", async () => {
     const id = await cart(["slide"]);

@@ -138,7 +138,7 @@ describe("section 4: the unit step (no skip) and the unit question", () => {
     expect(redirect(await call("addr-unit-ask-choice", { Digits: "2" }))).toBe("addr-check");
     expect(h.session.data).toMatchObject({ unitUnverified: true, unit: undefined });
   });
-  it("on the question: key 5 not valid, no key = the no-choice line, 1 minute = goodbye, star = back to the street", async () => {
+  it("on the question: key 5 not valid, no key = the no-choice line, cart silent 3 minutes = the disconnect check, star = back to the street", async () => {
     const bad = await call("addr-unit-ask-choice", { Digits: "5" });
     expect(said(bad)).toEqual([PROMPTS.not_valid.text]);
     expect(redirect(bad)).toBe("addr-unit-ask");
@@ -147,7 +147,11 @@ describe("section 4: the unit step (no skip) and the unit question", () => {
     expect(redirect(q)).toMatch(/^idle\?to=addr-unit-ask/);
     const noKey = await call("idle", {}, `to=addr-unit-ask&nk=${Date.now()}`);
     expect(said(noKey)).toEqual(["We did not get your choice. Please try again."]);
-    const end = await call("idle", {}, `to=addr-unit-ask&nk=${Date.now() - NO_KEY_END_MS - 1000}`);
+    // Items in the cart (Abraham, Nov 26, 2026): no 1-minute end; after 3 minutes, the disconnect check, then Line 7
+    const minute = await call("idle", {}, `to=addr-unit-ask&nk=${Date.now() - NO_KEY_END_MS - 1000}`);
+    expect(minute).not.toContain("<Hangup/>");
+    const end = await call("idle", {}, `to=addr-unit-ask&nk=${Date.now() - 181_000}`);
+    expect(said(end)[0]).toBe("It sounds like we got disconnected. To continue, press any key.");
     expect(end).toContain("<Hangup/>");
     expect(redirect(await call("addr-unit-ask-choice", { Digits: "*" }))).toBe("addr-street");
   });

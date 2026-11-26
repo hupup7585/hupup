@@ -306,6 +306,8 @@ function bookHoursOn(ctx: { prompts: PromptOverrides }) {
 }
 /** Box 148's dates line (Nov 25, 2026, 4:43 PM): off until Abraham approves the exact words (5:50 PM). */
 export const PAY_DATES_LIVE = true; // Abraham approved the exact words (Nov 26, 2026, 01:25 ET)
+/** After payment: about 3 seconds for a key after Lines 4, 5 and 8 (Abraham, Nov 26, 2026). */
+export const PAID_WAIT_SECONDS = 3;
 
 /** A menu made of several recordings, in the order the Owner set in Admin (src/lib/ivr/menu-order.ts). */
 async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) => void | Promise<void>, opts: { firstTime?: boolean } = {}) {
@@ -510,7 +512,8 @@ async function box56(vr: VR, ctx: Ctx, orderId: number, days: { order: { id: num
   const cats = ids.length ? await db.select({ id: products.id, cat: categories.name }).from(products).innerJoin(categories, eq(categories.id, products.categoryId)).where(inArray(products.id, ids)) : [];
   const catOf = new Map(cats.map((c) => [c.id, c.cat]));
   const groups = box56Groups(days.map((d, i) => ({ subtotalCents: subtotals[i] ?? 0, lines: d.items.map((it) => ({ categoryName: catOf.get(it.productId) ?? "", productName: it.name, qty: it.qty, cents: it.qty * it.unitPriceCents })) })));
-  sp(vr, ctx, "checkout_order_number", { number: spokenDigits(orderNumber(orderId)) });
+  // The order number is spoken only after the payment is approved (Abraham, Nov 26, 2026): not here, before payment
+  void orderId;
   sp(vr, ctx, "checkout_total", { total: spokenMoney(totals.totalCents) });
   const piece = (n: number) => clipUrls(ctx.prompts, [`checkout_includes#${n}`]);
   const parts = groups.map((g) => ({ amount: spokenMoney(g.cents), clip: typeClip(g), urls: clipUrls(ctx.prompts, [typeSlotKey(g.kind, g.count > 1)]) }));
@@ -580,6 +583,31 @@ function toStep(vr: VR, ctx: Ctx, extra: Record<string, string | number | undefi
   const to = ctx.query.get("to") || "menu";
   const params = Object.fromEntries(new URLSearchParams(ctx.query.get("q") || ""));
   vr.redirect({ method: "POST" }, url(to, { ...params, ...extra }));
+  return vr;
+}
+
+/*
+ * Disconnect ending (Abraham, Nov 26, 2026, 08:56 to 09:49 ET): a caller with items in the cart who presses nothing for
+ * the Admin silence time (3 minutes) hears "It sounds like we got disconnected. To continue, press any key." Any key:
+ * back to the exact step. No key within the Admin wait (3 seconds): Line 7, the disconnect goodbye, and the call ends.
+ * An empty cart keeps the usual no-key timing. (Callers who never ordered: unchanged, still open with Abraham.)
+ */
+async function cartSilence(ctx: Ctx) {
+  return (await callOrders(ctx)).length > 0;
+}
+async function disconnectCheckDue(since: number) {
+  const s = await getSettings();
+  const minutes = Number(s.disconnectSilenceMinutes) > 0 ? Number(s.disconnectSilenceMinutes) : 3;
+  return Date.now() - since >= minutes * 60_000;
+}
+async function disconnectCheck(vr: VR, ctx: Ctx) {
+  const s = await getSettings();
+  const wait = Number(s.disconnectCheckSeconds) > 0 ? Number(s.disconnectCheckSeconds) : 3;
+  await track(ctx.callSid, "step", "Disconnect check: no key with items in the cart");
+  const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: wait, finishOnKey: "", action: url("disconnect-key", { to: ctx.query.get("to") || "menu", q: ctx.query.get("q") || undefined }), method: "POST" });
+  sp(g, ctx, "disconnect_check");
+  sp(vr, ctx, "disconnect_goodbye");
+  vr.hangup();
   return vr;
 }
 
@@ -1625,9 +1653,10 @@ const handlers: Record<string, Handler> = {
   },
 
   /** A menu played with no key: again, until 3 plays AND 20 seconds have passed; then goodbye. */
-  "no-key"(ctx, vr) {
+  async "no-key"(ctx, vr) {
     const np = Number(ctx.query.get("np") || 0);
     const t0 = Number(ctx.query.get("t0")) || Date.now();
+    if (await cartSilence(ctx)) return (await disconnectCheckDue(t0)) ? disconnectCheck(vr, ctx) : toStep(vr, ctx, { np, t0 });
     if (np >= MENU_PLAYS_BEFORE_END && Date.now() - t0 >= MENU_MIN_SECONDS * 1000) {
       sp(vr, ctx, "no_input_final");
       vr.hangup(); // a voicemail waiting for 1, 2 or 3 is kept when the call ends
@@ -1641,8 +1670,14 @@ const handlers: Record<string, Handler> = {
    * and the same screen again. The call ends only after 1 full minute with no key, counted from when the screen first
    * finished playing (never mid-play), with the goodbye line.
    */
-  idle(ctx, vr) {
+  async idle(ctx, vr) {
     const nk = Number(ctx.query.get("nk")) || Date.now() - NO_KEY_SECONDS * 1000;
+    // Items in the cart (Abraham, Nov 26, 2026): no 1-minute end; after the Admin silence time, the disconnect check
+    if (await cartSilence(ctx)) {
+      if (await disconnectCheckDue(nk)) return disconnectCheck(vr, ctx);
+      sp(vr, ctx, "no_choice");
+      return toStep(vr, ctx, { nk });
+    }
     if (Date.now() - nk >= NO_KEY_END_MS) {
       sp(vr, ctx, "no_input_final");
       vr.hangup();
@@ -1650,6 +1685,12 @@ const handlers: Record<string, Handler> = {
     }
     sp(vr, ctx, "no_choice");
     return toStep(vr, ctx, { nk });
+  },
+
+  /** The disconnect check (Abraham, Nov 26, 2026): any key returns the caller to the exact step they were on. */
+  async "disconnect-key"(ctx, vr) {
+    await track(ctx.callSid, "step", "Disconnect check: a key was pressed, back to the same step");
+    return toStep(vr, ctx);
   },
 
   /** Old links (the 9-minute warning is gone): back to the same step. */
@@ -1696,7 +1737,7 @@ const handlers: Record<string, Handler> = {
     const p = txPurpose(ctx);
     const o = ctx.query.get("o") ?? undefined;
     const d = ctx.body.Digits;
-    if (d === "*") return p === "pay" ? back(vr, "paylink", { o }) : p === "conf" ? back(vr, "pay-approved", { o }) : back(vr, "catalog");
+    if (d === "*") return p === "pay" ? back(vr, "paylink", { o }) : p === "conf" ? back(vr, "pay-approved-text", { o }) : back(vr, "catalog");
     if (d === "1") {
       const to = toE164(ctx.from);
       return to ? txSend(ctx, vr, p, to) : back(vr, "tx-enter", { p, o });
@@ -4456,37 +4497,51 @@ const handlers: Record<string, Handler> = {
    * number is {number}. ... To send it to a different number, press 1. ..." No key: on with the call.
    */
   /*
-   * Box 148 (Abraham, Nov 25, 2026, 00:29): "Thank you! Your payment was approved, and your booking is confirmed. Your
-   * order number is {number}." (no name), "To hear it again, press star.", then, only for a caller who agreed to order
-   * texts, "We will text your confirmation ... press 1.", else the line for texts (draft, preview only until approved),
-   * then "We look forward to serving you again. ..." Star replays "Your order number is {number}." and the rest.
-   * r=1: the rest only (after a wrong key); st=1: the number again (star).
+   * After a card payment (Abraham, Nov 26, 2026, 09:38 to 09:45 ET; replaces the Box 148 ending): Line 1 "Thank you!
+   * Your payment was approved, and your booking is confirmed. Your order number is {number}." (the only place the order
+   * number is spoken), Line 2 "We will deliver on {date} and pick up on {pickup}." (pieces 2a and 2b around the system
+   * dates), Line 3 the pickup note, Line 4 "To hear it again, press star." with about 3 seconds for a key (star = from
+   * Line 1). Then Line 5a or 5b (pay-approved-text), box 35 (receipt by email), Line 8 (promo-consent) and Line 7
+   * (goodbye), then the call hangs up. The old Line 6 and goodbye_order no longer play.
    */
   async "pay-approved"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "promo-consent");
     const number = spokenDigits(orderNumber(o));
-    const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: 5 }); // 5 seconds (Nov 25, 2026, 12:22)
-    if (ctx.query.get("st")) sp(g, ctx, "checkout_order_number", { number });
-    else if (!ctx.query.get("r")) sp(g, ctx, "phonepay_approved", { number });
-    // The dates line (Abraham dictated 4:43 PM; approved Nov 26, 2026, 01:25 ET): right after the number, on star too;
-    // several days = the first delivery date and the last pickup date (to confirm with Abraham)
-    if (PAY_DATES_LIVE && !ctx.query.get("r")) {
-      const days = group.orders.map((x) => x.order); // sorted by date
+    const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: PAID_WAIT_SECONDS });
+    sp(g, ctx, "phonepay_approved", { number });
+    if (PAY_DATES_LIVE) {
+      const days = group.orders.map((x) => x.order); // sorted by date: the first delivery and the last pickup
       sp(g, ctx, "pay_approved_dates", { date: spokenDate(days[0].eventDate), pickup: spokenDate(days.map((x) => x.pickupDate).sort().at(-1)!) });
-      sp(g, ctx, "pay_approved_pickup_note"); // Abraham, Nov 26, 2026, 01:28 ET: only with the dates line
+      sp(g, ctx, "pay_approved_pickup_note");
     }
-    // approved Nov 25, 2026, 12:22 (pay_approved_optin for callers not signed up for order texts)
-    if (await orderTextsAgreed(ctx, o)) menuRun(g, ctx, "pay_approved_text", ["phonepay_approved_star", "phonepay_approved_text", "phonepay_approved_bye"]);
-    else menuRun(g, ctx, "pay_approved_optin", ["phonepay_approved_star", "pay_approved_optin", "phonepay_approved_bye"]);
-    return back(vr, "receipt-email", { o }); // no key: box 35, the receipt by email (Abraham, Nov 25, 2026, 11:51)
+    sp(g, ctx, "phonepay_approved_star");
+    return back(vr, "pay-approved-text", { o }); // no key: on to Line 5
   },
 
+  /** Line 4's key: star = Line 1 again; anything else = the shared line, then on to Line 5. */
   async "pay-approved-choice"(ctx, vr) {
     const o = ctx.query.get("o") ?? undefined;
     const d = ctx.body.Digits;
-    if (d === "*") return back(vr, "pay-approved", { o, st: 1 }); // star: the order number again (nothing to go back to)
+    if (d === "*") return back(vr, "pay-approved", { o });
+    if (d && d !== "#") sp(vr, ctx, "not_valid");
+    return back(vr, "pay-approved-text", { o });
+  },
+
+  /** Line 5a (signed up for order texts) or Line 5b (not signed up), about 3 seconds for a key; then box 35. */
+  async "pay-approved-text"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    if (!o || !(await getPaymentGroup(o))) return back(vr, "promo-consent");
+    const g = keypad(vr, url("pay-approved-text-choice", { o }), { numDigits: 1, timeout: PAID_WAIT_SECONDS });
+    sp(g, ctx, (await orderTextsAgreed(ctx, o)) ? "phonepay_approved_text" : "pay_approved_optin");
+    return back(vr, "receipt-email", { o }); // no key: box 35, the receipt by email
+  },
+
+  async "pay-approved-text-choice"(ctx, vr) {
+    const o = ctx.query.get("o") ?? undefined;
+    const d = ctx.body.Digits;
+    if (d === "*") return back(vr, "pay-approved", { o }); // star: back to Line 1
     if (d === "1") {
       // Agreed to order texts: a different number (box 143, then the read-back). Not agreed: pressing 1 signs up for this
       // order's texts, to the number they choose (box 142, then the read-back) (Abraham, Nov 25, 2026, 00:34)
@@ -4506,12 +4561,11 @@ const handlers: Record<string, Handler> = {
       } else if (phone) sp(vr, ctx, "consent_stopped");
       return back(vr, "receipt-email", { o });
     }
-    if (d === "#") return back(vr, "receipt-email", { o }); // pound: no texts, on to box 35
-    if (d) {
+    if (d && d !== "#") {
       sp(vr, ctx, "not_valid");
-      return back(vr, "pay-approved", { o, r: 1 });
+      return back(vr, "pay-approved-text", { o });
     }
-    return back(vr, "receipt-email", { o }); // box 35
+    return back(vr, "receipt-email", { o }); // pound or no key: box 35
   },
 
   /** Before the first card try: 0 = a payment link (box 141) instead; any other key = the shared line, then box 140 again. */
@@ -4661,10 +4715,12 @@ const handlers: Record<string, Handler> = {
     const group = id ? await getPaymentGroup(id) : null;
     if (!caller || !group || group.due > 0) return back(vr, "goodbye");
     const customer = await customerByPhone(caller);
-    if (customer?.marketingOptIn || customer?.smsOptOut) return back(vr, "goodbye");
-    const g = keypad(vr, url("promo-consent-answer"), { numDigits: 1, timeout: 5 });
+    if (customer?.smsOptOut) return back(vr, "goodbye");
+    // Already gets promotions: skipped while the Admin switch is on (the default; Abraham has not decided, Nov 26, 2026)
+    if (customer?.marketingOptIn && (await getSettings()).paidPromoSkipOptedIn) return back(vr, "goodbye");
+    const g = keypad(vr, url("promo-consent-answer"), { numDigits: 1, timeout: PAID_WAIT_SECONDS });
     sp(g, ctx, "paid_promo_offer");
-    return back(vr, "goodbye"); // no key in 5 seconds: skip, no change
+    return back(vr, "goodbye"); // no key in about 3 seconds: skip, no change
   },
 
   async "promo-consent-answer"(ctx, vr) {
@@ -4749,12 +4805,9 @@ const handlers: Record<string, Handler> = {
 
   async goodbye(ctx, vr) {
     const id = ctx.session?.data.placedOrderId;
-    // Batch 3 item 2 (Abraham, Nov 25, 2026): the order goodbye lines only once the order is paid
+    // After a paid order, Line 7 ends the call (Abraham, Nov 26, 2026, 09:45 ET); goodbye_order no longer plays
     const group = id ? await getPaymentGroup(id) : null;
-    const full = group && group.due <= 0 ? await getOrderWithItems(id!) : null;
-    const several = full?.order.paymentGroupId ? (await db.select({ id: orders.id }).from(orders).where(eq(orders.paymentGroupId, full.order.paymentGroupId))).length > 1 : false;
-    if (full && several) sp(vr, ctx, "goodbye_order_days");
-    else if (full) sp(vr, ctx, "goodbye_order", { date: spokenDate(full.order.eventDate), pickup: spokenDate(full.order.pickupDate) });
+    if (group && group.due <= 0) sp(vr, ctx, "disconnect_goodbye");
     vr.hangup();
     return vr;
   },

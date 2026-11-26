@@ -41,15 +41,14 @@ export const KEY_ACTIONS: Record<KeyAction["type"], string> = {
 /** Built parts that are not recordings: the shared go-back line, a half pause, and key 7's hours from the Hours page. */
 export const BUILT_PARTS = new Set(["star", "pause", "hours_lines"]);
 
-/** The menu (layout) a combined slot belongs to: the coming-back bookings menu and Box 148's two endings share one. */
+/** The menu (layout) a combined slot belongs to: the coming-back bookings menu shares the bookings menu's. */
 export function layoutIdFor(comboId: string): string {
-  return comboId === "book_again" ? "book" : comboId === "pay_approved_optin" ? "pay_approved_text" : comboId;
+  return comboId === "book_again" ? "book" : comboId;
 }
 
 /** A layout's default lines: its combined slot's lines (both variants for the shared ones), all on. */
 export function defaultLayout(layoutId: string): Line[] {
   const parts = [...(MENU_COMBOS[layoutId] ?? [])];
-  if (layoutId === "pay_approved_text") parts.splice(2, 0, "pay_approved_optin");
   // The customer service hours line (Nov 26, 2026) sits right after 3a, so it can be turned off in Phone screens
   if (layoutId === "book" && parts.includes("book_r3a")) parts.splice(parts.indexOf("book_r3a") + 1, 0, "book_r3c");
   return parts.filter((p) => p !== "pause").map((ref) => ({ ref, on: true }));

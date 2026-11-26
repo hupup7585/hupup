@@ -273,6 +273,11 @@ export const SETTING_DEFAULTS = {
   stockAddress: "",
   /** Website note under the hours (Abraham's wording). */
   hoursWebsiteNote: "Please note that you can book at any time using our automated phone system.",
+  /** Line 8 after payment (Abraham, Nov 26, 2026; his answer is still open): skip the question for a caller who already gets promotions. */
+  paidPromoSkipOptedIn: true,
+  /** Disconnect ending (Abraham, Nov 26, 2026): minutes of silence with items in the cart before the disconnect check, and seconds to wait for a key. */
+  disconnectSilenceMinutes: "3",
+  disconnectCheckSeconds: "3",
 } as const;
 
 export type Settings = { -readonly [K in keyof typeof SETTING_DEFAULTS]: (typeof SETTING_DEFAULTS)[K] extends boolean ? boolean : string };

@@ -183,16 +183,6 @@ export const MENU_COMBOS: Record<string, readonly string[]> = {
     "after_hours_auto",
     "after_hours_message"
   ],
-  "pay_approved_text": [
-    "phonepay_approved_star",
-    "phonepay_approved_text",
-    "phonepay_approved_bye"
-  ],
-  "pay_approved_optin": [
-    "phonepay_approved_star",
-    "pay_approved_optin",
-    "phonepay_approved_bye"
-  ],
   "hours": [
     "key7_cs_hours"
   ]
@@ -231,8 +221,6 @@ export const PROMPTS = {
   whole_book: { group: "Whole menus (one recording each)", label: "Whole menu: Bookings menu (first time) (plays instead of its separate lines once a recording is chosen)", text: "To receive our catalog by text or email, press 8. The fastest way to place an order is with our easy automated system. For information or questions, press 0 for customer service. For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3. For schools, corporate events, and organizational bookings, press 9. To go back, press star." },
   whole_book_again: { group: "Whole menus (one recording each)", label: "Whole menu: Bookings menu (coming back, without line 1b) (plays instead of its separate lines once a recording is chosen)", text: "To receive our catalog by text or email, press 8. For information or questions, press 0 for customer service. For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3. For schools, corporate events, and organizational bookings, press 9. To go back, press star." },
   whole_after_hours_closed: { group: "Whole menus (one recording each)", label: "Whole menu: Bookings key 0 after hours (lines 1, 3, 4) (plays instead of its separate lines once a recording is chosen)", text: "Our customer service is currently closed. For the best availability and fastest booking, please use our easy automated system to ensure your booking today. To get started, press 1. Otherwise, leave a message after the tone, and a customer service representative will return your call on the next open day, and will help you find the best available options for your needs." },
-  whole_pay_approved_text: { group: "Whole menus (one recording each)", label: "Whole menu: Box 148 ending (signed up for order texts) (plays instead of its separate lines once a recording is chosen)", text: "To hear it again, press star. We will text your confirmation to the number you are calling from. To send it to a different number, press 1. We look forward to serving you again. Thank you for choosing Hup Up Attractions!" },
-  whole_pay_approved_optin: { group: "Whole menus (one recording each)", label: "Whole menu: Box 148 ending (not signed up for order texts) (plays instead of its separate lines once a recording is chosen)", text: "To hear it again, press star. To receive your confirmation and order updates by text, press 1. We look forward to serving you again. Thank you for choosing Hup Up Attractions!" },
   // Welcome & main menu
   // Start of the call (Abraham, Nov 16, 2026): separate prompts, in this order. Greeting (always), call recording
   // notice (only when call recording is on), office closed (only when closed), catalog offer (always), main menu.
@@ -611,8 +599,8 @@ export const PROMPTS = {
   thanks_order: { group: "Checkout", label: "Order placed", text: "You are all set, {name}! Your order number is {number}.", vars: ["name", "number"] },
   link_sent: { group: "Checkout", label: "Payment link texted (Abraham, Nov 13, 2026)", text: "We just texted you a secure payment link. Your party rentals are saved for {minutes} minutes while you pay. After that, they go back into stock, and you will need to book them again.", vars: ["minutes"] },
   link_failed: { group: "Checkout", label: "Couldn't text the link", text: "We could not send the text, so someone from our team will call you back shortly to finish up." },
-  goodbye_order_days: { group: "Checkout", label: "Goodbye after ordering several days", text: "We will deliver and pick up on the days you chose. Thanks so much for choosing Hup Up Attractions. Have an amazing party, bye for now!" },
-  goodbye_order: { group: "Checkout", label: "Goodbye after ordering", text: "We will deliver on {date} and pick up on {pickup}. Thanks so much for choosing Hup Up Attractions. Have an amazing party, bye for now!", vars: ["date", "pickup"] },
+  goodbye_order_days: { group: "Checkout", label: "Old goodbye after ordering several days (no longer played after payment, Nov 26, 2026)", text: "We will deliver and pick up on the days you chose. Thanks so much for choosing Hup Up Attractions. Have an amazing party, bye for now!" },
+  goodbye_order: { group: "Checkout", label: "Old goodbye after ordering (no longer played after payment, Nov 26, 2026)", text: "We will deliver on {date} and pick up on {pickup}. Thanks so much for choosing Hup Up Attractions. Have an amazing party, bye for now!", vars: ["date", "pickup"] },
 
   // Text message consent (A2P 10DLC). The exact text spoken is stored with every consent record.
   // Box 49 (Abraham, Nov 24, 2026): the only line; key 1 agrees, no key 2, no long disclosure (the first text carries it)
@@ -646,7 +634,9 @@ export const PROMPTS = {
   },
   // Promo texts by phone, keys only (Abraham, Nov 10, 2026): replaces consent_marketing_v2, which is no longer played.
   // Abraham, Nov 26, 2026 (approved): asked after a paid order, before the goodbye; 1 = promotional texts only
-  paid_promo_offer: { group: "Promo texts by phone (keys only)", label: "After a paid order: seasonal offers by text (1 opts in, pound skips)", text: "To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1. To skip, press pound." },
+  paid_promo_offer: { group: "Promo texts by phone (keys only)", label: "After payment, Line 8: seasonal offers by text (1 signs up, pound skips; about 3 seconds for a key)", text: "Would you like to receive our seasonal offers by text? You will get up to 5 messages a year. To sign up, press 1. To skip, press pound." },
+  disconnect_check: { group: "Checkout", label: "Disconnect check: a caller with items in the cart was silent (any key = back to the same step; no key = Line 7 and the call ends)", text: "It sounds like we got disconnected. To continue, press any key." },
+  disconnect_goodbye: { group: "Checkout", label: "After payment, Line 7, and the disconnect goodbye: the last line before the call hangs up", text: "We look forward to serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!" },
   promo_ask: { group: "Promo texts by phone (keys only)", label: "Step 1: after the order", text: "To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1." },
   promo_which: { group: "Promo texts by phone (keys only)", label: "Step 2: which number", text: "To get texts at the number you are calling from, press 1. To use a different phone number, press 2." },
   promo_enter: { group: "Promo texts by phone (keys only)", label: "Step 3: enter a number", text: "Please enter the 10-digit mobile number. When you are finished, please press pound." },
@@ -719,16 +709,16 @@ export const PROMPTS = {
   phonepay_third_decline: { group: "Pay by card (Sola PhonePay)", label: "Third decline on a call (not active yet)", text: "Not active yet: Abraham will send this line.", pending: true }, // Nov 18, 2026: wording to come; the approved "card did not go through" line plays until then
   phonepay_blocked: { group: "Pay by card (Sola PhonePay)", label: "Card payment blocked for this number (not active yet)", text: "Not active yet: Abraham will send this line.", pending: true }, // Nov 18, 2026: wording to come; the caller gets the payment link until then
   // Box 148 (Abraham, Nov 25, 2026, 00:29): no name; four recordings around the order number (one digit at a time)
-  phonepay_approved: { group: "Pay by card (Sola PhonePay)", label: "Box 148 Part A: payment approved, order number", text: "Thank you! Your payment was approved, and your booking is confirmed. Your order number is {number}.", vars: ["number"] },
+  phonepay_approved: { group: "Pay by card (Sola PhonePay)", label: "After payment, Line 1: payment approved and the order number (the order number is spoken only here, after the payment is approved)", text: "Thank you! Your payment was approved, and your booking is confirmed. Your order number is {number}.", vars: ["number"] },
   // Abraham dictated Nov 25, 2026, 4:43 PM; held until he approves the exact words (5:50 PM): not played yet
-  pay_approved_dates: { group: "Pay by card (Sola PhonePay)", label: "Box 148: delivery and pickup dates (right after the order number)", text: "We will deliver on {date} and pick up on {pickup}.", vars: ["date", "pickup"] },
+  pay_approved_dates: { group: "Pay by card (Sola PhonePay)", label: "After payment, Line 2: delivery and pickup dates (piece 1 is Line 2a, piece 2 is Line 2b; the dates are spoken by the system)", text: "We will deliver on {date} and pick up on {pickup}.", vars: ["date", "pickup"] },
   // Abraham, Nov 26, 2026, 01:28 ET (approved): right after the dates line, only when it plays
-  pay_approved_pickup_note: { group: "Pay by card (Sola PhonePay)", label: "Box 148: rental outside by 9 AM on the pickup day (right after the dates line)", text: "Please put the rental outside the door by 9 AM on the pickup day." },
-  phonepay_approved_star: { group: "Pay by card (Sola PhonePay)", label: "Box 148 Part B1: hear the number again", text: "To hear it again, press star." },
-  phonepay_approved_text: { group: "Pay by card (Sola PhonePay)", label: "Box 148 Part B2: confirmation by text (only for callers who agreed to order texts)", text: "We will text your confirmation to the number you are calling from. To send it to a different number, press 1." },
-  phonepay_approved_bye: { group: "Pay by card (Sola PhonePay)", label: "Box 148 Part B3: closing", text: "We look forward to serving you again. Thank you for choosing Hup Up Attractions!" },
+  pay_approved_pickup_note: { group: "Pay by card (Sola PhonePay)", label: "After payment, Line 3: rental ready outside by 9 AM for pickup", text: "Please make sure your rental is ready outside for pickup by 9 AM, to ensure an on-time pickup." },
+  phonepay_approved_star: { group: "Pay by card (Sola PhonePay)", label: "After payment, Line 4: star replays from Line 1 (about 3 seconds for a key)", text: "To hear it again, press star." },
+  phonepay_approved_text: { group: "Pay by card (Sola PhonePay)", label: "After payment, Line 5a: confirmation by text (callers signed up for order texts; 1 = a different number)", text: "We will text your confirmation to the number you are calling from. To send it to a different number, press 1." },
+  phonepay_approved_bye: { group: "Pay by card (Sola PhonePay)", label: "Old after-payment closing (removed Nov 26, 2026; no longer played)", text: "We look forward to serving you again. Thank you for choosing Hup Up Attractions!" },
   // Abraham, Nov 25, 2026, 12:22 (approved): box 148 for callers not signed up for order texts, in place of part B2
-  pay_approved_optin: { group: "Pay by card (Sola PhonePay)", label: "Box 148: order texts sign-up (callers not signed up for order texts; 1 = sign up the calling number)", text: "To receive your confirmation and order updates by text, press 1." },
+  pay_approved_optin: { group: "Pay by card (Sola PhonePay)", label: "After payment, Line 5b: order texts sign-up (callers not signed up for order texts; 1 = sign up the calling number)", text: "To receive your confirmation and order updates by text, press 1." },
   phonepay_approved_join: { group: "Pay by card (Sola PhonePay)", label: "Box 148: confirmation and order updates by text (callers who did not agree to texts; draft)", text: "To receive your confirmation and order updates by text, press 1.", pending: true },
   phonepay_unclear: { group: "Pay by card (Sola PhonePay)", label: "Box 147: payment could not be confirmed", text: "Sorry, we could not confirm your payment. To try again, press 1." }, // approved Nov 18, 2026 (box 147)
   phonepay_retry: { group: "Pay by card (Sola PhonePay)", label: "Card did not go through (tries 1 to 4)", text: "We are sorry, your card did not go through. To try again, press 1." }, // approved Nov 15
@@ -924,7 +914,7 @@ export const PROMPTS = {
 
 /** Old lines no longer played anywhere (kept so nothing is lost; shown as "Not used"). */
 // Hark's audit items 12 and 14 (Nov 24, 2026): lines no step plays any more were still shown as Live
-export const RETIRED_PROMPTS = new Set<string>(["book_note", "book_corporate", "box153", "no_input", "idle_warning", "only_some_left", "day_choice", "cart_cleared", "addr_rb_again", "type_email_symbols", "email_unclear", "thanks_order", "consent_unclear", "attraction_menu_back", "menu_category", "menu_empty", "retry_spoken", "addr_readback", "resume_added", "instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard", "cart_expired", "addr_unit_skip", "ask_directions", "directions_saved", "addr_price", "addr_saved", "vma_charge_amount", "vma_charge_readback", "vma_charge_bad", "address_outside_area", "phonepay_approved_join", "phonepay_back", "ocean_balls", "cart_add_balls", "instr_laser", "automated_only", "nearest_date", "laser_second_set", "second_laser", "laser_third_set", "laser_packs", "whole_hours"]);
+export const RETIRED_PROMPTS = new Set<string>(["book_note", "book_corporate", "box153", "no_input", "idle_warning", "only_some_left", "day_choice", "cart_cleared", "addr_rb_again", "type_email_symbols", "email_unclear", "thanks_order", "consent_unclear", "attraction_menu_back", "menu_category", "menu_empty", "retry_spoken", "addr_readback", "resume_added", "instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard", "cart_expired", "addr_unit_skip", "ask_directions", "directions_saved", "addr_price", "addr_saved", "vma_charge_amount", "vma_charge_readback", "vma_charge_bad", "address_outside_area", "phonepay_approved_join", "phonepay_back", "ocean_balls", "cart_add_balls", "instr_laser", "automated_only", "nearest_date", "laser_second_set", "second_laser", "laser_third_set", "laser_packs", "whole_hours", "whole_pay_approved_text", "whole_pay_approved_optin"]);
 
 /** The extension (or part of the call) each group of lines belongs to, for the Admin filter. New groups fall into "Other". */
 export const PROMPT_AREAS: Record<string, string> = {

@@ -716,20 +716,22 @@ export const SCREENS: Record<string, ScreenInfo> = {
   "pay-approved": {
     "choice": "pay-approved-choice",
     "lines": [
-      "checkout_order_number",
       "phonepay_approved",
       "pay_approved_dates",
       "pay_approved_pickup_note",
-      "phonepay_approved_star",
+      "phonepay_approved_star"
+    ],
+    "keys": "",
+    "combos": []
+  },
+  "pay-approved-text": {
+    "choice": "pay-approved-text-choice",
+    "lines": [
       "phonepay_approved_text",
-      "phonepay_approved_bye",
       "pay_approved_optin"
     ],
     "keys": "1",
-    "combos": [
-      "pay_approved_text",
-      "pay_approved_optin"
-    ]
+    "combos": []
   },
   "phonepay-retry": {
     "choice": "phonepay-retry-answer",
