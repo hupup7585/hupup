@@ -55,6 +55,26 @@ export async function saveScreenDraft(screen: string, before: Editor, after: Edi
   await db.insert(schema.auditLog).values({ userId, action: `${action}_draft`, entityType: "settings", entityId: `screen:${screen}`, before, after });
 }
 
+/**
+ * Change the draft safely (Hark's Phases 1-3 review, item 13): the draft is read and written in one transaction,
+ * with the draft row locked, so two edits made at the same moment (two tabs, two people) both survive instead of one
+ * overwriting the other. fn gets the current draft (or the live screens when there is no draft yet).
+ */
+export async function editScreenDraft(screen: string, userId: number | null, action: string, fn: (e: Editor) => Editor | { error: string }): Promise<{ error?: string }> {
+  return inTx(async (tx) => {
+    // Make sure there is a draft row to lock (starting from the live screens), then lock it
+    const live = await raw(LIVE_KEY, tx);
+    await tx.insert(schema.appSettings).values({ key: DRAFT_KEY, value: null as never, updatedBy: userId }).onConflictDoNothing();
+    const [row] = await tx.select({ value: schema.appSettings.value }).from(schema.appSettings).where(eq(schema.appSettings.key, DRAFT_KEY)).for("update");
+    const before = parseEditor(row?.value && typeof row.value === "object" ? row.value : live);
+    const r = fn(before);
+    if ("error" in r) return { error: r.error };
+    await tx.update(schema.appSettings).set({ value: r as never, updatedAt: new Date(), updatedBy: userId }).where(eq(schema.appSettings.key, DRAFT_KEY));
+    await tx.insert(schema.auditLog).values({ userId, action: `${action}_draft`, entityType: "settings", entityId: `screen:${screen}`, before, after: r });
+    return {};
+  });
+}
+
 /** Publish the draft: callers hear it from the next call step. One transaction; the version is recorded. */
 export async function publishScreens(userId: number | null, reason: string) {
   const why = reason.trim();

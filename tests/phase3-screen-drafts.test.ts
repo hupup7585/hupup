@@ -60,7 +60,7 @@ describe("phone screens, draft first", () => {
     expect(readFileSync("src/app/admin/(app)/phone/screens/[id]/page.tsx", "utf8")).toContain("<DraftBanner screen={id} />");
     expect(readFileSync("src/app/admin/(app)/phone/screens/page.tsx", "utf8")).toContain("<DraftBanner />");
     const actions = readFileSync("src/app/admin/(app)/phone/screens/actions.ts", "utf8");
-    expect(actions).toContain("saveScreenDraft(");
+    expect(actions).toContain("editScreenDraft("); // the locked edit (review item 13)
     expect(actions).not.toMatch(/insert\(schema\.appSettings\)/);
   });
 });
