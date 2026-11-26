@@ -12,6 +12,8 @@ import { KEY_ACTIONS, defaultLayout, layoutIdFor, parseEditor, type KeyDef, type
 import { GO_TO_SCREENS, SCREENS, screenArea, screenLabel } from "@/lib/ivr/screens";
 import { SCREEN_EXPLANATIONS } from "@/lib/ivr/screen-explanations";
 import { previewScreen } from "@/lib/ivr/screen-preview";
+import { editingEditor } from "@/lib/screen-drafts";
+import DraftBanner from "../DraftBanner";
 import { addLineAction, moveLineAction, removeKeyAction, removeLineAction, setKeyAction, toggleLineAction } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -27,8 +29,7 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
   if (!s) notFound();
   const sp = await searchParams;
   const preview = await previewScreen(id).catch(() => null); // Test this screen: a preview call, nothing saved
-  const [row] = await db.select({ value: schema.appSettings.value }).from(schema.appSettings).where(eq(schema.appSettings.key, "screenEditor")).limit(1);
-  const e = parseEditor(row?.value);
+  const e = await editingEditor(); // the draft when there is one (draft first, Phase 3)
   const slots = allSlots(await catalogItems(), {}, await customSlots()).filter((x) => x.kind === "line");
   const recorded = new Set((await db.select({ key: schema.voicePrompts.key, rec: schema.voicePrompts.recordingId }).from(schema.voicePrompts)).filter((r) => r.rec).map((r) => r.key));
   const info = (ref: string): Info => {
@@ -123,6 +124,7 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
           <div><dt className="inline font-semibold">If you change it: </dt><dd className="inline text-muted">{SCREEN_EXPLANATIONS[id].ifChanged}</dd></div>
         </dl>
       )}
+      <DraftBanner screen={id} />
       <details className="card my-3 p-4" data-screen-test>
         <summary className="cursor-pointer font-bold">Test this screen</summary>
         {preview ? (
@@ -143,7 +145,7 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
           </p>
         )}
       </details>
-      {sp.ok && <p className="my-3 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]" role="status">{sp.ok === "1" ? "Saved, live now." : sp.ok}</p>}
+      {sp.ok && <p className="my-3 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]" role="status">{sp.ok === "1" ? "Saved to the draft. Publish to make it live." : sp.ok}</p>}
       {sp.err && <p className="my-3 rounded-xl bg-[#FFE6E4] p-3 font-semibold text-[#C83A2F]" role="alert">{sp.err}</p>}
 
       {layouts.length === 0 && (

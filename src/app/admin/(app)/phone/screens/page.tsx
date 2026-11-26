@@ -6,6 +6,7 @@ import { catalogItems } from "@/lib/slot-status";
 import { db, schema } from "@/lib/db";
 import { SCREENS, screenArea, screenLabel } from "@/lib/ivr/screens";
 import { SCREEN_EXPLANATIONS } from "@/lib/ivr/screen-explanations";
+import DraftBanner from "./DraftBanner";
 
 export const metadata = { title: "Phone screens | Hup Up Attractions" };
 export const dynamic = "force-dynamic";
@@ -40,8 +41,9 @@ const PARTS: [string, string, RegExp][] = [
   ["Hours", "Key 7 reads the hours from the Hours page with the number and date word recordings, or plays its own recordings set on the Key 7 screen.", /dates and times|number clips/i],
 ];
 
-export default async function ScreensPage() {
+export default async function ScreensPage({ searchParams }: { searchParams?: Promise<{ ok?: string; err?: string }> }) {
   await requireOwner();
+  const sp = (await searchParams) ?? {};
   const slots = allSlots(await catalogItems(), {}, await customSlots());
   const inUse = new Set((await db.select({ key: schema.voicePrompts.key, rec: schema.voicePrompts.recordingId }).from(schema.voicePrompts)).filter((r) => r.rec).map((r) => r.key));
   const groups = [...new Set(slots.map((s) => s.group))];
@@ -51,8 +53,11 @@ export default async function ScreensPage() {
     <div className="w-full" data-phone-screens>
       <h1 className="text-2xl font-black sm:text-3xl">Phone screens</h1>
       <p className="mb-5 mt-1 text-muted">
-        Every phone screen, by extension. Open one to see its lines in play order, add or turn off lines, use its combined recording, and set what each key does. Nothing changes on the phone line until you turn a change on.
+        Every phone screen, by extension. Open one to see its lines in play order, add or turn off lines, use its combined recording, and set what each key does. Every change is saved as a draft first; callers hear it only after you publish.
       </p>
+      {sp.ok && <p className="mb-3 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]" role="status">{sp.ok}</p>}
+      {sp.err && <p className="mb-3 rounded-xl bg-[#FFE6E4] p-3 font-semibold text-[#C83A2F]" role="alert">{sp.err}</p>}
+      <DraftBanner />
 
       {[...areas.entries()].map(([area, ids]) => (
         <section key={area} className="card mb-5 p-5" data-screens-area={area}>

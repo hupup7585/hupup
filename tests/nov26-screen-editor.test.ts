@@ -135,7 +135,7 @@ describe("Admin", () => {
     const { readFileSync } = await import("node:fs");
     for (const f of ["src/app/admin/(app)/phone/screens/page.tsx", "src/app/admin/(app)/phone/screens/[id]/page.tsx", "src/app/admin/(app)/phone/screens/recordings/page.tsx"]) expect(readFileSync(f, "utf8")).toContain("await requireOwner()");
     const actions = readFileSync("src/app/admin/(app)/phone/screens/actions.ts", "utf8");
-    expect(actions.match(/await requireOwner\(\)/g)?.length).toBe(6);
+    expect(actions.match(/await requireOwner\(\)/g)?.length).toBe(7); // 6 edits + publish, discard and undo (draft first, Phase 3)
     expect(readFileSync("src/components/Sidebar.tsx", "utf8")).toContain('"Phone screens", O]');
     void db;
     void schema;
