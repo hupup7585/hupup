@@ -616,6 +616,11 @@ const OTHER: Record<string, Explanation> = {
     where: "Callers who just paid by card on the phone, right before the last goodbye line.",
     ifChanged: "Off: every paying caller hears the offers question, even if already signed up. A number that replied STOP never hears it either way.",
   },
+  disconnectGoodbyeOn: {
+    what: "Plays Line 7 (\"We look forward serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!\") right before the phone hangs up on a caller who stopped pressing keys, including callers who never ordered.",
+    where: "Callers who stay silent until the phone ends the call: after the usual disconnect line on a menu, and when a cart's hold runs out.",
+    ifChanged: "Off: those calls end exactly as before, without Line 7. The silence timing is the same either way. Callers with items in the cart who are silent for the minutes below always hear Line 7 after the disconnect check.",
+  },
   disconnectSilenceMinutes: {
     what: "How many minutes a caller with items in the cart can stay silent (no key pressed) before the phone asks whether the call got disconnected.",
     where: "Callers in the middle of a booking with items in the cart. Callers with an empty cart keep the usual timing.",

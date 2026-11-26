@@ -276,6 +276,8 @@ export const SETTING_DEFAULTS = {
   /** Line 8 after payment (Abraham, Nov 26, 2026; his answer is still open): skip the question for a caller who already gets promotions. */
   paidPromoSkipOptedIn: true,
   /** Disconnect ending (Abraham, Nov 26, 2026): minutes of silence with items in the cart before the disconnect check, and seconds to wait for a key. */
+  /** Line 7 before every automatic hang-up on a silent call, also with an empty cart (Abraham, Nov 26, 2026, 09:53 ET). */
+  disconnectGoodbyeOn: true,
   disconnectSilenceMinutes: "3",
   disconnectCheckSeconds: "3",
 } as const;

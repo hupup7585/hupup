@@ -52,12 +52,12 @@ describe("box 30: the cart hold", () => {
     await call("book");
     expect((await holdOf(orderId)).holdExpiresAt!.getTime()).toBeLessThan(Date.now());
   });
-  it("the time ran out (caller stopped responding): the call just hangs up, no timed-out line, no main menu", async () => {
+  it("the time ran out (caller stopped responding): Line 7, then the call hangs up; no timed-out line, no main menu", async () => {
     expect(await releaseExpired()).toBeGreaterThan(0);
     expect((await holdOf(orderId)).status).not.toBe("HOLD");
     for (const step of ["finalize", "terms-answer", "ask"]) {
       const x = await call(step, {}, step === "ask" ? "f=name" : "");
-      expect(said(x), step).toEqual([]);
+      expect(said(x), step).toEqual(["We look forward serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!"]); // only Line 7 before the hang-up (Abraham, Nov 26, 2026, 09:53 ET)
       expect(x, step).toContain("<Hangup/>");
       expect(x, step).not.toContain("/menu");
       expect(x, step).not.toMatch(/timed out/i);

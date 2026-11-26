@@ -80,7 +80,7 @@ exports[`baseline: every phone step as it plays today > altdates 1`] = `"<?xml v
 
 exports[`baseline: every phone step as it plays today > another 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/added-menu</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > ask 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
+exports[`baseline: every phone step as it plays today > ask 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">We look forward serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!</Say><Hangup/></Response>"`;
 
 exports[`baseline: every phone step as it plays today > attraction 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/attraction-after?m=i&amp;t=*" method="POST"/><Redirect method="POST">https://hupup.example/api/voice/ring?k=4</Redirect></Response>"`;
 
@@ -204,7 +204,7 @@ exports[`baseline: every phone step as it plays today > directions-recorded 1`] 
 
 exports[`baseline: every phone step as it plays today > disconnect-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > finalize 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
+exports[`baseline: every phone step as it plays today > finalize 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">We look forward serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!</Say><Hangup/></Response>"`;
 
 exports[`baseline: every phone step as it plays today > goodbye 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
 
@@ -370,7 +370,7 @@ exports[`baseline: every phone step as it plays today > taken-size-choice 1`] = 
 
 exports[`baseline: every phone step as it plays today > terms 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="8" finishOnKey="" action="https://hupup.example/api/voice/terms-answer" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">By pressing #, you agree to our Terms and Conditions. To review them, go to hupupattractions.com/terms. To get the link by text message, press 1. To continue, press #.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/terms-answer</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > terms-answer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
+exports[`baseline: every phone step as it plays today > terms-answer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">We look forward serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!</Say><Hangup/></Response>"`;
 
 exports[`baseline: every phone step as it plays today > the inventory of phone steps 1`] = `
 [

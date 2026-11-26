@@ -465,6 +465,7 @@ function repeatMenu(vr: VR, ctx: Ctx, action: string, params: Record<string, str
  */
 async function cartGone(vr: VR, ctx: Ctx) {
   await track(ctx.callSid, "step", "Cart hold ran out (no keys pressed): call ended");
+  await silentGoodbye(vr, ctx);
   vr.hangup();
   return vr;
 }
@@ -590,8 +591,15 @@ function toStep(vr: VR, ctx: Ctx, extra: Record<string, string | number | undefi
  * Disconnect ending (Abraham, Nov 26, 2026, 08:56 to 09:49 ET): a caller with items in the cart who presses nothing for
  * the Admin silence time (3 minutes) hears "It sounds like we got disconnected. To continue, press any key." Any key:
  * back to the exact step. No key within the Admin wait (3 seconds): Line 7, the disconnect goodbye, and the call ends.
- * An empty cart keeps the usual no-key timing. (Callers who never ordered: unchanged, still open with Abraham.)
+ * An empty cart keeps the usual no-key timing, with Line 7 added before the hang-up (silentGoodbye).
  */
+/**
+ * Line 7 before every automatic hang-up on a silent call, also for callers who never ordered (Abraham, Nov 26, 2026,
+ * 09:53 ET). The silence timing is unchanged; only the line is added. Admin switch, on by default.
+ */
+async function silentGoodbye(vr: VR, ctx: Ctx) {
+  if ((await getSettings()).disconnectGoodbyeOn) sp(vr, ctx, "disconnect_goodbye");
+}
 async function cartSilence(ctx: Ctx) {
   return (await callOrders(ctx)).length > 0;
 }
@@ -1659,6 +1667,7 @@ const handlers: Record<string, Handler> = {
     if (await cartSilence(ctx)) return (await disconnectCheckDue(t0)) ? disconnectCheck(vr, ctx) : toStep(vr, ctx, { np, t0 });
     if (np >= MENU_PLAYS_BEFORE_END && Date.now() - t0 >= MENU_MIN_SECONDS * 1000) {
       sp(vr, ctx, "no_input_final");
+      await silentGoodbye(vr, ctx);
       vr.hangup(); // a voicemail waiting for 1, 2 or 3 is kept when the call ends
       return vr;
     }
@@ -1680,6 +1689,7 @@ const handlers: Record<string, Handler> = {
     }
     if (Date.now() - nk >= NO_KEY_END_MS) {
       sp(vr, ctx, "no_input_final");
+      await silentGoodbye(vr, ctx);
       vr.hangup();
       return vr;
     }

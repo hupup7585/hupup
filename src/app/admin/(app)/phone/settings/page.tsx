@@ -96,6 +96,10 @@ export default async function PhoneSettingsPage({ searchParams }: { searchParams
             <input type="checkbox" name="paidPromoSkipOptedIn" defaultChecked={Boolean(settings.paidPromoSkipOptedIn)} />
             <span>Skip the offers question (Line 8) for callers who already get promotional texts. Now: {settings.paidPromoSkipOptedIn ? "on" : "off"}.</span>
           </label>
+          <label className="flex items-start gap-2">
+            <input type="checkbox" name="disconnectGoodbyeOn" defaultChecked={Boolean(settings.disconnectGoodbyeOn)} />
+            <span>Play the goodbye (Line 7) before every automatic hang-up on a silent call, also for callers who never ordered. Now: {settings.disconnectGoodbyeOn ? "on" : "off"}.</span>
+          </label>
           <label className="grid gap-1">
             <span className="font-semibold">Minutes of silence with items in the cart before the disconnect check (now {settings.disconnectSilenceMinutes})</span>
             <input name="disconnectSilenceMinutes" defaultValue={settings.disconnectSilenceMinutes} inputMode="numeric" className="input w-28" />

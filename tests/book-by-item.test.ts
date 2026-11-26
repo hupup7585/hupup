@@ -121,7 +121,8 @@ describe("key 1: booking by item", () => {
     expect(redirect(await call("idle", {}, `to=booked&q=${enc}&nk=${nk}`))).toBe(`booked?${q}&nk=${nk}`);
     // a full minute with no key: the goodbye line, then the call ends
     const end = await call("idle", {}, `to=booked&q=${enc}&nk=${Date.now() - 61_000}`);
-    expect(said(end)).toEqual(["It sounds like we got disconnected, but you can call us back at any time. Thank you for calling Hup Up Attractions. Bye for now!"]);
+    // + Line 7 before the hang-up (Abraham, Nov 26, 2026, 09:53 ET; Admin switch, on by default)
+    expect(said(end)).toEqual(["It sounds like we got disconnected, but you can call us back at any time. Thank you for calling Hup Up Attractions. Bye for now!", "We look forward serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!"]);
     expect(end).toContain("<Hangup/>");
   });
 

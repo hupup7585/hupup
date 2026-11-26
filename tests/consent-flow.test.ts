@@ -304,7 +304,7 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
     (globalThis as { __due?: number }).__due = 0;
     try {
       const xml = await call("goodbye");
-      expect(xml).toContain("We look forward to serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!");
+      expect(xml).toContain("We look forward serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!");
       expect(xml).not.toContain("Have an amazing party");
       expect(xml).toContain("<Hangup/>");
     } finally {

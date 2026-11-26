@@ -58,6 +58,7 @@ const META: Record<string, Partial<ConfigDef>> = {
   catalogTextItems: { label: "Catalog pictures for texts", page: "/admin/catalog-send", group: "Texts and emails", type: "json" },
   holidayFridayMutzeDays: { label: "Friday plus Mutze Shabbes: days charged", group: "Offers and discounts", type: "number", min: 1, max: 3 },
   paidPromoSkipOptedIn: { label: "After payment, Line 8: skip it for callers who already get promotions", group: "Phone: after payment", type: "bool" },
+  disconnectGoodbyeOn: { label: "Disconnect goodbye (Line 7) before every automatic hang-up on a silent call", group: "Phone: after payment", type: "bool" },
   disconnectSilenceMinutes: { label: "Disconnect check: minutes of silence with items in the cart", group: "Phone: after payment", type: "int", min: 1, max: 10 },
   disconnectCheckSeconds: { label: "Disconnect check: seconds to wait for a key", group: "Phone: after payment", type: "int", min: 1, max: 15 },
   holidayMutzeAloneDays: { label: "Mutze Shabbes alone: days charged", group: "Offers and discounts", type: "number", min: 0.5, max: 3 },

@@ -50,7 +50,7 @@ const LINE4 = "To hear it again, press star.";
 const LINE5A = "We will text your confirmation to the number you are calling from. To send it to a different number, press 1.";
 const LINE5B = "To receive your confirmation and order updates by text, press 1.";
 const LINE8 = "Would you like to receive our seasonal offers by text? You will get up to 5 messages a year. To sign up, press 1. To skip, press pound.";
-const LINE7 = "We look forward to serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!";
+const LINE7 = "We look forward serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!";
 const CHECK = "It sounds like we got disconnected. To continue, press any key.";
 
 beforeAll(async () => {
@@ -81,6 +81,7 @@ describe("the approved words (Admin slots, word for word, no contractions)", () 
     expect(PROMPTS.pay_approved_optin.text).toBe(LINE5B);
     expect(PROMPTS.paid_promo_offer.text).toBe(LINE8);
     expect(PROMPTS.disconnect_goodbye.text).toBe(LINE7);
+    expect(PROMPTS.disconnect_goodbye.text).not.toContain("forward to"); // Abraham, 10:17 ET: no "to"
     expect(PROMPTS.disconnect_check.text).toBe(CHECK);
     for (const k of ["phonepay_approved", "pay_approved_dates", "pay_approved_pickup_note", "phonepay_approved_star", "phonepay_approved_text", "pay_approved_optin", "paid_promo_offer", "disconnect_goodbye", "disconnect_check"] as const)
       expect(PROMPTS[k].text, k).not.toMatch(/\b\w+'(s|t|re|ll|ve|d|m)\b/i);
@@ -216,14 +217,29 @@ describe("disconnect ending: items in the cart, silent", () => {
     await saveSetting("disconnectSilenceMinutes", "3", null);
     await saveSetting("disconnectCheckSeconds", "3", null);
   });
-  it("empty cart: today's timing, unchanged (1 minute, the usual goodbye line, no disconnect check, no Line 7)", async () => {
+  it("empty cart: today's timing (1 minute), no disconnect check; Line 7 right before the hang-up (Abraham, 09:53 ET)", async () => {
     h.session.data = {};
     const early = await call("idle", {}, `to=book&nk=${ago(30_000)}`);
     expect(said(early)).toEqual(["We did not get your choice. Please try again."]);
+    expect(early).not.toContain("<Hangup/>");
     const end = await call("idle", {}, `to=book&nk=${ago(61_000)}`);
     expect(said(end)).not.toContain(CHECK);
-    expect(said(end)).not.toContain(LINE7);
+    expect(said(end)).toEqual([PROMPTS.no_input_final.text, LINE7]);
+    expect(end.trim().endsWith(`${LINE7}</Say><Hangup/></Response>`)).toBe(true);
+  });
+  it("a caller who never ordered, silent on the main menu: Line 7 before the hang-up; the 3-play timing is unchanged", async () => {
+    h.session.data = {};
+    expect(await call("no-key", {}, `to=menu&np=2&t0=${ago(60_000)}`)).not.toContain("<Hangup/>");
+    const end = await call("no-key", {}, `to=menu&np=3&t0=${ago(21_000)}`);
+    expect(said(end)).toEqual([PROMPTS.no_input_final.text, LINE7]);
+    expect(end).toContain("<Hangup/>");
+  });
+  it("the Admin switch (on by default) turns Line 7 off on those hang-ups; the timing stays the same", async () => {
+    h.session.data = {};
+    await saveSetting("disconnectGoodbyeOn", false, null);
+    const end = await call("idle", {}, `to=book&nk=${ago(61_000)}`);
     expect(said(end)).toEqual([PROMPTS.no_input_final.text]);
     expect(end).toContain("<Hangup/>");
+    await saveSetting("disconnectGoodbyeOn", true, null);
   });
 });
