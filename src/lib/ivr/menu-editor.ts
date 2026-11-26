@@ -121,6 +121,7 @@ export function lineOnAt(e: Editor, screen: string, ref: string): boolean {
  */
 export function activeKey(e: Editor, screen: string, digit: string | undefined): KeyDef | null {
   if (!digit || !/^[0-9]$/.test(digit)) return null;
+  if (protectedKeys(screen).includes(digit)) return null; // an old stored key on a protected step is ignored
   const d = (e.keys[screen] ?? []).find((k) => k.key === digit && k.on);
   if (!d) return null;
   const built = (SCREENS[screen]?.keys ?? "").includes(digit);
@@ -158,10 +159,31 @@ export function removeLine(e: Editor, where: { layout?: string; screen?: string 
   return edit(e, where, (l) => (where.screen || !isBuiltRef(l[index]?.ref ?? "") ? l.filter((_, i) => i !== index) : l));
 }
 
+/**
+ * Protected screens (Hark's Phases 1-3 review, item 3, Nov 26, 2026): the Terms, consent, payment, read-back and
+ * voicemail password steps. A key set in Admin there could skip the caller's agreement, a payment or a password (a
+ * 1 on the Terms step sent callers to the main menu, so no phone booking could finish). No Admin key is allowed on
+ * them, a stored one is refused at publish, and a live call ignores it.
+ */
+const PROTECTED_SCREENS = new Set(["terms", "sms-consent", "pay-consent", "pay-choice", "readback", "addr-readback", "promo-consent", "paylink", "pay-approved", "pay-approved-text", "phonepay-go", "phonepay-retry"]);
+export function isProtectedScreen(screen: string): boolean {
+  return PROTECTED_SCREENS.has(screen) || screen.startsWith("vma-") || /consent/.test(screen);
+}
+/** The keys Admin may not set on this screen (every key on a protected screen). */
+export function protectedKeys(screen: string): string {
+  return isProtectedScreen(screen) ? "0123456789" : "";
+}
+export const PROTECTED_REASON = "This step is protected: it takes the caller's agreement, a payment, a read-back or a password, so its keys stay exactly as built.";
+/** Admin keys stored on protected screens (refused when publishing). */
+export function protectedKeyProblems(e: Editor): string[] {
+  return Object.entries(e?.keys ?? {}).flatMap(([screen, list]) => (list ?? []).filter((k) => protectedKeys(screen).includes(k.key)).map((k) => `${screen}: key ${k.key}`));
+}
+
 /** Set (or replace) a key on a screen. Star and pound are reserved; a key starts as the Owner chose (on or off). */
 export function setKey(e: Editor, screen: string, def: KeyDef): Editor | { error: string } {
   if (!/^[0-9]$/.test(def.key)) return { error: "Choose a key from 0 to 9. Star and pound stay as built." };
   if (!SCREENS[screen]?.choice) return { error: "This step does not wait for a key." };
+  if (protectedKeys(screen).includes(def.key)) return { error: PROTECTED_REASON };
   const list = (e.keys[screen] ?? []).filter((k) => k.key !== def.key);
   return { ...e, keys: { ...e.keys, [screen]: [...list, def].sort((a, b) => a.key.localeCompare(b.key)) } };
 }

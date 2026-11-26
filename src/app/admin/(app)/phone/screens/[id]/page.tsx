@@ -8,7 +8,7 @@ import { customSlots } from "@/lib/custom-slots";
 import { catalogItems } from "@/lib/slot-status";
 import { PROMPTS, promptArea } from "@/lib/ivr/prompts";
 import { RING_KEYS, RING_KEY_LABELS } from "@/lib/ivr/routing";
-import { KEY_ACTIONS, defaultLayout, layoutIdFor, parseEditor, type KeyDef, type Line } from "@/lib/ivr/menu-editor";
+import { KEY_ACTIONS, PROTECTED_REASON, defaultLayout, isProtectedScreen, protectedKeys, layoutIdFor, parseEditor, type KeyDef, type Line } from "@/lib/ivr/menu-editor";
 import { GO_TO_SCREENS, SCREENS, screenArea, screenLabel } from "@/lib/ivr/screens";
 import { SCREEN_EXPLANATIONS } from "@/lib/ivr/screen-explanations";
 import { previewScreen } from "@/lib/ivr/screen-preview";
@@ -200,7 +200,7 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
                   <tr key={d}>
                     <td className="td font-black">{d}</td>
                     <td className="td">
-                      {own ? <>{keyName(own)} {own.on ? <b className="text-[#13895C]">(on)</b> : <span className="text-muted">(off)</span>}{own.line ? <span className="text-muted"> · line: {info(own.line).name}</span> : null}</> : s.keys.includes(d) ? "As built" : <span className="text-muted">Not used</span>}
+                      {protectedKeys(id).includes(d) ? <b className="text-navy" data-key-protected>Protected{s.keys.includes(d) ? " (as built)" : ""}</b> : own ? <>{keyName(own)} {own.on ? <b className="text-[#13895C]">(on)</b> : <span className="text-muted">(off)</span>}{own.line ? <span className="text-muted"> · line: {info(own.line).name}</span> : null}</> : s.keys.includes(d) ? "As built" : <span className="text-muted">Not used</span>}
                     </td>
                     <td className="td">{own && <form action={removeKeyAction}><input type="hidden" name="screen" value={id} /><input type="hidden" name="key" value={d} /><button className="text-xs font-bold text-[#C83A2F]">Back to as built</button></form>}</td>
                   </tr>
@@ -208,9 +208,12 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
               })}
             </tbody>
           </table>
+          {isProtectedScreen(id) ? (
+            <p className="rounded-xl bg-bg p-3 text-sm font-semibold" data-keys-protected>{PROTECTED_REASON}</p>
+          ) : (
           <form action={setKeyAction} className="grid gap-3 rounded-xl bg-bg p-3 md:grid-cols-3">
             <input type="hidden" name="screen" value={id} />
-            <label className="block"><span className="label">Key</span><select name="key" className="input">{"1234567890".split("").map((d) => <option key={d} value={d}>{d}{s.keys.includes(d) ? " (used now: this changes it)" : ""}</option>)}</select></label>
+            <label className="block"><span className="label">Key</span><select name="key" className="input">{"1234567890".split("").filter((d) => !protectedKeys(id).includes(d)).map((d) => <option key={d} value={d}>{d}{s.keys.includes(d) ? " (used now: this changes it)" : ""}</option>)}</select></label>
             <label className="block"><span className="label">What it does</span><select name="type" className="input">{Object.entries(KEY_ACTIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
             <label className="block"><span className="label">Its line (for a new key)</span><select name="line" className="input" defaultValue=""><option value="">None</option>{addedHere.map((r) => <option key={r} value={r}>{info(r).name}</option>)}</select></label>
             <label className="block"><span className="label">Go to (menu or step)</span><select name="target" className="input">{GO_TO_SCREENS.map((x) => <option key={x} value={x}>{x in SCREENS ? screenLabel(x) : x === "menu" ? "Main menu" : x}</option>)}</select></label>
@@ -224,7 +227,8 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
             <label className="flex items-center gap-2 font-semibold"><input type="checkbox" name="on" /> On</label>
             <div className="flex items-end"><button className="btn-dark">Save key</button></div>
           </form>
-          <p className="mt-2 text-xs text-muted">Only the box that matches &ldquo;What it does&rdquo; is used.</p>
+          )}
+          {!isProtectedScreen(id) && <p className="mt-2 text-xs text-muted">Only the box that matches &ldquo;What it does&rdquo; is used.</p>}
         </section>
       )}
     </div>

@@ -64,6 +64,10 @@ export async function publishScreens(userId: number | null, reason: string) {
     if (!draft || typeof draft !== "object") throw new ScreenDraftError("There are no draft changes to publish.");
     const live = await raw(LIVE_KEY, tx);
     if (same(draft, live)) throw new ScreenDraftError("The draft is the same as the live screens. Nothing to publish.");
+    // Hark's review item 3: the whole draft is checked again; no Admin key on a protected step
+    const { protectedKeyProblems, PROTECTED_REASON } = await import("@/lib/ivr/menu-editor");
+    const bad = protectedKeyProblems(draft as never);
+    if (bad.length) throw new ScreenDraftError(`Not published. ${PROTECTED_REASON} Remove these keys first: ${bad.join(", ")}.`);
     await writeSettingValue(tx, LIVE_KEY, draft, userId);
     await writeSettingValue(tx, DRAFT_KEY, null, userId);
     await tx.update(schema.configVersions).set({ status: "replaced" }).where(and(eq(schema.configVersions.key, LIVE_KEY), eq(schema.configVersions.status, "live")));
