@@ -12,7 +12,7 @@ import { linkHoldMinutes } from "@/lib/settings";
 import { webConsentCopy } from "@/lib/sms-terms-v2";
 import { smsNumberDisplay } from "@/lib/sms-number";
 import DualDate from "@/components/DualDate";
-import { LINK_TEXT, holdEnded, holdForCardPage, keepHoldWhileActive, linkOptionsActive, linkRulesActive, removedWithOptions } from "@/lib/late-payment";
+import { LINK_TEXT, linkHoldKindOf, holdEnded, holdForCardPage, keepHoldWhileActive, linkOptionsActive, linkRulesActive, removedWithOptions } from "@/lib/late-payment";
 import { checkAgainAction, chooseOptionAction } from "./actions";
 import { orderIdFromParam } from "@/lib/order-path";
 
@@ -164,8 +164,8 @@ export default async function PayPage({ params, searchParams }: { params: Promis
             <p className="mt-3 text-sm" data-link-gone>{LINK_TEXT.goneCall}</p>
           </section>
         )}
-        {rules && held && due > 0 && <p data-held-again className="mt-4 rounded-lg bg-[#e5f4e4] px-3 py-2 text-sm font-semibold">{LINK_TEXT.heldAgain(o.holdExpiresAt ? minutesLeft(o.holdExpiresAt) : await linkHoldMinutes(o.channel === "POS" ? "admin" : "phone"))}</p>}
-        {rules && o.status === "PENDING_PAYMENT" && due > 0 && <p data-card-note className="mt-3 text-sm">{LINK_TEXT.cardNote}</p>}
+        {rules && held && due > 0 && <p data-held-again className="mt-4 rounded-lg bg-[#e5f4e4] px-3 py-2 text-sm font-semibold">{LINK_TEXT.heldAgain(o.holdExpiresAt ? minutesLeft(o.holdExpiresAt) : await linkHoldMinutes(linkHoldKindOf(o)))}</p>}
+        {rules && o.status === "PENDING_PAYMENT" && due > 0 && <p data-card-note className="mt-3 text-sm">{LINK_TEXT.cardNote(await linkHoldMinutes(linkHoldKindOf(o)))}</p>}
         <div className="mt-6">
           {o.status === "PENDING_PAYMENT" && due > 0 ? <PayForm orderId={id} token={t!} consent={{ transactionalText: webConsentCopy().transactional, marketingText: webConsentCopy().marketing, smsNumber: smsNumberDisplay() }} /> : removed.length ? null : <p className="font-semibold">This order is not waiting for payment. Questions? Call (845) 777-7585.</p>}
         </div>

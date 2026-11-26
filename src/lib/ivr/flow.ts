@@ -1514,7 +1514,7 @@ async function deliverPayLink(ctx: Ctx, orderId: number, via: { phone?: string; 
   }
   if (sent) {
     const ids = days.map((d) => d.order.id);
-    await db.update(orders).set({ holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")), linkOpenedAt: null, updatedAt: new Date() }).where(and(inArray(orders.id, ids), eq(orders.status, "PENDING_PAYMENT")));
+    await db.update(orders).set({ holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")), linkHoldKind: "phone", linkOpenedAt: null, updatedAt: new Date() }).where(and(inArray(orders.id, ids), eq(orders.status, "PENDING_PAYMENT")));
   }
   await track(ctx.callSid, "step", `Payment link ${sent ? "sent" : "could not be sent"} by ${via.phone ? "text" : "email"} (order #${num})`, { orderId, sent });
   return sent;

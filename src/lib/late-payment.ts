@@ -93,7 +93,7 @@ export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now
         .update(schema.orders)
         .set({
           status: "PENDING_PAYMENT",
-          holdExpiresAt: inMinutes(o.channel === "POS" ? holdFor.admin : holdFor.phone, now),
+          holdExpiresAt: inMinutes(holdFor[linkHoldKindOf(o)], now),
           subtotalCents: sql`COALESCE((SELECT SUM(qty * unit_price_cents) FROM order_items WHERE order_id = ${o.id}), 0)`,
           totalCents: null, // re-priced below
           updatedAt: now,
@@ -128,8 +128,16 @@ export const LINK_TEXT = {
   // The nearest options (same as the phone line offers). Abraham's wording, Nov 13, 2026 (approved)
   optionsIntro: "Here are the nearest options that are free for you right now. Tap one to hold it for you:",
   // Abraham's wording, Nov 18, 2026 (approved; replaces the Nov 13 note): 10 minutes from the text, plus 4 once opened
-  cardNote: "This link holds your booking for 10 minutes. Once you open it, you get 4 more minutes to pay.",
+  // Abraham, Nov 26, 2026, 14:04 ("Go ahead, fix it"): the same approved words with this link's own hold minutes
+  // (phone-sent links: the phone hold, 10; staff and Admin links: the Admin hold, 25), never a fixed number
+  cardNote: (min: number) => `This link holds your booking for ${min} minutes. Once you open it, you get 4 more minutes to pay.`,
 };
+
+/** Which hold this order's payment link has: the one that sent it, else by how it was booked. */
+export function linkHoldKindOf(o: { linkHoldKind?: string | null; channel?: string | null }): "phone" | "admin" {
+  if (o.linkHoldKind === "phone" || o.linkHoldKind === "admin") return o.linkHoldKind;
+  return o.channel === "POS" ? "admin" : "phone"; // as before: New booking 25, everything else the phone hold
+}
 
 
 export type LinkOption = { kind: "bigger" | "smaller" | "before" | "after"; productId: number; name: string; date: string; priceCents: number };
@@ -177,7 +185,7 @@ export async function chooseLinkOption(primaryId: number, index: number, product
     const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, productId)).limit(1);
     const [primary] = await tx.select().from(schema.orders).where(eq(schema.orders.id, primaryId)).limit(1);
     if (!p?.active || !primary) return false;
-    const holdMin = primary.channel === "POS" ? holdFor.admin : holdFor.phone;
+    const holdMin = holdFor[linkHoldKindOf(primary)]; // the hold of the link that was sent (Nov 26, 2026)
     if ((await checkBookable(p.id, p.quantity, date, tx, pickup)) < entry.qty) return false;
     const groupIds = primary.paymentGroupId
       ? (await tx.select({ id: schema.orders.id }).from(schema.orders).where(eq(schema.orders.paymentGroupId, primary.paymentGroupId))).map((r) => r.id)

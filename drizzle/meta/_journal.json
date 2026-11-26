@@ -701,6 +701,13 @@
       "when": 1795800000000,
       "tag": "0099_order_services",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1795810000000,
+      "tag": "0100_link_hold_kind",
+      "breakpoints": true
     }
   ]
 }

@@ -150,6 +150,9 @@ export const orders = pgTable(
     spanDays: real("span_days"),
     /** When the customer first opened the payment link (Abraham, Nov 17, 2026: then 4 more minutes, once) */
     linkOpenedAt: timestamp("link_opened_at", { withTimezone: true }),
+    /** Who sent the last payment link (Abraham, Nov 26, 2026, 14:04): "phone" (the phone line's hold, 10 minutes) or
+     *  "admin" (staff in Admin or New booking, 25 minutes). Null = by the order's channel. The pay page says this hold. */
+    linkHoldKind: text("link_hold_kind"),
     /** sola | cash | check | other */
     paymentMethod: text("payment_method"),
     solaRefNum: text("sola_ref_num"),

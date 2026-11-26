@@ -3,7 +3,7 @@ import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { loadPromptOverrides, promptText } from "@/lib/ivr/prompts";
 import { getSettings } from "@/lib/settings";
-import { LINE_IDS, LINE_LABEL, effectiveLine, formatDateOverrides, formatWindows, loadHours, recordedHoursWarnings, scheduleWords, seasonAt, timeWords, type Schedule } from "@/lib/hours-schedule";
+import { LINE_IDS, LINE_LABEL, effectiveLine, formatDateOverrides, formatWindows, loadHours, OPERATOR_FRIDAY_SEASON, recordedHoursWarnings, scheduleWords, seasonAt, timeWords, type Schedule } from "@/lib/hours-schedule";
 import { addGroupAction, removeFromGroupAction, saveScheduleAction } from "./actions";
 
 export const metadata = { title: "Hours | Hup Up Attractions" };
@@ -54,7 +54,7 @@ export default async function HoursPage({ searchParams }: { searchParams: Promis
               </li>
             ))}
           </ul>
-          <ScheduleForm schedule={g.schedule} on={g.on} group={g.id} />
+          <ScheduleForm schedule={g.schedule} on={g.on} group={g.id} seasonAllowed={!g.members.includes("office")} />
         </section>
       ))}
 
@@ -64,7 +64,7 @@ export default async function HoursPage({ searchParams }: { searchParams: Promis
           <section key={id} className="card mb-5 p-5" data-hours-line={id}>
             <h2 className="text-xl font-black">{LINE_LABEL[id]}</h2>
             <p className="mb-3 text-sm text-muted">Now: {scheduleWords(e.schedule) || "Closed every day"}.</p>
-            <ScheduleForm schedule={e.schedule} on={e.on} line={id} />
+            <ScheduleForm schedule={e.schedule} on={e.on} line={id} seasonAllowed={id !== "office"} />
           </section>
         );
       })}
@@ -91,7 +91,7 @@ export default async function HoursPage({ searchParams }: { searchParams: Promis
   );
 }
 
-function ScheduleForm({ schedule, on, line, group }: { schedule: Schedule; on: boolean; line?: string; group?: string }) {
+function ScheduleForm({ schedule, on, line, group, seasonAllowed = true }: { schedule: Schedule; on: boolean; line?: string; group?: string; seasonAllowed?: boolean }) {
   return (
     <form action={saveScheduleAction} className="grid gap-4">
       {line && <input type="hidden" name="line" value={line} />}
@@ -109,7 +109,7 @@ function ScheduleForm({ schedule, on, line, group }: { schedule: Schedule; on: b
           </label>
         ))}
       </div>
-      {schedule.fridaySeason && <FridaySeasonFields schedule={schedule} />}
+      {seasonAllowed && <FridaySeasonFields schedule={schedule} />}
       <label className="flex items-center gap-2 text-sm font-semibold" data-shushan-purim>
         <input type="checkbox" name="closedShushanPurim" defaultChecked={Boolean(schedule.closedShushanPurim)} /> Closed on Shushan Purim (every year, 15 Adar; in a leap year 15 Adar II)
       </label>
@@ -134,14 +134,25 @@ function ScheduleForm({ schedule, on, line, group }: { schedule: Schedule; on: b
   );
 }
 
-/** The Operator's Friday closing by season (Abraham, Nov 26, 2026): editable, with the one in effect today. */
+/**
+ * Friday closing by season (Abraham, Nov 26, 2026: the Operator first; 14:04, every department): a tick to use it,
+ * the winter and summer times, the one in effect today, and the plain-English explanation. Not offered for the
+ * website and office hours, because the website would then show new words ("Season closing").
+ */
 function FridaySeasonFields({ schedule }: { schedule: Schedule }) {
-  const fs = schedule.fridaySeason!;
+  const fs = schedule.fridaySeason ?? OPERATOR_FRIDAY_SEASON;
   const now = seasonAt(new Date());
   return (
     <fieldset className="rounded-xl border border-line p-3" data-friday-season>
-      <legend className="px-1 text-sm font-semibold">Friday closing by season (Friday ends at &ldquo;Season closing&rdquo;)</legend>
-      <input type="hidden" name="season" value="1" />
+      <legend className="px-1 text-sm font-semibold">Friday closing by season</legend>
+      <label className="mb-2 flex items-center gap-2 text-sm font-semibold">
+        <input type="checkbox" name="season" value="1" defaultChecked={Boolean(schedule.fridaySeason)} data-season-on /> Close on Friday at a set time by season (instead of Chatzos)
+      </label>
+      <div className="mb-3 space-y-1 text-xs text-muted" data-season-help>
+        <p><b>What it does:</b> this line stops ringing on Friday at the winter time from the first Sunday of November, and at the summer time from the second Sunday of March. The clock change decides the season by itself every year.</p>
+        <p><b>How to use it:</b> tick the box, set both times, and write Friday as the opening time then Season closing, for example 09:30-Season closing.</p>
+        <p><b>If you change it:</b> the next call on a Friday follows the new time. It never rings past candle lighting. Untick it to go back to closing at Chatzos (then write Friday as 09:30-Chatzos).</p>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {(["winter", "summer"] as const).map((k) => (
           <label key={k} className="block">
