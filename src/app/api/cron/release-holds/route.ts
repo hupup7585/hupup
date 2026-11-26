@@ -37,5 +37,7 @@ export async function GET(req: Request) {
   // JOIN invitation: switched off until Abraham picks the wording (does nothing while off).
   const joinInvites = await runJob("JOIN invitations", () => sendJoinInvites());
   const backup = await runJob("Weekly backup by email", () => weeklyBackupEmail());
-  return Response.json({ released, voicemailAlerts, joinInvites });
+  // Gap review (Nov 26, 2026): texts and emails that failed in the last 24 hours, to the Owner when there are any
+  const failedSends = await runJob("Failed texts and emails report", async () => (await import("@/lib/ops-alerts")).failedSendsReport());
+  return Response.json({ released, voicemailAlerts, joinInvites, backup: Boolean(backup), failedSends });
 }

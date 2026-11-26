@@ -3,11 +3,28 @@ import { paymentReceivedNotices, recordPaymentResult } from "@/lib/payment-resul
 import { getPaymentGroup, markGroupPaid } from "@/lib/orders";
 import { linkPaymentToAcceptance } from "@/lib/rental-terms";
 import { parseMoneyToCents } from "@/lib/money";
+import { alertOwner, withCallbackAlert } from "@/lib/ops-alerts";
+import { sql } from "drizzle-orm";
+import { db } from "@/lib/db";
+
+/**
+ * A payment Sola already told us about (gap review, Nov 26, 2026): any earlier approved notice with the same Sola
+ * reference, not only the latest one on the order, so a repeat of an older payment is never counted twice.
+ */
+async function alreadyApproved(ref: string | null): Promise<boolean> {
+  if (!ref) return false;
+  const r = await db.execute(sql`SELECT 1 FROM audit_log WHERE action = 'payment.approved' AND after->>'solaRef' = ${ref} LIMIT 1`);
+  return r.rows.length > 0;
+}
 
 export const dynamic = "force-dynamic";
 
-/** Sola Payments (Cardknox) transaction webhook. */
+/** Sola Payments (Cardknox) transaction webhook. A failure emails the Owner and returns 500 so Sola sends it again. */
 export async function POST(req: Request) {
+  return withCallbackAlert("Sola", () => handle(req));
+}
+
+async function handle(req: Request): Promise<Response> {
   const raw = await req.text();
   const fields: Record<string, string> = {};
   new URLSearchParams(raw).forEach((v, k) => {
@@ -43,12 +60,20 @@ export async function POST(req: Request) {
   if (!isApproved(fields)) return new Response("ignored (not approved)");
 
   const cents = parseMoneyToCents(field(fields, "xAuthAmount") || field(fields, "xAmount") || "");
-  if (!orderId || cents === null) return new Response("ignored (no invoice/amount)");
+  if (!orderId || cents === null) {
+    await alertOwner("a Sola payment could not be matched to an order", `Sola sent an approved payment (reference ${field(fields, "xRefNum") ?? "none"}) without an order number or amount. Please check it in Sola and in Admin.`, { type: "payment_callback", id: field(fields, "xRefNum") ?? "sola" });
+    return new Response("ignored (no invoice/amount)");
+  }
   if (cents <= 0) return new Response("ignored (zero amount)");
+  // The same payment sent again (Sola retries): counted once, whatever came in between
+  if (await alreadyApproved(field(fields, "xRefNum") || null)) return new Response("ok (already recorded)");
 
   // One payment may cover several rental days booked together (a payment group); all of them are confirmed.
   const group = await getPaymentGroup(orderId);
-  if (!group) return new Response("unknown order", { status: 404 });
+  if (!group) {
+    await alertOwner("a Sola payment could not be matched to an order", `Sola sent an approved payment of $${(cents / 100).toFixed(2)} (reference ${field(fields, "xRefNum") ?? "none"}) for invoice ${field(fields, "xInvoice") ?? "(none)"}, but no such order was found. Please check it in Sola and in Admin.`, { type: "payment_callback", id: field(fields, "xRefNum") ?? "sola" });
+    return new Response("unknown order", { status: 404 });
+  }
   const before = group.primary;
   const days = group.orders;
   const updated = await markGroupPaid(orderId, cents, "sola", field(fields, "xRefNum") || null);

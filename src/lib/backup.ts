@@ -27,3 +27,50 @@ export async function buildBackup(now = new Date()) {
 }
 
 export const backupFileName = (now = new Date()) => `hupup-backup-${now.toISOString().slice(0, 10)}.json.gz`;
+
+/**
+ * Restore a backup made by buildBackup into an EMPTY database (gap review, Nov 26, 2026): never overwrites or deletes
+ * anything. A table that already has rows is skipped and reported. Tables are filled in as many passes as their links
+ * need (an order after its customer); each table's id counter is moved past the highest id restored. Left-out columns
+ * (keys, passwords, codes) come back empty and must be set again by hand.
+ */
+export async function restoreBackup(gz: Buffer | Uint8Array, exec: { execute: typeof db.execute } = db) {
+  const { gunzipSync } = await import("node:zlib");
+  const parsed = JSON.parse(gunzipSync(Buffer.from(gz)).toString("utf8")) as { tables: Record<string, Record<string, unknown>[]> };
+  const restored: Record<string, number> = {};
+  const skipped: Record<string, string> = {};
+  const exists = new Set((await exec.execute(sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`)).rows.map((r) => String((r as { table_name: string }).table_name)));
+  let pending = Object.keys(parsed.tables).filter((t) => {
+    if (!exists.has(t)) return (skipped[t] = "no such table here"), false;
+    return true;
+  });
+  for (const t of [...pending]) {
+    const n = Number(((await exec.execute(sql.raw(`SELECT count(*)::int AS n FROM "${t.replace(/"/g, "")}"`))).rows[0] as { n: number }).n);
+    if (n > 0) {
+      skipped[t] = `already has ${n} rows (nothing changed)`;
+      pending = pending.filter((x) => x !== t);
+    }
+  }
+  for (let pass = 0; pending.length && pass < 20; pass++) {
+    const failed: string[] = [];
+    for (const t of pending) {
+      const rows = parsed.tables[t];
+      const name = t.replace(/"/g, "");
+      try {
+        if (rows.length) {
+          await exec.execute(sql`INSERT INTO ${sql.raw(`"${name}"`)} SELECT * FROM json_populate_recordset(NULL::${sql.raw(`"${name}"`)}, ${JSON.stringify(rows)}::json)`);
+          const hasId = rows.some((r) => typeof r.id === "number");
+          if (hasId) await exec.execute(sql.raw(`SELECT setval(pg_get_serial_sequence('"${name}"', 'id'), (SELECT max(id) FROM "${name}"))`)).catch(() => null);
+        }
+        restored[t] = rows.length;
+      } catch (e) {
+        failed.push(t);
+        skipped[t] = (e as Error).message.slice(0, 200);
+      }
+    }
+    if (failed.length === pending.length) break; // no progress: report what could not be restored
+    for (const t of pending) if (!failed.includes(t)) delete skipped[t];
+    pending = failed;
+  }
+  return { restored, skipped };
+}
