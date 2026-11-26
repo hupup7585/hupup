@@ -2,6 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
 const h = vi.hoisted(() => ({ recorded: [] as Record<string, unknown>[], redirected: "" as string, order: null as unknown }));
+// No real database: an in-memory one (Hark's Phases 1-3 review, item 2)
+vi.mock("@/lib/db", async () => {
+  const { createMemoryDb } = await import("./helpers/memory-db");
+  const m = await createMemoryDb();
+  return { db: m.db, schema: m.schema };
+});
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-forwarded-for": "1.2.3.4", "user-agent": "UA" }) }));
 vi.mock("next/navigation", () => ({ redirect: (u: string) => ((h.redirected = u), undefined) }));
 vi.mock("@/lib/order-pricing", () => ({ ensurePriced: async () => true, ensureGroupPriced: async () => true })); // orders here are already priced

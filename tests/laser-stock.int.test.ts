@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq, inArray, sql } from "drizzle-orm";
 

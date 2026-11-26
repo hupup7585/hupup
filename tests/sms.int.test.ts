@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import twilio from "twilio";
 import { eq, inArray } from "drizzle-orm";
