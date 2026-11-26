@@ -65,3 +65,11 @@ describe("the Phone timing page", () => {
     expect(p.match(/<li>/g)!.length).toBeGreaterThanOrEqual(8);
   });
 });
+
+describe("item 6, until the staff-wait music is connected", () => {
+  it("the staff accept timer says the caller hears ringing, not hold music", () => {
+    const t = PHONE_TIMERS.find((x) => x.key === "timerStaffAccept")!;
+    expect(t.where).toContain("The caller hears ringing");
+    expect(t.where).not.toContain("hold music meanwhile");
+  });
+});
