@@ -83,6 +83,7 @@ export const NAV_GROUPS: Group[] = [
       ["/admin/campaigns", Megaphone, "Campaigns", OS],
       ["/admin/phone/prompts", Mic, "Hotline prompts", O],
       ["/admin/phone/screens", Mic, "Phone screens", O], // every screen's lines and keys, set in Admin (Nov 26, 2026)
+      ["/admin/phone/library", BookOpen, "Recording library", O], // every line, how it is recorded, where it plays (Phase 3)
       ["/admin/phone/menu-order", ListOrdered, "Menu order", O], // Nov 19, 2026: the order of each menu's recordings
       ["/admin/compliance", ShieldCheck, "Compliance", OS],
       ["/admin/phone/settings", PhoneForwarded, "Phone settings", O],
