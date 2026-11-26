@@ -1,3 +1,4 @@
+import { UNREACHED_SCREENS } from "@/lib/ivr/unreached.generated";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
@@ -128,6 +129,7 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
           <div><dt className="inline font-semibold">If you change it: </dt><dd className="inline text-muted">{SCREEN_EXPLANATIONS[id].ifChanged}</dd></div>
         </dl>
       )}
+      {UNREACHED_SCREENS.includes(id) && <p className="mb-4 rounded-xl bg-bg p-3 text-sm font-semibold" data-not-reached>Not reached (kept so old routes do not break): no call comes to this screen any more. Changes here do nothing until a step sends callers to it.</p>}
       <DraftBanner screen={id} />
       <details className="card my-3 p-4" data-screen-test>
         <summary className="cursor-pointer font-bold">Test this screen</summary>

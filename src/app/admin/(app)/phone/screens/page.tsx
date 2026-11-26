@@ -1,3 +1,4 @@
+import { UNREACHED_SCREENS } from "@/lib/ivr/unreached.generated";
 import Link from "next/link";
 import { requireOwner } from "@/lib/auth";
 import { allSlots } from "@/lib/recording-slots";
@@ -67,6 +68,7 @@ export default async function ScreensPage({ searchParams }: { searchParams?: Pro
               <li key={id}>
                 <Link href={`/admin/phone/screens/${encodeURIComponent(id)}`} className="block rounded-xl border border-line p-3 hover:bg-bg">
                   <span className="block font-bold">{screenLabel(id)}</span>
+                  {UNREACHED_SCREENS.includes(id) && <span className="block text-xs font-semibold text-muted" data-not-reached>Not reached (kept so old routes do not break)</span>}
                   <span className="block text-sm text-muted" data-screen-what>{SCREEN_EXPLANATIONS[id]?.what}</span>
                   <span className="block text-xs text-muted">
                     {SCREENS[id].lines.length} lines · keys used: {SCREENS[id].keys || "none"}{SCREENS[id].combos.length ? " · combined recording" : ""}

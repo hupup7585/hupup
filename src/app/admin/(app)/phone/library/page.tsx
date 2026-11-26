@@ -1,3 +1,4 @@
+import { UNREACHED_SCREENS } from "@/lib/ivr/unreached.generated";
 import Link from "next/link";
 import { requireOwner } from "@/lib/auth";
 import { KIND_HELP, KIND_LABEL, libraryReconciliation, recordingLibrary, type LibraryKind } from "@/lib/recording-library";
@@ -66,7 +67,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
               {e.screens.map((s, i) => (
                 <span key={s}>
                   {i ? ", " : ""}
-                  <Link className="text-navy underline" href={`/admin/phone/screens/${encodeURIComponent(s)}`}>{s}</Link>
+                  <Link className="text-navy underline" href={`/admin/phone/screens/${encodeURIComponent(s)}`}>{s}</Link>{UNREACHED_SCREENS.includes(s) ? <span className="text-muted" data-not-reached> (not reached: kept so old routes do not break)</span> : null}
                 </span>
               ))}
             </p>
