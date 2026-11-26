@@ -8,7 +8,7 @@ import { dueNow } from "@/lib/cron-schedule";
 export const dynamic = "force-dynamic";
 
 /**
- * Called every 5 minutes by the free Cloudflare scheduler Worker; does its work once an hour (see dueNow) (cloudflare/scheduler-worker.js). Vercel's free
+ * Called every 5 minutes by the free Cloudflare scheduler Worker; does its work every 3 hours (src/lib/cron-schedule.ts) (cloudflare/scheduler-worker.js). Vercel's free
  * plan runs its own scheduler only once a day, so the short jobs run here as well:
  * - release phone holds and unpaid orders whose time ran out
  * - send voicemail alerts that never went out
@@ -28,13 +28,13 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
-  if (!dueNow() && new URL(req.url).searchParams.get("all") !== "1") return Response.json({ skipped: "not due: the jobs run once an hour, without waking the database in between" });
-  const released = await runJob("Release ended holds (hourly)", () => releaseExpired());
-  const voicemailAlerts = await runJob("Voicemail alerts safety net (hourly)", () => notifyStragglers());
+  if (!dueNow() && new URL(req.url).searchParams.get("all") !== "1") return Response.json({ skipped: "not due: the jobs run every 3 hours, without waking the database in between" });
+  const released = await runJob("Release ended holds (every 3 hours)", () => releaseExpired());
+  const voicemailAlerts = await runJob("Voicemail alerts safety net (every 3 hours)", () => notifyStragglers());
   // Deleted voicemails are kept 30 days, then erased forever with their pieces (Nov 23, 2026)
   await runJob("Erase deleted voicemails after 30 days", async () => (await import("@/lib/vm-boxes")).purgeOldDeleted());
-  const heldPromotions = await runJob("Held promotional texts (hourly)", () => processHeldPromotions());
+  const heldPromotions = await runJob("Held promotional texts (every 3 hours)", () => processHeldPromotions());
   // Schedule send in the Admin Inbox (Abraham, Nov 19, 2026)
-  const scheduledEmails = await runJob("Scheduled emails (hourly)", () => sendScheduledEmails());
+  const scheduledEmails = await runJob("Scheduled emails (every 3 hours)", () => sendScheduledEmails());
   return Response.json({ released, voicemailAlerts, heldPromotions, scheduledEmails });
 }

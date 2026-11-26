@@ -5,12 +5,16 @@ import { inboxUnreadCount } from "@/lib/inbox";
 import Sidebar from "@/components/Sidebar";
 import DateInputHints from "@/components/DateInputHints";
 import { logoutAction } from "../login/actions";
+import { after } from "next/server";
+import { runWhileAwake } from "@/lib/cron-schedule";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Hup Up Attractions", robots: { index: false } };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const staff = await requireAdmin();
+  // Staff are using Admin, so the database is awake anyway: the time-sensitive jobs get a chance to run, after the page
+  after(() => runWhileAwake().catch((e) => console.error("[run while awake]", e)));
   return (
     <div className="min-h-screen bg-bg lg:flex">
       <Suspense fallback={null}>

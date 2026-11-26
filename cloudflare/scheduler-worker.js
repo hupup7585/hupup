@@ -1,8 +1,8 @@
 /**
  * Free scheduler for Hup Up Attractions (Cloudflare Workers, free plan, no card needed). Nov 15, 2026.
  *
- * Every hour it calls the website's short jobs: /api/cron/frequent (release ended holds, voicemail alert safety net,
- * held promotional texts). The site runs them once an hour whatever the schedule (Neon free plan, Nov 26, 2026). Vercel's free plan can only run its own scheduler once a day.
+ * Every 3 hours it calls the website's short jobs: /api/cron/frequent (release ended holds, voicemail alert safety net,
+ * held promotional texts). The site runs them every 3 hours whatever the schedule (Neon free plan, Nov 26, 2026). Vercel's free plan can only run its own scheduler once a day.
  *
  * Worker settings (set by cloudflare/wrangler.scheduler.toml, plus one secret):
  *   SITE_URL      https://hupupattractions.com   (plain text, in the toml file)

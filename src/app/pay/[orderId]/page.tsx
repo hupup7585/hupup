@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { runWhileAwake } from "@/lib/cron-schedule";
 import { prefillFor } from "@/lib/pay-prefill";
 import { paymentsClosedLine } from "@/lib/payments-closed";
 import { notFound, redirect } from "next/navigation";
@@ -21,6 +23,8 @@ const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
 /** Review-and-pay page (from the payment text). Terms must be accepted with an unchecked box before Sola. */
 export default async function PayPage({ params, searchParams }: { params: Promise<{ orderId: string }>; searchParams: Promise<{ t?: string; held?: string }> }) {
+  // The payment page reads the database anyway: the time-sensitive jobs get a chance to run, after the page
+  after(() => runWhileAwake().catch((e) => console.error("[run while awake]", e)));
   const { orderId } = await params;
   const { t, held } = await searchParams;
   const id = orderIdFromParam(orderId); // the order number (1077) or an older id link (77)
