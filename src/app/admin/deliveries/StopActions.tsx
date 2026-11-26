@@ -84,7 +84,7 @@ export default function StopActions({ orderId, phone, stop, done, stage }: { ord
       ) : (
         <div className="space-y-2">
           <textarea className="input" rows={2} value={problem} onChange={(e) => setProblem(e.target.value)} placeholder="What happened? For example: no one home, wrong address, item damaged" aria-label="What is the problem" />
-          <button type="button" className="btn-dark w-full" disabled={pending || !problem.trim()} onClick={() => start(async () => { const r = await stageAction(orderId, stop, "problem", problem); setMsg(r); if (r.ok) setProblem(null); })}>
+          <button type="button" className="btn-dark w-full" disabled={pending} onClick={() => (!problem.trim() ? setMsg({ ok: false, message: "Type what went wrong first." }) : start(async () => { const r = await stageAction(orderId, stop, "problem", problem); setMsg(r); if (r.ok) setProblem(null); }))}>
             Send to the office
           </button>
         </div>

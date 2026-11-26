@@ -91,6 +91,7 @@ export default function ReplyForm({ phone }: { phone: string }) {
       className="mt-4 space-y-2"
       onSubmit={(e) => {
         e.preventDefault();
+        if (!body.trim() && !files.length) return setError("Type a message or attach a file first.");
         send();
       }}
     >
@@ -117,10 +118,10 @@ export default function ReplyForm({ phone }: { phone: string }) {
       )}
       <div className="flex flex-wrap items-center gap-3">
         <input ref={input} type="file" multiple accept="image/jpeg,image/png,image/gif,application/pdf,audio/mpeg,audio/wav,.mp3,.wav" className="hidden" onChange={(e) => pick(e.target.files)} data-file-input />
-        <button type="button" className="btn-ghost" disabled={pending || files.length >= MAX_FILES} onClick={() => input.current?.click()} data-attach>
+        <button type="button" className="btn-ghost" disabled={pending} onClick={() => (files.length >= MAX_FILES ? setError(`Up to ${MAX_FILES} files in one text. Remove one first.`) : input.current?.click())} data-attach>
           <Paperclip className="mr-1 inline h-4 w-4" aria-hidden /> Attach
         </button>
-        <button className="btn-dark" disabled={pending || (!body.trim() && !files.length)}>{pending ? "Sending..." : "Send text"}</button>
+        <button className="btn-dark" disabled={pending}>{pending ? "Sending..." : "Send text"}</button>
         {files.length > 0 && <span className="text-xs text-muted">{files.length} file{files.length > 1 ? "s" : ""}, {mb(total)} of 5 MB</span>}
         {sent && <span className="text-sm font-semibold text-[#13895C]">Sent.</span>}
         {error && <span role="alert" className="text-sm font-semibold text-[#C83A2F]">{error}</span>}

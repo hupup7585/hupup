@@ -52,7 +52,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </p>
         {others !== undefined && <p role="status" className="mb-3 text-sm font-semibold text-[#13895C]">Saved. {others === "0" ? "No other devices were signed in." : `Signed out ${others} other ${others === "1" ? "device" : "devices"}.`}</p>}
         <form action={signOutOtherDevicesAction}>
-          <button className="btn-ghost" disabled={sessions.length < 2}>Sign out all other devices</button>
+          <button className="btn-ghost">Sign out all other devices</button>
         </form>
       </section>
     </div>

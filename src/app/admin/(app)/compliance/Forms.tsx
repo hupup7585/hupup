@@ -10,7 +10,7 @@ export function ReportIssueForm() {
   return (
     <div>
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="What happened? For example: a promotional text went to someone who replied STOP, a message went to the wrong person, a lost phone, or a login you don't recognize." className="w-full rounded-xl border p-3 text-sm" />
-      <button type="button" className="btn-dark mt-2" disabled={pending || !text.trim()} onClick={() => start(async () => { const r = await reportIssueAction(text); setMsg(r); if (r.ok) setText(""); })}>
+      <button type="button" className="btn-dark mt-2" disabled={pending} onClick={() => (!text.trim() ? setMsg({ ok: false, message: "Type what happened first." }) : start(async () => { const r = await reportIssueAction(text); setMsg(r); if (r.ok) setText(""); }))}>
         {pending ? "Sending..." : "Report to the owner now"}
       </button>
       {msg && <p className={`mt-2 text-sm font-semibold ${msg.ok ? "text-[#13895C]" : "text-coral"}`}>{msg.message}</p>}

@@ -183,7 +183,12 @@ export default function ReplyForm(props: { emailId?: number; to?: string; active
       </div>
       <div className="mt-3 flex items-center gap-3">
         <span className="inline-flex">
-          <button className={`btn-dark ${isNew ? "!rounded-r-none" : ""}`} disabled={!props.active || pending || !body.trim() || (isNew && (!to.trim() || !subject.trim()))} onClick={() => start(send)}>
+          <button className={`btn-dark ${isNew ? "!rounded-r-none" : ""}`} disabled={pending} onClick={() => {
+            // Every button answers (Abraham, Nov 26, 2026): say what is missing instead of a greyed-out button
+            const why = !props.active ? "Email sending is not set up yet: replies go out once the info@ sender is set up." : isNew && !to.trim() ? "Type who the email goes to first." : isNew && !subject.trim() ? "Type a subject first." : !body.trim() ? "Write the message first." : null;
+            if (why) return setMsg({ ok: false, message: why });
+            start(send);
+          }}>
             {isNew ? "Send email" : "Send reply"}
           </button>
           {isNew && (

@@ -64,7 +64,7 @@ export default function OrderActions(props: {
 
       <div className="card p-5">
         <h2 className="mb-3 font-bold">Payment</h2>
-        <button className="btn-dark mb-4 w-full" disabled={pending || !props.hasPhone || props.due <= 0} onClick={() => run(() => sendPayLinkAction(props.orderId))}>
+        <button className="btn-dark mb-4 w-full" disabled={pending} onClick={() => (!props.hasPhone ? setMsg({ ok: false, message: "This customer has no mobile number. Add it on the customer, then send the link." }) : props.due <= 0 ? setMsg({ ok: false, message: "Nothing is left to pay on this order." }) : run(() => sendPayLinkAction(props.orderId)))}>
           Send payment link by text
         </button>
         <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
