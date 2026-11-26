@@ -197,6 +197,24 @@ function fmt(d: Date) {
   return d.toLocaleTimeString("en-US", { timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit" });
 }
 
+/**
+ * Reopen time after Shabbes or Yom Tov (Hark's review C1, Nov 26, 2026): minutes after sunset from Admin, or tzeis.
+ * Never earlier than nightfall (tzeis, 8.5 degrees), whatever is stored, so a mistyped small number can never open
+ * the hotline or bookings during Shabbes or Yom Tov.
+ */
+function reopenTime(z: ReturnType<typeof zmanim>, reopenAfter: string): Date {
+  const nightfall = z.tzeit(8.5);
+  const t = String(reopenAfter ?? "").trim();
+  const chosen = /^\d+$/.test(t) ? new Date(z.sunset().getTime() + Number(t) * 60_000) : nightfall;
+  return nightfall && chosen.getTime() < nightfall.getTime() ? nightfall : chosen;
+}
+
+/** Candle lighting, minutes before sunset: 10 to 60 from Admin; anything else uses 18 (the earlier, safer close). */
+export function candleMinutes(v: string | number | undefined): number {
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 10 && n <= 60 ? n : 18;
+}
+
 /** Everything about one calendar day. */
 export function dayInfo(iso: string, s: CalendarSettings = calendarDefaults()): DayInfo {
   const hd = hebrewFromISO(iso);
@@ -214,11 +232,11 @@ export function dayInfo(iso: string, s: CalendarSettings = calendarDefaults()): 
   if (!today.closed && yes(s.calendarEnabled) && !overrides(s).get(iso)?.open && shabbosOrYomTov(tomorrow) && !fullClosed(iso, { ...s, calendarOverrides: "" }).closed) {
     const isShabbos = weekday(tomorrow) === 6 && !kinds(tomorrow).kinds.has("yomtov");
     const mode = isShabbos ? s.erevShabbosClose : s.erevYomTovClose;
-    closesAt = mode === "candles" ? new Date(z.sunset().getTime() - (Number(s.candleLightingMinutes) || 18) * 60_000) : z.chatzot();
+    closesAt = mode === "candles" ? new Date(z.sunset().getTime() - candleMinutes(s.candleLightingMinutes) * 60_000) : z.chatzot();
     closesAtLabel = `${isShabbos ? "Erev Shabbes" : "Erev Yom Tov"}: closes at ${mode === "candles" ? "candle lighting" : "chatzos"} (${fmt(closesAt)})`;
   }
   if (today.closed && shabbosOrYomTov(iso) && !fullClosed(tomorrow, s).closed) {
-    reopensAt = /^\d+$/.test(s.reopenAfter.trim()) ? new Date(z.sunset().getTime() + Number(s.reopenAfter) * 60_000) : z.tzeit(8.5);
+    reopensAt = reopenTime(z, s.reopenAfter);
   }
   return {
     date: iso,
@@ -240,7 +258,7 @@ export function dayInfo(iso: string, s: CalendarSettings = calendarDefaults()): 
 /** Candle lighting on Erev Shabbes / Erev Yom Tov (Monroe, NY 10950 zmanim), or null on other days. */
 export function erevCandleLighting(iso: string, s: CalendarSettings = calendarDefaults()): Date | null {
   if (!shabbosOrYomTov(addDaysISO(iso, 1)) || shabbosOrYomTov(iso)) return null;
-  return new Date(zmanim(iso, s).sunset().getTime() - (Number(s.candleLightingMinutes) || 18) * 60_000);
+  return new Date(zmanim(iso, s).sunset().getTime() - candleMinutes(s.candleLightingMinutes) * 60_000);
 }
 
 /** Today is Shabbes or Yom Tov (nothing rings). */
@@ -303,7 +321,7 @@ export function bookingLock(at: Date = new Date(), s: CalendarSettings = calenda
     let last = d;
     while (shabbosOrYomTov(addDaysISO(last, 1))) last = addDaysISO(last, 1);
     const z = zmanim(last, s);
-    const opens = /^\d+$/.test(String(s.reopenAfter).trim()) ? new Date(z.sunset().getTime() + Number(s.reopenAfter) * 60_000) : z.tzeit(8.5);
+    const opens = reopenTime(z, s.reopenAfter);
     // Hark for Abraham, Nov 19, 2026: after Shabbes the hotline stays closed until 2 minutes after Rabbeinu Tam
     return opens && weekday(last) === 6 ? new Date(opens.getTime() + SHABBES_EXTRA_MINUTES * 60_000) : opens;
   };

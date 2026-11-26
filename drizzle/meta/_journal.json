@@ -687,6 +687,13 @@
       "when": 1795780000000,
       "tag": "0097_config_versions",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1795790000000,
+      "tag": "0098_config_versions_rules",
+      "breakpoints": true
     }
   ]
 }

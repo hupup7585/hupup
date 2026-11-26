@@ -2,14 +2,17 @@ import { SETTING_DEFAULTS } from "@/lib/settings";
 import { CONFIG_USAGE } from "@/lib/config-usage.generated";
 import { CONFIG_EXPLANATIONS, type Explanation } from "@/lib/config-explanations";
 import { PHONE_TIMERS } from "@/lib/ivr/timers";
+import { rules, type Rule } from "@/lib/setting-rules";
 
 /**
- * Admin handoff Phase 2 (Abraham, Nov 26, 2026): one typed registry of every Admin setting. Each entry has a plain
- * label and explanation, its type and limits, its current default, where it is used, and whether it is customer
- * wording (publishing it is the Owner's approval of the exact words). Live values stay in app_settings, so the phone
- * line, website and Admin read them exactly as before; drafts and history live in config_versions.
+ * Admin handoff Phase 2 (Abraham, Nov 26, 2026), tightened after Hark's Phase 1-2 review (H1, H4, H5, H6, M1, M2, M7,
+ * M8): one explicit entry for EVERY setting. A setting is edited on All settings only when this file can check the
+ * value completely, with the same limits the code uses. Settings whose checks live on their own Admin page are shown
+ * read-only with a link (that page checks them). Protected, paid, unused and system-filled settings are locked with
+ * the reason. Nothing is guessed from the default value.
  */
 export type ConfigType = "bool" | "int" | "number" | "text" | "list" | "choice" | "json";
+export type ConfigMode = "edit" | "page" | "locked";
 export type ConfigDef = {
   key: string;
   label: string;
@@ -21,102 +24,147 @@ export type ConfigDef = {
   max?: number;
   choices?: string[];
   /** Customer-facing words: publishing needs the Owner's explicit approval of the exact text. */
-  wording?: boolean;
-  /** Edited on its own Admin page (a structured value); shown here read-only with a link. */
+  wording: boolean;
+  mode: ConfigMode;
+  /** mode page: the Admin page that edits and checks it. */
   page?: string;
-  /** Protected: shown with the reason, never editable here. */
+  /** mode locked: why it cannot be changed here. */
   locked?: string;
+  /** mode edit: the check for a typed value (with type and limits). */
+  rule?: Rule;
   usedBy: string[];
   /** Plain-English explanation: what it does, where customers meet it, what happens if changed (Nov 26, 2026). */
   explain: Explanation | null;
 };
 
-/** Plain-English labels, limits and groups for the settings that need more than their name. */
-const META: Record<string, Partial<ConfigDef>> = {
-  phoneLinkHoldMinutes: { label: "Payment link hold, phone (minutes)", help: "How long a payment link sent from the phone line holds the rentals.", group: "Payments", type: "int", min: 1, max: 240 },
-  adminLinkHoldMinutes: { label: "Payment link hold, Admin New booking (minutes)", help: "How long a payment link sent from New booking holds the rentals.", group: "Payments", type: "int", min: 1, max: 240 },
-  salesTaxPercent: { label: "Sales tax (percent)", help: "Applied to the whole order including delivery. Review with the accountant before changing.", group: "Fees and tax", type: "number", min: 0, max: 20 },
-  deliveryFeeKjCents: { label: "Delivery fee, Kiryas Joel (cents)", help: "1000 = $10.00.", group: "Fees and tax", type: "int", min: 0, max: 100000 },
-  deliveryFeeAreaCents: { label: "Delivery fee, nearby towns (cents)", help: "1500 = $15.00.", group: "Fees and tax", type: "int", min: 0, max: 100000 },
-  deliveryFeeOutsideCents: { label: "Delivery fee, rest of Orange County (cents)", help: "2000 = $20.00.", group: "Fees and tax", type: "int", min: 0, max: 100000 },
-  laserThirdSetHalfOn: { label: "Laser tag: every third set half price", help: "On: the set added third is half price.", group: "Offers and discounts", type: "bool" },
-  offerThuSunOn: { label: "Offer: Thursday to Sunday at 1.5 times", group: "Offers and discounts", type: "bool" },
-  offerFourthSundayOn: { label: "Offer: 4th Sunday free", group: "Offers and discounts", type: "bool" },
-  phonePayTriesPerCall: { label: "Card tries per call", group: "Payments", type: "int", min: 1, max: 10 },
-  phonePayCallsPerDay: { label: "Calls with card tries per number in 24 hours", group: "Payments", type: "int", min: 1, max: 50 },
-  candleLightingMinutes: { label: "Candle lighting (minutes before sunset)", help: "Used for the Erev Shabbes and Erev Yom Tov close.", group: "Hours and calendar", type: "int", min: 0, max: 60 },
-  reopenAfter: { label: "Reopen after Shabbes and Yom Tov", help: "Minutes after sunset, or tzeis.", group: "Hours and calendar", type: "text" },
-  erevShabbosClose: { label: "Erev Shabbes closes at", group: "Hours and calendar", type: "choice", choices: ["chatzos", "candles"] },
-  erevYomTovClose: { label: "Erev Yom Tov closes at", group: "Hours and calendar", type: "choice", choices: ["chatzos", "candles"] },
-  calendarEnabled: { label: "Shabbes and Yom Tov closing", group: "Hours and calendar", type: "choice", choices: ["yes", "no"], locked: "Shabbes and Yom Tov closures are protected and cannot be switched off from Admin." },
-  calendarLatitude: { label: "Zmanim location: latitude", help: "Monroe, NY. Used for chatzos, candle lighting and reopening.", group: "Hours and calendar", type: "number", min: -90, max: 90 },
-  calendarLongitude: { label: "Zmanim location: longitude", group: "Hours and calendar", type: "number", min: -180, max: 180 },
-  offersIntro: { label: "Offers page: line at the top", group: "Offers and discounts", type: "text", wording: false, help: "Shown to staff only." },
-  nameSpeakingRate: { label: "Speaking rate for names", group: "Phone: voice", type: "number", min: 0.5, max: 2 },
-  hoursSchedules: { label: "Every line's hours", page: "/admin/hours", group: "Hours and calendar", type: "json" },
-  menuOrders: { label: "Menu order", page: "/admin/phone/menu-order", group: "Phone: menus", type: "json" },
-  deliveryAreas: { label: "Delivery map areas", page: "/admin/delivery-settings", group: "Delivery", type: "json" },
-  catalogTextItems: { label: "Catalog pictures for texts", page: "/admin/catalog-send", group: "Texts and emails", type: "json" },
-  holidayFridayMutzeDays: { label: "Friday plus Mutze Shabbes: days charged", group: "Offers and discounts", type: "number", min: 1, max: 3 },
-  paidPromoSkipOptedIn: { label: "After payment, Line 8: skip it for callers who already get promotions", group: "Phone: after payment", type: "bool" },
-  disconnectGoodbyeOn: { label: "Disconnect goodbye (Line 7) before every automatic hang-up on a silent call", group: "Phone: after payment", type: "bool" },
-  disconnectSilenceMinutes: { label: "Disconnect check: minutes of silence with items in the cart", group: "Phone: after payment", type: "int", min: 1, max: 10 },
-  disconnectCheckSeconds: { label: "Disconnect check: seconds to wait for a key", group: "Phone: after payment", type: "int", min: 1, max: 15 },
-  holidayMutzeAloneDays: { label: "Mutze Shabbes alone: days charged", group: "Offers and discounts", type: "number", min: 0.5, max: 3 },
+type Spec = Partial<Omit<ConfigDef, "key" | "default" | "usedBy" | "explain" | "help">> & { mode: ConfigMode; group: string };
+
+const PROTECTED = "Shabbes and Yom Tov closures are protected and cannot be switched off from Admin.";
+const NOT_IN_USE = "Not in use: nothing reads this setting now (Needs Claude to connect before it can be changed).";
+const SYSTEM = "Filled in by the system; nothing to change by hand.";
+
+const page = (path: string, group: string, extra: Partial<Spec> = {}): Spec => ({ mode: "page", page: path, group, ...extra });
+const lock = (why: string, group: string, extra: Partial<Spec> = {}): Spec => ({ mode: "locked", locked: why, group, ...extra });
+
+/** Exact settings first; families (by pattern) after. Every key in SETTING_DEFAULTS must match one (tested). */
+const EXACT: Record<string, Spec> = {
+  // Editable here (fully checked, same limits as the code)
+  phoneLinkHoldMinutes: { mode: "edit", label: "Payment link hold, phone (minutes)", group: "Payments", type: "int", min: 1, max: 240 },
+  adminLinkHoldMinutes: { mode: "edit", label: "Payment link hold, Admin New booking (minutes)", group: "Payments", type: "int", min: 1, max: 240 },
+  nameSpeakingRate: { mode: "edit", label: "Speaking rate for names", group: "Phone: voice", type: "number", min: 0.5, max: 2 },
+  paidPromoSkipOptedIn: { mode: "edit", label: "After payment, Line 8: skip it for callers who already get promotions", group: "Phone: after payment", type: "bool" },
+  disconnectGoodbyeOn: { mode: "edit", label: "Disconnect goodbye (Line 7) before every automatic hang-up on a silent call", group: "Phone: after payment", type: "bool" },
+  disconnectSilenceMinutes: { mode: "edit", label: "Disconnect check: minutes of silence with items in the cart", group: "Phone: after payment", type: "int", min: 1, max: 10 },
+  disconnectCheckSeconds: { mode: "edit", label: "Disconnect check: seconds to wait for a key", group: "Phone: after payment", type: "int", min: 1, max: 15 },
+
+  // Locked
+  calendarEnabled: lock(PROTECTED, "Hours and calendar", { label: "Shabbes and Yom Tov closing" }),
+  googleLiveVoice: lock("A paid service (Google voice). It stays off and cannot be turned on from Admin; ask Claude if this is ever wanted.", "Phone: voice", { label: "Google voice for the changing parts" }),
+  callRecording: lock("Waits for the Owner's approval of the recording notice; switched only on Phone settings, never from this list.", "Phone: ringing", { label: "Call recording", page: "/admin/phone/settings" }),
+  smsHelpText: lock(NOT_IN_USE, "Texts and emails", { label: "HELP reply words (not in use)", wording: true }),
+  smsHelpReplyEnabled: lock(NOT_IN_USE, "Texts and emails", { label: "HELP reply switch (not in use)" }),
+  supportPhone: lock(NOT_IN_USE, "Texts and emails", { label: "Support phone (not in use)" }),
+  operatorAcceptText: lock(NOT_IN_USE, "Phone: ringing", { label: "Old staff accept words (not in use)" }),
+  phonePayDeclinesPerDay: lock("Not in use: the card code reads it but it has no effect (replaced by the calls-per-day limit).", "Payments", { label: "Old declines-per-day limit (not in use)" }),
+  catalogTextMissingAt: lock(SYSTEM, "Texts and emails", { label: "Last catalog text asked for with no pictures" }),
+  deliveryAreasLoadedAt: lock(SYSTEM, "Delivery", { label: "Delivery map last loaded" }),
+  glBaseCurrency: lock("Fixed: the books are kept in US dollars.", "Bookkeeping", { label: "Bookkeeping currency" }),
+
+  // Edited on their own pages
+  hoursSchedules: page("/admin/hours", "Hours and calendar", { label: "Every line's hours", type: "json" }),
+  menuOrders: page("/admin/phone/menu-order", "Phone: menus", { label: "Menu order", type: "json" }),
+  calendarOverrides: page("/admin/holidays", "Hours and calendar", { label: "Dates opened or closed by hand", type: "list" }),
+  hoursWebsiteNote: page("/admin/settings", "Hours and calendar", { label: "Website note under the hours", wording: true }),
+  ownerUsername: page("/admin/staff", "Sign-in", { label: "Owner sign-in username" }),
+  stockAddress: page("/admin/settings", "Delivery", { label: "Warehouse address (delivery routes)" }),
+  salesTaxPercent: page("/admin/settings", "Fees and tax", { label: "Sales tax (percent)", type: "number" }),
+  zoneKjPlaces: page("/admin/settings", "Delivery", { label: "Kiryas Joel place names", type: "list" }),
+  zoneAreaPlaces: page("/admin/settings", "Delivery", { label: "Nearby town names", type: "list" }),
+  emailSignature: page("/admin/settings", "Texts and emails", { label: "Email signature", wording: true }),
+  emailMailingAddress: page("/admin/settings", "Texts and emails", { label: "Mailing address in promotional emails", wording: true }),
+  catalogName: page("/admin/catalog-send", "Texts and emails", { label: "Catalog name (in the email subject)", wording: true }),
+  catalogEmailSubjectText: page("/admin/catalog-send", "Texts and emails", { label: "Catalog email subject", wording: true }),
+  catalogEmailBodyText: page("/admin/catalog-send", "Texts and emails", { label: "Catalog email words", wording: true }),
+  catalogTextItems: page("/admin/catalog-send", "Texts and emails", { label: "Catalog pictures for texts", type: "json" }),
+  catalogAutoAttach: page("/admin/catalog-send", "Texts and emails", { label: "Attach the catalog file to the catalog email", type: "bool" }),
+  catalogTextPicture1: page("/admin/catalog", "Texts and emails", { label: "Catalog text picture 1" }),
+  catalogTextPicture2: page("/admin/catalog", "Texts and emails", { label: "Catalog text picture 2" }),
+  achirdWholeLine: page("/admin/phone/prompts/slots", "Phone: voice", { label: "Whole lines from recorded pieces", type: "bool" }),
+  offersIntro: page("/admin/offers", "Offers and discounts", { label: "Offers page: line at the top" }),
+  deliveryAreas: page("/admin/delivery-settings", "Delivery", { label: "Delivery map areas", type: "json" }),
+  localStreets: page("/admin/delivery-settings", "Delivery", { label: "Kiryas Joel $10 streets", type: "list" }),
+  blockedCallers: page("/admin/phone/settings", "Phone: ringing", { label: "Blocked callers", type: "list" }),
+  smsTestOnly: page("/admin/phone/settings", "Texts and emails", { label: "Customer texts to test numbers only", type: "bool" }),
+  smsTestNumbers: page("/admin/phone/settings", "Texts and emails", { label: "Texting test numbers", type: "list" }),
+  smsForwardEnabled: page("/admin/phone/settings", "Texts and emails", { label: "Copy incoming texts to the Owner", type: "bool" }),
+  smsForwardPhone: page("/admin/phone/settings", "Texts and emails", { label: "Phone for copies of incoming texts" }),
+  voicemailMms: page("/admin/voicemail", "Texts and emails", { label: "Voicemail sound file in the alert text", type: "bool" }),
+  missedCallAlerts: page("/admin/voicemail", "Texts and emails", { label: "Missed-call alerts", type: "bool" }),
+  incomingTextEmail: page("/admin/voicemail", "Texts and emails", { label: "Email copy of incoming texts", type: "bool" }),
+  paymentTestNumbers: page("/admin/phone/phonepay", "Payments", { label: "Card payment test numbers", type: "list" }),
+  phoneCardProvider: page("/admin/phone/phonepay", "Payments", { label: "Card payment service on the phone", type: "choice", choices: ["sola", "stripe"] }),
+  solaListenOn: page("/admin/phone/phonepay", "Payments", { label: "Sola listening helper", type: "bool" }),
 };
 
-for (const t of PHONE_TIMERS) META[t.key] = { label: t.label, group: "Phone: timing", type: "int", min: t.min, max: t.max };
-
-/** Words in a key that tell its group, when META does not. */
-const GROUP_BY_WORD: [RegExp, string][] = [
-  [/^(ring|operator)/i, "Phone: ringing"],
-  [/^(phonePay|solaPhonePay|solaListen|phoneCard|payment)/i, "Payments"],
-  [/^(music)/i, "Phone: music"],
-  [/^(sms|incomingText|missedCall|voicemail)/i, "Texts and emails"],
-  [/^(email|catalog)/i, "Texts and emails"],
-  [/^(delivery|zone|local)/i, "Delivery"],
-  [/^(hours|close|calendar|holiday)/i, "Hours and calendar"],
-  [/^(offer|laser)/i, "Offers and discounts"],
+const FAMILIES: [RegExp, Spec][] = [
+  [/^timer[A-Z]/, { mode: "edit", group: "Phone: timing", type: "int" }], // limits filled in from timers.ts below
+  [/^(ring[A-Z][A-Za-z]*\d|operator(Targets|Mode|AcceptPrompt))$/, page("/admin/phone/settings", "Phone: ringing")],
+  [/^(solaPhonePay|phonePay)/, page("/admin/phone/phonepay", "Payments")],
+  [/^music[A-Z]/, page("/admin/phone/music", "Phone: music")],
+  [/^(deliveryFee|deliveryPromo)/, page("/admin/delivery-settings", "Fees and tax")],
+  [/^(solaFee|book[A-Z]|gl[A-Z])/, page("/admin/bookkeeping", "Bookkeeping")],
+  [/^(laserThirdSetHalfOn|offer[A-Z]|holiday[A-Z])/, page("/admin/offers", "Offers and discounts")],
+  [/^(erev|candle|reopen|close[A-Z]|calendar(Latitude|Longitude)|hours[A-Z])/, page("/admin/settings", "Hours and calendar")],
 ];
 
+const TIMER = new Map(PHONE_TIMERS.map((t) => [t.key, t]));
+
+export function specFor(key: string): Spec | null {
+  const t = TIMER.get(key as never);
+  if (t) return { mode: "edit", group: "Phone: timing", type: "int", min: t.min, max: t.max, label: t.label };
+  return EXACT[key] ?? FAMILIES.find(([re]) => re.test(key))?.[1] ?? null;
+}
+
 const SECRET = /(apikey|api_key|secret|token|password|pin$|webhook)/i;
-const WORDING_KEY = /(Text|Intro|Subject|Body|Signature|Greeting|Line|Wording)$/;
 
 function humanize(key: string) {
   return key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
 }
-function inferType(v: unknown): ConfigType {
-  if (typeof v === "boolean") return "bool";
-  const s = String(v);
-  if (s === "yes" || s === "no") return "choice";
-  if (/^-?\d+$/.test(s)) return "int";
-  if (/^-?\d*\.\d+$/.test(s)) return "number";
-  if (s.includes("\n")) return "list";
-  return "text";
+const displayType = (v: unknown): ConfigType => (typeof v === "boolean" ? "bool" : "text");
+
+function ruleFor(type: ConfigType, min?: number, max?: number, choices?: string[]): Rule | undefined {
+  if (type === "int" && min !== undefined && max !== undefined) return rules.wholeBetween(min, max);
+  if (type === "number" && min !== undefined && max !== undefined) return rules.numberBetween(min, max);
+  if (type === "choice" && choices) return rules.oneOf(choices);
+  if (type === "bool") return (v) => (["on", "off", "true", "false", ""].includes(v.trim()) ? null : "Choose on or off.");
+  return undefined;
 }
 
-/** Every Admin setting, typed, with its defaults and where it is used (secrets are never listed). */
+/** Every Admin setting with its explicit entry (secrets are never listed). */
 export function configDefs(): ConfigDef[] {
   return Object.entries(SETTING_DEFAULTS as Record<string, unknown>)
     .filter(([k]) => !SECRET.test(k))
     .map(([key, def]) => {
-      const m = META[key] ?? {};
-      const type = m.type ?? inferType(def);
+      const s = specFor(key) ?? lock("No entry in the settings list yet (Needs Claude to connect).", "Other settings");
+      const type = s.type ?? displayType(def);
+      const explain = CONFIG_EXPLANATIONS[key] ?? null;
       return {
         key,
-        label: m.label ?? humanize(key),
-        help: m.help ?? CONFIG_EXPLANATIONS[key]?.what ?? "",
-        group: m.group ?? GROUP_BY_WORD.find(([re]) => re.test(key))?.[1] ?? "Other settings",
+        label: s.label ?? humanize(key),
+        help: explain?.what ?? "",
+        group: s.group,
         type,
         default: def,
-        min: m.min,
-        max: m.max,
-        choices: m.choices ?? (type === "choice" ? ["yes", "no"] : undefined),
-        wording: m.wording ?? (type === "text" && WORDING_KEY.test(key)),
-        page: m.page,
-        locked: m.locked,
+        min: s.min,
+        max: s.max,
+        choices: s.choices,
+        wording: s.wording ?? false,
+        mode: s.mode,
+        page: s.page,
+        locked: s.locked,
+        rule: s.mode === "edit" ? (s.rule ?? ruleFor(type, s.min, s.max, s.choices)) : undefined,
         usedBy: CONFIG_USAGE[key] ?? [],
-        explain: CONFIG_EXPLANATIONS[key] ?? null,
+        explain,
       } satisfies ConfigDef;
     });
 }
@@ -125,45 +173,15 @@ export function configDef(key: string): ConfigDef | null {
   return configDefs().find((d) => d.key === key) ?? null;
 }
 
-const PHONE = /^\+1\d{10}$/;
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 /** Check a typed value against its setting; returns the value to store, or a plain-English reason. */
 export function validateConfig(def: ConfigDef, raw: string): { ok: true; value: unknown } | { ok: false; error: string } {
-  if (def.locked) return { ok: false, error: def.locked };
-  if (def.page) return { ok: false, error: `This is edited on its own page: ${def.page}` };
-  const t = raw.trim();
-  switch (def.type) {
-    case "bool":
-      return t === "on" || t === "true" ? { ok: true, value: true } : t === "off" || t === "false" || t === "" ? { ok: true, value: false } : { ok: false, error: "Choose on or off." };
-    case "int":
-    case "number": {
-      if (t === "") return { ok: false, error: "Enter a number." };
-      const n = Number(t);
-      if (!Number.isFinite(n) || (def.type === "int" && !Number.isInteger(n))) return { ok: false, error: def.type === "int" ? "Enter a whole number." : "Enter a number." };
-      if (def.min !== undefined && n < def.min) return { ok: false, error: `The lowest allowed is ${def.min}.` };
-      if (def.max !== undefined && n > def.max) return { ok: false, error: `The highest allowed is ${def.max}.` };
-      if (n < 0 && def.min === undefined) return { ok: false, error: "Negative numbers are not allowed here." };
-      return { ok: true, value: String(n) };
-    }
-    case "choice":
-      return def.choices?.includes(t) ? { ok: true, value: t } : { ok: false, error: `Choose one of: ${def.choices?.join(", ")}.` };
-    case "list":
-    case "text": {
-      if (t.length > 5000) return { ok: false, error: "That is too long (5,000 characters at most)." };
-      if (/Phone$/.test(def.key) && t && !PHONE.test(t)) return { ok: false, error: "Enter the phone number as +1 and 10 digits, for example +18454157585." };
-      if (/Email$/.test(def.key) && t && !EMAIL.test(t)) return { ok: false, error: "Enter a full email address." };
-      if (def.type === "list") {
-        const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
-        if (/Numbers$/.test(def.key)) {
-          const bad = lines.find((l) => !PHONE.test(l));
-          if (bad) return { ok: false, error: `Not a phone number: ${bad}. Use +1 and 10 digits.` };
-        }
-        return { ok: true, value: lines.join("\n") };
-      }
-      return { ok: true, value: t };
-    }
-    default:
-      return { ok: false, error: "This setting is edited on its own page." };
-  }
+  if (def.mode === "locked") return { ok: false, error: def.locked ?? "This setting is locked." };
+  if (def.mode === "page") return { ok: false, error: `This is edited and checked on its own page: ${def.page}` };
+  if (!def.rule) return { ok: false, error: "This setting has no check yet, so it cannot be changed here." };
+  const t = raw.replace(/\r/g, "").trim();
+  const reason = def.rule(t);
+  if (reason) return { ok: false, error: reason };
+  if (def.type === "bool") return { ok: true, value: t === "on" || t === "true" };
+  if (def.type === "int" || def.type === "number") return { ok: true, value: String(Number(t)) };
+  return { ok: true, value: t };
 }

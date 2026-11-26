@@ -25,7 +25,7 @@ describe("everything editable", () => {
   });
   // (the generated where-used list and the explanations file name every setting, so they are left out)
   it("the settings listed as unused are really not read anywhere", () => {
-    const lib = files("src").filter((f) => !f.endsWith("lib/settings.ts") && !f.endsWith("config-usage.generated.ts") && !f.endsWith("config-explanations.ts")).map((f) => readFileSync(f, "utf8")).join("\n");
+    const lib = files("src").filter((f) => !f.endsWith("lib/settings.ts") && !/(config-usage\.generated|config-explanations|config-registry|setting-rules)\.ts$/.test(f)).map((f) => readFileSync(f, "utf8")).join("\n");
     for (const k of UNUSED.filter((x) => x !== "phonePayDeclinesPerDay")) expect(new RegExp(`\\b${k}\\b`).test(lib), k).toBe(false);
   });
 });

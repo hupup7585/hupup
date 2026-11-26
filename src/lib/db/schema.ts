@@ -1718,7 +1718,8 @@ export const configVersions = pgTable(
     key: text("key").notNull(),
     value: jsonb("value"),
     previous: jsonb("previous"),
-    status: text("status").$type<"draft" | "live" | "discarded">().notNull().default("draft"),
+    // replaced: was live, then a newer value went live (Hark's review M13/L8, Nov 26, 2026)
+    status: text("status").$type<"draft" | "live" | "discarded" | "replaced">().notNull().default("draft"),
     reason: text("reason"),
     createdBy: integer("created_by"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

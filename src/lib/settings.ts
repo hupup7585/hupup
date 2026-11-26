@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME } from "@/lib/config";
 import { TIMER_DEFAULTS } from "@/lib/ivr/timers";
@@ -307,11 +307,48 @@ export async function getSettings(): Promise<Settings> {
   return out;
 }
 
-export async function saveSetting<K extends keyof Settings>(key: K, value: Settings[K], userId?: number | null) {
-  await db
+/** Values in the history are kept wrapped ({ v }) so "12" stays the text "12" (the database turns a bare "12" into 12). */
+export const wrapValue = (v: unknown) => ({ v }) as never;
+export const unwrapValue = (x: unknown): unknown => (x && typeof x === "object" && "v" in (x as object) ? (x as { v: unknown }).v : x);
+type Tx = Pick<typeof db, "select" | "insert" | "update">;
+
+/**
+ * The value really stored for a setting (or its default), with no fallbacks filled in from the server (Hark's review
+ * M6: a blank forward phone must not be recorded as the server's phone number).
+ */
+export async function rawSetting(key: string, tx: Tx = db): Promise<unknown> {
+  const [row] = await tx.select({ value: schema.appSettings.value }).from(schema.appSettings).where(eq(schema.appSettings.key, key)).limit(1);
+  const def = (SETTING_DEFAULTS as Record<string, unknown>)[key];
+  if (!row) return def;
+  const v = row.value;
+  return typeof def === "string" && v !== null && typeof v !== "string" ? (typeof v === "object" ? JSON.stringify(v) : String(v)) : v;
+}
+
+const sameValue = (a: unknown, b: unknown) => (typeof a === "object" || typeof b === "object" ? JSON.stringify(a) === JSON.stringify(b) : String(a) === String(b));
+
+/** Write the live value only (no history row): used inside a publish, which records its own version. */
+export async function writeSettingValue(tx: Tx, key: string, value: unknown, userId: number | null) {
+  await tx
     .insert(schema.appSettings)
-    .values({ key, value, updatedBy: userId ?? null })
-    .onConflictDoUpdate({ target: schema.appSettings.key, set: { value, updatedAt: new Date(), updatedBy: userId ?? null } });
+    .values({ key, value: value as never, updatedBy: userId })
+    .onConflictDoUpdate({ target: schema.appSettings.key, set: { value: value as never, updatedAt: new Date(), updatedBy: userId } });
+}
+
+/**
+ * Save a setting from any Admin page or the system (Hark's review H3, Nov 26, 2026): the live value and a history row
+ * (the value before, the new value, who, and which page) are written together, so All settings shows every change and
+ * Undo always knows the real value before. A save that changes nothing writes no history.
+ */
+export async function saveSetting<K extends keyof Settings>(key: K, value: Settings[K], userId?: number | null, source = "Saved on its Admin page") {
+  const write = async (tx: Tx) => {
+    const before = await rawSetting(key, tx);
+    await writeSettingValue(tx, key, value, userId ?? null);
+    if (sameValue(before, value)) return;
+    await tx.update(schema.configVersions).set({ status: "replaced" }).where(and(eq(schema.configVersions.key, key), eq(schema.configVersions.status, "live")));
+    await tx.insert(schema.configVersions).values({ key, value: wrapValue(value), previous: wrapValue(before), status: "live", reason: source.slice(0, 300), createdBy: userId ?? null, publishedBy: userId ?? null, publishedAt: new Date() });
+  };
+  if (typeof db.transaction === "function") await db.transaction((tx) => write(tx as unknown as Tx));
+  else await write(db);
 }
 
 export async function deleteSetting(key: string) {

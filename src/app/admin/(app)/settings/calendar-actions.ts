@@ -5,24 +5,16 @@ import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { getSettings, saveSetting } from "@/lib/settings";
 import { CALENDAR_KEYS } from "./calendar-keys";
-
-
+import { checkCalendarValues } from "@/lib/setting-rules";
 
 /** Owner only: save the Jewish-calendar open/closed settings. Every change is audited. */
 export async function saveCalendarSettingsAction(values: Record<string, string>): Promise<{ ok: boolean; message: string }> {
   const owner = await requireOwner();
   const before = await getSettings();
-  const bad = (values.calendarOverrides ?? "")
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l && !/^\d{4}-\d{2}-\d{2}\s+(open|closed)\b/i.test(l));
-  if (bad.length) return { ok: false, message: `Override lines must look like "2027-01-01 closed" or "2027-04-25 open". Check: ${bad[0]}` };
-  const time = /^\d{1,2}:\d{2}$/;
-  const span = /^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/;
-  for (const [k, re] of [["hoursMonThu", span], ["hoursSunday", span], ["hoursCholHamoed", span], ["hoursChanukah", span], ["hoursFridayOpen", time], ["hoursMotzeiCloseWinter", time], ["hoursMotzeiCloseSummer", time]] as const) {
-    if (k in values && !re.test(String(values[k]).trim())) return { ok: false, message: `Check the format of ${k}: use 24-hour times like 10:30 or 10:30-19:00.` };
-  }
-  if ("hoursMotzeiOpen" in values && !/^(tzeis(\+\d{1,3})?|\d{1,2}:\d{2})$/.test(String(values.hoursMotzeiOpen).trim())) return { ok: false, message: 'Motzei Shabbes opening: "tzeis+120" (2 hours after Shabbes), "tzeis", or a time like 20:00.' };
+  // One set of rules with All settings (Hark's review C1, Nov 26, 2026): reopen never before nightfall, candle
+  // lighting 10 to 60 minutes, the zmanim location in Orange County, Shabbes and Yom Tov closing protected
+  const reason = checkCalendarValues(Object.fromEntries(Object.entries(values).filter(([k]) => (CALENDAR_KEYS as readonly string[]).includes(k)).map(([k, v]) => [k, String(v)])));
+  if (reason) return { ok: false, message: `Not saved. ${reason}` };
   const changed: Record<string, [string, string]> = {};
   for (const k of CALENDAR_KEYS) {
     if (!(k in values)) continue;

@@ -8,6 +8,7 @@ import { db, schema } from "@/lib/db";
 import { FEATURE_SWITCHES } from "@/lib/feature-switches";
 import { unwrap } from "@/lib/config-versions";
 import { discardAction, publishAction, saveDraftAction, undoAction } from "./actions";
+import { OK_MESSAGES } from "./messages";
 
 export const metadata = { title: "All settings | Hup Up Attractions" };
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
     <div className="w-full" data-config-page>
       <h1 className="text-2xl font-black sm:text-3xl">All settings</h1>
       <p className="mb-4 mt-1 text-muted">Every setting in one place. A change is saved as a draft first; customers see nothing until you publish it. Every change is kept, with who changed it and when, and can be undone.</p>
-      {sp.ok && <p className="mb-4 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]" role="status">{sp.ok}</p>}
+      {sp.ok && sp.ok in OK_MESSAGES && <p className="mb-4 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]" role="status">{OK_MESSAGES[sp.ok as keyof typeof OK_MESSAGES]}</p>}
       {sp.err && <p className="mb-4 rounded-xl bg-[#FFE6E4] p-3 font-semibold text-[#C83A2F]" role="alert">{sp.err}</p>}
       <form className="mb-5 flex gap-2" role="search">
         <input name="q" defaultValue={sp.q ?? ""} className="input max-w-md" placeholder="Search settings, for example hold, tax, ring" />
@@ -78,10 +79,12 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
                       {d.max !== undefined ? ` · highest ${d.max}` : ""}
                       {d.usedBy.length ? ` · used in ${d.usedBy.length} place${d.usedBy.length === 1 ? "" : "s"}: ${d.usedBy.slice(0, 4).join(", ")}${d.usedBy.length > 4 ? "…" : ""}` : ""}
                     </p>
-                    {d.locked ? (
-                      <p className="mt-2 text-sm font-semibold text-[#5C4600]" data-config-locked>Protected: {d.locked}</p>
-                    ) : d.page ? (
-                      <p className="mt-2 text-sm"><Link className="text-navy underline" href={d.page}>Edit on its own page</Link></p>
+                    {d.mode === "locked" ? (
+                      <p className="mt-2 text-sm font-semibold text-[#5C4600]" data-config-locked>Locked: {d.locked}{d.page ? <> <Link className="text-navy underline" href={d.page}>Open its page</Link></> : null}</p>
+                    ) : d.mode === "page" ? (
+                      <p className="mt-2 text-sm" data-config-page-link>
+                        Changed and checked on its own page: <Link className="text-navy underline" href={d.page!}>open it</Link>. Every change there is kept in the history below.
+                      </p>
                     ) : (
                       <form action={saveDraftAction} className="mt-2 flex flex-wrap items-end gap-2">
                         <input type="hidden" name="key" value={d.key} />
@@ -90,12 +93,12 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
                           <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="value" defaultChecked={Boolean(draft ? unwrap(draft.value) : live[d.key])} /> On</label>
                         ) : d.type === "choice" ? (
                           <select name="value" defaultValue={current} className="input w-auto">{d.choices?.map((c) => <option key={c}>{c}</option>)}</select>
-                        ) : d.type === "list" || (d.type === "text" && current.length > 60) ? (
+                        ) : d.type === "list" || d.type === "text" ? (
                           <textarea name="value" rows={3} defaultValue={current} className="input min-w-[18rem] flex-1" />
                         ) : (
                           <input name="value" defaultValue={current} className="input w-auto min-w-[10rem]" inputMode={d.type === "int" || d.type === "number" ? "decimal" : undefined} />
                         )}
-                        <input name="reason" className="input w-auto min-w-[12rem]" placeholder="Reason (optional)" />
+                        <input name="reason" required minLength={3} className="input w-auto min-w-[12rem]" placeholder="Reason (kept in the history)" />
                         <button className="btn-dark">Save draft</button>
                       </form>
                     )}
@@ -103,13 +106,14 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
                       <div className="mt-2 flex flex-wrap gap-2">
                         <form action={publishAction} className="flex items-center gap-2">
                           <input type="hidden" name="key" value={d.key} />
+                          <input type="hidden" name="version" value={draft.id} />
                           {d.wording && <label className="flex items-center gap-1 text-sm"><input type="checkbox" name="approveWords" /> I approve these exact words</label>}
                           <button className="btn-dark">Publish (make live)</button>
                         </form>
-                        <form action={discardAction}><input type="hidden" name="key" value={d.key} /><button className="rounded-full px-3 py-1 text-sm font-semibold text-[#C83A2F] underline">Discard draft</button></form>
+                        <form action={discardAction}><input type="hidden" name="key" value={d.key} /><input type="hidden" name="version" value={draft.id} /><button className="rounded-full px-3 py-1 text-sm font-semibold text-[#C83A2F] underline">Discard draft</button></form>
                       </div>
                     )}
-                    {lastLive && (
+                    {lastLive && d.mode === "edit" && !draft && (
                       <form action={undoAction} className="mt-1"><input type="hidden" name="key" value={d.key} /><button className="text-xs font-semibold text-navy underline">Undo the last published change</button></form>
                     )}
                     {hist.length > 0 && (

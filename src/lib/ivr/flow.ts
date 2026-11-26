@@ -612,12 +612,14 @@ async function cartSilence(ctx: Ctx) {
 }
 async function disconnectCheckDue(since: number) {
   const s = await getSettings();
-  const minutes = Number(s.disconnectSilenceMinutes) > 0 ? Number(s.disconnectSilenceMinutes) : 3;
+  const m = Number(s.disconnectSilenceMinutes);
+  const minutes = Number.isInteger(m) && m >= 1 && m <= 10 ? m : 3; // the same limits as Admin (Hark's review H4)
   return Date.now() - since >= minutes * 60_000;
 }
 async function disconnectCheck(vr: VR, ctx: Ctx) {
   const s = await getSettings();
-  const wait = Number(s.disconnectCheckSeconds) > 0 ? Number(s.disconnectCheckSeconds) : 3;
+  const w = Number(s.disconnectCheckSeconds);
+  const wait = Number.isInteger(w) && w >= 1 && w <= 15 ? w : 3; // the same limits as Admin (Hark's review H4)
   await track(ctx.callSid, "step", "Disconnect check: no key with items in the cart");
   const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: wait, finishOnKey: "", action: url("disconnect-key", { to: ctx.query.get("to") || "menu", q: ctx.query.get("q") || undefined }), method: "POST" });
   sp(g, ctx, "disconnect_check");

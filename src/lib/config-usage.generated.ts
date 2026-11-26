@@ -3,49 +3,36 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "smsForwardEnabled": [
   "app/admin/(app)/phone/settings/page.tsx",
   "app/admin/(app)/settings/texting-actions.ts",
-  "lib/config-explanations.ts",
   "lib/sms-inbound.ts"
  ],
  "voicemailMms": [
   "app/admin/(app)/voicemail/actions.ts",
   "app/admin/(app)/voicemail/page.tsx",
-  "lib/config-explanations.ts",
   "lib/voicemail.ts"
  ],
  "missedCallAlerts": [
   "app/admin/(app)/voicemail/actions.ts",
   "app/admin/(app)/voicemail/page.tsx",
-  "lib/config-explanations.ts",
   "lib/owner-alerts.ts"
  ],
  "incomingTextEmail": [
   "app/admin/(app)/voicemail/actions.ts",
   "app/admin/(app)/voicemail/page.tsx",
-  "lib/config-explanations.ts",
   "lib/owner-alerts.ts"
  ],
  "smsForwardPhone": [
   "app/admin/(app)/phone/settings/page.tsx",
   "app/admin/(app)/settings/texting-actions.ts",
-  "lib/config-explanations.ts",
   "lib/sms-inbound.ts"
  ],
- "smsHelpReplyEnabled": [
-  "lib/config-explanations.ts"
- ],
- "smsHelpText": [
-  "lib/config-explanations.ts"
- ],
- "supportPhone": [
-  "lib/config-explanations.ts"
- ],
+ "smsHelpReplyEnabled": [],
+ "smsHelpText": [],
+ "supportPhone": [],
  "deliveryFeeKjCents": [
   "app/admin/(app)/delivery-settings/area-actions.ts",
   "app/admin/(app)/delivery-settings/page.tsx",
   "app/admin/(app)/settings/PricingForms.tsx",
   "app/admin/(app)/settings/pricing-actions.ts",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/delivery-areas.ts",
   "lib/pricing.ts"
  ],
@@ -54,29 +41,22 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/delivery-settings/page.tsx",
   "app/admin/(app)/settings/PricingForms.tsx",
   "app/admin/(app)/settings/pricing-actions.ts",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/delivery-areas.ts",
   "lib/pricing.ts"
  ],
  "deliveryFeeOutsideCents": [
   "app/admin/(app)/delivery-settings/area-actions.ts",
   "app/admin/(app)/delivery-settings/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/delivery-areas.ts"
  ],
  "deliveryPromoOn": [
   "app/admin/(app)/delivery-settings/area-actions.ts",
   "app/admin/(app)/delivery-settings/page.tsx",
-  "lib/config-explanations.ts",
   "lib/delivery-areas.ts"
  ],
  "laserThirdSetHalfOn": [
   "app/admin/(app)/offers/actions.ts",
   "app/admin/(app)/offers/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/feature-switches.ts",
   "lib/ivr/flow.ts",
   "lib/orders.ts"
@@ -86,136 +66,106 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/offers/page.tsx",
   "app/admin/(app)/pos/actions.ts",
   "app/admin/(app)/pos/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/feature-switches.ts",
   "lib/offers.ts"
  ],
  "offersIntro": [
   "app/admin/(app)/offers/actions.ts",
-  "app/admin/(app)/offers/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts"
+  "app/admin/(app)/offers/page.tsx"
  ],
  "offerFourthSundayOn": [
   "app/admin/(app)/offers/actions.ts",
   "app/admin/(app)/offers/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/feature-switches.ts",
   "lib/offers.ts"
  ],
  "catalogTextPicture1": [
   "app/admin/(app)/catalog/actions.ts",
-  "lib/catalog-send.ts",
-  "lib/config-explanations.ts"
+  "lib/catalog-send.ts"
  ],
  "musicStaffWait": [
   "app/admin/(app)/phone/music/actions.ts",
-  "lib/config-explanations.ts",
   "lib/music.ts"
  ],
  "emailSignature": [
   "app/admin/(app)/settings/email-actions.ts",
   "app/admin/(app)/settings/page.tsx",
-  "lib/config-explanations.ts",
   "lib/notify.ts"
  ],
  "catalogName": [
   "app/admin/(app)/catalog-send/actions.ts",
   "app/admin/(app)/catalog-send/page.tsx",
-  "lib/catalog-send.ts",
-  "lib/config-explanations.ts"
+  "lib/catalog-send.ts"
  ],
  "emailMailingAddress": [
   "app/admin/(app)/settings/email-actions.ts",
   "app/admin/(app)/settings/page.tsx",
-  "lib/config-explanations.ts",
   "lib/notify.ts"
  ],
  "catalogTextItems": [
   "app/admin/(app)/catalog-send/actions.ts",
   "app/admin/(app)/catalog-send/page.tsx",
-  "lib/catalog-send.ts",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts"
+  "lib/catalog-send.ts"
  ],
  "catalogTextMissingAt": [
   "app/admin/(app)/catalog-send/page.tsx",
-  "lib/catalog-send.ts",
-  "lib/config-explanations.ts"
+  "lib/catalog-send.ts"
  ],
  "catalogAutoAttach": [
   "app/admin/(app)/catalog-send/actions.ts",
   "app/admin/(app)/catalog-send/page.tsx",
-  "lib/catalog-send.ts",
-  "lib/config-explanations.ts"
+  "lib/catalog-send.ts"
  ],
  "catalogEmailSubjectText": [
   "app/admin/(app)/catalog-send/actions.ts",
   "app/admin/(app)/catalog-send/page.tsx",
-  "lib/catalog-send.ts",
-  "lib/config-explanations.ts"
+  "lib/catalog-send.ts"
  ],
  "catalogEmailBodyText": [
   "app/admin/(app)/catalog-send/actions.ts",
   "app/admin/(app)/catalog-send/page.tsx",
-  "lib/catalog-send.ts",
-  "lib/config-explanations.ts"
+  "lib/catalog-send.ts"
  ],
  "musicPayConnect": [
-  "lib/config-explanations.ts",
   "lib/music.ts"
  ],
  "nameSpeakingRate": [
   "app/admin/(app)/settings/hold-actions.ts",
   "app/admin/(app)/settings/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/ivr/flow.ts"
  ],
  "phoneLinkHoldMinutes": [
   "app/admin/(app)/settings/hold-actions.ts",
-  "app/admin/(app)/settings/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts"
+  "app/admin/(app)/settings/page.tsx"
  ],
  "adminLinkHoldMinutes": [
   "app/admin/(app)/settings/hold-actions.ts",
-  "app/admin/(app)/settings/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts"
+  "app/admin/(app)/settings/page.tsx"
  ],
  "catalogTextPicture2": [
   "app/admin/(app)/catalog/actions.ts",
-  "lib/catalog-send.ts",
-  "lib/config-explanations.ts"
+  "lib/catalog-send.ts"
  ],
  "deliveryPromoStart": [
   "app/admin/(app)/delivery-settings/area-actions.ts",
   "app/admin/(app)/delivery-settings/page.tsx",
-  "lib/config-explanations.ts",
   "lib/delivery-areas.ts"
  ],
  "deliveryPromoEnd": [
   "app/admin/(app)/delivery-settings/area-actions.ts",
   "app/admin/(app)/delivery-settings/page.tsx",
-  "lib/config-explanations.ts",
   "lib/delivery-areas.ts"
  ],
  "salesTaxPercent": [
   "app/admin/(app)/settings/PricingForms.tsx",
   "app/admin/(app)/settings/page.tsx",
   "app/admin/(app)/settings/pricing-actions.ts",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/pricing.ts"
  ],
  "zoneKjPlaces": [
   "app/admin/(app)/delivery-settings/page.tsx",
   "app/admin/(app)/settings/PricingForms.tsx",
   "app/admin/(app)/settings/pricing-actions.ts",
-  "lib/config-explanations.ts",
   "lib/delivery-areas.ts",
   "lib/pricing.ts"
  ],
@@ -223,133 +173,108 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/delivery-settings/page.tsx",
   "app/admin/(app)/settings/PricingForms.tsx",
   "app/admin/(app)/settings/pricing-actions.ts",
-  "lib/config-explanations.ts",
   "lib/delivery-areas.ts",
   "lib/pricing.ts"
  ],
  "ownerUsername": [
   "app/admin/(app)/staff/actions.ts",
   "app/admin/(app)/staff/page.tsx",
-  "lib/auth.ts",
-  "lib/config-explanations.ts"
+  "lib/auth.ts"
  ],
  "solaPhonePayOn": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
   "lib/sola-phonepay.ts",
   "lib/stripe-pay-voice.ts"
  ],
  "phonePayTriesPerCall": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/phonepay-watch.ts"
  ],
  "phonePayDeclinesPerDay": [
-  "lib/config-explanations.ts",
   "lib/phonepay-watch.ts"
  ],
  "phonePayCallsPerDay": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/phonepay-watch.ts"
  ],
  "holidayPerDayChanukah": [
   "app/admin/(app)/offers/actions.ts",
   "app/admin/(app)/offers/page.tsx",
-  "lib/config-explanations.ts",
   "lib/holiday-rentals.ts",
   "lib/offers.ts"
  ],
  "holidayPerDayCholHamoed": [
   "app/admin/(app)/offers/actions.ts",
   "app/admin/(app)/offers/page.tsx",
-  "lib/config-explanations.ts",
   "lib/holiday-rentals.ts",
   "lib/offers.ts"
  ],
  "holidayNoPromos": [
   "app/admin/(app)/offers/actions.ts",
   "app/admin/(app)/offers/page.tsx",
-  "lib/config-explanations.ts",
   "lib/holiday-rentals.ts",
   "lib/offers.ts"
  ],
  "holidayPickupAfterShabbesMin": [
   "app/admin/(app)/offers/actions.ts",
   "app/admin/(app)/offers/page.tsx",
-  "lib/config-explanations.ts",
   "lib/holiday-rentals.ts"
  ],
  "holidayMutzeDeliveryAfterMin": [
   "app/admin/(app)/offers/actions.ts",
   "app/admin/(app)/offers/page.tsx",
-  "lib/config-explanations.ts",
   "lib/holiday-rentals.ts"
  ],
  "holidaySundayPickup": [
   "app/admin/(app)/offers/actions.ts",
   "app/admin/(app)/offers/page.tsx",
-  "lib/config-explanations.ts",
   "lib/holiday-rentals.ts"
  ],
  "holidayFridayMutzeDays": [
   "app/admin/(app)/offers/actions.ts",
   "app/admin/(app)/offers/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/holiday-rentals.ts",
   "lib/offers.ts"
  ],
  "holidayMutzeAloneDays": [
   "app/admin/(app)/offers/actions.ts",
   "app/admin/(app)/offers/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/holiday-rentals.ts"
  ],
  "phonePayDeclineHangupSeconds": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
   "lib/phonepay-watch.ts"
  ],
  "solaListenOn": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
   "lib/ivr/flow.ts",
   "lib/phonepay-watch.ts"
  ],
  "phonePaySilenceSeconds": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
   "lib/phonepay-watch.ts"
  ],
  "menuOrders": [
   "app/admin/(app)/phone/menu-order/actions.ts",
   "app/admin/(app)/phone/menu-order/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/ivr/flow.ts",
   "lib/ivr/menu-order.ts"
  ],
  "solaPhonePayOwnerOnly": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
   "lib/ivr/flow.ts",
   "lib/sola-phonepay.ts"
  ],
  "solaPhonePayNumber": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
   "lib/ivr/flow.ts",
   "lib/sola-phonepay.ts",
   "lib/stripe-pay-voice.ts"
@@ -357,7 +282,6 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "solaPhonePayBackup": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
   "lib/ivr/flow.ts",
   "lib/sola-phonepay.ts",
   "lib/stripe-pay-voice.ts"
@@ -365,7 +289,6 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "solaPhonePayDigits": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
   "lib/ivr/flow.ts",
   "lib/sola-phonepay.ts",
   "lib/stripe-pay-voice.ts"
@@ -373,155 +296,123 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "solaPhonePayCustomDigits": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
   "lib/ivr/flow.ts",
   "lib/stripe-pay-voice.ts"
  ],
  "solaPhonePayCustomCapCents": [
   "app/admin/(app)/phone/phonepay/actions.ts",
-  "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts"
+  "app/admin/(app)/phone/phonepay/page.tsx"
  ],
  "paymentTestNumbers": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
   "lib/ivr/flow.ts",
   "lib/sola-phonepay.ts"
  ],
  "phoneCardProvider": [
   "app/admin/(app)/phone/phonepay/actions.ts",
   "app/admin/(app)/phone/phonepay/page.tsx",
-  "lib/config-explanations.ts",
   "lib/ivr/flow.ts",
   "lib/phone-pay.ts"
  ],
  "deliveryAreas": [
   "app/admin/(app)/delivery-settings/area-actions.ts",
   "app/admin/(app)/delivery-settings/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/delivery-areas.ts"
  ],
  "achirdWholeLine": [
   "app/admin/(app)/phone/prompts/slots/actions.ts",
   "app/admin/(app)/phone/prompts/slots/page.tsx",
-  "lib/config-explanations.ts",
   "lib/ivr/prompts.ts"
  ],
  "googleLiveVoice": [
   "app/admin/(app)/phone/prompts/slots/actions.ts",
   "app/admin/(app)/phone/prompts/slots/page.tsx",
   "app/api/voice-audio/live/route.ts",
-  "lib/config-explanations.ts",
   "lib/ivr/prompts.ts"
  ],
  "smsTestOnly": [
   "app/admin/(app)/phone/settings/page.tsx",
   "app/admin/(app)/settings/texting-actions.ts",
-  "lib/config-explanations.ts",
   "lib/feature-switches.ts",
   "lib/sms.ts"
  ],
  "smsTestNumbers": [
   "app/admin/(app)/phone/settings/page.tsx",
   "app/admin/(app)/settings/texting-actions.ts",
-  "lib/config-explanations.ts",
   "lib/sms.ts"
  ],
  "deliveryAreasLoadedAt": [
   "app/admin/(app)/delivery-settings/page.tsx",
-  "lib/config-explanations.ts",
   "lib/delivery-areas.ts"
  ],
  "localStreets": [
   "app/admin/(app)/delivery-settings/area-actions.ts",
   "app/admin/(app)/delivery-settings/page.tsx",
-  "lib/config-explanations.ts",
   "lib/delivery-areas.ts",
   "lib/order-pricing.ts"
  ],
  "calendarEnabled": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/jewish-calendar.ts"
  ],
  "calendarLatitude": [
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/jewish-calendar.ts"
  ],
  "calendarLongitude": [
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/jewish-calendar.ts"
  ],
  "erevShabbosClose": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/jewish-calendar.ts"
  ],
  "erevYomTovClose": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/jewish-calendar.ts"
  ],
  "candleLightingMinutes": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/jewish-calendar.ts"
  ],
  "reopenAfter": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/jewish-calendar.ts"
  ],
  "closeCholHamoed": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
   "lib/jewish-calendar.ts"
  ],
  "closeChanukah": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
   "lib/jewish-calendar.ts"
  ],
  "closePurim": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
   "lib/jewish-calendar.ts"
  ],
  "closeTishaBav": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
   "lib/jewish-calendar.ts"
  ],
  "closeMinorFasts": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
   "lib/jewish-calendar.ts"
  ],
  "closeLagBaomer": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/config-explanations.ts",
   "lib/jewish-calendar.ts"
  ],
  "calendarOverrides": [
@@ -529,251 +420,440 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/holidays/data.ts",
   "app/admin/(app)/holidays/page.tsx",
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-actions.ts",
   "app/admin/(app)/settings/calendar-keys.ts",
   "lib/business-hours.ts",
-  "lib/config-explanations.ts",
   "lib/jewish-calendar.ts"
  ],
  "hoursSchedules": [
   "app/admin/(app)/hours/actions.ts",
   "lib/business-hours.ts",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/hours-schedule.ts"
  ],
  "hoursMonThu": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-actions.ts",
   "app/admin/(app)/settings/calendar-keys.ts",
   "app/page.tsx",
   "lib/business-hours.ts",
-  "lib/config-explanations.ts",
   "lib/hours-schedule.ts"
  ],
  "hoursFridayOpen": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-actions.ts",
   "app/admin/(app)/settings/calendar-keys.ts",
   "lib/business-hours.ts",
-  "lib/config-explanations.ts",
   "lib/hours-schedule.ts"
  ],
  "hoursSunday": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-actions.ts",
   "app/admin/(app)/settings/calendar-keys.ts",
   "app/page.tsx",
   "lib/business-hours.ts",
-  "lib/config-explanations.ts",
   "lib/hours-schedule.ts"
  ],
  "hoursMotzeiOpen": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-actions.ts",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/business-hours.ts",
-  "lib/config-explanations.ts"
+  "lib/business-hours.ts"
  ],
  "hoursMotzeiCloseWinter": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-actions.ts",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/business-hours.ts",
-  "lib/config-explanations.ts"
+  "lib/business-hours.ts"
  ],
  "hoursMotzeiCloseSummer": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-actions.ts",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/business-hours.ts",
-  "lib/config-explanations.ts"
+  "lib/business-hours.ts"
  ],
  "hoursMotzeiSeason": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/business-hours.ts",
-  "lib/config-explanations.ts"
+  "lib/business-hours.ts"
  ],
  "hoursCholHamoed": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-actions.ts",
   "app/admin/(app)/settings/calendar-keys.ts",
   "lib/business-hours.ts",
-  "lib/config-explanations.ts",
   "lib/hours-schedule.ts"
  ],
  "hoursChanukah": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-actions.ts",
   "app/admin/(app)/settings/calendar-keys.ts",
   "lib/business-hours.ts",
-  "lib/config-explanations.ts",
   "lib/hours-schedule.ts"
  ],
  "operatorTargets": [
   "app/admin/(app)/phone/settings/page.tsx",
   "app/admin/(app)/settings/routing-actions.ts",
-  "lib/config-explanations.ts",
   "lib/ivr/routing.ts"
  ],
  "operatorMode": [
   "app/admin/(app)/phone/settings/page.tsx",
   "app/admin/(app)/settings/routing-actions.ts",
-  "lib/config-explanations.ts",
   "lib/ivr/routing.ts"
  ],
  "operatorAcceptPrompt": [
   "app/admin/(app)/phone/settings/page.tsx",
   "app/admin/(app)/settings/routing-actions.ts",
-  "lib/config-explanations.ts",
   "lib/ivr/routing.ts"
  ],
- "operatorAcceptText": [
-  "lib/config-explanations.ts"
+ "operatorAcceptText": [],
+ "ringAttempts0": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
  ],
- "ringAttempts0": [],
- "ringAttempts2": [],
- "ringAttempts4": [],
- "ringAttempts5": [],
- "ringAttempts6": [],
- "ringAttempts8": [],
- "ringAfterHours0": [],
- "ringAfterHours2": [],
- "ringAfterHours4": [],
- "ringAfterHours5": [],
- "ringAfterHours6": [],
- "ringAfterHours8": [],
- "ringAfterFrom0": [],
- "ringAfterTo0": [],
- "ringErevTo0": [],
- "ringErevBefore0": [],
- "ringAfterFrom2": [],
- "ringAfterTo2": [],
- "ringErevTo2": [],
- "ringErevBefore2": [],
- "ringAfterFrom4": [],
- "ringAfterTo4": [],
- "ringErevTo4": [],
- "ringErevBefore4": [],
- "ringAfterFrom5": [],
- "ringAfterTo5": [],
- "ringErevTo5": [],
- "ringErevBefore5": [],
- "ringAfterFrom6": [],
- "ringAfterTo6": [],
- "ringErevTo6": [],
- "ringErevBefore6": [],
- "ringAfterFrom8": [],
- "ringAfterTo8": [],
- "ringErevTo8": [],
- "ringErevBefore8": [],
- "ringAnnounce0": [],
- "ringAnnounce2": [],
- "ringAnnounce4": [],
- "ringAnnounce5": [],
- "ringAnnounce6": [],
- "ringAnnounce8": [],
- "ringName0": [],
- "ringName2": [],
- "ringName4": [],
- "ringName5": [],
- "ringName6": [],
- "ringName8": [],
+ "ringAttempts2": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAttempts4": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAttempts5": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAttempts6": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAttempts8": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterHours0": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterHours2": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterHours4": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterHours5": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterHours6": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterHours8": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterFrom0": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterTo0": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevTo0": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevBefore0": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterFrom2": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterTo2": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevTo2": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevBefore2": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterFrom4": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterTo4": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevTo4": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevBefore4": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterFrom5": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterTo5": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevTo5": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevBefore5": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterFrom6": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterTo6": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevTo6": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevBefore6": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterFrom8": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAfterTo8": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevTo8": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevBefore8": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAnnounce0": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/flow.ts"
+ ],
+ "ringAnnounce2": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/flow.ts"
+ ],
+ "ringAnnounce4": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/flow.ts"
+ ],
+ "ringAnnounce5": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/flow.ts"
+ ],
+ "ringAnnounce6": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/flow.ts"
+ ],
+ "ringAnnounce8": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/flow.ts"
+ ],
+ "ringName0": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringName2": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringName4": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringName5": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringName6": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringName8": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
  "ringName9": [
   "app/admin/(app)/phone/settings/page.tsx",
   "app/admin/(app)/settings/routing-actions.ts",
-  "lib/config-explanations.ts"
+  "lib/ivr/routing.ts"
  ],
- "ringTargets2": [],
- "ringMode2": [],
- "ringAccept2": [],
- "ringTargets4": [],
- "ringMode4": [],
- "ringAccept4": [],
- "ringTargets5": [],
- "ringMode5": [],
- "ringAccept5": [],
- "ringTargets6": [],
- "ringMode6": [],
- "ringAccept6": [],
- "ringTargets8": [],
- "ringMode8": [],
- "ringAccept8": [],
+ "ringTargets2": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringMode2": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAccept2": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringTargets4": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringMode4": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAccept4": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringTargets5": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringMode5": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAccept5": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringTargets6": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringMode6": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAccept6": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringTargets8": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringMode8": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringAccept8": [
+  "app/admin/(app)/phone/settings/page.tsx",
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
  "blockedCallers": [
   "app/admin/(app)/phone/settings/page.tsx",
   "app/admin/(app)/settings/BlockingForm.tsx",
   "app/admin/(app)/settings/blocking-actions.ts",
-  "lib/config-explanations.ts",
   "lib/ivr/flow.ts"
  ],
  "callRecording": [
   "app/admin/(app)/phone/settings/page.tsx",
   "app/admin/(app)/settings/RecordingForm.tsx",
   "app/admin/(app)/settings/recording-actions.ts",
-  "lib/config-explanations.ts",
   "lib/ivr/flow.ts",
   "lib/system-status.ts"
  ],
  "solaFeePercent": [
   "app/admin/(app)/bookkeeping/actions.ts",
-  "app/admin/(app)/bookkeeping/page.tsx",
-  "lib/config-explanations.ts"
+  "app/admin/(app)/bookkeeping/page.tsx"
  ],
  "solaFeeCents": [
   "app/admin/(app)/bookkeeping/actions.ts",
-  "app/admin/(app)/bookkeeping/page.tsx",
-  "lib/config-explanations.ts"
+  "app/admin/(app)/bookkeeping/page.tsx"
  ],
  "bookReminderDays": [
   "app/admin/(app)/bookkeeping/actions.ts",
-  "app/admin/(app)/bookkeeping/page.tsx",
-  "lib/config-explanations.ts"
+  "app/admin/(app)/bookkeeping/page.tsx"
  ],
  "bookOpeningCashCents": [
   "app/admin/(app)/bookkeeping/actions.ts",
   "app/admin/(app)/bookkeeping/page.tsx",
-  "lib/books-reports.ts",
-  "lib/config-explanations.ts"
+  "lib/books-reports.ts"
  ],
  "bookOpeningDate": [
   "app/admin/(app)/bookkeeping/actions.ts",
   "app/admin/(app)/bookkeeping/page.tsx",
-  "lib/books-reports.ts",
-  "lib/config-explanations.ts"
+  "lib/books-reports.ts"
  ],
  "glChartApprovedBy": [
   "app/admin/(app)/bookkeeping/Ledger.tsx",
   "app/admin/(app)/bookkeeping/gl-actions.ts",
-  "lib/config-explanations.ts",
   "lib/gl.ts"
  ],
  "glChartApprovedOn": [
   "app/admin/(app)/bookkeeping/Ledger.tsx",
   "app/admin/(app)/bookkeeping/gl-actions.ts",
-  "lib/config-explanations.ts",
   "lib/gl.ts"
  ],
  "glFiscalYearStartMonth": [
   "app/admin/(app)/bookkeeping/Ledger.tsx",
   "app/admin/(app)/bookkeeping/gl-actions.ts",
-  "lib/config-explanations.ts",
   "lib/gl.ts"
  ],
  "glAccountingMethod": [
   "app/admin/(app)/bookkeeping/Ledger.tsx",
   "app/admin/(app)/bookkeeping/gl-actions.ts",
-  "lib/config-explanations.ts",
   "lib/gl.ts"
  ],
  "glBaseCurrency": [
-  "app/admin/(app)/bookkeeping/Ledger.tsx",
-  "lib/config-explanations.ts"
+  "app/admin/(app)/bookkeeping/Ledger.tsx"
  ],
  "glApprovalThresholdCents": [
   "app/admin/(app)/bookkeeping/Ledger.tsx",
   "app/admin/(app)/bookkeeping/gl-actions.ts",
-  "lib/config-explanations.ts",
   "lib/gl.ts"
  ],
  "stockAddress": [
@@ -781,42 +861,32 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/settings/StockAddressForm.tsx",
   "app/admin/(app)/settings/stock-actions.ts",
   "app/admin/deliveries/page.tsx",
-  "lib/config-explanations.ts",
   "lib/delivery-route.ts"
  ],
  "hoursWebsiteNote": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
   "lib/business-hours.ts",
-  "lib/config-explanations.ts",
   "lib/site-content.ts"
  ],
  "paidPromoSkipOptedIn": [
   "app/admin/(app)/phone/settings/after-pay-actions.ts",
   "app/admin/(app)/phone/settings/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/ivr/flow.ts"
  ],
  "disconnectGoodbyeOn": [
   "app/admin/(app)/phone/settings/after-pay-actions.ts",
   "app/admin/(app)/phone/settings/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/ivr/flow.ts"
  ],
  "disconnectSilenceMinutes": [
   "app/admin/(app)/phone/settings/after-pay-actions.ts",
   "app/admin/(app)/phone/settings/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/ivr/flow.ts"
  ],
  "disconnectCheckSeconds": [
   "app/admin/(app)/phone/settings/after-pay-actions.ts",
   "app/admin/(app)/phone/settings/page.tsx",
-  "lib/config-explanations.ts",
-  "lib/config-registry.ts",
   "lib/ivr/flow.ts"
  ],
  "timerMenuWait": [
