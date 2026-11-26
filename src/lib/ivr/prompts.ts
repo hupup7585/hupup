@@ -635,7 +635,7 @@ export const PROMPTS = {
   // Promo texts by phone, keys only (Abraham, Nov 10, 2026): replaces consent_marketing_v2, which is no longer played.
   // Abraham, Nov 26, 2026 (approved): asked after a paid order, before the goodbye; 1 = promotional texts only
   // Abraham, Nov 26, 2026, 15:00 ET (exact words, recording approved): replaces the earlier Line 8 (no pound key any more)
-  paid_promo_offer: { group: "Promo texts by phone (keys only)", label: "After payment, Line 8 (step 1): seasonal offers by text. 1 signs up; no key moves on to the goodbye; any other key: not valid, then again", text: "To stay informed, join our seasonal offers by text. You will never miss a deal, a special, or a new rental, with up to 5 messages a year. To sign up, press 1. To stop, you can reply stop at any time." },
+  paid_promo_offer: { group: "Promo texts by phone (keys only)", label: "After payment, Line 8 (step 1): seasonal offers by text. 1 signs up; any other key or no key moves on to the goodbye", text: "To stay informed, join our seasonal offers by text. You will never miss a deal, a special, or a new rental, with up to 5 messages a year. To sign up, press 1. To stop, you can reply stop at any time." },
   // Abraham, Nov 26, 2026, 15:00 ET (exact words, recording approved): after the number is chosen, then Line 7
   promo_joined: { group: "Promo texts by phone (keys only)", label: "After payment, Line 8 (step 3): joined the seasonal offers (then Line 7 and the call ends)", text: "You have now joined our seasonal offers! You will stay informed about new rentals and special deals. Thank you!" },
   // Box 30, the cart hold ran out (Abraham, Nov 26, 2026, 13:11 ET, approved word for word; Puck until recorded)

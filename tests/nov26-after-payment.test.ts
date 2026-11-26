@@ -117,14 +117,14 @@ describe("after payment, in order: 1, 2, 3, 4, then 5, then 8, then 7", () => {
     expect(gather(x)).toContain('timeout="1"');
     expect(redirect(x)).toBe("promo-consent");
   });
-  it("Line 8 after line 5: key 1 -> which number -> the number calling -> joined -> Line 7; no key moves on; pound is not valid", async () => {
+  it("Line 8 after line 5: key 1 -> which number -> the number calling -> joined -> Line 7; no key or any other key moves on", async () => {
     const x = await call("promo-consent");
     expect(said(x)).toEqual([LINE8]);
     expect(gather(x)).toContain('timeout="3"');
     expect(redirect(x)).toBe("goodbye"); // no key
-    const pound = await call("promo-consent-answer", { Digits: "#" }); // no pound key any more
-    expect(said(pound)).toEqual(["Sorry, that is not a valid selection."]);
-    expect(redirect(pound)).toBe("promo-consent");
+    const pound = await call("promo-consent-answer", { Digits: "#" }); // no pound key: any other key moves on
+    expect(said(pound)).toEqual([]);
+    expect(redirect(pound)).toBe("goodbye");
     expect(redirect(await call("promo-consent-answer", { Digits: "1" }))).toBe("tx-which?p=promo");
     const joined = await call("tx-which-choice", { Digits: "1" }, "p=promo");
     expect(said(joined)).toEqual([JOINED]);

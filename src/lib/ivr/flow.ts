@@ -1530,6 +1530,9 @@ async function deliverPayLink(ctx: Ctx, orderId: number, via: { phone?: string; 
  * chosen), the one sign-up confirmation text goes out, then the joined line and Line 7. A number that replied STOP
  * stays blocked (only START and YES undo it).
  */
+/** Line 8's sign-up confirmation text: off until Abraham approves the exact words (then set to true). */
+export const PHONE_PROMO_TEXT_APPROVED = false;
+
 async function promoJoin(ctx: Ctx, vr: VR, to: string) {
   const caller = toE164(ctx.from);
   const wording = promptText(ctx.prompts, "paid_promo_offer");
@@ -1554,9 +1557,11 @@ async function promoJoin(ctx: Ctx, vr: VR, to: string) {
     return back(vr, "goodbye");
   }
   await track(ctx.callSid, "step", `Seasonal offers: joined after a paid order (${to === caller ? "number calling" : "entered number"})`, { phone: to });
-  // The one sign-up confirmation text (its wording is still waiting for Abraham's approval: the approved text in use now)
-  const { PROMO_ENROLLED_SMS } = await import("@/lib/sms-terms-v2");
-  await sendMessage({ to, body: PROMO_ENROLLED_SMS, kind: "system", event: "consent_confirmation", customerId: (await customerByPhone(to))?.id ?? null, callSid: ctx.callSid });
+  // The one sign-up confirmation text: switched OFF until Abraham approves its exact words (Hark, Nov 26, 2026, 3:56 PM)
+  if (PHONE_PROMO_TEXT_APPROVED) {
+    const { PROMO_ENROLLED_SMS } = await import("@/lib/sms-terms-v2");
+    await sendMessage({ to, body: PROMO_ENROLLED_SMS, kind: "system", event: "consent_confirmation", customerId: (await customerByPhone(to))?.id ?? null, callSid: ctx.callSid });
+  } else await track(ctx.callSid, "step", "Seasonal offers: confirmation text not sent (its wording waits for Abraham's approval)", { phone: to });
   sp(vr, ctx, "promo_joined");
   return back(vr, "goodbye"); // Line 7, then the call ends
 }
@@ -4901,11 +4906,7 @@ const handlers: Record<string, Handler> = {
   async "promo-consent-answer"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "tx-which", { p: "promo" });
-    if (d) {
-      sp(vr, ctx, "not_valid"); // wrong key: the shared line, then the same question again
-      return back(vr, "promo-consent");
-    }
-    return back(vr, "goodbye");
+    return back(vr, "goodbye"); // Hark for Abraham, Nov 26, 2026, 3:56 PM ET: any other key or no key moves on to the goodbye
   },
 
   "promo-which"(ctx, vr) {

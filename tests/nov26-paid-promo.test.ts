@@ -91,14 +91,15 @@ describe("after a paid order", () => {
     expect((await customer()).marketingOptIn).toBe(true);
     // order-text consent unchanged: no transactional row written
     expect((await db.select().from(schema.smsConsents)).filter((r) => r.phone === PHONE && r.scope === "transactional")).toHaveLength(0);
-    // the sign-up confirmation text, logged on the contact (test builds don't reach Twilio)
+    // the sign-up confirmation text is switched off until Abraham approves its words (Nov 26, 2026, 3:56 PM ET)
     const texts = (await db.select().from(schema.messages)).filter((m) => m.contactPhone === PHONE && m.direction === "out");
-    expect(texts.map((m) => m.body)).toEqual([PROMO_ENROLLED_SMS]);
+    expect(texts).toEqual([]);
+    expect(PROMO_ENROLLED_SMS).toBeTruthy();
   });
-  it("pound is no longer a key here: the not-valid line, then the question again; no change", async () => {
+  it("pound (any other key): on to the goodbye, no change", async () => {
     const xml = await call("promo-consent-answer", { Digits: "#" });
-    expect(redirect(xml)).toBe("promo-consent");
-    expect(said(xml)).toEqual([PROMPTS.not_valid.text]);
+    expect(redirect(xml)).toBe("goodbye");
+    expect(said(xml)).toEqual([]);
     expect(await marketing()).toHaveLength(0);
     expect((await customer())?.marketingOptIn ?? false).toBe(false);
     expect((await db.select().from(schema.messages)).filter((m) => m.contactPhone === PHONE)).toHaveLength(0);
@@ -111,10 +112,10 @@ describe("after a paid order", () => {
     expect(redirect(answer)).toBe("goodbye");
     expect(await marketing()).toHaveLength(0);
   });
-  it("a wrong key: the shared line, then the question again", async () => {
+  it("a wrong key: on to the goodbye (Hark for Abraham, Nov 26, 2026, 3:56 PM ET)", async () => {
     const xml = await call("promo-consent-answer", { Digits: "5" });
-    expect(said(xml)).toEqual([PROMPTS.not_valid.text]);
-    expect(redirect(xml)).toBe("promo-consent");
+    expect(said(xml)).toEqual([]);
+    expect(redirect(xml)).toBe("goodbye");
   });
   it("already opted in to promos: not asked", async () => {
     await db.insert(schema.customers).values({ phone: PHONE, marketingOptIn: true });
