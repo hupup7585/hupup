@@ -179,6 +179,7 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "lib/pricing.ts"
  ],
  "ownerUsername": [
+  "app/admin/(app)/staff/SimpleStaff.tsx",
   "app/admin/(app)/staff/actions.ts",
   "app/admin/(app)/staff/page.tsx",
   "lib/auth.ts"

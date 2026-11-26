@@ -5,6 +5,7 @@ import { formatPhone } from "@/lib/phone";
 import { Badge, PageHeader, Section } from "@/components/staff/ui";
 import { AddStaffForm, OwnerUsernameForm, StaffRowActions } from "./StaffForms";
 import { getSettings } from "@/lib/settings";
+import { SimpleStaff } from "./SimpleStaff";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,27 @@ const ROLE_TABLE: [string, string, string, string][] = [
   ["Settings, phone system, bookkeeping", "Full access", "No access", "No access"],
 ];
 
-export default async function StaffPage() {
-  await requireOwner();
+export default async function StaffPage({ searchParams }: { searchParams: Promise<{ new?: string }> }) {
+  const me = await requireOwner();
   const [users, settings] = await Promise.all([db.select().from(schema.adminUsers).orderBy(asc(schema.adminUsers.name)), getSettings()]);
+  // The simple Staff page (Abraham, Nov 26, 2026, 4:07 PM): shown with ?new=1 until he approves the screenshots
+  if ((await searchParams).new === "1") {
+    const rows = users.map((u) => ({ id: u.id, name: u.name, role: u.role, phone: u.phone, phoneShown: formatPhone(u.phone), username: u.username, googleEmail: u.googleEmail, active: u.active, hasPassword: Boolean(u.passwordHash), isSelf: u.id === me.userId }));
+    return (
+      <div className="w-full space-y-6">
+        <PageHeader title="Staff" subtitle="Who can sign in to Admin, and what they can do." />
+        <SimpleStaff rows={rows} ownerUsername={settings.ownerUsername} ownerHasRow={rows.some((r) => r.isSelf)} />
+        <details className="rounded-2xl border border-line bg-white p-4">
+          <summary className="cursor-pointer text-base font-bold">What each role can do</summary>
+          <ul className="mt-3 space-y-2 text-base">
+            {ROLE_TABLE.map(([area, o, se, d]) => (
+              <li key={area}><b>{area}:</b> Owner: {o}. Secretary: {se}. Delivery: {d}.</li>
+            ))}
+          </ul>
+        </details>
+      </div>
+    );
+  }
   return (
     <div className="w-full space-y-6">
       <PageHeader title="Staff" subtitle="Accounts are deactivated, never deleted. Deactivating signs the person out everywhere." />

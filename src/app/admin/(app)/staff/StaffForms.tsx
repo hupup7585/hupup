@@ -63,7 +63,7 @@ export function StaffRowActions({ userId, role, active, username, googleEmail }:
         <p className="text-xs text-muted">The Owner&rsquo;s username is changed at the top of this page.</p>
       ) : (
         <div className="flex flex-wrap gap-2" data-username-row>
-          <input className="input max-w-[12rem]" autoCapitalize="none" spellCheck={false} placeholder="Username" value={un} onChange={(e) => setUn(e.target.value)} aria-label="Username" />
+          <input className="input max-w-[12rem]" name={`staff-username-${userId}`} autoComplete="off" data-lpignore="true" autoCapitalize="none" spellCheck={false} placeholder="Username" value={un} onChange={(e) => setUn(e.target.value)} aria-label="Username" />
           <button type="button" className="btn-ghost" disabled={pending} onClick={() => start(async () => setMsg(await setUsernameAction(userId, un)))}>Save username</button>
         </div>
       )}
@@ -75,7 +75,7 @@ export function StaffRowActions({ userId, role, active, username, googleEmail }:
         {role !== "delivery" && (
           <>
             <input className="input max-w-[12rem]" type="password" placeholder="New password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} aria-label="New password" />
-            <button type="button" className="btn-ghost" disabled={pending || !pw} onClick={() => start(async () => (setMsg(await setPasswordAction(userId, pw)), setPw("")))}>Set password</button>
+            <button type="button" className="btn-ghost" disabled={pending} onClick={() => (pw ? start(async () => (setMsg(await setPasswordAction(userId, pw)), setPw(""))) : setMsg({ ok: false, message: "Type a password of at least 10 characters first." }))}>Set password</button>
           </>
         )}
         <button type="button" className={active ? "btn-ghost" : "btn"} disabled={pending} onClick={() => {
@@ -98,7 +98,7 @@ export function OwnerUsernameForm({ initial }: { initial: string }) {
   return (
     <div className="space-y-2" data-owner-username>
       <div className="flex flex-wrap gap-2">
-        <input className="input max-w-[14rem]" autoCapitalize="none" spellCheck={false} placeholder="Your username" value={un} onChange={(e) => setUn(e.target.value)} aria-label="Your username" />
+        <input className="input max-w-[14rem]" name="owner-sign-in-name" autoComplete="off" data-lpignore="true" autoCapitalize="none" spellCheck={false} placeholder="Your username" value={un} onChange={(e) => setUn(e.target.value)} aria-label="Your username" />
         <button type="button" className="btn-ghost" disabled={pending} onClick={() => start(async () => setMsg(await setOwnerUsernameAction(un)))}>Save my username</button>
       </div>
       <p className="text-xs text-muted">You can sign in with this username, your mobile number or your email.</p>

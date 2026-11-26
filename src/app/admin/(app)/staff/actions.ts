@@ -30,14 +30,22 @@ async function log(userId: number | null, action: string, entityId: number, afte
 }
 
 /** Owner only. */
-export async function createStaffAction(form: { name: string; phone: string; role: Role; email?: string; password?: string; username?: string }): Promise<StaffResult> {
+export async function createStaffAction(form: { name: string; phone: string; role: Role; email?: string; password?: string; username?: string; googleEmail?: string }): Promise<StaffResult> {
   const owner = await requireOwner();
   const name = form.name.trim();
   const phone = toE164(form.phone);
-  if (!name) return { ok: false, message: "Enter a name." };
-  if (!phone) return { ok: false, message: "Enter a valid 10-digit mobile number." };
+  if (!name) return { ok: false, message: "Type the person's name first." };
+  if (!phone) return { ok: false, message: "Type a 10-digit mobile number first, for example 845-415-7585." };
   if (!ROLES.includes(form.role)) return { ok: false, message: "Choose a role." };
-  if (form.password && form.role === "delivery") return { ok: false, message: "Delivery accounts sign in with a texted code only." };
+  if (form.password && form.role === "delivery") return { ok: false, message: "Delivery accounts sign in with a texted code only. Leave the password empty." };
+  if (form.password && form.password.length < 10) return { ok: false, message: "Type a password of at least 10 characters, or leave it empty." };
+  let google: string | null = null;
+  if (form.googleEmail?.trim()) {
+    const { cleanGoogleEmail } = await import("@/lib/google-login");
+    const g = cleanGoogleEmail(form.googleEmail);
+    if (g.error) return { ok: false, message: g.error };
+    google = g.value;
+  }
   const [exists] = await db.select({ id: schema.adminUsers.id }).from(schema.adminUsers).where(eq(schema.adminUsers.phone, phone)).limit(1);
   if (exists) return { ok: false, message: "That phone number already has an account." };
   const un = cleanUsername(form.username);
@@ -51,7 +59,7 @@ export async function createStaffAction(form: { name: string; phone: string; rol
   }
   const [u] = await db
     .insert(schema.adminUsers)
-    .values({ name, phone, role: form.role, email: form.email?.trim() || null, username: un.value, passwordHash, passwordSetAt: passwordHash ? new Date() : null })
+    .values({ name, phone, role: form.role, email: form.email?.trim() || null, username: un.value, passwordHash, passwordSetAt: passwordHash ? new Date() : null, googleEmail: google })
     .returning({ id: schema.adminUsers.id });
   await log(owner.userId, "staff.created", u.id, { name, role: form.role, password: Boolean(passwordHash) });
   revalidatePath("/admin/staff");
@@ -130,4 +138,62 @@ export async function setOwnerUsernameAction(username: string): Promise<StaffRes
   await db.insert(schema.auditLog).values({ userId: owner.userId, action: "owner.username_set", entityType: "staff", entityId: "owner", after: { username: un.value } });
   revalidatePath("/admin/staff");
   return { ok: true, message: un.value ? `You can now sign in as "${un.value}".` : "Your username was removed." };
+}
+
+/**
+ * The simple Staff page's one Save (Abraham, Nov 26, 2026, 4:07 PM): name, mobile number, role, username, an
+ * optional new password and an optional Google email, checked together. Every problem is said in plain words; nothing
+ * is saved until all of it is right.
+ */
+export async function saveStaffAction(userId: number, form: { name: string; phone: string; role: Role; username: string; password: string; googleEmail: string }): Promise<StaffResult> {
+  const owner = await requireOwner();
+  const [u] = await db.select().from(schema.adminUsers).where(eq(schema.adminUsers.id, userId)).limit(1);
+  if (!u) return { ok: false, message: "This account was not found. Reload the page." };
+  const name = form.name.trim();
+  const phone = toE164(form.phone);
+  if (!name) return { ok: false, message: "Type the person's name first." };
+  if (!phone) return { ok: false, message: "Type a 10-digit mobile number first, for example 845-415-7585." };
+  if (!ROLES.includes(form.role)) return { ok: false, message: "Choose a role." };
+  if (owner.userId === userId && form.role !== "owner") return { ok: false, message: "You cannot take away your own Owner role." };
+  if (form.password && form.role === "delivery") return { ok: false, message: "Delivery accounts sign in with a texted code only. Leave the password empty." };
+  if (form.password && form.password.length < 10) return { ok: false, message: "Type a password of at least 10 characters, or leave it empty to keep the current one." };
+  const [other] = await db.select({ id: schema.adminUsers.id }).from(schema.adminUsers).where(eq(schema.adminUsers.phone, phone)).limit(1);
+  if (other && other.id !== userId) return { ok: false, message: "That mobile number already belongs to another account." };
+  const un = cleanUsername(form.username);
+  if (un.error) return { ok: false, message: un.error };
+  if (un.value && (await usernameTaken(un.value, userId))) return { ok: false, message: "That username is already taken. Try another one." };
+  const { cleanGoogleEmail } = await import("@/lib/google-login");
+  const g = form.googleEmail.trim() ? cleanGoogleEmail(form.googleEmail) : { value: null as string | null, error: undefined as string | undefined };
+  if (g.error) return { ok: false, message: g.error };
+  if (g.value) {
+    const { sql } = await import("drizzle-orm");
+    const [dup] = await db.select({ id: schema.adminUsers.id }).from(schema.adminUsers).where(sql`lower(${schema.adminUsers.googleEmail}) = ${g.value}`).limit(1);
+    if (dup && dup.id !== userId) return { ok: false, message: "That Google account is already saved on another staff member." };
+  }
+  let passwordHash: string | undefined;
+  if (form.password) {
+    try {
+      passwordHash = await hashPassword(form.password);
+    } catch (e) {
+      return { ok: false, message: (e as Error).message };
+    }
+  }
+  const toDelivery = form.role === "delivery" && u.role !== "delivery";
+  await db
+    .update(schema.adminUsers)
+    .set({
+      name,
+      phone,
+      role: form.role,
+      username: un.value,
+      googleEmail: g.value,
+      ...(passwordHash ? { passwordHash, passwordSetAt: new Date(), failedLogins: 0, lockedUntil: null } : {}),
+      ...(toDelivery ? { passwordHash: null } : {}), // Delivery signs in with a texted code only
+    })
+    .where(eq(schema.adminUsers.id, userId));
+  const signOut = Boolean(passwordHash) || u.role !== form.role || u.phone !== phone;
+  if (signOut) await revokeSessions(userId);
+  await log(owner.userId, "staff.saved", userId, { name, role: form.role, phoneChanged: u.phone !== phone, roleChanged: u.role !== form.role, username: un.value, googleEmail: g.value, password: Boolean(passwordHash) });
+  revalidatePath("/admin/staff");
+  return { ok: true, message: `Saved ${name}.${signOut ? " They were signed out and sign in again with the new details." : ""}` };
 }
