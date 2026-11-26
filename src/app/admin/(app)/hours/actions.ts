@@ -48,7 +48,7 @@ export async function saveScheduleAction(fd: FormData) {
   if (typeof chanukah === "string" || typeof cholHamoed === "string") return back(`err=${encodeURIComponent(`${typeof chanukah === "string" ? "Chanukah" : "Chol Hamoed"}: these hours are not clear. Example: 09:00-22:30, or tick Same as weekday.`)}`);
   const o = parseDateOverrides(String(fd.get("overrides") ?? ""));
   if (o.error) return back(`err=${encodeURIComponent(o.error)}`);
-  const schedule: Schedule = { days, chanukah, cholHamoed, overrides: o.list, ...(fridaySeason ? { fridaySeason } : {}) };
+  const schedule: Schedule = { days, chanukah, cholHamoed, overrides: o.list, closedShushanPurim: fd.get("closedShushanPurim") === "on", ...(fridaySeason ? { fridaySeason } : {}) };
   const on = fd.get("on") === "on" || line === "office";
   const after = setSchedule(data, group ? { group } : isLine(line) ? { line } : {}, schedule, on);
   await store(data, after, owner.userId, "settings.hours_saved");

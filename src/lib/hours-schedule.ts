@@ -34,7 +34,7 @@ export type DateOverride = { from: string; to: string; closed: boolean; windows:
  * America/New_York clock rules. A Friday window ending at "season" closes at the time in effect that day.
  */
 export type FridaySeason = { winter: string; summer: string };
-export type Schedule = { days: Record<"0" | "1" | "2" | "3" | "4" | "5" | "6", Day>; chanukah: HolidayRule; cholHamoed: HolidayRule; overrides: DateOverride[]; fridaySeason?: FridaySeason };
+export type Schedule = { days: Record<"0" | "1" | "2" | "3" | "4" | "5" | "6", Day>; chanukah: HolidayRule; cholHamoed: HolidayRule; overrides: DateOverride[]; fridaySeason?: FridaySeason; closedShushanPurim?: boolean };
 export type LineEntry = { schedule: Schedule; on: boolean };
 export type Group = { id: string; name: string; members: LineId[]; schedule: Schedule; on: boolean };
 export type HoursData = { lines: Record<LineId, LineEntry>; groups: Group[]; operatorFridaySeason?: boolean };
@@ -115,6 +115,12 @@ export function loadHours(s: HoursInput): HoursData {
   }
   // The Operator's Friday ends by season, not at Chatzos (Abraham, Nov 26, 2026): once, on the saved hours; the opening
   // time and every other line stay as they are. After that the Owner's own choice on the Hours page is kept.
+  // Closed on Shushan Purim (Abraham, Nov 26, 2026), every year by the Hebrew calendar: customer service ticked,
+  // every other block not, until the Owner changes it on the Hours page
+  for (const id of LINE_IDS) {
+    const sch = lines[id].schedule;
+    if (sch.closedShushanPurim === undefined) lines[id] = { ...lines[id], schedule: { ...sch, closedShushanPurim: id === "cs" } };
+  }
   if (!saved.operatorFridaySeason) {
     const op = lines.operator.schedule;
     const fri = op.days["5"];
@@ -129,7 +135,7 @@ export function loadHours(s: HoursInput): HoursData {
     if (!g || !validSchedule(g.schedule)) continue;
     const members = (g.members ?? []).filter((m): m is LineId => (LINE_IDS as readonly string[]).includes(m) && !seen.has(m as LineId));
     members.forEach((m) => seen.add(m));
-    if (members.length) groups.push({ id: String(g.id), name: String(g.name || "Group"), members, schedule: g.schedule, on: g.on !== false });
+    if (members.length) groups.push({ id: String(g.id), name: String(g.name || "Group"), members, schedule: { ...g.schedule, closedShushanPurim: g.schedule.closedShushanPurim ?? false }, on: g.on !== false });
   }
   return { lines, groups, operatorFridaySeason: true };
 }
@@ -195,6 +201,7 @@ export function scheduleOpenNow(sch: Schedule, at: Date, s: CalendarSettings): b
   if (info.closed) return false; // Shabbes, Yom Tov
   const keys = holidayKeys(iso);
   if (!own?.open && keys.some((k) => k.key === "Purim" || k.key.startsWith("Tish'a B'Av"))) return false; // the Owner can open one (Business hours & holidays)
+  if (sch.closedShushanPurim && keys.some((k) => k.key === "Shushan Purim")) return false; // 15 Adar (Adar II in a leap year), this block only
   const cholHamoed = keys.some((k) => k.flags.includes("CHOL_HAMOED"));
   const chanukah = d !== 5 && keys.some((k) => k.key.startsWith("Chanukah"));
   const rule = cholHamoed && d !== 5 ? sch.cholHamoed : chanukah ? sch.chanukah : null;
@@ -261,12 +268,41 @@ function dashTime(hhmm: string) {
   return `${((h + 11) % 12) + 1}:${String(mm).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
-/** Recorded hours lines that no longer match the saved hours (a red note on the Hours page). */
-export function recordedHoursWarnings(data: HoursData): string[] {
+/** Every clock time said in a line of words ("11 AM", "7:30 PM"), as minutes after midnight, sorted. */
+export function timesInWords(text: string): number[] {
+  const out = new Set<number>();
+  for (const m of text.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM|a\.m\.|p\.m\.)/gi)) {
+    let h = Number(m[1]) % 12;
+    if (/^p/i.test(m[3])) h += 12;
+    out.add(h * 60 + Number(m[2] ?? 0));
+  }
+  return [...out].sort((x, y) => x - y);
+}
+const norm2 = (t: string) => t.toLowerCase().replace(/[^a-z0-9:]+/g, " ").trim();
+
+/**
+ * The recorded hours line (the Bookings menu line 3c, book_r3c) against the saved Customer service hours (Abraham,
+ * Nov 26, 2026): a red note only when they really differ, compared with the slot's current approved text and the
+ * words its chosen recording was made for.
+ */
+export function recordedHoursWarnings(data: HoursData, line: { text: string; recordingWording?: string | null }): string[] {
   const out: string[] = [];
   const cs = effectiveLine(data, "cs").schedule;
-  const fourPm = ["1", "2", "3", "4"].every((d) => JSON.stringify(cs.days[d as "1"].windows) === JSON.stringify([{ from: "11:00", to: "16:00" }]));
-  if (!fourPm) out.push("The recorded hours line still says 11 AM to 4 PM. Ask for a new recording.");
+  const sched = new Set<number>();
+  for (const d of ["0", "1", "2", "3", "4"] as const) {
+    if (cs.days[d].closed) continue;
+    for (const w of cs.days[d].windows) for (const t of [w.from, w.to]) {
+      const m = mins(t);
+      if (m !== null) sched.add(m);
+    }
+  }
+  const want = [...sched].sort((x, y) => x - y);
+  const said = timesInWords(line.text);
+  if (said.join(",") !== want.join(",")) {
+    const words = (ms: number[]) => ms.map((m) => timeWords(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`)).join(", ");
+    out.push(`The recorded hours line says ${words(said) || "no times"}, but the Customer service hours (Sunday to Thursday) are ${words(want) || "closed"}. Ask for a new recording.`);
+  }
+  if (line.recordingWording && norm2(line.recordingWording) !== norm2(line.text)) out.push("The recording on the hours line was made for different words than its approved text. Ask for a new recording.");
   return out;
 }
 

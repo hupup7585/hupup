@@ -1,4 +1,7 @@
+import { eq } from "drizzle-orm";
 import { requireOwner } from "@/lib/auth";
+import { db, schema } from "@/lib/db";
+import { loadPromptOverrides, promptText } from "@/lib/ivr/prompts";
 import { getSettings } from "@/lib/settings";
 import { LINE_IDS, LINE_LABEL, effectiveLine, formatDateOverrides, formatWindows, loadHours, recordedHoursWarnings, scheduleWords, seasonAt, timeWords, type Schedule } from "@/lib/hours-schedule";
 import { addGroupAction, removeFromGroupAction, saveScheduleAction } from "./actions";
@@ -16,7 +19,11 @@ export default async function HoursPage({ searchParams }: { searchParams: Promis
   await requireOwner();
   const sp = await searchParams;
   const data = loadHours(await getSettings());
-  const warnings = recordedHoursWarnings(data);
+  // The hours line's approved text and the words its chosen recording was made for (Nov 26, 2026)
+  const prompts = await loadPromptOverrides();
+  const recId = prompts.book_r3c?.recordingId;
+  const rec = recId ? (await db.select({ wording: schema.promptRecordings.wording }).from(schema.promptRecordings).where(eq(schema.promptRecordings.id, recId)))[0] : undefined;
+  const warnings = recordedHoursWarnings(data, { text: promptText(prompts, "book_r3c"), recordingWording: rec?.wording ?? null });
   const ungrouped = LINE_IDS.filter((id) => !data.groups.some((g) => g.members.includes(id)));
   return (
     <div className="w-full" data-hours-page>
@@ -103,6 +110,9 @@ function ScheduleForm({ schedule, on, line, group }: { schedule: Schedule; on: b
         ))}
       </div>
       {schedule.fridaySeason && <FridaySeasonFields schedule={schedule} />}
+      <label className="flex items-center gap-2 text-sm font-semibold" data-shushan-purim>
+        <input type="checkbox" name="closedShushanPurim" defaultChecked={Boolean(schedule.closedShushanPurim)} /> Closed on Shushan Purim (every year, 15 Adar; in a leap year 15 Adar II)
+      </label>
       <div className="grid gap-3 sm:grid-cols-2">
         {(["chanukah", "cholHamoed"] as const).map((k) => (
           <fieldset key={k} className="rounded-xl border border-line p-3">

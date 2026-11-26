@@ -4774,18 +4774,11 @@ const handlers: Record<string, Handler> = {
     const settings = await getSettings();
     const open = officeOpenNow(new Date(), settings);
     await track(ctx.callSid, "step", open ? "Office open" : "Office closed", { open, key: "7" });
-    if (!open) {
-      sp(vr, ctx, "office_closed");
-      shortPause(vr);
+    // Key 7 (Abraham, Nov 26, 2026): the customer service hours with Friday (its recording, else the Google voice reads
+    // its text), plus any lines added in Admin > Phone > Screens; then, as before, a short pause and the main menu
+    for (const part of applyLayout(editorOf(ctx).e.layouts.hours, ["key7_cs_hours"])) {
+      if (part !== "pause" && part !== "star" && part !== "hours_lines") playRef(vr, ctx, part);
     }
-    // Key 7 (Nov 26, 2026): its combined recording when chosen, else its lines from Admin > Phone > Screens (the hours
-    // read from the Hours page, on unless turned off, plus any lines added there)
-    if (ctx.prompts.whole_hours?.recordingId) sp(vr, ctx, "whole_hours");
-    else
-      for (const part of applyLayout(editorOf(ctx).e.layouts.hours, ["hours_lines"])) {
-        if (part === "hours_lines") for (const line of hoursForSpeech(settings)) playText(vr, ctx, line, "hours"); // recordings word by word (Nov 24, 2026)
-        else if (part !== "pause" && part !== "star") playRef(vr, ctx, part);
-      }
     shortPause(vr);
     return back(vr, "menu");
   },

@@ -124,8 +124,9 @@ describe("the form and the red note", () => {
     expect(parseWindows("Closed")).toEqual([]);
     expect(parseWindows("lunch")).toBeNull();
   });
+  // Nov 26, 2026: the red note compares the slot's own approved text and recording (tests/nov26-key7-shushan.test.ts)
   it("the recorded customer service hours line no longer matches: the red note", () => {
-    expect(recordedHoursWarnings(defaultHours(S))).toEqual(["The recorded hours line still says 11 AM to 4 PM. Ask for a new recording."]);
+    expect(recordedHoursWarnings(defaultHours(S), { text: "Our customer service is open Sunday through Thursday, from 11 AM to 4 PM." })[0]).toMatch(/^The recorded hours line says 11 AM, 4 PM, but the Customer service hours/);
   });
 });
 

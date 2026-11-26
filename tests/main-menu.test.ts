@@ -332,7 +332,8 @@ describe("key 7: our hours (Abraham, Nov 9, 2026)", () => {
     expect(lines.join(" ")).not.toMatch(/Mutze|Motzei|Winter|Summer/); // closed Motzei Shabbes (Abraham, Nov 25, 2026, 3:44 PM)
     h.open = true;
     const xml = await call("hours", { CallSid: "CAhours1" });
-    expect(xml).toContain("10:30 AM to 7:00 PM.");
+    // Nov 26, 2026: key 7 plays the customer service hours with Friday (key7_cs_hours), no longer the office hours
+    expect(xml).toContain("Our customer service is open Sunday through Thursday, from 11 AM to 2 PM, and at night from 7:30 PM to 10:30 PM. Friday, from 10:30 AM till chatzos.");
     expect(xml).not.toContain("<Dial");
     expect(redirect(xml)).toBe("menu");
     h.open = false;

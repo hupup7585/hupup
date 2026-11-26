@@ -120,17 +120,13 @@ describe("on the call", () => {
     expect(h.sent.at(-1)).toMatchObject({ to: "+18455550149", body: "Here is our address." });
     expect(redirect(await call("cats-choice", { Digits: "6" }))).toBe("catalog");
   });
-  it("key 7: the hours line can be turned off and a recorded line added; its combined recording plays instead", async () => {
+  it("key 7: its hours line can be turned off and a recorded line added (Nov 26, 2026: key 7 plays key7_cs_hours)", async () => {
     let e = addLine(parseEditor({}), { layout: "hours" }, NEW, 0);
     e = toggleLine(toggleLine(e, { layout: "hours" }, 0, true), { layout: "hours" }, 1, false);
     await save(e);
     expect(said(await call("hours"))).toEqual(["We are open all week."]);
-    h.overrides = { whole_hours: { recordingId: 700 } };
-    const xml = await call("hours");
-    expect(said(xml)).toEqual([]);
-    expect(xml).toMatch(/<Play>[^<]*700[^<]*<\/Play>/);
-    h.overrides = {};
     await save(parseEditor({}));
+    expect(said(await call("hours"))).toEqual([T("key7_cs_hours")]);
   });
 });
 
