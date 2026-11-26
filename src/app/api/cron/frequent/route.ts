@@ -3,6 +3,7 @@ import { notifyStragglers } from "@/lib/voicemail";
 import { processHeldPromotions } from "@/lib/sms";
 import { runJob } from "@/lib/jobs";
 import { sendScheduledEmails } from "@/lib/inbox";
+import { dueNow } from "@/lib/cron-schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -22,14 +23,8 @@ export const dynamic = "force-dynamic";
  * awake day and night. Now the jobs touch the database only in the first minutes of each hour (one wake an hour when
  * nobody uses the site); the other calls answer at once without the database. Nothing caller-facing depends on the
  * 5 minutes: a phone hold that ran out already stops counting for stock the moment it ends (availability.ts); these
- * jobs only tidy up after it. ?all=1 runs them now (manual check, with the secret).
+ * jobs only tidy up after it. ?all=1 runs them now (manual check, with the secret). Schedule: src/lib/cron-schedule.ts.
  */
-export const RUN_EVERY_MINUTES = 60;
-export const RUN_WINDOW_MINUTES = 5;
-export function dueNow(now = new Date()): boolean {
-  return now.getUTCMinutes() % RUN_EVERY_MINUTES < RUN_WINDOW_MINUTES;
-}
-
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });

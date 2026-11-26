@@ -14,7 +14,8 @@ vi.mock("@/lib/db", () => {
 });
 vi.mock("@/lib/notify", () => ({ sendEmail: async () => null }));
 
-import { dueNow, GET } from "@/app/api/cron/frequent/route";
+import { GET } from "@/app/api/cron/frequent/route";
+import { dueNow } from "@/lib/cron-schedule";
 import { isNoop, runJob } from "@/lib/jobs";
 
 const at = (iso: string) => new Date(iso);
