@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { agreeAndPayAction } from "./actions";
-import { PAY_AGREE_LABEL } from "./label";
+import { PAY_AGREE_LABEL, PAY_SMS_HELP_LINE } from "./label";
 import TextConsentBoxes from "@/components/TextConsentBoxes";
 
 export default function PayForm({ orderId, token, consent }: { orderId: number; token: string; consent: { transactionalText: string; marketingText: string; smsNumber: string } }) {
@@ -31,7 +31,7 @@ export default function PayForm({ orderId, token, consent }: { orderId: number; 
           )
         </span>
       </label>
-      <TextConsentBoxes transactionalText={consent.transactionalText} marketingText={consent.marketingText} transactional={sms.transactional} marketing={sms.marketing} onChange={setSms} smsNumber={consent.smsNumber} />
+      <TextConsentBoxes transactionalText={consent.transactionalText} marketingText={consent.marketingText} transactional={sms.transactional} marketing={sms.marketing} onChange={setSms} smsNumber={consent.smsNumber} helpLine={PAY_SMS_HELP_LINE} />
       {error && (
         <p role="alert" className="rounded-lg bg-red-50 p-3 font-semibold text-red-800">
           {error}

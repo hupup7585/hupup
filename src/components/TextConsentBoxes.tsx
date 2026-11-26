@@ -14,6 +14,7 @@ export default function TextConsentBoxes({
   onChange,
   smsNumber,
   staff = false,
+  helpLine,
 }: {
   transactionalText: string;
   marketingText: string;
@@ -22,6 +23,8 @@ export default function TextConsentBoxes({
   onChange: (v: { transactional: boolean; marketing: boolean }) => void;
   smsNumber: string;
   staff?: boolean;
+  /** The pay page's own line under the boxes (Abraham, approved Nov 26, 2026, 01:29 ET); the links stay below it. */
+  helpLine?: string;
 }) {
   const box = (checked: boolean, set: (v: boolean) => void, text: string, name: string) => (
     <label className="flex items-start gap-3 text-sm leading-relaxed" data-consent-box={name}>
@@ -37,8 +40,13 @@ export default function TextConsentBoxes({
       {staff && <p className="text-xs text-muted">Read each box to the customer. Check a box only if they say yes. Neither is needed to book.</p>}
       {box(transactional, (v) => onChange({ transactional: v, marketing }), transactionalText, "smsTransactional")}
       {box(marketing, (v) => onChange({ transactional, marketing: v }), marketingText, "smsMarketing")}
+      {helpLine && (
+        <p className="text-sm text-hu-deep/70" data-consent-help-line>
+          {helpLine}
+        </p>
+      )}
       <p className="text-sm">
-        Text HELP to {smsNumber} for help. Text STOP to opt out. See our{" "}
+        {helpLine ? "" : `Text HELP to ${smsNumber} for help. Text STOP to opt out. `}See our{" "}
         <a href="/sms-terms" target="_blank" rel="noopener" className="font-semibold underline underline-offset-4">
           SMS Terms
         </a>{" "}
