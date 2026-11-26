@@ -69,10 +69,8 @@ describe("SMS Terms v2 switch", () => {
 });
 
 describe("written promotional consent (phone keypress only sends a confirmation text)", () => {
-  it("press 1 sends the confirmation text and enrolls nothing; YES enrolls; a second YES does nothing", async () => {
-    const ask = await call("promo-consent");
-    expect(ask.replace(/&apos;/g, "'")).toContain(PROMPTS.promo_ask.text);
-    expect(await call("promo-consent-answer", { Digits: "1" })).toContain("/api/voice/promo-which");
+  // The old number-choice step (calls already in it); the question after a paid order is tests/nov26-paid-promo.test.ts
+  it("the old number step sends the confirmation text and enrolls nothing; YES enrolls; a second YES does nothing", async () => {
 
     const after = await call("promo-which-answer", { Digits: "1" });
     expect(after.replace(/&apos;/g, "'")).toContain(PROMPTS.promo_final.text);

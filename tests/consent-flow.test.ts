@@ -236,31 +236,13 @@ describe("payment link: box 141, text or email (Abraham, Nov 17, 2026)", () => {
 
 describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
   const plain = (x: string) => x.replace(/&apos;/g, "'");
-  it("Step 1 after the order: exact wording, keys only (no speech), pound or nothing skips", async () => {
-    const xml = plain(await call("promo-consent"));
-    expect(xml).toContain("To get seasonal offers, discounts, and deals by text, up to 6 a year, press 1.");
-    expect(xml).toContain("To skip, press pound."); // the shared skip line (Nov 19, 2026)
-    expect(xml).toContain('input="dtmf"');
-    expect(xml).not.toContain("speech");
-    expect(xml).not.toContain("say yes");
-    expect(xml).toContain("/api/voice/promo-consent-answer");
-    for (const body of [{ Digits: "#" }, {}] as Record<string, string>[]) {
-      const out = await call("promo-consent-answer", body);
-      expect(out).toContain("/api/voice/goodbye");
-    }
-    expect(h.recorded.map((r) => [r.scope, r.action, r.wording])).toEqual([
-      ["marketing", "declined", PROMPTS.promo_ask.text],
-      ["marketing", "declined", PROMPTS.promo_ask.text],
-    ]);
-    expect(h.messages).toHaveLength(0);
-  });
+  // Nov 26, 2026: the question after a paid order is now one step (tests/nov26-paid-promo.test.ts); the old steps below stay for calls already in them
   it("the long spoken question is never played", async () => {
     const xml = plain(await call("promo-consent"));
     expect(xml).not.toContain(PROMPTS.consent_marketing_v2.text);
     expect(xml).not.toContain("One more question");
   });
-  it("Step 2: press 1 texts the approved confirmation to the caller's number, then the Final and Disclosure lines", async () => {
-    expect(await call("promo-consent-answer", { Digits: "1" })).toContain("/api/voice/promo-which");
+  it("Step 2 (old step): the number choice texts the approved confirmation to the caller's number, then the Final and Disclosure lines", async () => {
     expect(plain(await call("promo-which"))).toContain("To get texts at the number you are calling from, press 1. To use a different phone number, press 2.");
     const xml = plain(await call("promo-which-answer", { Digits: "1" }));
     expect(h.promoRequests).toHaveLength(1);
@@ -310,26 +292,11 @@ describe("promo texts by phone, keys only (Abraham, Nov 10, 2026)", () => {
     expect(h.messages).toHaveLength(0);
     expect(xml).not.toContain("We just sent a text");
   });
-  it("not live yet: other callers skip straight to goodbye; only the Owner's own phone hears it (owner test)", async () => {
-    process.env.ADMIN_PHONE = "+18457777585";
-    expect(await call("promo-consent")).toContain("/api/voice/goodbye");
-    h.promoMode = "off";
-    process.env.ADMIN_PHONE = "+18455550100";
-    expect(await call("promo-consent")).not.toContain("seasonal offers");
-  });
   it("once live: no 'we just sent a text' unless the text really went out (texting off until A2P)", async () => {
     h.promoMode = "live";
     h.sendOk = false;
     const xml = await call("promo-which-answer", { Digits: "1" });
     expect(xml).not.toContain("We just sent a text");
-    expect(xml).toContain("/api/voice/goodbye");
-  });
-  it("once live: skipped when the caller already decided recently", async () => {
-    h.promoMode = "live";
-    h.state.marketing = { action: "declined", at: new Date() };
-    process.env.ADMIN_PHONE = "+18457777585";
-    const xml = await call("promo-consent");
-    expect(xml).not.toContain("seasonal offers");
     expect(xml).toContain("/api/voice/goodbye");
   });
   it("goodbye reads the delivery and pickup dates and hangs up (paid order)", async () => {

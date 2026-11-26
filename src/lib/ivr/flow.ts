@@ -58,6 +58,7 @@ import {
   recordConsent,
   shouldAskMarketing,
   wordingVersion,
+  ConsentBlockedError,
 } from "@/lib/sms-consent";
 import { orderPath } from "@/lib/order-path";
 import { ensureSession, getSession, updateSession, type CallSession } from "./session";
@@ -4647,27 +4648,44 @@ const handlers: Record<string, Handler> = {
    * mobile number, hear it read back, press 1 to confirm. Then the approved confirmation text goes to the chosen
    * number; only a YES from that number within 24 hours signs it up. Who hears it: PHONE_PROMO_MODE.
    */
+  /**
+   * The promo question after a paid order (Abraham, Nov 26, 2026, approved wording): right after the payment and order
+   * number lines, before the thank-you and goodbye. 1 = this number opted in to promotional texts only (nothing more
+   * is played); pound or no key in 5 seconds = skip, no change. Not asked when the number already gets promotions,
+   * replied STOP, or the order is not paid. Order-text consent and STOP rules are unchanged; the JOIN invite stays off.
+   */
   async "promo-consent"(ctx, vr) {
-    const mode = phonePromoMode();
-    if (!phonePromoOn(ctx.from, mode)) return back(vr, "goodbye");
-    if (mode === "live") {
-      const caller = toE164(ctx.from);
-      if (caller && !shouldAskMarketing(await consentState(caller), await customerByPhone(caller))) return back(vr, "goodbye");
-    }
-    const g = keypad(vr, url("promo-consent-answer"), { numDigits: 1, timeout: 6 });
-    menuRun(g, ctx, "promo_ask", ["promo_ask", "pause", "skip_pound"]);
-    return back(vr, "promo-consent-answer"); // nothing pressed = skip
+    const caller = toE164(ctx.from);
+    const id = ctx.session?.data.placedOrderId;
+    const group = id ? await getPaymentGroup(id) : null;
+    if (!caller || !group || group.due > 0) return back(vr, "goodbye");
+    const customer = await customerByPhone(caller);
+    if (customer?.marketingOptIn || customer?.smsOptOut) return back(vr, "goodbye");
+    const g = keypad(vr, url("promo-consent-answer"), { numDigits: 1, timeout: 5 });
+    sp(g, ctx, "paid_promo_offer");
+    return back(vr, "goodbye"); // no key in 5 seconds: skip, no change
   },
 
   async "promo-consent-answer"(ctx, vr) {
-    if (ctx.body.Digits === "1") return back(vr, "promo-which");
-    if (ctx.body.Digits && ctx.body.Digits !== "2" && ctx.body.Digits !== "#") {
-      sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
+    const d = ctx.body.Digits;
+    const caller = toE164(ctx.from);
+    if (d === "1" && caller) {
+      try {
+        await recordPhoneConsent(ctx, "marketing", "opt_in", caller, "paid_promo_offer");
+        await track(ctx.callSid, "step", "Promo texts: opted in (pressed 1)", { phone: caller });
+        // The approved sign-up confirmation text (SMS v3, PROMO_ENROLLED_SMS), as after a YES; nothing more is played
+        const { PROMO_ENROLLED_SMS } = await import("@/lib/sms-terms-v2");
+        await sendMessage({ to: caller, body: PROMO_ENROLLED_SMS, kind: "system", event: "consent_confirmation", customerId: (await customerByPhone(caller))?.id ?? null, callSid: ctx.callSid });
+      } catch (e) {
+        if (!(e instanceof ConsentBlockedError)) throw e; // a number that replied STOP stays blocked (START + YES only)
+      }
+      return back(vr, "goodbye");
+    }
+    if (d && d !== "#") {
+      sp(vr, ctx, "not_valid"); // wrong key: the shared line, then the same question again
       return back(vr, "promo-consent");
     }
-    const caller = toE164(ctx.from);
-    if (caller) await recordPhoneConsent(ctx, "marketing", "declined", caller, "promo_ask");
-    return back(vr, "goodbye");
+    return back(vr, "goodbye"); // pound: skip, no change
   },
 
   "promo-which"(ctx, vr) {
