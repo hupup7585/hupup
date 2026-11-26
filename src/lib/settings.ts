@@ -31,6 +31,8 @@ export const SETTING_DEFAULTS = {
   laserThirdSetHalfOn: true,
   /** Offers (Abraham, Nov 17, 2026), Owner on/off, all off until he switches them on. They never combine. */
   offerThuSunOn: false,
+  // The Offers page intro line (Abraham, Nov 26, 2026), editable on that page
+  offersIntro: "Turn each offer on or off here. Customers only get the offers that are on.",
   offerFourthSundayOn: false,
   /**
    * Catalog by text (Abraham, Nov 17, 2026): two messages, picture 1 with the catalog words, then picture 2 alone.

@@ -1,6 +1,6 @@
 import { requireOwner } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
-import { saveHolidayRentalsAction, saveOffersAction } from "./actions";
+import { saveHolidayRentalsAction, saveOffersAction, saveOffersIntroAction } from "./actions";
 
 /** Offers (Owner only): its own page in the side menu, under Catalog (Abraham, Nov 17, 2026). */
 export default async function OffersPage({ searchParams }: { searchParams: Promise<{ ok?: string }> }) {
@@ -10,7 +10,7 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
   return (
     <div className="w-full">
       <h1 className="text-2xl font-black sm:text-3xl">Offers</h1>
-      <p className="mb-5 mt-1 text-muted">Each offer is off until you switch it on. They never combine: a booking gets the one that saves the customer the most. They cover jumping balloons, laser tag and paddle boats.</p>
+      <p className="mb-5 mt-1 text-muted" data-offers-intro>{String(settings.offersIntro || "").trim() || "Turn each offer on or off here. Customers only get the offers that are on."}</p>
       {sp.ok && <p className="mb-4 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]">{sp.ok}</p>}
       <section className="card mb-5 p-5" data-offers>
         <form action={saveOffersAction} className="grid gap-2">
@@ -20,6 +20,14 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
           <button className="btn-dark mt-1 w-fit">Save offers</button>
         </form>
       </section>
+      {/* The intro line above, editable (Abraham, Nov 26, 2026) */}
+      <details className="mb-5" data-offers-intro-edit>
+        <summary className="cursor-pointer text-sm font-semibold text-navy">Edit the line at the top of this page</summary>
+        <form action={saveOffersIntroAction} className="mt-2 grid gap-2">
+          <textarea name="offersIntro" rows={2} maxLength={500} defaultValue={String(settings.offersIntro)} className="input" />
+          <button className="btn-dark w-fit">Save the line</button>
+        </form>
+      </details>
       {/* Chanukah and Chol Hamoed rentals (Abraham, Nov 18, 2026, approved) */}
       <section className="card mb-5 p-5" data-holiday-rentals>
         <h2 className="text-xl font-black">Chanukah and Chol Hamoed rentals</h2>

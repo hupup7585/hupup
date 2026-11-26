@@ -48,3 +48,14 @@ export async function saveHolidayRentalsAction(fd: FormData) {
   redirect(`/admin/offers?ok=${encodeURIComponent("Chanukah and Chol Hamoed settings saved. They apply to new bookings.")}`);
 }
 
+
+/** The Offers page intro line (Abraham, Nov 26, 2026): Owner only, audited; empty = the approved line. */
+export async function saveOffersIntroAction(fd: FormData) {
+  const owner = await requireOwner();
+  const s = await getSettings();
+  const text = String(fd.get("offersIntro") ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
+  await saveSetting("offersIntro", text || "Turn each offer on or off here. Customers only get the offers that are on.", owner.userId);
+  await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.offers_intro_updated", entityType: "settings", entityId: "offers", before: { offersIntro: s.offersIntro }, after: { offersIntro: text } });
+  revalidatePath("/admin/offers");
+  redirect(`/admin/offers?ok=${encodeURIComponent("Saved.")}`);
+}
