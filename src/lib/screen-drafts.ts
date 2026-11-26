@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { parseEditor, type Editor } from "@/lib/ivr/menu-editor";
+import { defaultLayout, parseEditor, type Editor } from "@/lib/ivr/menu-editor";
 import { unwrapValue, wrapValue, writeSettingValue } from "@/lib/settings";
 
 /**
@@ -76,9 +76,12 @@ export async function editScreenDraft(screen: string, userId: number | null, act
 }
 
 /** Publish the draft: callers hear it from the next call step. One transaction; the version is recorded. */
-export async function publishScreens(userId: number | null, reason: string) {
+export async function publishScreens(userId: number | null, reason: string, opts: { approveWords?: boolean } = {}) {
   const why = reason.trim();
   if (why.length < 3) throw new ScreenDraftError("Write a short reason for the change (it is kept in the history).");
+  // New words callers would hear or get need the exact-words approval (Hark's review item 7)
+  const words = await newWordsInDraft();
+  if (words.length && !opts.approveWords) throw new ScreenDraftError(`This draft has new words callers would hear or get. Read them, then tick "I approve these exact words" and publish again: ${words.map((w) => `"${w.words}"`).join("; ")}`);
   // What keys may point at (items, recordings), read before the transaction (Hark's review item 4)
   const { brokenKeys, loadKeyTargets } = await import("@/lib/screen-keys");
   const targets = await loadKeyTargets();
@@ -102,6 +105,7 @@ export async function publishScreens(userId: number | null, reason: string) {
       .values({ key: LIVE_KEY, value: wrapValue(draft), previous: wrapValue(live), status: "live", reason: why.slice(0, 300), createdBy: userId, publishedBy: userId, publishedAt: new Date() })
       .returning();
     await tx.insert(schema.auditLog).values({ userId, action: "phone.screens_published", entityType: "settings", entityId: LIVE_KEY, before: live as never, after: { version: row.id, reason: why } });
+    if (words.length) await tx.insert(schema.auditLog).values({ userId, action: "phone.screens_words_approved_published", entityType: "settings", entityId: LIVE_KEY, after: { version: row.id, words } as never });
     return row.id;
   });
 }
@@ -127,4 +131,43 @@ export async function undoScreens(userId: number | null) {
     await writeSettingValue(tx, DRAFT_KEY, before, userId);
     await tx.insert(schema.auditLog).values({ userId, action: "phone.screens_undo_drafted", entityType: "settings", entityId: LIVE_KEY, after: { undoOf: last.id } });
   });
+}
+
+/**
+ * New words callers would hear or get from this draft (Hark's Phases 1-3 review, item 7): a line turned on (or
+ * added on) that has no uploaded recording (the computer voice would read its words), and a "Send a text" key that
+ * is new or changed (its words are texted to callers). Publishing these needs "I approve these exact words".
+ */
+export type NewWords = { screen: string; kind: "line" | "text"; words: string };
+export async function newWordsInDraft(): Promise<NewWords[]> {
+  const d = await draftEditor();
+  if (!d) return [];
+  const l = await liveEditor();
+  const { PROMPTS } = await import("@/lib/ivr/prompts");
+  const recorded = new Set((await db.select({ key: schema.voicePrompts.key, rec: schema.voicePrompts.recordingId }).from(schema.voicePrompts)).filter((r) => r.rec).map((r) => r.key));
+  const { customSlots } = await import("@/lib/custom-slots");
+  const texts = Object.fromEntries((await customSlots()).map((c) => [c.key, c.text]));
+  const wordsOf = (ref: string) => (PROMPTS as Record<string, { text: string }>)[ref]?.text ?? texts[ref] ?? "";
+  const out: NewWords[] = [];
+  for (const group of ["layouts", "extra"] as const) {
+    for (const [screen, lines] of Object.entries(d[group])) {
+      // the live lines, or the screen as built when nothing was ever changed there
+      const liveLines = l[group][screen] ?? (group === "layouts" ? defaultLayout(screen) : []);
+      const liveOn = new Set(liveLines.filter((x) => x.on).map((x) => x.ref));
+      for (const line of lines ?? []) {
+        if (!line.on || liveOn.has(line.ref) || line.ref === "star" || line.ref === "pause" || recorded.has(line.ref)) continue;
+        const words = wordsOf(line.ref);
+        if (words) out.push({ screen, kind: "line", words });
+      }
+    }
+  }
+  for (const [screen, keys] of Object.entries(d.keys)) {
+    for (const k of keys ?? []) {
+      if (k.action.type !== "text" || !k.on) continue;
+      const before = (l.keys[screen] ?? []).find((x) => x.key === k.key);
+      if (before && before.on && same(before.action, k.action)) continue;
+      out.push({ screen, kind: "text", words: k.action.text });
+    }
+  }
+  return out;
 }

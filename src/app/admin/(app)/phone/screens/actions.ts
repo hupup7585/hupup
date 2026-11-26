@@ -113,7 +113,7 @@ async function draftAction(fd: FormData, fn: (userId: number | null) => Promise<
   return screen ? back(screen, q) : redirect(`/admin/phone/screens?${q}`);
 }
 export async function publishScreensAction(fd: FormData) {
-  await draftAction(fd, (u) => publishScreens(u, String(fd.get("reason") ?? "")), "Published. Callers hear the new screens from the next call step.");
+  await draftAction(fd, (u) => publishScreens(u, String(fd.get("reason") ?? ""), { approveWords: fd.get("approveWords") === "on" }), "Published. Callers hear the new screens from the next call step.");
 }
 export async function discardScreensAction(fd: FormData) {
   await draftAction(fd, (u) => discardScreens(u), "Draft discarded. The live screens did not change.");
