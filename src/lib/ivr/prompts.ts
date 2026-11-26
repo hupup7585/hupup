@@ -721,7 +721,7 @@ export const PROMPTS = {
   // Box 148 (Abraham, Nov 25, 2026, 00:29): no name; four recordings around the order number (one digit at a time)
   phonepay_approved: { group: "Pay by card (Sola PhonePay)", label: "Box 148 Part A: payment approved, order number", text: "Thank you! Your payment was approved, and your booking is confirmed. Your order number is {number}.", vars: ["number"] },
   // Abraham dictated Nov 25, 2026, 4:43 PM; held until he approves the exact words (5:50 PM): not played yet
-  pay_approved_dates: { group: "Pay by card (Sola PhonePay)", label: "Box 148: delivery and pickup dates (right after the order number; waiting for Abraham's OK)", text: "We will deliver on {date} and pick up on {pickup}.", vars: ["date", "pickup"] },
+  pay_approved_dates: { group: "Pay by card (Sola PhonePay)", label: "Box 148: delivery and pickup dates (right after the order number)", text: "We will deliver on {date} and pick up on {pickup}.", vars: ["date", "pickup"] },
   phonepay_approved_star: { group: "Pay by card (Sola PhonePay)", label: "Box 148 Part B1: hear the number again", text: "To hear it again, press star." },
   phonepay_approved_text: { group: "Pay by card (Sola PhonePay)", label: "Box 148 Part B2: confirmation by text (only for callers who agreed to order texts)", text: "We will text your confirmation to the number you are calling from. To send it to a different number, press 1." },
   phonepay_approved_bye: { group: "Pay by card (Sola PhonePay)", label: "Box 148 Part B3: closing", text: "We look forward to serving you again. Thank you for choosing Hup Up Attractions!" },

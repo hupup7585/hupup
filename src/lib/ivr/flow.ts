@@ -305,7 +305,7 @@ function bookHoursOn(ctx: { prompts: PromptOverrides }) {
   return !promptWaiting(ctx.prompts, "book_r3c") && Boolean(o?.recordingId || o?.audioUrl); // an upload, not a Google voice file
 }
 /** Box 148's dates line (Nov 25, 2026, 4:43 PM): off until Abraham approves the exact words (5:50 PM). */
-export const PAY_DATES_LIVE = false;
+export const PAY_DATES_LIVE = true; // Abraham approved the exact words (Nov 26, 2026, 01:25 ET)
 
 /** A menu made of several recordings, in the order the Owner set in Admin (src/lib/ivr/menu-order.ts). */
 async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) => void | Promise<void>, opts: { firstTime?: boolean } = {}) {
@@ -4470,8 +4470,8 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: 5 }); // 5 seconds (Nov 25, 2026, 12:22)
     if (ctx.query.get("st")) sp(g, ctx, "checkout_order_number", { number });
     else if (!ctx.query.get("r")) sp(g, ctx, "phonepay_approved", { number });
-    // The dates line (Abraham dictated 4:43 PM; held until he approves the exact words): right after the number, on
-    // star too; several days = the first delivery date and the last pickup date (to confirm with Abraham)
+    // The dates line (Abraham dictated 4:43 PM; approved Nov 26, 2026, 01:25 ET): right after the number, on star too;
+    // several days = the first delivery date and the last pickup date (to confirm with Abraham)
     if (PAY_DATES_LIVE && !ctx.query.get("r")) {
       const days = group.orders.map((x) => x.order); // sorted by date
       sp(g, ctx, "pay_approved_dates", { date: spokenDate(days[0].eventDate), pickup: spokenDate(days.map((x) => x.pickupDate).sort().at(-1)!) });

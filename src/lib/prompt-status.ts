@@ -11,7 +11,6 @@ export type LineStatus = { status: "Live" | "Waiting for approval" | "Not active
 /** Why a line can't play yet, even when its wording is fine (features that are switched off). */
 export function notActiveReason(key: string, env: Record<string, string | undefined> = process.env): string | null {
   if (key.startsWith("promo_") || key === "consent_marketing_v2") return PHONE_PROMO_MODE === "off" ? "Phone promo steps are off until SMS Terms v3 is live and you approve a test recording." : null;
-  if (key === "pay_approved_dates") return "Waiting for Abraham's OK on the exact words."; // Box 148 dates line (Nov 25, 2026)
   if (key.startsWith("pay_")) return stripePhonePayMode() !== "live" ? "Keypad payment plays only on your own test calls until you approve a real test." : null;
   if (key.startsWith("vma_")) return "Staff voicemail access by phone runs on preview only until you approve it and the call-back price.";
   if (key === "spoken_readback") return "Waits for your OK on speech to text and its price.";
