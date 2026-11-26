@@ -5,6 +5,7 @@ import { customSlots } from "@/lib/custom-slots";
 import { catalogItems } from "@/lib/slot-status";
 import { db, schema } from "@/lib/db";
 import { SCREENS, screenArea, screenLabel } from "@/lib/ivr/screens";
+import { SCREEN_EXPLANATIONS } from "@/lib/ivr/screen-explanations";
 
 export const metadata = { title: "Phone screens | Hup Up Attractions" };
 export const dynamic = "force-dynamic";
@@ -61,6 +62,7 @@ export default async function ScreensPage() {
               <li key={id}>
                 <Link href={`/admin/phone/screens/${encodeURIComponent(id)}`} className="block rounded-xl border border-line p-3 hover:bg-bg">
                   <span className="block font-bold">{screenLabel(id)}</span>
+                  <span className="block text-sm text-muted" data-screen-what>{SCREEN_EXPLANATIONS[id]?.what}</span>
                   <span className="block text-xs text-muted">
                     {SCREENS[id].lines.length} lines · keys used: {SCREENS[id].keys || "none"}{SCREENS[id].combos.length ? " · combined recording" : ""}
                   </span>

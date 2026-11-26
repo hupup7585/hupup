@@ -10,6 +10,7 @@ import { PROMPTS, promptArea } from "@/lib/ivr/prompts";
 import { RING_KEYS, RING_KEY_LABELS } from "@/lib/ivr/routing";
 import { KEY_ACTIONS, defaultLayout, layoutIdFor, parseEditor, type KeyDef, type Line } from "@/lib/ivr/menu-editor";
 import { GO_TO_SCREENS, SCREENS, screenArea, screenLabel } from "@/lib/ivr/screens";
+import { SCREEN_EXPLANATIONS } from "@/lib/ivr/screen-explanations";
 import { addLineAction, moveLineAction, removeKeyAction, removeLineAction, setKeyAction, toggleLineAction } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -112,6 +113,14 @@ export default async function ScreenPage({ params, searchParams }: { params: Pro
     <div className="w-full" data-screen-editor={id}>
       <p className="mb-2 text-sm"><Link className="text-navy underline" href="/admin/phone/screens">All phone screens</Link> · {screenArea(id)}</p>
       <h1 className="text-2xl font-black sm:text-3xl">{screenLabel(id)}</h1>
+      {SCREEN_EXPLANATIONS[id] && (
+        <dl className="mt-2 grid gap-0.5 text-sm" data-screen-explain>
+          <div><dt className="inline font-semibold">What it does: </dt><dd className="inline text-muted">{SCREEN_EXPLANATIONS[id].what}</dd></div>
+          <div><dt className="inline font-semibold">Where the caller meets it: </dt><dd className="inline text-muted">{SCREEN_EXPLANATIONS[id].where}</dd></div>
+          <div><dt className="inline font-semibold">Now: </dt><dd className="inline text-muted">{s.lines.length} recorded lines; keys that work here: {s.keys ? s.keys.split("").join(", ") : "none (the caller types or speaks)"}.</dd></div>
+          <div><dt className="inline font-semibold">If you change it: </dt><dd className="inline text-muted">{SCREEN_EXPLANATIONS[id].ifChanged}</dd></div>
+        </dl>
+      )}
       {sp.ok && <p className="my-3 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]" role="status">{sp.ok === "1" ? "Saved, live now." : sp.ok}</p>}
       {sp.err && <p className="my-3 rounded-xl bg-[#FFE6E4] p-3 font-semibold text-[#C83A2F]" role="alert">{sp.err}</p>}
 

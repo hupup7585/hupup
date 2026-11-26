@@ -3,6 +3,7 @@ import { desc, inArray } from "drizzle-orm";
 import { requireOwner } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { configDefs } from "@/lib/config-registry";
+import { ACCOUNTANT_NOTE } from "@/lib/config-explanations";
 import { db, schema } from "@/lib/db";
 import { FEATURE_SWITCHES } from "@/lib/feature-switches";
 import { unwrap } from "@/lib/config-versions";
@@ -57,7 +58,20 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
                       {draft && <span className="rounded-full bg-[#FFF8E1] px-2 text-xs font-bold text-[#5C4600]" data-config-draft>Draft: {show(unwrap(draft.value))}</span>}
                       {d.wording && <span className="rounded-full bg-[#E8F0FB] px-2 text-xs font-bold text-navy">Customer words</span>}
                     </div>
-                    {d.help && <p className="text-sm text-muted">{d.help}</p>}
+                    {d.explain ? (
+                      <dl className="mt-1 grid gap-0.5 text-sm" data-config-explain>
+                        <div><dt className="inline font-semibold">What it does: </dt><dd className="inline text-muted">{d.explain.what}</dd></div>
+                        <div><dt className="inline font-semibold">Where it is used: </dt><dd className="inline text-muted">{d.explain.where}</dd></div>
+                        <div><dt className="inline font-semibold">Now: </dt><dd className="inline text-muted">{show(live[d.key])}</dd></div>
+                        {d.explain.source && <div><dt className="inline font-semibold">Where the number comes from: </dt><dd className="inline text-muted">{d.explain.source}</dd></div>}
+                        {d.explain.calculation && <div><dt className="inline font-semibold">How it is worked out: </dt><dd className="inline text-muted">{d.explain.calculation}</dd></div>}
+                        {d.explain.example && <div><dt className="inline font-semibold">Example: </dt><dd className="inline text-muted">{d.explain.example}</dd></div>}
+                        <div><dt className="inline font-semibold">If you change it: </dt><dd className="inline text-muted">{d.explain.ifChanged}</dd></div>
+                        {d.explain.askAccountant && <div className="font-semibold text-[#5C4600]">{ACCOUNTANT_NOTE}</div>}
+                      </dl>
+                    ) : (
+                      d.help && <p className="text-sm text-muted">{d.help}</p>
+                    )}
                     <p className="text-xs text-muted">
                       Default: {show(d.default)}
                       {d.min !== undefined ? ` · lowest ${d.min}` : ""}

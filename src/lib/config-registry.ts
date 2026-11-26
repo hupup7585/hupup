@@ -1,5 +1,6 @@
 import { SETTING_DEFAULTS } from "@/lib/settings";
 import { CONFIG_USAGE } from "@/lib/config-usage.generated";
+import { CONFIG_EXPLANATIONS, type Explanation } from "@/lib/config-explanations";
 
 /**
  * Admin handoff Phase 2 (Abraham, Nov 26, 2026): one typed registry of every Admin setting. Each entry has a plain
@@ -25,6 +26,8 @@ export type ConfigDef = {
   /** Protected: shown with the reason, never editable here. */
   locked?: string;
   usedBy: string[];
+  /** Plain-English explanation: what it does, where customers meet it, what happens if changed (Nov 26, 2026). */
+  explain: Explanation | null;
 };
 
 /** Plain-English labels, limits and groups for the settings that need more than their name. */
@@ -95,7 +98,7 @@ export function configDefs(): ConfigDef[] {
       return {
         key,
         label: m.label ?? humanize(key),
-        help: m.help ?? "",
+        help: m.help ?? CONFIG_EXPLANATIONS[key]?.what ?? "",
         group: m.group ?? GROUP_BY_WORD.find(([re]) => re.test(key))?.[1] ?? "Other settings",
         type,
         default: def,
@@ -106,6 +109,7 @@ export function configDefs(): ConfigDef[] {
         page: m.page,
         locked: m.locked,
         usedBy: CONFIG_USAGE[key] ?? [],
+        explain: CONFIG_EXPLANATIONS[key] ?? null,
       } satisfies ConfigDef;
     });
 }
