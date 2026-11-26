@@ -766,9 +766,7 @@ export const RECORDING_USAGE: Record<string, string[]> = {
  "pay_approved_dates": [
   "lib/ivr/flow.ts"
  ],
- "pay_approved_optin": [
-  "lib/ivr/flow.ts"
- ],
+ "pay_approved_optin": [],
  "pay_approved_pickup_note": [
   "lib/ivr/flow.ts"
  ],
@@ -778,6 +776,12 @@ export const RECORDING_USAGE: Record<string, string[]> = {
  "pay_card_number": [
   "lib/ivr/flow.ts",
   "lib/stripe-pay-voice.ts"
+ ],
+ "pay_confirm_how": [
+  "lib/ivr/flow.ts"
+ ],
+ "pay_confirm_offer": [
+  "lib/ivr/flow.ts"
  ],
  "pay_declined": [
   "lib/ivr/flow.ts",
@@ -814,6 +818,9 @@ export const RECORDING_USAGE: Record<string, string[]> = {
  "pay_success": [
   "lib/ivr/flow.ts",
   "lib/stripe-pay-voice.ts"
+ ],
+ "pay_texted_receipt": [
+  "lib/ivr/flow.ts"
  ],
  "phone_bad": [
   "lib/ivr/flow.ts"

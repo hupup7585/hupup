@@ -100,38 +100,24 @@ describe("the approved words (Admin slots, word for word, no contractions)", () 
 });
 
 describe("after payment, in order: 1, 2, 3, 4, then 5, then 8, then 7", () => {
-  it("Lines 1 to 4 in one screen with about 3 seconds for a key; no key goes on to Line 5", async () => {
+  it("lines 1, 2 and 3 in one screen with about 3 seconds for a key (Nov 26, 2026, 3:56 PM ET); no key goes on to line 4", async () => {
     const x = await call("pay-approved", {}, `o=${orderId}`);
-    expect(said(x)).toEqual([LINE1(), LINE2, LINE3, LINE4]);
+    expect(said(x)).toEqual([LINE1(), LINE2, LINE4]);
     expect(gather(x)).toContain('timeout="3"');
     expect(redirect(x)).toBe(`pay-approved-text?o=${orderId}`);
     expect(redirect(await call("pay-approved-choice", {}, `o=${orderId}`))).toBe(`pay-approved-text?o=${orderId}`);
   });
-  it("star replays from Line 1", async () => {
+  it("star replays lines 1 and 2", async () => {
     expect(redirect(await call("pay-approved-choice", { Digits: "*" }, `o=${orderId}`))).toBe(`pay-approved?o=${orderId}`);
-    expect(said(await call("pay-approved", {}, `o=${orderId}`))[0]).toBe(LINE1());
+    expect(said(await call("pay-approved", {}, `o=${orderId}`)).slice(0, 2)).toEqual([LINE1(), LINE2]);
   });
-  it("not signed up for order texts: Line 5b; no key goes on (box 35, then Line 8)", async () => {
+  it("line 4 (the pickup note), then line 5 with no wait; no key goes straight on to Line 8 (covered fully in nov26-after-payment-v2)", async () => {
     const x = await call("pay-approved-text", {}, `o=${orderId}`);
-    expect(said(x)).toEqual([LINE5B]);
-    expect(gather(x)).toContain('timeout="3"');
-    expect(redirect(x)).toBe(`receipt-email?o=${orderId}`);
-    expect(redirect(await call("pay-approved-text-choice", {}, `o=${orderId}`))).toBe(`receipt-email?o=${orderId}`);
+    expect(said(x)).toEqual([LINE3, "To get your confirmation and receipt by text or email, press 1."]);
+    expect(gather(x)).toContain('timeout="1"');
+    expect(redirect(x)).toBe("promo-consent");
   });
-  it("Line 5b, key 1: signs up the calling number and texts the confirmation", async () => {
-    const r = await call("pay-approved-text-choice", { Digits: "1" }, `o=${orderId}`);
-    expect(redirect(r)).toBe(`receipt-email?o=${orderId}`);
-    expect(h.sent.map((m) => m.to)).toEqual([CALLER]);
-    const rows = await db.select().from(schema.smsConsents).where(eq(schema.smsConsents.phone, CALLER));
-    expect(rows.some((c) => c.scope === "transactional" && c.action === "opt_in")).toBe(true);
-  });
-  it("signed up for order texts: Line 5a; key 1 = a different number", async () => {
-    await optInOrderTexts();
-    expect(said(await call("pay-approved-text", {}, `o=${orderId}`))).toEqual([LINE5A]);
-    expect(redirect(await call("pay-approved-text-choice", { Digits: "1" }, `o=${orderId}`))).toBe(`tx-enter?p=conf&o=${orderId}`);
-    expect(redirect(await call("pay-approved-text-choice", {}, `o=${orderId}`))).toBe(`receipt-email?o=${orderId}`); // no key
-  });
-  it("Line 8 after box 35: key 1 -> which number -> the number calling -> joined -> Line 7; no key moves on; pound is not valid", async () => {
+  it("Line 8 after line 5: key 1 -> which number -> the number calling -> joined -> Line 7; no key moves on; pound is not valid", async () => {
     const x = await call("promo-consent");
     expect(said(x)).toEqual([LINE8]);
     expect(gather(x)).toContain('timeout="3"');

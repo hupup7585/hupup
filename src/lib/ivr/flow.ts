@@ -1578,9 +1578,10 @@ async function txSend(ctx: Ctx, vr: VR, p: "cat" | "pay" | "conf" | "promo", to:
       // caller asked for it on this call (key 1), so the order-text consent for that number is recorded first.
       const joined = Boolean(ctx.session?.data.textJoin);
       const blocked = (await customerByPhone(to))?.smsOptOut;
+      const both = Boolean(ctx.session?.data.confBoth);
       if (blocked) {
         sp(vr, ctx, "consent_stopped");
-        return back(vr, "receipt-email", { o }); // box 35
+        return both ? back(vr, "catalog-email", { p: "rcpt", o }) : back(vr, "promo-consent");
       }
       await recordPhoneConsent(ctx, "transactional", "opt_in", to, joined ? "phonepay_approved_join" : "phonepay_approved_text");
       await setOrderTextPhone(o, to);
@@ -1589,7 +1590,8 @@ async function txSend(ctx: Ctx, vr: VR, p: "cat" | "pay" | "conf" | "promo", to:
       const body = await confirmationText(o);
       const r = body ? await sendMessage({ to, body, kind: "transactional", event: "confirmation_resend", orderId: o, callSid: ctx.callSid }) : null;
       await track(ctx.callSid, "step", `Box 148: the order's text number is now ${to}${r?.sent ? "; confirmation texted" : ""}${joined ? " (signed up for this order's texts)" : ""}`, { to });
-      return back(vr, "receipt-email", { o }); // box 35 after the different-number step
+      // "Both" (line 5 sub-menu, key 3): the receipt by email next; else on to Line 8
+      return both ? back(vr, "catalog-email", { p: "rcpt", o }) : back(vr, "promo-consent");
     }
     return back(vr, "promo-consent");
   }
@@ -4654,6 +4656,12 @@ const handlers: Record<string, Handler> = {
    * Line 1). Then Line 5a or 5b (pay-approved-text), box 35 (receipt by email), Line 8 (promo-consent) and Line 7
    * (goodbye), then the call hangs up. The old Line 6 and goodbye_order no longer play.
    */
+  /*
+   * After a card payment (Hark for Abraham, Nov 26, 2026, 3:56 PM ET, exact words): 1 "Thank you! Your payment was
+   * approved ... Your order number is {number}." 2 "We will deliver on {date} and pick up on {pickup}." 3 "To hear it
+   * again, press star." with about 3 seconds for a key (star replays 1 and 2). Then (pay-approved-text) 4 the pickup
+   * note, 5 the confirmation and receipt line with no wait, 6 Line 8 (seasonal offers) and 7 the goodbye.
+   */
   async "pay-approved"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     const group = o ? await getPaymentGroup(o) : null;
@@ -4664,13 +4672,12 @@ const handlers: Record<string, Handler> = {
     if (PAY_DATES_LIVE) {
       const days = group.orders.map((x) => x.order); // sorted by date: the first delivery and the last pickup
       sp(g, ctx, "pay_approved_dates", { date: spokenDate(days[0].eventDate), pickup: spokenDate(days.map((x) => x.pickupDate).sort().at(-1)!) });
-      sp(g, ctx, "pay_approved_pickup_note");
     }
     sp(g, ctx, "phonepay_approved_star");
-    return back(vr, "pay-approved-text", { o }); // no key: on to Line 5
+    return back(vr, "pay-approved-text", { o }); // no key: on to line 4
   },
 
-  /** Line 4's key: star = Line 1 again; anything else = the shared line, then on to Line 5. */
+  /** Line 3's key: star = lines 1 and 2 again; anything else = the shared line, then on to line 4. */
   async "pay-approved-choice"(ctx, vr) {
     const o = ctx.query.get("o") ?? undefined;
     const d = ctx.body.Digits;
@@ -4679,43 +4686,56 @@ const handlers: Record<string, Handler> = {
     return back(vr, "pay-approved-text", { o });
   },
 
-  /** Line 5a (signed up for order texts) or Line 5b (not signed up), about 3 seconds for a key; then box 35. */
+  /**
+   * Line 4 (the pickup note), then line 5 with no wait: key 1 works while it plays, otherwise straight on to Line 8.
+   * Callers signed up for text updates hear the texted variant (1 = the receipt by email); everyone else hears the
+   * text-or-email offer (1 = the sub-menu). This replaces the old separate text line and the old box 35 receipt line.
+   */
   async "pay-approved-text"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     if (!o || !(await getPaymentGroup(o))) return back(vr, "promo-consent");
-    const g = keypad(vr, url("pay-approved-text-choice", { o }), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
-    sp(g, ctx, (await orderTextsAgreed(ctx, o)) ? "phonepay_approved_text" : "pay_approved_optin");
-    return back(vr, "receipt-email", { o }); // no key: box 35, the receipt by email
+    if (PAY_DATES_LIVE) sp(vr, ctx, "pay_approved_pickup_note");
+    const g = keypad(vr, url("pay-approved-text-choice", { o }), { numDigits: 1, timeout: T(vr, "timerPaidLine5") });
+    sp(g, ctx, (await orderTextsAgreed(ctx, o)) ? "pay_texted_receipt" : "pay_confirm_offer");
+    return back(vr, "promo-consent"); // no key: straight on
   },
 
   async "pay-approved-text-choice"(ctx, vr) {
-    const o = ctx.query.get("o") ?? undefined;
+    const o = Number(ctx.query.get("o"));
     const d = ctx.body.Digits;
-    if (d === "*") return back(vr, "pay-approved", { o }); // star: back to Line 1
+    if (d === "*") return back(vr, "pay-approved", { o }); // star: back to line 1
     if (d === "1") {
-      // Agreed to order texts: a different number (box 143, then the read-back). Not agreed: pressing 1 signs up for this
-      // order's texts, to the number they choose (box 142, then the read-back) (Abraham, Nov 25, 2026, 00:34)
-      if (await orderTextsAgreed(ctx, Number(o))) return back(vr, "tx-enter", { p: "conf", o });
-      // Not signed up (Abraham, Nov 25, 2026, 12:22): key 1 signs up the calling number for this order's texts (the same
-      // consent record as box 49 key 1), the box 49 thank-you lines, the confirmation text, then box 35
-      const phone = toE164(ctx.session?.fromNumber ?? ctx.from);
-      if (phone && !(await customerByPhone(phone))?.smsOptOut) {
-        await recordPhoneConsent(ctx, "transactional", "opt_in", phone, "pay_approved_optin");
-        await updateSession(ctx.callSid, { data: { smsConsent: "yes" } }, ctx.session);
-        await setOrderTextPhone(Number(o), phone);
-        sp(vr, ctx, "consent_tx_thanks", { number: spokenPhone(phone) });
-        const { confirmationText } = await import("@/lib/payment-result");
-        const body = await confirmationText(Number(o));
-        const r = body ? await sendMessage({ to: phone, body, kind: "transactional", event: "confirmation_resend", orderId: Number(o), callSid: ctx.callSid }) : null;
-        await track(ctx.callSid, "step", `Box 148: signed up ${phone} for this order's texts${r?.sent ? "; confirmation texted" : ""}`, { to: phone });
-      } else if (phone) sp(vr, ctx, "consent_stopped");
-      return back(vr, "receipt-email", { o });
+      await updateSession(ctx.callSid, { data: { confBoth: undefined } }, ctx.session);
+      // Signed up for text updates: the confirmation was texted; 1 = the receipt by email (the email steps)
+      if (await orderTextsAgreed(ctx, o)) return back(vr, "catalog-email", { p: "rcpt", o });
+      return back(vr, "pay-confirm-how", { o });
     }
-    if (d && d !== "#") {
+    return back(vr, "promo-consent"); // no wait: any other key or none moves on
+  },
+
+  /** Line 5's sub-menu: 1 text (which number, then the read-back), 2 email (the email steps), 3 both (text, then email). */
+  async "pay-confirm-how"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    const g = keypad(vr, url("pay-confirm-how-choice", { o }), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
+    sp(g, ctx, "pay_confirm_how");
+    backLine(g, ctx);
+    return back(vr, "promo-consent"); // no key: on to Line 8
+  },
+
+  async "pay-confirm-how-choice"(ctx, vr) {
+    const o = Number(ctx.query.get("o"));
+    const d = ctx.body.Digits;
+    if (d === "*") return back(vr, "pay-approved-text", { o });
+    if (d === "1" || d === "3") {
+      await updateSession(ctx.callSid, { data: { confBoth: d === "3" ? 1 : undefined } }, ctx.session);
+      return back(vr, "tx-which", { p: "conf", o });
+    }
+    if (d === "2") return back(vr, "catalog-email", { p: "rcpt", o });
+    if (d) {
       sp(vr, ctx, "not_valid");
-      return back(vr, "pay-approved-text", { o });
+      return back(vr, "pay-confirm-how", { o });
     }
-    return back(vr, "receipt-email", { o }); // pound or no key: box 35
+    return back(vr, "promo-consent");
   },
 
   /** Before the first card try: 0 = a payment link (box 141) instead; any other key = the shared line, then box 140 again. */

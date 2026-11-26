@@ -276,6 +276,8 @@ export type CallData = {
   dirMatchId?: number; // the directory household matched by the address entered by hand (Nov 25, 2026)
   callerName?: string;
   unitUnverified?: boolean;
+  /** After payment, line 5 sub-menu key 3 (Nov 26, 2026): text first, then the receipt by email */
+  confBoth?: number;
   textJoin?: boolean; // box 148 key 1 by a caller who had not opted in (Nov 25, 2026) // key 2 on the unit question: no unit, not in the directory (Nov 25, 2026) // the name the caller gave, kept when a directory household name is used // the street keypad search: the streets found (Nov 24, 2026)
   /** Phone-number lookup (Nov 23, 2026): the number looked up, and the address the caller picked (for the owner alert) */
   dirPhone?: string;

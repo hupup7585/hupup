@@ -256,11 +256,15 @@ exports[`baseline: every phone step as it plays today > pay-approved-choice 1`] 
 
 exports[`baseline: every phone step as it plays today > pay-approved-text 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/promo-consent</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > pay-approved-text-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/receipt-email</Redirect></Response>"`;
+exports[`baseline: every phone step as it plays today > pay-approved-text-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/promo-consent</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > pay-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > pay-choice-answer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-confirm-how 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="3" finishOnKey="" action="https://hupup.example/api/voice/pay-confirm-how-choice?o=0" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">For text, press 1. For email, press 2. For both, press 3.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/promo-consent</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > pay-confirm-how-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/promo-consent</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > pay-consent 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="8" finishOnKey="" action="https://hupup.example/api/voice/pay-consent-answer" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To receive text updates to your phone number, about your reservation, press 1.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/pay-consent-answer</Redirect></Response>"`;
 
@@ -509,6 +513,8 @@ exports[`baseline: every phone step as it plays today > the inventory of phone s
   "pay-approved-text-choice",
   "pay-choice",
   "pay-choice-answer",
+  "pay-confirm-how",
+  "pay-confirm-how-choice",
   "pay-consent",
   "pay-consent-answer",
   "pay-done",
