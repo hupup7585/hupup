@@ -193,7 +193,11 @@ export const SCREENS: Record<string, ScreenInfo> = {
   },
   "cs-closed": {
     "choice": "cs-closed-key",
-    "lines": [],
+    "lines": [
+      "after_hours_closed",
+      "after_hours_auto",
+      "after_hours_message"
+    ],
     "keys": "1",
     "combos": [
       "after_hours_closed"

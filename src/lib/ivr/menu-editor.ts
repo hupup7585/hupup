@@ -50,6 +50,8 @@ export function layoutIdFor(comboId: string): string {
 export function defaultLayout(layoutId: string): Line[] {
   const parts = [...(MENU_COMBOS[layoutId] ?? [])];
   if (layoutId === "pay_approved_text") parts.splice(2, 0, "pay_approved_optin");
+  // The customer service hours line (Nov 26, 2026) sits right after 3a, so it can be turned off in Phone screens
+  if (layoutId === "book" && parts.includes("book_r3a")) parts.splice(parts.indexOf("book_r3a") + 1, 0, "book_r3c");
   return parts.filter((p) => p !== "pause").map((ref) => ({ ref, on: true }));
 }
 
@@ -103,7 +105,8 @@ export function applyLayout(layout: Line[] | undefined, parts: readonly string[]
 
 /** A line the code itself plays somewhere (a recording slot of a screen, or a built part), not an added line. */
 function isBuiltRef(ref: string): boolean {
-  return BUILT_PARTS.has(ref) || Object.values(MENU_COMBOS).some((p) => p.includes(ref));
+  // book_r3c: a built bookings menu line that is skipped when it has no upload, never played as an added line
+  return BUILT_PARTS.has(ref) || ref === "book_r3c" || Object.values(MENU_COMBOS).some((p) => p.includes(ref));
 }
 
 /** Is this line in the screen's lines (its layouts or its end lines) and on? */

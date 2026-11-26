@@ -295,15 +295,22 @@ function menuRun(g: Gather, ctx: { prompts: PromptOverrides }, id: string, parts
   }
 }
 
-export const BOOK_R3C_LIVE = false;
+/**
+ * The customer service hours line (book_r3c, Abraham, Nov 26, 2026): in the bookings menu only, and only from its
+ * uploaded recording; off (waiting) or with no recording, it is skipped, never read by the Google voice.
+ */
+function bookHoursOn(ctx: { prompts: PromptOverrides }) {
+  const o = ctx.prompts.book_r3c;
+  return !promptWaiting(ctx.prompts, "book_r3c") && Boolean(o?.recordingId || o?.audioUrl); // an upload, not a Google voice file
+}
 /** Box 148's dates line (Nov 25, 2026, 4:43 PM): off until Abraham approves the exact words (5:50 PM). */
 export const PAY_DATES_LIVE = false;
 
 /** A menu made of several recordings, in the order the Owner set in Admin (src/lib/ivr/menu-order.ts). */
 async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) => void | Promise<void>, opts: { firstTime?: boolean } = {}) {
-  const order = menuOrder(menu, (await getSettings()).menuOrders).filter((part) => !(FIRST_TIME_ONLY.has(part) && opts.firstTime === false));
+  const order = menuOrder(menu, (await getSettings()).menuOrders).filter((part) => !(FIRST_TIME_ONLY.has(part) && opts.firstTime === false) && !(part === "book_r3c" && !bookHoursOn(ctx)));
   // The bookings menu as one recording (Nov 26, 2026), when chosen and the lines are its lines in its order
-  if (menu === "book" && !BOOK_R3C_LIVE) {
+  if (menu === "book") {
     const parts = order.map((x) => (x === "book_back" ? "star" : x));
     const id = opts.firstTime === false ? "book_again" : "book";
     if (ctx.prompts[`whole_${id}` as PromptKey]?.recordingId && MENU_COMBOS[id].join("|") === parts.join("|")) return menuRun(g, ctx, id, parts);
@@ -316,9 +323,6 @@ async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) =
     else if (part === "book_back") backLine(g, ctx);
     else if (!(part in PROMPTS)) playRef(g, ctx, part);
     else sp(g, ctx, part as PromptKey);
-    // 3c (customer service hours) plays right after 3a once its new wording is in. Off (Abraham, Nov 25, 2026, 4:50 PM):
-    // the hours changed, so "11 AM to 4 PM" is wrong; the slot keeps its text and waits for new wording.
-    if (part === "book_r3a" && BOOK_R3C_LIVE) sp(g, ctx, "book_r3c");
   }
 }
 
@@ -2268,7 +2272,7 @@ const handlers: Record<string, Handler> = {
   async "cs-closed"(ctx, vr) {
     await track(ctx.callSid, "step", "Bookings key 0: customer service closed (after-hours set)");
     const g = keypad(vr, url("cs-closed-key"), { timeout: 1 });
-    menuRun(g, ctx, "after_hours_closed", BOOK_R3C_LIVE ? ["after_hours_closed", "book_r3c", "after_hours_auto", "after_hours_message"] : ["after_hours_closed", "after_hours_auto", "after_hours_message"]);
+    menuRun(g, ctx, "after_hours_closed", ["after_hours_closed", "after_hours_auto", "after_hours_message"]); // the hours line: bookings menu only (Nov 26, 2026)
     const box = await vmBox("4");
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "voicemail", data: { vmEntry: "4", missed: "closed" } }, ctx.session);
     return vmRecord(vr, box, "4");

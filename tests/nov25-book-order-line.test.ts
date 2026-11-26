@@ -56,18 +56,4 @@ describe("item 1: the bookings menu order line", () => {
   });
 });
 
-describe("item 2: customer service hours line 3c (Abraham, Yes, Nov 25, 2026, 3:25 PM)", () => {
-  const R3C = "Our customer service is open Sunday through Thursday, from 11 AM to 4 PM.";
-  it("slot text exact, own Admin slot", () => {
-    expect(PROMPTS.book_r3c.text).toBe(R3C);
-    expect(PROMPTS.book_r3c.label).toBe("Bookings menu, recording 3c: customer service hours");
-    expect(RETIRED_PROMPTS.has("book_r3c")).toBe(false);
-  });
-  it("4:50 PM: not played anywhere (the hours changed); the slot keeps its text and shows Waiting for new wording", async () => {
-    const lines = said(await call("book"));
-    expect(lines).not.toContain(R3C);
-    expect(lines).toContain(PROMPTS.book_r3a.text);
-    const { lineStatus } = await import("@/lib/prompt-status");
-    expect(lineStatus("book_r3c", {})).toEqual({ status: "Not active yet", reason: "Waiting for new wording." });
-  });
-});
+// Item 2 (the hours line 3c) is now played in the bookings menu: tests/nov26-book-hours.test.ts

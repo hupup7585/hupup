@@ -25,10 +25,10 @@ describe("Shabbes: closed until 2 minutes after Rabbeinu Tam", () => {
 
 describe("menu order (Admin)", () => {
   it("default orders; the Owner's order is used only when it holds every recording once", () => {
-    const DEF = ["book_r1", "book_orders_only", "book_r3a", "book_r2", "book_r3b", "book_back"];
+    const DEF = ["book_r1", "book_orders_only", "book_r3a", "book_r3c", "book_r2", "book_r3b", "book_back"]; // + 3c (Nov 26, 2026)
     expect(menuOrder("book", "")).toEqual(DEF);
-    const stored = setMenuOrder("book", ["book_r2", "book_r1", "book_orders_only", "book_r3a", "book_r3b", "book_back"], "");
-    expect(menuOrder("book", stored)).toEqual(["book_r2", "book_r1", "book_orders_only", "book_r3a", "book_r3b", "book_back"]);
+    const stored = setMenuOrder("book", ["book_r2", "book_r1", "book_orders_only", "book_r3a", "book_r3c", "book_r3b", "book_back"], "");
+    expect(menuOrder("book", stored)).toEqual(["book_r2", "book_r1", "book_orders_only", "book_r3a", "book_r3c", "book_r3b", "book_back"]);
     expect(menuOrder("balloons", stored)).toEqual([...MENU_RECORDINGS.balloons.keys]);
     expect(() => setMenuOrder("book", ["book_r1"], "")).toThrow();
     expect(menuOrder("book", '{"book":["book_r1","x","book_orders_only","book_r3a","book_r3b","book_back"]}')).toEqual(DEF);

@@ -60,7 +60,7 @@ describe("the rules", () => {
     expect(applyLayout(e.layouts.book_r2, parts)).toEqual([NEW, "cart_key", "book_r2"]);
     expect(removeLine(e, { layout: "book_r2" }, 1).layouts.book_r2).toHaveLength(4); // a built line is turned off, never removed
     expect(removeLine(e, { layout: "book_r2" }, 0).layouts.book_r2.map((x) => x.ref)).not.toContain(NEW);
-    expect(defaultLayout("book").map((x) => x.ref)).toEqual(["book_r1", "book_orders_only", "book_r3a", "book_r2", "book_r3b", "star"]);
+    expect(defaultLayout("book").map((x) => x.ref)).toEqual(["book_r1", "book_orders_only", "book_r3a", "book_r3c", "book_r2", "book_r3b", "star"]);
   });
   it("keys: star and pound reserved; a new key needs its line on; a used key can be changed", () => {
     let e = parseEditor({});
