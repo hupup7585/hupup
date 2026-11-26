@@ -124,6 +124,8 @@ export async function docFromBooking(orderId: number, kind: DocKind, userId: num
   const lines: LineInput[] = [
     ...items.map((i) => ({ description: `${i.name} (rental ${o.eventDate})`, qty: i.qty, unitCents: i.unit, productId: i.productId })),
     ...(o.deliveryFeeCents ? [{ description: "Delivery", qty: 1, unitCents: o.deliveryFeeCents }] : []),
+    // Custom-amount services (Nov 26, 2026): each its own line by name (the note only when staff ticked it)
+    ...(await (await import("@/lib/order-services")).listServices(orderId)).map((s) => ({ description: s.showNoteOnReceipt && s.note ? `${s.name} (${s.note})` : s.name, qty: 1, unitCents: s.amountCents })),
   ];
   return createDoc(
     {

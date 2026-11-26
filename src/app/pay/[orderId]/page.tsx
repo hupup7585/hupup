@@ -102,6 +102,16 @@ export default async function PayPage({ params, searchParams }: { params: Promis
                   <span>{money(i.qty * i.unitPriceCents)}</span>
                 </li>
               ))}
+              {/* Custom-amount services staff added (Nov 26, 2026): by name and amount; the note only when ticked */}
+              {(day.services ?? []).map((s) => (
+                <li key={`s${s.id}`} className="flex justify-between" data-pay-service>
+                  <span>
+                    {s.name}
+                    {s.showNoteOnReceipt && s.note ? <span className="block text-xs text-hu-deep/70">{s.note}</span> : null}
+                  </span>
+                  <span>{money(s.amountCents)}</span>
+                </li>
+              ))}
               {/* The Owner's customer discount is always shown to the customer (Abraham, Nov 19, 2026) */}
               {day.order.offerDiscountCents > 0 && /^Customer discount: /.test(day.order.offerNote ?? "") && (
                 <li className="flex justify-between font-semibold" data-pay-discount>

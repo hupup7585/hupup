@@ -161,6 +161,7 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/settings/PricingForms.tsx",
   "app/admin/(app)/settings/page.tsx",
   "app/admin/(app)/settings/pricing-actions.ts",
+  "lib/order-services.ts",
   "lib/pricing.ts"
  ],
  "zoneKjPlaces": [

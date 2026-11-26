@@ -30,13 +30,15 @@ import { filesForOrder } from "@/lib/message-files";
 import MessageFiles from "@/components/staff/MessageFiles";
 import { orderIdFromParam } from "@/lib/order-path";
 import { payState } from "@/lib/pay-label";
+import ServicesPanel from "./ServicesPanel";
+import { SERVICE_FIELD_EXPLANATIONS } from "@/lib/order-services";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const staff = await requireAdmin();
   const full = await getOrderWithItems(orderIdFromParam(id)); // the order number (1031) or an older id link (31)
   if (!full) notFound();
-  const { order: o, items, customer } = full;
+  const { order: o, items, customer, services } = full;
   const due = (o.totalCents ?? o.subtotalCents) - o.paidCents;
   const textStatus = !customer?.phone ? "none" : customer.smsOptOut ? "stopped" : (await hasTransactionalConsent(customer.phone)) ? "ok" : "none";
   return (
@@ -79,13 +81,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             <div className="mt-3 space-y-1 text-right">
               {o.totalCents !== null ? (
                 <>
-                  <div className="text-sm text-muted">Rentals {formatMoney(o.subtotalCents)} · Delivery {formatMoney(o.deliveryFeeCents)} · Sales tax ({o.taxPercent}%) {formatMoney(o.taxCents)}</div>
+                  <div className="text-sm text-muted">Rentals {formatMoney(o.subtotalCents)} · Delivery {formatMoney(o.deliveryFeeCents)}{o.servicesCents ? ` · Services ${formatMoney(o.servicesCents)}` : ""} · Sales tax ({o.taxPercent}%) {formatMoney(o.taxCents)}</div>
                   {o.offerNote && <div className="text-sm font-semibold text-navy" data-offer>Offer: {o.offerNote} ({o.offerDiscountCents >= 0 ? `${formatMoney(o.offerDiscountCents)} off` : `${formatMoney(-o.offerDiscountCents)} added`}, already in the rentals)</div>}
                   <div>Total <b className="ml-3 text-lg">{formatMoney(o.totalCents)}</b></div>
                 </>
               ) : (
                 <>
-                  <div>Total <b className="ml-3 text-lg">{formatMoney(o.subtotalCents)}</b></div>
+                  <div>Total <b className="ml-3 text-lg">{formatMoney(o.subtotalCents + o.servicesCents)}</b></div>
+                  {o.servicesCents > 0 && <div className="text-xs text-muted">Rentals {formatMoney(o.subtotalCents)} + services {formatMoney(o.servicesCents)}; delivery and sales tax are added when the order is priced.</div>}
                   {(await (async () => {
                     // No delivery price: the reason, in words (the price is never set by hand)
                     const { pricingProblem } = await import("@/lib/order-pricing");
@@ -120,6 +123,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               {due > 0 && <div className="text-sm font-bold text-coral">Balance due {formatMoney(due)}</div>}
             </div>
           </div>
+          {/* Custom-amount services (Abraham, Nov 26, 2026): Owner and Secretary */}
+          <ServicesPanel
+            orderId={o.id}
+            cancelled={o.status === "CANCELLED"}
+            help={SERVICE_FIELD_EXPLANATIONS}
+            services={services.map((s) => ({ id: s.id, name: s.name, amountCents: s.amountCents, note: s.note, showNoteOnReceipt: s.showNoteOnReceipt, taxable: s.taxable, locked: Boolean(s.lockedAt) }))}
+          />
           {staff.role === "owner" && (o.paymentMethod === "stripe" || o.paymentMethod === "sola" || o.paymentMethod === "sola_phonepay" || o.paymentMethod === "sola_phonepay_custom") && o.paidCents > 0 && (await (async () => {
             // Refund (Owner only; Secretary and Delivery never see it). Stripe phone or Sola website payments.
             const [refunds, disputes] = await Promise.all([refundsFor(o.id), o.paymentMethod === "stripe" ? disputesFor(o.id) : Promise.resolve([])]);

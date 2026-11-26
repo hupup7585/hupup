@@ -140,7 +140,7 @@ export async function disputeEvidence(orderId: number) {
     `${BUSINESS_NAME}, order #${orderNumber(o.id)}. Party rental booked by phone through our automated booking line and paid in full by card at booking (keypad, Twilio Pay with Stripe).`,
     "",
     "ORDER",
-    ...group.orders.map((d) => `${messageDate(d.order.eventDate)}: ${d.items.map((i) => `${i.qty} x ${i.name}`).join(", ")}. Delivered to ${d.order.deliveryAddress ?? "the customer's address"}, picked up ${messageDate(d.order.pickupDate)}. Status: ${d.order.status.toLowerCase().replace(/_/g, " ")}.`),
+    ...group.orders.map((d) => `${messageDate(d.order.eventDate)}: ${[...d.items.map((i) => `${i.qty} x ${i.name}`), ...(d.services ?? []).map((s) => `${s.name} ${money(s.amountCents)}`)].join(", ")}. Delivered to ${d.order.deliveryAddress ?? "the customer's address"}, picked up ${messageDate(d.order.pickupDate)}. Status: ${d.order.status.toLowerCase().replace(/_/g, " ")}.`),
     `Rentals ${money(totals.items)}, delivery ${money(totals.delivery)}, sales tax ${money(totals.tax)}, total ${money(totals.total)}.`,
     "",
     "PHONE RECORD",

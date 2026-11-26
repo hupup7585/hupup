@@ -28,6 +28,8 @@ export function businessOrderEmail(full: Full, paidCents: number): { subject: st
     "",
     "Items:",
     ...full.items.map((i) => `  ${i.qty} x ${i.name} at ${money(i.unitPriceCents)}`),
+    // Custom-amount services (Nov 26, 2026), numbered in the order added; this email goes to the business only
+    ...(full.services ?? []).map((s, n) => `  Service ${n + 1}: ${s.name} ${money(s.amountCents)}${s.taxable ? "" : " (not taxed)"}${s.note ? `. Note: ${s.note}` : ""}`),
     "",
     `Rentals: ${money(o.subtotalCents)}`,
     `Delivery: ${money(o.deliveryFeeCents)}`,

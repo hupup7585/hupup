@@ -193,7 +193,7 @@ function EntryRows({ entries, tab }: { entries: (typeof schema.bookEntries.$infe
         e.party || e.personName || "—",
         <>{e.method ? methodName(e.method) : "—"}{e.checkNo ? `, check number ${e.checkNo}` : ""}</>,
         <b>{money(e.amountCents)}</b>,
-        e.rentalCents || e.deliveryCents || e.taxCents || e.tipCents ? <span className="text-xs text-muted">rental {money(e.rentalCents)} · delivery {money(e.deliveryCents)} · tax {money(e.taxCents)} · tip {money(e.tipCents)}</span> : "",
+        e.rentalCents || e.deliveryCents || e.taxCents || e.tipCents || e.servicesCents ? <span className="text-xs text-muted">rental {money(e.rentalCents)} · delivery {money(e.deliveryCents)}{e.servicesCents ? ` · services ${money(e.servicesCents)}` : ""} · tax {money(e.taxCents)} · tip {money(e.tipCents)}</span> : "",
         e.orderId ? <Link className="text-navy underline" href={orderPath(e.orderId)}>Booking number {1000 + Number(e.orderId)}</Link> : "—",
         e.fileId ? <a className="text-navy underline" href={`/admin/bookkeeping/files/${e.fileId}`} target="_blank">View</a> : "—",
         e.correctsId ? <span className="text-xs text-muted">This fixes entry number {e.correctsId}</span> : (

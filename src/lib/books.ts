@@ -95,6 +95,8 @@ export type NewEntry = {
   deliveryCents?: number;
   taxCents?: number;
   tipCents?: number;
+  /** The part that paid for custom-amount services (Nov 26, 2026) */
+  servicesCents?: number;
   method?: string | null;
   checkNo?: string | null;
   party?: string | null;
@@ -156,6 +158,7 @@ export async function reverseEntry(id: number, reason: string, userId: number | 
       deliveryCents: -o.deliveryCents,
       taxCents: -o.taxCents,
       tipCents: -o.tipCents,
+      servicesCents: -o.servicesCents,
       method: o.method,
       checkNo: o.checkNo,
       party: o.party,
@@ -178,7 +181,7 @@ export async function reverseEntry(id: number, reason: string, userId: number | 
 
 /**
  * A booking payment arrived (Sola webhook or staff "mark paid"): record it as income automatically, split into rental,
- * delivery, sales tax and anything paid above the total (tip). Never throws into the payment flow.
+ * delivery, custom-amount services, sales tax and anything paid above the total (tip). Never throws into the payment flow.
  */
 export async function recordBookingPayment(orderId: number, cents: number, method: string, ref?: string | null, date = todayISO()) {
   try {
@@ -200,7 +203,9 @@ export async function recordBookingPayment(orderId: number, cents: number, metho
     const share = total > 0 ? toTotal / total : 0;
     const deliveryCents = Math.round(o.deliveryFeeCents * share);
     const taxCents = Math.round(o.taxCents * share);
-    const rentalCents = toTotal - deliveryCents - taxCents;
+    // Custom-amount services (Nov 26, 2026): their own part of the payment, never counted as rental income
+    const servicesCents = Math.round(o.servicesCents * share);
+    const rentalCents = toTotal - deliveryCents - taxCents - servicesCents;
     const tipCents = cents - toTotal;
     await addEntry(
       {
@@ -212,6 +217,7 @@ export async function recordBookingPayment(orderId: number, cents: number, metho
         deliveryCents,
         taxCents,
         tipCents,
+        servicesCents,
         method: (METHODS as readonly string[]).includes(method) ? method : "other",
         orderId,
         ref: ref ?? null,

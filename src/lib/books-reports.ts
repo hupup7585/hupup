@@ -30,6 +30,8 @@ export type PnlRow = {
   period: string;
   rental: number;
   delivery: number;
+  /** Custom-amount services on bookings (Nov 26, 2026) */
+  services: number;
   tips: number;
   otherIncome: number;
   deposits: number;
@@ -50,15 +52,16 @@ export function pnl(entries: Entry[], group: "month" | "quarter" | "year"): PnlR
     const k = periodKey(e.entryDate, group);
     const r =
       by.get(k) ??
-      ({ period: k, rental: 0, delivery: 0, tips: 0, otherIncome: 0, deposits: 0, cancellationFees: 0, refunds: 0, totalIncome: 0, expenses: {}, processorFees: 0, contractors: 0, totalExpenses: 0, net: 0, taxCollected: 0 } as PnlRow);
+      ({ period: k, rental: 0, delivery: 0, services: 0, tips: 0, otherIncome: 0, deposits: 0, cancellationFees: 0, refunds: 0, totalIncome: 0, expenses: {}, processorFees: 0, contractors: 0, totalExpenses: 0, net: 0, taxCollected: 0 } as PnlRow);
     by.set(k, r);
     switch (e.kind) {
       case "income":
-        if (e.rentalCents || e.deliveryCents || e.tipCents) {
+        if (e.rentalCents || e.deliveryCents || e.tipCents || e.servicesCents) {
           r.rental += e.rentalCents;
           r.delivery += e.deliveryCents;
+          r.services += e.servicesCents;
           r.tips += e.tipCents;
-          r.otherIncome += revenue(e) - e.rentalCents - e.deliveryCents - e.tipCents;
+          r.otherIncome += revenue(e) - e.rentalCents - e.deliveryCents - e.servicesCents - e.tipCents;
         } else r.otherIncome += revenue(e);
         r.taxCollected += e.taxCents;
         break;
@@ -87,7 +90,7 @@ export function pnl(entries: Entry[], group: "month" | "quarter" | "year"): PnlR
   }
   const rows = [...by.values()].sort((a, b) => a.period.localeCompare(b.period));
   for (const r of rows) {
-    r.totalIncome = r.rental + r.delivery + r.tips + r.otherIncome + r.deposits + r.cancellationFees - r.refunds;
+    r.totalIncome = r.rental + r.delivery + r.services + r.tips + r.otherIncome + r.deposits + r.cancellationFees - r.refunds;
     r.totalExpenses = Object.values(r.expenses).reduce((s, v) => s + v, 0) + r.processorFees + r.contractors;
     r.net = r.totalIncome - r.totalExpenses;
   }
@@ -323,8 +326,8 @@ export async function buildBookReport(report: BookReport, from: string, to: stri
       return [
         {
           name: "Ledger",
-          header: ["#", "Date", "Type", "Category", "Party", "Method", "Check #", "Amount", "Rental", "Delivery", "Sales tax", "Tip", "Booking", "Invoice", "Bill", "Person", "County", "Tax exempt", "Ref", "Notes", "Source", "Corrects #"],
-          rows: entries.map((e) => [e.id, e.entryDate, KIND_LABEL[e.kind as EntryKind] ?? e.kind, e.category, e.party, e.method, e.checkNo, $(e.amountCents), $(e.rentalCents), $(e.deliveryCents), $(e.taxCents), $(e.tipCents), e.orderId, e.invoiceId, e.billId, e.personName, e.county, e.taxExempt ? "yes" : "", e.ref, e.notes, e.source, e.correctsId]),
+          header: ["#", "Date", "Type", "Category", "Party", "Method", "Check #", "Amount", "Rental", "Delivery", "Services", "Sales tax", "Tip", "Booking", "Invoice", "Bill", "Person", "County", "Tax exempt", "Ref", "Notes", "Source", "Corrects #"],
+          rows: entries.map((e) => [e.id, e.entryDate, KIND_LABEL[e.kind as EntryKind] ?? e.kind, e.category, e.party, e.method, e.checkNo, $(e.amountCents), $(e.rentalCents), $(e.deliveryCents), $(e.servicesCents), $(e.taxCents), $(e.tipCents), e.orderId, e.invoiceId, e.billId, e.personName, e.county, e.taxExempt ? "yes" : "", e.ref, e.notes, e.source, e.correctsId]),
         },
       ];
     case "pnl": {
@@ -333,8 +336,8 @@ export async function buildBookReport(report: BookReport, from: string, to: stri
       return [
         {
           name: "Profit and loss",
-          header: ["Period", "Rental", "Delivery", "Tips", "Other income", "Deposits", "Cancellation fees", "Refunds", "Total income", ...cats, "Processor fees", "Staff and contractors", "Total expenses", "Net profit", "Sales tax collected (not income)"],
-          rows: rows.map((r) => [r.period, $(r.rental), $(r.delivery), $(r.tips), $(r.otherIncome), $(r.deposits), $(r.cancellationFees), $(-r.refunds), $(r.totalIncome), ...cats.map((c) => $(r.expenses[c] ?? 0)), $(r.processorFees), $(r.contractors), $(r.totalExpenses), $(r.net), $(r.taxCollected)]),
+          header: ["Period", "Rental", "Delivery", "Services", "Tips", "Other income", "Deposits", "Cancellation fees", "Refunds", "Total income", ...cats, "Processor fees", "Staff and contractors", "Total expenses", "Net profit", "Sales tax collected (not income)"],
+          rows: rows.map((r) => [r.period, $(r.rental), $(r.delivery), $(r.services), $(r.tips), $(r.otherIncome), $(r.deposits), $(r.cancellationFees), $(-r.refunds), $(r.totalIncome), ...cats.map((c) => $(r.expenses[c] ?? 0)), $(r.processorFees), $(r.contractors), $(r.totalExpenses), $(r.net), $(r.taxCollected)]),
         },
       ];
     }

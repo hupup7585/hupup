@@ -248,10 +248,13 @@ async function recalcSubtotal(tx: Tx | typeof db, orderId: number) {
     return;
   }
   const { taxOn } = await import("@/lib/pricing");
+  const { serviceSumsFor, withServices } = await import("@/lib/order-services");
   const sub = Number(o.subtotal_cents);
   const fee = Number(o.delivery_fee_cents);
   const tax = taxOn(sub + fee, String(o.tax_percent));
-  await tx.execute(sql`UPDATE orders SET tax_cents = ${tax}, total_cents = ${sub + fee + tax} WHERE id = ${orderId}`);
+  // Custom-amount services (Nov 26, 2026) stay in the total and the sales tax
+  const w = withServices({ subtotalCents: sub, deliveryFeeCents: fee, taxPercent: String(o.tax_percent), taxCents: tax, totalCents: sub + fee + tax }, await serviceSumsFor(orderId, tx as typeof db));
+  await tx.execute(sql`UPDATE orders SET tax_cents = ${w.taxCents}, total_cents = ${w.totalCents}, services_cents = ${w.servicesCents}, services_tax_cents = ${w.servicesTaxCents} WHERE id = ${orderId}`);
 }
 
 /**
@@ -400,7 +403,9 @@ export async function getOrderWithItems(orderId: number) {
   const customer = o.customerId
     ? (await db.select().from(customers).where(eq(customers.id, o.customerId)))[0] ?? null
     : null;
-  return { order: o, items, customer };
+  // Custom-amount services (Nov 26, 2026), in the order they were added (Service 1, 2, ...)
+  const services = await (await import("@/lib/order-services")).listServices(orderId);
+  return { order: o, items, customer, services };
 }
 
 export async function setOrderStatus(orderId: number, status: OrderStatus, extra: Partial<typeof orders.$inferInsert> = {}, why?: { reason: string; userId?: number | null }) {
@@ -471,6 +476,8 @@ export async function markPaid(orderId: number, cents: number, method: string, r
     .where(eq(orders.id, orderId))
     .returning();
   if (late) await handleLatePayment(orderId, cents, method, stillFree);
+  // Custom-amount services on the order now were paid for: they no longer change (Nov 26, 2026)
+  await (await import("@/lib/order-services")).lockServices(orderId);
   if (status !== o.status) {
     const paidText = `Paid $${(cents / 100).toFixed(2)} by ${method}`;
     const why = shortNote ? `${paidText}: ${shortNote.trim()}` : paidText;

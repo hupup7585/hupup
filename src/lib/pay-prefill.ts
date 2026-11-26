@@ -8,6 +8,8 @@
 export type PrefillOrder = {
   order: { id: number; eventDate: string; pickupDate: string; deliveryAddress?: string | null };
   items: { name: string; qty: number }[];
+  /** Custom-amount services (Nov 26, 2026): shown by name and amount */
+  services?: { name: string; amountCents: number; note?: string | null; showNoteOnReceipt?: boolean }[];
   customer?: { name?: string | null; email?: string | null; phone?: string | null } | null;
 };
 
@@ -54,7 +56,7 @@ const dayText = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString
 export function prefillFor(primary: PrefillOrder, days: PrefillOrder[] = [primary], orderNumber?: string): Prefill {
   const c = primary.customer ?? {};
   const address = primary.order.deliveryAddress ?? days.find((d) => d.order.deliveryAddress)?.order.deliveryAddress ?? null;
-  const lines = days.map((d) => `${d.items.map((i) => `${i.qty} x ${i.name}`).join(", ")}: delivery ${dayText(d.order.eventDate)}, pickup ${dayText(d.order.pickupDate)}`);
+  const lines = days.map((d) => `${[...d.items.map((i) => `${i.qty} x ${i.name}`), ...(d.services ?? []).map((s) => `${s.name} $${(s.amountCents / 100).toFixed(2)}`)].join(", ")}: delivery ${dayText(d.order.eventDate)}, pickup ${dayText(d.order.pickupDate)}`);
   const description = `${orderNumber ? `Order ${orderNumber}: ` : ""}${lines.join("; ")}`.slice(0, 250);
   return {
     ...(c.name ? { name: c.name } : {}),

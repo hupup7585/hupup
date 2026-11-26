@@ -1471,7 +1471,7 @@ async function lineRingsNowFor(k: RingKey, settings: Awaited<ReturnType<typeof g
  * The Sola payment link for a phone order (items + delivery + tax): emailed to the caller, and texted with order-text
  * consent once Twilio approves texting; then the line that says how it was sent.
  */
-type LinkDay = { order: { id: number; eventDate: string; pickupDate: string; subtotalCents: number; deliveryFeeCents: number; taxCents: number; totalCents: number | null }; items: { qty: number; name: string }[] };
+type LinkDay = { order: { id: number; eventDate: string; pickupDate: string; subtotalCents: number; deliveryFeeCents: number; taxCents: number; totalCents: number | null }; items: { qty: number; name: string }[]; services?: { name: string; amountCents: number; note: string | null; showNoteOnReceipt: boolean }[] };
 
 /**
  * Send the payment link for the whole reservation by text or email (Abraham, Nov 17, 2026). The booking is held 10
@@ -1490,7 +1490,9 @@ async function deliverPayLink(ctx: Ctx, orderId: number, via: { phone?: string; 
   };
   const num = orderNumber(orderId);
   const link = payPageLink(orderId); // review-and-pay page for the whole reservation, then Sola
-  const dayText = (o: (typeof days)[number]) => `${o.items.map((i) => `${i.qty} x ${i.name}`).join(", ")} for ${messageDate(o.order.eventDate)} (pickup ${messageDate(o.order.pickupDate)})`;
+  // Custom-amount services (Nov 26, 2026) by name and amount, after the rentals
+  const { customerServiceText } = await import("@/lib/order-services");
+  const dayText = (o: (typeof days)[number]) => `${[...o.items.map((i) => `${i.qty} x ${i.name}`), ...(o.services ?? []).map(customerServiceText)].join(", ")} for ${messageDate(o.order.eventDate)} (pickup ${messageDate(o.order.pickupDate)})`;
   const details = promptText(ctx.prompts, "msg_payment_link", {
     number: num,
     items: days.map(dayText).join("; "),
@@ -4295,7 +4297,10 @@ const handlers: Record<string, Handler> = {
     }
     // Each rental day is its own delivery: its own delivery fee and tax. One charge pays for all of them.
     // The free delivery promo counts by each day's delivery date; a free 4th Sunday has its own delivery (Nov 17, 2026)
-    const perDay = days.map((o) => ({ o, t: totalsWithFee(o.order.subtotalCents, quote.zone, quote.kind ? deliveryFeeFor(quote.kind, settings, o.order.eventDate, o.order.offerNote) : quote.feeCents, settings) }));
+    // Custom-amount services staff may have added to a held order (Nov 26, 2026) count in its total and tax
+    const { servicesByOrder, sumServices, withServices } = await import("@/lib/order-services");
+    const svc = await servicesByOrder(days.map((o) => o.order.id));
+    const perDay = days.map((o) => ({ o, t: withServices(totalsWithFee(o.order.subtotalCents, quote.zone, quote.kind ? deliveryFeeFor(quote.kind, settings, o.order.eventDate, o.order.offerNote) : quote.feeCents, settings), sumServices(svc.get(o.order.id) ?? [])) }));
     const primary = days[0].order;
     for (const { o, t } of perDay) {
       await db
@@ -4312,6 +4317,8 @@ const handlers: Record<string, Handler> = {
           taxPercent: t!.taxPercent,
           taxCents: t!.taxCents,
           totalCents: t!.totalCents,
+          servicesCents: t!.servicesCents,
+          servicesTaxCents: t!.servicesTaxCents,
           paymentGroupId: days.length > 1 ? primary.id : null,
           updatedAt: new Date(),
         })

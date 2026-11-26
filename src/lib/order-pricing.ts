@@ -51,9 +51,12 @@ export async function ensurePriced(orderId: number): Promise<boolean> {
   const [fresh] = await db.select({ subtotalCents: schema.orders.subtotalCents, offerNote: schema.orders.offerNote }).from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
   const t = await totalsFor(fresh.subtotalCents, fresh.offerNote, o.deliveryAddress, o.eventDate, s);
   if (!t) return false; // outside every zone, or not found: never guessed (pricingProblem says which)
+  // Custom-amount services staff added (Nov 26, 2026) count in the total and the sales tax
+  const { serviceSumsFor, withServices } = await import("@/lib/order-services");
+  const w = withServices(t, await serviceSumsFor(orderId));
   await db
     .update(schema.orders)
-    .set({ deliveryZone: t.zone, deliveryFeeCents: t.deliveryFeeCents, taxPercent: t.taxPercent, taxCents: t.taxCents, totalCents: t.totalCents, updatedAt: new Date() })
+    .set({ deliveryZone: w.zone, deliveryFeeCents: w.deliveryFeeCents, taxPercent: w.taxPercent, taxCents: w.taxCents, totalCents: w.totalCents, servicesCents: w.servicesCents, servicesTaxCents: w.servicesTaxCents, updatedAt: new Date() })
     .where(eq(schema.orders.id, orderId));
   return true;
 }

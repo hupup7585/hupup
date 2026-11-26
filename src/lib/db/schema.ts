@@ -142,6 +142,10 @@ export const orders = pgTable(
     /** Offers (Abraham, Nov 17, 2026): the discount already taken off subtotal_cents, and which offer */
     offerDiscountCents: integer("offer_discount_cents").notNull().default(0),
     offerNote: text("offer_note"),
+    /** Custom-amount services added by staff (Abraham, Nov 26, 2026): their total and the sales tax on the taxable ones.
+     *  Both are already inside tax_cents and total_cents once the order is priced. */
+    servicesCents: integer("services_cents").notNull().default(0),
+    servicesTaxCents: integer("services_tax_cents").notNull().default(0),
     /** A closed day booked from the day before to the day after (Nov 20, 2026): charged as this many days */
     spanDays: real("span_days"),
     /** When the customer first opened the payment link (Abraham, Nov 17, 2026: then 4 more minutes, once) */
@@ -184,6 +188,31 @@ export const orderItems = pgTable(
     unitPriceCents: integer("unit_price_cents").notNull(),
   },
   (t) => [index("order_items_order_idx").on(t.orderId), index("order_items_product_idx").on(t.productId)],
+);
+
+/**
+ * Custom-amount services on an order (Abraham, Nov 26, 2026): e.g. "Extra setup" or "Late pickup fee", added by the
+ * Owner or Secretary in Admin. Each is its own line (Service 1, 2, ... in the order added), shown by name and amount.
+ * Not inventory: never touches the calendar or stock. locked_at = a payment was taken while it was on the order.
+ */
+export const orderServices = pgTable(
+  "order_services",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    note: text("note"),
+    showNoteOnReceipt: boolean("show_note_on_receipt").notNull().default(false),
+    taxable: boolean("taxable").notNull().default(true),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("order_services_order_idx").on(t.orderId)],
 );
 
 export type CallData = {
@@ -726,6 +755,8 @@ export const bookEntries = pgTable(
     deliveryCents: integer("delivery_cents").notNull().default(0),
     taxCents: integer("tax_cents").notNull().default(0),
     tipCents: integer("tip_cents").notNull().default(0),
+    /** The part of a booking payment that paid for custom-amount services (Nov 26, 2026) */
+    servicesCents: integer("services_cents").notNull().default(0),
     /** cash | check | zelle | card | sola | bank | other */
     method: text("method"),
     checkNo: text("check_no"),
