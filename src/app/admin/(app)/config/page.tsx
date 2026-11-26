@@ -8,6 +8,7 @@ import { db, schema } from "@/lib/db";
 import { featureSwitches } from "@/lib/feature-switches";
 import { unwrap } from "@/lib/config-versions";
 import { discardAction, publishAction, saveDraftAction, undoAction } from "./actions";
+import { SubmitButton } from "@/components/staff/SubmitButton";
 import { OK_MESSAGES } from "./messages";
 
 export const metadata = { title: "All settings | Hup Up Attractions" };
@@ -109,16 +110,24 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
                           <input name="value" defaultValue={current} className="input w-auto min-w-[10rem]" inputMode={d.type === "int" || d.type === "number" ? "decimal" : undefined} />
                         )}
                         <input name="reason" required minLength={3} defaultValue={rejected !== null ? (sp.r ?? "") : ""} className="input w-auto min-w-[12rem]" placeholder="Reason (kept in the history)" />
-                        <button className="btn-dark">Save draft</button>
+                        <SubmitButton>Save draft</SubmitButton>
                       </form>
                     )}
-                    {draft && (
+                    {draft && d.mode !== "edit" && (
+                      // Hark's review item 15: a draft saved here before this setting moved to its own page can never be
+                      // published from here; only Discard is offered, with the reason
+                      <div className="mt-2 flex flex-wrap items-center gap-2" data-config-stale-draft>
+                        <span className="text-sm text-muted">This draft was saved here before the setting moved to its own page, so it cannot be published from here.</span>
+                        <form action={discardAction}><input type="hidden" name="key" value={d.key} /><input type="hidden" name="version" value={draft.id} /><button className="rounded-full px-3 py-1 text-sm font-semibold text-[#C83A2F] underline">Discard (now changed on its own page)</button></form>
+                      </div>
+                    )}
+                    {draft && d.mode === "edit" && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         <form action={publishAction} className="flex items-center gap-2">
                           <input type="hidden" name="key" value={d.key} />
                           <input type="hidden" name="version" value={draft.id} />
                           {d.wording && <label className="flex items-center gap-1 text-sm"><input type="checkbox" name="approveWords" /> I approve these exact words</label>}
-                          <button className="btn-dark">Publish (make live)</button>
+                          <SubmitButton pendingLabel="Publishing...">Publish (make live)</SubmitButton>
                         </form>
                         <form action={discardAction}><input type="hidden" name="key" value={d.key} /><input type="hidden" name="version" value={draft.id} /><button className="rounded-full px-3 py-1 text-sm font-semibold text-[#C83A2F] underline">Discard draft</button></form>
                       </div>

@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/staff/SubmitButton";
 import { draftChanges } from "@/lib/screen-drafts";
 import { screenLabel } from "@/lib/ivr/screens";
 import { discardScreensAction, publishScreensAction, undoScreensAction } from "./actions";
@@ -20,7 +21,7 @@ export default async function DraftBanner({ screen = "" }: { screen?: string }) 
             <form action={publishScreensAction} className="flex flex-wrap items-end gap-2">
               <input type="hidden" name="screen" value={screen} />
               <input name="reason" required minLength={3} className="input w-auto min-w-[14rem]" placeholder="Reason (kept in the history)" />
-              <button className="btn-dark">Publish (make live)</button>
+              <SubmitButton pendingLabel="Publishing...">Publish (make live)</SubmitButton>
             </form>
             <form action={discardScreensAction}>
               <input type="hidden" name="screen" value={screen} />
