@@ -132,6 +132,12 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
                         <form action={discardAction}><input type="hidden" name="key" value={d.key} /><input type="hidden" name="version" value={draft.id} /><button className="rounded-full px-3 py-1 text-sm font-semibold text-[#C83A2F] underline">Discard draft</button></form>
                       </div>
                     )}
+                    {d.mode === "page" && hist[0] && (
+                      // Hark's review item 10: settings changed on their own page are undone there, so its checks still run
+                      <p className="mt-1 text-xs" data-config-page-undo>
+                        Undo the last change: it was <b>{show(unwrap(hist[0].previous))}</b> before. <Link className="font-semibold text-navy underline" href={d.page!}>Open its page</Link> and set it back to that.
+                      </p>
+                    )}
                     {lastLive && d.mode === "edit" && !draft && (
                       <form action={undoAction} className="mt-1"><input type="hidden" name="key" value={d.key} /><button className="text-xs font-semibold text-navy underline">Undo the last published change</button></form>
                     )}
@@ -140,7 +146,19 @@ export default async function ConfigPage({ searchParams }: { searchParams: Promi
                         <summary className="cursor-pointer text-muted">History ({hist.length})</summary>
                         <ul className="mt-1 grid gap-1">
                           {hist.slice(0, 10).map((v) => (
-                            <li key={v.id}>{new Date(v.createdAt).toLocaleString("en-US", { timeZone: "America/New_York" })}: {v.status} · {show(unwrap(v.previous))} → {show(unwrap(v.value))}{v.reason ? ` · ${v.reason}` : ""}</li>
+                            <li key={v.id} className="flex flex-wrap items-center gap-2">
+                              <span>{new Date(v.createdAt).toLocaleString("en-US", { timeZone: "America/New_York" })}: {v.status} · {show(unwrap(v.previous))} → {show(unwrap(v.value))}{v.reason ? ` · ${v.reason}` : ""}</span>
+                              {/* Hark's review item 10: put an older version back (as a draft, then publish) */}
+                              {d.mode === "edit" && !draft && v.status !== "draft" && JSON.stringify(unwrap(v.value)) !== JSON.stringify(live[d.key]) && (
+                                <form action={saveDraftAction} className="inline">
+                                  <input type="hidden" name="key" value={d.key} />
+                                  <input type="hidden" name="type" value={d.type} />
+                                  {d.type === "bool" ? (unwrap(v.value) ? <input type="hidden" name="value" value="on" /> : null) : <input type="hidden" name="value" value={String(unwrap(v.value) ?? "")} />}
+                                  <input type="hidden" name="reason" value={`Put back the version from ${new Date(v.createdAt).toLocaleDateString("en-US", { timeZone: "America/New_York" })}`} />
+                                  <button className="font-semibold text-navy underline" data-config-restore={v.id}>Use this version</button>
+                                </form>
+                              )}
+                            </li>
                           ))}
                         </ul>
                       </details>
