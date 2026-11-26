@@ -122,6 +122,10 @@ exports[`baseline: every phone step as it plays today > cart 1`] = `"<?xml versi
 
 exports[`baseline: every phone step as it plays today > cart-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=cart</Redirect></Response>"`;
 
+exports[`baseline: every phone step as it plays today > cart-hold-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
+
+exports[`baseline: every phone step as it plays today > cart-hold-release 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">The items in your cart will now be released. You can call us back at any time.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Thank you for calling Hup Up Attractions</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Bye for now!</Say><Hangup/></Response>"`;
+
 exports[`baseline: every phone step as it plays today > catalog 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/catalog-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To receive our catalog by text, press 1. To get it by email, press 2.</Say><Play>https://hupup.example/audio/pause-500ms.wav</Play><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/idle?to=catalog</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > catalog-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sorry, that is not a valid selection.</Say><Redirect method="POST">https://hupup.example/api/voice/catalog</Redirect></Response>"`;
@@ -435,6 +439,8 @@ exports[`baseline: every phone step as it plays today > the inventory of phone s
   "call-recording",
   "cart",
   "cart-choice",
+  "cart-hold-key",
+  "cart-hold-release",
   "catalog",
   "catalog-choice",
   "catalog-done",

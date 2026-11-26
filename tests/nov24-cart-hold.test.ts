@@ -52,15 +52,61 @@ describe("box 30: the cart hold", () => {
     await call("book");
     expect((await holdOf(orderId)).holdExpiresAt!.getTime()).toBeLessThan(Date.now());
   });
-  it("the time ran out (caller stopped responding): the disconnect line, then the call hangs up; no timed-out line, no main menu", async () => {
-    expect(await releaseExpired()).toBeGreaterThan(0);
-    expect((await holdOf(orderId)).status).not.toBe("HOLD");
+  /* Box 30 (Abraham, Nov 26, 2026, 13:11 ET): the hold ran out on a caller who stopped responding */
+  const CHECK = "It sounds like we got disconnected. To keep the items in your cart, press any key to continue.";
+  const RELEASED = ["The items in your cart will now be released. You can call us back at any time.", "Thank you for calling Hup Up Attractions", "Bye for now!"];
+  it("the time ran out: the hold check with a 3-second wait; nothing is released yet; no timed-out line, no main menu", async () => {
+    expect(await releaseExpired()).toBeGreaterThan(0); // the hourly tidy-up released the ended hold
     for (const step of ["finalize", "terms-answer", "ask"]) {
       const x = await call(step, {}, step === "ask" ? "f=name" : "");
-      expect(said(x), step).toEqual(["It sounds like we got disconnected, but you can call us back at any time. Thank you for calling Hup Up Attractions. Bye for now!"]); // the disconnect line only, then the hang-up (Abraham, Nov 26, 2026, 12:27 ET)
-      expect(x, step).toContain("<Hangup/>");
-      expect(x, step).not.toContain("/menu");
-      expect(x, step).not.toMatch(/timed out/i);
+      expect(said(x), step).toEqual([CHECK]);
+      expect(x, step).toMatch(/<Gather [^>]*timeout="3"[^>]*action="[^"]*cart-hold-key/);
+      expect(x, step).toContain("/api/voice/cart-hold-release</Redirect>");
+      expect(x, step).not.toContain("<Hangup/>");
+      expect(x, step).not.toMatch(/timed out|\/menu/i);
     }
+  });
+  it("any key within the wait: the items are held again and the caller is back on the exact step", async () => {
+    const x = await call("ask", {}, "f=name");
+    const action = x.match(/action="([^"]+)"/)![1].replace(/&amp;/g, "&");
+    const back = await call("cart-hold-key", { Digits: "4" }, new URL(action).searchParams.toString());
+    expect(back).toMatch(/<Redirect method="POST">[^<]*\/api\/voice\/ask\?f=name<\/Redirect>/);
+    const o = await holdOf(orderId);
+    expect(o.status).toBe("HOLD");
+    expect(o.holdExpiresAt!.getTime()).toBeGreaterThan(Date.now() + 14 * 60_000);
+  });
+  it("no key: the items are released, then the three pieces in order, and the call ends", async () => {
+    expect((await holdOf(orderId)).status).toBe("HOLD"); // released only on no key
+    const x = await call("cart-hold-release");
+    expect(said(x)).toEqual(RELEASED);
+    expect(x.trim().endsWith("<Hangup/></Response>")).toBe(true);
+    expect((await holdOf(orderId)).status).toBe("CANCELLED");
+  });
+  it("an item booked by someone else meanwhile: it comes out of the cart and the caller hears the usual item-taken screen", async () => {
+    const [mine] = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
+    await db.update(schema.orders).set({ status: "HOLD", holdExpiresAt: minutesAgo(1) }).where(eq(schema.orders.id, orderId));
+    const [other] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: "2026-12-07", pickupDate: "2026-12-08" }).returning();
+    await db.insert(schema.orderItems).values({ orderId: other.id, productId: mine.productId, qty: 3, unitPriceCents: 6500 });
+    const back = await call("cart-hold-key", { Digits: "1" }, "to=ask&q=f%3Dname");
+    expect(back).toMatch(new RegExp(`/api/voice/booked\\?p=${mine.productId}&amp;d=2026-12-07`));
+    expect(await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId))).toHaveLength(0);
+    await db.delete(schema.orderItems).where(eq(schema.orderItems.orderId, other.id));
+    await db.insert(schema.orderItems).values({ orderId, productId: mine.productId, qty: 1, unitPriceCents: 6500 });
+  });
+  it("the wait comes from Admin (Phone timing)", async () => {
+    const { saveSetting } = await import("@/lib/settings");
+    await db.update(schema.orders).set({ status: "HOLD", holdExpiresAt: minutesAgo(1) }).where(eq(schema.orders.id, orderId));
+    await releaseExpired();
+    await saveSetting("timerCartHoldCheck" as never, "6" as never, null);
+    expect(await call("ask", {}, "f=name")).toMatch(/<Gather [^>]*timeout="6"/);
+    await saveSetting("timerCartHoldCheck" as never, "3" as never, null);
+  });
+  it("goodbye rule (Abraham, 12:46 ET): before payment 'Thank you for calling', after payment Line 7 'Thank you for choosing'", async () => {
+    const { PROMPTS } = await import("@/lib/ivr/prompts");
+    for (const k of ["no_input_final", "goodbye_thanks_calling", "catalog_bye", "catalog_texted", "pay_link_sent"] as const) {
+      expect(PROMPTS[k].text, k).toContain("Thank you for calling Hup Up Attractions");
+      expect(PROMPTS[k].text, k).not.toContain("Thank you for choosing");
+    }
+    expect(PROMPTS.disconnect_goodbye.text).toContain("Thank you for choosing Hup Up Attractions");
   });
 });

@@ -99,7 +99,7 @@ describe("Abraham, Nov 22, 2026: piece 1", () => {
     expect(PROMPTS.book_r3b.text).toBe("For schools, corporate events, and organizational bookings, press 9.");
     expect(PROMPTS.catalog_emailed.text).toBe("We just emailed you our catalog! Check your inbox for a variety of attractions and endless fun for your entire family.");
     expect(PROMPTS.catalog_main_star.text).toBe("To go to the main menu, press star.");
-    expect(PROMPTS.catalog_bye.text).toBe("Thank you for choosing Hup Up Attractions! Bye for now!");
+    expect(PROMPTS.catalog_bye.text).toBe("Thank you for calling Hup Up Attractions! Bye for now!");
     expect(spokenMoney(100)).toBe("1 dollar");
     expect(spokenMoney(101)).toBe("1 dollar and 1 cent");
     expect(spokenMoney(7550)).toBe("75 dollars and 50 cents");

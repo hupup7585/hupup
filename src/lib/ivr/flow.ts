@@ -467,15 +467,85 @@ function repeatMenu(vr: VR, ctx: Ctx, action: string, params: Record<string, str
 }
 
 /**
- * Box 30 (Abraham, Nov 24, 2026): the cart's hold ran out (the caller stopped responding): the call just ends. No
- * "cart timed out" line and no return to the main menu.
+ * Box 30, the cart's hold ran out on a caller who stopped responding (Abraham, Nov 26, 2026, 13:11 ET; replaces "just
+ * hang up"): "It sounds like we got disconnected. To keep the items in your cart, press any key to continue." and the
+ * Admin wait (3 seconds). Any key: the items are held again and the caller is back on the exact step (an item taken
+ * meanwhile goes to the usual item-taken screen). No key: the items are released, then "The items in your cart will
+ * now be released. You can call us back at any time." "Thank you for calling Hup Up Attractions" "Bye for now!" and
+ * the call ends. No cart at all: the disconnect line, then the call ends.
  */
 async function cartGone(vr: VR, ctx: Ctx) {
-  await track(ctx.callSid, "step", "Cart hold ran out (no keys pressed): call ended");
-  // Abraham, Nov 26, 2026, 12:27 ET: every silent or dropped call ends with the disconnect line only (never Line 7)
-  sp(vr, ctx, "no_input_final");
-  vr.hangup();
+  const ids = callCartIds(ctx);
+  if (!(await holdableCart(ids))) {
+    await track(ctx.callSid, "step", "Cart hold ran out (nothing left to keep): call ended");
+    sp(vr, ctx, "no_input_final");
+    vr.hangup();
+    return vr;
+  }
+  await track(ctx.callSid, "step", "Cart hold ran out: asked to press a key to keep the items");
+  const q = new URLSearchParams(ctx.query);
+  const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: T(vr, "timerCartHoldCheck"), finishOnKey: "", action: url("cart-hold-key", { to: ctx.action, q: q.toString() || undefined }), method: "POST" });
+  sp(g, ctx, "cart_hold_check");
+  vr.redirect({ method: "POST" }, url("cart-hold-release"));
   return vr;
+}
+
+/** Something the hold check could keep: an order of this call with items whose hold simply ran out. */
+async function holdableCart(ids: number[]): Promise<boolean> {
+  for (const id of ids) {
+    const full = await getOrderWithItems(id);
+    if (full?.items.length && (full.order.status === "HOLD" || (full.order.status === "CANCELLED" && /Expired hold released/.test(full.order.notes ?? "")))) return true;
+  }
+  return false;
+}
+
+/** The order ids in this call's cart (every rental day), whatever their status. */
+function callCartIds(ctx: Ctx): number[] {
+  return [...new Set([...(ctx.session?.data.dayOrderIds ?? []), ...(ctx.session?.orderId ? [ctx.session.orderId] : [])])];
+}
+
+/**
+ * Hold the cart again after its time ran out (Box 30): every item still free is held for the normal phone hold; an
+ * item someone else booked meanwhile comes out of the cart (the first one is returned, for the item-taken screen).
+ * Only this call's orders whose hold simply ran out (still HOLD, or released by the hourly tidy-up) are held again.
+ */
+async function reholdCart(ctx: Ctx): Promise<{ p: number; d: string } | null> {
+  const { PHONE_HOLD_MINUTES, refreshOrderTotals } = await import("@/lib/orders");
+  let taken: { p: number; d: string } | null = null;
+  for (const id of callCartIds(ctx)) {
+    const full = await getOrderWithItems(id);
+    if (!full) continue;
+    const o = full.order;
+    const expiredRelease = o.status === "CANCELLED" && /Expired hold released/.test(o.notes ?? "");
+    if (o.status !== "HOLD" && !expiredRelease) continue;
+    let kept = 0;
+    for (const it of full.items) {
+      const prod = await getProduct(it.productId);
+      const free = prod ? await checkBookable(prod.id, prod.quantity, o.eventDate, db, o.pickupDate) : 0;
+      if (free >= it.qty) kept++;
+      else {
+        await db.delete(schema.orderItems).where(and(eq(schema.orderItems.orderId, id), eq(schema.orderItems.productId, it.productId)));
+        taken ??= { p: it.productId, d: o.eventDate };
+      }
+    }
+    if (kept) {
+      await db.update(orders).set({ status: "HOLD", holdExpiresAt: new Date(Date.now() + PHONE_HOLD_MINUTES * 60_000), updatedAt: new Date() }).where(eq(orders.id, id));
+      await refreshOrderTotals(id);
+    } else await db.update(orders).set({ status: "CANCELLED", updatedAt: new Date() }).where(eq(orders.id, id));
+  }
+  return taken;
+}
+
+/** Release this call's cart (Box 30, no key): every order still on hold for this call is released. */
+async function releaseCart(ctx: Ctx) {
+  const ids = callCartIds(ctx);
+  if (!ids.length) return 0;
+  const res = await db
+    .update(orders)
+    .set({ status: "CANCELLED", updatedAt: new Date(), notes: sql`COALESCE(${orders.notes}, '') || 'Cart released: the caller did not answer the hold check. '` })
+    .where(and(inArray(orders.id, ids), eq(orders.status, "HOLD")))
+    .returning({ id: orders.id });
+  return res.length;
 }
 
 /**
@@ -1696,6 +1766,25 @@ const handlers: Record<string, Handler> = {
     }
     sp(vr, ctx, "no_choice");
     return toStep(vr, ctx, { nk });
+  },
+
+  /** Box 30, any key after the hold check: the items are held again and the caller is back on the same step. */
+  async "cart-hold-key"(ctx, vr) {
+    const taken = await reholdCart(ctx);
+    await track(ctx.callSid, "step", taken ? "Cart hold check: a key was pressed; an item was taken meanwhile" : "Cart hold check: a key was pressed, items held again");
+    if (taken) return back(vr, "booked", { p: taken.p, d: taken.d }); // the usual item-taken screen for that item
+    return toStep(vr, ctx);
+  },
+
+  /** Box 30, no key after the hold check: release the items, the three goodbye pieces, and the call ends. */
+  async "cart-hold-release"(ctx, vr) {
+    const n = await releaseCart(ctx);
+    await track(ctx.callSid, "step", `Cart hold check: no key; ${n} rental day(s) released, call ended`);
+    sp(vr, ctx, "cart_hold_released");
+    sp(vr, ctx, "goodbye_thanks_calling");
+    sp(vr, ctx, "goodbye_bye_for_now");
+    vr.hangup();
+    return vr;
   },
 
   /** The disconnect check (Abraham, Nov 26, 2026): any key returns the caller to the exact step they were on. */

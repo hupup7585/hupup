@@ -305,6 +305,12 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "lib/prompt-versions.ts"
  ],
  "cart_expired": [],
+ "cart_hold_check": [
+  "lib/ivr/flow.ts"
+ ],
+ "cart_hold_released": [
+  "lib/ivr/flow.ts"
+ ],
  "cart_intro": [
   "lib/ivr/flow.ts"
  ],
@@ -478,8 +484,14 @@ export const RECORDING_USAGE: Record<string, string[]> = {
  "fri_only": [
   "lib/ivr/flow.ts"
  ],
+ "goodbye_bye_for_now": [
+  "lib/ivr/flow.ts"
+ ],
  "goodbye_order": [],
  "goodbye_order_days": [],
+ "goodbye_thanks_calling": [
+  "lib/ivr/flow.ts"
+ ],
  "greeting": [
   "lib/ivr/flow.ts",
   "lib/ivr/vmail.ts"

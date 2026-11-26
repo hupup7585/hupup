@@ -951,6 +951,10 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "lib/ivr/flow.ts",
   "lib/ivr/timers.ts"
  ],
+ "timerCartHoldCheck": [
+  "lib/ivr/flow.ts",
+  "lib/ivr/timers.ts"
+ ],
  "timerSpokenMax": [
   "lib/ivr/flow.ts",
   "lib/ivr/timers.ts"

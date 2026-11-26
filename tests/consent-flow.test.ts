@@ -212,7 +212,7 @@ describe("payment link: box 141, text or email (Abraham, Nov 17, 2026)", () => {
     expect(h.sms[0].to).toBe("+18455550100");
     expect(h.sms[0].body).not.toContain("Reply HELP for help, STOP to opt out.");
     expect(h.sms[0].opts).toMatchObject({ kind: "transactional", orderId: 7, callSid: "CA1" });
-    expect(xml).toContain("Done! We just sent you the payment link. To keep your booking, please complete your payment within the next ten minutes. Otherwise, the booking will be released. Thank you for choosing Hup Up Attractions!");
+    expect(xml).toContain("Done! We just sent you the payment link. To keep your booking, please complete your payment within the next ten minutes. Otherwise, the booking will be released. Thank you for calling Hup Up Attractions!");
     expect(xml).toContain("/api/voice/promo-consent");
     expect(xml).not.toContain("0100"); // the caller's number is never read out
   });

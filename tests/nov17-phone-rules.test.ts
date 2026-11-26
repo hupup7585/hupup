@@ -18,7 +18,7 @@ describe("the approved lines, word for word", () => {
     expect(PROMPTS.text_which.text).toBe("To text it to the number you are calling from, press 1. To enter a different number, press 2.");
     expect(PROMPTS.text_enter.text).toBe("Please enter the 10-digit phone number. When you are finished, please press pound.");
     expect(PROMPTS.text_heard.text).toBe("I have {number}. If that is correct, press 1. To enter a different number, press 2.");
-    expect(PROMPTS.pay_link_sent.text).toBe("Done! We just sent you the payment link. To keep your booking, please complete your payment within the next ten minutes. Otherwise, the booking will be released. Thank you for choosing Hup Up Attractions!");
+    expect(PROMPTS.pay_link_sent.text).toBe("Done! We just sent you the payment link. To keep your booking, please complete your payment within the next ten minutes. Otherwise, the booking will be released. Thank you for calling Hup Up Attractions!");
   });
   it("the old key 8 number lines and the booking email lines are no longer played", () => {
     for (const k of ["catalog_text_which", "catalog_text_enter", "catalog_text_heard", "ask_email", "ask_email_required", "phone_confirm", "phonepay_link_option"]) expect(RETIRED_PROMPTS.has(k)).toBe(true);
