@@ -399,7 +399,7 @@ export async function recordSentEmail(input: { to: string; subject: string; body
 }
 
 /**
- * Schedule send (Abraham, Nov 19, 2026): every 5 minutes (the free Cloudflare scheduler), scheduled emails whose time
+ * Schedule send (Abraham, Nov 19, 2026): once an hour (the free scheduler; Neon free plan, Nov 26, 2026), scheduled emails whose time
  * has come are sent with their files and the catalog. One that cannot be sent goes back to Drafts with the reason.
  */
 export async function sendScheduledEmails(now = new Date()) {

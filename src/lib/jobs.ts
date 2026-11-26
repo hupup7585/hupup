@@ -10,15 +10,28 @@ import { sendEmail } from "@/lib/notify";
  */
 export const JOB_TRIES = 3;
 
+/** Nothing was done: 0, null, empty, or an object whose values are all nothing. */
+export function isNoop(v: unknown): boolean {
+  if (v === null || v === undefined || v === 0 || v === false || v === "") return true;
+  if (Array.isArray(v)) return v.length === 0;
+  if (typeof v === "object") return Object.values(v as object).every(isNoop);
+  return false;
+}
+
 export async function runJob<T>(name: string, fn: () => Promise<T>, opts: { tries?: number; waitMs?: number } = {}): Promise<T | null> {
   const tries = opts.tries ?? JOB_TRIES;
   const wait = opts.waitMs ?? 2000;
-  const [run] = await db.insert(schema.jobRuns).values({ name }).returning();
+  // Neon free plan (Nov 26, 2026): a run that did nothing (first try, no error) writes no row in the job history
+  const startedAt = new Date();
+  let run: { id: number } | null = null;
+  const ensureRow = async () => (run ??= (await db.insert(schema.jobRuns).values({ name, startedAt }).returning())[0]);
   let lastError = "";
   for (let attempt = 1; attempt <= tries; attempt++) {
     try {
       const result = await fn();
-      await db.update(schema.jobRuns).set({ ok: true, attempts: attempt, finishedAt: new Date(), result: (result ?? null) as never, error: lastError || null }).where(eq(schema.jobRuns.id, run.id));
+      if (attempt === 1 && isNoop(result)) return result;
+      const row = await ensureRow();
+      await db.update(schema.jobRuns).set({ ok: true, attempts: attempt, finishedAt: new Date(), result: (result ?? null) as never, error: lastError || null }).where(eq(schema.jobRuns.id, row.id));
       return result;
     } catch (e) {
       lastError = (e as Error)?.message?.slice(0, 500) || String(e);
@@ -26,7 +39,8 @@ export async function runJob<T>(name: string, fn: () => Promise<T>, opts: { trie
       if (attempt < tries) await new Promise((r) => setTimeout(r, wait * attempt));
     }
   }
-  await db.update(schema.jobRuns).set({ ok: false, attempts: tries, finishedAt: new Date(), error: lastError }).where(eq(schema.jobRuns.id, run.id));
+  const failed = await ensureRow();
+  await db.update(schema.jobRuns).set({ ok: false, attempts: tries, finishedAt: new Date(), error: lastError }).where(eq(schema.jobRuns.id, failed.id));
   const to = config.adminEmail();
   if (to)
     await sendEmail(to, `Hup Up Attractions: the daily job "${name}" failed`, `The job "${name}" failed ${tries} times.\n\nLast error: ${lastError}\n\nIt will try again tomorrow. Details are in Admin > System status.\n${config.baseUrl()}/admin/status`).catch(() => null);

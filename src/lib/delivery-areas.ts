@@ -143,10 +143,18 @@ const normalizeAddress = (a: string) => a.trim().replace(/\s+/g, " ").toLowerCas
 /** Most callers say the street and town; New York is added when the address has no state. */
 export const withState = (a: string) => (/\b(ny|new york)\b/i.test(a) ? a : `${a}, NY`);
 
+/** Neon free plan (Nov 26, 2026): addresses already looked up are kept in memory too (a page pricing many orders). */
+const GEO_MEMO = new Map<string, { lng: number; lat: number; source: string } | null>();
 export async function geocode(address: string, fetcher: typeof fetch = fetch): Promise<{ lng: number; lat: number; source: string } | null> {
   const key = normalizeAddress(address);
+  if (!process.env.VITEST && GEO_MEMO.has(key)) return GEO_MEMO.get(key)!;
   const [hit] = await db.select().from(schema.geocodeCache).where(eq(schema.geocodeCache.address, key)).limit(1);
-  if (hit) return hit.lat === null || hit.lng === null ? null : { lng: hit.lng, lat: hit.lat, source: hit.source };
+  if (hit) {
+    const v = hit.lat === null || hit.lng === null ? null : { lng: hit.lng, lat: hit.lat, source: hit.source };
+    if (GEO_MEMO.size > 2000) GEO_MEMO.clear();
+    GEO_MEMO.set(key, v);
+    return v;
+  }
   let found: { lng: number; lat: number; source: string } | null = null;
   try {
     const r = await fetcher(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=${encodeURIComponent(withState(address))}`, { signal: AbortSignal.timeout(8000) });

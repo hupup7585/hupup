@@ -8,7 +8,9 @@ compatibility_date = "2026-11-01"
 workers_dev = true
 
 [triggers]
-crons = ["*/5 * * * *"]
+# Hourly (Neon free plan, Nov 26, 2026): the site does the jobs once an hour anyway; a 5-minute schedule only
+# made extra calls. Takes effect the next time this Worker is deployed.
+crons = ["0 * * * *"]
 
 [vars]
 SITE_URL = "https://hupupattractions.com"

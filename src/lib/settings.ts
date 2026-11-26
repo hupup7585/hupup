@@ -285,10 +285,27 @@ export const SETTING_DEFAULTS = {
 
 export type Settings = { -readonly [K in keyof typeof SETTING_DEFAULTS]: (typeof SETTING_DEFAULTS)[K] extends boolean ? boolean : string };
 
+/**
+ * Neon free plan (Nov 26, 2026): the settings are read many times per call step and page, so one read is kept in
+ * memory for 15 seconds on each server instance and cleared at once by every save here. A change made in Admin reaches
+ * every instance within 15 seconds. (Tests read the database every time.)
+ */
+const SETTINGS_TTL_MS = 15_000;
+let settingsCache: { at: number; rows: { key: string; value: unknown }[] } | null = null;
+export function clearSettingsCache() {
+  settingsCache = null;
+}
+async function settingRows(): Promise<{ key: string; value: unknown }[]> {
+  if (!process.env.VITEST && settingsCache && Date.now() - settingsCache.at < SETTINGS_TTL_MS) return settingsCache.rows;
+  const rows = await db.select({ key: schema.appSettings.key, value: schema.appSettings.value }).from(schema.appSettings);
+  settingsCache = { at: Date.now(), rows };
+  return rows;
+}
+
 export async function getSettings(): Promise<Settings> {
   const out = { ...SETTING_DEFAULTS } as Settings;
   try {
-    const rows = await db.select().from(schema.appSettings);
+    const rows = await settingRows();
     for (const r of rows) {
       if (!(r.key in out)) continue;
       // The database hands back a saved "72" as the number 72; keep every value the same type as its default
@@ -326,6 +343,7 @@ const sameValue = (a: unknown, b: unknown) => (typeof a === "object" || typeof b
 
 /** Write the live value only (no history row): used inside a publish, which records its own version. */
 export async function writeSettingValue(tx: Tx, key: string, value: unknown, userId: number | null) {
+  clearSettingsCache();
   await tx
     .insert(schema.appSettings)
     .values({ key, value: value as never, updatedBy: userId })
@@ -347,9 +365,11 @@ export async function saveSetting<K extends keyof Settings>(key: K, value: Setti
   };
   if (typeof db.transaction === "function") await db.transaction((tx) => write(tx as unknown as Tx));
   else await write(db);
+  clearSettingsCache();
 }
 
 export async function deleteSetting(key: string) {
+  clearSettingsCache();
   await db.delete(schema.appSettings).where(eq(schema.appSettings.key, key));
 }
 
