@@ -54,7 +54,11 @@ export function holidayFridayPickup(eventDate: string, s: HolidaySettings): stri
   return kinds(sat).kinds.has("yomtov") ? null : sat;
 }
 
-export const pickupAfterShabbesMin = (s: HolidaySettings) => Math.max(0, Math.round(Number(s.holidayPickupAfterShabbesMin ?? 60)) || 60);
+/** Minutes after Shabbes for the pickup: 0 to 300, exactly what the Offers page allows (Hark's review H4: 0 used to become 60). */
+export const pickupAfterShabbesMin = (s: HolidaySettings) => {
+  const n = Math.round(Number(s.holidayPickupAfterShabbesMin ?? 60));
+  return Number.isFinite(n) && n >= 0 && n <= 300 ? n : 60;
+};
 
 /** Friday plus Mutze Shabbes is offered on this date (box 150): a Friday in a Chanukah or Chol Hamoed week with
  *  per-day pricing on, before a plain Shabbes. */

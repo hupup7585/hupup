@@ -33,14 +33,17 @@ export async function savePhonePayAction(form: FormData) {
   const tries = Math.floor(Number(form.get("triesPerCall")));
   const declines = Math.floor(Number(form.get("callsPerDay")));
   if (!(tries >= 1 && tries <= 20) || !(declines >= 1 && declines <= 20)) return back("Tries per call and calls per day must each be a number from 1 to 20.");
-  const before = await getSettings();
-  await saveSetting("phonePayTriesPerCall", String(tries), owner.userId);
-  await saveSetting("phonePayCallsPerDay", String(declines), owner.userId);
-  const waitSec = Number(form.get("declineHangupSeconds"));
-  if (Number.isFinite(waitSec) && waitSec >= 0 && waitSec <= 15) await saveSetting("phonePayDeclineHangupSeconds", String(waitSec), owner.userId);
+  // Every number is checked before anything is saved (Hark's review H4: no half-saved form, nothing quietly ignored)
+  const waitRaw = String(form.get("declineHangupSeconds") ?? "").trim();
+  const waitSec = Number(waitRaw);
+  if (waitRaw !== "" && !(Number.isFinite(waitSec) && waitSec >= 0 && waitSec <= 15)) return back("The wait after a declined card must be a number of seconds from 0 to 15.");
   // Sola hang-up helper (Abraham, Nov 18, 2026, option a): on/off and the silence check seconds
   const silence = Math.floor(Number(form.get("silenceSeconds")));
   if (!(silence >= 5 && silence <= 120)) return back("The silence check must be a number of seconds from 5 to 120.");
+  const before = await getSettings();
+  await saveSetting("phonePayTriesPerCall", String(tries), owner.userId);
+  await saveSetting("phonePayCallsPerDay", String(declines), owner.userId);
+  if (waitRaw !== "") await saveSetting("phonePayDeclineHangupSeconds", String(waitSec), owner.userId);
   await saveSetting("phonePaySilenceSeconds", String(silence), owner.userId);
   await saveSetting("solaListenOn", form.get("listenOn") === "on", owner.userId);
   await saveSetting("solaPhonePayOn", on, owner.userId);
