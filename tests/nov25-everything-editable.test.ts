@@ -22,8 +22,9 @@ describe("everything editable", () => {
     const missing = Object.keys(SETTING_DEFAULTS).filter((k) => !UNUSED.includes(k) && !DYNAMIC.test(k) && !new RegExp(`\\b${k}\\b`).test(admin));
     expect(missing).toEqual([]);
   });
+  // (the generated where-used list, config-usage.generated.ts, names every setting, so it is left out)
   it("the settings listed as unused are really not read anywhere", () => {
-    const lib = files("src").filter((f) => !f.endsWith("lib/settings.ts")).map((f) => readFileSync(f, "utf8")).join("\n");
+    const lib = files("src").filter((f) => !f.endsWith("lib/settings.ts") && !f.endsWith("config-usage.generated.ts")).map((f) => readFileSync(f, "utf8")).join("\n");
     for (const k of UNUSED.filter((x) => x !== "phonePayDeclinesPerDay")) expect(new RegExp(`\\b${k}\\b`).test(lib), k).toBe(false);
   });
 });

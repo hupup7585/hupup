@@ -680,6 +680,13 @@
       "when": 1795770000000,
       "tag": "0096_laser_third_set_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1795780000000,
+      "tag": "0097_config_versions",
+      "breakpoints": true
     }
   ]
 }

@@ -1706,3 +1706,24 @@ export const voicemailActions = pgTable("voicemail_actions", {
   callSid: text("call_sid"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Admin handoff Phase 2 (Nov 26, 2026): every Admin setting change as a version. Draft (does not affect customers),
+ * live (published by the Owner), discarded. Never edited or deleted: undo publishes the earlier value as a new version.
+ */
+export const configVersions = pgTable(
+  "config_versions",
+  {
+    id: serial("id").primaryKey(),
+    key: text("key").notNull(),
+    value: jsonb("value"),
+    previous: jsonb("previous"),
+    status: text("status").$type<"draft" | "live" | "discarded">().notNull().default("draft"),
+    reason: text("reason"),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    publishedBy: integer("published_by"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+  },
+  (t) => [index("config_versions_key_idx").on(t.key, t.createdAt)],
+);

@@ -106,6 +106,7 @@ export const NAV_GROUPS: Group[] = [
       ["/admin/hours", CalendarClock, "Hours", O], // Abraham, Nov 25, 2026, 4:54 PM: every line's hours in one place
       ["/admin/holidays", CalendarClock, "Business hours & holidays", O],
       ["/admin/settings", Settings, "General settings", O],
+      ["/admin/config", Settings, "All settings", O], // Admin handoff Phase 2 (Nov 26, 2026): drafts, publish, history, undo
       ["/admin/status", Activity, "System status", O],
       ["/admin/keys", KeyRound, "API keys", O], // Abraham, Nov 14, 2026: Owner only
       ["/admin/design", Palette, "Staff screens (preview)", O],
