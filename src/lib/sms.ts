@@ -210,6 +210,7 @@ export const SYSTEM_EVENTS: Record<string, { afterStop: boolean }> = {
   confirmation_resend: { afterStop: false }, // box 148, press 1: the payment confirmation to the number the caller entered
   catalog_reply: { afterStop: false }, // texting CATALOG: the reply with the catalog (Nov 18, 2026: was refused as an order text)
   join_invite: { afterStop: false }, // JOIN invitation: once per customer, separate text, only while JOIN_INVITE_ON (off until Abraham picks the wording)
+  menu_key_request: { afterStop: false }, // a key set in Admin (Nov 26, 2026): the caller asked for this text with a key; never after STOP
 };
 
 export type Customer = typeof schema.customers.$inferSelect;
@@ -467,7 +468,7 @@ export const NO_TEXT_CONSENT = "No text consent; call or email.";
 export const TEXTING_NOT_ACTIVE = "Not active yet: waiting for Twilio A2P approval";
 /** Texts to our own staff (not customers): allowed before A2P approval. */
 const STAFF_EVENTS = new Set(["owner_alert", "owner_forward", "compliance_alert", "login_code", "info_email_alert"]);
-const REQUESTED_EVENTS = new Set(["catalog_request", "catalog_reply"]);
+const REQUESTED_EVENTS = new Set(["catalog_request", "catalog_reply", "menu_key_request"]); // + a text the caller asked for with a key set in Admin (Nov 26, 2026)
 
 const BLOCK_REASON: Record<Blocked, string> = {
   opted_out: "Customer replied STOP. They must text START and reply YES to receive order texts again.",

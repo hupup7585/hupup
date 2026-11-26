@@ -40,10 +40,10 @@ describe("the slots", () => {
     const slots = new Map(allSlots().map((s) => [s.key, s]));
     for (const [id, parts] of Object.entries(MENU_COMBOS)) {
       const key = `whole_${id}`;
-      expect(T(key)).toBe(parts.filter((x) => x !== "pause").map((x) => (x === "star" ? T("book_back") : T(x))).join(" "));
+      if (id !== "hours") expect(T(key)).toBe(parts.filter((x) => x !== "pause").map((x) => (x === "star" ? T("book_back") : T(x))).join(" ")); // key 7: the hours come from the Hours page
       expect(promptRecordable(key as PromptKey)).toBe(true);
       expect(slots.get(key)?.kind).toBe("line");
-      for (const x of parts) if (x !== "star" && x !== "pause") expect(slots.has(x) || PROMPTS[x as PromptKey]).toBeTruthy();
+      for (const x of parts) if (x !== "star" && x !== "pause" && x !== "hours_lines") expect(slots.has(x) || PROMPTS[x as PromptKey]).toBeTruthy();
     }
     expect(T("whole_book_r2")).toBe("For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3. To go to your shopping cart, press 0. To go back, press star.");
     expect(T("book_r2")).toBe("For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3.");

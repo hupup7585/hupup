@@ -82,6 +82,7 @@ export const NAV_GROUPS: Group[] = [
       ["/admin/voicemail", Voicemail, "Voicemail", OS],
       ["/admin/campaigns", Megaphone, "Campaigns", OS],
       ["/admin/phone/prompts", Mic, "Hotline prompts", O],
+      ["/admin/phone/screens", Mic, "Phone screens", O], // every screen's lines and keys, set in Admin (Nov 26, 2026)
       ["/admin/phone/menu-order", ListOrdered, "Menu order", O], // Nov 19, 2026: the order of each menu's recordings
       ["/admin/compliance", ShieldCheck, "Compliance", OS],
       ["/admin/phone/settings", PhoneForwarded, "Phone settings", O],

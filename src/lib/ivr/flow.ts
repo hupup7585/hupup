@@ -73,6 +73,8 @@ import { pluralName } from "@/lib/spoken-words";
 import { lastPhoneDate, normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { liveVoiceLink, nameVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
 import { FIRST_TIME_ONLY, menuOrder, type MenuId } from "./menu-order";
+import { EMPTY_EDITOR, activeKey, applyLayout, layoutIdFor, parseEditor, type Editor, type KeyDef } from "./menu-editor";
+import { GO_TO_SCREENS, SCREENS, screenForChoice } from "./screens";
 import { infoCatalogAutoreplyOn, catalogText, recordCatalogRequest, sendCatalogEmail } from "@/lib/catalog-send";
 import { CATALOG_ENDINGS, spellOut, spokenEmail, spokenLetters, validDomain, validLocal } from "./catalog-keys";
 import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState, textingActive } from "@/lib/voicemail";
@@ -244,6 +246,38 @@ function backLine(g: Gather, ctx: { prompts: PromptOverrides }) {
   sp(g, ctx, "book_back");
 }
 
+/* The screen editor (Abraham, Nov 26, 2026; src/lib/ivr/menu-editor.ts): loaded once per call step with the prompts. */
+const EDITOR = new WeakMap<PromptOverrides, { e: Editor; texts: Record<string, string> }>();
+const editorOf = (ctx: { prompts: PromptOverrides }) => EDITOR.get(ctx.prompts) ?? { e: EMPTY_EDITOR, texts: {} };
+
+async function loadEditor(): Promise<{ e: Editor; texts: Record<string, string> }> {
+  try {
+    const rows = await db.select().from(schema.appSettings).where(inArray(schema.appSettings.key, ["screenEditor", "customRecordingSlots"]));
+    const get = (k: string) => rows.find((r) => r.key === k)?.value;
+    const custom = Array.isArray(get("customRecordingSlots")) ? (get("customRecordingSlots") as { key: string; text: string }[]) : [];
+    return { e: parseEditor(get("screenEditor")), texts: Object.fromEntries(custom.filter((c) => c && c.key).map((c) => [c.key, String(c.text ?? "")])) };
+  } catch {
+    return { e: EMPTY_EDITOR, texts: {} };
+  }
+}
+
+/**
+ * Any line from the recordings list: a phone line slot plays as everywhere; a line added in Admin plays its chosen
+ * recording, else Google voice reads the text typed for it.
+ */
+function playRef(target: VR | Gather, ctx: { prompts: PromptOverrides }, ref: string) {
+  if (ref in PROMPTS) return void sp(target, ctx, ref as PromptKey);
+  const rec = clipUrls(ctx.prompts, [ref]);
+  if (rec) return void rec.forEach((u) => target.play(u));
+  const text = editorOf(ctx).texts[ref];
+  if (!text) return;
+  if (googleLiveOn(ctx.prompts)) target.play(liveVoiceLink(text));
+  else say(target, text);
+}
+
+/** The last key wait each step made, so lines added in Admin can play at the end of that screen. */
+const LAST_GATHER = new WeakMap<VR, Gather>();
+
 /**
  * A menu's fixed lines (Abraham, Nov 26, 2026): the whole-menu recording (slot whole_<id>) when one is chosen in
  * Admin and these are exactly its lines; else each line on its own, as before ("star" = the shared go-back line with
@@ -253,10 +287,11 @@ function menuRun(g: Gather, ctx: { prompts: PromptOverrides }, id: string, parts
   const whole = `whole_${id}` as PromptKey;
   const combo = MENU_COMBOS[id];
   if (combo && ctx.prompts[whole]?.recordingId && combo.join("|") === parts.join("|")) return void sp(g, ctx, whole);
-  for (const part of parts) {
+  // The Owner's order, on/off and added lines for this menu (Admin > Phone > Screens), else exactly as built
+  for (const part of applyLayout(editorOf(ctx).e.layouts[layoutIdFor(id)], parts)) {
     if (part === "star") backLine(g, ctx);
     else if (part === "pause") halfPause(g);
-    else sp(g, ctx, part as PromptKey);
+    else playRef(g, ctx, part);
   }
 }
 
@@ -273,10 +308,14 @@ async function playMenu(g: Gather, ctx: Ctx, menu: MenuId, items?: (g: Gather) =
     const id = opts.firstTime === false ? "book_again" : "book";
     if (ctx.prompts[`whole_${id}` as PromptKey]?.recordingId && MENU_COMBOS[id].join("|") === parts.join("|")) return menuRun(g, ctx, id, parts);
   }
-  for (const part of order) {
+  // The bookings menu's order, on/off and added lines from Admin > Phone > Screens (nothing saved: as built)
+  const lay = menu === "book" ? editorOf(ctx).e.layouts.book : undefined;
+  const run = lay ? applyLayout(lay, order.map((x) => (x === "book_back" ? "star" : x))).map((x) => (x === "star" ? "book_back" : x)) : order;
+  for (const part of run) {
     if (part === "balloon_items") await items?.(g);
     else if (part === "book_back") backLine(g, ctx);
-    else sp(g, ctx, part);
+    else if (!(part in PROMPTS)) playRef(g, ctx, part);
+    else sp(g, ctx, part as PromptKey);
     // 3c (customer service hours) plays right after 3a once its new wording is in. Off (Abraham, Nov 25, 2026, 4:50 PM):
     // the hours changed, so "11 AM to 4 PM" is wrong; the slot keeps its text and waits for new wording.
     if (part === "book_r3a" && BOOK_R3C_LIVE) sp(g, ctx, "book_r3c");
@@ -288,7 +327,7 @@ function pause(target: VR | Gather, seconds = 1) {
 }
 
 function keypad(vr: VR, action: string, opts: { numDigits?: number; timeout?: number; finishOnKey?: string } = {}) {
-  return vr.gather({
+  const g = vr.gather({
     input: ["dtmf"],
     numDigits: opts.numDigits ?? 1,
     timeout: opts.timeout ?? NO_KEY_SECONDS,
@@ -297,6 +336,8 @@ function keypad(vr: VR, action: string, opts: { numDigits?: number; timeout?: nu
     method: "POST",
     // On timeout Twilio falls through to the next verb (our noInput redirect).
   });
+  LAST_GATHER.set(vr, g);
+  return g;
 }
 
 /** "Sunday, November twenty-second": every date the phone reads (Abraham, Nov 18, 2026: the day as an ordinal). */
@@ -4695,7 +4736,14 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "office_closed");
       shortPause(vr);
     }
-    for (const line of hoursForSpeech(settings)) playText(vr, ctx, line, "hours"); // recordings word by word (Nov 24, 2026)
+    // Key 7 (Nov 26, 2026): its combined recording when chosen, else its lines from Admin > Phone > Screens (the hours
+    // read from the Hours page, on unless turned off, plus any lines added there)
+    if (ctx.prompts.whole_hours?.recordingId) sp(vr, ctx, "whole_hours");
+    else
+      for (const part of applyLayout(editorOf(ctx).e.layouts.hours, ["hours_lines"])) {
+        if (part === "hours_lines") for (const line of hoursForSpeech(settings)) playText(vr, ctx, line, "hours"); // recordings word by word (Nov 24, 2026)
+        else if (part !== "pause" && part !== "star") playRef(vr, ctx, part);
+      }
     shortPause(vr);
     return back(vr, "menu");
   },
@@ -5291,9 +5339,45 @@ function callerPhoneOf(ctx: { session?: { fromNumber?: string | null } | null; f
 
 const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music", "pay-leg", "pay-leg-status"]); // music: wait music pieces, not a step of the caller's journey
 
+/** What a key set in Admin does (Nov 26, 2026). */
+async function ownKey(ctx: Ctx, vr: VR, screen: string, k: KeyDef) {
+  const here = Object.fromEntries(ctx.query.entries());
+  const a = k.action;
+  switch (a.type) {
+    case "screen":
+      return back(vr, (GO_TO_SCREENS as readonly string[]).includes(a.target) ? a.target : "menu");
+    case "ring":
+      return back(vr, "ring", { k: (RING_KEYS as readonly string[]).includes(a.ext) ? a.ext : "0" });
+    case "voicemail":
+      return back(vr, "voicemail", { x: a.box });
+    case "play":
+      for (const ref of a.lines) playRef(vr, ctx, ref);
+      return back(vr, screen, here);
+    case "text": {
+      const to = toE164(ctx.session?.fromNumber ?? ctx.from);
+      const r = to && a.text.trim() ? await sendMessage({ to, body: a.text, ...(a.picture ? { mediaUrls: [a.picture] } : {}), kind: "system", event: "menu_key_request", callSid: ctx.callSid }) : null;
+      await track(ctx.callSid, "step", r?.sent ? `Texted the caller (key ${k.key} on ${screen})` : `Text not sent (key ${k.key} on ${screen})`, { to });
+      return back(vr, screen, here);
+    }
+    case "forward": {
+      const n = toE164(a.phone);
+      if (!n) return back(vr, screen, here);
+      vr.dial({ callerId: staffCallerId(ctx.session?.fromNumber ?? ctx.from) }, n);
+      return vr;
+    }
+    case "item": {
+      const day = ctx.session?.data.day;
+      return day ? back(vr, "qty", { p: a.productId, d: day }) : back(vr, "date", { p: a.productId });
+    }
+    case "back":
+      return handlers[ctx.action]({ ...ctx, body: { ...ctx.body, Digits: "*" } }, vr);
+  }
+}
+
 export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Promise<string> {
   const vr = new twilio.twiml.VoiceResponse();
   const prompts = await loadPromptOverrides();
+  EDITOR.set(prompts, await loadEditor());
   const ctx = { ...input, prompts };
   const handler = handlers[ctx.action];
   if (!handler) {
@@ -5323,7 +5407,20 @@ export async function handleVoice(input: Omit<Ctx, "session" | "prompts">): Prom
     current = await getSession(ctx.callSid);
   }
   try {
-    await handler({ ...ctx, session: current ?? session ?? (await getSession(ctx.callSid)) }, vr);
+    const full = { ...ctx, session: current ?? session ?? (await getSession(ctx.callSid)) };
+    // A key the Owner set for this screen in Admin (Nov 26, 2026); star and pound always stay as built
+    const screen = screenForChoice(ctx.action, ctx.query);
+    const own = screen ? activeKey(editorOf(ctx).e, screen, ctx.body.Digits) : null;
+    if (own && screen) {
+      await track(ctx.callSid, "step", `Key ${own.key} (set in Admin on ${screen}): ${own.action.type}`);
+      await ownKey(full, vr, screen, own);
+    } else {
+      await handler(full, vr);
+      // lines added in Admin at the end of this screen (only those turned on)
+      const g = LAST_GATHER.get(vr);
+      const extra = editorOf(ctx).e.extra[ctx.action];
+      if (g && extra?.length) for (const l of extra) if (l.on) playRef(g, ctx, l.ref);
+    }
     const voice = VOICE_LOG.get(prompts);
     if (voice?.length) await track(ctx.callSid, "step", `Voice: ${voice.join(" | ")}`).catch(() => undefined);
   } catch (e) {

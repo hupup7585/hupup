@@ -192,10 +192,16 @@ export const MENU_COMBOS: Record<string, readonly string[]> = {
     "phonepay_approved_star",
     "pay_approved_optin",
     "phonepay_approved_bye"
+  ],
+  "hours": [
+    "hours_lines"
   ]
 };
 
 export const PROMPTS = {
+  // Key 7 (Abraham, Nov 26, 2026): the hours as one recording, instead of reading them from the Hours page. Plays only
+  // once a recording is chosen; type the exact words here before recording them
+  whole_hours: { group: "Whole menus (one recording each)", label: "Whole menu: Key 7 hours (plays instead of the hours read from the Hours page once a recording is chosen)", text: "Our hours, as one recording." },
   whole_instr_menu: { group: "Whole menus (one recording each)", label: "Whole menu: Key 2 menu (instructions) (plays instead of its separate lines once a recording is chosen)", text: "For jumping balloon instructions, press 1. For laser tag, press 2. For paddle boats, press 3. To go back, press star." },
   whole_attraction_choice: { group: "Whole menus (one recording each)", label: "Whole menu: Key 6 menu (learn about our rentals) (plays instead of its separate lines once a recording is chosen)", text: "For jumping balloons, press 1. For laser tag, press 2. For paddle boats, press 3. To go back, press star." },
   whole_catalog_menu: { group: "Whole menus (one recording each)", label: "Whole menu: Key 8 catalog menu (plays instead of its separate lines once a recording is chosen)", text: "To receive our catalog by text, press 1. To get it by email, press 2. To go back, press star." },
