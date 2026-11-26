@@ -901,6 +901,9 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "lib/ivr/flow.ts"
  ],
  "promo_heard": [],
+ "promo_joined": [
+  "lib/ivr/flow.ts"
+ ],
  "promo_which": [
   "lib/ivr/flow.ts"
  ],

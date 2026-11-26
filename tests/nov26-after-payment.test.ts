@@ -49,7 +49,9 @@ const LINE3 = "Please make sure your rental is ready outside for pickup by 9 AM,
 const LINE4 = "To hear it again, press star.";
 const LINE5A = "We will text your confirmation to the number you are calling from. To send it to a different number, press 1.";
 const LINE5B = "To receive your confirmation and order updates by text, press 1.";
-const LINE8 = "Would you like to receive our seasonal offers by text? You will get up to 5 messages a year. To sign up, press 1. To skip, press pound.";
+// Abraham, Nov 26, 2026, 15:00 ET: the new Line 8 (no pound key)
+const LINE8 = "To stay informed, join our seasonal offers by text. You will never miss a deal, a special, or a new rental, with up to 5 messages a year. To sign up, press 1. To stop, you can reply stop at any time.";
+const JOINED = "You have now joined our seasonal offers! You will stay informed about new rentals and special deals. Thank you!";
 const LINE7 = "We look forward serving you again. You can call us back at any time. Thank you for choosing Hup Up Attractions! Bye for now!";
 const CHECK = "It sounds like we got disconnected. To continue, press any key.";
 
@@ -80,6 +82,7 @@ describe("the approved words (Admin slots, word for word, no contractions)", () 
     expect(PROMPTS.phonepay_approved_text.text).toBe(LINE5A);
     expect(PROMPTS.pay_approved_optin.text).toBe(LINE5B);
     expect(PROMPTS.paid_promo_offer.text).toBe(LINE8);
+    expect(PROMPTS.promo_joined.text).toBe(JOINED);
     expect(PROMPTS.disconnect_goodbye.text).toBe(LINE7);
     expect(PROMPTS.disconnect_goodbye.text).not.toContain("forward to"); // Abraham, 10:17 ET: no "to"
     expect(PROMPTS.disconnect_check.text).toBe(CHECK);
@@ -128,13 +131,18 @@ describe("after payment, in order: 1, 2, 3, 4, then 5, then 8, then 7", () => {
     expect(redirect(await call("pay-approved-text-choice", { Digits: "1" }, `o=${orderId}`))).toBe(`tx-enter?p=conf&o=${orderId}`);
     expect(redirect(await call("pay-approved-text-choice", {}, `o=${orderId}`))).toBe(`receipt-email?o=${orderId}`); // no key
   });
-  it("Line 8 after box 35: about 3 seconds; key 1 signs up, pound skips, no key skips; each then Line 7", async () => {
+  it("Line 8 after box 35: key 1 -> which number -> the number calling -> joined -> Line 7; no key moves on; pound is not valid", async () => {
     const x = await call("promo-consent");
     expect(said(x)).toEqual([LINE8]);
     expect(gather(x)).toContain('timeout="3"');
     expect(redirect(x)).toBe("goodbye"); // no key
-    expect(redirect(await call("promo-consent-answer", { Digits: "#" }))).toBe("goodbye"); // pound = skip only
-    expect(redirect(await call("promo-consent-answer", { Digits: "1" }))).toBe("goodbye");
+    const pound = await call("promo-consent-answer", { Digits: "#" }); // no pound key any more
+    expect(said(pound)).toEqual(["Sorry, that is not a valid selection."]);
+    expect(redirect(pound)).toBe("promo-consent");
+    expect(redirect(await call("promo-consent-answer", { Digits: "1" }))).toBe("tx-which?p=promo");
+    const joined = await call("tx-which-choice", { Digits: "1" }, "p=promo");
+    expect(said(joined)).toEqual([JOINED]);
+    expect(redirect(joined)).toBe("goodbye");
     const [c] = await db.select().from(schema.customers).where(eq(schema.customers.id, customerId));
     expect(c.marketingOptIn).toBe(true);
   });

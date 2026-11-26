@@ -634,7 +634,10 @@ export const PROMPTS = {
   },
   // Promo texts by phone, keys only (Abraham, Nov 10, 2026): replaces consent_marketing_v2, which is no longer played.
   // Abraham, Nov 26, 2026 (approved): asked after a paid order, before the goodbye; 1 = promotional texts only
-  paid_promo_offer: { group: "Promo texts by phone (keys only)", label: "After payment, Line 8: seasonal offers by text (1 signs up, pound skips; about 3 seconds for a key)", text: "Would you like to receive our seasonal offers by text? You will get up to 5 messages a year. To sign up, press 1. To skip, press pound." },
+  // Abraham, Nov 26, 2026, 15:00 ET (exact words, recording approved): replaces the earlier Line 8 (no pound key any more)
+  paid_promo_offer: { group: "Promo texts by phone (keys only)", label: "After payment, Line 8 (step 1): seasonal offers by text. 1 signs up; no key moves on to the goodbye; any other key: not valid, then again", text: "To stay informed, join our seasonal offers by text. You will never miss a deal, a special, or a new rental, with up to 5 messages a year. To sign up, press 1. To stop, you can reply stop at any time." },
+  // Abraham, Nov 26, 2026, 15:00 ET (exact words, recording approved): after the number is chosen, then Line 7
+  promo_joined: { group: "Promo texts by phone (keys only)", label: "After payment, Line 8 (step 3): joined the seasonal offers (then Line 7 and the call ends)", text: "You have now joined our seasonal offers! You will stay informed about new rentals and special deals. Thank you!" },
   // Box 30, the cart hold ran out (Abraham, Nov 26, 2026, 13:11 ET, approved word for word; Puck until recorded)
   cart_hold_check: { group: "Checkout", label: "Box 30: cart hold ran out, a caller with items who stopped responding (any key = keep the items, back to the same step)", text: "It sounds like we got disconnected. To keep the items in your cart, press any key to continue." },
   cart_hold_released: { group: "Checkout", label: "Box 30: no key, the items are released (then the two goodbye pieces)", text: "The items in your cart will now be released. You can call us back at any time." },

@@ -1521,14 +1521,52 @@ async function deliverPayLink(ctx: Ctx, orderId: number, via: { phone?: string; 
 }
 
 /** What the shared text steps are for (boxes 142 to 144). */
-function txPurpose(ctx: Ctx): "cat" | "pay" | "conf" {
+/**
+ * Line 8, step 3 (Abraham, Nov 26, 2026, 15:00 ET): the chosen number joins the seasonal offers. The opt-in is
+ * recorded for compliance (number, time, source "phone after paid order", the exact step 1 wording, which number was
+ * chosen), the one sign-up confirmation text goes out, then the joined line and Line 7. A number that replied STOP
+ * stays blocked (only START and YES undo it).
+ */
+async function promoJoin(ctx: Ctx, vr: VR, to: string) {
+  const caller = toE164(ctx.from);
+  const wording = promptText(ctx.prompts, "paid_promo_offer");
+  const chosen = to === caller ? "the number calling (pressed 1)" : "a different number, entered and confirmed (pressed 2, then 1)";
+  try {
+    await recordConsent({
+      phone: to,
+      scope: "marketing",
+      action: "opt_in",
+      source: "phone",
+      method: "keypad",
+      wording,
+      wordingVersion: wordingVersion(wording, PROMPTS.paid_promo_offer.text),
+      response: `phone after paid order: pressed 1 to join; number: ${chosen}`,
+      callerPhone: caller,
+      callSid: ctx.callSid,
+      orderId: ctx.session?.orderId ?? ctx.session?.data.placedOrderId ?? null,
+    });
+  } catch (e) {
+    if (!(e instanceof ConsentBlockedError)) throw e;
+    sp(vr, ctx, "consent_stopped");
+    return back(vr, "goodbye");
+  }
+  await track(ctx.callSid, "step", `Seasonal offers: joined after a paid order (${to === caller ? "number calling" : "entered number"})`, { phone: to });
+  // The one sign-up confirmation text (its wording is still waiting for Abraham's approval: the approved text in use now)
+  const { PROMO_ENROLLED_SMS } = await import("@/lib/sms-terms-v2");
+  await sendMessage({ to, body: PROMO_ENROLLED_SMS, kind: "system", event: "consent_confirmation", customerId: (await customerByPhone(to))?.id ?? null, callSid: ctx.callSid });
+  sp(vr, ctx, "promo_joined");
+  return back(vr, "goodbye"); // Line 7, then the call ends
+}
+
+function txPurpose(ctx: Ctx): "cat" | "pay" | "conf" | "promo" {
   const p = ctx.query.get("p");
-  return p === "pay" ? "pay" : p === "conf" ? "conf" : "cat";
+  return p === "pay" ? "pay" : p === "conf" ? "conf" : p === "promo" ? "promo" : "cat";
 }
 
 /** The number is chosen: the catalog, or the payment link (after the caller's OK for order texts). */
-async function txSend(ctx: Ctx, vr: VR, p: "cat" | "pay" | "conf", to: string) {
+async function txSend(ctx: Ctx, vr: VR, p: "cat" | "pay" | "conf" | "promo", to: string) {
   if (p === "cat") return catalogSendText(ctx, vr, to);
+  if (p === "promo") return promoJoin(ctx, vr, to);
   if (p === "conf") {
     // Box 148, press 1: the payment confirmation text to the number the caller entered (they asked for it)
     const o = Number(ctx.query.get("o"));
@@ -1839,7 +1877,7 @@ const handlers: Record<string, Handler> = {
     const p = txPurpose(ctx);
     const o = ctx.query.get("o") ?? undefined;
     const d = ctx.body.Digits;
-    if (d === "*") return p === "pay" ? back(vr, "paylink", { o }) : p === "conf" ? back(vr, "pay-approved-text", { o }) : back(vr, "catalog");
+    if (d === "*") return p === "pay" ? back(vr, "paylink", { o }) : p === "conf" ? back(vr, "pay-approved-text", { o }) : p === "promo" ? back(vr, "promo-consent") : back(vr, "catalog");
     if (d === "1") {
       const to = toE164(ctx.from);
       return to ? txSend(ctx, vr, p, to) : back(vr, "tx-enter", { p, o });
@@ -4829,29 +4867,22 @@ const handlers: Record<string, Handler> = {
     if (customer?.marketingOptIn && (await getSettings()).paidPromoSkipOptedIn) return back(vr, "goodbye");
     const g = keypad(vr, url("promo-consent-answer"), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
     sp(g, ctx, "paid_promo_offer");
-    return back(vr, "goodbye"); // no key in about 3 seconds: skip, no change
+    return back(vr, "goodbye"); // no key within the wait: on to the goodbye (Line 7), no change
   },
 
+  /**
+   * Line 8 (Abraham, Nov 26, 2026, 15:00 ET): 1 = sign up, then step 2, the shared "which number" steps (boxes 142 to
+   * 144, the same as key 8 and the payment link; star goes back here). No pound key any more: any other key is not
+   * valid and the question plays again; no key moves on to the goodbye.
+   */
   async "promo-consent-answer"(ctx, vr) {
     const d = ctx.body.Digits;
-    const caller = toE164(ctx.from);
-    if (d === "1" && caller) {
-      try {
-        await recordPhoneConsent(ctx, "marketing", "opt_in", caller, "paid_promo_offer");
-        await track(ctx.callSid, "step", "Promo texts: opted in (pressed 1)", { phone: caller });
-        // The approved sign-up confirmation text (SMS v3, PROMO_ENROLLED_SMS), as after a YES; nothing more is played
-        const { PROMO_ENROLLED_SMS } = await import("@/lib/sms-terms-v2");
-        await sendMessage({ to: caller, body: PROMO_ENROLLED_SMS, kind: "system", event: "consent_confirmation", customerId: (await customerByPhone(caller))?.id ?? null, callSid: ctx.callSid });
-      } catch (e) {
-        if (!(e instanceof ConsentBlockedError)) throw e; // a number that replied STOP stays blocked (START + YES only)
-      }
-      return back(vr, "goodbye");
-    }
-    if (d && d !== "#") {
+    if (d === "1") return back(vr, "tx-which", { p: "promo" });
+    if (d) {
       sp(vr, ctx, "not_valid"); // wrong key: the shared line, then the same question again
       return back(vr, "promo-consent");
     }
-    return back(vr, "goodbye"); // pound: skip, no change
+    return back(vr, "goodbye");
   },
 
   "promo-which"(ctx, vr) {

@@ -32,9 +32,10 @@ import { handleVoice } from "@/lib/ivr/flow";
 import { PROMPTS } from "@/lib/ivr/prompts";
 import { PROMO_ENROLLED_SMS } from "@/lib/sms-terms-v2";
 
-const ASK = "Would you like to receive our seasonal offers by text? You will get up to 5 messages a year. To sign up, press 1. To skip, press pound."; // Line 8 (Abraham, Nov 26, 2026, 09:38 ET)
+// Line 8 (Abraham, Nov 26, 2026, 15:00 ET, replacing the 09:38 words): no pound key; 1 goes on to the which-number step
+const ASK = "To stay informed, join our seasonal offers by text. You will never miss a deal, a special, or a new rental, with up to 5 messages a year. To sign up, press 1. To stop, you can reply stop at any time.";
 let PHONE = "+18455550188";
-const call = (action: string, body: Record<string, string> = {}) => handleVoice({ action, query: new URLSearchParams(), body: { CallSid: "CApromo", ...body }, callSid: "CApromo", from: PHONE });
+const call = (action: string, body: Record<string, string> = {}, q = "") => handleVoice({ action, query: new URLSearchParams(q), body: { CallSid: "CApromo", ...body }, callSid: "CApromo", from: PHONE });
 const plain = (x: string) => x.replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => plain(m[1]));
 const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/Redirect>/)?.[1].replace(/^.*\/api\/voice\//, "");
@@ -78,24 +79,26 @@ describe("after a paid order", () => {
     h.overrides = { paid_promo_offer: { text: null, audioUrl: null, recordingId: 5150 } };
     expect(await call("promo-consent")).toMatch(/<Play>[^<]*5150[^<]*<\/Play>/);
   });
-  it("press 1: promotional texts only, recorded with the exact words; nothing more is played; then the goodbye", async () => {
-    const xml = await call("promo-consent-answer", { Digits: "1" });
-    expect(said(xml)).toEqual([]);
+  it("press 1, then the number calling: promotional texts only, recorded with the exact words; the joined line; then the goodbye", async () => {
+    expect(redirect(await call("promo-consent-answer", { Digits: "1" }))).toBe("tx-which?p=promo");
+    const xml = await call("tx-which-choice", { Digits: "1" }, "p=promo");
+    expect(said(xml)).toEqual([PROMPTS.promo_joined.text]);
     expect(redirect(xml)).toBe("goodbye");
     const rows = await marketing();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ action: "opt_in", source: "phone", method: "keypad", wording: ASK, response: "pressed 1", callSid: "CApromo" });
+    expect(rows[0]).toMatchObject({ action: "opt_in", source: "phone", method: "keypad", wording: ASK, callSid: "CApromo" });
+    expect(rows[0].response).toContain("phone after paid order");
     expect((await customer()).marketingOptIn).toBe(true);
     // order-text consent unchanged: no transactional row written
     expect((await db.select().from(schema.smsConsents)).filter((r) => r.phone === PHONE && r.scope === "transactional")).toHaveLength(0);
-    // the approved sign-up confirmation text (SMS v3), logged on the contact (test builds don't reach Twilio)
+    // the sign-up confirmation text, logged on the contact (test builds don't reach Twilio)
     const texts = (await db.select().from(schema.messages)).filter((m) => m.contactPhone === PHONE && m.direction === "out");
     expect(texts.map((m) => m.body)).toEqual([PROMO_ENROLLED_SMS]);
   });
-  it("pound: skip, no change", async () => {
+  it("pound is no longer a key here: the not-valid line, then the question again; no change", async () => {
     const xml = await call("promo-consent-answer", { Digits: "#" });
-    expect(redirect(xml)).toBe("goodbye");
-    expect(said(xml)).toEqual([]);
+    expect(redirect(xml)).toBe("promo-consent");
+    expect(said(xml)).toEqual([PROMPTS.not_valid.text]);
     expect(await marketing()).toHaveLength(0);
     expect((await customer())?.marketingOptIn ?? false).toBe(false);
     expect((await db.select().from(schema.messages)).filter((m) => m.contactPhone === PHONE)).toHaveLength(0);
@@ -122,7 +125,7 @@ describe("after a paid order", () => {
   it("a number that replied STOP: not asked, and a 1 cannot sign it up (START + YES only)", async () => {
     await db.insert(schema.customers).values({ phone: PHONE, smsOptOut: true });
     expect(said(await call("promo-consent"))).toEqual([]);
-    expect(redirect(await call("promo-consent-answer", { Digits: "1" }))).toBe("goodbye");
+    expect(redirect(await call("tx-which-choice", { Digits: "1" }, "p=promo"))).toBe("goodbye");
     expect((await customer()).marketingOptIn).toBe(false);
     expect((await db.select().from(schema.messages)).filter((m) => m.contactPhone === PHONE)).toHaveLength(0);
   });

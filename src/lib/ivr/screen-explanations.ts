@@ -79,7 +79,7 @@ const S: Record<string, [what: string, where: string, ifChanged?: string]> = {
   "pay-approved": ["After a card payment: Line 1 (payment approved and the order number), Line 2 (delivery and pickup dates), Line 3 (rental ready outside by 9 AM), Line 4 (star to hear it again). About 3 seconds for a key.", "Right after a card payment is approved. This is the only place the order number is spoken."],
   "pay-approved-text": ["Line 5a for callers signed up for order texts (key 1 sends the confirmation to a different number) or Line 5b for callers not signed up (key 1 signs up the calling number). About 3 seconds for a key.", "After Line 4, when the payment is approved."],
   "phonepay-retry": ["Says the card could not be processed: key 1 to try again.", "After a declined or unclear card payment."],
-  "promo-consent": ["Line 8: offers seasonal offers by text (key 1 signs up, pound skips), about 3 seconds for a key, then Line 7 and the call ends.", "After a paid order, only if the caller has not already decided."],
+  "promo-consent": ["Line 8: offers seasonal offers by text. Key 1 signs up, then the caller chooses the number (the one calling, or a different one typed and read back) and hears the joined line. No key moves on; any other key is not valid and the question plays again. Then Line 7 and the call ends.", "After a paid order, only if the caller has not already decided."],
   "promo-which": ["Join with the calling number (key 1) or a different number (key 2).", "After choosing to join the offers by text."],
   "promo-enter": ["The caller types the phone number for offers by text.", "After choosing a different number."],
   "promo-heard": ["Reads back the number: key 1 to confirm, key 2 to type again.", "After typing a number for offers by text."],
