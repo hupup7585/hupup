@@ -91,3 +91,25 @@ describe("Admin", () => {
     expect(plainReason("Invalid API Key provided")).toBe("The refund key isn't set up correctly. Nothing was refunded.");
   });
 });
+
+describe("09:00 P9: no answer from Stripe", () => {
+  it("the refund is 'unknown' (kept counted), never 'nothing refunded', so a second try can't refund it twice", async () => {
+    process.env.STRIPE_REFUNDS_KEY = "rk_test_p9";
+    const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: "2026-12-29", pickupDate: "2026-12-30", subtotalCents: 5000, totalCents: 5000, paidCents: 5000, paymentMethod: "stripe", stripePaymentId: "ch_p9" }).returning();
+    const down = (async () => {
+      throw new TypeError("fetch failed");
+    }) as unknown as typeof fetch;
+    await expect(refundOrder(o.id, "full", 3, down)).rejects.toThrow("No answer from Stripe");
+    const { eq } = await import("drizzle-orm");
+    const rows = await db.select().from(schema.orderRefunds).where(eq(schema.orderRefunds.orderId, o.id));
+    expect(rows.map((r) => r.status)).toEqual(["unknown"]);
+    await expect(refundOrder(o.id, "full", 3, down)).rejects.toThrow(/At most/);
+    // a plain refusal from Stripe (not a server error) is still "failed", as before
+    const [o2] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: "2026-12-29", pickupDate: "2026-12-30", subtotalCents: 5000, totalCents: 5000, paidCents: 5000, paymentMethod: "stripe", stripePaymentId: "ch_p9b" }).returning();
+    const refused = (async () => new Response(JSON.stringify({ error: { message: "Charge ch_p9b has already been refunded." } }), { status: 400 })) as unknown as typeof fetch;
+    await expect(refundOrder(o2.id, "full", 3, refused)).rejects.toThrow();
+    const rows2 = await db.select().from(schema.orderRefunds).where(eq(schema.orderRefunds.orderId, o2.id));
+    expect(rows2.map((r) => r.status)).toEqual(["failed"]);
+    delete process.env.STRIPE_REFUNDS_KEY;
+  });
+});

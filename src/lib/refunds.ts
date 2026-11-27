@@ -130,15 +130,24 @@ export function plainReason(raw: string): string {
 }
 
 async function stripeRefund(ref: string, amount: number, o: Ord, fetcher?: typeof fetch, attemptId?: number) {
-  const re = await stripeApi<{ id: string; status: string; failure_reason?: string }>(
+  // Extra check (09:00 P9): never wait forever, and no answer (or a Stripe server error) means the outcome is unknown,
+  // never "nothing refunded": the refund stays counted until someone checks Stripe, so it is never refunded twice
+  const timed: typeof fetch = (url, init) => (fetcher ?? fetch)(url, { ...init, signal: AbortSignal.timeout(25_000) });
+  let re: { id: string; status: string; failure_reason?: string };
+  try {
+    re = await stripeApi<{ id: string; status: string; failure_reason?: string }>(
     "refunds",
     "POST",
     "/v1/refunds",
     { ...(ref.startsWith("pi_") ? { payment_intent: ref } : { charge: ref }), amount, reason: "requested_by_customer", metadata: { order_number: orderNumber(o.id) } },
     // Deep check 0600 M32: one key per refund try (its reserved row), so a retry after a failed try is a new request
     // (the key used to repeat when nothing had been refunded yet, and Stripe answered with the old failure)
-    { idempotencyKey: attemptId ? `refund-${o.id}-try-${attemptId}` : `refund-${o.id}-${o.refundedCents}-${amount}`, fetcher },
-  );
+    { idempotencyKey: attemptId ? `refund-${o.id}-try-${attemptId}` : `refund-${o.id}-${o.refundedCents}-${amount}`, fetcher: timed },
+    );
+  } catch (e) {
+    if (e instanceof StripeError && !(e.status && e.status >= 500)) throw e;
+    throw new RefundUnknown(`No answer from Stripe (${e instanceof Error ? e.message : String(e)}).`);
+  }
   if (re.status === "failed" || re.status === "canceled") throw new RefundError(plainReason(re.failure_reason ?? re.status));
   return { id: re.id, status: re.status };
 }
@@ -207,11 +216,12 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
   } catch (e) {
     if (e instanceof RefundUnknown) {
       // It may have gone through: the row stays counted ("unknown"), so it is never refunded again by mistake
-      await db.update(schema.orderRefunds).set({ status: "unknown", error: `${e.message} Check Sola before refunding again.`.slice(0, 300) }).where(eq(schema.orderRefunds.id, reserved.id));
+      const company = pay.provider === "stripe" ? "Stripe" : "Sola";
+      await db.update(schema.orderRefunds).set({ status: "unknown", error: `${e.message} Check ${company} before refunding again.`.slice(0, 300) }).where(eq(schema.orderRefunds.id, reserved.id));
       await db.insert(schema.auditLog).values({ userId, action: "payment.refund_unknown", entityType: "order", entityId: String(o.id), after: { amountCents: amount, provider: pay.provider, reason: e.message } });
       const owner = process.env.ADMIN_EMAIL;
-      if (owner) await sendEmail(owner, `Refund on order #${orderNumber(o.id)}: no answer from Sola`, `A refund of ${money(amount)} on order #${orderNumber(o.id)} got no answer from Sola (${e.message}). It may or may not have gone through.\n\nCheck the transaction in Sola before refunding again.\n\n${config.baseUrl()}${orderPath(o.id)}`).catch(() => null);
-      throw new RefundError(`No answer from Sola. The refund may have gone through: check Sola before trying again. The Owner was emailed.`);
+      if (owner) await sendEmail(owner, `Refund on order #${orderNumber(o.id)}: no answer from ${company}`, `A refund of ${money(amount)} on order #${orderNumber(o.id)} got no answer from ${company} (${e.message}). It may or may not have gone through.\n\nCheck the transaction in ${company} before refunding again.\n\n${config.baseUrl()}${orderPath(o.id)}`).catch(() => null);
+      throw new RefundError(`No answer from ${company}. The refund may have gone through: check ${company} before trying again. The Owner was emailed.`);
     }
     const reason = e instanceof RefundError ? e.message : plainReason(e instanceof StripeError || e instanceof Error ? e.message : String(e));
     await db.update(schema.orderRefunds).set({ status: "failed", error: reason.slice(0, 300) }).where(eq(schema.orderRefunds.id, reserved.id));
