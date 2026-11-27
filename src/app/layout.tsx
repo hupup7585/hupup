@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
-import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import PhoneAutoFormat from "@/components/PhoneAutoFormat";
 import { isLiveSite } from "@/lib/seo";
 import { config } from "@/lib/config";
 
-// Code audit L3 (Nov 24, 2026): Inter is self-hosted by Next (no blocking request to Google Fonts on every page)
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800", "900"], variable: "--font-inter", display: "swap", preload: false });
-const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-poppins", display: "swap" });
+import { inter, poppins } from "./fonts";
 
 export const metadata: Metadata = {
   // canonical and share links use the real site address, never a vercel.app one (item 7, Nov 25, 2026)
