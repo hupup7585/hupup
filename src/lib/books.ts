@@ -217,7 +217,8 @@ export async function recordBookingPayment(orderId: number, cents: number, metho
     );
     const owed = Math.max(0, total - prior);
     // A second charge on an order already paid in full is an overpayment to refund (the Owner is emailed), never a tip
-    const overpayment = total > 0 && owed === 0;
+    // Deep check 09:00 P2: money on an order with nothing left on it (total $0: every item was taken) is a refund due too
+    const overpayment = owed === 0;
     const toTotal = Math.min(cents, owed);
     const share = total > 0 ? toTotal / total : 0;
     const deliveryCents = Math.round(o.deliveryFeeCents * share);
@@ -231,7 +232,7 @@ export async function recordBookingPayment(orderId: number, cents: number, metho
         entryDate: await firstOpenDate(date, db),
         kind: "income",
         category: overpayment ? "Overpayment (refund due)" : "Bookings",
-        ...(overpayment ? { notes: "Second payment on an order already paid in full: refund due." } : {}),
+        ...(overpayment ? { notes: total > 0 ? "Second payment on an order already paid in full: refund due." : "Payment on an order with nothing left to pay for: refund due." } : {}),
         amountCents: cents,
         rentalCents,
         deliveryCents,

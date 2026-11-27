@@ -495,7 +495,10 @@ export async function markPaid(orderId: number, cents: number, method: string, r
   const staffCancelled = o.status === "CANCELLED" && (await cancelledByStaff(orderId));
   const late = !staffCancelled && holdEnded(o);
   // Deep check Nov 27 #4: the whole order checked as one, locked (shared units counted), as "Check availability again"
-  const stillFree = late ? await claimIfStillFree(orderId) : true;
+  // Deep check 09:00 P2: a day "Check availability again" emptied (every item taken, cancelled at $0) has nothing left to
+  // confirm; paying it (an old card page with the old amount) is a late payment whose items were taken, never confirmed
+  const emptied = late && (await nothingOnOrder(orderId));
+  const stillFree = late ? !emptied && (await claimIfStillFree(orderId)) : true;
   // Audit C1 (Nov 24, 2026): confirmed only when paid in full; less than the total needs staff attention
   const owed = o.totalCents ?? o.subtotalCents;
   const short = paid < owed;
@@ -531,6 +534,13 @@ export async function markPaid(orderId: number, cents: number, method: string, r
     const paidText = `Paid $${(cents / 100).toFixed(2)} by ${method}`;
     const why = shortNote ? `${paidText}: ${shortNote.trim()}` : paidText;
     await (await import("@/lib/status-history")).explainStatus(orderId, status, late ? (stillFree ? `${why} after the hold ended; the items were still free` : `${why} after the hold ended; the items were taken by another booking`) : why);
+  }
+  // Deep check 09:00 P2: some items were taken off by "Check availability again" and the old (larger) amount was paid:
+  // the booking is confirmed for what is left, and the Owner is emailed to refund the difference
+  if (waiting && status === "CONFIRMED" && paid > owed && (await linkShrunk(o))) {
+    const extra = paid - owed;
+    await db.update(orders).set({ notes: sql`COALESCE(${orders.notes}, '') || ${`Paid $${(extra / 100).toFixed(2)} more than the total after items were taken off the payment link: refund the difference. `}` }).where(eq(orders.id, orderId));
+    await shrunkPaidAlert(orderId, paid, owed, method, ref ?? null).catch((e) => console.error("[shrunk paid alert]", e));
   }
   if (staffCancelled) await cancelledPaidAlert(orderId, cents, method, ref ?? null).catch((e) => console.error("[cancelled paid alert]", e));
   // Less than the total (Audit C1): the Owner is emailed; the payment record is kept
@@ -615,6 +625,33 @@ async function cancelledPaidAlert(orderId: number, cents: number, method: string
 }
 
 /** Owner email: a payment on an order that was already paid in full (Hark's backend list 2, Nov 26, 2026). */
+/** Deep check 09:00 P2: no items and no services left on the order (every item was taken). */
+async function nothingOnOrder(orderId: number): Promise<boolean> {
+  const [i] = await db.select({ n: sql<number>`count(*)::int` }).from(orderItems).where(eq(orderItems.orderId, orderId));
+  const [v] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.orderServices).where(eq(schema.orderServices.orderId, orderId));
+  return !Number(i?.n) && !Number(v?.n);
+}
+
+/** Deep check 09:00 P2: "Check availability again" took items off this day's payment link (listed on the group's first day). */
+async function linkShrunk(o: { id: number; paymentGroupId: number | null; eventDate: string }): Promise<boolean> {
+  const [p] = await db.select({ removed: orders.linkRemoved }).from(orders).where(eq(orders.id, o.paymentGroupId ?? o.id)).limit(1);
+  return (p?.removed ?? []).some((r) => r.eventDate === o.eventDate);
+}
+
+async function shrunkPaidAlert(orderId: number, paidCents: number, owedCents: number, method: string, ref: string | null) {
+  const { config, BUSINESS_NAME } = await import("@/lib/config");
+  const to = config.adminEmail();
+  if (!to) return;
+  const { sendEmail } = await import("@/lib/notify");
+  const n = orderNumber(orderId);
+  const extra = paidCents - owedCents;
+  await sendEmail(
+    to,
+    `${BUSINESS_NAME}: order #${n} was paid $${(extra / 100).toFixed(2)} too much`,
+    [`Order #${n} was paid $${(paidCents / 100).toFixed(2)}, but its total is now $${(owedCents / 100).toFixed(2)}: some items were taken off its payment link ("Check availability again") before the customer paid the old amount.`, `Method: ${method}${ref ? `, reference ${ref}` : ""}.`, "", `The booking is confirmed for the items left. Please refund the difference of $${(extra / 100).toFixed(2)}.`, `${config.baseUrl()}${orderPath(orderId)}`].join("\n"),
+  );
+}
+
 async function overpaidAlert(orderId: number, cents: number, method: string, ref: string | null) {
   const { config, BUSINESS_NAME } = await import("@/lib/config");
   const to = config.adminEmail();
