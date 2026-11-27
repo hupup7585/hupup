@@ -19,7 +19,6 @@ import {
   getOrderWithItems,
   orderTextPhone,
   getPaymentGroup,
-  payingDays,
   minutesFromNow,
   orderNumber,
   refreshOrderTotals,
@@ -1169,6 +1168,10 @@ const money = (cents: number) => (cents / 100).toFixed(2);
 
 /** "{Qnt} {item}" (Abraham, Nov 19, 2026): the number, then the name (singular for 1, plural for 2 or more). */
 function itemPhrase(qty: number, name: string) {
+  // Hark's phone check (Nov 27, 2026, bug 6): an add-on named with its own count ("500 ocean balls") is said as named
+  // for one, as box 25 already does (it was "1 500 ocean balls"). Two or more such packs keep the count (new words for
+  // them would need Abraham's OK).
+  if (qty === 1 && /^\d/.test(name.trim())) return name;
   return `${qty} ${qty === 1 ? name : pluralName(name)}`;
 }
 
@@ -1209,6 +1212,11 @@ async function removeFromCart(ctx: Ctx, vr: VR, l: CartLine, n: number) {
     await updateSession(ctx.callSid, { orderId: null, outcome: "browsing", data: { dayOrderIds: [], day: undefined } }, ctx.session);
     sp(vr, ctx, "cart_empty");
     return back(vr, "book");
+  }
+  // Hark's phone check (Nov 27, 2026, bug 3): the last item of the day being shopped for is gone, so that day is no
+  // longer "the same day": the next item asks for its date (it was quietly put on the day just emptied)
+  if (!left && ctx.session?.data.day === l.date && !(await callOrders(ctx)).some((o) => o.order.eventDate === l.date)) {
+    await updateSession(ctx.callSid, { orderId: null, data: { day: undefined } }, ctx.session);
   }
   return back(vr, "cart", { u: 1 });
 }
@@ -2653,7 +2661,12 @@ const handlers: Record<string, Handler> = {
    */
   async "resume-choice"(ctx, vr) {
     const rd = ctx.body.Digits;
-    if (rd === "*") return back(vr, "menu"); // star: one step back, the main menu
+    if (rd === "*") {
+      // Hark's phone check (Nov 27, 2026, bug 4): star decides nothing, so the offer comes again the next time the caller
+      // goes into booking (the saved cart stayed held and blocked the caller's own items, with no welcome back)
+      await updateSession(ctx.callSid, { data: { resumeAsked: undefined } }, ctx.session);
+      return back(vr, "menu"); // star: one step back, the main menu
+    }
     if (rd === "2") {
       await releaseSavedCart(ctx); // a new order instead: the cart saved over Shabbes goes back to stock
       return back(vr, "book"); // 2: a new order
@@ -4071,7 +4084,7 @@ const handlers: Record<string, Handler> = {
     const street = findStreet(pick.street)?.spoken ?? pick.street;
     // The order name from the directory: last name, then first name (Nov 23, 2026); no name question
     const dirName = [pick.lastName, pick.firstName].filter(Boolean).join(", ");
-    await updateSession(ctx.callSid, { data: { lookupDone: true, ...(dirName ? { name: dirName, nameFromDirectory: true } : {}), house: pick.house, street: pick.street, unit: pick.unit ?? undefined, zip: pick.zip, town: pick.town, dirArea: pick.areaPrinted ?? undefined, dirPick: `${pick.house} ${street}${pick.unit ? `, unit ${pick.unit}` : ""}` } }, ctx.session);
+    await updateSession(ctx.callSid, { data: { lookupDone: true, ...(dirName ? { name: dirName, nameFromDirectory: true } : {}), house: pick.house, street: pick.street, unit: pick.unit ?? undefined, unitUnverified: undefined /* bug 8: the directory's own address */, zip: pick.zip, town: pick.town, dirArea: pick.areaPrinted ?? undefined, dirPick: `${pick.house} ${street}${pick.unit ? `, unit ${pick.unit}` : ""}` } }, ctx.session);
     await track(ctx.callSid, "step", `Address lookup: the caller confirmed an address${n > 1 ? ` (${n} on the number)` : ""}`);
     return back(vr, "addr-check", { dir: 1 });
   },
@@ -4106,7 +4119,9 @@ const handlers: Record<string, Handler> = {
     const units = await directoryHouseUnits({ house: d.house, street: d.street, zip: d.zip });
     // Hark's 2nd phone check, B7: a one-family house in the directory (no units there) never asks for a unit
     if (units === "none") {
-      await updateSession(ctx.callSid, { data: { unit: undefined } }, ctx.session);
+      // Hark's phone check (Nov 27, 2026, bug 8): a corrected address (a one-family house) drops an earlier
+      // "Unit not verified" flag, so staff are never asked to confirm a unit for a house that has none
+      await updateSession(ctx.callSid, { data: { unit: undefined, unitUnverified: undefined } }, ctx.session);
       return back(vr, "addr-check");
     }
     if (units === "units") return back(vr, "addr-unit");
@@ -5048,19 +5063,11 @@ const handlers: Record<string, Handler> = {
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "promo-consent");
     if (!group.paid) return back(vr, "goodbye"); // Hark's 2nd check, A2: "approved" only after a real payment
-    // Hark's payment check (Nov 27, 2026, bug 4): paid, but a day needs staff (a late payment whose item was taken by
-    // another booking, or a payment that did not cover every day): never "your booking is confirmed". The goodbye; the
-    // Owner was emailed and the customer gets the approved "please call us" email.
-    if (group.orders.some((x) => x.order.status === "NEEDS_ATTENTION")) {
-      await track(ctx.callSid, "step", "Payment counted but a day needs staff attention: no confirmation line, goodbye").catch(() => undefined);
-      return back(vr, "goodbye");
-    }
     const number = spokenDigits(orderNumber(o));
     const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
     sp(g, ctx, "phonepay_approved", { number });
     if (PAY_DATES_LIVE) {
-      // sorted by date: the first delivery and the last pickup; a released or cancelled day with nothing paid is not spoken
-      const days = payingDays(group.orders, group.primary).map((x) => x.order);
+      const days = group.orders.map((x) => x.order); // sorted by date: the first delivery and the last pickup
       sp(g, ctx, "pay_approved_dates", { date: spokenDate(days[0].eventDate), pickup: spokenDate(days.map((x) => x.pickupDate).sort().at(-1)!) });
     }
     sp(g, ctx, "phonepay_approved_star");
@@ -5160,20 +5167,6 @@ const handlers: Record<string, Handler> = {
     if (group.paid) return back(vr, "pay-approved", { o });
     // Hark's 2nd check, A2: the hold ran out during payment and nothing was paid: never "approved", no new try
     if (group.due <= 0) {
-      // Hark's payment check (Nov 27, 2026, bug 2): the hold can run out (10 minutes) while the caller is still on the
-      // call to Sola (up to 15). A card try that has no result yet is checked in Sola's record first, so a charge that
-      // went through is counted (a late payment: confirmed when the items are still free, else Needs attention and the
-      // Owner emailed) and never left unseen.
-      if (a) {
-        if (ctx.body.DialCallSid) await db.update(schema.phonepayAttempts).set({ payLegSid: ctx.body.DialCallSid }).where(eq(schema.phonepayAttempts.id, a));
-        const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1);
-        if (attempt && !attempt.result && attempt.amountCents > 0) {
-          await endMainPayLeg(attempt.payLegSid);
-          const r = await checkPhonePayTry(o, a, attempt.amountCents);
-          await track(ctx.callSid, "step", `Card payment try ${attempt.tryNumber ?? "?"} after the hold ran out: ${r.result}`, { attempt: a });
-          if (r.result === "paid") return back(vr, "pay-approved", { o });
-        }
-      }
       await track(ctx.callSid, "step", "Payment step reached after the hold ran out (nothing paid): unpaid goodbye").catch(() => undefined);
       return back(vr, "goodbye");
     }
