@@ -252,12 +252,26 @@ export async function passwordLogin(rawPhone: string, password: string, trustDev
     await audit("login.password_locked", u.id, {});
     return { ok: false, error: `${generic} Too many tries: try again later or use a texted code.` };
   }
+  // Deep check 06:00 M21: a try is used up BEFORE the password is compared (a lock that has run out starts the count
+  // again). In a burst of guesses only the first 5 are compared at all; every later one gets the same "Too many tries"
+  // answer whatever it is, so the answers never tell which guess was right. A right password resets the count.
+  const [c] = await db
+    .update(adminUsers)
+    .set({
+      failedLogins: sql`CASE WHEN ${adminUsers.lockedUntil} IS NOT NULL AND ${adminUsers.lockedUntil} <= now() THEN 1 ELSE ${adminUsers.failedLogins} + 1 END`,
+      lockedUntil: sql`CASE WHEN ${adminUsers.lockedUntil} <= now() THEN NULL ELSE ${adminUsers.lockedUntil} END`,
+    })
+    .where(eq(adminUsers.id, u.id))
+    .returning({ failures: adminUsers.failedLogins, lockedUntil: adminUsers.lockedUntil });
+  const failures = c?.failures ?? u.failedLogins + 1;
+  if ((c?.lockedUntil && c.lockedUntil > new Date()) || failures > MAX_PASSWORD_FAILURES) {
+    await audit("login.password_locked", u.id, { failures });
+    return { ok: false, error: `${generic} Too many tries: try again later or use a texted code.` };
+  }
   if (!(await bcrypt.compare(password, u.passwordHash))) {
-    // Deep check B2: counted in the database in one step, so guesses sent at the same moment all count
-    const [c] = await db.update(adminUsers).set({ failedLogins: sql`${adminUsers.failedLogins} + 1` }).where(eq(adminUsers.id, u.id)).returning({ failures: adminUsers.failedLogins });
-    const failures = c?.failures ?? u.failedLogins + 1;
+    // Deep check B2: counted in the database in one step (above), so guesses sent at the same moment all count
     const lock = failures >= MAX_PASSWORD_FAILURES ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null;
-    if (lock) await db.update(adminUsers).set({ failedLogins: 0, lockedUntil: lock }).where(eq(adminUsers.id, u.id));
+    if (lock) await db.update(adminUsers).set({ lockedUntil: lock }).where(eq(adminUsers.id, u.id));
     await audit(lock ? "login.locked" : "login.password_failed", u.id, { failures });
     return { ok: false, error: lock ? `${generic} Too many tries: try again later or use a texted code.` : generic };
   }
