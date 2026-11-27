@@ -120,7 +120,11 @@ export async function addEntry(e: NewEntry, userId: number | null) {
   if (![...MONEY_IN, ...MONEY_OUT].includes(e.kind)) throw new BooksError("Choose a type.");
   if (!Number.isInteger(e.amountCents) || (e.amountCents <= 0 && !e.correctsId)) throw new BooksError("Enter an amount greater than zero.");
   if (e.method && !(METHODS as readonly string[]).includes(e.method)) throw new BooksError("Choose a payment method.");
-  if (e.method === "check" && e.kind !== "expense" && !e.checkNo && !e.correctsId) throw new BooksError("Enter the check number.");
+  // Hark's Admin list 1 (Nov 26, 2026): a check recorded on a booking (New booking, the order page) is booked
+  // automatically even without its number, so it is never missing from Bookkeeping; the entry says so
+  const autoCheck = e.method === "check" && e.source === "auto" && !e.checkNo;
+  if (e.method === "check" && e.kind !== "expense" && !e.checkNo && !e.correctsId && !autoCheck) throw new BooksError("Enter the check number.");
+  if (autoCheck) e = { ...e, notes: [e.notes, "Check number not entered on the booking."].filter(Boolean).join(" ") };
   assertNoCardNumber(e.notes, e.party, e.checkNo, e.ref, e.personName, e.category);
   if (await isLocked(e.entryDate)) throw new BooksError(`${e.entryDate.slice(0, 7)} is locked. Date the entry in an open month.`);
   const [row] = await db

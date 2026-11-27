@@ -143,7 +143,10 @@ export async function createBookingAction(input: {
     const { onlinePaymentReady, PAYMENT_UNAVAILABLE } = await import("@/lib/sola");
     if (!onlinePaymentReady()) return { ok: false, message: `${PAYMENT_UNAVAILABLE.replace("Please call us.", "")}Card payments need SOLA_PAYMENTSITE_NAME in Vercel.`.trim() };
   }
-  const status = input.payment === "link" || input.payment === "card" ? "PENDING_PAYMENT" : "CONFIRMED";
+  // Hark's Admin list 1-3 (Nov 26, 2026): cash or check taken now goes through the same payment step as every other
+  // payment, so it is in Bookkeeping, and a booking paid less than its total is marked Needs attention (never confirmed)
+  const paysNow = paidCents > 0;
+  const status = input.payment === "link" || input.payment === "card" || paysNow ? "PENDING_PAYMENT" : "CONFIRMED";
 
   // Thursday to Sunday: only while the offer is on, and only for a Thursday (pickup Monday)
   const s = await getSettings();
@@ -159,8 +162,8 @@ export async function createBookingAction(input: {
     customer: { name: input.name.trim(), phone, email: input.email.trim() || null, address: input.address.trim() || null },
     deliveryTime: input.deliveryTime || (mutze?.ok ? mutze.deliveryLabel : null),
     notes: mutze?.ok ? [`Mutze Shabbes: ${mutze.deliveryLabel.replace("Mutze Shabbes, d", "D")}; pickup ${mutze.pickupLabel}.`, input.notes].filter(Boolean).join(" ") : input.notes || null,
-    paymentMethod: paidCents ? input.payment : null,
-    paidCents,
+    paymentMethod: null,
+    paidCents: 0, // recorded just below with markPaid (Bookkeeping, full or short)
   });
   if (!r.ok) {
     if (r.reason === "unavailable") return { ok: false, message: `Not enough units available for ${dualDate(input.date)} (only ${r.free} left of one item). Refresh availability.` };
@@ -174,6 +177,12 @@ export async function createBookingAction(input: {
   }
   // Code audit M5 (Nov 24, 2026): a cash, check or pay-later booking is confirmed right away, so it gets its units now
   if (status === "CONFIRMED") await (await import("@/lib/units")).assignUnits(r.orderId);
+  // Cash or check taken now (Admin list 1-3): paid in full confirms it (and assigns units); less is Needs attention
+  if (paysNow) {
+    const { markPaid } = await import("@/lib/orders");
+    await markPaid(r.orderId, paidCents, input.payment);
+    await db.insert(schema.auditLog).values({ userId: session.userId ?? null, action: "order.payment_recorded", entityType: "order", entityId: String(r.orderId), after: { cents: paidCents, method: input.payment, at: "new booking" } });
+  }
 
   // Log the customer's acceptance of the Terms, as chosen by staff (only while the Terms flow is on).
   const reqHeaders = await headers();

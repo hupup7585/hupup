@@ -165,3 +165,19 @@ describe("Admin bugs (Nov 24, 2026)", () => {
     expect(readFileSync("src/app/admin/deliveries/page.tsx", "utf8")).toContain("sp.d && isValidISO(sp.d) ? sp.d : todayISO()");
   });
 });
+
+describe("cash or check taken at New booking (Hark's Admin list 1-3, Nov 26, 2026)", () => {
+  it("paid in full: confirmed and in Bookkeeping; paid less: Needs attention, also in Bookkeeping", async () => {
+    const q = await quoteAction({ date: DATE, items: { [castle]: 1 }, phone: "845-555-0161", address: "12 Forest Road, Monroe", thuSun: false });
+    const full = await createBookingAction({ ...base, date: DATE, items: { [castle]: 1 }, phone: "845-555-0161", address: "12 Forest Road, Monroe", payment: "cash", amountPaid: (q!.totalCents! / 100).toFixed(2) });
+    expect(full.ok).toBe(true);
+    const [a] = await db.select().from(schema.orders).where(eq(schema.orders.id, full.orderId!));
+    expect([a.status, a.paidCents, a.paymentMethod]).toEqual(["CONFIRMED", q!.totalCents, "cash"]);
+    const booksA = await db.select().from(schema.bookEntries).where(eq(schema.bookEntries.orderId, full.orderId!));
+    expect(booksA.length).toBeGreaterThan(0);
+    const short = await createBookingAction({ ...base, date: DATE, items: { [castle]: 1 }, phone: "845-555-0162", address: "12 Forest Road, Monroe", payment: "check", amountPaid: "50.00" });
+    const [b] = await db.select().from(schema.orders).where(eq(schema.orders.id, short.orderId!));
+    expect([b.status, b.paidCents]).toEqual(["NEEDS_ATTENTION", 5000]);
+    expect((await db.select().from(schema.bookEntries).where(eq(schema.bookEntries.orderId, short.orderId!))).length).toBeGreaterThan(0);
+  });
+});
