@@ -86,6 +86,13 @@ describe("catalog photos and Garbage", () => {
     fd.set("photo", new File([jpeg], "x.jpg", { type: "image/jpeg" }));
     expect(await uploadCatalogPhotoAction(fd)).toEqual({ ok: false, message: "Choose picture 1 or picture 2." });
     expect(h.stored.size).toBe(before);
+    // deep check 0600 M69 (B6 leftover): a photo for an item that no longer exists is never stored
+    const gone = new FormData();
+    gone.set("kind", "product");
+    gone.set("id", "987654");
+    gone.set("photo", new File([jpeg], "x.jpg", { type: "image/jpeg" }));
+    expect(await uploadCatalogPhotoAction(gone)).toEqual({ ok: false, message: "That item no longer exists. Reload the page." });
+    expect(h.stored.size).toBe(before);
     h.r2Down = true;
     try {
       const r = await catalogPhoto(new Request("https://x"), { params: Promise.resolve({ key: ["catalog", "products", "1-a.jpg"] }) });

@@ -75,7 +75,8 @@ export async function createStaffAction(form: { name: string; phone: string; rol
     const code = (e as { code?: string; cause?: { code?: string } }).code ?? (e as { cause?: { code?: string } }).cause?.code;
     if (code !== "23505") throw e;
     const detail = String((e as { detail?: string; cause?: { detail?: string } }).detail ?? (e as { cause?: { detail?: string } }).cause?.detail ?? "");
-    return { ok: false, message: /username/i.test(detail) ? "That username is already taken." : "That phone number already has an account." };
+    // Deep check 0600 M69 (B3 leftover): the same Google account saved twice at once gets its own plain answer
+    return { ok: false, message: /username/i.test(detail) ? "That username is already taken." : /google/i.test(detail) ? "That Google account is already saved on another staff member." : "That phone number already has an account." };
   }
   await log(owner.userId, "staff.created", u.id, { name, role: form.role, password: Boolean(passwordHash) });
   revalidatePath("/admin/staff");
@@ -137,7 +138,14 @@ export async function setGoogleEmailAction(userId: number, googleEmail: string):
     const [other] = await db.select({ id: schema.adminUsers.id }).from(schema.adminUsers).where(sql`lower(${schema.adminUsers.googleEmail}) = ${g.value}`).limit(1);
     if (other && other.id !== userId) return { ok: false, message: "That Google account is already saved on another staff member." };
   }
-  await db.update(schema.adminUsers).set({ googleEmail: g.value }).where(eq(schema.adminUsers.id, userId));
+  // Deep check 0600 M69 (B3 leftover): two saves at once for the same Google account: a plain answer, never an error page
+  try {
+    await db.update(schema.adminUsers).set({ googleEmail: g.value }).where(eq(schema.adminUsers.id, userId));
+  } catch (e) {
+    const code = (e as { code?: string; cause?: { code?: string } }).code ?? (e as { cause?: { code?: string } }).cause?.code;
+    if (code !== "23505") throw e;
+    return { ok: false, message: "That Google account is already saved on another staff member." };
+  }
   await log(owner.userId, g.value ? "staff.google_email_set" : "staff.google_email_removed", userId, { googleEmail: g.value });
   revalidatePath("/admin/staff");
   return { ok: true, message: g.value ? "Saved. This Google account can now sign in to Admin." : "Removed. No Google account can sign in as this person." };
