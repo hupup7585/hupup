@@ -33,7 +33,7 @@ describe("no short forms in any phone prompt", () => {
       .filter(([, d]) => !(d as PromptDef).message)
       .map(([k, d]) => [k, shortForm(d.text)] as const)
       .filter(([, s]) => s);
-    expect(found).toEqual([["cart_empty", "Let's"], ["field_unclear", "Let's"]]); // Abraham's approved exceptions (Nov 22, 2026)
+    expect([...found].sort()).toEqual([["cart_cleared", "Let's"], ["cart_empty", "Let's"], ["field_unclear", "Let's"]]); // Abraham's approved exceptions (Nov 22, 2026; cart_cleared Nov 26, 11:32 PM)
   });
   it("Admin refuses a short form in a spoken line (possessives are fine)", () => {
     expect(shortForm("It's also available")).toBe("It's");

@@ -113,12 +113,16 @@ describe("the cart (Nov 19 and 22, 2026)", () => {
     expect(o.status).not.toBe("HOLD");
   });
 
-  it("key 4: start over (empty cart line, then the bookings menu)", async () => {
+  it("key 4: the cart cleared line once (Abraham, Nov 26, 11:32 PM; not cart_empty), 0 items, then the bookings menu", async () => {
     await freshCart();
     const r = await call("cart-choice", { Digits: "4" });
-    expect(said(r)).toEqual(["Your shopping cart is empty right now. Let's start shopping!"]);
+    expect(said(r)).toEqual(["Your cart has been cleared, and it is now empty. Let's start shopping."]);
     expect(redirect(r)).toBe("book");
+    expect(h.session.data.dayOrderIds).toEqual([]);
     expect(cat).toBeGreaterThan(0);
+    // a cart opened with 0 items keeps the empty cart line
+    const empty = await call("cart");
+    expect(said(empty).join(" ")).toContain("Your shopping cart is empty right now. Let's start shopping!");
   });
 
   it("each rental name has a singular and a plural recording slot", async () => {

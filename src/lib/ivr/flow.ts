@@ -749,6 +749,22 @@ async function hotlineClosed(ctx: Ctx, vr: VR, n = 0): Promise<VR | null> {
   return vmRecord(vr, await vmBox("9"), "closed");
 }
 
+/**
+ * Shabbes or Yom Tov starts in the middle of a booking (Abraham's priority list, Nov 26, 2026): no order is finalized
+ * and no payment is taken after candle lighting. Until Abraham decides the words for this case, the caller gets the
+ * same closed greeting and general voicemail as a call that starts then (or, while that greeting waits for approval on
+ * the live line, "not a valid selection" and the main menu, as key 1 does). The cart holds end with the call.
+ */
+async function shabbesStop(ctx: Ctx, vr: VR, where: string): Promise<VR | null> {
+  const lock = bookingLock(calendarNow(), await getSettings());
+  if (!lock.locked) return null;
+  await track(ctx.callSid, "step", `Booking closed during the call (${lock.reason}): stopped at ${where}`).catch(() => undefined);
+  const closed = await hotlineClosed(ctx, vr);
+  if (closed) return closed;
+  sp(vr, ctx, "not_valid");
+  return back(vr, "menu");
+}
+
 /** Item lists with 10 or more items: seconds to wait for a second key after the first (Abraham, Nov 17, 2026). */
 export const MULTI_KEY_WAIT_SECONDS = 2;
 
@@ -3410,7 +3426,7 @@ const handlers: Record<string, Handler> = {
       // refresh the cart and start over (box 29)
       for (const o of await callOrders(ctx)) await cancelHold(o.order.id);
       await updateSession(ctx.callSid, { orderId: null, outcome: "browsing", data: { dayOrderIds: [], day: undefined } }, ctx.session);
-      sp(vr, ctx, "cart_empty"); // Nov 22, 2026: the empty cart line, then straight to the bookings menu
+      sp(vr, ctx, "cart_cleared"); // Abraham, Nov 26, 2026, 11:32 PM: the cart cleared line (not cart_empty), then the bookings menu as before
       return back(vr, "book");
     }
     if (d) {
@@ -4395,6 +4411,8 @@ const handlers: Record<string, Handler> = {
   },
 
   async finalize(ctx, vr) {
+    const stop = await shabbesStop(ctx, vr, "checkout");
+    if (stop) return stop;
     const days = await callOrders(ctx);
     const data = ctx.session?.data ?? {};
     if (!days.length) return cartGone(vr, ctx);
@@ -4517,6 +4535,8 @@ const handlers: Record<string, Handler> = {
   async "paylink-choice"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     if (!o) return back(vr, "goodbye");
+    const stop = await shabbesStop(ctx, vr, "payment link");
+    if (stop) return stop;
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "tx-which", { p: "pay", o }); // texting approved (Nov 15, 2026)
     if (d === "2") return back(vr, "catalog-email", { p: "pay", o });
@@ -4582,6 +4602,8 @@ const handlers: Record<string, Handler> = {
     const o = Number(ctx.query.get("o"));
     const group = o ? await getPaymentGroup(o) : null;
     if (group?.paid) return back(vr, "promo-consent");
+    const stop = await shabbesStop(ctx, vr, "payment");
+    if (stop) return stop;
     // Hark's 2nd check, A2: the hold ran out during payment (nothing due, nothing paid): no new try, the unpaid goodbye
     if (!group || group.due <= 0) return back(vr, "goodbye");
     // Any Sola call from an earlier try is hung up first
@@ -4970,6 +4992,8 @@ const handlers: Record<string, Handler> = {
   async "pay-keypad"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     if (!o) return back(vr, "goodbye");
+    const stop = await shabbesStop(ctx, vr, "card payment");
+    if (stop) return stop;
     // The rentals stay held for the whole payment (a fresh hold now; each try in the payment line renews it)
     const group = await getPaymentGroup(o);
     const waiting = group?.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id) ?? [];

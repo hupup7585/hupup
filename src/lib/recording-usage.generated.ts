@@ -296,7 +296,9 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "lib/ivr/flow.ts"
  ],
  "cart_add_balls": [],
- "cart_cleared": [],
+ "cart_cleared": [
+  "lib/ivr/flow.ts"
+ ],
  "cart_day": [
   "lib/ivr/flow.ts"
  ],

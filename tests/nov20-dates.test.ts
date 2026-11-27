@@ -31,7 +31,7 @@ describe("phone dates", () => {
     expect(PROMPTS).not.toHaveProperty("box151"); // dropped for box 25 (Nov 22, 2026)
     for (const k of ["keep_shopping"] as const) expect(PROMPTS[k].text).not.toContain("shopping cart, press 0");
     expect(PROMPTS).not.toHaveProperty("resume_added"); // retired for box 25 (Nov 22, 2026)
-    const all = Object.entries(PROMPTS).filter(([k]) => k !== "cart_empty" && k !== "field_unclear").map(([, p]) => p.text).join(" "); // "Let's": the one exception
+    const all = Object.entries(PROMPTS).filter(([k]) => k !== "cart_empty" && k !== "cart_cleared" && k !== "field_unclear").map(([, p]) => p.text).join(" "); // "Let's": the one exception (cart_cleared too: Abraham's own words, Nov 26, 2026, 11:32 PM)
     expect(all).not.toMatch(/\b(?:don't|can't|won't|we're|you're|it's|let's|isn't|didn't|we'll|you'll)\b/i);
   });
 });
