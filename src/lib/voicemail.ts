@@ -311,6 +311,18 @@ export async function notifyVoicemail(id: number): Promise<{ sent: number }> {
     .where(and(eq(schema.voicemails.id, id), isNull(schema.voicemails.notifiedAt)))
     .returning();
   if (!v) return { sent: 0 };
+  // Deep check 06:00 M71: an error after the claim (settings, database, the box) released nothing, so that alert was
+  // lost for good. Now the claim is released when nothing went out, and the safety net tries again.
+  const counts = { sent: 0, held: 0 };
+  try {
+    return await sendVoicemailAlert(v, counts);
+  } catch (e) {
+    if (!counts.sent && !counts.held) await db.update(schema.voicemails).set({ notifiedAt: null }).where(eq(schema.voicemails.id, v.id)).catch(() => undefined);
+    throw e;
+  }
+}
+
+async function sendVoicemailAlert(v: typeof schema.voicemails.$inferSelect, counts: { sent: number; held: number }): Promise<{ sent: number }> {
   const box = await boxById(v.boxId);
   const [session] = v.callSid ? await db.select({ data: schema.callSessions.data }).from(schema.callSessions).where(eq(schema.callSessions.callSid, v.callSid)).limit(1) : [];
   const phone = toE164(v.fromNumber || "");
@@ -333,7 +345,7 @@ export async function notifyVoicemail(id: number): Promise<{ sent: number }> {
   let tried = 0;
   for (const to of box.notifyEmail) {
     tried++;
-    if ((await sendEmail(to, alert.subject, alert.email, attachments).catch(() => ({ sent: false }))).sent) sent++;
+    if ((await sendEmail(to, alert.subject, alert.email, attachments).catch(() => ({ sent: false }))).sent) counts.sent = ++sent;
   }
   // Text alerts start by themselves once Twilio approves texting. The MP3 rides along as an MMS only when the Owner
   // has turned that on (it costs more per message) and the file is small enough for carriers; the link is always there.
@@ -342,8 +354,8 @@ export async function notifyVoicemail(id: number): Promise<{ sent: number }> {
     for (const to of box.notifySms) {
       tried++;
       const r = await sendSms(to, alert.text, { kind: "system", event: "owner_alert", ...(mms ? { mediaUrls: [playLink] } : {}) }).catch(() => ({ sent: false, blocked: undefined }));
-      if (r.sent) sent++;
-      else if (r.blocked === "quiet_hours") held++; // held for Shabbes or Yom Tov: it goes out after, by itself
+      if (r.sent) counts.sent = ++sent;
+      else if (r.blocked === "quiet_hours") counts.held = ++held; // held for Shabbes or Yom Tov: it goes out after, by itself
     }
   }
   // Extra check G1 (Nov 27, 2026): when there was someone to tell but nothing went out (and nothing is waiting for
