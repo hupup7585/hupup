@@ -36,7 +36,16 @@ export async function placeTracks(place: MusicPlace): Promise<{ id: number; piec
     .split(",")
     .map((x) => Number(x.trim()))
     .filter((n) => Number.isInteger(n) && n > 0);
-  if (!ids.length) return [];
+  if (!ids.length) {
+    // Waiting for staff with no songs chosen (Abraham, Nov 27, 2026): the song "2 Phone Holding Music" when it is uploaded
+    if (place !== "staff") return [];
+    const [d] = await db
+      .select({ id: schema.musicTracks.id, pieces: schema.musicTracks.pieces, pieceSeconds: schema.musicTracks.pieceSeconds, complete: schema.musicTracks.complete })
+      .from(schema.musicTracks)
+      .where(and(sql`lower(trim(${schema.musicTracks.name})) like '2 phone holding music%'`, isNull(schema.musicTracks.trashedAt)))
+      .limit(1);
+    return d && d.complete && d.pieces > 0 ? [d] : [];
+  }
   const rows = await db
     .select({ id: schema.musicTracks.id, pieces: schema.musicTracks.pieces, pieceSeconds: schema.musicTracks.pieceSeconds, complete: schema.musicTracks.complete })
     .from(schema.musicTracks)

@@ -63,6 +63,7 @@ const EXACT: Record<string, Spec> = {
   promosPerYear: { mode: "edit", label: "Promo texts per customer per year (most)", group: "Offers and discounts", type: "int", min: 1, max: 12 },
   recordingFlags: lock(SYSTEM, "Phone: voice", { label: "Recordings that need a new recording (automatic)" }),
   recordingLinks: page("/admin/phone/prompts/slots", "Phone: voice", { label: "Settings spoken inside recordings", type: "json" }),
+  staffHoldMusicOn: { mode: "edit", label: "Hold music while staff are rung", group: "Phone: ringing", type: "bool" },
   addressTriesBeforeMenu: { mode: "edit", label: "Address tries before going back to the address menu", group: "Phone: menus", type: "int", min: 1, max: 20 },
   staffMutzeEveryWeek: { mode: "edit", label: "Allow Mutze Shabbes bookings by staff every week", group: "Bookings", type: "bool" },
   staffMutzeDeliveryAfterMin: { mode: "edit", label: "Mutze Shabbes by staff: delivery minutes after Shabbes ends", group: "Bookings", type: "int", min: 0, max: 360 },

@@ -297,6 +297,9 @@ export type CallData = {
   cartLeft?: number[];
   /** Failed address tries since the caller last chose how to find the address (Nov 27, 2026) */
   addrFails?: number;
+  /** Hold music while staff are rung (Nov 27, 2026): the staff calls ringing now, and the one that took the call */
+  staffLegs?: string[];
+  staffBridged?: string;
   /** The Shabbes / Yom Tov cut-off saved this call's cart until this time (ISO; Abraham, Nov 26, 2026, 11:51 PM) */
   shabbesSaved?: string;
   /** Box 25 (Nov 22, 2026): the item just added, for "Successfully added to your cart: {Qnt} {item} for {date}." */

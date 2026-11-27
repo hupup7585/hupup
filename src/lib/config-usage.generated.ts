@@ -102,6 +102,9 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/phone/music/actions.ts",
   "lib/music.ts"
  ],
+ "staffHoldMusicOn": [
+  "lib/ivr/flow.ts"
+ ],
  "emailSignature": [
   "app/admin/(app)/settings/email-actions.ts",
   "app/admin/(app)/settings/page.tsx",

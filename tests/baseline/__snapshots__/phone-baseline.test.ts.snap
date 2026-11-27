@@ -366,6 +366,16 @@ exports[`baseline: every phone step as it plays today > soldout-choice 1`] = `"<
 
 exports[`baseline: every phone step as it plays today > speech-partial 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response/>"`;
 
+exports[`baseline: every phone step as it plays today > staff-hold 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Pause length="8"/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > staff-leg 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="8" action="https://hupup.example/api/voice/staff-leg-accept?k=0" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Call from Hup Up Attractions, extension 0, Operator. Press 1 to accept, or press 2 to reject.</Say></Gather><Gather input="dtmf" numDigits="1" timeout="6" action="https://hupup.example/api/voice/staff-leg-accept?k=0" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Call from Hup Up Attractions, extension 0, Operator. Press 1 to accept, or press 2 to reject.</Say></Gather><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > staff-leg-accept 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>"`;
+
+exports[`baseline: every phone step as it plays today > staff-leg-status 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response/>"`;
+
+exports[`baseline: every phone step as it plays today > staff-queue-exit 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/voicemail?x=0</Redirect></Response>"`;
+
 exports[`baseline: every phone step as it plays today > stt-check 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/heard?f=null</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > stt-recorded 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/heard?f=null&amp;empty=1</Redirect></Response>"`;
@@ -565,6 +575,11 @@ exports[`baseline: every phone step as it plays today > the inventory of phone s
   "sms-consent-answer",
   "soldout-choice",
   "speech-partial",
+  "staff-hold",
+  "staff-leg",
+  "staff-leg-accept",
+  "staff-leg-status",
+  "staff-queue-exit",
   "stt-check",
   "stt-recorded",
   "taken-choice",

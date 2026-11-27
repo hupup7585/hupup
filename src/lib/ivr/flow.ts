@@ -774,6 +774,93 @@ function toFinalize(vr: VR, ctx: Ctx) {
   return back(vr, "finalize");
 }
 
+/* ---- Hold music while staff are rung (Abraham, Nov 27, 2026, 1:20 AM) ---- */
+
+const staffQueueName = (callerSid: string) => `staff-${callerSid}`;
+
+/** Music is chosen for staff waits (Music page), or the default song "2 Phone Holding Music" is uploaded. */
+async function staffHoldReady(): Promise<boolean> {
+  const { placeTracks } = await import("@/lib/music");
+  return (await placeTracks("staff")).length > 0;
+}
+
+/** Ring step i of line k for a caller waiting in the staff queue: one REST call per number (all of them at once in
+ *  "ring all" mode). Returns false when nothing could be started (then the usual direct ring is used). */
+async function startStaffLegs(callerSid: string, k: RingKey, i: number, settings: Awaited<ReturnType<typeof getSettings>>): Promise<boolean> {
+  const { getTwilio } = await import("@/lib/twilio-client");
+  const client = getTwilio();
+  const from = process.env.TWILIO_PHONE_NUMBER;
+  if (!client || !from) return false;
+  const s = await getSession(callerSid);
+  const self = toE164(s?.fromNumber);
+  const list = ringListFor(settings, k);
+  const others = list.targets.filter((t) => toE164(t.phone) !== self);
+  const targets = others.length ? others : list.targets;
+  if (!targets.length) return false;
+  const ring = list.mode === "simultaneous" ? targets : [targets[i % targets.length]];
+  const legs: string[] = [];
+  for (const t of ring) {
+    try {
+      const leg = await client.calls.create({
+        to: t.phone,
+        from,
+        url: url("staff-leg", { c: callerSid, k }),
+        method: "POST",
+        statusCallback: url("staff-leg-status", { c: callerSid, k, i }),
+        statusCallbackMethod: "POST",
+        statusCallbackEvent: ["completed"],
+        timeout: t.ringSeconds,
+      });
+      legs.push(leg.sid);
+    } catch (e) {
+      console.error("[staff hold] could not ring", e);
+    }
+  }
+  if (!legs.length) return false;
+  if (s) await updateSession(callerSid, { data: { staffLegs: legs, staffBridged: undefined, ringStart: Date.now() } }, s);
+  return true;
+}
+
+/** The staff member takes the call: joined to the waiting caller; every other ringing staff phone stops. */
+async function bridgeStaff(vr: VR, callerSid: string, legSid: string): Promise<VR> {
+  const s = await getSession(callerSid);
+  if (!s || s.data?.staffBridged) {
+    vr.hangup(); // someone else already took it, or the caller is gone
+    return vr;
+  }
+  await updateSession(callerSid, { data: { staffBridged: legSid } }, s);
+  await endStaffLegs(callerSid, legSid).catch(() => undefined);
+  vr.dial().queue(staffQueueName(callerSid));
+  return vr;
+}
+
+/** Stop the staff phones still ringing for this caller (all but `keep`). */
+async function endStaffLegs(callerSid: string, keep?: string) {
+  const s = await getSession(callerSid);
+  const legs = (s?.data?.staffLegs ?? []).filter((x) => x !== keep);
+  if (!legs.length) return;
+  const { getTwilio } = await import("@/lib/twilio-client");
+  const client = getTwilio();
+  for (const sid of legs) await client?.calls(sid).update({ status: "completed" }).catch(() => undefined);
+}
+
+/** One staff leg ended. Nobody took the call and no leg of this round is left: the next round, or the voicemail path. */
+async function staffLegEnded(callerSid: string, k: RingKey, i: number, legSid: string) {
+  const s = await getSession(callerSid);
+  if (!s || s.data?.staffBridged || s.status === "completed") return;
+  const left = (s.data?.staffLegs ?? []).filter((x) => x !== legSid);
+  await updateSession(callerSid, { data: { staffLegs: left } }, s);
+  if (left.length) return;
+  const settings = await getSettings();
+  const list = ringListFor(settings, k);
+  const steps = (list.mode === "simultaneous" ? 1 : list.targets.length) * ringAttempts(settings, k);
+  if (i + 1 < steps && (await lineRingsNowFor(k, settings)) && (await startStaffLegs(callerSid, k, i + 1, settings))) return;
+  // nobody answered on any number or round: the caller leaves the queue to the extension's voicemail, as today
+  await updateSession(callerSid, { data: { missed: "no_answer" } }, s);
+  const { getTwilio } = await import("@/lib/twilio-client");
+  await getTwilio()?.calls(callerSid).update({ url: url("voicemail", { x: k }), method: "POST" }).catch((e) => console.error("[staff hold] voicemail", e));
+}
+
 /** The phone's booking cut-off now (Abraham, Nov 26, 2026, 11:51 PM): 15 minutes before candle lighting (Admin). */
 async function phoneCutoff() {
   const st = await getSettings();
@@ -5254,7 +5341,81 @@ const handlers: Record<string, Handler> = {
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "forwarded", data: { ringStart: Date.now() } }, ctx.session);
     // Abraham, Nov 27, 2026, 1:20 AM: customer service (main menu key 3, bookings key 0) has its own connecting line
     sp(vr, ctx, k === "4" ? "transfer_connecting_cs" : "transfer_connecting");
+    // Hold music while staff are rung (Abraham, Nov 27, 2026, 1:20 AM; Owner switch): the caller waits in a private
+    // queue with the "Waiting for staff" songs; staff phones are called from the hotline number
+    if (settings.staffHoldMusicOn && (await staffHoldReady())) {
+      if (await startStaffLegs(ctx.callSid, k, 0, settings)) {
+        vr.enqueue({ waitUrl: url("staff-hold", { k }), waitUrlMethod: "POST", action: url("staff-queue-exit", { k }), method: "POST" }, staffQueueName(ctx.callSid));
+        return vr;
+      }
+    }
     return dialTargets(vr, list, k, 0, ctx.session?.fromNumber ?? ctx.from);
+  },
+
+  /** The waiting caller's music (Enqueue waitUrl): the next piece of the staff-wait songs; Twilio asks again after it. */
+  async "staff-hold"(ctx, vr) {
+    const settings = await getSettings();
+    const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
+    // Safety: never wait longer than every round of ringing plus a minute (then the voicemail path, as today)
+    const list = ringListFor(settings, k);
+    const perRound = Math.max(20, ...list.targets.map((t) => t.ringSeconds));
+    const most = perRound * (list.mode === "simultaneous" ? 1 : Math.max(1, list.targets.length)) * ringAttempts(settings, k) + 60;
+    if (Number(ctx.body.QueueTime ?? 0) > most) {
+      vr.leave();
+      return vr;
+    }
+    const piece = await (await import("@/lib/music")).nextPiece("staff");
+    if (piece) vr.play(piece.url);
+    else vr.pause({ length: T(vr, "timerNoMusicPause") }); // no song chosen yet: the same quiet wait as elsewhere
+    return vr;
+  },
+
+  /** The caller left the staff queue: after a conversation the call ends; no answer at all (safety leave): voicemail. */
+  async "staff-queue-exit"(ctx, vr) {
+    const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
+    const result = ctx.body.QueueResult ?? "";
+    await endStaffLegs(ctx.callSid).catch(() => undefined);
+    if (result === "bridged" || result === "hangup") {
+      vr.hangup();
+      return vr;
+    }
+    await updateSession(ctx.callSid, { data: { missed: "no_answer" } }, ctx.session);
+    return back(vr, "voicemail", { x: k });
+  },
+
+  /** A staff phone answered a held call: the announcement (press 1 to take it), or straight through without it. */
+  async "staff-leg"(ctx, vr) {
+    const settings = await getSettings();
+    const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
+    const c = ctx.query.get("c") ?? "";
+    if (!ringListFor(settings, k).accept) return bridgeStaff(vr, c, ctx.body.CallSid ?? "");
+    const text = staffAnnouncement(k, extensionName(settings, k), settings[`ringAnnounce${k}`], {
+      withNumber: promptText(ctx.prompts, "staff_whisper"),
+      noNumber: promptText(ctx.prompts, "staff_whisper_no_number"),
+    });
+    for (const t of [T(vr, "timerStaffAccept"), T(vr, "timerStaffAcceptAgain")]) {
+      const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: t, action: url("staff-leg-accept", { c, k }), method: "POST" });
+      say(g, text);
+    }
+    vr.hangup(); // no answer from the staff member (or their voicemail): this leg ends; the status call moves on
+    return vr;
+  },
+
+  /** Press 1: this staff member takes the call (the others stop ringing); 2 or anything else passes it on. */
+  async "staff-leg-accept"(ctx, vr) {
+    const c = ctx.query.get("c") ?? "";
+    if (ctx.body.Digits === "1") return bridgeStaff(vr, c, ctx.body.CallSid ?? "");
+    vr.hangup();
+    return vr;
+  },
+
+  /** A staff leg ended (Twilio status): when every leg of this round ended with nobody taking the call, the next round. */
+  async "staff-leg-status"(ctx, vr) {
+    const c = ctx.query.get("c") ?? "";
+    const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
+    const i = Number(ctx.query.get("i") ?? 0);
+    await staffLegEnded(c, k, i, ctx.body.CallSid ?? "");
+    return vr;
   },
 
   /**
@@ -5864,7 +6025,7 @@ function callerPhoneOf(ctx: { session?: { fromNumber?: string | null } | null; f
   return toE164(ctx.session?.fromNumber ?? ctx.from ?? "") || null;
 }
 
-const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music", "pay-leg", "pay-leg-status"]); // music: wait music pieces, not a step of the caller's journey
+const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music", "pay-leg", "pay-leg-status", "staff-leg", "staff-leg-accept", "staff-leg-status"]); // music: wait music pieces, not a step of the caller's journey
 
 /** What a key set in Admin does (Nov 26, 2026). */
 async function ownKey(ctx: Ctx, vr: VR, screen: string, k: KeyDef) {

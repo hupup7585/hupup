@@ -48,6 +48,8 @@ export const SETTING_DEFAULTS = {
   catalogTextPicture1: "",
   // Music (Abraham, Nov 17, 2026): the songs (ids, in order) for each place; empty = no music there
   musicStaffWait: "",
+  /** Abraham, Nov 27, 2026, 1:20 AM: hold music while staff are rung (staff phones then show the hotline number) */
+  staffHoldMusicOn: false,
   // Email signature (Abraham, Nov 17, 2026): empty = the approved default (src/lib/email-brand.ts)
   emailSignature: "",
   // Catalog email (Abraham, Nov 17, 2026): the catalog's name (added to the subject) and attach the PDF automatically

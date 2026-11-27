@@ -368,7 +368,7 @@ const OTHER: Record<string, Explanation> = {
   musicStaffWait: {
     what: "The songs, in order, that callers hear while staff phones ring.",
     where: "Callers waiting to be connected to staff.",
-    ifChanged: "Edited on the Music page. The next waiting caller hears the new songs; blank means no music there.",
+    ifChanged: "Edited on the Music page. The next waiting caller hears the new songs; blank means the song \"2 Phone Holding Music\" when it is uploaded (with the hold music switch on).",
   },
   musicPayConnect: {
     what: "The songs callers hear while the card payment line is being connected.",
@@ -593,6 +593,11 @@ const OTHER: Record<string, Explanation> = {
     what: "The recordings that need a new recording because a value spoken inside them changed. Filled in automatically; it clears when a new recording is put on the line or the value is changed back.",
     where: "The red banner on the Recording text list and the Admin home page.",
     ifChanged: "Nothing to change by hand.",
+  },
+  staffHoldMusicOn: {
+    what: "On: a caller being put through to a staff member (customer service, operator, problems, delivery, schools and the other lines) hears the \"Waiting for staff to answer\" songs from the Music page (default: 2 Phone Holding Music) until someone presses 1, instead of ringing. Note: with it on, staff phones show the hotline number instead of the customer's own number (the announcement still says the caller's number). Off: the ringing as before, and staff see the customer's number.",
+    where: "Every transfer to a person on the phone.",
+    ifChanged: "Callers hear music or ringing while staff are called; no answer still goes to the line's voicemail.",
   },
   addressTriesBeforeMenu: {
     what: "How many times a caller's address can fail (street not found, or the map cannot find the house) before the phone takes them back to the menu where they choose how to find the address (by their phone number or by entering it). The count starts over when they choose again; there is no limit on rounds, and they are never sent to customer service for this.",
