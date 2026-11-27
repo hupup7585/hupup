@@ -5226,7 +5226,16 @@ const handlers: Record<string, Handler> = {
     };
     const max = phonePayLimits(await getSettings()).triesPerCall;
     if (n >= max) {
-      if (!asked) await tellOwner(`Hup Up Attractions: phone card payment failed ${max} times, order #${num}`, `The caller tried to pay order #${num} ($${(due / 100).toFixed(2)}) by card ${max} times on the phone and it did not go through. The call ended and the caller was asked to call back. The order is still Payment pending.`);
+      // Extra check (09:00 P13): when the last try could not be confirmed (unclear, or Sola could not be checked), a charge
+      // may have gone through: the Owner email says so plainly instead of "it did not go through" (Owner email only)
+      const maybeCharged = ctx.query.get("u") === "1";
+      if (!asked)
+        await tellOwner(
+          `Hup Up Attractions: phone card payment ${maybeCharged ? "could not be confirmed" : "failed"} ${max} times, order #${num}`,
+          maybeCharged
+            ? `The caller tried to pay order #${num} ($${(due / 100).toFixed(2)}) by card ${max} times on the phone. The last try could not be confirmed in Sola, so a charge may have gone through: please check Sola for this amount before anything else. The call ended and the caller was asked to call back. The order is still Payment pending.`
+            : `The caller tried to pay order #${num} ($${(due / 100).toFixed(2)}) by card ${max} times on the phone and it did not go through. The call ended and the caller was asked to call back. The order is still Payment pending.`,
+        );
       sp(vr, ctx, "phonepay_failed", undefined, { draftOk: true });
       vr.hangup();
       return vr;

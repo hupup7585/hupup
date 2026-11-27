@@ -147,6 +147,14 @@ describe("card payment on the phone line", () => {
     expect(x).not.toMatch(/payment link/i);
   });
 
+  it("09:00 P13: when the last try could not be confirmed, the caller hears the same line but the Owner email says a charge may have gone through", async () => {
+    h.emails = [];
+    const x = await call("phonepay-retry", {}, `o=${orderId}&n=3&u=1`);
+    expect(said(x)).toEqual(["We are sorry, we were not able to process your card at this time. Please call us back later to complete your order, or you can contact customer service at extension 3 from the main menu. Thank you for calling Hup Up Attractions. Goodbye."]);
+    expect(h.emails.some((e) => e.includes("could not be confirmed 3 times"))).toBe(true);
+    expect(h.emails.some((e) => e.includes("failed 3 times"))).toBe(false);
+  });
+
   it("the order total found in Sola: paid, and the thank-you plays", async () => {
     h.sola = [{ xRefNum: "GOOD1", xAmount: "800.00", xEnteredDate: nowEastern() }];
     await call("phonepay-go", {}, `o=${orderId}`);
