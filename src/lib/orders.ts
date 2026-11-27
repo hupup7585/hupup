@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { addDays } from "@/lib/dates";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
@@ -451,14 +451,17 @@ export async function markPaid(orderId: number, cents: number, method: string, r
   const paid = o.paidCents + cents;
   // Late payment (Abraham, Nov 13, 2026): the hold had already ended. Still free: confirm. Taken: never confirm.
   const { handleLatePayment, holdEnded, itemsStillFree } = await import("@/lib/late-payment");
-  const late = holdEnded(o);
+  // Code audit M1 (Nov 24, 2026): an order staff cancelled on purpose (Cancel order in Admin) is never brought back by
+  // a payment; it goes to Needs attention and the Owner is emailed to refund or re-book. Only an ended hold revives.
+  const staffCancelled = o.status === "CANCELLED" && (await cancelledByStaff(orderId));
+  const late = !staffCancelled && holdEnded(o);
   const stillFree = late ? await itemsStillFree(orderId) : true;
   // Audit C1 (Nov 24, 2026): confirmed only when paid in full; less than the total needs staff attention
   const owed = o.totalCents ?? o.subtotalCents;
   const short = paid < owed;
   const waiting = o.status === "PENDING_PAYMENT" || o.status === "HOLD" || o.status === "CANCELLED";
-  const status: OrderStatus = late && !stillFree ? "NEEDS_ATTENTION" : waiting ? (short ? "NEEDS_ATTENTION" : "CONFIRMED") : o.status;
-  const shortNote = waiting && short ? `Paid $${(paid / 100).toFixed(2)} of $${(owed / 100).toFixed(2)}. ` : "";
+  const status: OrderStatus = staffCancelled ? "NEEDS_ATTENTION" : late && !stillFree ? "NEEDS_ATTENTION" : waiting ? (short ? "NEEDS_ATTENTION" : "CONFIRMED") : o.status;
+  const shortNote = staffCancelled ? "Payment received on an order staff had cancelled: refund or re-book. " : waiting && short ? `Paid $${(paid / 100).toFixed(2)} of $${(owed / 100).toFixed(2)}. ` : "";
   const [updated] = await db
     .update(orders)
     .set({
@@ -483,8 +486,9 @@ export async function markPaid(orderId: number, cents: number, method: string, r
     const why = shortNote ? `${paidText}: ${shortNote.trim()}` : paidText;
     await (await import("@/lib/status-history")).explainStatus(orderId, status, late ? (stillFree ? `${why} after the hold ended; the items were still free` : `${why} after the hold ended; the items were taken by another booking`) : why);
   }
+  if (staffCancelled) await cancelledPaidAlert(orderId, cents, method, ref ?? null).catch((e) => console.error("[cancelled paid alert]", e));
   // Less than the total (Audit C1): the Owner is emailed; the payment record is kept
-  if (shortNote) await underpaidAlert(orderId, paid, owed, method, ref ?? null).catch((e) => console.error("[underpaid alert]", e));
+  else if (shortNote) await underpaidAlert(orderId, paid, owed, method, ref ?? null).catch((e) => console.error("[underpaid alert]", e));
   if (updated?.status === "CONFIRMED") await (await import("@/lib/units")).assignUnits(orderId);
   // Bookkeeping (Abraham T): every paid booking is recorded as income automatically (rental, delivery, tax, tip).
   const { recordBookingPayment } = await import("@/lib/books");
@@ -542,6 +546,37 @@ export async function keepCartHeld(orderIds: number[], opts: { keyPressed?: bool
 }
 
 /** Owner email: a payment for less than the order's total (Audit C1, Nov 24, 2026). */
+/** Was this order cancelled by staff in Admin (Cancel order), not by an ended hold or an emptied cart? (Audit M1) */
+export async function cancelledByStaff(orderId: number): Promise<boolean> {
+  const [h] = await db
+    .select({ reason: schema.orderStatusHistory.reason, userId: schema.orderStatusHistory.userId })
+    .from(schema.orderStatusHistory)
+    .where(and(eq(schema.orderStatusHistory.orderId, orderId), eq(schema.orderStatusHistory.toStatus, "CANCELLED")))
+    .orderBy(desc(schema.orderStatusHistory.id))
+    .limit(1);
+  const [a] = await db
+    .select({ after: schema.auditLog.after })
+    .from(schema.auditLog)
+    .where(and(eq(schema.auditLog.action, "order.status"), eq(schema.auditLog.entityId, String(orderId))))
+    .orderBy(desc(schema.auditLog.id))
+    .limit(1);
+  if ((a?.after as { status?: string } | null)?.status === "CANCELLED") return true;
+  return Boolean(h && h.userId !== null && !/^(Hold ended|Cart emptied|Removed from the cart|Expired)/.test(h.reason ?? ""));
+}
+
+async function cancelledPaidAlert(orderId: number, cents: number, method: string, ref: string | null) {
+  const { config, BUSINESS_NAME } = await import("@/lib/config");
+  const to = config.adminEmail();
+  if (!to) return;
+  const { sendEmail } = await import("@/lib/notify");
+  const n = orderNumber(orderId);
+  await sendEmail(
+    to,
+    `${BUSINESS_NAME}: payment received on cancelled order #${n}`,
+    [`Order #${n} was cancelled by staff, and then a payment of $${(cents / 100).toFixed(2)} arrived.`, `Method: ${method}${ref ? `, reference ${ref}` : ""}.`, "", "The order was NOT brought back. It is marked Needs attention: refund the payment, or re-book the customer.", `${config.baseUrl()}${orderPath(orderId)}`].join("\n"),
+  );
+}
+
 async function underpaidAlert(orderId: number, paidCents: number, owedCents: number, method: string, ref: string | null) {
   const { config, BUSINESS_NAME } = await import("@/lib/config");
   const to = config.adminEmail();

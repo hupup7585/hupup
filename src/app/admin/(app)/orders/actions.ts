@@ -55,11 +55,17 @@ export async function updateStatusAction(orderId: number, status: OrderStatus, r
   return { ok: true, message: "Status updated" };
 }
 
+/** Code audit M6: the ways staff can record a payment by hand (the list on the order page) */
+const RECORD_METHODS = ["cash", "check", "sola", "other"] as const;
+
 export async function recordPaymentAction(orderId: number, amount: string, method: string): Promise<ActionResult> {
-  await requireAdmin();
+  const staff = await requireAdmin();
   const cents = parseMoneyToCents(amount);
   if (!cents) return { ok: false, message: "Enter an amount" };
+  if (!RECORD_METHODS.includes(method as (typeof RECORD_METHODS)[number])) return { ok: false, message: "Choose how it was paid: cash, check, card (Sola) or other." };
   const r = await markPaid(orderId, cents, method);
+  // Code audit M6: every payment recorded by hand is in the audit log (who, how much, how); confirmed only when paid in full
+  if (r) await db.insert(schema.auditLog).values({ userId: staff.userId, action: "order.payment_recorded", entityType: "order", entityId: String(orderId), after: { cents, method, status: r.status } });
   revalidatePath("/admin", "layout");
   return r ? { ok: true, message: "Payment recorded" } : { ok: false, message: "Order not found" };
 }
