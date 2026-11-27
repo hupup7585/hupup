@@ -1,14 +1,16 @@
+import { seoMetadata } from "@/lib/site-seo";
 import LegalPage from "@/components/site/LegalPage";
 import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 import { PROVIDER_DISCLOSURE, RECORD_RETENTION_MONTHS } from "@/lib/sms-consent-copy";
 import { publicEmail } from "@/lib/config";
 import { PRIVACY_V2, smsTermsV2Active } from "@/lib/sms-terms-v2";
 
-export const metadata = {
-  title: "Privacy Policy | Hup Up Attractions",
-  description: "How Hup Up Attractions collects, uses and protects your information when you book a party rental by phone or sign up for our texts.",
-  alternates: { canonical: "/privacy" },
-};
+/** Title and description from Admin (website Phase W3, search listing), starting as today's; the rest as before. */
+export async function generateMetadata() {
+  return seoMetadata("privacy", {
+    alternates: { canonical: "/privacy" },
+  });
+}
 export const revalidate = 3600;
 
 export default function Privacy() {

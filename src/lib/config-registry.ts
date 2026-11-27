@@ -4,6 +4,7 @@ import { CONFIG_EXPLANATIONS, type Explanation } from "@/lib/config-explanations
 import { PHONE_TIMERS } from "@/lib/ivr/timers";
 import { rules, type Rule } from "@/lib/setting-rules";
 import { SITE_WORD_KEYS, checkSiteWords, type SiteWordKey } from "@/lib/site-words";
+import { SEO_KEYS, SEO_PAGES, checkSeo, seoPageOf } from "@/lib/site-seo";
 
 /**
  * Admin handoff Phase 2 (Abraham, Nov 26, 2026), tightened after Hark's Phase 1-2 review (H1, H4, H5, H6, M1, M2, M7,
@@ -146,6 +147,12 @@ const SITE_WORD_LABELS: Record<SiteWordKey, string> = {
 };
 for (const k of SITE_WORD_KEYS)
   EXACT[k] = { mode: "edit", label: SITE_WORD_LABELS[k], group: "Website: home page", type: k === "siteWhyList" ? "list" : "text", wording: true, rule: (v) => checkSiteWords(k, v) };
+
+/** Search listing (website Phase W3): each public page's title and description, customer words. */
+for (const k of SEO_KEYS) {
+  const p = SEO_PAGES[seoPageOf(k)!];
+  EXACT[k] = { mode: "edit", label: `${p.name}: ${k.endsWith("Title") ? "title in Google and the browser tab" : "description in Google"}`, group: "Website: search listing", type: "text", wording: true, rule: (v) => checkSeo(k, v) };
+}
 
 const FAMILIES: [RegExp, Spec][] = [
   [/^timer[A-Z]/, { mode: "edit", group: "Phone: timing", type: "int" }], // limits filled in from timers.ts below

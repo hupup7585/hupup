@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME } from "@/lib/config";
 import { TIMER_DEFAULTS } from "@/lib/ivr/timers";
 import { SITE_WORD_DEFAULTS } from "@/lib/site-words";
+import { SEO_DEFAULTS } from "@/lib/site-seo";
 
 /** Admin-editable settings with defaults. Stored in app_settings (key -> jsonb). */
 export const SETTING_DEFAULTS = {
@@ -332,6 +333,8 @@ export const SETTING_DEFAULTS = {
   ...TIMER_DEFAULTS,
   /** Website words (Admin handoff website Phase W2, Nov 27, 2026): the home page's words, starting as Abraham's approved text. */
   ...SITE_WORD_DEFAULTS,
+  /** Search listing (website Phase W3, Nov 27, 2026): each public page's title and description, starting as today's. */
+  ...(SEO_DEFAULTS as Record<"seoHomeTitle" | "seoHomeDescription" | "seoPrivacyTitle" | "seoPrivacyDescription" | "seoTermsTitle" | "seoTermsDescription" | "seoSmsTermsTitle" | "seoSmsTermsDescription" | "seoTextAlertsTitle" | "seoTextAlertsDescription", string>),
   disconnectSilenceMinutes: "3",
   disconnectCheckSeconds: "3",
 } as const;

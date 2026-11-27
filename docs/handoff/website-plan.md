@@ -13,8 +13,8 @@ today's words and settings; every Admin item has a plain-English explanation; cu
 |---|---|---|
 | W1 | Baseline: what every public page shows today (rendered pages in `website-baseline.json` by `scripts/website-baseline.mjs`; every website text and page title/description in `tests/baseline/website-baseline.test.ts`). Every page has one H1. | Done |
 | W2 | Website words in Admin: 15 home page texts (slogan, line under it, Why Choose list, the three steps, delivery lines, yellow call band, hours box) in All settings, group "Website: home page", as customer words: draft, publish only with "I approve these exact words", history, undo. Defaults = today's words; the rendered pages match the W1 baseline. The catalog line (it holds the email link) stays in code for now. | Done |
-| W3 | Search listing in Admin: each public page's title and description (the words Google shows), with checks (length, unique, business name kept). | Next |
-| W4 | Website switches and numbers in Admin: catalog card on/off, catalog sends per address per day (10), with explanations. | Planned |
+| W3 | Search listing in Admin: the title and description of 5 public pages (home, privacy, terms, text message terms, text updates) in All settings, group "Website: search listing", as customer words; checks: business name in every title, each title unique, 10-75 / 50-300 characters, plain one-line words. Starting values are today's; the rendered pages match the W1 baseline. | Done |
+| W4 | Website switches and numbers in Admin: catalog card on/off, catalog sends per address per day (10), with explanations. | Next |
 | W5 | Website preview in Admin: the home page with the drafts, side by side with live (nothing saved, nothing public). | Planned |
 
 Not planned without Abraham's OK: the legal pages (Terms, Privacy, SMS Terms) stay in code because their words are

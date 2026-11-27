@@ -774,6 +774,56 @@ const OTHER: Record<string, Explanation> = {
     where: "Website visitors, in Our Hours.",
     ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
   },
+  seoHomeTitle: {
+    what: "The title of the Home page (/): the blue line Google shows for it in search results, and the name on the browser tab. It must keep \"Hup Up Attractions\" and differ from every other page's title (10 to 75 characters).",
+    where: "People searching on Google and other search engines, and visitors' browser tabs and bookmarks.",
+    ifChanged: "The page shows the new title within about an hour; Google updates its results when it next visits the page (days or weeks). Customer words: publishing needs the Owner's \"I approve these exact words\". The starting title is today's; Undo puts back the version before.",
+  },
+  seoHomeDescription: {
+    what: "The short description of the Home page (/) that Google may show under the title in search results (50 to 300 characters). Natural words that say what the page offers; no keyword stuffing.",
+    where: "People searching on Google and other search engines (not shown on the page itself).",
+    ifChanged: "The page carries the new description within about an hour; Google updates its results when it next visits the page. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting description is today's; Undo puts back the version before.",
+  },
+  seoPrivacyTitle: {
+    what: "The title of the Privacy Policy page (/privacy): the blue line Google shows for it in search results, and the name on the browser tab. It must keep \"Hup Up Attractions\" and differ from every other page's title (10 to 75 characters).",
+    where: "People searching on Google and other search engines, and visitors' browser tabs and bookmarks.",
+    ifChanged: "The page shows the new title within about an hour; Google updates its results when it next visits the page (days or weeks). Customer words: publishing needs the Owner's \"I approve these exact words\". The starting title is today's; Undo puts back the version before.",
+  },
+  seoPrivacyDescription: {
+    what: "The short description of the Privacy Policy page (/privacy) that Google may show under the title in search results (50 to 300 characters). Natural words that say what the page offers; no keyword stuffing.",
+    where: "People searching on Google and other search engines (not shown on the page itself).",
+    ifChanged: "The page carries the new description within about an hour; Google updates its results when it next visits the page. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting description is today's; Undo puts back the version before.",
+  },
+  seoTermsTitle: {
+    what: "The title of the Terms and Conditions page (/terms): the blue line Google shows for it in search results, and the name on the browser tab. It must keep \"Hup Up Attractions\" and differ from every other page's title (10 to 75 characters).",
+    where: "People searching on Google and other search engines, and visitors' browser tabs and bookmarks.",
+    ifChanged: "The page shows the new title within about an hour; Google updates its results when it next visits the page (days or weeks). Customer words: publishing needs the Owner's \"I approve these exact words\". The starting title is today's; Undo puts back the version before.",
+  },
+  seoTermsDescription: {
+    what: "The short description of the Terms and Conditions page (/terms) that Google may show under the title in search results (50 to 300 characters). Natural words that say what the page offers; no keyword stuffing.",
+    where: "People searching on Google and other search engines (not shown on the page itself).",
+    ifChanged: "The page carries the new description within about an hour; Google updates its results when it next visits the page. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting description is today's; Undo puts back the version before.",
+  },
+  seoSmsTermsTitle: {
+    what: "The title of the text message terms page (/sms-terms): the blue line Google shows for it in search results, and the name on the browser tab. It must keep \"Hup Up Attractions\" and differ from every other page's title (10 to 75 characters).",
+    where: "People searching on Google and other search engines, and visitors' browser tabs and bookmarks.",
+    ifChanged: "The page shows the new title within about an hour; Google updates its results when it next visits the page (days or weeks). Customer words: publishing needs the Owner's \"I approve these exact words\". The starting title is today's; Undo puts back the version before.",
+  },
+  seoSmsTermsDescription: {
+    what: "The short description of the text message terms page (/sms-terms) that Google may show under the title in search results (50 to 300 characters). Natural words that say what the page offers; no keyword stuffing.",
+    where: "People searching on Google and other search engines (not shown on the page itself).",
+    ifChanged: "The page carries the new description within about an hour; Google updates its results when it next visits the page. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting description is today's; Undo puts back the version before.",
+  },
+  seoTextAlertsTitle: {
+    what: "The title of the Text updates sign-up page (/text-alerts): the blue line Google shows for it in search results, and the name on the browser tab. It must keep \"Hup Up Attractions\" and differ from every other page's title (10 to 75 characters).",
+    where: "People searching on Google and other search engines, and visitors' browser tabs and bookmarks.",
+    ifChanged: "The page shows the new title within about an hour; Google updates its results when it next visits the page (days or weeks). Customer words: publishing needs the Owner's \"I approve these exact words\". The starting title is today's; Undo puts back the version before.",
+  },
+  seoTextAlertsDescription: {
+    what: "The short description of the Text updates sign-up page (/text-alerts) that Google may show under the title in search results (50 to 300 characters). Natural words that say what the page offers; no keyword stuffing.",
+    where: "People searching on Google and other search engines (not shown on the page itself).",
+    ifChanged: "The page carries the new description within about an hour; Google updates its results when it next visits the page. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting description is today's; Undo puts back the version before.",
+  },
   hoursWebsiteNote: {
     what: "The note shown under the hours on the website.",
     where: "Website visitors, in the hours section.",

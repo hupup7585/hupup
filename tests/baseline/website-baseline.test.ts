@@ -1,4 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// no database in this test: the settings fall back to their starting values (with no Admin change, as on the live site)
+vi.mock("@/lib/db", async () => {
+  const { createMemoryDb } = await import("../helpers/memory-db");
+  const m = await createMemoryDb();
+  return { db: m.db, schema: m.schema };
+});
 
 /*
  * Website Phase W1 baseline (Admin handoff, website part, Nov 27, 2026): every customer-facing text the website code
@@ -34,7 +41,7 @@ describe("website baseline (W1)", () => {
     expect({ link, label: pick(label), error: pick(await import("@/lib/error-page-copy")), unsubscribe: (await import("@/lib/unsubscribe")).UNSUBSCRIBE_TEXT }).toMatchSnapshot();
   });
   it("every public page's title, description and canonical address", async () => {
-    const pages: Record<string, () => Promise<{ metadata?: unknown }>> = {
+    const pages: Record<string, () => Promise<{ metadata?: unknown; generateMetadata?: () => Promise<unknown> }>> = {
       "/": () => import("@/app/page"),
       "/privacy": () => import("@/app/privacy/page"),
       "/terms": () => import("@/app/terms/page"),
@@ -46,7 +53,9 @@ describe("website baseline (W1)", () => {
     };
     const out: Record<string, unknown> = {};
     for (const [p, load] of Object.entries(pages)) {
-      const m = (await load()).metadata as Record<string, unknown> | undefined;
+      const mod = await load();
+      // W3: pages with an Admin search listing build it in generateMetadata (no Admin change: the same words)
+      const m = (mod.generateMetadata ? await mod.generateMetadata() : mod.metadata) as Record<string, unknown> | undefined;
       out[p] = m ? { title: m.title, description: m.description, canonical: (m.alternates as { canonical?: string } | undefined)?.canonical, openGraph: m.openGraph } : null;
     }
     expect(out).toMatchSnapshot();

@@ -1,3 +1,4 @@
+import { seoMetadata } from "@/lib/site-seo";
 import { getSiteContent } from "@/lib/site-content";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -6,11 +7,12 @@ import { smsNumberDisplay } from "@/lib/sms-number";
 import SignUpForm from "./SignUpForm";
 import { signUpsDisabledReason } from "./actions";
 
-export const metadata = {
-  title: "Get Text Updates and Party Rental Deals | Hup Up Attractions",
-  description: "Join the Hup Up Attractions text list for new rental items, seasonal promos and order updates for your party in Kiryas Joel and Orange County, NY. Message frequency varies. Reply STOP to opt out.",
-  alternates: { canonical: "/text-alerts" },
-};
+/** Title and description from Admin (website Phase W3, search listing), starting as today's; the rest as before. */
+export async function generateMetadata() {
+  return seoMetadata("textAlerts", {
+    alternates: { canonical: "/text-alerts" },
+  });
+}
 export const dynamic = "force-dynamic";
 
 /** SMS enrollment only: nothing to order or pay for here (the site stays information only). */

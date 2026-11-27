@@ -90,7 +90,7 @@ describe("service area", () => {
     expect(saComp.indexOf("serviceArea.mainLabel")).toBeLessThan(saComp.indexOf("serviceArea.alsoTitle"));
     expect(page).toContain("areaServed");
     expect(page).not.toMatch(/Kiryas Joel and Town of Palm Tree/);
-    expect(page).toContain("Kiryas Joel (Town of Palm Tree)");
+    expect(page + readFileSync("src/lib/site-seo.ts", "utf8")).toContain("Kiryas Joel (Town of Palm Tree)"); // meta description (website W3: in site-seo.ts)
     expect(page).not.toMatch(/Call to check your area/);
   });
 });
@@ -135,7 +135,7 @@ describe("delivery fee wording", () => {
     expect(page).toMatch(/data-hero-delivery[^>]*>[\s\S]*?\{w\.heroDelivery\}/); // website W2: from Admin, starting "Delivery option available"
     expect(page).not.toContain("fee applies");
     expect(page).not.toMatch(/rounded-full bg-white px-1\.5/);
-    expect(page).toContain("Delivery available for an additional fee"); // meta description
+    expect(readFileSync("src/lib/site-seo.ts", "utf8")).toContain("Delivery available for an additional fee"); // meta description (website W3)
     expect(page).toContain("{noLonelyWord(w.howItWorksDelivery)}"); // How It Works (Abraham's approved sentence)
   });
 });
@@ -165,6 +165,7 @@ describe("Jumping Balloons and no slashes", () => {
     const stripHints = (t: string) =>
       t
         .replace(/export const metadata[\s\S]*?\n};\n/g, "")
+        .replace(/export async function generateMetadata[\s\S]*?\n}\n/g, "") // website W3: the same hints, built from Admin
         .replace(/const jsonLd = \{[\s\S]*?\n  \};\n/g, "");
     const all = visible
       .map((f) => stripHints(readFileSync(f, "utf8")))
@@ -173,7 +174,7 @@ describe("Jumping Balloons and no slashes", () => {
     expect(all).not.toMatch(/Bounce Houses/);
     expect(all.match(/bounce house/gi) ?? []).toEqual([]); // never in visible copy
     const page = readFileSync("src/app/page.tsx", "utf8");
-    expect(page).toContain("Jumping Balloons (bounce houses)");
+    expect(readFileSync("src/lib/site-seo.ts", "utf8")).toContain("Jumping Balloons (bounce houses)"); // meta description (website W3)
     expect(page).toContain("Jumping Balloon (bounce house)");
   });
   it("starter category data uses the new name and description", async () => {
@@ -439,8 +440,12 @@ describe("SEO rule (Abraham)", () => {
   });
   it("every public page has its own title and description; the rule is saved in CLAUDE.md", () => {
     const titles = new Set<string>();
-    for (const f of ["src/app/page.tsx", "src/app/text-alerts/page.tsx", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/app/sms-terms/page.tsx", "src/app/paid/page.tsx"]) {
-      const t = readFileSync(f, "utf8");
+    // website W3: the five pages with an Admin search listing keep their starting title and description in site-seo.ts
+    const seo = readFileSync("src/lib/site-seo.ts", "utf8");
+    const pageBlock = (key: string) => seo.slice(seo.indexOf(`  ${key}: {`), seo.indexOf("  },", seo.indexOf(`  ${key}: {`)));
+    for (const [key, f] of [["home", "src/app/page.tsx"], ["textAlerts", "src/app/text-alerts/page.tsx"], ["privacy", "src/app/privacy/page.tsx"], ["terms", "src/app/terms/page.tsx"], ["smsTerms", "src/app/sms-terms/page.tsx"]]) expect(readFileSync(f, "utf8"), f).toContain(`seoMetadata("${key}"`);
+    for (const f of ["home", "textAlerts", "privacy", "terms", "smsTerms", "src/app/paid/page.tsx"]) {
+      const t = f.startsWith("src/") ? readFileSync(f, "utf8") : pageBlock(f);
       const title = t.match(/title: "([^"]+)"/)?.[1];
       expect(title, f).toBeTruthy();
       expect(t, f).toMatch(/description:/);

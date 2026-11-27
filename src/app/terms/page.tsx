@@ -1,14 +1,16 @@
+import { seoMetadata } from "@/lib/site-seo";
 import { notFound } from "next/navigation";
 import LegalPage from "@/components/site/LegalPage";
 import { termsActive } from "@/lib/rental-terms";
 import { BUSINESS_NAME_NB } from "@/lib/site-copy";
 import { publicEmail } from "@/lib/config";
 
-export const metadata = {
-  title: "Terms and Conditions | Hup Up Attractions",
-  description: "The rental terms for bounce houses, laser tag, inflatable mazes and paddle boats from Hup Up Attractions: booking, delivery, safety and payment.",
-  alternates: { canonical: "/terms" },
-};
+/** Title and description from Admin (website Phase W3, search listing), starting as today's; the rest as before. */
+export async function generateMetadata() {
+  return seoMetadata("terms", {
+    alternates: { canonical: "/terms" },
+  });
+}
 export const revalidate = 3600;
 
 export default function Terms() {

@@ -1,3 +1,4 @@
+import { seoMetadata } from "@/lib/site-seo";
 import type { Metadata } from "next";
 import { customerServiceHours, websiteHoursLines, websiteOpeningHoursSpec } from "@/lib/business-hours";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
@@ -23,18 +24,18 @@ import { CallButton, ICON_STROKE, IconTile, SectionTitle, Wave, categoryIcon } f
 
 export const revalidate = 60; // hours and catalog come from Admin; saves also refresh right away
 
-export const metadata: Metadata = {
-  title: "Bounce House & Party Rentals in Kiryas Joel, NY | Hup Up Attractions",
-  description:
-    "Planning a party in Kiryas Joel (Town of Palm Tree) or Monroe, NY? Hup Up Attractions rents Jumping Balloons (bounce houses), laser tag, inflatable mazes and paddle boats across Orange County, NY. Delivery available for an additional fee. Call (845) 777-7585 to book.",
-  alternates: { canonical: "/" },
-  openGraph: {
-    title: "Hup Up Attractions | Bounce House, Laser Tag & Paddle Boat Rentals",
-    description: "Friendly party rentals for birthdays, schools and celebrations in Kiryas Joel and Orange County, NY. Call (845) 777-7585 to book.",
-    type: "website",
-    siteName: "Hup Up Attractions",
-  },
-};
+/** Title and description from Admin (website Phase W3, search listing), starting as today's; the rest as before. */
+export async function generateMetadata(): Promise<Metadata> {
+  return seoMetadata("home", {
+    alternates: { canonical: "/" },
+    openGraph: {
+      title: "Hup Up Attractions | Bounce House, Laser Tag & Paddle Boat Rentals",
+      description: "Friendly party rentals for birthdays, schools and celebrations in Kiryas Joel and Orange County, NY. Call (845) 777-7585 to book.",
+      type: "website",
+      siteName: "Hup Up Attractions",
+    },
+  });
+}
 
 
 const WHY_ICONS = [PartyPopper, ListChecks, PhoneCall, Headset, Truck, ClipboardCheck];

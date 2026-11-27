@@ -1,3 +1,4 @@
+import { seoMetadata } from "@/lib/site-seo";
 import LegalPage from "@/components/site/LegalPage";
 import SmsTermsV3 from "./SmsTermsV3";
 import { BUSINESS_NAME_NB } from "@/lib/site-copy";
@@ -7,11 +8,12 @@ import { LIVE_PUBLIC_EMAIL, NEW_EMAIL_LIVE, NEW_PUBLIC_EMAIL, config, publicEmai
 import { PROMOS_PER_YEAR, PROMO_ENDING_V2, PROMO_PREFIX_V2 } from "@/lib/sms-consent-copy";
 import { MESSAGE_EXAMPLES, PRIVACY_V2, SERVICE_TEXT_TYPES, smsTermsV2Active } from "@/lib/sms-terms-v2";
 
-export const metadata = {
-  title: "SMS Terms | Hup Up Attractions",
-  description: "How Hup Up Attractions text messages work: order and service texts, promotional texts, message frequency, and how to reply STOP or HELP.",
-  alternates: { canonical: "/sms-terms" },
-};
+/** Title and description from Admin (website Phase W3, search listing), starting as today's; the rest as before. */
+export async function generateMetadata() {
+  return seoMetadata("smsTerms", {
+    alternates: { canonical: "/sms-terms" },
+  });
+}
 export const revalidate = 3600;
 
 /** SMS program terms (A2P 10DLC): SMS messages only. Business and rental terms are on /terms. */
