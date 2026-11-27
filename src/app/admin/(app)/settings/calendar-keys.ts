@@ -6,6 +6,8 @@ export const CALENDAR_KEYS = [
   "erevShabbosClose",
   "erevYomTovClose",
   "candleLightingMinutes",
+  "phoneCutoffMinutes",
+  "shabbesSaveMinutes",
   "reopenAfter",
   "closeCholHamoed",
   "closeChanukah",

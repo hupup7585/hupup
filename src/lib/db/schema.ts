@@ -295,6 +295,8 @@ export type CallData = {
   dirArea?: string;
   /** Welcome back (Nov 23, 2026): the carts this call ended with, still holding items when the caller hung up */
   cartLeft?: number[];
+  /** The Shabbes / Yom Tov cut-off saved this call's cart until this time (ISO; Abraham, Nov 26, 2026, 11:51 PM) */
+  shabbesSaved?: string;
   /** Box 25 (Nov 22, 2026): the item just added, for "Successfully added to your cart: {Qnt} {item} for {date}." */
   lastAdded?: { name: string; qty: number; date: string; date2?: string };
   /** Keypad typing one key at a time (preview, Nov 22, 2026): committed text, the key being cycled and its presses */

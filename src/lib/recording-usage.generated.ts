@@ -951,6 +951,9 @@ export const RECORDING_USAGE: Record<string, string[]> = {
  "second_paddle": [
   "lib/ivr/flow.ts"
  ],
+ "shabbes_cutoff_saved": [
+  "lib/ivr/flow.ts"
+ ],
  "skip_pound": [
   "lib/ivr/flow.ts"
  ],
@@ -1469,5 +1472,8 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "lib/ivr/flow.ts",
   "lib/ivr/menu-editor.ts",
   "lib/recording-library.ts"
+ ],
+ "yomtov_cutoff_saved": [
+  "lib/ivr/flow.ts"
  ]
 };

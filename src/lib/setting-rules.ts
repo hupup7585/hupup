@@ -45,6 +45,14 @@ export const calendarRules: Record<string, Rule> = {
     const n = int(t);
     return Number.isNaN(n) || n < REOPEN_MIN || n > REOPEN_MAX ? `Reopen after Shabbes and Yom Tov: enter "tzeis" (nightfall) or whole minutes after sunset from ${REOPEN_MIN} to ${REOPEN_MAX} (72 is Rabbeinu Tam).` : null;
   },
+  phoneCutoffMinutes: (v) => {
+    const n = int(v);
+    return Number.isNaN(n) || n < 0 || n > 120 ? "Phone booking cut-off: whole minutes before candle lighting, from 0 to 120." : null;
+  },
+  shabbesSaveMinutes: (v) => {
+    const n = int(v);
+    return Number.isNaN(n) || n < 0 || n > 600 ? "Saved cart: whole minutes after Shabbes or Yom Tov ends, from 0 to 600." : null;
+  },
   candleLightingMinutes: (v) => {
     const n = int(v);
     return Number.isNaN(n) || n < CANDLE_MIN || n > CANDLE_MAX ? `Candle lighting: whole minutes before sunset from ${CANDLE_MIN} to ${CANDLE_MAX}.` : null;

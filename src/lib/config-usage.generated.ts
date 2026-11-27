@@ -390,6 +390,16 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/settings/calendar-keys.ts",
   "lib/jewish-calendar.ts"
  ],
+ "phoneCutoffMinutes": [
+  "app/admin/(app)/settings/CalendarSettingsForm.tsx",
+  "app/admin/(app)/settings/calendar-keys.ts",
+  "lib/ivr/flow.ts"
+ ],
+ "shabbesSaveMinutes": [
+  "app/admin/(app)/settings/CalendarSettingsForm.tsx",
+  "app/admin/(app)/settings/calendar-keys.ts",
+  "lib/ivr/flow.ts"
+ ],
  "candleLightingMinutes": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",

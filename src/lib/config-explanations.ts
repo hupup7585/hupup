@@ -554,6 +554,16 @@ const OTHER: Record<string, Explanation> = {
     where: "Callers and customers on the day before Yom Tov.",
     ifChanged: "Changes the closing time on those days.",
   },
+  phoneCutoffMinutes: {
+    what: "How many minutes before candle lighting the phone stops taking bookings and payments, even for a caller who is in the middle of a booking.",
+    where: "Every Erev Shabbes and Erev Yom Tov, on the phone line.",
+    ifChanged: "The phone stops bookings and payments earlier or later before Shabbes and Yom Tov.",
+  },
+  shabbesSaveMinutes: {
+    what: "When the phone stops a booking before Shabbes or Yom Tov, the caller's items stay saved for them until this many minutes after the phone opens again (after Shabbes or Yom Tov ends).",
+    where: "Callers who were in the middle of a booking at the cut-off.",
+    ifChanged: "Their saved items go back to stock earlier or later after Shabbes or Yom Tov.",
+  },
   candleLightingMinutes: {
     what: "Minutes before sunset for candle lighting.",
     where: "Every Friday and Erev Yom Tov closing that uses candle lighting.",

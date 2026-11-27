@@ -34,7 +34,9 @@ describe("the lock is used everywhere booking or paying can happen", () => {
     // Key 1 on Shabbes or Yom Tov: no separate line any more (Abraham, Nov 16, 2026); booking stays locked and the
     // caller gets the whole-hotline closed greeting (or, while it waits for approval, "not a valid selection")
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
-    expect(flow).toContain('await track(ctx.callSid, "step", `Booking closed (${lock.reason})`, { key: "1" });\n      const closed = await hotlineClosed(ctx, vr);');
+    // Abraham, Nov 26, 2026, 11:51 PM: key 1 uses the phone's booking cut-off (15 minutes before candle lighting too)
+    expect(flow).toContain('const stop = await shabbesStop(ctx, vr, "key 1");');
+    expect(flow).toContain("const closed = await hotlineClosed(ctx, vr, 0, { locked: true, reason: cut.reason, opensAt: cut.opensAt });");
     const { PROMPTS } = await import("@/lib/ivr/prompts");
     expect(PROMPTS).not.toHaveProperty("booking_closed_shabbos");
     expect(PROMPTS).not.toHaveProperty("booking_closed_yomtov");

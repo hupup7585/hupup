@@ -145,6 +145,10 @@ export const SETTING_DEFAULTS = {
   /** Erev Yom Tov closes at: "chatzos" or "candles" (pending Abraham; default chatzos) */
   erevYomTovClose: "chatzos",
   /** Minutes before sunset for candle lighting (used only when a "candles" close is chosen) */
+  /** Abraham, Nov 26, 2026, 11:51 PM: the phone stops new bookings and payment this many minutes before candle lighting */
+  phoneCutoffMinutes: "15",
+  /** ...and a caller's cart at that moment is saved until this many minutes after Shabbes / Yom Tov ends */
+  shabbesSaveMinutes: "60",
   candleLightingMinutes: "15", // Abraham, Nov 14, 2026: Monroe lights 15 minutes before the first shkia
   /** Reopen after Shabbes / Yom Tov: minutes after sunset, or "tzeis" for nightfall at 8.5 degrees */
   reopenAfter: "72", // Abraham, Nov 14, 2026: reopen at Rabbeinu Tam, 72 minutes after sunset

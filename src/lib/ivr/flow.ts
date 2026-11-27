@@ -82,7 +82,7 @@ import { CATALOG_ENDINGS, spellOut, spokenEmail, spokenLetters, validDomain, val
 import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState } from "@/lib/voicemail";
 import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staffAnnouncement, type RingKey } from "./routing";
 import { calendarNow } from "@/lib/clock";
-import { bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
+import { bookingCutoff, bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
 import { matchBlock, parseBlockList } from "./caller-filter";
 import { MENU_COMBOS, PROMPTS, clipUrls, composeClips, composeMixed, fill, textPieces, type LinePiece, googleLiveOn, liveClips, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
@@ -732,8 +732,8 @@ function spLines(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: Pr
  * and time we open again, then the tone; the message goes to the general voicemail (key 9's box). Draft wording: on
  * preview now, on the live line once Abraham approves it. Returns null when the hotline is open (or the greeting waits).
  */
-async function hotlineClosed(ctx: Ctx, vr: VR, n = 0): Promise<VR | null> {
-  const lock = bookingLock(calendarNow(), await getSettings());
+async function hotlineClosed(ctx: Ctx, vr: VR, n = 0, over?: { locked: boolean; reason: "Shabbes" | "Yom Tov" | null; opensAt: Date | null }): Promise<VR | null> {
+  const lock = over ?? bookingLock(calendarNow(), await getSettings());
   const closedKey = lock.reason === "Yom Tov" ? "closed_yomtov_greeting" : "closed_shabbos_greeting";
   if (!lock.locked || (process.env.VERCEL_ENV === "production" && promptWaiting(ctx.prompts, closedKey))) return null;
   const opens = lock.opensAt ?? new Date();
@@ -749,21 +749,55 @@ async function hotlineClosed(ctx: Ctx, vr: VR, n = 0): Promise<VR | null> {
   return vmRecord(vr, await vmBox("9"), "closed");
 }
 
+/** The phone's booking cut-off now (Abraham, Nov 26, 2026, 11:51 PM): 15 minutes before candle lighting (Admin). */
+async function phoneCutoff() {
+  const st = await getSettings();
+  return { st, cut: bookingCutoff(calendarNow(), st as never, Number(st.phoneCutoffMinutes ?? 15)) };
+}
+
 /**
- * Shabbes or Yom Tov starts in the middle of a booking (Abraham's priority list, Nov 26, 2026): no order is finalized
- * and no payment is taken after candle lighting. Until Abraham decides the words for this case, the caller gets the
- * same closed greeting and general voicemail as a call that starts then (or, while that greeting waits for approval on
- * the live line, "not a valid selection" and the main menu, as key 1 does). The cart holds end with the call.
+ * Shabbes or Yom Tov is about to start in the middle of a booking (Abraham, Nov 26, 2026, 11:51 PM): from 15 minutes
+ * before candle lighting no booking is finished and nothing is paid. A caller with items in the cart: the items stay
+ * saved (held, not back to stock) until 1 hour after the phone opens again after Shabbes / Yom Tov (Admin, Jewish
+ * calendar), the "items saved" line with that day and time, "Thank you for calling Hup Up Attractions.", and the call
+ * ends; calling back from the same number, welcome back offers the saved cart. Nothing in the cart: the closed
+ * greeting and the general voicemail, as today (or, while that greeting waits on the live line, the main menu).
  */
 async function shabbesStop(ctx: Ctx, vr: VR, where: string): Promise<VR | null> {
-  const lock = bookingLock(calendarNow(), await getSettings());
-  if (!lock.locked) return null;
-  await track(ctx.callSid, "step", `Booking closed during the call (${lock.reason}): stopped at ${where}`).catch(() => undefined);
-  const closed = await hotlineClosed(ctx, vr);
+  const { st, cut } = await phoneCutoff();
+  if (!cut.cut) return null;
+  const ids = [...new Set([...(ctx.session?.data.dayOrderIds ?? []), ...(ctx.session?.orderId ? [ctx.session.orderId] : [])])];
+  const now = new Date();
+  const held = ids.length
+    ? (await db.select().from(orders).where(and(inArray(orders.id, ids), inArray(orders.status, ["HOLD", "PENDING_PAYMENT"])))).filter((o) => o.paidCents === 0 && (!o.holdExpiresAt || o.holdExpiresAt > now))
+    : [];
+  const withItems = held.length ? new Set((await db.selectDistinct({ id: orderItems.orderId }).from(orderItems).where(inArray(orderItems.orderId, held.map((o) => o.id)))).map((r) => r.id)) : new Set<number>();
+  const saved = held.filter((o) => withItems.has(o.id));
+  if (saved.length) {
+    const opens = cut.opensAt ?? now;
+    const until = new Date(opens.getTime() + Math.max(0, Number(st.shabbesSaveMinutes ?? 60) || 0) * 60_000);
+    await db.update(orders).set({ status: "HOLD", holdExpiresAt: until, updatedAt: now }).where(inArray(orders.id, saved.map((o) => o.id)));
+    await updateSession(ctx.callSid, { data: { shabbesSaved: until.toISOString() } }, ctx.session);
+    await track(ctx.callSid, "step", `${cut.reason ?? "Shabbes"} cut-off at ${where}: ${saved.length} rental day(s) saved until ${until.toLocaleString("en-US", { timeZone: "America/New_York" })}`).catch(() => undefined);
+    const vars = {
+      day: spokenDate(localISO(until)),
+      time: until.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }),
+    };
+    sp(vr, ctx, cut.reason === "Yom Tov" ? "yomtov_cutoff_saved" : "shabbes_cutoff_saved", vars);
+    sp(vr, ctx, "goodbye_thanks_calling");
+    vr.hangup();
+    return vr;
+  }
+  await track(ctx.callSid, "step", `Booking closed (${cut.reason ?? "Shabbes"} cut-off): stopped at ${where}`).catch(() => undefined);
+  const closed = await hotlineClosed(ctx, vr, 0, { locked: true, reason: cut.reason, opensAt: cut.opensAt });
   if (closed) return closed;
   sp(vr, ctx, "not_valid");
   return back(vr, "menu");
 }
+
+/** Steps the cut-off never interrupts: the call's start, voicemail, ringing staff, and a payment already going on. */
+const CUTOFF_FREE = new Set(["music", "incoming", "record-start", "call-recording", "closed-key", "goodbye", "ring", "hours", "operator", "operator-done", "whisper", "whisper-accept", "phonepay-done", "pay-done", "disconnect-key", "cart-hold-release", "receipt-email", "receipt-email-choice"]);
+const cutoffFree = (action: string) => CUTOFF_FREE.has(action) || /^(vm|vma|voicemail|pay-leg|pay-approved|pay-confirm-how|promo-)/.test(action);
 
 /** Item lists with 10 or more items: seconds to wait for a second key after the first (Abraham, Nov 17, 2026). */
 export const MULTI_KEY_WAIT_SECONDS = 2;
@@ -868,6 +902,20 @@ function resumeActive(ctx: Ctx, env: Record<string, string | undefined> = proces
   return env.VERCEL_ENV !== "production" || RESUME_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k));
 }
 
+/** The cart the Shabbes cut-off saved on this number's last call goes back to stock (welcome back takes it over). */
+async function releaseSavedCart(ctx: Ctx) {
+  const from = toE164(ctx.session?.fromNumber ?? ctx.from);
+  if (!from) return;
+  const [last] = await db
+    .select({ data: schema.callSessions.data })
+    .from(schema.callSessions)
+    .where(and(eq(schema.callSessions.fromNumber, from), sql`${schema.callSessions.callSid} <> ${ctx.callSid}`))
+    .orderBy(desc(schema.callSessions.startedAt))
+    .limit(1);
+  if (!last?.data?.shabbesSaved) return;
+  for (const id of last.data.cartLeft ?? []) await cancelHold(id);
+}
+
 /**
  * Welcome back (Abraham, Nov 23, 2026): only when this number's LAST call ended with at least one item still in the
  * cart (the caller hung up with it). Not when that call ended with an empty cart (nothing added, everything removed,
@@ -885,14 +933,16 @@ async function unfinishedCart(ctx: Ctx): Promise<{ productId: number; name: stri
   const left = (last?.data?.cartLeft ?? []).filter((n) => Number.isInteger(n));
   if (!last || !left.length) return [];
   // that call placed an order (paid or waiting for payment): no welcome back
-  const [placed] = await db.select({ id: orders.id }).from(orders).where(and(eq(orders.callSid, last.callSid), sql`${orders.status} <> 'CANCELLED'`)).limit(1);
+  // (a cart the Shabbes cut-off saved is still HOLD: it is not a placed order)
+  const [placed] = await db.select({ id: orders.id }).from(orders).where(and(eq(orders.callSid, last.callSid), sql`${orders.status} NOT IN ('CANCELLED', 'HOLD')`)).limit(1);
   if (placed) return [];
   const rows = await db
     .select({ productId: orderItems.productId, qty: orderItems.qty, date: orders.eventDate, pickup: orders.pickupDate, span: orders.spanDays, name: products.name, paid: orders.paidCents })
     .from(orderItems)
     .innerJoin(orders, eq(orders.id, orderItems.orderId))
     .innerJoin(products, eq(products.id, orderItems.productId))
-    .where(and(inArray(orders.id, left), eq(orders.status, "CANCELLED")));
+    // released carts, and carts the Shabbes cut-off saved that are still held (Abraham, Nov 26, 2026, 11:51 PM)
+    .where(and(inArray(orders.id, left), sql`(${orders.status} = 'CANCELLED' OR (${orders.status} = 'HOLD' AND ${orders.holdExpiresAt} > now()))`));
   const today = todayISO();
   return rows.filter((r) => !r.paid && r.date >= today).map(({ paid: _p, ...r }) => r).sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -2410,14 +2460,9 @@ const handlers: Record<string, Handler> = {
     // starts gets the closed greeting and the general voicemail; while that greeting waits for approval on the live
     // line, "not a valid selection" and the main menu.
     // Abraham, Nov 14, 2026: no booking on Shabbes or Yom Tov (candle lighting until Rabbeinu Tam), automatically
-    const lock = bookingLock(calendarNow(), await getSettings());
-    if (lock.locked) {
-      await track(ctx.callSid, "step", `Booking closed (${lock.reason})`, { key: "1" });
-      const closed = await hotlineClosed(ctx, vr);
-      if (closed) return closed;
-      sp(vr, ctx, "not_valid");
-      return back(vr, "menu");
-    }
+    // Abraham, Nov 26, 2026, 11:51 PM: from 15 minutes before candle lighting too (the phone's booking cut-off)
+    const stop = await shabbesStop(ctx, vr, "key 1");
+    if (stop) return stop;
     // Abraham, Nov 15, 2026: a caller back from the same number is offered last call's unfinished cart (once)
     if (resumeActive(ctx) && !ctx.session?.data.resumeAsked && !(await callOrders(ctx)).length && (await unfinishedCart(ctx)).length) return back(vr, "resume");
     const cats = await phoneCategories();
@@ -2458,14 +2503,19 @@ const handlers: Record<string, Handler> = {
   async "resume-choice"(ctx, vr) {
     const rd = ctx.body.Digits;
     if (rd === "*") return back(vr, "menu"); // star: one step back, the main menu
-    if (rd === "2") return back(vr, "book"); // 2: a new order
+    if (rd === "2") {
+      await releaseSavedCart(ctx); // a new order instead: the cart saved over Shabbes goes back to stock
+      return back(vr, "book"); // 2: a new order
+    }
     if (!rd) return idleNoKey(vr, ctx, "resume"); // no key: the no-choice line, then the same offer (Hark's bug 5)
     if (rd !== "1") {
       sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
       return back(vr, "resume");
     }
     const lines: ResumeLine[] = [];
-    for (const l of (await unfinishedCart(ctx)).filter((x) => x.date >= todayISO())) {
+    const old = (await unfinishedCart(ctx)).filter((x) => x.date >= todayISO());
+    await releaseSavedCart(ctx); // the saved hold makes way for this call's own hold, item by item, just below
+    for (const l of old) {
       // each item its own hold, outside the cart, until the caller adds it
       // Hark's bug 6: the line keeps its pickup day and its closed-day span (box 17: 1.5 days) from the last call
       const r = await reserveItem({ orderId: null, productId: l.productId, qty: l.qty, eventDate: l.date, channel: "PHONE", status: "HOLD", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid, pickupDate: l.pickup });
@@ -5827,6 +5877,16 @@ async function handleVoiceInner(raw: Omit<Ctx, "session" | "prompts"> & { editor
   if (!session && ctx.action !== "incoming") await ensureSession(ctx.callSid, ctx.from);
   // Caller journey (Abraham S): this menu or question, with the key pressed or the words said
   await trackStep(ctx.callSid, ctx.action, ctx.body, ctx.query);
+  // The booking cut-off before Shabbes and Yom Tov (Abraham, Nov 26, 2026, 11:51 PM): a caller in the middle of a
+  // booking is stopped at the next step (the cart saved), unless something on this call is already paid
+  if ((session?.data?.dayOrderIds?.length || session?.orderId) && !cutoffFree(ctx.action) && (await phoneCutoff()).cut.cut) {
+    const ids = [...new Set([...(session!.data?.dayOrderIds ?? []), ...(session!.orderId ? [session!.orderId] : [])])];
+    const paid = (await db.select({ p: orders.paidCents }).from(orders).where(inArray(orders.id, ids))).some((o) => o.p > 0);
+    if (!paid) {
+      const stop = await shabbesStop({ ...ctx, session }, vr, ctx.action);
+      if (stop) return vr.toString();
+    }
+  }
   // Audit C2: every step keeps every day of the cart held (only holds that are still active)
   if (session?.data?.dayOrderIds?.length || session?.orderId) {
     const { keepCartHeld } = await import("@/lib/orders");
@@ -5879,7 +5939,8 @@ export async function handleCallStatus(callSid: string, status: string) {
     ? (await db.selectDistinct({ id: orders.id }).from(orders).innerJoin(orderItems, eq(orderItems.orderId, orders.id)).where(and(inArray(orders.id, dayIds), eq(orders.status, "HOLD")))).map((r) => r.id)
     : [];
   await updateSession(callSid, { data: { cartLeft: left } }, s).catch(() => null);
-  for (const id of dayIds) await cancelHold(id);
+  // The Shabbes cut-off saved this cart (Abraham, Nov 26, 2026, 11:51 PM): it stays held until its saved time
+  if (!s.data?.shabbesSaved) for (const id of dayIds) await cancelHold(id);
   // Items from the last call that were held while the caller decided (not added to the cart)
   for (const l of s.data?.resumeLines ?? []) if (l.state === "free" && l.holdId) await cancelHold(l.holdId);
   // Where the caller hung up (the last menu or question they reached) and whether a booking was finished

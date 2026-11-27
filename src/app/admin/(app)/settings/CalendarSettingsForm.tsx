@@ -49,6 +49,16 @@ export default function CalendarSettingsForm({ initial }: { initial: Record<stri
           <input className="input" inputMode="numeric" value={v.candleLightingMinutes} onChange={(e) => set("candleLightingMinutes", e.target.value)} />
         </label>
         <label className="block">
+          <span className="label">Phone stops bookings (minutes before candle lighting)</span>
+          <input className="input" inputMode="numeric" value={v.phoneCutoffMinutes} onChange={(e) => set("phoneCutoffMinutes", e.target.value)} />
+          <span className="mt-1 block text-xs text-muted">From this time no one can finish a booking or pay on the phone, even in the middle of a call.</span>
+        </label>
+        <label className="block">
+          <span className="label">Saved cart after Shabbes / Yom Tov (minutes)</span>
+          <input className="input" inputMode="numeric" value={v.shabbesSaveMinutes} onChange={(e) => set("shabbesSaveMinutes", e.target.value)} />
+          <span className="mt-1 block text-xs text-muted">A caller stopped by the cut-off keeps their items until this long after the phone opens again.</span>
+        </label>
+        <label className="block">
           <span className="label">Reopen after Shabbes / Yom Tov</span>
           <input className="input" value={v.reopenAfter} onChange={(e) => set("reopenAfter", e.target.value)} />
           <span className="mt-1 block text-xs text-muted">&ldquo;tzeis&rdquo; (nightfall, 8.5°) or a number of minutes after shkiah, e.g. 72.</span>

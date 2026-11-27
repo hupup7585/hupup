@@ -337,3 +337,21 @@ export function bookingLock(at: Date = new Date(), s: CalendarSettings = calenda
   }
   return { locked: false, reason: null, opensAt: null };
 }
+
+/**
+ * The phone's booking cut-off (Abraham, Nov 26, 2026, 11:51 PM): from `minutes` before candle lighting on Erev
+ * Shabbes and Erev Yom Tov, and all through Shabbes and Yom Tov, no booking is finished and nothing is paid on the
+ * phone. `opensAt` is when the phone opens again (the same time as bookingLock: the Admin reopen time, 72 minutes
+ * after sunset = Rabbeinu Tam, plus 2 minutes after Shabbes).
+ */
+export function bookingCutoff(at: Date = new Date(), s: CalendarSettings = calendarDefaults(), minutes = 15): { cut: boolean; reason: "Shabbes" | "Yom Tov" | null; opensAt: Date | null } {
+  const lock = bookingLock(at, s);
+  if (lock.locked) return { cut: true, reason: lock.reason, opensAt: lock.opensAt };
+  const candles = erevCandleLighting(localISO(at), s);
+  const m = Number.isInteger(minutes) && minutes >= 0 && minutes <= 120 ? minutes : 15;
+  if (candles && at.getTime() >= candles.getTime() - m * 60_000) {
+    const then = bookingLock(candles, s);
+    return { cut: true, reason: then.reason, opensAt: then.opensAt };
+  }
+  return { cut: false, reason: null, opensAt: null };
+}
