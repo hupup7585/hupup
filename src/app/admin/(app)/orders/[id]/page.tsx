@@ -34,7 +34,7 @@ import { payState } from "@/lib/pay-label";
 import ServicesPanel from "./ServicesPanel";
 import { SERVICE_FIELD_EXPLANATIONS } from "@/lib/order-services";
 
-export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ drivers?: string; driverss?: string }> }) {
   const { id } = await params;
   const staff = await requireAdmin();
   const full = await getOrderWithItems(orderIdFromParam(id)); // the order number (1031) or an older id link (31)
@@ -185,7 +185,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             );
           })())}
           {staff.role !== "delivery" && o.status !== "CANCELLED" && (await (async () => {
-            const drivers = await activeDrivers();
+            const active = await activeDrivers();
+            // Deep check 0600 M24: a driver who was since deactivated still shows as chosen (marked), so Save never drops them silently
+            const missing = [o.deliveryDriverId, o.pickupDriverId].filter((id): id is number => id !== null && !active.some((d) => d.id === id));
+            const gone = missing.length ? await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers).where((await import("drizzle-orm")).inArray(schema.adminUsers.id, missing)) : [];
+            const drivers = [...active, ...gone.map((d) => ({ id: d.id, name: `${d.name} (no longer active)` }))];
+            const sp = (await searchParams) ?? {};
+            const { trustedMsg } = await import("@/lib/url-message");
+            const driverMsg = trustedMsg(sp.drivers, sp.driverss);
             const warn = [...(await overlapsFor(o, "delivery")).map((w) => `Delivery driver also has: ${w}`), ...(await overlapsFor(o, "pickup")).map((w) => `Pickup driver also has: ${w}`)];
             const pick = (name: "delivery" | "pickup", current: number | null) => (
               <label className="block">
@@ -199,7 +206,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             return (
               <form action={assignDriversAction.bind(null, o.id)} className="card p-5" data-drivers>
                 <h2 className="mb-3 font-bold">Drivers</h2>
-                {!drivers.length && <p className="mb-2 text-sm text-muted">No active Delivery logins yet. <a className="font-semibold underline" href="/admin/staff">Add one in Staff</a>.</p>}
+                {driverMsg && <p role="status" className={`mb-2 text-sm font-semibold ${driverMsg === "Drivers saved." ? "text-[#13895C]" : "text-coral"}`} data-drivers-msg>{driverMsg}</p>}
+                {!active.length && <p className="mb-2 text-sm text-muted">No active Delivery logins yet. <a className="font-semibold underline" href="/admin/staff">Add one in Staff</a>.</p>}
                 <div className="grid gap-3 sm:grid-cols-2">
                   {pick("delivery", o.deliveryDriverId)}
                   {pick("pickup", o.pickupDriverId)}
