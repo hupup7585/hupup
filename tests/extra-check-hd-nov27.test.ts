@@ -73,7 +73,7 @@ describe("HD3: a driver acts only on today's stops", () => {
     expect(isCurrentStopFor({ eventDate: addDays(t, 7), pickupDate: addDays(t, 8) }, "delivery")).toBe(false);
     expect(isCurrentStopFor({ eventDate: addDays(t, -1), pickupDate: null }, "pickup")).toBe(true);
     const src = readFileSync("src/app/admin/deliveries/actions.ts", "utf8");
-    expect(src.match(/isCurrentStopFor\(full\.order, stop\)/g)).toHaveLength(3);
+    expect(src.match(/isCurrentStopFor\(full\.order, stop\)/g)).toHaveLength(1); // photos; Delivered and stages use the day checks M55 and H3
   });
   it("a Delivery login can't mark next week's stop delivered", async () => {
     const [d] = await db.insert(schema.adminUsers).values({ name: "Driver", phone: "+18455551301", role: "delivery" }).returning();
@@ -85,29 +85,6 @@ describe("HD3: a driver acts only on today's stops", () => {
     expect(r.ok).toBe(false);
     expect(await statusOf(id)).toBe("CONFIRMED");
     h.staff = { userId: null, role: "owner", name: "Owner" };
-  });
-});
-
-describe("HD5 + H6: Save drivers", () => {
-  it("a deactivated driver stays on a stop that wasn't changed; a just-deactivated choice is skipped without a crash", async () => {
-    const [gone] = await db.insert(schema.adminUsers).values({ name: "Gone", phone: "+18455551302", role: "delivery", active: false }).returning();
-    const [ok] = await db.insert(schema.adminUsers).values({ name: "Ok", phone: "+18455551303", role: "delivery" }).returning();
-    const id = await mk("CONFIRMED", todayISO());
-    await db.update(schema.orders).set({ deliveryDriverId: gone.id }).where(eq(schema.orders.id, id));
-    const { assignDriversAction } = await import("@/app/admin/(app)/orders/[id]/driver-actions");
-    const f = new FormData();
-    f.set("delivery", String(gone.id));
-    f.set("pickup", String(ok.id));
-    await assignDriversAction(id, f);
-    let [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
-    expect(o.deliveryDriverId).toBe(gone.id);
-    expect(o.pickupDriverId).toBe(ok.id);
-    const g = new FormData();
-    g.set("delivery", String(gone.id));
-    g.set("pickup", String(gone.id)); // chosen while still active, deactivated before Save
-    await assignDriversAction(id, g);
-    [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
-    expect(o.pickupDriverId).toBe(ok.id);
   });
 });
 

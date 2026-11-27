@@ -252,7 +252,8 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "app/admin/(app)/hours/page.tsx",
   "lib/ivr/flow.ts",
   "lib/ivr/menu-editor.ts",
-  "lib/ivr/menu-order.ts"
+  "lib/ivr/menu-order.ts",
+  "lib/recording-flags.ts"
  ],
  "bounce_water_note": [
   "lib/recording-slots.ts"

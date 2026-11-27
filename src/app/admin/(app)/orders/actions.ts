@@ -47,7 +47,8 @@ export async function updateStatusAction(orderId: number, status: OrderStatus, r
   // below) and not before the event day; Picked up only from Delivered. A mis-click on "Picked up" for next week's
   // order used to free its items for someone else, and an unpaid hold could be marked Delivered and never released.
   if (status === "DELIVERED" && full.order.status !== "DELIVERED") {
-    if (!["CONFIRMED", "NEEDS_ATTENTION"].includes(full.order.status)) return { ok: false, message: "Only a confirmed order can be marked delivered. Confirm it first." };
+    // (a cancelled order brought straight back to Delivered is allowed: re-checked for stock below, units booked, M57)
+    if (!["CONFIRMED", "NEEDS_ATTENTION", "CANCELLED"].includes(full.order.status)) return { ok: false, message: "Only a confirmed order can be marked delivered. Confirm it first." };
     // from the day before the event, like the Deliveries page (deep check 0600 M55)
     if (full.order.eventDate > addDays(todayISO(), 1)) return { ok: false, message: "This order's event is more than a day away, so it can't be marked delivered yet." };
   }
