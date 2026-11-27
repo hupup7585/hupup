@@ -5,6 +5,7 @@ import { safeTasksBack as safeBack } from "@/lib/safe-back";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { orderIdFromParam } from "@/lib/order-path";
 import { db, schema } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";
 import { PRIORITIES, STATUSES, TaskError, canAccess, canCreate, getTask, rateFor, seesMoney, taskAudit, type Staff } from "@/lib/tasks";
@@ -51,7 +52,7 @@ function fields(f: FormData) {
   const status = s(f, "status") || "todo";
   if (!(STATUSES as readonly string[]).includes(status)) throw new TaskError("Choose a status.");
   assertNoCardNumber(title, s(f, "notes"));
-  return { title, notes: s(f, "notes") || null, dueDate: iso(s(f, "dueDate")), dueTime: time(s(f, "dueTime")), priority, status, orderId: num(f, "orderId"), projectId: num(f, "projectId") };
+  return { title, notes: s(f, "notes") || null, dueDate: iso(s(f, "dueDate")), dueTime: time(s(f, "dueTime")), priority, status, orderId: orderIdFromParam(s(f, "orderId")) || null, projectId: num(f, "projectId") };
 }
 
 export async function createTaskAction(f: FormData) {
@@ -140,7 +141,8 @@ export async function startTimerAction(f: FormData) {
 
 export async function stopTimerAction(f: FormData) {
   const id = Number(s(f, "logId"));
-  const [l] = await db.select().from(schema.timeLogs).where(eq(schema.timeLogs.id, id));
+  // Deep check B8: a bad log number is "not running", never a crash
+  const [l] = Number.isInteger(id) && id > 0 ? await db.select().from(schema.timeLogs).where(eq(schema.timeLogs.id, id)) : [];
   return run(`/admin/tasks/${l?.taskId ?? ""}`, async (staff) => {
     if (!l || l.endedAt || l.minutes !== null) throw new TaskError("That timer isn't running.");
     if (staff.role !== "owner" && l.userId !== staff.userId) throw new TaskError("You can only stop your own timer.");
@@ -175,7 +177,8 @@ export async function logHoursAction(f: FormData) {
 
 /* ---- projects and rates (Owner; Secretary may create projects) ---- */
 
-const orderList = (v: string) => [...new Set(v.split(/[\s,#]+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+/** Booking numbers as people see them (1031) or the plain id; saved as the order id (deep check B1). */
+const orderList = (v: string) => [...new Set(v.split(/[\s,#]+/).filter(Boolean).map(orderIdFromParam).filter((n) => n > 0))];
 
 export async function saveProjectAction(f: FormData) {
   return run("/admin/tasks?view=projects", async (staff) => {

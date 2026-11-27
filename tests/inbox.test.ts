@@ -161,3 +161,16 @@ describe("attachment limit (Abraham, Nov 14, 2026: reach the free limit)", () =>
     expect(readFileSync("src/app/admin/(app)/inbox/[id]/ReplyForm.tsx", "utf8")).toContain("const MAX = 18 * 1024 * 1024;");
   });
 });
+
+describe("deep check C5: replies go to the email's Reply-To, like Gmail", () => {
+  it("a form notice from a no-reply address with Reply-To: the reply goes to the customer", async () => {
+    const mail = ["From: Booking Form <noreply@forms.example>", "Reply-To: Leah Gold <Leah@Example.org>", "To: info@hupupattractions.com", "Subject: New form entry", "Message-ID: <c5form@forms.example>", "MIME-Version: 1.0", "Content-Type: text/plain; charset=utf-8", "", "Leah wants a bounce house.", ""].join("\r\n");
+    const r = await receiveRawPiece("upload-c5-0001", 0, 1, Buffer.from(mail));
+    h.emails.length = 0;
+    await sendReply({ emailId: r.emailId!, body: "Thanks Leah!", fileIds: [], userId: null });
+    expect(h.emails[0].to).toBe("leah@example.org");
+    const { replyToOf } = await import("@/lib/inbox");
+    expect(replyToOf({ replyTo: [] }, "a@b.com")).toBe("a@b.com");
+    expect(replyToOf({ replyTo: [{ address: "not an address" }] }, "a@b.com")).toBe("a@b.com");
+  });
+});

@@ -92,6 +92,8 @@ export async function uploadCatalogPhotoAction(fd: FormData): Promise<{ ok: bool
   const id = Number(fd.get("id"));
   const file = fd.get("photo") as File | null;
   if (!id || !file || typeof file === "string") return { ok: false, message: "Choose a photo first." };
+  // Deep check B6: checked before anything is stored, so a refused picture never takes up storage
+  if (kind === "text" && id !== 1 && id !== 2) return { ok: false, message: "Choose picture 1 or picture 2." };
   const data = new Uint8Array(await file.arrayBuffer());
   const { photoKind } = await import("@/lib/delivery-photos");
   const { PHOTO_MAX_BYTES, r2Put } = await import("@/lib/r2");
@@ -107,8 +109,7 @@ export async function uploadCatalogPhotoAction(fd: FormData): Promise<{ ok: bool
   }
   const imageUrl = `/api/catalog-photo/${key}`;
   if (kind === "text") {
-    // Catalog by text, picture 1 or 2 (Abraham, Nov 17, 2026)
-    if (id !== 1 && id !== 2) return { ok: false, message: "Choose picture 1 or picture 2." };
+    // Catalog by text, picture 1 or 2 (Abraham, Nov 17, 2026; checked above)
     const { saveSetting } = await import("@/lib/settings");
     await saveSetting(id === 1 ? "catalogTextPicture1" : "catalogTextPicture2", imageUrl);
   } else if (kind === "categories") await db.update(schema.categories).set({ imageUrl }).where(eq(schema.categories.id, id));
