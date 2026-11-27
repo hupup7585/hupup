@@ -18,6 +18,10 @@ describe("Sola PhonePay", () => {
     expect(buildSendDigits("{dollars}#", { pin: "1", amountCents: 23050, orderNumber: "1" })).toBe("230#");
     expect(digitsTemplateError("ww{pin}#")).toBeNull();
     expect(digitsTemplateError("ww{pin}#abc")).toMatch(/only numbers/);
+    // deep check 06:00 M61: a pattern that fits with short sample values but not with a real long amount is refused
+    const longish = "w".repeat(100) + "{pin}#{amount}#{order}";
+    expect(buildSendDigits(longish, { pin: "1234", amountCents: 23000, orderNumber: "1438" }).length).toBeLessThanOrEqual(120);
+    expect(digitsTemplateError(longish)).toMatch(/too long/);
   });
   it("the hand-over to the subaccount is signed: order, call and amount can't be changed", () => {
     process.env.AUTH_SECRET = "test-secret-phonepay-0123456789";
