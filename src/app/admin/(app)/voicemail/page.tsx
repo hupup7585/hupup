@@ -8,9 +8,8 @@ import { TEXT_ALERTS_NOT_ACTIVE, hiddenVoicemails, listVoicemails, mainBox, text
 import { getSettings } from "@/lib/settings";
 import { db, schema } from "@/lib/db";
 import { PROMPTS } from "@/lib/ivr/prompts";
-import { setBoxPinAction, deleteVoicemailAction, purgeVoicemailAction, restoreVoicemailAction, saveBoxAction, setHeardAction, setUrgentAction } from "./actions";
+import { setVmPinAction, setBoxPasswordAction, deleteVoicemailAction, purgeVoicemailAction, restoreVoicemailAction, saveBoxAction, setHeardAction, setUrgentAction } from "./actions";
 import { dualDateTime } from "@/lib/dual-date";
-import { trustedMsg } from "@/lib/url-message";
 import { CALL_OUT_LIVE_APPROVED, VM_ACCESS_LIVE_APPROVED, VM_LOCK_MINUTES, recentVmAccess, vmLockedUntil, vmPinSet } from "@/lib/vm-access";
 
 export const metadata = { title: "Voicemail · Hup Up Attractions", robots: { index: false } };
@@ -22,9 +21,7 @@ const when = (d: Date) => dualDateTime(d);
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 /** Hotline voicemail: play, download, mark heard, urgent, call back, delete. Owner also edits the box settings. */
-export default async function VoicemailPage({ searchParams }: { searchParams?: Promise<{ m?: string; ms?: string }> }) {
-  const sp = (await searchParams) ?? {};
-  const pageMsg = trustedMsg(sp.m, sp.ms);
+export default async function VoicemailPage() {
   const alertSettings = await getSettings();
   const staff = await requireStaff(["owner", "secretary"]);
   let box, list;
@@ -128,35 +125,13 @@ export default async function VoicemailPage({ searchParams }: { searchParams?: P
             {!CALL_OUT_LIVE_APPROVED && <b> Calling back is off until you approve the price.</b>}
           </p>
           <table className="mt-3 w-full text-sm" data-vm-personal-boxes>
-            <thead><tr><th className="th">Box</th><th className="th">Box number</th><th className="th">Password</th><th className="th">New message alerts</th></tr></thead>
+            <thead><tr><th className="th">Box</th><th className="th">Box number</th><th className="th">Password</th><th className="th">New message alerts</th><th className="th">Set a new password</th></tr></thead>
             <tbody>
               {personal.map((b) => (
-                <tr key={b.id}><td className="td font-bold">{b.name}</td><td className="td">{b.boxNumber}</td><td className="td">{b.pinHash ? "Changed" : "Default, not changed yet"}{b.lockedUntil && b.lockedUntil > new Date() ? ` · locked until ${when(b.lockedUntil)}` : ""}</td><td className="td">{b.alertsOn ? "On (email)" : "Off"}</td></tr>
+                <tr key={b.id}><td className="td font-bold">{b.name}</td><td className="td">{b.boxNumber}</td><td className="td">{b.pinHash ? "Changed" : "Default, not changed yet"}{b.lockedUntil && b.lockedUntil > new Date() ? ` · locked until ${when(b.lockedUntil)}` : ""}</td><td className="td">{b.alertsOn ? "On (email)" : "Off"}</td><td className="td"><form action={setBoxPasswordAction.bind(null, b.id)} className="flex gap-2" data-vm-box-password><input name="pin" type="password" inputMode="numeric" pattern="[0-9]{4,8}" required autoComplete="new-password" placeholder="4 to 8 digits" aria-label={`New password for ${b.name}`} className="input w-32 py-1 text-xs" /><button className="btn-ghost text-xs">Save</button></form></td></tr>
               ))}
             </tbody>
           </table>
-          <form action={setBoxPinAction} id="vm-box-passwords" className="mt-4 grid gap-3 rounded-lg bg-bg p-4 sm:grid-cols-4" data-vm-box-password>
-            <h3 className="font-bold sm:col-span-4">Set or reset a box password</h3>
-            {pageMsg && <p role="status" className={`text-sm font-semibold sm:col-span-4 ${pageMsg.startsWith("Not saved") ? "text-[#C83A2F]" : ""}`}>{pageMsg}</p>}
-            <label className="block">
-              <span className="label">Box</span>
-              <select name="boxId" className="input" required>
-                {personal.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name} ({b.boxNumber})</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="label">New password (4 to 8 digits)</span>
-              <input name="pin" type="password" inputMode="numeric" pattern="[0-9]{4,8}" autoComplete="new-password" className="input" required />
-            </label>
-            <label className="block">
-              <span className="label">Same password again</span>
-              <input name="pinAgain" type="password" inputMode="numeric" pattern="[0-9]{4,8}" autoComplete="new-password" className="input" required />
-            </label>
-            <div className="flex items-end"><button className="btn-dark w-fit">Save password</button></div>
-            <p className="text-xs text-muted sm:col-span-4">For a forgotten password or to replace the default. Saving also unlocks the box. The password is stored scrambled and never shown.</p>
-          </form>
           <h3 className="mt-5 font-bold">Every action by phone</h3>
           {actions.length ? (
             <table className="mt-2 w-full text-sm" data-vm-actions>

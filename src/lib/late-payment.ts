@@ -257,13 +257,16 @@ export async function chooseLinkOption(primaryId: number, index: number, product
         .returning();
       target = created;
     }
-    // Deep check 0600 M52: laser tag items keep one line per set, as on the phone and New booking, so every third set
-    // can be priced on its own (a set of 3 on one line was charged as 3 full sets)
-    const laser = (await tx.execute(sql`SELECT 1 FROM categories c WHERE c.id = ${p.categoryId} AND c.name ~* 'laser'`)).rows.length > 0;
-    const [same] = laser ? [] : await tx.select().from(schema.orderItems).where(and(eq(schema.orderItems.orderId, target.id), eq(schema.orderItems.productId, p.id)));
-    if (same) await tx.update(schema.orderItems).set({ qty: same.qty + entry.qty }).where(eq(schema.orderItems.id, same.id));
-    else if (laser) for (let n = 0; n < entry.qty; n++) await tx.insert(schema.orderItems).values({ orderId: target.id, productId: p.id, qty: 1, unitPriceCents: p.priceCents });
-    else await tx.insert(schema.orderItems).values({ orderId: target.id, productId: p.id, qty: entry.qty, unitPriceCents: p.priceCents });
+    // Deep check 06:00 M52: laser sets are saved one line per set (as the phone and New booking save them), so every
+    // third set's half price and the delivery item count work the same; other items keep one line with the quantity
+    const [cat] = p.categoryId ? await tx.select({ name: schema.categories.name }).from(schema.categories).where(eq(schema.categories.id, p.categoryId)).limit(1) : [];
+    if (/laser/i.test(cat?.name ?? "")) {
+      for (let n = 0; n < entry.qty; n++) await tx.insert(schema.orderItems).values({ orderId: target.id, productId: p.id, qty: 1, unitPriceCents: p.priceCents });
+    } else {
+      const [same] = await tx.select().from(schema.orderItems).where(and(eq(schema.orderItems.orderId, target.id), eq(schema.orderItems.productId, p.id)));
+      if (same) await tx.update(schema.orderItems).set({ qty: same.qty + entry.qty }).where(eq(schema.orderItems.id, same.id));
+      else await tx.insert(schema.orderItems).values({ orderId: target.id, productId: p.id, qty: entry.qty, unitPriceCents: p.priceCents });
+    }
     await tx
       .update(schema.orders)
       .set({

@@ -8,8 +8,6 @@ import { requireOwner, requireStaff } from "@/lib/auth";
 import { deleteVoicemail, purgeVoicemail, restoreVoicemail } from "@/lib/voicemail";
 import { toE164 } from "@/lib/phone";
 import { setVmPin, validPin } from "@/lib/vm-access";
-import { redirect } from "next/navigation";
-import { msgQuery } from "@/lib/url-message";
 
 async function audit(userId: number | null, action: string, entityId: number, after: Record<string, unknown> = {}) {
   await db.insert(schema.auditLog).values({ userId, action, entityType: "voicemail", entityId: String(entityId), after });
@@ -90,23 +88,21 @@ export async function setVmPinAction(form: FormData) {
 }
 
 /**
- * Deep check 0600 M63 (Nov 27, 2026): Owner sets or resets a personal box password in Admin (a forgotten password,
- * or replacing the default 1234). Only the bcrypt hash is stored; it also clears wrong tries and any lock. Audited,
- * never with the password itself.
+ * Deep check 06:00 M63: the Owner sets or resets a staff box's password in Admin (4 to 8 digits, stored hashed only;
+ * the box's wrong-try lock is cleared). The password itself is never logged.
  */
-export async function setBoxPinAction(form: FormData) {
+export async function setBoxPasswordAction(boxId: number, form: FormData) {
   const s = await requireOwner();
-  const back = (m: string) => redirect(`/admin/voicemail?${msgQuery(m)}#vm-box-passwords`);
-  const boxId = Number(form.get("boxId"));
-  const pin = String(form.get("pin") ?? "").trim();
-  const again = String(form.get("pinAgain") ?? "").trim();
-  const { getBox, setBoxPin } = await import("@/lib/vm-boxes");
-  const box = Number.isSafeInteger(boxId) && boxId > 0 ? await getBox(boxId) : null;
-  if (!box || !box.ownerUserId) return back("Not saved: choose a box.");
-  if (!validPin(pin)) return back("Not saved: a password is 4 to 8 digits.");
-  if (pin !== again) return back("Not saved: the two passwords are not the same.");
-  await setBoxPin(box.id, pin);
-  await db.insert(schema.auditLog).values({ userId: s.userId, action: "voicemail_box.password_set", entityType: "voicemail_box", entityId: String(box.id), after: { box: box.boxNumber } });
+  const pin = String(form.get("pin") || "").trim();
+  if (!Number.isInteger(boxId) || boxId <= 0 || !validPin(pin)) {
+    revalidatePath("/admin/voicemail");
+    return;
+  }
+  const { getBox, setBoxPin, logAction } = await import("@/lib/vm-boxes");
+  if (!(await getBox(boxId))) return;
+  await setBoxPin(boxId, pin);
+  await logAction({ boxId, userId: s.userId ?? null, action: "password set in Admin" });
+  await audit(s.userId, "voicemail_box.password_set", boxId);
   revalidatePath("/admin/voicemail");
-  return back(`Saved: the password for ${box.name}'s box (${box.boxNumber}) is changed, and the box is unlocked.`);
 }
+
