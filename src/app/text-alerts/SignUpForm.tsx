@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Check } from "lucide-react";
-import { PROMO_BENEFITS, PROMO_BENEFITS_NOTE, PROMO_HEADING, PROMO_TITLE } from "@/lib/sms-consent-copy";
+import { PROMO_BENEFITS, PROMO_BENEFITS_NOTE, PROMO_HEADING, PROMO_TITLE, PROMOS_PER_YEAR } from "@/lib/sms-consent-copy"; // 5 a year everywhere (Abraham, Nov 26, 2026, item 4)
 import { signUpForTexts, type SignUpState } from "./actions";
 import ConsentText from "@/components/ConsentText";
 
@@ -71,7 +71,7 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-base">{v3 ? "Up to 6 promo texts a year, never more." : PROMO_BENEFITS_NOTE}</p>
+          <p className="mt-2 text-base">{v3 ? `Up to ${PROMOS_PER_YEAR} promo texts a year, never more.` : PROMO_BENEFITS_NOTE}</p>
           <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-white p-4">
             <input type="checkbox" name="marketing" className="mt-1 h-6 w-6 shrink-0 accent-hu-deep" />
             <span>

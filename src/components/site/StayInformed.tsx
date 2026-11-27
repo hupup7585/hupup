@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { signUpForTexts, type SignUpState } from "@/app/text-alerts/actions";
 import ConsentText from "@/components/ConsentText";
 import { SectionTitle } from "@/components/site/parts";
+import { PROMOS_PER_YEAR } from "@/lib/sms-consent-copy"; // 5 a year everywhere (Abraham, Nov 26, 2026, item 4)
 
 /**
  * Homepage "Stay Informed" (Abraham, SMS v3): promo sign-up only. The box is never checked for the customer; signing
@@ -18,7 +19,7 @@ export default function StayInformed({ marketingText, smsNumber, notActive, disa
         <div data-stay-informed-body className="max-w-3xl">
         <SectionTitle kicker="Never miss a deal" title="Stay Informed" />
         <p className="mt-3 text-lg leading-relaxed">Be the first to hear about seasonal deals, specials, and new rentals from Hup Up Attractions.</p>
-        <p className="mt-1 text-sm font-semibold opacity-80">Up to 6 promo texts a year, never more.</p>
+        <p className="mt-1 text-sm font-semibold opacity-80">Up to {PROMOS_PER_YEAR} promo texts a year, never more.</p>
         {state.ok ? (
           <div data-stay-informed-done className="mt-6 rounded-2xl border-2 border-hu-deep bg-white p-5">
             <p className="text-lg font-bold">Almost done! Check your phone and reply YES to our text to confirm.</p>
