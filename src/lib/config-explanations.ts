@@ -290,6 +290,26 @@ const OTHER: Record<string, Explanation> = {
     where: "Customers booking an address farther out in Orange County.",
     ifChanged: "New orders use the new fee; orders already placed keep theirs.",
   },
+  staffPromoMode: {
+    what: "Whether the staff promo sign-up box on an order page shows a Preview mark. \"owner_preview\" shows the mark while Abraham reviews the box; \"live\" removes it. The box itself, its three lines and the confirmation text stay exactly as approved.",
+    where: "Owner and Secretary, on each order page (the promo sign-up box). Customers do not see this setting.",
+    ifChanged: "The Preview mark on the box shows or goes away. Nothing is sent and nobody is signed up by changing it.",
+  },
+  liveRefundsOn: {
+    what: "Live refunds: whether the Refund button on an order sends real money back to the customer's card (Stripe phone payments and Sola website payments). Off: only test (sandbox) refunds work. It was set in the code (off) until Nov 27, 2026.",
+    where: "The Owner, on the order page (Refund). The customer gets the money back on their card.",
+    ifChanged: "On: a refund on an order goes to the real card. Off: the Refund button says live refunds are off. With the safety check on, turning it on needs a fresh code and typed words.",
+  },
+  invoiceEmailOn: {
+    what: "Whether the Email to customer button on an invoice sends the customer a link to view and print it (the wording Abraham approved on Nov 15, 2026). It was set in the code (on) until Nov 27, 2026.",
+    where: "Staff with Bookkeeping, on an invoice page. The customer gets the email with the invoice link.",
+    ifChanged: "Off: the button says emailing invoices is turned off; the customer link can still be copied and sent by hand.",
+  },
+  itemTypes: {
+    what: "What each category and laser tag item is (laser tag, laser add-on packs, paddle boats, ocean balls, jumping balloons; and for laser items: a maze with 6 or 4 guns, or a 6 or 4 gun set). Until Nov 27, 2026 this was worked out only from words in the names. Anything not set here is still worked out from the name, exactly as before.",
+    where: "Staff on New booking (mazes, add-on packs, ocean balls under a balloon). The phone and the prices still work it out from the names until they are connected to this list.",
+    ifChanged: "New booking treats the item as the type chosen. Renaming an item no longer changes what it is once its type is set here.",
+  },
   deliveryPromoOn: {
     what: "Turns on the free-delivery offer: Kiryas Joel free and the nearby towns $10.00 between the start and end dates below. The farther area keeps its price.",
     where: "Customers booking during the offer dates: the delivery line on their order total.",

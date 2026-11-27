@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireOwner } from "@/lib/auth";
 import { asc } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -76,7 +77,10 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   ]);
   return (
     <div className="w-full">
-      <h1 className="text-2xl font-black sm:text-3xl">Catalog</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-black sm:text-3xl">Catalog</h1>
+        <Link href="/admin/catalog/types" className="text-sm font-bold text-navy" data-item-types-link>Item types</Link>
+      </div>
       <p className="mb-5 mt-1 text-muted">
         Categories with a phone key appear in the hotline menu automatically (“For Bounce Houses, press 1”). Items are read in phone-menu order (10 or more: item 10 is press 10). What callers get by email and text is on Catalog email & text.
       </p>

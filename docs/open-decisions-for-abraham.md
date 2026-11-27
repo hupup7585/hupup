@@ -28,6 +28,24 @@ card form, and the server rejects any payment attempt. Right after Shabbes / Yom
 - **Receipt "Total due".** The receipt email's grouped lines end with "Total due", which equals the amount just paid.
   Say if the receipt should use other words there (for example "Total paid").
 
+## Admin and Bookkeeping (Admin session, Nov 27, 2026)
+
+1. **Possible duplicate customers: consent and terms records on a merge.** Hark's item 2 said a merge moves the
+   consent records to the kept record. The texting-consent and Terms records are locked by the database as legal
+   records (they can never be edited), so a merge leaves them exactly as written on the merged record. They are still
+   found by phone number as before, and the kept customer's page links to every record merged into it. Is that OK?
+   (Orders, payments, texts, invoices, emails and notes do move; nothing is deleted; a STOP on any record wins.)
+2. **Overpayments in Bookkeeping.** A second charge on an order already paid in full is now booked as
+   "Overpayment (refund due)" (not a tip, not a taxable sale), and refunding it gives back no sales tax. Say if your
+   accountant wants it shown another way.
+3. **"Close-by areas" for the same-day notice.** Since the Nov 27 same-day notice (two versions by customer service
+   hours) this list is not read; it is kept and labelled "Not used now". Remove it, or use areas again? (The two
+   same-day hours settings still matter: changing one marks the same-day notice recordings for a new recording.)
+4. **Item types (Catalog > Item types).** New booking and the laser gun stock follow the types you set there. The
+   phone line, the prices and the offers still work them out from the names until they are connected (phone/payments
+   session). Until then, if you set a type that differs from an item's name, New booking and the phone can disagree, so
+   please leave the list as it is until that is done.
+
 ## Phone, payments, texts and delivery (phone/payments session, Nov 27, 2026)
 
 1. **4th Sunday + extra items.** Delivery on the 4th Sunday is 2x the zone price. Is the $5 for each additional item

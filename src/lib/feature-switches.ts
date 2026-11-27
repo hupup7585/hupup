@@ -1,14 +1,11 @@
 import { PHONE_PROMO_MODE } from "@/lib/phone-promo";
 import { JOIN_INVITE_ON } from "@/lib/join-invite";
 import { stripePhonePayMode } from "@/lib/phone-pay";
-import { LIVE_REFUNDS_APPROVED } from "@/lib/refunds";
 import { CALL_OUT_LIVE_APPROVED, VM_ACCESS_LIVE_APPROVED } from "@/lib/vm-access";
 import { MESSAGE_DUAL_DATES } from "@/lib/dual-date";
-import { STAFF_PROMO_MODE } from "@/lib/staff-promo";
 import { PAY_DATES_LIVE } from "@/lib/ivr/flow";
 import { STT_LIVE_APPROVED } from "@/lib/speech-to-text";
 import { RECEIPT_APPROVED } from "@/lib/phone-receipt";
-import { INVOICE_EMAIL_APPROVED } from "@/lib/invoice-share";
 import { LATE_EMAIL_APPROVED, LINK_WORDING_APPROVED, OPTIONS_WORDING_APPROVED } from "@/lib/late-payment";
 import { SMS_CATALOG_REPLY_ON } from "@/lib/catalog-send";
 import { WEBSITE_CATALOG_FORM_LIVE_APPROVED } from "@/lib/catalog-request";
@@ -33,16 +30,16 @@ export function featureSwitches(settings: Record<string, unknown> = SETTING_DEFA
     { id: "join_invite", label: "JOIN by text invitation", state: onOff(JOIN_INVITE_ON), waitsFor: "Abraham's OK (stays off)" },
     { id: "phone_promo_old", label: "Old three-step promo sign-up on the phone", state: mode(PHONE_PROMO_MODE), waitsFor: "Replaced by the paid-order question" },
     { id: "stripe_phone_pay", label: "Stripe card payment on the phone", state: mode(stripePhonePayMode(process.env, { phoneCardProvider: String(settings.phoneCardProvider ?? "sola") })), waitsFor: "Provider setup, a real test call and Abraham's OK for live" },
-    { id: "live_refunds", label: "Live refunds", state: onOff(LIVE_REFUNDS_APPROVED), waitsFor: "Provider setup, test results and Abraham's OK" },
+    { id: "live_refunds", label: "Live refunds", state: yes("liveRefundsOn"), waitsFor: "Provider setup, test results and Abraham's OK", settingKey: "liveRefundsOn" },
     { id: "vm_call_out", label: "Calling a customer back from the voicemail menu", state: onOff(CALL_OUT_LIVE_APPROVED), waitsFor: "Abraham's OK on the price" },
     { id: "vm_access", label: "Staff voicemail by phone", state: onOff(VM_ACCESS_LIVE_APPROVED), waitsFor: "Approved" },
     { id: "hebrew_dates", label: "Hebrew dates in messages", state: onOff(MESSAGE_DUAL_DATES), waitsFor: "Abraham's OK (stays off)" },
-    { id: "staff_promo", label: "Staff promo sign-up box", state: mode(STAFF_PROMO_MODE), waitsFor: "Abraham's OK" },
+    { id: "staff_promo", label: "Staff promo sign-up box", state: mode(String(settings.staffPromoMode ?? "owner_preview")), waitsFor: "Abraham's OK", settingKey: "staffPromoMode" },
     { id: "pay_dates", label: "After payment: the delivery and pickup dates line", state: onOff(PAY_DATES_LIVE), waitsFor: "Approved Nov 26, 2026" },
     { id: "directory_lookup", label: "Caller lookup in the directory", state: "Preview only", waitsFor: "Abraham's OK on its lines" },
     { id: "speech_to_text", label: "Speech to text for spoken answers", state: onOff(STT_LIVE_APPROVED), waitsFor: "Approved Nov 17, 2026" },
     { id: "phone_receipt", label: "Receipt email after a phone payment", state: onOff(RECEIPT_APPROVED), waitsFor: "Approved Nov 13, 2026" },
-    { id: "invoice_email", label: "Invoice by email", state: onOff(INVOICE_EMAIL_APPROVED), waitsFor: "Approved" },
+    { id: "invoice_email", label: "Invoice by email", state: yes("invoiceEmailOn"), waitsFor: "Approved", settingKey: "invoiceEmailOn" },
     { id: "link_wording", label: "Payment link page wording", state: onOff(LINK_WORDING_APPROVED), waitsFor: "Approved Nov 13, 2026" },
     { id: "options_wording", label: "Payment link: nearest options list", state: onOff(OPTIONS_WORDING_APPROVED), waitsFor: "Approved" },
     { id: "late_email", label: "Late payment email", state: onOff(LATE_EMAIL_APPROVED), waitsFor: "Approved Nov 13, 2026" },

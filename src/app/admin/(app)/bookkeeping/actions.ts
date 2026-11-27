@@ -323,6 +323,30 @@ export async function saveBookSettingsAction(f: FormData) {
   });
 }
 
+/**
+ * Admin handoff Phase 2 (Nov 27, 2026): two switches that were set in code, now Owner settings. Live refunds sends real
+ * money back to cards, so turning it on needs the safety check (a fresh code and typed words) while that check is on.
+ * Turning either one off never needs a code. Owner only, audited.
+ */
+export async function saveRefundSwitchesAction(f: FormData) {
+  return run("settings", async (userId) => {
+    const { currentStaff } = await import("@/lib/auth");
+    const me = await currentStaff();
+    if (me?.role !== "owner") throw new BooksError("Only the Owner can change these two switches.");
+    const before = await getSettings();
+    const wasOn = before.liveRefundsOn === true || String(before.liveRefundsOn) === "true";
+    const refunds = s(f, "liveRefundsOn") === "on";
+    const invoices = s(f, "invoiceEmailOn") === "on";
+    const { sensitiveRefusal } = await import("@/lib/switch-guard");
+    const refusal = await sensitiveRefusal(userId, "liveRefundsOn", refunds && !wasOn, f);
+    if (refusal) throw new BooksError(`Not saved. ${refusal}`);
+    await saveSetting("liveRefundsOn", refunds, userId);
+    await saveSetting("invoiceEmailOn", invoices, userId);
+    await bookAudit(userId, "refund_switches_saved", "settings", null, { liveRefundsOn: refunds, invoiceEmailOn: invoices, before: { liveRefundsOn: before.liveRefundsOn, invoiceEmailOn: before.invoiceEmailOn } });
+    return `Saved. Live refunds: ${refunds ? "on" : "off"}. Email invoices to customers: ${invoices ? "on" : "off"}.`;
+  });
+}
+
 export async function lockMonthAction(f: FormData) {
   return run("settings", async (userId) => {
     const month = s(f, "month");
