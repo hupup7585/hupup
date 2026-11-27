@@ -166,3 +166,31 @@ export function todayHours(at: Date = new Date(), s: HoursSettings = hoursDefaul
 export function customerServiceHours(s: HoursSettings = hoursDefaults()): string {
   return scheduleWords(effectiveLine(loadHours(s), "cs").schedule) || "Closed";
 }
+
+const SCHEMA_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+export type OpeningHoursSpec = { "@type": "OpeningHoursSpecification"; dayOfWeek: string | string[]; opens: string; closes: string };
+
+/**
+ * The weekly hours for search engines (LocalBusiness schema), from the same Hours page schedule the website's Our Hours
+ * list shows (Nov 25, 2026), so the two never disagree. Only fixed clock times are listed: Friday closes at Chatzos (or
+ * by season), which changes every week, so it is left to the Hours section; Shabbes is closed. Days with the same
+ * times are grouped.
+ */
+export function websiteOpeningHoursSpec(s: HoursSettings = hoursDefaults()): OpeningHoursSpec[] {
+  const sch = effectiveLine(loadHours(s), "office").schedule;
+  const clock = /^([01]\d|2[0-3]):[0-5]\d$/;
+  const byTimes = new Map<string, string[]>();
+  for (let d = 0; d < 7; d++) {
+    const day = sch.days[String(d) as "0"];
+    if (!day || day.closed) continue;
+    for (const w of day.windows) {
+      if (!clock.test(w.from.trim()) || !clock.test(w.to.trim())) continue; // Chatzos and seasonal closes are not fixed times
+      const key = `${w.from.trim()}-${w.to.trim()}`;
+      byTimes.set(key, [...(byTimes.get(key) ?? []), SCHEMA_DAYS[d]]);
+    }
+  }
+  return [...byTimes].map(([key, days]) => {
+    const [opens, closes] = key.split("-");
+    return { "@type": "OpeningHoursSpecification", dayOfWeek: days.length === 1 ? days[0] : days, opens, closes };
+  });
+}
