@@ -11,7 +11,7 @@ vi.mock("@/lib/notify", () => ({ sendEmail: async () => ({ sent: true }), sendSm
 
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { customChargeMadeBy, matchCustomCharge, startAttempt } from "@/lib/sola-phonepay";
+import { customChargeMadeBy, matchCustomCharge, pickWindowMatch, startAttempt } from "@/lib/sola-phonepay";
 
 const solaReturns = (amount: string, ref: string) =>
   (async () =>
@@ -80,5 +80,30 @@ describe("custom charge matched by the time of the call to Sola (Abraham, Nov 24
     const r = await matchCustomCharge(a.id, null, null, { fetcher: empty, waitMs: 0 });
     expect(r).toMatchObject({ found: false, reason: "not_found" });
     expect((await db.select().from(schema.orders)).length).toBe(before);
+  });
+});
+
+describe("extra check HS3: a custom charge never takes another caller's phone payment", () => {
+  const at = new Date("2026-11-27T16:00:30Z");
+  const t = (o: Partial<{ refNum: string; invoice: string | null }>) => ({ refNum: "C1", amountCents: 8000, at, invoice: "8454157585", last4: "1111", cardType: "Visa", approved: true, ...o });
+  const want = { from: new Date("2026-11-27T16:00:00Z"), to: new Date("2026-11-27T16:02:00Z") };
+  it("a website link payment (our order number in Invoice) is never taken", () => {
+    expect(pickWindowMatch([t({ invoice: "HU-1077" })], want).reason).toBe("not_found");
+  });
+  it("while another caller pays by phone at the same time, a charge without the calling number is not certain", () => {
+    expect(pickWindowMatch([t({})], { ...want, othersPaying: true }).reason).toBe("ambiguous");
+    expect(pickWindowMatch([t({})], { ...want, othersPaying: false }).reason).toBe("found");
+  });
+  it("a charge with the calling number in Invoice is the Owner's, even then", () => {
+    const r = pickWindowMatch([t({ refNum: "CUST", invoice: "8455550177" }), t({ refNum: "OWN", invoice: "8455550100" })], { ...want, phone: "+18455550100", othersPaying: true });
+    expect(r).toMatchObject({ reason: "found", match: { refNum: "OWN" } });
+  });
+  it("in the database: a customer's open card try on another call makes the custom charge not certain (nothing taken)", async () => {
+    process.env.SOLA_API_KEY = "test-key";
+    const [cust] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2026-12-21", pickupDate: "2026-12-22", subtotalCents: 8000, totalCents: 8000 }).returning();
+    await startAttempt(cust.id, "CAcustomer", 8000, "order");
+    const own = await startAttempt(null, "CAownerHS3", 0, "custom");
+    const r = await matchCustomCharge(own.id, null, null, { fetcher: solaReturns("80.00", "R-CUST"), waitMs: 0 });
+    expect(r).toMatchObject({ found: false, reason: "ambiguous" });
   });
 });

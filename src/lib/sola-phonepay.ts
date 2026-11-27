@@ -1,6 +1,6 @@
 import { signingSecret } from "@/lib/secret";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
@@ -563,10 +563,42 @@ export function phonePayDialTwiml(vr: DialHost, phone: string, digits: string, a
  * Owner custom charge without our amount (Abraham, Nov 24, 2026): the one approved Sola charge made during this call
  * to Sola (from the dial to the caller's return) is the match. More than one in that time = not certain (no match).
  */
-export function pickWindowMatch(txns: SolaTxn[], want: { from: Date; to: Date }, alreadyUsed: Set<string> = new Set()): { match: SolaTxn | null; reason: "found" | "not_found" | "ambiguous" } {
-  const inWindow = txns.filter((t) => t.approved && t.refNum && !alreadyUsed.has(t.refNum) && t.at >= new Date(want.from.getTime() - 60_000) && t.at <= new Date(want.to.getTime() + 120_000));
+export function pickWindowMatch(
+  txns: SolaTxn[],
+  want: { from: Date; to: Date; phone?: string | null; othersPaying?: boolean },
+  alreadyUsed: Set<string> = new Set(),
+): { match: SolaTxn | null; reason: "found" | "not_found" | "ambiguous" } {
+  // Extra check HS3 (Nov 27, 2026): only phone (PhonePay) charges, never a website link payment; a charge carrying the
+  // calling number in Sola's Invoice field wins; and while another caller is paying by phone at the same time, a charge
+  // without the calling number is not certain (it could be that customer's payment, who would then be told "did not go
+  // through" and pay twice)
+  let inWindow = txns.filter((t) => t.approved && t.refNum && !alreadyUsed.has(t.refNum) && isPhonePayInvoice(t.invoice) && t.at >= new Date(want.from.getTime() - 60_000) && t.at <= new Date(want.to.getTime() + 120_000));
+  const phone = (want.phone ?? "").replace(/\D/g, "").slice(-10);
+  const inv = (t: SolaTxn) => (t.invoice ?? "").replace(/\D/g, "").slice(-10);
+  if (phone && inWindow.some((t) => inv(t) === phone)) inWindow = inWindow.filter((t) => inv(t) === phone);
+  else if (want.othersPaying && inWindow.length) return { match: null, reason: "ambiguous" };
   if (inWindow.length === 1) return { match: inWindow[0], reason: "found" };
   return { match: null, reason: inWindow.length ? "ambiguous" : "not_found" };
+}
+
+/** Another call's card try overlapping this one (a customer paying by phone at the same time): extra check HS3. */
+export async function otherCallPaying(attempt: { id: number; callSid: string; startedAt: Date } | undefined, now: Date): Promise<boolean> {
+  if (!attempt) return false;
+  const { ne, lte, or } = await import("drizzle-orm");
+  const rows = await db
+    .select({ id: schema.phonepayAttempts.id })
+    .from(schema.phonepayAttempts)
+    .where(
+      and(
+        ne(schema.phonepayAttempts.callSid, attempt.callSid),
+        lte(schema.phonepayAttempts.startedAt, new Date(now.getTime() + 60_000)),
+        gte(schema.phonepayAttempts.startedAt, new Date(attempt.startedAt.getTime() - 15 * 60_000)),
+        // still going, or ended after this call's try started (a try that finished before has had its charge settled)
+        or(isNull(schema.phonepayAttempts.endedAt), gte(schema.phonepayAttempts.endedAt, attempt.startedAt)),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
 }
 
 /** cents = null: no amount entered on our line, the charge is matched by the time of the call to Sola (pickWindowMatch). */
@@ -582,7 +614,7 @@ export async function matchCustomCharge(attemptId: number, cents: number | null,
     try {
       const now = deps.now?.() ?? new Date();
       const txns = await solaApprovedBetween(new Date(from.getTime() - 60_000), now, deps.fetcher);
-      const r = cents === null ? pickWindowMatch(txns, { from, to: now }, await usedSolaRefs()) : pickMatch(txns, { amountCents: cents, orderNumber: num || "none", from, to: now }, await usedSolaRefs());
+      const r = cents === null ? pickWindowMatch(txns, { from, to: now, phone: attempt?.callerPhone, othersPaying: await otherCallPaying(attempt, now) }, await usedSolaRefs()) : pickMatch(txns, { amountCents: cents, orderNumber: num || "none", from, to: now }, await usedSolaRefs());
       reason = r.reason;
       found = r.match;
     } catch (e) {
