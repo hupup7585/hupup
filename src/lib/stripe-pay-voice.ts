@@ -4,7 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, inArray, isNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config, BUSINESS_NAME } from "@/lib/config";
-import { PAYMENT_HOLD_MINUTES, getPaymentGroup, markGroupPaid, minutesFromNow, orderNumber } from "@/lib/orders";
+import { PAYMENT_HOLD_MINUTES, getPaymentGroup, markGroupPaid, orderNumber } from "@/lib/orders";
 import { RECEIPT_APPROVED, sendPhoneReceipt } from "@/lib/phone-receipt";
 import { ensureGroupPriced } from "@/lib/order-pricing";
 import { loadPromptOverrides, promptText, type PromptKey, type PromptOverrides } from "@/lib/ivr/prompts";
@@ -47,16 +47,21 @@ async function payTwiml(vr: VR, orderId: number, sid: string, tries: number, pro
   const waiting = group.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id);
   await ensureGroupPriced(waiting);
   // The rentals stay held for the whole payment: every try starts a fresh hold (Abraham, Nov 12, 2026)
-  await db.update(schema.orders).set({ holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")), updatedAt: new Date() }).where(inArray(schema.orders.id, waiting));
+  // Deep check 09:00 P6: a hold that already ended is renewed only when the whole order is still free (locked check,
+  // as on the Sola path, M7); someone else booked it meanwhile: no card entry, the call goes back (not charged)
+  const { renewPaymentHold } = await import("@/lib/ivr/flow");
+  if ((await renewPaymentHold(waiting, await linkHoldMinutes("phone"))).length) {
+    vr.hangup();
+    return vr;
+  }
   const due = (await getPaymentGroup(orderId))!.due;
   if (due <= 0) {
     vr.hangup();
     return vr;
   }
-  // Deep check M19 (Nov 27, 2026): never record card numbers. The call recording (when on) is paused before the keypad
-  // card entry, like the Sola PhonePay path; no recording running = nothing to pause (the error is ignored)
-  const { pauseRecording } = await import("@/lib/call-recording");
-  await pauseRecording(sid).catch(() => null);
+  // Deep check M19 / 09:00 P5: never record card numbers. The recording runs on the caller's hotline call (main
+  // account), so it is paused there before this payment line is dialed (flow.ts "pay-keypad") and resumed after
+  // ("pay-done"); this subaccount call is never recorded
   const pay = vr.pay({
     paymentConnector: payConnector(),
     chargeAmount: (due / 100).toFixed(2),

@@ -39,7 +39,7 @@ describe("ring all: press 2, then someone else takes the call", () => {
     expect(xml).not.toBe("");
     expect(h.session.data.rejectedAt).toBeUndefined(); // used up
   });
-  it("M19: the Stripe keypad card entry pauses the call recording first", () => {
-    expect(readFileSync("src/lib/stripe-pay-voice.ts", "utf8")).toMatch(/pauseRecording\(sid\)[\s\S]*vr\.pay\(/);
+  it("M19: the Stripe keypad card entry pauses the call recording first (on the hotline call; behaviour: deep-check-0900-p5-keypad)", () => {
+    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toMatch(/pauseRecording\(ctx\.callSid\)[\s\S]{0,400}vr\.dial\(\{ action: url\("pay-done"/);
   });
 });

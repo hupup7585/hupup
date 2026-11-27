@@ -5285,7 +5285,13 @@ const handlers: Record<string, Handler> = {
       return back(vr, "goodbye"); // Hark's 2nd check, A3
     }
     sp(vr, ctx, "pay_start", undefined, { draftOk: true });
-    const dial = vr.dial({ action: url("pay-done", { o }), method: "POST", timeLimit: 900, answerOnBridge: true });
+    // Deep check 09:00 P5 (M19): never record card numbers. The call recording (when on) runs on this hotline call: it is
+    // paused before the card entry is dialed, and resumed back on our line (pay-done). A pause that fails: no card entry
+    if (ctx.session?.data.recording && !(await pauseRecording(ctx.callSid).then(() => true).catch(() => false))) {
+      await track(ctx.callSid, "step", "Card payment by keypad not started: the call recording could not be paused").catch(() => undefined);
+      return back(vr, "paylink", { o });
+    }
+    const dial = vr.dial({ action: url("pay-done", { o }), method: "POST", timeLimit: 900, answerOnBridge: true, record: "do-not-record" });
     dial.sip({ username: process.env.TWILIO_PAY_SIP_USERNAME, password: process.env.TWILIO_PAY_SIP_PASSWORD }, paySipUri(o, ctx.callSid));
     return vr;
   },
@@ -5293,6 +5299,8 @@ const handlers: Record<string, Handler> = {
   /** Back from the payment line: paid, then on as usual; not paid (declined, chose the link, hung up), the link. */
   async "pay-done"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
+    // Deep check 09:00 P5 (M19): back on our line, the call recording (paused for the card entry) goes on
+    if (ctx.session?.data.recording) await resumeRecording(ctx.callSid).catch(() => null);
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "goodbye");
     if (group.due > 0) return back(vr, "paylink", { o }); // not paid: the payment link, text or email (box 141)
