@@ -175,3 +175,25 @@ describe("our receipt (approved; replaces the short payment email)", () => {
     expect(h.emails[0].subject).toBe("Hup Up Attractions receipt for order #1005");
   });
 });
+
+describe("deep check 0600 M11 + M12 (Stripe refund notices)", () => {
+  const mk = async (pay: string, date: string) =>
+    (await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: date, pickupDate: date, subtotalCents: 10000, totalCents: 10000, paidCents: 10000, paymentMethod: "stripe", stripePaymentId: pay }).returning())[0];
+  it("M11: a payment for several days: a refund already recorded on another day is not recorded again", async () => {
+    const a = await mk("ch_multi", "2027-06-01");
+    const b = await mk("ch_multi", "2027-06-02");
+    await db.insert(schema.orderRefunds).values({ orderId: b.id, amountCents: 500, stripeRefundId: "re_on_day_two", status: "succeeded", source: "admin", provider: "stripe" });
+    await handleStripeEvent({ type: "charge.refunded", data: { object: { id: "ch_multi", amount_refunded: 500 } } });
+    expect((await db.select().from(schema.orderRefunds).where(eq(schema.orderRefunds.orderId, a.id)))).toHaveLength(0);
+  });
+  it("M12: the two kinds of notice for one refund arriving together record it once", async () => {
+    const c = await mk("ch_pair", "2027-06-05");
+    await Promise.all([
+      handleStripeEvent({ type: "charge.refunded", data: { object: { id: "ch_pair", amount_refunded: 300 } } }),
+      handleStripeEvent({ type: "refund.created", data: { object: { id: "re_pair", amount: 300, status: "succeeded", charge: "ch_pair", payment_intent: null } } }),
+    ]);
+    const [after] = await db.select().from(schema.orders).where(eq(schema.orders.id, c.id));
+    expect(after.refundedCents).toBe(300);
+    expect((await db.select().from(schema.appSettings)).filter((s) => s.key.startsWith("lock:"))).toHaveLength(0);
+  });
+});
