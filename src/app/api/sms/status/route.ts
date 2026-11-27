@@ -5,8 +5,8 @@ export const dynamic = "force-dynamic";
 
 /** Twilio message status callback (queued → sent → delivered / failed / undelivered). */
 export async function POST(req: Request) {
-  const { ok, body } = await readTwilioRequest(req);
+  const { ok, body, query } = await readTwilioRequest(req);
   if (!ok) return new Response("Invalid signature", { status: 403 });
-  await handleSmsStatus(body);
+  await handleSmsStatus(body, Number(query.get("m")) || null);
   return new Response(null, { status: 204 });
 }

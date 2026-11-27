@@ -242,8 +242,12 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
 }
 
 /** Twilio message status callback. */
-export async function handleSmsStatus(body: Record<string, string>) {
+export async function handleSmsStatus(body: Record<string, string>, messageId: number | null = null) {
   if (!body.MessageSid) return;
+  // Deep check 0600 M58: the row this text was saved as (from the signed status address). A run cut off right after
+  // Twilio accepted the text never saved Twilio's id; it is saved now, so the text is not held and sent again.
+  if (messageId && Number.isSafeInteger(messageId) && messageId > 0)
+    await db.update(schema.messages).set({ twilioSid: body.MessageSid }).where(and(eq(schema.messages.id, messageId), isNull(schema.messages.twilioSid)));
   const status = body.MessageStatus || body.SmsStatus || "unknown";
   // Extra check E8 (Nov 27, 2026): Twilio's status notices can arrive out of order. A late "sent" never moves a text
   // that is already "delivered" (or failed) back; the update only applies while the saved status is still earlier.

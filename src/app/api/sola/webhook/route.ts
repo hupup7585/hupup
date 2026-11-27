@@ -4,7 +4,7 @@ import { getPaymentGroup, markGroupPaid } from "@/lib/orders";
 import { linkPaymentToAcceptance } from "@/lib/rental-terms";
 import { parseMoneyToCents } from "@/lib/money";
 import { alertOwner, withCallbackAlert } from "@/lib/ops-alerts";
-import { sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 
 /**
@@ -89,7 +89,11 @@ async function handle(req: Request): Promise<Response> {
   // Deep check 06:00 M26: two copies of the same notice at the same moment: the second finds the payment already
   // counted (duplicate) and sends nothing
   if (updated.length && updated.every((u) => "duplicate" in u && u.duplicate)) return new Response("ok (already recorded)");
-  await recordPaymentResult(days.map((d) => d.order.id), "approved", last4Of(fields), field(fields, "xRefNum") || null);
+  // Deep check 06:00 M40: "Paid" only on the days this payment went to; a day still released or cancelled (no money on
+  // it) is not shown as paid (the activity log keeps the whole notice)
+  const after = await db.select({ id: schema.orders.id, status: schema.orders.status, paidCents: schema.orders.paidCents }).from(schema.orders).where(inArray(schema.orders.id, days.map((d) => d.order.id)));
+  const paidDays = after.filter((d) => d.status !== "CANCELLED" || d.paidCents > 0).map((d) => d.id);
+  await recordPaymentResult(paidDays.length ? paidDays : [orderId], "approved", last4Of(fields), field(fields, "xRefNum") || null);
   if (!updated.length && fresh) return new Response("unknown order", { status: 404 });
   // Evidence: tie this payment to the rental terms version the customer accepted (or record that none was).
   if (fresh) await linkPaymentToAcceptance(orderId, field(fields, "xRefNum") || null, cents);
@@ -97,6 +101,16 @@ async function handle(req: Request): Promise<Response> {
   // The "paid" notice only when the booking is now confirmed (Audit C1: never for less than the total)
   // Hark's backend list 2 (Nov 26, 2026): money on an order that was already paid in full sends the customer nothing
   // (the Owner is emailed to refund it)
-  if ((!group.paid || resumed) && fresh && updated.some((u) => u.status === "CONFIRMED")) await paymentReceivedNotices(orderId, cents);
+  if ((!group.paid || resumed) && fresh && updated.some((u) => u.status === "CONFIRMED")) {
+    // Deep check M26 (Nov 27, 2026): two copies of the same notice at the same moment both got here; only the one that
+    // claims this payment reference on the order sends the "paid" text and email
+    const key = ref ?? `${orderId}:${cents}`;
+    const [claimed] = await db
+      .update(schema.orders)
+      .set({ paidNoticeRef: key })
+      .where(and(eq(schema.orders.id, before.order.id), sql`${schema.orders.paidNoticeRef} IS DISTINCT FROM ${key}`))
+      .returning({ id: schema.orders.id });
+    if (claimed) await paymentReceivedNotices(orderId, cents);
+  }
   return new Response("ok");
 }

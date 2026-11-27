@@ -35,6 +35,7 @@ export async function savePromoPicture(input: {
 }): Promise<PromoPicture> {
   if (!isJpeg(input.jpg)) throw new Error("That picture couldn't be converted to JPG. Try another photo.");
   if (input.jpg.length > PICTURE_MAX_BYTES) throw new Error("That picture is still too big after shrinking. Try another photo.");
+  await (await import("@/lib/db-room")).assertDatabaseRoom(input.jpg.length + (input.originalBytes ?? 0)); // extra check HP3
   if (input.source === "upload") {
     const t = (input.originalType ?? "").toLowerCase();
     if (!ORIGINAL_TYPES.includes(t as (typeof ORIGINAL_TYPES)[number])) throw new Error("Use a JPG, JPEG or PNG picture.");
@@ -64,9 +65,13 @@ export async function savePromoPicture(input: {
 
 /** One piece of the full-size original. The last piece marks the original complete when every byte arrived. */
 export async function saveOriginalChunk(pictureId: number, idx: number, data: Buffer, last: boolean): Promise<{ complete: boolean }> {
-  const [p] = await db.select({ originalBytes: schema.promoPictures.originalBytes, source: schema.promoPictures.source }).from(schema.promoPictures).where(eq(schema.promoPictures.id, pictureId)).limit(1);
+  const [p] = await db.select({ originalBytes: schema.promoPictures.originalBytes, source: schema.promoPictures.source, originalComplete: schema.promoPictures.originalComplete }).from(schema.promoPictures).where(eq(schema.promoPictures.id, pictureId)).limit(1);
   if (!p || p.source !== "upload") throw new Error("Picture not found.");
-  if (idx < 0 || data.length === 0 || data.length > ORIGINAL_CHUNK_BYTES) throw new Error("That piece of the photo didn't arrive correctly.");
+  // Extra check HP3 (Nov 27, 2026): a whole-number piece inside the original's size only, never after it is complete
+  // (extra pieces used to corrupt the download; a bad piece number crashed)
+  if (p.originalComplete) return { complete: true };
+  if (!Number.isInteger(idx) || idx < 0 || data.length === 0 || data.length > ORIGINAL_CHUNK_BYTES) throw new Error("That piece of the photo didn't arrive correctly.");
+  if (!p.originalBytes || idx * ORIGINAL_CHUNK_BYTES + data.length > p.originalBytes) throw new Error("That piece of the photo didn't arrive correctly.");
   await db.insert(schema.promoPictureChunks).values({ pictureId, idx, data }).onConflictDoNothing();
   if (!last) return { complete: false };
   const chunks = await db.select({ data: schema.promoPictureChunks.data }).from(schema.promoPictureChunks).where(eq(schema.promoPictureChunks.pictureId, pictureId));

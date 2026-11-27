@@ -49,4 +49,13 @@ describe("Sola notices", () => {
     expect(h.texts.length).toBe(n); // the next repeat sends nothing
     expect((await get(o.id)).paidCents).toBe(6000);
   });
+  it("deep check 06:00 M40: a cancelled day of the booking is not marked Paid by the payment for the other day", async () => {
+    const [d1] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-11-03", pickupDate: "2027-11-04", subtotalCents: 5000, totalCents: 5000, paymentGroupId: 940040, holdExpiresAt: new Date(Date.now() + 600_000) }).returning();
+    const [d2] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "PHONE", eventDate: "2027-11-05", pickupDate: "2027-11-06", subtotalCents: 4000, totalCents: 4000, paymentGroupId: 940040 }).returning();
+    await db.insert(schema.auditLog).values({ action: "order.status", entityType: "order", entityId: String(d2.id), after: { to: "CANCELLED", by: "staff" } });
+    expect((await post({ xResult: "A", xInvoice: invoiceFor(d1.id), xAuthAmount: "50.00", xRefNum: "M40A", xMaskedCardNumber: "4xxxxxxxxxxx1111" })).status).toBe(200);
+    expect((await get(d1.id)).paymentResult).toBe("approved");
+    // "Paid" only where the money went
+    for (const d of [await get(d1.id), await get(d2.id)]) expect(d.paymentResult === "approved", `day ${d.id}`).toBe(d.status !== "CANCELLED" || d.paidCents > 0);
+  });
 });

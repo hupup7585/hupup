@@ -36,6 +36,7 @@ export async function startRecordingUpload(key: string, fileName: string, sizeBy
   if (!(await isConfirmed(key))) throw new Error("Abraham has not confirmed this exact text yet. Record and upload it only after he confirms it.");
   if (!/\.(mp3|wav)$/i.test(fileName)) throw new Error("Upload an MP3 or WAV file.");
   if (sizeBytes <= 0 || sizeBytes > RECORDING_MAX_BYTES) throw new Error("Keep the recording under 10 MB.");
+  await (await import("@/lib/db-room")).assertDatabaseRoom(sizeBytes); // extra check HP3: room left in the free database
   const [r] = await db
     .insert(schema.promptRecordings)
     .values({ promptKey: key, source: "upload", fileName: fileName.slice(0, 200), contentType: /\.wav$/i.test(fileName) ? "audio/wav" : "audio/mpeg", sizeBytes, createdBy: userId })

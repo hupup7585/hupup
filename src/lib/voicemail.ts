@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { sendEmail, sendSms } from "@/lib/notify";
@@ -311,6 +311,17 @@ export async function notifyVoicemail(id: number): Promise<{ sent: number }> {
     .where(and(eq(schema.voicemails.id, id), isNull(schema.voicemails.notifiedAt)))
     .returning();
   if (!v) return { sent: 0 };
+  // Deep check 06:00 M71 (G1 leftover): an error anywhere between the claim and the sending frees the claim, so the
+  // scheduled job tries this alert again (the error is still reported)
+  try {
+    return await sendVoicemailAlert(v);
+  } catch (e) {
+    await db.update(schema.voicemails).set({ notifiedAt: null }).where(eq(schema.voicemails.id, v.id)).catch(() => null);
+    throw e;
+  }
+}
+
+async function sendVoicemailAlert(v: typeof schema.voicemails.$inferSelect): Promise<{ sent: number }> {
   const box = await boxById(v.boxId);
   const [session] = v.callSid ? await db.select({ data: schema.callSessions.data }).from(schema.callSessions).where(eq(schema.callSessions.callSid, v.callSid)).limit(1) : [];
   const phone = toE164(v.fromNumber || "");
@@ -366,7 +377,8 @@ export async function notifyStragglers() {
     .from(schema.voicemails)
     .where(and(isNull(schema.voicemails.notifiedAt), isNull(schema.voicemails.deletedAt), eq(schema.voicemails.state, "submitted"), lt(schema.voicemails.createdAt, sql`now() - interval '15 minutes'`)));
   let n = 0;
-  for (const r of rows) n += (await notifyVoicemail(r.id)).sent ? 1 : 0;
+  // One alert that fails never stops the others (deep check 06:00 M71); it is tried again next run
+  for (const r of rows) n += (await notifyVoicemail(r.id).catch((e) => (console.error("voicemail alert failed", e), { sent: 0 }))).sent ? 1 : 0;
   return n;
 }
 
@@ -412,15 +424,38 @@ export async function restoreVoicemail(id: number) {
 
 /** Delete for good (Owner only, after a confirm step): remove the recording from Twilio. */
 export async function purgeVoicemail(id: number) {
-  const [v] = await db.select().from(schema.voicemails).where(eq(schema.voicemails.id, id)).limit(1);
+  const vm = schema.voicemails;
+  const [v] = await db.select().from(vm).where(eq(vm.id, id)).limit(1);
   if (!v || v.purgedAt) return false;
-  try {
-    await getTwilio()?.recordings(v.recordingSid).remove();
-  } catch (e) {
-    console.error("[voicemail] Twilio recording delete failed:", e);
-    return false;
+  // Extra check I2 (Nov 27, 2026): a forwarded copy plays the original's recording. The Twilio recording (and the
+  // 5-second pieces) go only with the last copy still kept; a copy has no Twilio recording of its own.
+  const audioId = v.audioOf ?? v.id;
+  const [other] = await db
+    .select({ id: vm.id })
+    .from(vm)
+    .where(and(or(eq(vm.id, audioId), eq(vm.audioOf, audioId)), isNull(vm.purgedAt), ne(vm.id, v.id)))
+    .limit(1);
+  if (!other) {
+    const [orig] = audioId === v.id ? [v] : await db.select().from(vm).where(eq(vm.id, audioId)).limit(1);
+    if (orig && !orig.recordingSid.startsWith("fwd-")) {
+      try {
+        await getTwilio()?.recordings(orig.recordingSid).remove();
+      } catch (e) {
+        // already gone at Twilio is fine; anything else: nothing is changed, so it can be tried again
+        if ((e as { status?: number }).status !== 404) {
+          console.error("[voicemail] Twilio recording delete failed:", e);
+          return false;
+        }
+      }
+    }
+    if (orig?.pieces) {
+      const { deletePieces } = await import("@/lib/vm-audio");
+      await deletePieces(audioId, orig.pieces);
+      await db.update(vm).set({ pieces: null }).where(eq(vm.id, audioId));
+    }
   }
-  await db.update(schema.voicemails).set({ purgedAt: new Date(), deletedAt: v.deletedAt ?? new Date() }).where(eq(schema.voicemails.id, id));
+  if (v.noteKey) await (await import("@/lib/r2")).r2Delete(v.noteKey).catch(() => null);
+  await db.update(vm).set({ purgedAt: new Date(), deletedAt: v.deletedAt ?? new Date() }).where(eq(vm.id, id));
   return true;
 }
 

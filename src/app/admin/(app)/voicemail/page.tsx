@@ -8,7 +8,7 @@ import { TEXT_ALERTS_NOT_ACTIVE, hiddenVoicemails, listVoicemails, mainBox, text
 import { getSettings } from "@/lib/settings";
 import { db, schema } from "@/lib/db";
 import { PROMPTS } from "@/lib/ivr/prompts";
-import { setVmPinAction, deleteVoicemailAction, purgeVoicemailAction, restoreVoicemailAction, saveBoxAction, setHeardAction, setUrgentAction } from "./actions";
+import { setVmPinAction, setBoxPasswordAction, deleteVoicemailAction, purgeVoicemailAction, restoreVoicemailAction, saveBoxAction, setHeardAction, setUrgentAction } from "./actions";
 import { dualDateTime } from "@/lib/dual-date";
 import { CALL_OUT_LIVE_APPROVED, VM_ACCESS_LIVE_APPROVED, VM_LOCK_MINUTES, recentVmAccess, vmLockedUntil, vmPinSet } from "@/lib/vm-access";
 
@@ -125,10 +125,10 @@ export default async function VoicemailPage() {
             {!CALL_OUT_LIVE_APPROVED && <b> Calling back is off until you approve the price.</b>}
           </p>
           <table className="mt-3 w-full text-sm" data-vm-personal-boxes>
-            <thead><tr><th className="th">Box</th><th className="th">Box number</th><th className="th">Password</th><th className="th">New message alerts</th></tr></thead>
+            <thead><tr><th className="th">Box</th><th className="th">Box number</th><th className="th">Password</th><th className="th">New message alerts</th><th className="th">Set a new password</th></tr></thead>
             <tbody>
               {personal.map((b) => (
-                <tr key={b.id}><td className="td font-bold">{b.name}</td><td className="td">{b.boxNumber}</td><td className="td">{b.pinHash ? "Changed" : "Default, not changed yet"}{b.lockedUntil && b.lockedUntil > new Date() ? ` · locked until ${when(b.lockedUntil)}` : ""}</td><td className="td">{b.alertsOn ? "On (email)" : "Off"}</td></tr>
+                <tr key={b.id}><td className="td font-bold">{b.name}</td><td className="td">{b.boxNumber}</td><td className="td">{b.pinHash ? "Changed" : "Default, not changed yet"}{b.lockedUntil && b.lockedUntil > new Date() ? ` · locked until ${when(b.lockedUntil)}` : ""}</td><td className="td">{b.alertsOn ? "On (email)" : "Off"}</td><td className="td"><form action={setBoxPasswordAction.bind(null, b.id)} className="flex gap-2" data-vm-box-password><input name="pin" type="password" inputMode="numeric" pattern="[0-9]{4,8}" required autoComplete="new-password" placeholder="4 to 8 digits" aria-label={`New password for ${b.name}`} className="input w-32 py-1 text-xs" /><button className="btn-ghost text-xs">Save</button></form></td></tr>
               ))}
             </tbody>
           </table>

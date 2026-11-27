@@ -523,29 +523,36 @@ function callCartIds(ctx: Ctx): number[] {
  */
 async function reholdCart(ctx: Ctx): Promise<{ p: number; d: string } | null> {
   const { PHONE_HOLD_MINUTES, refreshOrderTotals } = await import("@/lib/orders");
-  let taken: { p: number; d: string } | null = null;
-  for (const id of callCartIds(ctx)) {
-    const full = await getOrderWithItems(id);
-    if (!full) continue;
-    const o = full.order;
-    const expiredRelease = o.status === "CANCELLED" && /Expired hold released/.test(o.notes ?? "");
-    if (o.status !== "HOLD" && !expiredRelease) continue;
-    let kept = 0;
-    for (const it of full.items) {
-      const prod = await getProduct(it.productId);
-      const free = prod ? await checkBookable(prod.id, prod.quantity, o.eventDate, db, o.pickupDate) : 0;
-      if (free >= it.qty) kept++;
-      else {
-        await db.delete(schema.orderItems).where(and(eq(schema.orderItems.orderId, id), eq(schema.orderItems.productId, it.productId)));
-        taken ??= { p: it.productId, d: o.eventDate };
-      }
+  const ids = callCartIds(ctx);
+  if (!ids.length) return null;
+  // Deep check 06:00 M53 (Nov 27, 2026): the whole cart is checked as ONE, in one locked step (items, groups and laser
+  // pools locked in id order, like checkout), so two items sharing a unit (the maze group, a laser pool, the same item
+  // on two days) can never both be held again when only one is free, and another caller can't take it in between.
+  const { lockStock } = await import("@/lib/stock-lock");
+  const { recheckOrderLines } = await import("@/lib/recheck-lines");
+  const r = await db.transaction(async (tx) => {
+    const ords = (await tx.select().from(orders).where(inArray(orders.id, ids)))
+      .filter((o) => o.status === "HOLD" || (o.status === "CANCELLED" && /Expired hold released/.test(o.notes ?? "")))
+      .sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.id - b.id);
+    if (!ords.length) return { taken: null as { p: number; d: string } | null, kept: [] as number[] };
+    const lines = await tx.select().from(schema.orderItems).where(inArray(schema.orderItems.orderId, ords.map((o) => o.id)));
+    await lockStock(tx, lines.map((l) => l.productId));
+    // Out of the count while checked, then each day back in, its items put back one at a time with the ones before counted
+    await tx.update(orders).set({ status: "HOLD", holdExpiresAt: sql`now() - interval '1 second'` }).where(inArray(orders.id, ords.map((o) => o.id)));
+    let taken: { p: number; d: string } | null = null;
+    const kept: number[] = [];
+    for (const o of ords) {
+      await tx.update(orders).set({ holdExpiresAt: new Date(Date.now() + PHONE_HOLD_MINUTES * 60_000), updatedAt: new Date() }).where(eq(orders.id, o.id));
+      const gone = await recheckOrderLines(tx as never, o);
+      if (gone.length) taken ??= { p: gone[0].productId, d: o.eventDate };
+      const [left] = await tx.select({ n: sql<number>`count(*)::int` }).from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id));
+      if (Number(left?.n ?? 0) > 0) kept.push(o.id);
+      else await tx.update(orders).set({ status: "CANCELLED", holdExpiresAt: null, updatedAt: new Date() }).where(eq(orders.id, o.id));
     }
-    if (kept) {
-      await db.update(orders).set({ status: "HOLD", holdExpiresAt: new Date(Date.now() + PHONE_HOLD_MINUTES * 60_000), updatedAt: new Date() }).where(eq(orders.id, id));
-      await refreshOrderTotals(id);
-    } else await db.update(orders).set({ status: "CANCELLED", updatedAt: new Date() }).where(eq(orders.id, id));
-  }
-  return taken;
+    return { taken, kept };
+  });
+  for (const id of r.kept) await refreshOrderTotals(id);
+  return r.taken;
 }
 
 /** Release this call's cart (Box 30, no key): every order still on hold for this call is released. */
@@ -5488,8 +5495,10 @@ const handlers: Record<string, Handler> = {
     // Abraham, Nov 14, 2026, every line: staff pressed 2 = pass the call on to the next number or round, exactly like
     // no answer; voicemail only after the last round. Checked first: Twilio may report that leg as completed.
     const rejectedAt = ctx.session?.data.rejectedAt;
-    const rejected = Boolean(rejectedAt && Date.now() - rejectedAt < 10 * 60_000);
-    if (rejected) await updateSession(ctx.callSid, { data: { rejectedAt: undefined } }, ctx.session);
+    const acceptedAt = Number(ctx.session?.data.acceptedAt ?? 0);
+    // Deep check M18: a staff member who pressed 1 after the "press 2" took the call; the conversation is what ended
+    const rejected = Boolean(rejectedAt && Date.now() - rejectedAt < 10 * 60_000) && !(acceptedAt && acceptedAt >= Number(rejectedAt));
+    if (rejectedAt || acceptedAt) await updateSession(ctx.callSid, { data: { rejectedAt: undefined, acceptedAt: undefined } }, ctx.session);
     if (!rejected && ctx.body.DialCallStatus === "completed") {
       vr.hangup();
       return vr;
@@ -5540,7 +5549,16 @@ const handlers: Record<string, Handler> = {
   },
 
   async "whisper-accept"(ctx, vr) {
-    if (ctx.body.Digits === "1") return vr; // empty response = connect the caller
+    if (ctx.body.Digits === "1") {
+      // Deep check M18 (Nov 27, 2026): in "ring all", someone took the call; remembered on the caller's call so an
+      // earlier "press 2" from another staff phone can't send the caller back to ringing after the conversation
+      const parent = ctx.body.ParentCallSid;
+      if (parent) {
+        const s = await getSession(parent);
+        if (s) await updateSession(parent, { data: { acceptedAt: Date.now() } }, s);
+      }
+      return vr; // empty response = connect the caller
+    }
     // Abraham (Nov 14, 2026): press 2 passes the call on to the next number or round (voicemail only after the last
     // round). Marked on the caller's call, so the next step moves on whatever Twilio reports for this leg.
     const parent = ctx.body.ParentCallSid;
@@ -6066,7 +6084,8 @@ function callerPhoneOf(ctx: { session?: { fromNumber?: string | null } | null; f
   return toE164(ctx.session?.fromNumber ?? ctx.from ?? "") || null;
 }
 
-const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music", "pay-leg", "pay-leg-status", "staff-leg", "staff-leg-accept", "staff-leg-status"]); // music: wait music pieces, not a step of the caller's journey
+// Deep check 06:00 M41: "pay-leg-wait" runs on our call to Sola (not the caller's), so it never makes a caller session
+const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music", "pay-leg", "pay-leg-wait", "pay-leg-status", "staff-leg", "staff-leg-accept", "staff-leg-status"]); // music: wait music pieces, not a step of the caller's journey
 
 /** What a key set in Admin does (Nov 26, 2026). */
 async function ownKey(ctx: Ctx, vr: VR, screen: string, k: KeyDef) {

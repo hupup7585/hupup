@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { getSettings, saveSetting } from "@/lib/settings";
-import { LINE_IDS, addGroup, loadHours, parseDateOverrides, parseWindows, removeFromGroup, setSchedule, type HoursData, type LineId, type Schedule } from "@/lib/hours-schedule";
+import { LINE_IDS, addGroup, effectiveLine, loadHours, scheduleWords, parseDateOverrides, parseWindows, removeFromGroup, setSchedule, type HoursData, type LineId, type Schedule } from "@/lib/hours-schedule";
 
 /** The Hours page (Abraham, Nov 25, 2026, 4:54 PM): Owner only, audited; live on the next call or page view. */
 const back = (q: string) => redirect(`/admin/hours?${q}`);
@@ -13,6 +13,10 @@ const isLine = (x: string): x is LineId => (LINE_IDS as readonly string[]).inclu
 
 async function store(before: HoursData, after: HoursData, userId: number | null, action: string) {
   await saveSetting("hoursSchedules", JSON.stringify(after), userId);
+  // Extra check HP5 (Nov 27, 2026): the recordings that speak the hours are flagged only when the customer service
+  // hours themselves change (in words), not for the Delivery line, a new group or the first save
+  const words = (d: HoursData) => scheduleWords(effectiveLine(d, "cs").schedule);
+  if (words(before) !== words(after)) await (await import("@/lib/recording-flags")).linkedValueChanged("setting:hoursSchedules", words(before), words(after), userId);
   await db.insert(schema.auditLog).values({ userId, action, entityType: "settings", entityId: "hours", before, after });
   revalidatePath("/", "layout"); // the website hours, and every Admin page
 }
