@@ -87,5 +87,38 @@ describe("deep check 06:00 M42, M43", () => {
     expect(src).toContain("jsonb_build_object('staffLegs'");
     expect(src).not.toContain("updateSession(callerSid, { data: { staffLegs");
   });
+  it("M43 paths: 2, star, pound or no key hang up only that staff phone and never claim the caller; 1 afterwards still takes it", async () => {
+    const { eq } = await import("drizzle-orm");
+    await db.update(schema.callSessions).set({ data: {} }).where(eq(schema.callSessions.callSid, "CAhold"));
+    for (const d of ["2", "*", "#", ""]) {
+      const x = await call("staff-leg-accept", d ? { Digits: d } : {}, "c=CAhold&k=0", "CAstaffX");
+      expect(x, `key ${d || "none"}`).toContain("<Hangup/>");
+      expect(x).not.toContain("<Queue>");
+    }
+    const [row] = await db.select().from(schema.callSessions).where(eq(schema.callSessions.callSid, "CAhold"));
+    expect((row.data as Record<string, unknown>).staffBridged).toBeUndefined();
+    expect(await call("staff-leg-accept", { Digits: "1" }, "c=CAhold&k=0", "CAstaffY")).toContain("<Queue>staff-CAhold</Queue>");
+    // a caller who already hung up (no session row): pressing 1 just ends the staff phone
+    expect(await call("staff-leg-accept", { Digits: "1" }, "c=CAgone&k=0", "CAstaffZ")).toContain("<Hangup/>");
+  });
+  it("full simulated call: ring (music, staff phone called), staff takes it; next caller, nobody answers, line voicemail", async () => {
+    const { eq } = await import("drizzle-orm");
+    await db.update(schema.callSessions).set({ data: {} }).where(eq(schema.callSessions.callSid, "CAhold"));
+    h.session.data = {};
+    h.created.length = 0;
+    h.updated.length = 0;
+    expect(await call("ring", {}, "k=0")).toMatch(/<Enqueue [^>]*>staff-CAhold<\/Enqueue>/);
+    expect(h.created).toHaveLength(1);
+    const [s1] = await db.select().from(schema.callSessions).where(eq(schema.callSessions.callSid, "CAhold"));
+    expect((s1.data as { staffLegs?: string[] }).staffLegs).toEqual(["CAstaff1"]);
+    expect(await call("staff-hold", { QueueTime: "3" }, "k=0")).toMatch(/<Play>/);
+    expect(await call("staff-leg-accept", { Digits: "1" }, "c=CAhold&k=0", "CAstaff1")).toContain("<Queue>staff-CAhold</Queue>");
+    await db.update(schema.callSessions).set({ data: {} }).where(eq(schema.callSessions.callSid, "CAhold"));
+    h.session.data = {};
+    h.created.length = 0;
+    await call("ring", {}, "k=0");
+    await call("staff-leg-status", { CallStatus: "no-answer" }, "c=CAhold&k=0&i=0", "CAstaff1");
+    expect(h.updated.some((u) => u.sid === "CAhold" && String(u.body.url).includes("/voicemail?x=0"))).toBe(true);
+  });
 });
 
