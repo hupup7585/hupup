@@ -72,6 +72,9 @@ export function laserRole(p: { id: number; name: string }, kind: CategoryKind, t
   return types.products[String(p.id)] ?? guessLaserRole(p.name, kind);
 }
 
+/** The shared laser gun stock (pools) each role uses, the same as the name rule in availability.ts. */
+export const LASER_ROLE_POOLS: Record<LaserRole, readonly ("maze" | "six" | "four")[]> = { maze_six: ["maze", "six"], maze_four: ["maze", "four"], maze: ["maze"], six_guns: ["six"], four_guns: ["four"], none: [] };
+
 export const isMazeRole = (r: LaserRole) => r === "maze_six" || r === "maze_four" || r === "maze";
 
 /** The saved setting value for a form's choices: only the ones that differ from what the name already gives. */

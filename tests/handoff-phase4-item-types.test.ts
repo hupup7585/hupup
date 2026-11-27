@@ -52,3 +52,24 @@ describe("item types", () => {
     expect(readFileSync("src/app/admin/(app)/pos/PosForm.tsx", "utf8")).not.toMatch(/\/maze\/i\.test/);
   });
 });
+
+describe("laser gun stock follows the item types", () => {
+  it("unset: the same pools as the names give; set: the Owner's types decide", async () => {
+    const { laserPoolInfo } = await import("@/lib/availability");
+    const { saveSetting } = await import("@/lib/settings");
+    const [laser] = await db.insert(schema.categories).values({ name: "Laser Tag", sortOrder: 2, active: true }).returning();
+    const [party] = await db.insert(schema.categories).values({ name: "Party extras", sortOrder: 3, active: true }).returning();
+    const [maze] = await db.insert(schema.products).values({ categoryId: laser.id, name: "Maze with 6 laser guns", priceCents: 1, quantity: 1, active: true }).returning();
+    const [big] = await db.insert(schema.products).values({ categoryId: party.id, name: "Big gun set", priceCents: 1, quantity: 3, active: true }).returning();
+    await saveSetting("itemTypes", "");
+    let info = await laserPoolInfo();
+    expect(info.items.get(maze.id)?.pools).toEqual(["maze", "six"]);
+    expect(info.items.has(big.id)).toBe(false);
+    await saveSetting("itemTypes", JSON.stringify({ categories: { [party.id]: "laser_addons" }, products: { [big.id]: "four_guns" } }));
+    info = await laserPoolInfo();
+    expect(info.items.get(maze.id)?.pools).toEqual(["maze", "six"]);
+    expect(info.items.get(big.id)?.pools).toEqual(["four"]);
+    expect(info.sizes.four).toBe(3);
+    await saveSetting("itemTypes", "");
+  });
+});

@@ -964,6 +964,7 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/catalog/types/page.tsx",
   "app/admin/(app)/pos/PosForm.tsx",
   "app/admin/(app)/pos/page.tsx",
+  "lib/availability.ts",
   "lib/item-types.ts"
  ],
  "staffMutzeEveryWeek": [
