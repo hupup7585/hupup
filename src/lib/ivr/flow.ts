@@ -4684,6 +4684,12 @@ const handlers: Record<string, Handler> = {
         .where(and(eq(orders.id, o.order.id), eq(orders.status, "HOLD")));
     }
     await updateSession(ctx.callSid, { outcome: "checked_out" }, ctx.session);
+    // Address check with two backups (Abraham, Nov 27, 2026): a house no map service could place is priced by its town
+    // and marked "Address not confirmed yet"; it is checked again automatically
+    {
+      const { noteAddressCheck } = await import("@/lib/address-checks");
+      for (const { o } of perDay) await noteAddressCheck(o.order.id);
+    }
     // A number two directory entries share (Abraham, Nov 22, 2026): alert him right away
     const sharedOn = [ctx.from, data.dirPhone ?? null, phone].find(Boolean);
     const shared = (await isSharedNumber(ctx.from)) ? ctx.from : data.dirPhone && (await isSharedNumber(data.dirPhone)) ? data.dirPhone : sharedOn;

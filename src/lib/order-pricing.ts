@@ -74,6 +74,9 @@ export async function ensurePriced(orderId: number): Promise<boolean> {
     .update(schema.orders)
     .set({ deliveryZone: w.zone, deliveryFeeCents: w.deliveryFeeCents, taxPercent: w.taxPercent, taxCents: w.taxCents, totalCents: w.totalCents, servicesCents: w.servicesCents, servicesTaxCents: w.servicesTaxCents, updatedAt: new Date() })
     .where(eq(schema.orders.id, orderId));
+  // Address check with two backups (Abraham, Nov 27, 2026): which service placed the house, or the "not confirmed" mark
+  const { noteAddressCheck } = await import("@/lib/address-checks");
+  await noteAddressCheck(orderId);
   return true;
 }
 

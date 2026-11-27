@@ -103,7 +103,7 @@ describe("zone prices, Orange County only, and the free delivery promo (Abraham,
   /** Census stand-in: the address spot, and the county for that spot. */
   const censusIn = (lng: number, lat: number, county: string) =>
     (async (u: string) =>
-      new Response(JSON.stringify(u.includes("/geographies/") ? { result: { geographies: { Counties: [{ GEOID: county }] } } } : { result: { addressMatches: [{ coordinates: { x: lng, y: lat } }] } }))) as unknown as typeof fetch;
+      new Response(JSON.stringify(u.includes("/geographies/coordinates") ? { result: { geographies: { Counties: [{ GEOID: county }] } } } : { result: { addressMatches: [{ coordinates: { x: lng, y: lat }, geographies: { Counties: [{ GEOID: county }] } }] } }))) as unknown as typeof fetch;
   it("the three prices are the Owner's, with $10, $15 and $20 as the defaults", () => {
     expect([zoneFee("local"), zoneFee("area"), zoneFee("outside")]).toEqual([1000, 1500, 2000]);
     expect(zoneFee("outside", { deliveryFeeOutsideCents: "2500" })).toBe(2500);

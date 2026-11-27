@@ -80,6 +80,15 @@ export const SETTING_DEFAULTS = {
   zoneKjPlaces: "Kiryas Joel\nKiryas Yoel\nTown of Palm Tree\nPalm Tree",
   /** Surrounding towns ($15 zone), all in Orange County. */
   zoneAreaPlaces: "Monroe\nBlooming Grove\nWoodbury\nHighland Mills\nChester\nHarriman\nMiddletown\nWashingtonville",
+  /* Address check with two backups (Abraham, Nov 27, 2026, 2:02 AM): the rest of Orange County by town name (used only
+     when no map service answers), the two free backups, and the re-check timing */
+  zoneCountyPlaces:
+    "Orange County\nGoshen\nNewburgh\nNew Windsor\nWarwick\nFlorida\nPort Jervis\nCornwall\nCornwall on Hudson\nMontgomery\nWalden\nMaybrook\nPine Bush\nWallkill\nGreenwood Lake\nTuxedo\nTuxedo Park\nOtisville\nWesttown\nSlate Hill\nUnionville\nPine Island\nSugar Loaf\nCampbell Hall\nCircleville\nBullville\nCuddebackville\nHuguenot\nVails Gate\nSalisbury Mills\nMountainville\nCentral Valley\nRock Tavern\nHighland Falls\nWest Point\nFort Montgomery\nSouthfields\nArden\nHamptonburgh\nCrawford\nDeerpark\nMount Hope\nMinisink\nWawayanda\nGreenville",
+  geoBackupCensusOn: true,
+  geoBackupOsmOn: true,
+  addressRecheckEarlyMinutes: "15",
+  addressRecheckEarlyForMinutes: "60",
+  addressRecheckLaterMinutes: "60",
   /* Jewish calendar (Abraham, 2026-11-06). Diaspora; zmanim for Monroe / Kiryas Joel. Booleans as "yes"/"no". */
   /* Sola PhonePay (Abraham, Nov 14, 2026): card by phone through Sola's free PhonePay line. Off; Owner test first. */
   /** The Owner's sign-in username (Abraham, Nov 14, 2026); staff usernames live on their accounts */

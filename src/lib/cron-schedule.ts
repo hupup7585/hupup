@@ -21,6 +21,7 @@ export const TIMED_JOBS = [
   { name: "Voicemail alerts safety net", every: "Every 3 hours, and whenever the system is already in use", why: "Only retries an alert that failed; the normal alert goes out the moment the message is left." },
   { name: "Erase deleted voicemails after 30 days", every: "Every 3 hours", why: "Nothing waits on it." },
   { name: "Held promotional texts", every: "Every 3 hours", why: "Promotional texts held for quiet hours go out up to 3 hours after quiet hours end; consent and quiet hours are checked again before each one." },
+  { name: "Address re-checks", every: "Every 3 hours, and whenever one is due: every 15 minutes for the first hour, then hourly (Delivery settings)", why: "Houses no map service could place are checked again; a small file on free Cloudflare storage says when, so the database wakes only then." },
   { name: "Scheduled emails", every: "Every 3 hours, and whenever the system is already in use", why: "An email scheduled for a set time goes out within minutes while anyone uses the system, and within 3 hours otherwise." },
 ] as const;
 

@@ -28,7 +28,14 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
-  if (!dueNow() && new URL(req.url).searchParams.get("all") !== "1") return Response.json({ skipped: "not due: the jobs run every 3 hours, without waking the database in between" });
+  // Address re-checks (Abraham, Nov 27, 2026): every 15 minutes for the first hour, then hourly. A small file on our
+  // free Cloudflare storage says when the next one is due, so the database wakes only then (Neon free plan)
+  const { recheckDue, runAddressChecks } = await import("@/lib/address-checks");
+  if (!dueNow() && new URL(req.url).searchParams.get("all") !== "1") {
+    if (await recheckDue()) return Response.json({ addressChecks: await runJob("Address re-checks (when due)", () => runAddressChecks()) });
+    return Response.json({ skipped: "not due: the jobs run every 3 hours, without waking the database in between" });
+  }
+  const addressChecks = await runJob("Address re-checks (every 3 hours, and when due)", () => runAddressChecks());
   const released = await runJob("Release ended holds (every 3 hours)", () => releaseExpired());
   const voicemailAlerts = await runJob("Voicemail alerts safety net (every 3 hours)", () => notifyStragglers());
   // Deleted voicemails are kept 30 days, then erased forever with their pieces (Nov 23, 2026)
@@ -36,5 +43,5 @@ export async function GET(req: Request) {
   const heldPromotions = await runJob("Held promotional texts (every 3 hours)", () => processHeldPromotions());
   // Schedule send in the Admin Inbox (Abraham, Nov 19, 2026)
   const scheduledEmails = await runJob("Scheduled emails (every 3 hours)", () => sendScheduledEmails());
-  return Response.json({ released, voicemailAlerts, heldPromotions, scheduledEmails });
+  return Response.json({ released, voicemailAlerts, heldPromotions, scheduledEmails, addressChecks });
 }

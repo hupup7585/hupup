@@ -144,51 +144,110 @@ const normalizeAddress = (a: string) => a.trim().replace(/\s+/g, " ").toLowerCas
 export const withState = (a: string) => (/\b(ny|new york)\b/i.test(a) ? a : `${a}, NY`);
 
 /** Neon free plan (Nov 26, 2026): addresses already looked up are kept in memory too (a page pricing many orders). */
-const GEO_MEMO = new Map<string, { lng: number; lat: number; source: string } | null>();
-export async function geocode(address: string, fetcher: typeof fetch = fetch): Promise<{ lng: number; lat: number; source: string } | null> {
-  const key = normalizeAddress(address);
-  if (!process.env.VITEST && GEO_MEMO.has(key)) return GEO_MEMO.get(key)!;
-  const [hit] = await db.select().from(schema.geocodeCache).where(eq(schema.geocodeCache.address, key)).limit(1);
-  if (hit) {
-    const v = hit.lat === null || hit.lng === null ? null : { lng: hit.lng, lat: hit.lat, source: hit.source };
-    if (GEO_MEMO.size > 2000) GEO_MEMO.clear();
-    GEO_MEMO.set(key, v);
-    return v;
-  }
-  // Hark's 2nd phone check, B8 (Nov 26, 2026): both map services at the same time with a short limit (a phone step must
-  // answer well within Twilio's 15 seconds), and "not found" is remembered ONLY when both really answered "no match";
-  // a timeout or an error is never saved, so the same address works again once the service is back
-  type Look = { found: { lng: number; lat: number; source: string } | null; answered: boolean };
+const GEO_MEMO = new Map<string, GeoHit>();
+export type GeoHit = { lng: number; lat: number; source: string; county?: string | null };
+export type GeoLookup = { found: GeoHit | null; allAnswered: boolean; tried: string[] };
+export type GeoOptions = { census?: boolean; osm?: boolean; fresh?: boolean };
+
+/** About 4.5 seconds per map service, so all three stay well under Twilio's 15 seconds (Abraham, Nov 27, 2026). */
+export const GEO_TRY_MS = 4500;
+let lastOsmAt = 0;
+
+/**
+ * Address check with two backups (Abraham, Nov 27, 2026, 2:02 AM): the main map service (Google, used only when a
+ * GOOGLE_MAPS_API_KEY is set), then backup 1, the free US Census Bureau geocoder (no key), then backup 2, OpenStreetMap
+ * Nominatim (free; at most one request a second, with a User-Agent naming Hup Up Attractions). Each backup can be turned
+ * off in Admin (Delivery settings). The first that answers with a house decides; its county comes along when it gives one.
+ * `allAnswered` is true only when every service tried really answered "no such address" (not a timeout or an error).
+ */
+export async function lookupAddress(address: string, fetcher: typeof fetch = fetch, opts: GeoOptions = {}): Promise<GeoLookup> {
+  const tried: string[] = [];
+  let allAnswered = true;
+  type Look = { found: GeoHit | null; answered: boolean };
+  const google = async (): Promise<Look> => {
+    const key = process.env.GOOGLE_MAPS_API_KEY;
+    try {
+      const r = await fetcher(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(withState(address))}&components=country:US&key=${encodeURIComponent(String(key))}`, { signal: AbortSignal.timeout(GEO_TRY_MS) });
+      if (!r.ok) return { found: null, answered: false };
+      const j = (await r.json()) as { status?: string; results?: { geometry?: { location?: { lat: number; lng: number } }; address_components?: { long_name: string; types: string[] }[]; partial_match?: boolean }[] };
+      if (j.status === "ZERO_RESULTS") return { found: null, answered: true };
+      const hit = j.status === "OK" ? j.results?.find((x) => !x.partial_match) ?? null : null;
+      const loc = hit?.geometry?.location;
+      if (!loc) return { found: null, answered: false };
+      const comp = (t: string) => hit?.address_components?.find((c) => c.types.includes(t))?.long_name ?? "";
+      const county = comp("administrative_area_level_2") ? (/orange/i.test(comp("administrative_area_level_2")) && /new york/i.test(comp("administrative_area_level_1")) ? ORANGE_COUNTY_NY : "other") : null;
+      return { found: { lng: loc.lng, lat: loc.lat, source: "google", county }, answered: true };
+    } catch {
+      return { found: null, answered: false };
+    }
+  };
   const census = async (): Promise<Look> => {
     try {
-      const r = await fetcher(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=${encodeURIComponent(withState(address))}`, { signal: AbortSignal.timeout(5000) });
+      const r = await fetcher(`https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress?benchmark=Public_AR_Current&vintage=Current_Current&layers=Counties&format=json&address=${encodeURIComponent(withState(address))}`, { signal: AbortSignal.timeout(GEO_TRY_MS) });
       if (!r.ok) return { found: null, answered: false };
-      const j = (await r.json()) as { result?: { addressMatches?: { coordinates?: { x: number; y: number } }[] } };
-      const c = j.result?.addressMatches?.[0]?.coordinates;
-      return { found: c ? { lng: c.x, lat: c.y, source: "census" } : null, answered: Boolean(j.result) };
+      const j = (await r.json()) as { result?: { addressMatches?: { coordinates?: { x: number; y: number }; geographies?: { Counties?: { GEOID?: string }[] } }[] } };
+      const m = j.result?.addressMatches?.[0];
+      const c = m?.coordinates;
+      return { found: c ? { lng: c.x, lat: c.y, source: "census", county: m?.geographies?.Counties?.[0]?.GEOID ?? null } : null, answered: Boolean(j.result) };
     } catch {
       return { found: null, answered: false };
     }
   };
   const osm = async (): Promise<Look> => {
     try {
-      const r = await fetcher(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(withState(address))}`, { headers: { "user-agent": "HupUpAttractionsBookings/1.0" }, signal: AbortSignal.timeout(5000) });
+      const wait = lastOsmAt + 1000 - Date.now(); // never more than one request a second
+      if (wait > 0) await new Promise((res) => setTimeout(res, wait));
+      lastOsmAt = Date.now();
+      const r = await fetcher(`https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=us&q=${encodeURIComponent(withState(address))}`, { headers: { "user-agent": "HupUpAttractions-Bookings/1.0 (Hup Up Attractions delivery address check)" }, signal: AbortSignal.timeout(GEO_TRY_MS) });
       if (!r.ok) return { found: null, answered: false };
-      const j = (await r.json()) as { lat?: string; lon?: string }[];
-      return { found: j[0]?.lat && j[0]?.lon ? { lng: Number(j[0].lon), lat: Number(j[0].lat), source: "openstreetmap" } : null, answered: Array.isArray(j) };
+      const j = (await r.json()) as { lat?: string; lon?: string; address?: { county?: string; state?: string } }[];
+      if (!Array.isArray(j)) return { found: null, answered: false };
+      const a = j[0];
+      const county = a?.address?.county ? (/orange/i.test(a.address.county) && /new york/i.test(a.address.state ?? "") ? ORANGE_COUNTY_NY : "other") : null;
+      return { found: a?.lat && a?.lon ? { lng: Number(a.lon), lat: Number(a.lat), source: "openstreetmap", county } : null, answered: true };
     } catch {
       return { found: null, answered: false };
     }
   };
-  const [a, b] = await Promise.all([census(), osm()]);
-  const found = a.found ?? b.found;
-  if (found || (a.answered && b.answered)) {
+  const steps: [string, () => Promise<Look>][] = [];
+  if (process.env.GOOGLE_MAPS_API_KEY) steps.push(["google", google]);
+  if (opts.census !== false) steps.push(["census", census]);
+  if (opts.osm !== false) steps.push(["openstreetmap", osm]);
+  for (const [name, run] of steps) {
+    tried.push(name);
+    const r = await run();
+    if (r.found) return { found: r.found, allAnswered: false, tried };
+    if (!r.answered) allAnswered = false;
+  }
+  return { found: null, allAnswered: allAnswered && tried.length > 0, tried };
+}
+
+/** A house on the map (from the saved list first). A lookup that failed is never saved as "not found" (Nov 27, 2026). */
+export async function geocode(address: string, fetcher: typeof fetch = fetch, opts: GeoOptions = {}): Promise<GeoHit | null> {
+  return (await geocodeDetail(address, fetcher, opts)).found;
+}
+
+export async function geocodeDetail(address: string, fetcher: typeof fetch = fetch, opts: GeoOptions = {}): Promise<GeoLookup> {
+  const key = normalizeAddress(address);
+  if (!opts.fresh) {
+    if (!process.env.VITEST && GEO_MEMO.has(key)) return { found: GEO_MEMO.get(key)!, allAnswered: false, tried: [] };
+    const [hit] = await db.select().from(schema.geocodeCache).where(eq(schema.geocodeCache.address, key)).limit(1);
+    // older "none" rows (from before Nov 27, 2026) are ignored: the address is looked up again
+    if (hit && hit.lat !== null && hit.lng !== null) {
+      const v = { lng: hit.lng, lat: hit.lat, source: hit.source };
+      if (GEO_MEMO.size > 2000) GEO_MEMO.clear();
+      GEO_MEMO.set(key, v);
+      return { found: v, allAnswered: false, tried: [] };
+    }
+  }
+  const r = await lookupAddress(address, fetcher, opts);
+  if (r.found) {
     await db
       .insert(schema.geocodeCache)
-      .values({ address: key, lat: found?.lat ?? null, lng: found?.lng ?? null, source: found?.source ?? "none" })
-      .onConflictDoNothing();
+      .values({ address: key, lat: r.found.lat, lng: r.found.lng, source: r.found.source })
+      .onConflictDoUpdate({ target: schema.geocodeCache.address, set: { lat: r.found.lat, lng: r.found.lng, source: r.found.source } });
   }
-  return found;
+  return r;
 }
 
 /** Orange County, New York (Census county code). */
@@ -205,7 +264,7 @@ export async function countyAt(lng: number, lat: number, fetcher: typeof fetch =
   if (countyCache.has(k)) return countyCache.get(k) ?? null;
   let geoid: string | null = null;
   try {
-    const r = await fetcher(`https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=${lng}&y=${lat}&benchmark=Public_AR_Current&vintage=Current_Current&layers=Counties&format=json`, { signal: AbortSignal.timeout(8000) });
+    const r = await fetcher(`https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=${lng}&y=${lat}&benchmark=Public_AR_Current&vintage=Current_Current&layers=Counties&format=json`, { signal: AbortSignal.timeout(GEO_TRY_MS) });
     const j = (await r.json().catch(() => ({}))) as { result?: { geographies?: { Counties?: { GEOID?: string }[] } } };
     geoid = j.result?.geographies?.Counties?.[0]?.GEOID ?? null;
   } catch {
@@ -289,7 +348,7 @@ export function spellingHint(address: string, list: string): string | null {
   return best && best.d <= Math.max(2, Math.floor(typed.length / 5)) ? best.n : null;
 }
 
-export type DeliveryQuote = { ok: true; zone: string; feeCents: number; kind?: "local" | "area" | "outside" } | { ok: false; reason: "no_address" | "not_found" | "outside" | "no_price"; area?: string };
+export type DeliveryQuote = { ok: true; zone: string; feeCents: number; kind?: "local" | "area" | "outside"; source?: string; unconfirmed?: boolean } | { ok: false; reason: "no_address" | "not_found" | "outside" | "no_price"; area?: string };
 
 /**
  * The delivery fee for an address: the price of the map area it is in. Before the map is loaded, the older town-name
@@ -304,16 +363,34 @@ export async function deliveryQuote(address: string | null | undefined, s: ZoneP
     const z = deliveryZone(address, s);
     return z === "outside" ? { ok: false, reason: "outside" } : { ok: true, zone: z, feeCents: zoneFee(z === "kj" ? "local" : "area", s, now), kind: z === "kj" ? "local" : "area" };
   }
-  // The house decides (Abraham, Nov 15, 2026): its spot on the map, from the free US Census address service
-  const at = await geocode(address, fetcher);
-  if (!at) return { ok: false, reason: "not_found" };
+  // The house decides (Abraham, Nov 15, 2026): its spot on the map. Main service, then the two free backups (Nov 27, 2026)
+  const on = (v: unknown) => v !== false && v !== "false";
+  const opts = { census: on((s as { geoBackupCensusOn?: unknown }).geoBackupCensusOn), osm: on((s as { geoBackupOsmOn?: unknown }).geoBackupOsmOn) };
+  const at = await geocode(address, fetcher, opts);
+  if (!at) {
+    // Every map service failed (Abraham, Nov 27, 2026): the customer is not blocked. The price comes from the town they
+    // gave (Delivery settings town lists); the order is marked "Address not confirmed yet" and checked again later.
+    const t = townQuote(address, s, now);
+    return t ?? { ok: false, reason: "not_found" };
+  }
   const a = areaAt(at.lng, at.lat, areas);
   // Outside every colored area: Orange County, NY only (Abraham, Nov 17, 2026)
   if (!a) {
-    const county = await countyAt(at.lng, at.lat, fetcher);
+    const county = at.county ?? (await countyAt(at.lng, at.lat, fetcher));
     if (county && county !== ORANGE_COUNTY_NY) return { ok: false, reason: "outside" };
   }
-  return { ok: true, zone: a ? a.name : "Anywhere else in Orange County", feeCents: priceFor(a, s, now), kind: zoneKind(a) };
+  return { ok: true, zone: a ? a.name : "Anywhere else in Orange County", feeCents: priceFor(a, s, now), kind: zoneKind(a), source: at.source };
+}
+
+/** The town lists in Delivery settings: Kiryas Joel zone, nearby towns, the rest of Orange County. Null = no town matched. */
+export function townQuote(address: string, s: ZonePrices & { zoneKjPlaces: string; zoneAreaPlaces: string; zoneCountyPlaces?: string }, now: Date | string = new Date()): DeliveryQuote | null {
+  const norm = (x: string) => ` ${x.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
+  const a = norm(address);
+  const has = (list: string | undefined) => String(list ?? "").split("\n").map((x) => x.trim()).filter(Boolean).some((p) => a.includes(norm(p)));
+  const kind: "local" | "area" | "outside" | null = has(s.zoneKjPlaces) ? "local" : has(s.zoneAreaPlaces) ? "area" : has(s.zoneCountyPlaces) ? "outside" : null;
+  if (!kind) return null;
+  const zone = kind === "local" ? "Kiryas Joel" : kind === "area" ? "Nearby towns" : "Anywhere else in Orange County";
+  return { ok: true, zone, feeCents: zoneFee(kind, s, now), kind, source: "town", unconfirmed: true };
 }
 
 export const QUOTE_WHY: Record<string, string> = {

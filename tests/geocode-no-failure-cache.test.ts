@@ -15,14 +15,13 @@ describe("map lookup", () => {
     const failing = (async () => { throw new Error("timeout"); }) as unknown as typeof fetch;
     const t0 = Date.now();
     expect(await geocode("12 Nowhere Road, Monroe, NY 10950", failing)).toBeNull();
-    expect(Date.now() - t0).toBeLessThan(6000);
+    expect(Date.now() - t0).toBeLessThan(14000); // one try after the other, about 4.5 seconds each at most
     expect(await db.select().from(schema.geocodeCache)).toEqual([]);
   });
-  it("both services answer 'no match': saved as not found", async () => {
+  it("both services answer 'no match': still never saved as 'not found' (Abraham, Nov 27, 2026), so it is asked again next time", async () => {
     const none = (async (url: string) => new Response(JSON.stringify(String(url).includes("census") ? { result: { addressMatches: [] } } : []))) as unknown as typeof fetch;
     expect(await geocode("99 Nowhere Lane, Monroe, NY 10950", none)).toBeNull();
-    const rows = await db.select().from(schema.geocodeCache);
-    expect(rows.map((r) => r.source)).toEqual(["none"]);
+    expect(await db.select().from(schema.geocodeCache)).toEqual([]);
   });
   it("one service answers with a place: found and saved", async () => {
     const census = (async (url: string) => new Response(JSON.stringify(String(url).includes("census") ? { result: { addressMatches: [{ coordinates: { x: -74.18, y: 41.33 } }] } } : []))) as unknown as typeof fetch;

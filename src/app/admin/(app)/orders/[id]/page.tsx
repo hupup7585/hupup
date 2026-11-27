@@ -49,6 +49,22 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         <StatusBadge status={o.status} />
         <span className="text-sm text-muted">{o.channel === "PHONE" ? "Booked by phone" : "Booked in person"} · <DualDate yi at={o.createdAt} /></span>
       </div>
+      {/* Address check with two backups (Abraham, Nov 27, 2026): red while the house is not confirmed on the map */}
+      {await (async () => {
+        const { addressMarks } = await import("@/lib/address-checks");
+        const mark = (await addressMarks([o.id])).get(o.id);
+        const SOURCE: Record<string, string> = { google: "Google Maps", census: "US Census Bureau (backup 1)", openstreetmap: "OpenStreetMap (backup 2)", town: "the town name only (no map service answered)" };
+        return (
+          <>
+            {mark && (
+              <div data-address-mark className="mb-3 rounded-xl border-2 border-[#C83A2F] bg-[#FFE6E4] p-3 text-sm font-semibold text-[#5C1A14]">
+                {mark}. The delivery price came from the town on the order. The address is checked again automatically; nothing is charged, refunded or cancelled by itself.
+              </div>
+            )}
+            {o.addressSource && <p data-address-source className="mb-3 text-xs text-muted">Address placed on the map by: {SOURCE[o.addressSource] ?? o.addressSource}</p>}
+          </>
+        );
+      })()}
       {o.status === "NEEDS_ATTENTION" && (await (async () => {
         const free = await attentionItemsFree(o.id);
         return (

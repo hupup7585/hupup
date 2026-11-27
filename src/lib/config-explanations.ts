@@ -419,6 +419,36 @@ const OTHER: Record<string, Explanation> = {
     where: "Customers whose address is in one of these towns, when the map areas cannot decide.",
     ifChanged: "New orders in these towns get the nearby-towns fee.",
   },
+  zoneCountyPlaces: {
+    what: "Town names in the rest of Orange County, one per line, for the outside-zone delivery fee.",
+    where: "Used only when no map service can place a house: the price then comes from the town the customer gave.",
+    ifChanged: "New orders in these towns get the rest-of-Orange-County fee when the map services cannot answer.",
+  },
+  geoBackupCensusOn: {
+    what: "Backup 1 for the address check: the free US Census Bureau address service.",
+    where: "Every delivery address on the phone, the website and New booking, when the main map service fails or finds nothing.",
+    ifChanged: "Off: the Census Bureau is not asked, so the next backup (or the town price) is used sooner.",
+  },
+  geoBackupOsmOn: {
+    what: "Backup 2 for the address check: the free Open Street Map address service (at most one lookup a second).",
+    where: "Every delivery address, only when the main service and backup 1 both fail or find nothing.",
+    ifChanged: "Off: Open Street Map is not asked; when the others fail the price comes from the town name.",
+  },
+  addressRecheckEarlyMinutes: {
+    what: "How often an address that was not confirmed is checked again at first, in minutes.",
+    where: "Orders marked red Address not confirmed yet (order page, deliveries list, driver screen).",
+    ifChanged: "Shorter: checked more often in the first part; longer: fewer checks.",
+  },
+  addressRecheckEarlyForMinutes: {
+    what: "How long the first, more frequent checks go on, in minutes after the booking.",
+    where: "Orders marked Address not confirmed yet. After this time the Owner gets one text if it is still not confirmed.",
+    ifChanged: "The Owner text and the switch to the slower checks come earlier or later.",
+  },
+  addressRecheckLaterMinutes: {
+    what: "How often the address is checked again after the first period, in minutes.",
+    where: "Orders still marked Address not confirmed yet, or with an address problem.",
+    ifChanged: "The later checks happen more or less often.",
+  },
   ownerUsername: {
     what: "The Owner's sign-in username for Admin.",
     where: "Staff only: the Admin sign-in screen.",

@@ -86,3 +86,21 @@ export async function saveLocalStreetsAction(form: FormData) {
   revalidatePath("/admin/delivery-settings");
   redirect(`/admin/delivery-settings?${msgQuery(`Saved (${list.length} streets).`)}#streets`);
 }
+
+/** Address check with two backups (Abraham, Nov 27, 2026): the backups on or off, the re-check timing, the county towns. */
+export async function saveAddressCheckAction(form: FormData) {
+  const owner = await requireOwner();
+  const n = (k: string, d: number, min: number, max: number) => {
+    const v = Math.round(Number(form.get(k)));
+    return String(Number.isFinite(v) && v >= min && v <= max ? v : d);
+  };
+  const towns = [...new Set(String(form.get("zoneCountyPlaces") ?? "").split(/\r?\n/).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 500).join("\n");
+  await saveSetting("geoBackupCensusOn", form.get("geoBackupCensusOn") === "on", owner.userId);
+  await saveSetting("geoBackupOsmOn", form.get("geoBackupOsmOn") === "on", owner.userId);
+  await saveSetting("addressRecheckEarlyMinutes", n("addressRecheckEarlyMinutes", 15, 5, 120), owner.userId);
+  await saveSetting("addressRecheckEarlyForMinutes", n("addressRecheckEarlyForMinutes", 60, 0, 1440), owner.userId);
+  await saveSetting("addressRecheckLaterMinutes", n("addressRecheckLaterMinutes", 60, 15, 1440), owner.userId);
+  await saveSetting("zoneCountyPlaces", towns, owner.userId);
+  revalidatePath("/admin/delivery-settings");
+  redirect(`/admin/delivery-settings?${msgQuery("Saved.")}#address-check`);
+}

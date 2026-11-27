@@ -31,9 +31,9 @@ describe("the 5-minute scheduler call", () => {
     const calls = Array.from({ length: 288 }, (_, i) => new Date(Date.UTC(2026, 10, 26, 0, i * 5))); // a day of 5-minute calls
     expect(calls.filter((d) => dueNow(d)).length).toBe(8);
   });
-  it("the five jobs are listed in plain words with their timing", async () => {
+  it("the six jobs are listed in plain words with their timing", async () => {
     const { TIMED_JOBS } = await import("@/lib/cron-schedule");
-    expect(TIMED_JOBS.map((j) => j.name)).toEqual(["Release ended holds", "Voicemail alerts safety net", "Erase deleted voicemails after 30 days", "Held promotional texts", "Scheduled emails"]);
+    expect(TIMED_JOBS.map((j) => j.name)).toEqual(["Release ended holds", "Voicemail alerts safety net", "Erase deleted voicemails after 30 days", "Held promotional texts", "Address re-checks", "Scheduled emails"]);
     for (const j of TIMED_JOBS) expect(j.every).toMatch(/^Every 3 hours/);
   });
   it("the two time-sensitive jobs also run while the system is in use, at most every 10 minutes, adding no wake-ups", async () => {

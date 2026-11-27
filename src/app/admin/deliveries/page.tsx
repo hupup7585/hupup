@@ -44,6 +44,8 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
         .where(inArray(schema.orderItems.orderId, ids))
     : [];
   const stages = await stagesFor(ids);
+  // Address check (Abraham, Nov 27, 2026): red "Address not confirmed yet" (or the problem) on the stop
+  const addrMarks = await (await import("@/lib/address-checks")).addressMarks(ids);
   const photos = ids.length ? await db.select({ id: schema.deliveryPhotos.id, orderId: schema.deliveryPhotos.orderId, stop: schema.deliveryPhotos.stop }).from(schema.deliveryPhotos).where(inArray(schema.deliveryPhotos.orderId, ids)) : [];
   const driverNames = new Map((await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers).where(eq(schema.adminUsers.role, "delivery"))).map((d) => [d.id, d.name]));
   const custIds = rows.map((r) => r.customerId).filter((x): x is number => Boolean(x));
@@ -179,6 +181,11 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
                       "No address"
                     )}
                   </div>
+                  {addrMarks.get(o.id) && (
+                    <div data-address-mark className="mt-1 rounded-lg bg-[#FFE6E4] px-2 py-1 text-sm font-bold text-[#b3261e]">
+                      {addrMarks.get(o.id)}
+                    </div>
+                  )}
                   <div className="mt-0.5 text-sm text-muted">{its.map((i) => `${i.qty} × ${i.name}`).join(", ")}</div>
                   {o.notes && <div className="mt-1 text-sm">Note: {o.notes}</div>}
                   {photos.some((p) => p.orderId === o.id && p.stop === stop) && (

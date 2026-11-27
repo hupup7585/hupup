@@ -197,6 +197,33 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "lib/delivery-areas.ts",
   "lib/pricing.ts"
  ],
+ "geoBackupCensusOn": [
+  "app/admin/(app)/delivery-settings/area-actions.ts",
+  "app/admin/(app)/delivery-settings/page.tsx",
+  "lib/address-checks.ts",
+  "lib/delivery-areas.ts"
+ ],
+ "geoBackupOsmOn": [
+  "app/admin/(app)/delivery-settings/area-actions.ts",
+  "app/admin/(app)/delivery-settings/page.tsx",
+  "lib/address-checks.ts",
+  "lib/delivery-areas.ts"
+ ],
+ "addressRecheckEarlyMinutes": [
+  "app/admin/(app)/delivery-settings/area-actions.ts",
+  "app/admin/(app)/delivery-settings/page.tsx",
+  "lib/address-checks.ts"
+ ],
+ "addressRecheckEarlyForMinutes": [
+  "app/admin/(app)/delivery-settings/area-actions.ts",
+  "app/admin/(app)/delivery-settings/page.tsx",
+  "lib/address-checks.ts"
+ ],
+ "addressRecheckLaterMinutes": [
+  "app/admin/(app)/delivery-settings/area-actions.ts",
+  "app/admin/(app)/delivery-settings/page.tsx",
+  "lib/address-checks.ts"
+ ],
  "ownerUsername": [
   "app/admin/(app)/staff/SimpleStaff.tsx",
   "app/admin/(app)/staff/actions.ts",

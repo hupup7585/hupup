@@ -5,7 +5,7 @@ import StockAddressForm from "../settings/StockAddressForm";
 import { DeliveryPricingForm } from "../settings/PricingForms";
 import { DELIVERY_TEMPLATES } from "@/lib/delivery-templates";
 import { PROMO_CENTS, deliveryPromoActive, priceFor, savedAreas, zoneFee } from "@/lib/delivery-areas";
-import { checkAddressAction, reloadMapAction, saveAreasAction, saveLocalStreetsAction, saveZonePricesAction } from "./area-actions";
+import { checkAddressAction, reloadMapAction, saveAddressCheckAction, saveAreasAction, saveLocalStreetsAction, saveZonePricesAction } from "./area-actions";
 
 const usd = (c: number | string) => `$${(Number(c) / 100).toFixed(2)}`;
 
@@ -82,8 +82,25 @@ export default async function DeliverySettingsPage({ searchParams }: { searchPar
         </form>
       </section>
       <section className="card mb-6 p-5" id="fees">
-        <h2 className="mb-3 text-lg font-extrabold">Town lists (used only until the map is loaded)</h2>
+        <h2 className="mb-1 text-lg font-extrabold">Town lists</h2>
+        <p className="mb-3 text-sm text-muted">Used before the map is loaded, and when no map service can place a house (see Address check below): then the price comes from the town the customer gave.</p>
         <DeliveryPricingForm initial={{ deliveryFeeKjCents: settings.deliveryFeeKjCents, deliveryFeeAreaCents: settings.deliveryFeeAreaCents, zoneKjPlaces: settings.zoneKjPlaces, zoneAreaPlaces: settings.zoneAreaPlaces }} />
+      </section>
+      {/* Address check with two backups (Abraham, Nov 27, 2026, 2:02 AM) */}
+      <section className="card mb-6 p-5" id="address-check" data-address-check>
+        <h2 className="mb-1 text-lg font-extrabold">Address check (two free backups)</h2>
+        <p className="mb-3 text-sm text-muted">
+          Every delivery address is placed on the map to find its zone. {process.env.GOOGLE_MAPS_API_KEY ? "Google Maps is tried first." : "Google Maps is not set up (no key), so backup 1 is tried first."} If a service fails, takes too long (about 4 to 5 seconds) or finds nothing, the next one is asked. Both backups are free and need no card. If all of them fail, the customer is not stopped: the price comes from the town they gave (the town lists below), the order is marked red &ldquo;Address not confirmed yet&rdquo;, and the address is checked again automatically. You get one text per order per problem (still not confirmed after the first hour, the address does not exist, or the house is in a different zone than the customer paid for). Nothing is charged, refunded or cancelled by itself.
+        </p>
+        <form action={saveAddressCheckAction} className="grid gap-3 sm:grid-cols-2">
+          <label className="flex items-start gap-2 sm:col-span-2"><input type="checkbox" name="geoBackupCensusOn" defaultChecked={settings.geoBackupCensusOn !== false} className="mt-1" /> <span><b>Backup 1: US Census Bureau.</b> The government&rsquo;s free address service. Gives the spot on the map and the county.</span></label>
+          <label className="flex items-start gap-2 sm:col-span-2"><input type="checkbox" name="geoBackupOsmOn" defaultChecked={settings.geoBackupOsmOn !== false} className="mt-1" /> <span><b>Backup 2: OpenStreetMap.</b> Free world map. At most one lookup a second, so it is only asked when the others fail.</span></label>
+          <label className="block"><span className="label">Re-check every (minutes) at first</span><input name="addressRecheckEarlyMinutes" type="number" min={5} max={120} defaultValue={String(settings.addressRecheckEarlyMinutes)} className="input" /></label>
+          <label className="block"><span className="label">For the first (minutes)</span><input name="addressRecheckEarlyForMinutes" type="number" min={0} max={1440} defaultValue={String(settings.addressRecheckEarlyForMinutes)} className="input" /></label>
+          <label className="block"><span className="label">Then re-check every (minutes)</span><input name="addressRecheckLaterMinutes" type="number" min={15} max={1440} defaultValue={String(settings.addressRecheckLaterMinutes)} className="input" /></label>
+          <label className="block sm:col-span-2"><span className="label">Rest of Orange County, town names (one per line)</span><textarea name="zoneCountyPlaces" rows={6} defaultValue={String(settings.zoneCountyPlaces ?? "")} className="input font-mono text-sm" /></label>
+          <div className="sm:col-span-2"><button className="btn-dark w-fit">Save address check</button></div>
+        </form>
       </section>
       <section className="card mb-6 p-5" id="stock">
         <h2 className="mb-3 text-lg font-extrabold">Delivery routes: stock address</h2>

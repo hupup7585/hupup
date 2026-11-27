@@ -131,6 +131,8 @@ export const orders = pgTable(
     /** Delivery zone at checkout: kj ($10) | area ($15). Set when the order is priced. */
     deliveryZone: text("delivery_zone"),
     deliveryFeeCents: integer("delivery_fee_cents").notNull().default(0),
+    /** Which map service placed the house (google | census | openstreetmap | town = not confirmed yet) (Nov 27, 2026) */
+    addressSource: text("address_source"),
     /** Sales tax rate used (percent, e.g. "8.125") and amount, on items + delivery */
     taxPercent: text("tax_percent"),
     taxCents: integer("tax_cents").notNull().default(0),
@@ -1674,6 +1676,26 @@ export const messageFiles = pgTable(
 );
 
 /** Addresses already placed on the map (delivery fees by area), so each address is looked up once. */
+/** Address check with two backups (Abraham, Nov 27, 2026): orders whose house is not confirmed on the map yet, or whose
+ * re-check found a problem. status: unconfirmed | problem | confirmed | stopped. alerts: [{ key, text, sentAt }]. */
+export const addressChecks = pgTable("address_checks", {
+  orderId: integer("order_id").primaryKey().references(() => orders.id),
+  address: text("address").notNull(),
+  status: text("status").notNull().default("unconfirmed"),
+  problemKind: text("problem_kind"),
+  problem: text("problem"),
+  source: text("source"),
+  /** What the customer paid for: local | area | outside, and the zone name on the order */
+  paidKind: text("paid_kind"),
+  paidZone: text("paid_zone"),
+  tries: integer("tries").notNull().default(0),
+  firstAt: timestamp("first_at", { withTimezone: true }).notNull().defaultNow(),
+  lastAt: timestamp("last_at", { withTimezone: true }),
+  nextAt: timestamp("next_at", { withTimezone: true }).notNull().defaultNow(),
+  alerts: jsonb("alerts").$type<{ key: string; text: string; sentAt: string | null }[]>().notNull().default([]),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const geocodeCache = pgTable("geocode_cache", {
   address: text("address").primaryKey(),
   lat: doublePrecision("lat"),
