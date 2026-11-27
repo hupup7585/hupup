@@ -3,7 +3,7 @@
 import { ensurePriced, pricingProblem } from "@/lib/order-pricing";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/db/schema";
@@ -18,7 +18,8 @@ import { linkHoldMinutes } from "@/lib/settings";
 
 export type ActionResult = { ok: boolean; message: string };
 
-const OCCUPYING: OrderStatus[] = ["HOLD", "PENDING_PAYMENT", "CONFIRMED", "DELIVERED"];
+// Code audit M2: NEEDS_ATTENTION holds its items too (availability counts it), so moving it on is not a re-booking
+const OCCUPYING: OrderStatus[] = ["HOLD", "PENDING_PAYMENT", "CONFIRMED", "DELIVERED", "NEEDS_ATTENTION"];
 
 export async function updateStatusAction(orderId: number, status: OrderStatus, reason = ""): Promise<ActionResult> {
   const staff = await requireAdmin();
@@ -31,12 +32,22 @@ export async function updateStatusAction(orderId: number, status: OrderStatus, r
     OCCUPYING.includes(full.order.status) &&
     !(["HOLD", "PENDING_PAYMENT"].includes(full.order.status) && full.order.holdExpiresAt && full.order.holdExpiresAt < new Date());
   if (!wasOccupying && OCCUPYING.includes(status)) {
-    // Re-activating an order: make sure the items are still free.
-    for (const it of full.items) {
-      const [p] = await db.select().from(schema.products).where(eq(schema.products.id, it.productId));
-      const free = await checkBookable(it.productId, p.quantity, full.order.eventDate);
-      if (free < it.qty) return { ok: false, message: `${it.name} is no longer available for ${dualDate(full.order.eventDate)} (${free} free).` };
-    }
+    // Re-activating an order: make sure the items are still free. Code audit M2 (Nov 24, 2026): the order's own
+    // pickup day, and the check and the change in one locked step (the items and their shared groups locked in id
+    // order, like a phone booking), so two staff can never both re-book the last unit.
+    const ids = [...new Set(full.items.map((i) => i.productId))].sort((x, y) => x - y);
+    const problem = await db.transaction(async (tx) => {
+      for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
+      for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+      for (const it of full.items) {
+        const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, it.productId));
+        const free = await checkBookable(it.productId, p.quantity, full.order.eventDate, tx as never, full.order.pickupDate);
+        if (free < it.qty) return `${it.name} is no longer available for ${dualDate(full.order.eventDate)} (${free} free).`;
+      }
+      await tx.update(schema.orders).set({ status, updatedAt: new Date(), ...(status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}) }).where(eq(schema.orders.id, orderId));
+      return null;
+    });
+    if (problem) return { ok: false, message: problem };
   }
   await setOrderStatus(orderId, status, status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}, { reason: why || "Changed by staff in Admin", userId: staff.userId });
   await db.insert(schema.auditLog).values({ userId: staff.userId, action: "order.status", entityType: "order", entityId: String(orderId), before: { status: full.order.status }, after: { status, reason: why || null } });

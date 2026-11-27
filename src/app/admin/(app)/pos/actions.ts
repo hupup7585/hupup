@@ -162,6 +162,8 @@ export async function createBookingAction(input: {
     const { refreshOrderTotals } = await import("@/lib/orders");
     await refreshOrderTotals(r.orderId);
   }
+  // Code audit M5 (Nov 24, 2026): a cash, check or pay-later booking is confirmed right away, so it gets its units now
+  if (status === "CONFIRMED") await (await import("@/lib/units")).assignUnits(r.orderId);
 
   // Log the customer's acceptance of the Terms, as chosen by staff (only while the Terms flow is on).
   const reqHeaders = await headers();

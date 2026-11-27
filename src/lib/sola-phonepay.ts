@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
@@ -199,15 +199,19 @@ export function pickMatch(txns: SolaTxn[], want: { amountCents: number; orderNum
   const inWindow = txns.filter((t) => t.approved && t.refNum && !alreadyUsed.has(t.refNum) && t.at >= new Date(want.from.getTime() - 60_000) && t.at <= new Date(want.to.getTime() + 120_000));
   const byInvoice = inWindow.filter((t) => t.invoice && t.invoice.replace(/\D/g, "") === want.orderNumber);
   if (byInvoice.length === 1) return byInvoice[0].amountCents === want.amountCents ? { match: byInvoice[0], reason: "found" } : { match: null, reason: "amount_mismatch" };
-  const byAmount = inWindow.filter((t) => t.amountCents === want.amountCents);
+  // Code audit M7 (Nov 24, 2026): matching by amount never takes a payment made for another order (its Invoice is
+  // one of our order numbers: a website link or the staff POS), so a custom charge cannot claim a customer's payment
+  const byAmount = inWindow.filter((t) => t.amountCents === want.amountCents && isPhonePayInvoice(t.invoice));
   if (byAmount.length === 1) return { match: byAmount[0], reason: "found" };
   if (byAmount.length > 1) return { match: null, reason: "ambiguous" };
-  return { match: null, reason: inWindow.length ? "amount_mismatch" : "not_found" };
+  return { match: null, reason: inWindow.some((t) => isPhonePayInvoice(t.invoice)) ? "amount_mismatch" : "not_found" };
 }
 
 export async function usedSolaRefs(): Promise<Set<string>> {
   const rows = await db.select({ ref: schema.phonepayAttempts.solaRef }).from(schema.phonepayAttempts);
-  return new Set(rows.map((r) => r.ref).filter((r): r is string => Boolean(r)));
+  // Code audit M7: a Sola payment already recorded on any order is used too (website link or staff POS payments)
+  const paid = await db.select({ ref: schema.orders.solaRefNum }).from(schema.orders).where(isNotNull(schema.orders.solaRefNum));
+  return new Set([...rows.map((r) => r.ref), ...paid.map((r) => r.ref)].filter((r): r is string => Boolean(r)));
 }
 
 export const phonePayAdminUrl = () => `${config.baseUrl()}/admin/phone/phonepay`;

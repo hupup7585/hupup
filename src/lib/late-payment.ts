@@ -79,6 +79,9 @@ export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now
     if (!ended.length) return { held: rows.map((o) => o.id), removed: 0 }; // still held: nothing to do
     const items = await tx.select().from(schema.orderItems).where(inArray(schema.orderItems.orderId, ended.map((o) => o.id)));
     const pids = [...new Set(items.map((i) => i.productId))].sort((a, b) => a - b);
+    // Code audit L9 (Nov 24, 2026): items sharing one unit (the maze group) are locked as a whole group first, in id
+    // order, like a phone booking, so a late payment and a new booking can never both take the shared unit
+    for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
     for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
     const removed: { productId: number; qty: number; eventDate: string; name: string }[] = [];
     for (const o of ended) {
