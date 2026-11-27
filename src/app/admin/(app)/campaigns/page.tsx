@@ -17,7 +17,7 @@ import { approveCampaignAction, cancelCampaignAction, sendCampaignAction } from 
 export const dynamic = "force-dynamic";
 
 const SOURCE: Record<string, string> = { web: "Website", phone: "Phone", keyword: "Text reply", sms_reply: "Text reply", pos: "Staff (New booking)", staff: "Staff" };
-const STATUS: Record<string, string> = { draft: "Draft", approved: "Approved, ready to send", sent: "Sent", canceled: "Canceled" };
+const STATUS: Record<string, string> = { draft: "Draft", approved: "Approved, ready to send", sent: "Sent", sending: "Sending (if it stopped partway, Send finishes it after 10 minutes)", canceled: "Canceled" };
 
 /** Promo campaigns (Abraham, Nov 9, 2026): Owner writes and approves; Owner or Secretary sends to eligible customers only. */
 export default async function CampaignsPage({ searchParams }: { searchParams: Promise<{ msg?: string; err?: string }> }) {
@@ -107,7 +107,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                     {owner && c.status === "draft" && (
                       <form action={approveCampaignAction}><input type="hidden" name="id" value={c.id} /><button className="btn-dark">Approve wording</button></form>
                     )}
-                    {c.status === "approved" && (
+                    {(c.status === "approved" || c.status === "sending") && (
                       <form action={sendCampaignAction}>
                         <input type="hidden" name="id" value={c.id} />
                         <ConfirmSubmit message={`Send this campaign to ${eligible.length} customer${eligible.length === 1 ? "" : "s"} now, as ${cost.kind}? Estimated cost about ${dollars(cost.total)}. This can't be undone.`} className="btn" disabled={!canSend || eligible.length === 0} title={!canSend ? CAMPAIGNS_NOT_ACTIVE : eligible.length === 0 ? "No customer can get a promo right now" : undefined}>
@@ -115,7 +115,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                         </ConfirmSubmit>
                       </form>
                     )}
-                    {c.status === "sent" && <CampaignHistory id={c.id} />}
+                    {(c.status === "sent" || c.status === "sending") && <CampaignHistory id={c.id} />}
                     {owner && (c.status === "draft" || c.status === "approved") && (
                       <form action={cancelCampaignAction}><input type="hidden" name="id" value={c.id} /><ConfirmSubmit message="Cancel this campaign? It will not be sent." className="btn-ghost">Cancel campaign</ConfirmSubmit></form>
                     )}

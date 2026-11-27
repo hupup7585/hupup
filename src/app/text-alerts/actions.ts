@@ -7,13 +7,14 @@ import { config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
 import { sendMessage } from "@/lib/sms";
 import { MARKETING_CONFIRMATION_SMS, TRANSACTIONAL_CONFIRMATION_SMS, recordConsent } from "@/lib/sms-consent";
-import { smsTermsV2Active, webConsentCopy } from "@/lib/sms-terms-v2";
+import { smsSignupNotActive, smsTermsV2Active, webConsentCopy } from "@/lib/sms-terms-v2";
 import { requestPromoByCustomer } from "@/lib/sms-reenroll";
 
 export type SignUpState = { ok?: boolean; error?: string; stopped?: boolean; promo?: boolean; orders?: boolean };
 
 const MAX_PER_PHONE_PER_DAY = 6; // 3 sign-ups x 2 boxes
 const MAX_PER_IP_PER_DAY = 20;
+const WEB_PROMO_REQUEST = "sms.web_promo_request";
 
 /** Preview builds share the production database: never create real consent records from the preview site. */
 export async function signUpsDisabledReason(): Promise<string | null> {
@@ -25,8 +26,10 @@ export async function signUpsDisabledReason(): Promise<string | null> {
 
 export async function signUpForTexts(_prev: SignUpState, form: FormData): Promise<SignUpState> {
   if (String(form.get("company") || "")) return { ok: true }; // honeypot: bots fill hidden fields
+  // Extra check E2 (Nov 27, 2026): US and Canadian numbers only (+1 and 10 digits), as the message says; a "+44..."
+  // or other international number is refused, so nobody can make the site text numbers abroad
   const phone = toE164(String(form.get("phone") || ""));
-  if (!phone) return { error: "Please enter a valid 10-digit US or Canadian mobile number." };
+  if (!phone || !/^\+1\d{10}$/.test(phone)) return { error: "Please enter a valid 10-digit US or Canadian mobile number." };
   const orders = form.get("transactional") === "on";
   const promo = form.get("marketing") === "on";
   if (!orders && !promo) return { error: "Please check at least one box to sign up." };
@@ -34,6 +37,9 @@ export async function signUpForTexts(_prev: SignUpState, form: FormData): Promis
 
   const disabled = await signUpsDisabledReason();
   if (disabled) return { error: disabled };
+  // Extra check E10 (Nov 27, 2026): while the button shows "Not active yet", a direct post records nothing either
+  const notActive = smsSignupNotActive();
+  if (notActive) return { error: notActive };
 
   const h = await headers();
   const ip = (h.get("x-forwarded-for") || "").split(",")[0].trim() || h.get("x-real-ip") || null;
@@ -50,7 +56,20 @@ export async function signUpForTexts(_prev: SignUpState, form: FormData): Promis
           .where(and(eq(schema.smsConsents.source, "web"), gt(schema.smsConsents.createdAt, since), cond))
       )[0]?.n ?? 0,
     );
-  if ((await count(eq(schema.smsConsents.phone, phone))) >= MAX_PER_PHONE_PER_DAY || (ip && (await count(eq(schema.smsConsents.ip, ip))) >= MAX_PER_IP_PER_DAY)) {
+  // Extra check E1 (Nov 27, 2026): a promo-box request (SMS v3 writes no consent row until YES) counts toward the same
+  // limits, from its own log row, so the promo box alone can't be used to text many numbers
+  const promoCount = async (cond: ReturnType<typeof eq>) =>
+    Number(
+      (
+        await db
+          .select({ n: sql<number>`count(*)` })
+          .from(schema.auditLog)
+          .where(and(eq(schema.auditLog.action, WEB_PROMO_REQUEST), gt(schema.auditLog.createdAt, since), cond))
+      )[0]?.n ?? 0,
+    );
+  const byPhone = (await count(eq(schema.smsConsents.phone, phone))) + (await promoCount(eq(schema.auditLog.entityId, phone)));
+  const byIp = ip ? (await count(eq(schema.smsConsents.ip, ip))) + (await promoCount(eq(schema.auditLog.ip, ip))) : 0;
+  if (byPhone >= MAX_PER_PHONE_PER_DAY || byIp >= MAX_PER_IP_PER_DAY) {
     return { error: "Too many sign-ups right now. Please try again tomorrow or call us." };
   }
 
@@ -72,6 +91,7 @@ export async function signUpForTexts(_prev: SignUpState, form: FormData): Promis
   // One confirmation text per program joined (non-promotional).
   if (orders) await sendMessage({ to: phone, body: TRANSACTIONAL_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId });
   if (promo && !v3) await sendMessage({ to: phone, body: MARKETING_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId });
+  if (promo && v3) await db.insert(schema.auditLog).values({ action: WEB_PROMO_REQUEST, entityType: "phone", entityId: phone, ip, userAgent });
   if (promo && v3) await requestPromoByCustomer(phone, `website /text-alerts box (wording ${copy.version}: "${copy.marketing}"), IP ${ip ?? "unknown"}`);
   return { ok: true, orders, promo };
 }

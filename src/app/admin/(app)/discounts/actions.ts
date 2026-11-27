@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { msgQuery } from "@/lib/url-message";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -21,8 +21,20 @@ export async function addDiscountAction(form: FormData) {
     note: String(form.get("note") ?? ""),
   });
   if ("error" in d) return back(d.error);
-  const [row] = await db.insert(schema.customerDiscounts).values({ ...d, percent: d.percent === null ? null : String(d.percent), createdBy: owner.userId }).returning();
-  await db.insert(schema.auditLog).values({ userId: owner.userId, action: "discount.added", entityType: "customer_discount", entityId: String(row.id), after: d });
+  // Extra check F9 (Nov 27, 2026): a double click saves one discount. Under a lock on the phone, the same discount
+  // saved for this phone in the last 2 minutes and still on is not added again.
+  const added = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"discount:" + d.phone}))`);
+    const recent = await tx
+      .select()
+      .from(schema.customerDiscounts)
+      .where(and(eq(schema.customerDiscounts.phone, d.phone), eq(schema.customerDiscounts.active, true), gte(schema.customerDiscounts.createdAt, new Date(Date.now() - 120_000))));
+    const same = recent.find((r) => r.kind === d.kind && (r.amountCents ?? null) === d.amountCents && (r.percent === null ? null : Number(r.percent)) === d.percent && (r.endsOn ?? null) === d.endsOn && r.note === d.note);
+    if (same) return null;
+    const [row] = await tx.insert(schema.customerDiscounts).values({ ...d, percent: d.percent === null ? null : String(d.percent), createdBy: owner.userId }).returning();
+    return row;
+  });
+  if (added) await db.insert(schema.auditLog).values({ userId: owner.userId, action: "discount.added", entityType: "customer_discount", entityId: String(added.id), after: d });
   revalidatePath("/admin/discounts");
   return back("Saved. It counts on this customer's bookings from now on, before tax.");
 }

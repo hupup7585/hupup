@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { bookingLock } from "@/lib/jewish-calendar";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
@@ -71,7 +71,26 @@ export function inMarketingHours(to: string, now = new Date(), customerTimeZone?
 
 /** Shabbes or Yom Tov right now (from candle lighting until the hotline opens again after). */
 export function restNow(now = new Date()): boolean {
-  return bookingLock(now).locked;
+  return smsBookingLock(now).locked;
+}
+
+/**
+ * Extra check G8 (Nov 27, 2026): the Shabbes and Yom Tov holds for texts use Admin's calendar settings (candle
+ * lighting minutes, reopen time, location), the same as the phone, not the built-in defaults. The settings are read
+ * once a minute at most (sendMessage and the held-texts run refresh them); until the first read, the defaults.
+ */
+let calendarCache: { s: Parameters<typeof bookingLock>[1]; at: number } | null = null;
+export async function refreshSmsCalendar(force = false) {
+  if (!force && calendarCache && Date.now() - calendarCache.at < 60_000) return;
+  try {
+    const { getSettings } = await import("@/lib/settings");
+    calendarCache = { s: (await getSettings()) as unknown as Parameters<typeof bookingLock>[1], at: Date.now() };
+  } catch {
+    // no database (some tests): the defaults
+  }
+}
+function smsBookingLock(now: Date) {
+  return calendarCache ? bookingLock(now, calendarCache.s) : bookingLock(now);
 }
 
 /** Staff and Owner alert texts wait out Shabbes and Yom Tov (Abraham, Nov 27, 2026); sign-in codes never wait. */
@@ -319,6 +338,7 @@ export function nextPromoWindow(to: string, from: Date, customerTimeZone?: strin
 export async function sendMessage(input: SendInput): Promise<SendResult> {
   const to = toE164(input.to);
   if (!to) return { sent: false, error: "Invalid phone number" };
+  await refreshSmsCalendar();
   const kind = input.kind ?? "transactional";
   const log = input.log !== false;
   if (kind === "marketing") input = { ...input, body: marketingBody(input.body) };
@@ -357,7 +377,7 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
     if (kind === "marketing" && typeof exec.execute === "function") await exec.execute(sql`select pg_advisory_xact_lock(hashtext(${"promo:" + to}))`);
     let blocked: Blocked | null = a2pOff ? "not_active" : testOnly ? "test_only" : await checkEligibility({ to, kind, event: input.event, customer, now: input.now, exec });
     // Staff and Owner alerts during Shabbes or Yom Tov: held, then sent right after (customer-requested texts never wait)
-    const lock = kind === "system" && !blocked && STAFF_ALERTS_HELD.has(String(input.event)) ? bookingLock(input.now ?? new Date()) : null;
+    const lock = kind === "system" && !blocked && STAFF_ALERTS_HELD.has(String(input.event)) ? smsBookingLock(input.now ?? new Date()) : null;
     if (lock?.locked) blocked = "quiet_hours";
     const held = blocked === "quiet_hours";
     const sendAfter = !held ? null : lock?.locked ? lock.opensAt : nextPromoWindow(to, input.now ?? new Date(), customer?.timeZone);
@@ -436,23 +456,44 @@ async function deliver(m: { messageId?: number; to: string; body: string; mediaU
  */
 /** A held text is taken by one run only (Deep check Nov 27, item 17): held -> sending, or false when another run has it. */
 async function claimHeld(id: number): Promise<boolean> {
-  const [claimed] = await db.update(schema.messages).set({ status: "sending" }).where(and(eq(schema.messages.id, id), eq(schema.messages.status, "held"))).returning({ id: schema.messages.id });
+  // send_after becomes the moment it was claimed, so a claim left by a run that was cut off can be told apart (G4)
+  const [claimed] = await db.update(schema.messages).set({ status: "sending", sendAfter: new Date() }).where(and(eq(schema.messages.id, id), eq(schema.messages.status, "held"))).returning({ id: schema.messages.id });
   return Boolean(claimed);
 }
 
+/** Held texts sent per run (Extra check G4): a big campaign goes out over a few runs, within the time limit. */
+export const HELD_TEXTS_PER_RUN = 200;
+/** A held text claimed ("sending") this long ago whose run was cut off goes back to "held" (Extra check G4). */
+export const STUCK_SENDING_MS = 15 * 60_000;
+
 export async function processHeldPromotions(now = new Date()): Promise<{ sent: number; canceled: number; rescheduled: number }> {
+  await refreshSmsCalendar(true);
+  // Extra check G4 (Nov 27, 2026): a held text claimed by a run that was cut off (time limit) is "sending" with no
+  // Twilio id; 15 minutes after it was claimed it is held again, so it goes out instead of waiting forever
+  await db
+    .update(schema.messages)
+    .set({ status: "held" })
+    .where(
+      and(
+        eq(schema.messages.status, "sending"),
+        isNull(schema.messages.twilioSid),
+        inArray(schema.messages.kind, ["marketing", "system"]),
+        lte(schema.messages.sendAfter, new Date(now.getTime() - STUCK_SENDING_MS)),
+      ),
+    );
   const due = await db
     .select()
     .from(schema.messages)
     .where(and(eq(schema.messages.status, "held"), inArray(schema.messages.kind, ["marketing", "system"]), lte(schema.messages.sendAfter, now)))
-    .orderBy(asc(schema.messages.sendAfter), asc(schema.messages.id)); // oldest first
+    .orderBy(asc(schema.messages.sendAfter), asc(schema.messages.id)) // oldest first
+    .limit(HELD_TEXTS_PER_RUN);
   const out = { sent: 0, canceled: 0, rescheduled: 0 };
   for (const m of due) {
     const to = m.toNumber || m.contactPhone || "";
     const customer = m.customerId ? ((await db.select().from(schema.customers).where(eq(schema.customers.id, m.customerId)))[0] ?? null) : await customerByPhone(to);
     if (m.kind === "system") {
       // a staff alert held for Shabbes or Yom Tov
-      const lock = bookingLock(now);
+      const lock = smsBookingLock(now);
       if (lock.locked) {
         await db.update(schema.messages).set({ sendAfter: lock.opensAt }).where(eq(schema.messages.id, m.id));
         out.rescheduled++;
@@ -476,8 +517,14 @@ export async function processHeldPromotions(now = new Date()): Promise<{ sent: n
     }
   }
   // the free timer: when the next held text is due (or nothing waiting)
-  const [next] = await db.select({ at: schema.messages.sendAfter }).from(schema.messages).where(eq(schema.messages.status, "held")).orderBy(asc(schema.messages.sendAfter)).limit(1);
-  await (await import("@/lib/wake-flags")).armWake("held-texts", next?.at ?? null);
+  const wake = await import("@/lib/wake-flags");
+  const nextHeld = async () => (await db.select({ at: schema.messages.sendAfter }).from(schema.messages).where(eq(schema.messages.status, "held")).orderBy(asc(schema.messages.sendAfter)).limit(1))[0]?.at ?? null;
+  const next = await nextHeld();
+  await wake.armWake("held-texts", next);
+  // Extra check G10 (Nov 27, 2026): a text held while this run was finishing could be overwritten by a later time;
+  // read again after writing and move the timer earlier if needed (never later)
+  const again = await nextHeld();
+  if (again && (!next || again.getTime() < next.getTime())) await wake.armWake("held-texts", again, { earliest: true });
   return out;
 }
 
