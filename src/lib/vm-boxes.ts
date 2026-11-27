@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
@@ -74,22 +74,30 @@ export async function getBox(id: number): Promise<Box | null> {
 
 /** The password check: 3 wrong tries lock the box for 15 minutes and email the Owner. */
 export async function checkBoxPin(box: Box, pin: string, now = new Date()): Promise<"ok" | "wrong" | "locked"> {
-  if (box.lockedUntil && box.lockedUntil > now) return "locked";
+  // Extra check I1 (Nov 27, 2026): the lock and the count are read and changed by the database in one step each, so
+  // several calls guessing at the same moment share the same 3 tries (before, each call got its own 3)
+  const b = schema.voicemailBoxes;
+  const open = and(eq(b.id, box.id), or(isNull(b.lockedUntil), lte(b.lockedUntil, now)));
+  // Deep check 06:00 M20: a try is used up BEFORE the password is compared, so in a burst of guesses only the first 3
+  // are compared at all; the rest are "locked" whatever they are (the right one hidden among many could get in before)
+  const [r] = await db
+    .update(b)
+    .set({ wrongTries: sql`CASE WHEN ${b.lockedUntil} IS NOT NULL THEN 1 ELSE ${b.wrongTries} + 1 END`, lockedUntil: null })
+    .where(open)
+    .returning({ tries: b.wrongTries });
+  if (!r || r.tries > VM_PIN_TRIES) return "locked";
   const ok = box.pinHash ? await bcrypt.compare(pin, box.pinHash) : pin === VM_DEFAULT_PIN;
   if (ok) {
-    await db.update(schema.voicemailBoxes).set({ wrongTries: 0, lockedUntil: null }).where(eq(schema.voicemailBoxes.id, box.id));
-    return "ok";
+    const [done] = await db.update(b).set({ wrongTries: 0, lockedUntil: null }).where(open).returning({ id: b.id });
+    return done ? "ok" : "locked"; // locked by another call's wrong tries meanwhile
   }
-  const tries = (box.lockedUntil && box.lockedUntil <= now ? 0 : box.wrongTries) + 1;
-  if (tries >= VM_PIN_TRIES) {
-    const until = new Date(now.getTime() + VM_LOCK_MINUTES * 60_000);
-    await db.update(schema.voicemailBoxes).set({ wrongTries: 0, lockedUntil: until }).where(eq(schema.voicemailBoxes.id, box.id));
-    if (config.adminEmail())
-      await sendEmail(config.adminEmail(), `${BUSINESS_NAME}: voicemail box ${box.boxNumber ?? box.id} locked`, `Voicemail box ${box.boxNumber ?? ""} (${box.name}) was locked for ${VM_LOCK_MINUTES} minutes after ${VM_PIN_TRIES} wrong passwords on the phone.`).catch(() => null);
-    return "locked";
-  }
-  await db.update(schema.voicemailBoxes).set({ wrongTries: tries }).where(eq(schema.voicemailBoxes.id, box.id));
-  return "wrong";
+  if (r.tries < VM_PIN_TRIES) return "wrong";
+  const until = new Date(now.getTime() + VM_LOCK_MINUTES * 60_000);
+  // Only the call that sets the lock emails the Owner
+  const [locked] = await db.update(b).set({ wrongTries: 0, lockedUntil: until }).where(and(open, gte(b.wrongTries, VM_PIN_TRIES))).returning({ id: b.id });
+  if (locked && config.adminEmail())
+    await sendEmail(config.adminEmail(), `${BUSINESS_NAME}: voicemail box ${box.boxNumber ?? box.id} locked`, `Voicemail box ${box.boxNumber ?? ""} (${box.name}) was locked for ${VM_LOCK_MINUTES} minutes after ${VM_PIN_TRIES} wrong passwords on the phone.`).catch(() => null);
+  return "locked";
 }
 
 export async function setBoxPin(boxId: number, pin: string) {

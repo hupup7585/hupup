@@ -13,7 +13,14 @@ import { orderPath } from "@/lib/order-path";
  * its own dated entry; the original payment is never edited or deleted. Sandbox only until Abraham approves live
  * refunds (LIVE_REFUNDS_APPROVED). A failed refund shows the reason in plain words and emails Abraham.
  */
-export const LIVE_REFUNDS_APPROVED = false;
+export const LIVE_REFUNDS_APPROVED = false; // the starting value of the Owner setting liveRefundsOn (Bookkeeping > Settings)
+
+/** Admin handoff Phase 2: live refunds are an Owner setting now (off until Abraham turns it on, with the safety check). */
+export async function liveRefundsOn(): Promise<boolean> {
+  const { getSettings } = await import("@/lib/settings");
+  const s = (await getSettings()) as { liveRefundsOn?: unknown };
+  return s.liveRefundsOn === true || s.liveRefundsOn === "true";
+}
 
 export type Provider = "stripe" | "sola";
 type Ord = typeof schema.orders.$inferSelect;
@@ -52,7 +59,9 @@ export function refundQuestion(amountCents: number, last4: string | null) {
 /** Is this the sandbox (test) setup? Live refunds wait for Abraham's OK. */
 export function refundsSandbox(provider: Provider, env: Record<string, string | undefined> = process.env) {
   if (provider === "stripe") return /^(rk|sk)_test_/.test(env.STRIPE_REFUNDS_KEY ?? "");
-  return env.SOLA_REFUND_MODE === "sandbox";
+  // Deep check 0600 M37 (Nov 27, 2026): on the live site the Sola "sandbox" setting is never trusted (it could let a
+  // real refund through without the Live refunds switch); only test and preview sites use it
+  return env.SOLA_REFUND_MODE === "sandbox" && env.VERCEL_ENV !== "production";
 }
 
 /** Records one refund on the order (and in the books as money out). Shared with refunds made in Stripe's dashboard. */
@@ -67,11 +76,26 @@ export async function applyRefund(o: Ord, input: { amountCents: number; refundId
     : await db.insert(schema.orderRefunds).values(values).returning();
   if (status === "succeeded" || status === "pending") {
     await db.update(schema.orders).set({ refundedCents: sql`${schema.orders.refundedCents} + ${input.amountCents}`, updatedAt: new Date() }).where(eq(schema.orders.id, o.id));
-    // Deep check A4 (Nov 27, 2026): the refund gives back its share of the sales tax, so tax collected goes down
-    await recordAutoMoneyOut({ kind: "refund", amountCents: input.amountCents, taxCents: await refundTaxShare(o.id, input.amountCents), category: "Refunds", method: input.provider, orderId: o.id, ref: input.refundId, notes: `${input.provider === "stripe" ? "Stripe" : "Sola"} refund, order #${orderNumber(o.id)}` });
+    // Deep check A4 (Nov 27, 2026): the refund gives back its share of the sales tax, so tax collected goes down.
+    // Deep check 0600 M34: the part that gives back an overpayment (money paid above the total) is its own entry,
+    // "Overpayment (refund due)", which is not a sale: taxable sales are never lowered by it.
+    const over = Math.min(input.amountCents, await overpaidNow(o.id));
+    const sale = input.amountCents - over;
+    const who = `${input.provider === "stripe" ? "Stripe" : "Sola"} refund, order #${orderNumber(o.id)}`;
+    if (over > 0) await recordAutoMoneyOut({ kind: "refund", amountCents: over, category: "Overpayment (refund due)", method: input.provider, orderId: o.id, ref: `${input.refundId}:overpayment`, notes: `${who} (overpayment given back)` });
+    if (sale > 0) await recordAutoMoneyOut({ kind: "refund", amountCents: sale, taxCents: await refundTaxShare(o.id, sale), category: "Refunds", method: input.provider, orderId: o.id, ref: input.refundId, notes: who });
   }
   await db.insert(schema.auditLog).values({ userId: input.userId, action: "payment.refunded", entityType: "order", entityId: String(o.id), after: { amountCents: input.amountCents, refundId: input.refundId, provider: input.provider, source: input.source, status } });
   return row;
+}
+
+/** Money received on the order above its total and not yet given back (from Bookkeeping). */
+async function overpaidNow(orderId: number): Promise<number> {
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
+  if (!o) return 0;
+  const total = o.totalCents ?? o.subtotalCents;
+  const r = (await db.execute(sql`SELECT COALESCE(SUM(CASE WHEN kind = 'refund' THEN -amount_cents ELSE amount_cents END), 0)::int AS net FROM book_entries WHERE order_id = ${orderId} AND ((kind = 'income' AND source = 'auto') OR kind = 'refund')`)).rows[0] as { net: number };
+  return Math.max(0, Number(r?.net ?? 0) - total);
 }
 
 /**
@@ -81,7 +105,9 @@ export async function applyRefund(o: Ord, input: { amountCents: number; refundId
 export async function refundTaxShare(orderId: number, amountCents: number): Promise<number> {
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
   if (!o) return 0;
-  const tax = (o.taxCents ?? 0) + (o.servicesTaxCents ?? 0);
+  // Deep check 06:00 (Nov 27): taxCents already includes the services' tax (servicesTaxCents is the part of it the
+  // services added), so adding it again gave back too much tax on orders with services
+  const tax = o.taxCents ?? 0;
   const total = o.totalCents ?? o.subtotalCents;
   if (tax <= 0 || total <= 0) return 0;
   const r = (await db.execute(sql`SELECT COALESCE(SUM(tax_cents) FILTER (WHERE kind = 'refund'), 0)::int AS t, COALESCE(SUM(CASE WHEN kind = 'refund' THEN -amount_cents ELSE amount_cents END), 0)::int AS net FROM book_entries WHERE order_id = ${orderId} AND ((kind = 'income' AND source = 'auto') OR kind = 'refund')`)).rows[0] as { t: number; net: number };
@@ -103,27 +129,39 @@ export function plainReason(raw: string): string {
   return `The card company didn't accept the refund (${raw}).`;
 }
 
-async function stripeRefund(ref: string, amount: number, o: Ord, fetcher?: typeof fetch) {
+async function stripeRefund(ref: string, amount: number, o: Ord, fetcher?: typeof fetch, attemptId?: number) {
   const re = await stripeApi<{ id: string; status: string; failure_reason?: string }>(
     "refunds",
     "POST",
     "/v1/refunds",
     { ...(ref.startsWith("pi_") ? { payment_intent: ref } : { charge: ref }), amount, reason: "requested_by_customer", metadata: { order_number: orderNumber(o.id) } },
-    { idempotencyKey: `refund-${o.id}-${o.refundedCents}-${amount}`, fetcher },
+    // Deep check 0600 M32: one key per refund try (its reserved row), so a retry after a failed try is a new request
+    // (the key used to repeat when nothing had been refunded yet, and Stripe answered with the old failure)
+    { idempotencyKey: attemptId ? `refund-${o.id}-try-${attemptId}` : `refund-${o.id}-${o.refundedCents}-${amount}`, fetcher },
   );
   if (re.status === "failed" || re.status === "canceled") throw new RefundError(plainReason(re.failure_reason ?? re.status));
   return { id: re.id, status: re.status };
 }
 
 /** Sola (Cardknox) gateway: cc:refund by the saved transaction ref. */
+/** No answer from the card company (timeout or network): the refund may or may not have gone through. */
+export class RefundUnknown extends Error {}
+
 async function solaRefund(ref: string, amount: number, fetcher: typeof fetch = fetch) {
   const key = process.env.SOLA_API_KEY;
   if (!key) throw new RefundError("Not active yet: SOLA_API_KEY isn't in Vercel.");
-  const res = await fetcher("https://x1.cardknox.com/gatewayjson", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ xKey: key, xVersion: "5.0.0", xSoftwareName: BUSINESS_NAME, xSoftwareVersion: "1.0", xCommand: "cc:refund", xRefNum: ref, xAmount: (amount / 100).toFixed(2) }),
-  });
+  // Deep check 0600 M33: never wait forever; no answer means the outcome is unknown (never "nothing refunded")
+  let res: Response;
+  try {
+    res = await fetcher("https://x1.cardknox.com/gatewayjson", {
+      method: "POST",
+      signal: AbortSignal.timeout(25_000),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ xKey: key, xVersion: "5.0.0", xSoftwareName: BUSINESS_NAME, xSoftwareVersion: "1.0", xCommand: "cc:refund", xRefNum: ref, xAmount: (amount / 100).toFixed(2) }),
+    });
+  } catch (e) {
+    throw new RefundUnknown(`No answer from Sola (${e instanceof Error ? e.message : String(e)}).`);
+  }
   const j = (await res.json().catch(() => ({}))) as { xResult?: string; xStatus?: string; xError?: string; xRefNum?: string };
   if (j.xResult !== "A" || !j.xRefNum) throw new RefundError(plainReason(j.xError || j.xStatus || `Sola answered ${res.status}`));
   return { id: `sola:${j.xRefNum}`, status: "succeeded" };
@@ -144,7 +182,7 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
   if (!o) throw new RefundError("Order not found.");
   const pay = await paymentRef(o);
   if (!pay) throw new RefundError("This order has no card payment to refund (only Stripe phone payments and Sola website payments can be refunded here).");
-  if (!LIVE_REFUNDS_APPROVED && !refundsSandbox(pay.provider))
+  if (!(await liveRefundsOn()) && !refundsSandbox(pay.provider))
     throw new RefundError(pay.provider === "stripe" && !stripeKey("refunds") ? "Not active yet: STRIPE_REFUNDS_KEY isn't in Vercel." : "Live refunds are off until Abraham approves them. Use the sandbox (test) keys for now.");
   // Deep check A7 (Nov 27, 2026): two Refund clicks at once could both pass the "at most" check and refund twice. The
   // order is locked, refunds still being sent (the last 10 minutes) count as taken, and this refund's row is saved as
@@ -153,7 +191,7 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
     await tx.execute(sql`SELECT id FROM orders WHERE id = ${o.id} FOR UPDATE`);
     const [cur] = await tx.select().from(schema.orders).where(eq(schema.orders.id, o.id));
     // also refunds that went through at the card company but could not be fully saved here (deep check 15a)
-    const sending = (await tx.execute(sql`SELECT COALESCE(SUM(amount_cents), 0)::int AS c FROM order_refunds WHERE order_id = ${o.id} AND ((status = 'sending' AND created_at > now() - interval '10 minutes') OR (status <> 'failed' AND error LIKE 'Refunded at the card company, but not fully saved%'))`)).rows[0] as { c: number };
+    const sending = (await tx.execute(sql`SELECT COALESCE(SUM(amount_cents), 0)::int AS c FROM order_refunds WHERE order_id = ${o.id} AND ((status = 'sending' AND created_at > now() - interval '24 hours') OR status = 'unknown' OR (status <> 'failed' AND error LIKE 'Refunded at the card company, but not fully saved%'))`)).rows[0] as { c: number };
     const left = Math.max(0, refundable(cur) - Number(sending?.c ?? 0));
     const amount = amountCents === "full" ? left : amountCents;
     if (!Number.isInteger(amount) || amount <= 0) return { error: left <= 0 && amountCents === "full" ? `At most ${money(0)} can be refunded on this order.` : "Enter an amount to refund." };
@@ -165,8 +203,16 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
   const amount = reserved.amount;
   let r: { id: string; status: string };
   try {
-    r = pay.provider === "stripe" ? await stripeRefund(pay.ref, amount, o, fetcher) : await solaRefund(pay.ref, amount, fetcher);
+    r = pay.provider === "stripe" ? await stripeRefund(pay.ref, amount, o, fetcher, reserved.id) : await solaRefund(pay.ref, amount, fetcher);
   } catch (e) {
+    if (e instanceof RefundUnknown) {
+      // It may have gone through: the row stays counted ("unknown"), so it is never refunded again by mistake
+      await db.update(schema.orderRefunds).set({ status: "unknown", error: `${e.message} Check Sola before refunding again.`.slice(0, 300) }).where(eq(schema.orderRefunds.id, reserved.id));
+      await db.insert(schema.auditLog).values({ userId, action: "payment.refund_unknown", entityType: "order", entityId: String(o.id), after: { amountCents: amount, provider: pay.provider, reason: e.message } });
+      const owner = process.env.ADMIN_EMAIL;
+      if (owner) await sendEmail(owner, `Refund on order #${orderNumber(o.id)}: no answer from Sola`, `A refund of ${money(amount)} on order #${orderNumber(o.id)} got no answer from Sola (${e.message}). It may or may not have gone through.\n\nCheck the transaction in Sola before refunding again.\n\n${config.baseUrl()}${orderPath(o.id)}`).catch(() => null);
+      throw new RefundError(`No answer from Sola. The refund may have gone through: check Sola before trying again. The Owner was emailed.`);
+    }
     const reason = e instanceof RefundError ? e.message : plainReason(e instanceof StripeError || e instanceof Error ? e.message : String(e));
     await db.update(schema.orderRefunds).set({ status: "failed", error: reason.slice(0, 300) }).where(eq(schema.orderRefunds.id, reserved.id));
     await db.insert(schema.auditLog).values({ userId, action: "payment.refund_failed", entityType: "order", entityId: String(o.id), after: { amountCents: amount, provider: pay.provider, reason } });

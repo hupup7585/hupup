@@ -7,10 +7,15 @@ import ConfirmSubmit from "@/components/ConfirmSubmit";
 import MusicUpload from "./MusicUpload";
 import PayMusicWarning from "@/components/PayMusicWarning";
 import { savePlacesAction, trashTrackAction } from "./actions";
+import { trustedMsg } from "@/lib/url-message";
+
+export const metadata = { title: "Music · Hup Up Attractions", robots: { index: false } };
 
 /** Music (Abraham, Nov 17, 2026): upload songs, and choose the songs for each place. Owner only. */
-export default async function MusicPage() {
+export default async function MusicPage({ searchParams }: { searchParams?: Promise<{ m?: string; ms?: string }> }) {
   await requireOwner();
+  const sp = (await searchParams) ?? {};
+  const saved = trustedMsg(sp.m, sp.ms);
   const tracks = await db.select().from(schema.musicTracks).where(isNull(schema.musicTracks.trashedAt)).orderBy(asc(schema.musicTracks.createdAt));
   const s = (await getSettings()) as Record<string, unknown>;
   const chosen = (place: MusicPlace) => String(s[MUSIC_PLACES[place].setting] ?? "").split(",").filter(Boolean);
@@ -47,8 +52,9 @@ export default async function MusicPage() {
           {!tracks.length && <li className="py-3 text-muted">No songs yet.</li>}
         </ul>
       </section>
-      <section className="card mb-5 p-5">
+      <section className="card mb-5 p-5" id="places">
         <h2 className="text-xl font-black">Where each song plays</h2>
+        {saved && <p role="status" className="mt-2 rounded-lg bg-mint/15 p-2 text-sm font-semibold text-[#13895C]">{saved}</p>}
         <p className="mb-3 mt-1 text-sm text-muted">Tick the songs for each place; they play in the order shown. No song ticked: no music there, except while callers wait for staff, where the song "2 Phone Holding Music" plays when it is uploaded.</p>
         <form action={savePlacesAction} className="grid gap-5 sm:grid-cols-2" data-music-places>
           {(Object.keys(MUSIC_PLACES) as MusicPlace[]).map((place) => (

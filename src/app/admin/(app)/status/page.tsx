@@ -24,10 +24,10 @@ export default async function StatusPage() {
         <a href="/api/admin/backup" className="btn-dark">Download a backup now</a>
       </section>
       <section className="card mb-5 p-5" data-job-runs>
-        <h2 className="mb-1 text-lg font-bold">Daily jobs</h2>
-        <p className="mb-3 text-sm text-muted">Each job runs once a day. If one fails, it tries again up to 3 times, and you are emailed if it still fails.</p>
+        <h2 className="mb-1 text-lg font-bold">Timed jobs</h2>
+        <p className="mb-3 text-sm text-muted">Each job runs every 3 hours (some also run while the system is in use, and the address re-checks and held texts run when they are due). If one fails, it tries again up to 3 times, and you are emailed if it still fails.</p>
         {jobs.length === 0 ? (
-          <p className="text-sm text-muted">No runs yet. The first run is tonight.</p>
+          <p className="text-sm text-muted">No runs yet. The first run is within 3 hours.</p>
         ) : (
           <table className="w-full text-sm">
             <thead><tr><th className="th">Job</th><th className="th">When</th><th className="th">Result</th><th className="th">Tries</th></tr></thead>

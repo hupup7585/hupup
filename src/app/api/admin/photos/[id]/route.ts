@@ -1,10 +1,10 @@
-import { idParam } from "@/lib/id-param";
 import { eq } from "drizzle-orm";
 import { currentStaff } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { getOrderWithItems } from "@/lib/orders";
 import { hasAnyStop } from "@/lib/drivers";
 import { r2Get } from "@/lib/r2";
+import { isDbId } from "@/lib/db-id";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,9 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const staff = await currentStaff();
   if (!staff) return new Response("Unauthorized", { status: 401 });
-  const [p] = await db.select().from(schema.deliveryPhotos).where(eq(schema.deliveryPhotos.id, idParam((await params).id) ?? 0)).limit(1);
+  const id = Number((await params).id);
+  if (!isDbId(id)) return new Response("Not found", { status: 404 }); // deep check 0600 M56
+  const [p] = await db.select().from(schema.deliveryPhotos).where(eq(schema.deliveryPhotos.id, id)).limit(1);
   if (!p) return new Response("Not found", { status: 404 });
   if (staff.role === "delivery") {
     const full = await getOrderWithItems(p.orderId);

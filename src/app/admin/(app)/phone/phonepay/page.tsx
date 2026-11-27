@@ -2,6 +2,8 @@ import { trustedMsg } from "@/lib/url-message";
 import { requireOwner } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { recentAttempts } from "@/lib/sola-phonepay";
+import { phonePayLimits } from "@/lib/phonepay-watch";
+import { digitWaits } from "@/lib/phonepay-digits";
 import { orderNumber } from "@/lib/orders";
 import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
@@ -105,7 +107,7 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
           <span className="label">Digits sent to PhonePay</span>
           <input name="digits" defaultValue={s.solaPhonePayDigits} className="input font-mono" />
           <span className="mt-1 block text-xs text-muted">
-            Sent automatically after PhonePay answers. <code>w</code> waits half a second. <code>{"{pin}"}</code> is our merchant PIN (kept secret in Vercel), <code>{"{amount}"}</code> the total in cents with no point (230.00 is 23000), <code>{"{dollars}"}</code> whole dollars, <code>{"{order}"}</code> the order number. The default matches your test call of November 15: it waits 5 seconds for the greeting, enters the PIN and pound, waits 12 seconds for the amount question, enters the amount and pound, waits 5 seconds, then presses 1 to confirm. After that it sends nothing more, and the caller types the card.
+            Sent automatically after PhonePay answers. <code>w</code> waits half a second. <code>{"{pin}"}</code> is our merchant PIN (kept secret in Vercel), <code>{"{amount}"}</code> the total in cents with no point (230.00 is 23000), <code>{"{dollars}"}</code> whole dollars, <code>{"{order}"}</code> the order number. {(() => { const w = digitWaits(String(s.solaPhonePayDigits ?? "")); return w.length >= 3 ? `As saved now: it waits ${w[0]} seconds for the greeting, enters the PIN and pound, waits ${w[1]} seconds for the amount question, enters the amount and pound, waits ${w[2]} seconds, then presses 1 to confirm.` : "The waits are the w letters in the digits above (each w is half a second)."; })()} After that it sends nothing more, and the caller types the card.
           </span>
         </label>
         <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2" data-phonepay-custom>
@@ -133,9 +135,9 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
                     {a.orderId ? <a className="underline" href={orderPath(a.orderId)}>Order number {orderNumber(a.orderId)}</a> : "No order number"}
                     {a.kind === "custom" && <span className="block text-xs text-muted">Custom charge (owner)</span>}
                   </td>
-                  <td className="td">{a.kind === "custom" ? "" : `${a.tryNumber} of 6`}</td>
+                  <td className="td">{a.kind === "custom" ? "" : `${a.tryNumber} of ${phonePayLimits(s as never).triesPerCall}`}</td>
                   <td className="td">{formatMoney(a.amountCents)}</td>
-                  <td className={`td font-semibold ${a.matched ? "text-[#13895C]" : a.matched === false ? "text-[#C83A2F]" : "text-muted"}`}>{a.matched ? "Yes" : a.matched === false ? `No (${NOTE[a.note ?? ""] ?? a.note ?? ""})` : "In progress"}</td>
+                  <td className={`td font-semibold ${a.matched ? "text-[#13895C]" : a.matched === false ? "text-[#C83A2F]" : "text-muted"}`}>{a.matched ? "Yes" : a.matched === false ? `No (${NOTE[a.note ?? ""] ?? a.note ?? ""})` : Date.now() - new Date(a.startedAt).getTime() > 30 * 60_000 ? "No result" : "In progress"}</td>
                   <td className="td">{a.cardType ?? ""}{a.last4 ? ` ending ${a.last4}` : ""}</td>
                   <td className="td font-mono text-xs">{a.solaRef ?? ""}</td>
                 </tr>

@@ -9,6 +9,7 @@ import { requireOwner, requireStaff } from "@/lib/auth";
 export async function saveCustomerAction(form: FormData) {
   const s = await requireStaff(["owner", "secretary"]);
   const id = Number(form.get("id"));
+  if (!(await import("@/lib/db-id")).isDbId(id)) return; // deep check 0600 M56: a bad id is ignored, never an error page
   const clean = (k: string, max: number) => String(form.get(k) || "").trim().slice(0, max) || null;
   const email = clean("email", 200);
   const [before] = await db

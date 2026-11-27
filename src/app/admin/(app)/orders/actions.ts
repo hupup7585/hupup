@@ -1,6 +1,6 @@
 "use server";
 
-import { todayISO } from "@/lib/dates";
+import { addDays, todayISO } from "@/lib/dates";
 
 import { ensurePriced, pricingProblem } from "@/lib/order-pricing";
 
@@ -9,7 +9,8 @@ import { eq, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/db/schema";
-import { checkBookable } from "@/lib/availability";
+import { recheckOrderLines } from "@/lib/recheck-lines";
+import { lockStock } from "@/lib/stock-lock";
 import { getOrderWithItems, markPaid, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES, setOrderStatus } from "@/lib/orders";
 import { payPageLink } from "@/lib/rental-terms";
 import { sendOrderText } from "@/lib/notify";
@@ -17,6 +18,8 @@ import { parseMoneyToCents } from "@/lib/money";
 import { BUSINESS_NAME } from "@/lib/config";
 import { dualDate, messageDate } from "@/lib/dual-date";
 import { linkHoldMinutes } from "@/lib/settings";
+
+class NoLongerFree extends Error {}
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -45,7 +48,8 @@ export async function updateStatusAction(orderId: number, status: OrderStatus, r
   // order used to free its items for someone else, and an unpaid hold could be marked Delivered and never released.
   if (status === "DELIVERED" && full.order.status !== "DELIVERED") {
     if (!["CONFIRMED", "NEEDS_ATTENTION"].includes(full.order.status)) return { ok: false, message: "Only a confirmed order can be marked delivered. Confirm it first." };
-    if (full.order.eventDate > todayISO()) return { ok: false, message: "This order's event day hasn't come yet, so it can't be marked delivered." };
+    // from the day before the event, like the Deliveries page (deep check 0600 M55)
+    if (full.order.eventDate > addDays(todayISO(), 1)) return { ok: false, message: "This order's event is more than a day away, so it can't be marked delivered yet." };
   }
   if (status === "PICKED_UP" && full.order.status !== "PICKED_UP" && full.order.status !== "DELIVERED") return { ok: false, message: "Mark it delivered first." };
   // Hark's Admin list 4: "Needs staff attention" becomes Confirmed only after the whole order is checked again, locked
@@ -67,20 +71,25 @@ export async function updateStatusAction(orderId: number, status: OrderStatus, r
     // pickup day, and the check and the change in one locked step (the items and their shared groups locked in id
     // order, like a phone booking), so two staff can never both re-book the last unit.
     const ids = [...new Set(full.items.map((i) => i.productId))].sort((x, y) => x - y);
-    const problem = await db.transaction(async (tx) => {
-      for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
-      for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
-      for (const it of full.items) {
-        const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, it.productId));
-        const free = await checkBookable(it.productId, p.quantity, full.order.eventDate, tx as never, full.order.pickupDate);
-        if (free < it.qty) return `${it.name} is no longer available for ${dualDate(full.order.eventDate)} (${free} free).`;
-      }
-      await tx.update(schema.orders).set({ status, updatedAt: new Date(), ...(status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}) }).where(eq(schema.orders.id, orderId));
-      return null;
-    });
+    // Deep check 06:00 M8: the order is checked as ONE (recheckOrderLines), so two lines sharing a unit (maze group,
+    // laser gun pools, the same item twice) can never both pass when only one is free; a misfit undoes everything.
+    let problem: string | null = null;
+    try {
+      await db.transaction(async (tx) => {
+        await lockStock(tx, ids); // K2 (deep check 06:00 M48): items, groups and laser pools, one id-ordered step
+        await tx.update(schema.orders).set({ status, updatedAt: new Date(), ...(status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}) }).where(eq(schema.orders.id, orderId));
+        const out = await recheckOrderLines(tx as never, full.order);
+        if (out.length) throw new NoLongerFree(`${out.map((l) => full.items.find((i) => i.productId === l.productId)?.name ?? "An item").join(", ")} ${out.length === 1 ? "is" : "are"} no longer available for ${dualDate(full.order.eventDate)}.`);
+      });
+    } catch (e) {
+      if (!(e instanceof NoLongerFree)) throw e;
+      problem = e.message;
+    }
     if (problem) return { ok: false, message: problem };
   }
   await setOrderStatus(orderId, status, status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}, { reason: why || "Changed by staff in Admin", userId: staff.userId });
+  // Deep check 0600 M57: an order brought back straight to Delivered gets its units too (Confirmed already does)
+  if (status === "DELIVERED" && !wasOccupying) await (await import("@/lib/units")).assignUnits(orderId, { quiet: true });
   await db.insert(schema.auditLog).values({ userId: staff.userId, action: "order.status", entityType: "order", entityId: String(orderId), before: { status: full.order.status }, after: { status, reason: why || null } });
   revalidatePath("/admin", "layout");
   return { ok: true, message: "Status updated" };
@@ -94,6 +103,16 @@ export async function recordPaymentAction(orderId: number, amount: string, metho
   const cents = parseMoneyToCents(amount);
   if (!cents) return { ok: false, message: "Enter an amount" };
   if (!RECORD_METHODS.includes(method as (typeof RECORD_METHODS)[number])) return { ok: false, message: "Choose how it was paid: cash, check, card (Sola) or other." };
+  // Deep check 0600 M54 (Nov 27, 2026): a double click counted the cash twice. The order is locked while a payment of
+  // the same amount and way recorded by hand in the last 15 seconds is looked for; the first click claims it.
+  const claimed = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`);
+    const recent = await tx.execute(sql`SELECT 1 FROM audit_log WHERE action = 'order.payment_claim' AND entity_type = 'order' AND entity_id = ${String(orderId)} AND after->>'cents' = ${String(cents)} AND after->>'method' = ${method} AND created_at > now() - interval '15 seconds' LIMIT 1`);
+    if (recent.rows.length) return false;
+    await tx.insert(schema.auditLog).values({ userId: staff.userId, action: "order.payment_claim", entityType: "order", entityId: String(orderId), after: { cents: String(cents), method } });
+    return true;
+  });
+  if (!claimed) return { ok: false, message: "This payment was just recorded (the button was pressed twice). If there really was a second payment of the same amount, wait 15 seconds and record it again." };
   const r = await markPaid(orderId, cents, method);
   // Code audit M6: every payment recorded by hand is in the audit log (who, how much, how); confirmed only when paid in full
   if (r) await db.insert(schema.auditLog).values({ userId: staff.userId, action: "order.payment_recorded", entityType: "order", entityId: String(orderId), after: { cents, method, status: r.status } });
@@ -138,7 +157,20 @@ export async function updateDetailsAction(orderId: number, form: FormData): Prom
   const [before] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
   if (!before) return { ok: false, message: "Not saved. Order not found." };
   const deliveryAddress = String(form.get("deliveryAddress") || "").trim() || null;
-  const notes = String(form.get("notes") || "") || null;
+  // Deep check 0600 M23 (Nov 27, 2026): the notes box was saved back as it was when the page opened, erasing notes the
+  // system added since (for example "refund it"). Untouched: the notes stay as they are now. Changed by staff while the
+  // system also added a note: the staff text is kept and the system's addition is put back after it.
+  const typed = String(form.get("notes") ?? "");
+  const opened = form.has("notesBefore") ? String(form.get("notesBefore") ?? "") : null;
+  const nowNotes = before.notes ?? "";
+  let notes: string | null;
+  if (opened === null) notes = typed || null; // an old open page without the field: as before
+  else if (typed === opened) notes = before.notes;
+  else if (nowNotes === opened) notes = typed || null;
+  else {
+    const added = nowNotes.startsWith(opened) ? nowNotes.slice(opened.length).trim() : nowNotes.trim();
+    notes = [typed.trim(), added].filter(Boolean).join("\n") || null;
+  }
   const moved = (before.deliveryAddress ?? null) !== deliveryAddress;
   // Audit H2 (Nov 24, 2026): a new address on an order nothing has been paid on is priced again (zone, delivery, tax,
   // total), so the next payment link charges the new amount. Paid or finished orders keep their price.

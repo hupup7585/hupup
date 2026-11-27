@@ -66,6 +66,8 @@ const OUTCOME: Record<string, [string, string]> = {
   voicemail: ["Left a voicemail", "bg-[#F1E8FF] text-[#6B3FB8]"],
 };
 
+export const metadata = { title: "Call log · Hup Up Attractions", robots: { index: false } };
+
 export default async function CallsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const staff = await requireStaff(["owner", "secretary"]);
   const { q } = await searchParams;
@@ -77,7 +79,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
     <div className="w-full">
       <h1 className="mb-1 text-2xl font-black sm:text-3xl">Call log</h1>
       {!journeySection.ok && <SectionNotActive title="Call journeys" reason={journeySection.reason} />}
-      <p className="mb-5 text-muted">Every call to the hotline. Callers who hung up with items in their cart are listed so you can call them back. Open &ldquo;Journey&rdquo; on a call to see every menu, key, item, date and answer, and where the caller hung up.</p>
+      <p className="mb-5 text-muted">Every call to the hotline (times are Eastern time). Callers who hung up with items in their cart are marked so you can call them back. Open &ldquo;Journey&rdquo; on a call to see every menu, key, item, date and answer, and where the caller hung up.</p>
       <form className="mb-3 flex w-full gap-2" role="search" data-call-search>
         <input name="q" defaultValue={q} placeholder="Search a phone number or name" aria-label="Search calls" className="input" />
         <button className="btn-ghost">Search</button>

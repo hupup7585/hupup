@@ -68,7 +68,8 @@ describe("HD3: a driver acts only on today's stops", () => {
   it("the stop's own day, today or yesterday", () => {
     const t = todayISO();
     expect(isCurrentStopFor({ eventDate: t, pickupDate: addDays(t, 1) }, "delivery")).toBe(true);
-    expect(isCurrentStopFor({ eventDate: t, pickupDate: addDays(t, 1) }, "pickup")).toBe(false);
+    expect(isCurrentStopFor({ eventDate: t, pickupDate: addDays(t, 2) }, "pickup")).toBe(false);
+    expect(isCurrentStopFor({ eventDate: addDays(t, 1), pickupDate: addDays(t, 2) }, "delivery")).toBe(true); // the day before
     expect(isCurrentStopFor({ eventDate: addDays(t, 7), pickupDate: addDays(t, 8) }, "delivery")).toBe(false);
     expect(isCurrentStopFor({ eventDate: addDays(t, -1), pickupDate: null }, "pickup")).toBe(true);
     const src = readFileSync("src/app/admin/deliveries/actions.ts", "utf8");

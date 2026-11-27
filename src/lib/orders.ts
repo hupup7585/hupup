@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
+import { lockStock } from "@/lib/stock-lock";
 import { db, schema } from "@/lib/db";
 import { addDays } from "@/lib/dates";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
@@ -73,13 +74,9 @@ async function reserveInTx(
   const pickupDate = opts.pickupDate ?? addDays(opts.eventDate, 1);
   // Items that share one unit (the maze): lock the whole group first, in id order, so two callers can't take it at the
   // same moment (and never lock the group in two different orders)
-  await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${opts.productId}) ORDER BY id FOR UPDATE`);
-  // Laser items share their gun packs (Nov 24, 2026): lock every laser item, in id order, so two callers can never both
-  // take the last six-pack
-  await tx.execute(sql`
-    SELECT p.id FROM products p JOIN categories c ON c.id = p.category_id
-    WHERE c.name ~* 'laser' AND EXISTS (SELECT 1 FROM products q JOIN categories qc ON qc.id = q.category_id WHERE q.id = ${opts.productId} AND qc.name ~* 'laser')
-    ORDER BY p.id FOR UPDATE OF p`);
+  // Laser items share their gun packs (Nov 24, 2026): every laser item is locked too, so two callers can never both
+  // take the last six-pack. K2 (deep check 06:00 M48): all of it in one statement, in id order, like every other path
+  await lockStock(tx, [opts.productId]);
   const locked = await tx.execute(
     sql`SELECT id, quantity, price_cents, active FROM products WHERE id = ${opts.productId} FOR UPDATE`,
   );
@@ -306,6 +303,9 @@ export async function createOrderWithItems(opts: {
   }
   try {
     return await db.transaction(async (tx) => {
+      // K2 (deep check 06:00 M48): every item of the booking locked up front, in one id-ordered statement, so a later
+      // item never takes a lower-numbered lock after a higher one (two bookings at once could deadlock)
+      await lockStock(tx, items.map((it) => it.productId));
       let orderId: number | null = null;
       for (const it of items) {
         const r = await reserveInTx(tx, {
@@ -443,6 +443,9 @@ export async function releaseExpired(): Promise<number> {
   return res.length;
 }
 
+/** A payment saved halfway (amount saved, the rest not) is finished by a repeat notice only after this long (M26). */
+export const RESUME_AFTER_MS = 20_000;
+
 /** Mark an order paid (from Sola webhook or manual entry). Idempotent. */
 export async function markPaid(orderId: number, cents: number, method: string, ref?: string | null) {
   // Hark's backend list 1 (Nov 26, 2026): two payment callbacks at the same moment could both read the old amount (one
@@ -459,15 +462,17 @@ export async function markPaid(orderId: number, cents: number, method: string, r
     if (ref && cur.solaRefNum === ref) {
       // Deep check Nov 27 #7: this payment's amount was saved but the rest (status, Books) did not finish (an error in
       // between). The repeat notice finishes it, without adding the amount again; a finished order is a duplicate.
-      const unfinished = (cur.status === "PENDING_PAYMENT" || cur.status === "HOLD" || cur.status === "CANCELLED") && cur.paidCents >= cents;
+      // Deep check 06:00 M26: only once the first handling has had time to finish (20 seconds since the amount was
+      // saved); a copy arriving while the first is still running is a duplicate, so the paid text goes out once
+      const unfinished = (cur.status === "PENDING_PAYMENT" || cur.status === "HOLD" || cur.status === "CANCELLED") && cur.paidCents >= cents && cur.updatedAt.getTime() < Date.now() - RESUME_AFTER_MS;
       return unfinished ? { o: { ...cur, paidCents: cur.paidCents - cents }, dupe: false } : { o: cur, dupe: true };
     }
-    await tx.update(orders).set({ paidCents: sql`${orders.paidCents} + ${cents}`, solaRefNum: ref ?? cur.solaRefNum }).where(eq(orders.id, orderId));
+    await tx.update(orders).set({ paidCents: sql`${orders.paidCents} + ${cents}`, solaRefNum: ref ?? cur.solaRefNum, updatedAt: new Date() }).where(eq(orders.id, orderId));
     return { o: cur, dupe: false };
   });
   const o = counted.o;
   if (!o) return null;
-  if (counted.dupe) return o; // duplicate webhook
+  if (counted.dupe) return { ...o, duplicate: true as const }; // duplicate webhook (deep check M26: the caller sends no notice)
   const paid = o.paidCents + cents;
   // Hark's backend list 2: money on an order that was already paid in full (a second charge). It is recorded, the
   // booking stays as it is, the Owner is emailed to refund it, and the customer gets no new "paid" notice.
@@ -549,10 +554,7 @@ export async function recheckHolds(orderIds: number[]): Promise<{ orderId: numbe
     const ords = (await tx.select().from(orders).where(and(inArray(orders.id, orderIds), eq(orders.status, "HOLD")))).sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.id - b.id);
     if (!ords.length) return [];
     const lines = await tx.select().from(orderItems).where(inArray(orderItems.orderId, ords.map((o) => o.id)));
-    for (const pid of [...new Set(lines.map((l) => l.productId))].sort((a, b) => a - b)) {
-      await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${pid}) ORDER BY id FOR UPDATE`);
-      await tx.execute(sql`SELECT id FROM products WHERE id = ${pid} FOR UPDATE`);
-    }
+    await lockStock(tx, lines.map((l) => l.productId)); // K2: items, groups and laser pools, one id-ordered step
     // Out of the count while checked (now() is the transaction's start time)
     await tx.update(orders).set({ holdExpiresAt: sql`now() - interval '1 second'` }).where(inArray(orders.id, ords.map((o) => o.id)));
     const taken: { orderId: number; productId: number; eventDate: string; qty: number }[] = [];
@@ -707,18 +709,20 @@ export async function markGroupPaid(orderId: number, cents: number, method: stri
   // Deep check Nov 27 #2: when every day's hold ran out (released, paid nothing), the late payment goes to each released
   // day with its own amount, so each day is checked and confirmed on its own (never all of it to the first day while the
   // other days stay cancelled). A day staff cancelled is never one of them.
+  // Deep check 06:00 M9: also when some days are still open and others were released (a day added by "Choose this
+  // option" holds longer than the old day): the open days are paid first, then each released day with its own amount,
+  // so a released day's money is never put on an open day (paid twice, a "tip") while the released day stays cancelled.
   const released: FullOrder[] = [];
-  if (!all.some(open)) {
-    const { holdEnded } = await import("@/lib/late-payment");
-    for (const x of all) if (x.order.status === "CANCELLED" && holdEnded(x.order) && dueOf(x.order) > 0 && !(await cancelledByStaff(x.order.id))) released.push(x);
-  }
-  const ordered = all.some(open) ? all.filter(open) : released.length ? released : [group.primary];
+  const { holdEnded } = await import("@/lib/late-payment");
+  for (const x of all) if (x.order.status === "CANCELLED" && holdEnded(x.order) && dueOf(x.order) > 0 && !(await cancelledByStaff(x.order.id))) released.push(x);
+  const ordered = all.some(open) || released.length ? [...all.filter(open), ...released] : [group.primary];
   let remaining = cents;
   const out = [];
   for (let i = 0; i < ordered.length; i++) {
     const o = ordered[i].order;
     const pay = i === ordered.length - 1 ? remaining : Math.min(remaining, dueOf(o));
     remaining -= pay;
+    if (pay <= 0 && i > 0) continue; // nothing left for a later day: it stays as it is
     const u = await markPaid(o.id, pay, method, ref);
     if (u) out.push(u);
   }

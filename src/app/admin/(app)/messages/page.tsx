@@ -31,7 +31,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="mb-1 text-2xl font-black sm:text-3xl">Messages</h1>
-          <p className="text-muted">Texts to and from customers on the hotline number.</p>
+          <p className="text-muted">Texts to and from customers on the hotline number. Times are Eastern time.</p>
         </div>
         <form className="flex w-full gap-2 sm:w-96" role="search" data-search>
           {view !== "conversations" && <input type="hidden" name="v" value={view} />}

@@ -226,7 +226,14 @@ export async function mergeCustomers(keepId: number, otherIds: number[], userId:
     }
     const anyStop = rows.some((r) => r.sms_opt_out);
     const pick = (f: "name" | "email" | "address") => keep[f]?.trim() || rest.map((r) => r[f]?.trim()).find(Boolean) || null;
-    const today = new Date().toISOString().slice(0, 10);
+    const { todayISO } = await import("@/lib/dates");
+    const today = todayISO(); // New York date (deep check 0600 M36)
+    // Deep check 0600 M22 (Nov 27, 2026): a promo sign-up on a merged-in record was dropped. A sign-up belongs to its
+    // phone number, so it is kept when that record has the same number as the kept record (with its sign-up time); a
+    // sign-up on a different number is not moved to the kept number (its consent record stays with that number).
+    const finalPhone = keep.phone || rest.map((r) => r.phone).find(Boolean) || null;
+    const sameNumberOptIn = anyStop || keep.marketing_opt_in ? null : rest.find((r) => r.marketing_opt_in && phoneKey(r.phone) !== null && phoneKey(r.phone) === phoneKey(finalPhone));
+    const otherNumberOptIns = anyStop ? [] : rest.filter((r) => r.marketing_opt_in && phoneKey(r.phone) !== phoneKey(finalPhone));
     const noteLines = [keep.notes?.trim(), ...rest.map((r) => `Merged in on ${today}: customer number ${r.id}${r.name ? ` (${r.name})` : ""}${r.phone ? `, phone ${r.phone}` : ""}${r.email ? `, email ${r.email}` : ""}${r.notes?.trim() ? `. Notes: ${r.notes.trim()}` : ""}`)].filter(Boolean);
     await tx
       .update(schema.customers)
@@ -239,6 +246,7 @@ export async function mergeCustomers(keepId: number, otherIds: number[], userId:
         // A STOP on any record wins (Abraham): no texts, and no promo opt-in
         smsOptOut: anyStop,
         ...(anyStop ? { marketingOptIn: false } : {}),
+        ...(sameNumberOptIn ? { marketingOptIn: true, marketingOptInAt: sameNumberOptIn.marketing_opt_in_at ? new Date(sameNumberOptIn.marketing_opt_in_at) : new Date() } : {}),
         timeZone: keep.time_zone || (rest.map((r) => r.time_zone).find(Boolean) ?? null),
       })
       .where(sql`${schema.customers.id} = ${keepId}`);
@@ -258,7 +266,7 @@ export async function mergeCustomers(keepId: number, otherIds: number[], userId:
     }
     await tx.insert(schema.auditLog).values({ userId, action: "customer.merge", entityType: "customer", entityId: String(keepId), before: keep, after: { mergedIds: others, moved, stopApplied: anyStop } });
     const n = Object.values(moved).reduce((s, x) => s + x, 0);
-    return { ok: true, message: `Merged ${others.length} record${others.length === 1 ? "" : "s"} into customer number ${keepId}: ${moved.orders ?? 0} order${moved.orders === 1 ? "" : "s"} and ${n - (moved.orders ?? 0)} other rows moved. Nothing was deleted.${anyStop ? " A STOP was on one of the records, so the kept record is marked Replied STOP." : ""}`, moved };
+    return { ok: true, message: `Merged ${others.length} record${others.length === 1 ? "" : "s"} into customer number ${keepId}: ${moved.orders ?? 0} order${moved.orders === 1 ? "" : "s"} and ${n - (moved.orders ?? 0)} other rows moved. Nothing was deleted.${anyStop ? " A STOP was on one of the records, so the kept record is marked Replied STOP." : ""}${sameNumberOptIn ? " The promo sign-up was kept." : ""}${otherNumberOptIns.length ? ` A promo sign-up on another number (${otherNumberOptIns.map((r) => r.phone).join(", ")}) was not moved to the kept number.` : ""}`, moved };
   });
 }
 

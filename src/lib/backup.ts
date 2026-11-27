@@ -1,3 +1,4 @@
+import { todayISO } from "@/lib/dates";
 import { gzipSync } from "node:zlib";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -26,7 +27,8 @@ export async function buildBackup(now = new Date()) {
   return { gz: gzipSync(json), tables: Object.keys(data).length, rows: Object.values(data).reduce((n, r) => n + r.length, 0) };
 }
 
-export const backupFileName = (now = new Date()) => `hupup-backup-${now.toISOString().slice(0, 10)}.json.gz`;
+/** Deep check 0600 M36: named by the New York date (a Saturday-night backup was named after Sunday in UTC). */
+export const backupFileName = (now = new Date()) => `hupup-backup-${todayISO(now)}.json.gz`;
 
 /**
  * Restore a backup made by buildBackup into an EMPTY database (gap review, Nov 26, 2026): never overwrites or deletes

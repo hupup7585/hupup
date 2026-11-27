@@ -28,6 +28,24 @@ card form, and the server rejects any payment attempt. Right after Shabbes / Yom
 - **Receipt "Total due".** The receipt email's grouped lines end with "Total due", which equals the amount just paid.
   Say if the receipt should use other words there (for example "Total paid").
 
+## Admin and Bookkeeping (Admin session, Nov 27, 2026)
+
+1. **Possible duplicate customers: consent and terms records on a merge.** Hark's item 2 said a merge moves the
+   consent records to the kept record. The texting-consent and Terms records are locked by the database as legal
+   records (they can never be edited), so a merge leaves them exactly as written on the merged record. They are still
+   found by phone number as before, and the kept customer's page links to every record merged into it. Is that OK?
+   (Orders, payments, texts, invoices, emails and notes do move; nothing is deleted; a STOP on any record wins.)
+2. **Overpayments in Bookkeeping.** A second charge on an order already paid in full is now booked as
+   "Overpayment (refund due)" (not a tip, not a taxable sale), and refunding it gives back no sales tax. Say if your
+   accountant wants it shown another way.
+3. **"Close-by areas" for the same-day notice.** Since the Nov 27 same-day notice (two versions by customer service
+   hours) this list is not read; it is kept and labelled "Not used now". Remove it, or use areas again? (The two
+   same-day hours settings still matter: changing one marks the same-day notice recordings for a new recording.)
+4. **Item types (Catalog > Item types).** New booking and the laser gun stock follow the types you set there. The
+   phone line, the prices and the offers still work them out from the names until they are connected (phone/payments
+   session). Until then, if you set a type that differs from an item's name, New booking and the phone can disagree, so
+   please leave the list as it is until that is done.
+
 ## Phone, payments, texts and delivery (phone/payments session, Nov 27, 2026)
 
 1. **4th Sunday + extra items.** Delivery on the 4th Sunday is 2x the zone price. Is the $5 for each additional item
@@ -71,3 +89,24 @@ The rule is never to delete live data, so these were not built. Both only free s
 The info@ email Worker (`cloudflare/info-inbox-worker.js`) was fixed: a Gmail forward error no longer stops the Admin
 inbox copy, and a missing piece is logged. The new code takes effect once it is put on Cloudflare (free).
 
+## Opt-out words with a space (extra check J5, Nov 27, 2026)
+
+When someone texts "Opt out" or "Stop all" (with a space), the app records the opt-out but sends no confirmation,
+expecting Twilio to send it (as Twilio does for STOP). If Twilio does not answer these with a space, the customer gets
+no confirmation. One test text of "Opt out" from a test phone will show which it is; then the app can send the one
+confirmation itself when Twilio doesn't. Nothing was changed, so a customer never gets two confirmations.
+
+14. **Catalog email read-back (`catalog_got`, phone audit 2):** still "We got {letters}. To continue, press pound. To
+    start over, press 1. To add more, press 2." The pound rule (Nov 23) says confirm lines end with the shared confirm
+    ending (1 = correct, 2 = again). New words needed, including how "add more" fits.
+15. **"Something went wrong" line (`went_wrong`, phone audit 3):** it still says "Let us head back to the main menu", but
+    the phone now goes back one step instead. New words needed.
+16. **Sola PhonePay "Only test calls" (phone audit 5):** the box is unticked in Admin. Is card-by-phone meant to be live
+    for every caller now? (Nothing was changed.)
+17. **Terms notice (`terms_notice`, phone audit 15):** still says "press #". It is not active on the live line; new words
+    are needed before it is turned on.
+18. **Two after-hours voicemail greetings (phone audit 17):** `vm_after_hours` (approved Nov 13) and `vm_closed`. Pick
+    one; the other is retired.
+19. **"(pickup {date})" in delivery texts (phone audit 26):** keep, or a different word?
+20. **Slot file check (phone audit 16, Hark):** the "Address step 1 - house number" slot holds a file named "22 Address
+    step 2 - house number.mp3". Please listen in Admin and re-upload if it is the wrong recording.

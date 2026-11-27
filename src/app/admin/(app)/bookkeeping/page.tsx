@@ -91,6 +91,7 @@ export default async function BookkeepingPage({ searchParams }: { searchParams: 
       {tab === "ledger" && <Ledger from={from} to={to} />}
       {tab === "gl" && <GeneralLedger asOf={/^\d{4}-\d{2}-\d{2}$/.test(sp.asOf ?? "") ? sp.asOf! : today} accountId={Number(sp.account) || undefined} from={from} to={to} owner={staff.role === "owner"} />}
       {tab === "settings" && <SettingsTab categories={categories} pct={settings.solaFeePercent} fixed={settings.solaFeeCents} days={settings.bookReminderDays} openingCash={settings.bookOpeningCashCents} openingDate={settings.bookOpeningDate} />}
+      {tab === "settings" && <RefundSwitches />}
     </div>
   );
 }
@@ -778,6 +779,40 @@ async function Ledger({ from, to }: { from: string; to: string }) {
         <EntryRows entries={entries} tab="ledger" />
       </Card>
     </>
+  );
+}
+
+/** Admin handoff Phase 2 (Nov 27, 2026): Owner only. Live refunds and emailing invoices, once set in code. */
+async function RefundSwitches() {
+  const { currentStaff } = await import("@/lib/auth");
+  const me = await currentStaff();
+  if (me?.role !== "owner") return null;
+  const s = await getSettings();
+  const on = (v: unknown) => v === true || v === "true";
+  const { SENSITIVE_SWITCHES } = await import("@/lib/switch-guard");
+  const { SwitchConfirm } = await import("@/components/staff/SwitchConfirm");
+  return (
+    <Card title="Refunds and invoice emails (Owner)" note="These two used to be set in the code. Each starts exactly as it was.">
+      <form action={A.saveRefundSwitchesAction} className="space-y-3" data-refund-switches>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="liveRefundsOn" defaultChecked={on(s.liveRefundsOn)} className="mt-1" />
+          <span>
+            <b>Live refunds</b>: the Refund button on an order sends real money back to the customer&rsquo;s card (Stripe phone payments and Sola
+            website payments). Off: refunds work only with the test (sandbox) keys. Turn it on only after the providers are set up and a test
+            refund worked.
+          </span>
+        </label>
+        {s.sensitiveSwitchGuard && !on(s.liveRefundsOn) && <SwitchConfirm sw="liveRefundsOn" label={SENSITIVE_SWITCHES.liveRefundsOn.label} phrase={SENSITIVE_SWITCHES.liveRefundsOn.phrase} />}
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="invoiceEmailOn" defaultChecked={on(s.invoiceEmailOn)} className="mt-1" />
+          <span>
+            <b>Email invoices to customers</b>: the &ldquo;Email to customer&rdquo; button on an invoice sends the customer a link to view and print it, in
+            the wording you approved on Nov 15, 2026. Off: the button says it is turned off; the customer link can still be copied.
+          </span>
+        </label>
+        <Save />
+      </form>
+    </Card>
   );
 }
 

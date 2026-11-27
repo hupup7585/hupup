@@ -1,4 +1,5 @@
 import { paymentResultLabel } from "@/lib/payment-result";
+import { getSettings } from "@/lib/settings";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderWithItems, orderNumber } from "@/lib/orders";
@@ -9,17 +10,16 @@ import OrderActions from "./OrderActions";
 import ConsentPanel from "./ConsentPanel";
 import PromoSignupPanel from "./PromoSignupPanel";
 import { requireAdmin } from "@/lib/auth";
-import { STAFF_PROMO_MODE, staffPromoStep2, staffPromoVisible } from "@/lib/staff-promo";
+import { staffPromoStep2, staffPromoVisible } from "@/lib/staff-promo";
 import { staffDisclosure } from "@/lib/sms-terms-v2";
 import { NO_TEXT_CONSENT, hasTransactionalConsent } from "@/lib/sms";
 import DualDate from "@/components/DualDate";
 import StripePanel from "./StripePanel";
 import { disputesFor } from "@/lib/stripe-ops";
-import { LIVE_REFUNDS_APPROVED, refundStatus, refundsFor, refundsSandbox } from "@/lib/refunds";
+import { liveRefundsOn, refundStatus, refundsFor, refundsSandbox } from "@/lib/refunds";
 import RefundPanel from "./RefundPanel";
 import { inboxWhen } from "@/lib/inbox-format";
 import { db, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
 import { spokenAnswersFor } from "@/lib/speech-to-text";
 import { activeDrivers, overlapsFor } from "@/lib/drivers";
 import { assignDriversAction } from "./driver-actions";
@@ -34,7 +34,7 @@ import { payState } from "@/lib/pay-label";
 import ServicesPanel from "./ServicesPanel";
 import { SERVICE_FIELD_EXPLANATIONS } from "@/lib/order-services";
 
-export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ drivers?: string; driverss?: string }> }) {
   const { id } = await params;
   const staff = await requireAdmin();
   const full = await getOrderWithItems(orderIdFromParam(id)); // the order number (1031) or an older id link (31)
@@ -153,7 +153,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             const users = await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers);
             const who = (r: { source: string; userId: number | null }) => (r.source === "stripe_dashboard" ? "Stripe dashboard" : r.userId ? (users.find((u) => u.id === r.userId)?.name ?? "Staff") : "Owner");
             const provider = o.paymentMethod === "stripe" ? "stripe" : "sola";
-            const ready = LIVE_REFUNDS_APPROVED || refundsSandbox(provider);
+            const ready = (await liveRefundsOn()) || refundsSandbox(provider);
             const notReady =
               provider === "stripe"
                 ? process.env.STRIPE_REFUNDS_KEY
@@ -172,7 +172,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   status={refundStatus(o)}
                   ready={ready}
                   notReadyReason={ready ? null : notReady}
-                  refunds={refunds.map((r) => ({ id: r.id, when: inboxWhen(r.createdAt), amount: formatMoney(r.amountCents), by: who(r), result: r.status === "failed" ? "Failed" : r.status === "pending" ? "Pending" : r.status === "sending" ? "Sending" : "Refunded", refundId: r.stripeRefundId, error: r.error }))}
+                  refunds={refunds.map((r) => ({ id: r.id, when: inboxWhen(r.createdAt), amount: formatMoney(r.amountCents), by: who(r), result: r.status === "failed" ? "Failed" : r.status === "pending" ? "Pending" : r.status === "sending" ? "Sending" : r.status === "unknown" ? "No answer (check Sola)" : "Refunded", refundId: r.stripeRefundId, error: r.error }))}
                 />
                 {disputes.length > 0 && (
                   <StripePanel
@@ -185,13 +185,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             );
           })())}
           {staff.role !== "delivery" && o.status !== "CANCELLED" && (await (async () => {
-            const drivers: { id: number; name: string | null }[] = await activeDrivers();
-            // Extra check HD5 (Nov 27, 2026): a deactivated driver still on a stop shows (marked), so saving keeps them
-            for (const id of [o.deliveryDriverId, o.pickupDriverId]) {
-              if (!id || drivers.some((d) => d.id === id)) continue;
-              const [gone] = await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers).where(eq(schema.adminUsers.id, id)).limit(1);
-              if (gone) drivers.push({ id: gone.id, name: `${gone.name ?? "Driver"} (deactivated)` });
-            }
+            const active = await activeDrivers();
+            // Deep check 0600 M24: a driver who was since deactivated still shows as chosen (marked), so Save never drops them silently
+            const missing = [o.deliveryDriverId, o.pickupDriverId].filter((id): id is number => id !== null && !active.some((d) => d.id === id));
+            const gone = missing.length ? await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers).where((await import("drizzle-orm")).inArray(schema.adminUsers.id, missing)) : [];
+            const drivers = [...active, ...gone.map((d) => ({ id: d.id, name: `${d.name} (no longer active)` }))];
+            const sp = (await searchParams) ?? {};
+            const { trustedMsg } = await import("@/lib/url-message");
+            const driverMsg = trustedMsg(sp.drivers, sp.driverss);
             const warn = [...(await overlapsFor(o, "delivery")).map((w) => `Delivery driver also has: ${w}`), ...(await overlapsFor(o, "pickup")).map((w) => `Pickup driver also has: ${w}`)];
             const pick = (name: "delivery" | "pickup", current: number | null) => (
               <label className="block">
@@ -205,7 +206,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             return (
               <form action={assignDriversAction.bind(null, o.id)} className="card p-5" data-drivers>
                 <h2 className="mb-3 font-bold">Drivers</h2>
-                {!drivers.length && <p className="mb-2 text-sm text-muted">No active Delivery logins yet. <a className="font-semibold underline" href="/admin/staff">Add one in Staff</a>.</p>}
+                {driverMsg && <p role="status" className={`mb-2 text-sm font-semibold ${driverMsg === "Drivers saved." ? "text-[#13895C]" : "text-coral"}`} data-drivers-msg>{driverMsg}</p>}
+                {!active.length && <p className="mb-2 text-sm text-muted">No active Delivery logins yet. <a className="font-semibold underline" href="/admin/staff">Add one in Staff</a>.</p>}
                 <div className="grid gap-3 sm:grid-cols-2">
                   {pick("delivery", o.deliveryDriverId)}
                   {pick("pickup", o.pickupDriverId)}
@@ -316,7 +318,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           )}
           {customer?.phone && <ConsentPanel orderId={o.id} phoneDisplay={formatPhone(customer.phone)} disclosures={staffDisclosure()} stopped={textStatus === "stopped"} scopes={["transactional"]} />}
           {staffPromoVisible(staff.role) && (
-            <PromoSignupPanel orderId={o.id} phoneDisplay={customer?.phone ? formatPhone(customer.phone) : ""} step2={customer?.phone ? staffPromoStep2(customer.phone) : "Should we text your number, or a different number?"} preview={STAFF_PROMO_MODE !== "live"} stopped={textStatus === "stopped"} />
+            <PromoSignupPanel orderId={o.id} phoneDisplay={customer?.phone ? formatPhone(customer.phone) : ""} step2={customer?.phone ? staffPromoStep2(customer.phone) : "Should we text your number, or a different number?"} preview={String((await getSettings()).staffPromoMode ?? "owner_preview") !== "live"} stopped={textStatus === "stopped"} />
           )}
         </div>
         <OrderActions
