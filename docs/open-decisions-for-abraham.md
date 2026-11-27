@@ -121,3 +121,14 @@ The customer's invoice page (opened from the invoice link) now has its heading. 
 (the short text a phone may show under a shared link). The page is hidden from Google, so this only matters for link
 previews. Suggested wording, not used until approved: "Your invoice from Hup Up Attractions. View or print it here."
 
+
+## Phone booking and payments (deep check 09:00 list, Nov 27, 2026, claude/ecstatic-clarke-x12we8)
+
+23. **Text updates question (Box 49) after many wrong keys (P15):** today a wrong key plays "Sorry, that is not a valid
+    selection." and Box 49 again, with no limit (your Nov 16 rule for every menu). Should it stop after some number of
+    wrong keys, and then what: no texts and on with checkout (as with no key), or something else? Nothing was changed.
+24. **Payment link already sent when the Shabbes cut-off comes (P22):** the cut-off saves the cart and turns the order
+    back into a held cart, so after Shabbes "welcome back" can offer it on the phone, but the payment link the caller
+    already got says "This order is not waiting for payment". Which do you want after Shabbes (until one hour after the
+    phone reopens)? (a) As today: the phone's welcome back, the link no longer works; or (b) the link works again, and
+    the phone has no welcome back for that order (both at once would hold the items twice). Nothing was changed.

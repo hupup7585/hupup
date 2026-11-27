@@ -189,3 +189,41 @@ describe("P21: the 'another day' and 'free that date' values are kept on every w
     expect(redirect(await c.call("balloon-choice", { Digits: "0" }, `p=${p}&f=${f}`))).toBe("cart"); // the cart key: unchanged
   });
 });
+
+describe("P16: a line's Saturday-night (Motzei Shabbes) hours ring once Shabbes is over", () => {
+  async function saturdayNight(win: { from: string; to: string } | null) {
+    const { defaultHours } = await import("@/lib/hours-schedule");
+    const { getSettings, saveSetting } = await import("@/lib/settings");
+    const h = defaultHours((await getSettings()) as never);
+    h.lines.cs.schedule.days["6"] = win ? { closed: false, windows: [win] } : { closed: true, windows: [] };
+    await saveSetting("hoursSchedules", JSON.stringify(h), null);
+  }
+  const ring = async (iso: string) => {
+    at(iso);
+    const c = caller();
+    await ensureSession(c.sid, c.from);
+    return c.call("ring", {}, "k=4");
+  };
+  afterAll(async () => {
+    const { saveSetting } = await import("@/lib/settings");
+    await saveSetting("hoursSchedules", "", null);
+    at("2027-01-13T17:00:00Z");
+  });
+  it("customer service open Saturday 7-11 PM: 9 PM (after Shabbes) rings; Shabbes noon and 5:30 PM (before reopening) go to voicemail", async () => {
+    await saturdayNight({ from: "19:00", to: "23:00" });
+    const night = await ring("2027-01-17T02:00:00Z"); // Saturday 9 PM
+    expect(night).toContain("<Dial");
+    expect(say(night)).toContain("We are connecting you to our customer service.");
+    expect(redirect(await ring("2027-01-16T17:00:00Z"))).toBe("voicemail?x=4"); // Shabbes noon
+    expect(redirect(await ring("2027-01-16T22:30:00Z"))).toBe("voicemail?x=4"); // 5:30 PM, before the phone reopens
+    expect(redirect(await ring("2027-01-17T04:30:00Z"))).toBe("voicemail?x=4"); // 11:30 PM, after the window
+  });
+  it("no Saturday-night hours (the default): 9 PM still goes to voicemail, as before", async () => {
+    await saturdayNight(null);
+    expect(redirect(await ring("2027-01-17T02:00:00Z"))).toBe("voicemail?x=4");
+  });
+  it("a weekday is unchanged: noon rings", async () => {
+    await saturdayNight({ from: "19:00", to: "23:00" });
+    expect(await ring("2027-01-13T17:00:00Z")).toContain("<Dial");
+  });
+});
