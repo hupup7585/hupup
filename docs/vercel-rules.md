@@ -13,12 +13,23 @@ Never delete deployments, projects or data.
 - Each build takes about 2.5 to 3 minutes, and Hobby runs one build at a time, so extra builds also delay live fixes.
 - Every merge costs **two** deployments: the live branch and the preview branch.
 
-## Status right now (Nov 27, 04:05 ET)
+## Check before every merge to the live branch
 
-**Vercel is refusing every live and preview deploy ("rate limited").** The live site is still on `c4a7e20`
-(deployed 02:54 ET). Every merge since then is waiting, not live. Do not merge to the live branch until Vercel
-accepts deploys again; the first accepted deploy takes everything merged so far in one go. Keep working and testing
-on your own branch. (A session updating this note when the limit clears: change it to "OK".)
+The daily allowance is used up for most of Nov 27: 128 deployments in the 24 hours to 06:55 ET. A slot only comes
+back when a deployment turns 24 hours old, so from about 1:40 PM ET on Nov 27 a merge gets through roughly every
+10 to 20 minutes, and capacity only really returns overnight. Before merging, look at what Vercel said about the
+live branch's last commit:
+
+```bash
+gh api repos/hupup7585/hupup/commits/claude/nifty-mendel-7hlzdb/statuses --jq '[.[]|select(.context=="Vercel")][0]|.state+" "+.description+" "+.created_at'
+```
+
+- `success ...` and more than 30 minutes ago: OK to merge (rule 2 first).
+- `pending ...`: a deploy is building; wait for it.
+- `failure Deployment rate limited ...`: a refused push uses no slot, so you may still merge a finished, tested
+  batch, but it will not go live until a slot opens. The first accepted deploy takes everything merged so far in one
+  go. Never retry, push empty commits or create deployments by hand to force it.
+- `failure` for any other reason: the build is broken; see rule 7.
 
 ## What builds on Vercel
 
@@ -51,8 +62,9 @@ Ignored Build Step as a backup):
    list cost two deployments each. Keep them on your own branch and bring them along with your next real merge.
 4. **Push the live branch and the preview branch in one go** (same commit), not one after the other with new commits.
 5. **Never force-push** the live or preview branch. If a push is rejected, fetch, merge, test again, push.
-6. **If Vercel says "rate limited"**: stop merging. Do not retry, do not push empty commits, do not create
-   deployments by hand. Tell Abraham. Capacity comes back as day-old deployments age out (rolling 24 hours).
+6. **If Vercel says "rate limited"**: nothing is broken; the site stays on its last deploy. Keep batching (rule 1).
+   Do not retry, do not push empty commits, do not create
+   deployments by hand (no `create_deployment`: each one uses a slot too). Tell Abraham. Capacity comes back as day-old deployments age out (rolling 24 hours).
 7. **If a deploy fails**: the site keeps serving the last good deployment. One GitHub issue labeled
    `vercel-deploy-failed` opens automatically (later failures are added to it as comments). Close it when deploys work again. Fix it in one commit, run rule 2, merge once.
 8. After your merge, check the deployment reached READY (Vercel `list_deployments` for the commit) and report it.

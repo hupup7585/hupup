@@ -110,3 +110,16 @@ confirmation itself when Twilio doesn't. Nothing was changed, so a customer neve
 19. **"(pickup {date})" in delivery texts (phone audit 26):** keep, or a different word?
 20. **Slot file check (phone audit 16, Hark):** the "Address step 1 - house number" slot holds a file named "22 Address
     step 2 - house number.mp3". Please listen in Admin and re-upload if it is the wrong recording.
+
+## Vercel free plan (Vercel check, Nov 27, 2026)
+
+21. **Preview builds on every merge.** Each merge to the live branch also builds the preview branch, even when both
+    hold the same code, so every merge uses 2 of the 100 free deployments a day (128 used in the 24 hours to
+    06:55 ET; many merges were refused as "rate limited"). Suggestion: update the preview branch only when it holds
+    something the live site doesn't (website wording waiting for your OK), instead of on every merge. That halves the
+    count but changes your "keep preview in sync" rule, so it waits for you.
+22. **Database changes before the build check.** Every build updates the database first and checks the code second, so
+    a build that fails can already have changed the live database (preview builds too, while previews share the live
+    database: item 13). Safe as long as changes only add things, which the rules ask. Moving the database step after
+    the code check is possible but needs care (some pages read the database while building). Look into it?
+
