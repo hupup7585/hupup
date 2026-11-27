@@ -121,3 +121,12 @@ The customer's invoice page (opened from the invoice link) now has its heading. 
 (the short text a phone may show under a shared link). The page is hidden from Google, so this only matters for link
 previews. Suggested wording, not used until approved: "Your invoice from Hup Up Attractions. View or print it here."
 
+## Welcome back with an item that is no longer free (extra check P4, Nov 27, 2026)
+
+Welcome back adds the old cart's items one at a time. When the caller presses a key after the first one (0 the cart, 1
+keep shopping, 2 another day), the other free items are added too (Hark's bug 4), but an old item that was taken in the
+meantime is skipped without a word: the caller never hears the "item taken" screen for it. Which should it be?
+1. Before going where the caller pressed, play the item-taken screen for each taken item (existing lines), then go on.
+2. Go where the caller pressed (as today), and mention nothing.
+Nothing was changed until you decide.
+
