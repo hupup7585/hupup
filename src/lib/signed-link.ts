@@ -1,8 +1,9 @@
+import { signingSecret } from "@/lib/secret";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { config } from "@/lib/config";
 
 /** Private play links for voicemail alerts: signed with AUTH_SECRET, expire after `days` (default 14). No sign-in needed. */
-const sign = (id: number, exp: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`voicemail:${id}:${exp}`).digest("hex").slice(0, 32);
+const sign = (id: number, exp: number) => createHmac("sha256", signingSecret()).update(`voicemail:${id}:${exp}`).digest("hex").slice(0, 32);
 
 export function voicemailPlayLink(id: number, days = 14, now = Date.now()): string {
   const exp = Math.floor(now / 1000) + days * 86_400;
@@ -18,7 +19,7 @@ export function verifyVoicemailLink(id: number, exp: string | null, sig: string 
 }
 
 /** Phone line recordings (Abraham, Phone Recordings): a fixed signed link Twilio can play; no expiry, not guessable. */
-const signPrompt = (id: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`prompt-recording:${id}`).digest("hex").slice(0, 32);
+const signPrompt = (id: number) => createHmac("sha256", signingSecret()).update(`prompt-recording:${id}`).digest("hex").slice(0, 32);
 
 export function promptRecordingLink(id: number): string {
   return `${config.baseUrl()}/api/voice-audio/prompt/${id}?sig=${signPrompt(id)}`;
@@ -32,7 +33,7 @@ export function verifyPromptRecordingLink(id: number, sig: string | null): boole
 }
 
 /** The customer's own invoice page (Abraham, Nov 15, 2026): a fixed signed link, no sign-in, not guessable. */
-const signInvoice = (id: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`invoice:${id}`).digest("hex").slice(0, 32);
+const signInvoice = (id: number) => createHmac("sha256", signingSecret()).update(`invoice:${id}`).digest("hex").slice(0, 32);
 
 export function invoiceCustomerLink(id: number): string {
   return `${config.siteUrl()}/invoice/${id}?t=${signInvoice(id)}`; // the real site address (item 7, Nov 25, 2026)
@@ -49,7 +50,7 @@ export function verifyInvoiceLink(id: number, t: string | null | undefined): boo
  * Option B (Abraham, Nov 15, 2026; off until the Owner turns it on): a changing line spoken in Achird by Google, made
  * when Twilio fetches it. Signed so only our own words can be turned into audio.
  */
-const signLive = (text: string) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`live-voice:${text}`).digest("hex").slice(0, 32);
+const signLive = (text: string) => createHmac("sha256", signingSecret()).update(`live-voice:${text}`).digest("hex").slice(0, 32);
 export function liveVoiceLink(text: string): string {
   return `${config.baseUrl()}/api/voice-audio/live?t=${Buffer.from(text).toString("base64url")}&sig=${signLive(text)}`;
 }
@@ -62,7 +63,7 @@ export function verifyLiveVoiceLink(t: string | null, sig: string | null): strin
 }
 
 /** A delivery photo for a picture text: Twilio fetches it once; the link works for 30 minutes only (Abraham, Nov 16, 2026). */
-const signPhoto = (id: number, exp: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`delivery-photo:${id}:${exp}`).digest("hex").slice(0, 32);
+const signPhoto = (id: number, exp: number) => createHmac("sha256", signingSecret()).update(`delivery-photo:${id}:${exp}`).digest("hex").slice(0, 32);
 export function deliveryPhotoLink(id: number, now = Date.now()): string {
   const exp = Math.floor(now / 1000) + 30 * 60;
   return `${config.baseUrl()}/api/media/delivery-photo/${id}?exp=${exp}&sig=${signPhoto(id, exp)}`;
@@ -75,7 +76,7 @@ export function verifyDeliveryPhotoLink(id: number, exp: number, sig: string | n
 }
 
 /** A file sent with a text (Abraham, Nov 16, 2026): Twilio fetches it; the link works for 24 hours. */
-const signMsgFile = (id: number, exp: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`message-file:${id}:${exp}`).digest("hex").slice(0, 32);
+const signMsgFile = (id: number, exp: number) => createHmac("sha256", signingSecret()).update(`message-file:${id}:${exp}`).digest("hex").slice(0, 32);
 export function messageFileLink(id: number, now = Date.now()): string {
   const exp = Math.floor(now / 1000) + 24 * 3600;
   return `${config.baseUrl()}/api/media/message-file/${id}?exp=${exp}&sig=${signMsgFile(id, exp)}`;
@@ -98,7 +99,7 @@ export function inboundEmailSecret(env: Record<string, string | undefined> = pro
 }
 
 /** Unsubscribe link for promotional emails (Abraham, Nov 17, 2026): signed per address, never expires. */
-const signUnsub = (email: string) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`unsubscribe:${email.toLowerCase()}`).digest("hex").slice(0, 32);
+const signUnsub = (email: string) => createHmac("sha256", signingSecret()).update(`unsubscribe:${email.toLowerCase()}`).digest("hex").slice(0, 32);
 export function unsubscribeLink(email: string, base: string): string {
   return `${base.replace(/\/$/, "")}/unsubscribe?e=${encodeURIComponent(email.toLowerCase())}&s=${signUnsub(email)}`;
 }
@@ -113,7 +114,7 @@ export function verifyUnsubscribe(email: string | null, sig: string | null): boo
  * Household names (Abraham, Nov 25, 2026, 12:36): spoken by Google at the Owner's name speed (default 1.1). The rate is
  * part of what is signed, so no one can ask our server for other words or another speed.
  */
-const signName = (text: string, rate: string) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`name-voice:${rate}:${text}`).digest("hex").slice(0, 32);
+const signName = (text: string, rate: string) => createHmac("sha256", signingSecret()).update(`name-voice:${rate}:${text}`).digest("hex").slice(0, 32);
 export function nameVoiceLink(text: string, rate: number): string {
   const r = rate.toFixed(2);
   return `${config.baseUrl()}/api/voice-audio/name?t=${Buffer.from(text).toString("base64url")}&r=${r}&sig=${signName(text, r)}`;

@@ -1,3 +1,4 @@
+import { signingSecret } from "@/lib/secret";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -166,7 +167,7 @@ export function silenceSeconds(s: Record<string, unknown>): number {
   return x >= 5 && x <= 120 ? x : 20;
 }
 
-const signFor = (scope: string, attemptId: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`${scope}:${attemptId}`).digest("hex").slice(0, 32);
+const signFor = (scope: string, attemptId: number) => createHmac("sha256", signingSecret()).update(`${scope}:${attemptId}`).digest("hex").slice(0, 32);
 const same = (a: string, b: string | null) => Boolean(b) && a.length === (b ?? "").length && timingSafeEqual(Buffer.from(a), Buffer.from(b ?? ""));
 /** Our signed addresses the helper calls: "hangup" (the result is in and Sola stopped talking) or "silence". */
 export const helperUrl = (attemptId: number, what: "hangup" | "silence") => `${config.baseUrl()}/api/voice-watch/sola-listen?a=${attemptId}&do=${what}&s=${signFor(`sola-listen-${what}`, attemptId)}`;
@@ -244,7 +245,7 @@ export async function helperSilence(attemptId: number, deps: { fetcher?: typeof 
 }
 
 /** The signed address of the watcher for one try (only our server can start it). */
-const sign = (attemptId: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`phonepay-watch:${attemptId}`).digest("hex").slice(0, 32);
+const sign = (attemptId: number) => createHmac("sha256", signingSecret()).update(`phonepay-watch:${attemptId}`).digest("hex").slice(0, 32);
 export const watchUrl = (attemptId: number) => `${config.baseUrl()}/api/voice-watch/phonepay?a=${attemptId}&s=${sign(attemptId)}`;
 export function verifyWatch(attemptId: number, s: string | null): boolean {
   if (!attemptId || !s) return false;

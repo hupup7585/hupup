@@ -1,3 +1,4 @@
+import { signingSecret } from "@/lib/secret";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { toE164 } from "@/lib/phone";
 
@@ -61,7 +62,7 @@ export function keypadPayOn() {
 export const payConnector = (env: Record<string, string | undefined> = process.env) => env.TWILIO_PAY_CONNECTOR || "Stripe_Connector";
 
 /** The order travels to the subaccount in SIP headers, signed so it can't be changed on the way. */
-const sigFor = (orderId: number, callSid: string) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`phone-pay:${orderId}:${callSid}`).digest("hex").slice(0, 32);
+const sigFor = (orderId: number, callSid: string) => createHmac("sha256", signingSecret()).update(`phone-pay:${orderId}:${callSid}`).digest("hex").slice(0, 32);
 
 export function paySipUri(orderId: number, callSid: string, env: Record<string, string | undefined> = process.env): string {
   return `sip:pay@${env.TWILIO_PAY_SIP_DOMAIN}?X-Hup-Order=${orderId}&X-Hup-Call=${encodeURIComponent(callSid)}&X-Hup-Sig=${sigFor(orderId, callSid)}`;

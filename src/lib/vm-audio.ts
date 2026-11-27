@@ -1,3 +1,4 @@
+import { signingSecret } from "@/lib/secret";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -96,7 +97,7 @@ export async function deletePieces(audioId: number, count: number) {
 }
 
 /** Signed link for one R2 voicemail file (a piece, a greeting, a name or a note); Twilio fetches it. */
-const sign = (key: string, exp: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`vmr2:${key}:${exp}`).digest("hex").slice(0, 32);
+const sign = (key: string, exp: number) => createHmac("sha256", signingSecret()).update(`vmr2:${key}:${exp}`).digest("hex").slice(0, 32);
 export function r2AudioLink(key: string, now = Date.now()): string {
   const exp = Math.floor(now / 1000) + 2 * 86_400;
   return `${config.baseUrl()}/api/voicemail/r2?k=${encodeURIComponent(key)}&exp=${exp}&sig=${sign(key, exp)}`;

@@ -1,3 +1,4 @@
+import { signingSecret } from "@/lib/secret";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -83,7 +84,7 @@ export function digitsTemplateError(template: string): string | null {
 /** The order travels to the subaccount in SIP headers, signed so it can't be changed on the way. */
 export type PayKind = "order" | "custom";
 const sig = (orderId: number, callSid: string, cents: number, kind: PayKind) =>
-  createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`sola-phonepay:${kind}:${orderId}:${callSid}:${cents}`).digest("hex").slice(0, 32);
+  createHmac("sha256", signingSecret()).update(`sola-phonepay:${kind}:${orderId}:${callSid}:${cents}`).digest("hex").slice(0, 32);
 
 /** orderId 0 = an Owner custom charge with no order number. */
 export function phonePaySipUri(orderId: number, callSid: string, cents: number, env: Record<string, string | undefined> = process.env, kind: PayKind = "order"): string {

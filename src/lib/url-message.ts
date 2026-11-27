@@ -1,3 +1,4 @@
+import { signingSecret } from "@/lib/secret";
 import crypto from "node:crypto";
 
 /**
@@ -5,7 +6,7 @@ import crypto from "node:crypto";
  * is shown only when it was written by our own Save action. Anyone can type ?m=Published into an address; without the
  * matching signature the page shows nothing, so a fake message can never appear.
  */
-const sig = (text: string) => crypto.createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`msg:${text}`).digest("hex").slice(0, 16);
+const sig = (text: string) => crypto.createHmac("sha256", signingSecret()).update(`msg:${text}`).digest("hex").slice(0, 16);
 
 /** The address part for a message: name=text&names=signature */
 export function msgQuery(text: string, name = "m"): string {

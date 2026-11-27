@@ -1,3 +1,4 @@
+import { signingSecret } from "@/lib/secret";
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -21,7 +22,7 @@ export type SensitiveSwitch = keyof typeof SENSITIVE_SWITCHES;
 const KEY = "sensitiveSwitchCode";
 const TTL_MIN = 10;
 const MAX_TRIES = 5;
-const hash = (code: string) => crypto.createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`switch:${code}`).digest("hex");
+const hash = (code: string) => crypto.createHmac("sha256", signingSecret()).update(`switch:${code}`).digest("hex");
 type Stored = { userId: number | null; sw: SensitiveSwitch; hash: string; exp: number; tries: number };
 
 async function read(): Promise<Stored | null> {

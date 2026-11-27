@@ -1,3 +1,4 @@
+import { signingSecret } from "@/lib/secret";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { config } from "@/lib/config";
 
@@ -15,7 +16,7 @@ export const linkPieceKey = (fileId: number, idx: number) => `inbox-files/${file
 /** The approved line for one file. */
 export const tooBigLine = (link: string) => `This file was too big to attach. Download it here: ${link}`;
 
-const sig = (fileId: number, exp: number) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`file-link:${fileId}:${exp}`).digest("hex").slice(0, 32);
+const sig = (fileId: number, exp: number) => createHmac("sha256", signingSecret()).update(`file-link:${fileId}:${exp}`).digest("hex").slice(0, 32);
 
 /** A download link that works for 30 days from now. */
 export function fileLink(fileId: number, now = new Date()): string {

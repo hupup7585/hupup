@@ -42,7 +42,8 @@ export function publicEmail(env: Record<string, string | undefined> = process.en
 }
 
 export const config = {
-  baseUrl: () => (process.env.PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, ""),
+  // Code audit L6: the live site never texts localhost links when PUBLIC_BASE_URL is missing
+  baseUrl: () => (process.env.PUBLIC_BASE_URL || (process.env.VERCEL_ENV === "production" ? "https://hupupattractions.com" : "http://localhost:3000")).replace(/\/$/, ""),
   /**
    * The address in every customer link (Abraham, Nov 25, 2026): https://hupupattractions.com on the live site, never a
    * vercel.app address. Twilio's callbacks keep using baseUrl. PUBLIC_SITE_URL overrides it.

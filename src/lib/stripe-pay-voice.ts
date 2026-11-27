@@ -1,3 +1,4 @@
+import { signingSecret } from "@/lib/secret";
 import twilio from "twilio";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, inArray, isNull } from "drizzle-orm";
@@ -24,7 +25,7 @@ const voice = () => ({ voice: config.voice() as never, language: "en-US" as cons
 const payUrl = (action: string, q: Record<string, string | number>) => `${config.baseUrl()}/api/pay-voice/${action}?${new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v)])).toString()}`;
 
 /** Token for the follow-up steps on this payment leg (order + the subaccount's call). */
-const tok = (orderId: number, sid: string) => createHmac("sha256", process.env.AUTH_SECRET || "dev-secret").update(`pay-leg:${orderId}:${sid}`).digest("hex").slice(0, 32);
+const tok = (orderId: number, sid: string) => createHmac("sha256", signingSecret()).update(`pay-leg:${orderId}:${sid}`).digest("hex").slice(0, 32);
 function tokOk(orderId: number, sid: string, t: string | null) {
   if (!t) return false;
   const a = Buffer.from(tok(orderId, sid));

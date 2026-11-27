@@ -10,7 +10,7 @@ import { SETTING_DEFAULTS } from "@/lib/settings";
 /* Item 7 (Batch 4 item 1, Abraham Nov 25, 2026): no customer text or email ever holds vercel.app or dev=1; every customer
  * link uses https://hupupattractions.com from one setting; hold times 10 (phone) and 25 (Admin), never "30 minutes". */
 const saved = { ...process.env };
-const live = () => Object.assign(process.env, { AUTH_SECRET: process.env.AUTH_SECRET || "test-secret", VERCEL: "1", VERCEL_ENV: "production", PUBLIC_BASE_URL: "https://hupup.vercel.app", PUBLIC_SITE_URL: "", SOLA_PAYMENTSITE_NAME: "hupup" });
+const live = () => Object.assign(process.env, { AUTH_SECRET: "test-secret-that-is-long-enough-123", VERCEL: "1", VERCEL_ENV: "production", PUBLIC_BASE_URL: "https://hupup.vercel.app", PUBLIC_SITE_URL: "", SOLA_PAYMENTSITE_NAME: "hupup" });
 afterEach(() => {
   for (const k of ["VERCEL", "VERCEL_ENV", "PUBLIC_BASE_URL", "PUBLIC_SITE_URL", "SOLA_PAYMENTSITE_NAME"]) {
     if (saved[k] === undefined) delete process.env[k];
