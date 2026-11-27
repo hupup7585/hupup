@@ -691,13 +691,25 @@ export async function markGroupPaid(orderId: number, cents: number, method: stri
   }
   // duplicate webhook (deep check Nov 27 #7: unless the first try stopped halfway; markPaid finishes it then)
   const primaryDone = (x: FullOrder) => !(x.order.status === "PENDING_PAYMENT" || x.order.status === "HOLD" || x.order.status === "CANCELLED");
-  if (ref && group.primary.order.solaRefNum === ref) {
-    if (primaryDone(group.primary)) return [];
-    // Retry after a halfway stop: only the days that already carry this payment are finished (status and Books), each
-    // with the amount already saved on it; no money is moved again
+  const carrying = ref ? group.orders.filter((x) => x.order.solaRefNum === ref) : [];
+  if (carrying.length) {
+    // Retry after a halfway stop: the days that already carry this payment are finished (status and Books), each with
+    // the amount already saved on it; no money is moved again
     const out = [];
-    for (const x of group.orders) if (x.order.solaRefNum === ref && !primaryDone(x) && x.order.paidCents > 0) {
+    for (const x of carrying) if (!primaryDone(x) && x.order.paidCents > 0) {
       const u = await markPaid(x.order.id, x.order.paidCents, method, ref);
+      if (u) out.push(u);
+    }
+    // Extra check Pay2: the first try stopped before every day got its share (the first day finished, a later day not):
+    // only the money not yet saved under this payment goes on to the days still waiting for it (before, the retry
+    // stopped at a finished first day and the later day's money was never recorded)
+    const saved = carrying.reduce((n, x) => n + x.order.paidCents, 0);
+    let rest = cents - saved;
+    const waiting = group.orders.filter((x) => x.order.solaRefNum !== ref && (x.order.status === "PENDING_PAYMENT" || x.order.status === "HOLD") && dueOf(x.order) > 0);
+    for (let i = 0; i < waiting.length && rest > 0; i++) {
+      const pay = i === waiting.length - 1 ? rest : Math.min(rest, dueOf(waiting[i].order));
+      rest -= pay;
+      const u = await markPaid(waiting[i].order.id, pay, method, ref);
       if (u) out.push(u);
     }
     return out;
@@ -705,7 +717,9 @@ export async function markGroupPaid(orderId: number, cents: number, method: stri
   // Hark's website list 9 (Nov 26, 2026): the payment goes to the days still waiting for it, never to a day that was
   // cancelled or is already paid (the primary first when it is waiting; nothing waiting: the primary, as before)
   const all = [group.primary, ...group.orders.filter((x) => x.order.id !== group.primary.order.id)];
-  const open = (x: FullOrder) => x.order.status !== "CANCELLED" && dueOf(x.order) > 0;
+  // Extra check Pay3: only the days still waiting for payment, the same days the link amount ("due") counted; a confirmed
+  // day with a balance (staff added an item) is never paid from a link that did not charge for it
+  const open = (x: FullOrder) => (x.order.status === "PENDING_PAYMENT" || x.order.status === "HOLD") && dueOf(x.order) > 0;
   // Deep check Nov 27 #2: when every day's hold ran out (released, paid nothing), the late payment goes to each released
   // day with its own amount, so each day is checked and confirmed on its own (never all of it to the first day while the
   // other days stay cancelled). A day staff cancelled is never one of them.

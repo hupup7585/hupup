@@ -34,6 +34,8 @@ export function paymentResultLabel(o: { paymentResult: string | null; paymentRes
 export async function confirmationText(orderId: number): Promise<string | null> {
   const group = await getPaymentGroup(orderId);
   if (!group) return null;
+  // Extra check Pay4: never a "payment received" confirmation while a day needs staff (not confirmed)
+  if (group.orders.some((x) => x.order.status === "NEEDS_ATTENTION")) return null;
   const num = orderNumber(orderId);
   const { messageText } = await import("@/lib/ivr/prompts");
   // Deep check 06:00 M17 (item 24's missed path, box 148): only the days actually booked, as the automatic text

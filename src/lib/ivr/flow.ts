@@ -5063,6 +5063,9 @@ const handlers: Record<string, Handler> = {
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "promo-consent");
     if (!group.paid) return back(vr, "goodbye"); // Hark's 2nd check, A2: "approved" only after a real payment
+    // Extra check Pay4: paid, but a day needs staff (the hold ran out and an item was taken meanwhile): never "your
+    // booking is confirmed"; the goodbye, as for an unpaid order (the Owner was emailed to sort it out)
+    if (group.orders.some((x) => x.order.status === "NEEDS_ATTENTION")) return back(vr, "goodbye");
     const number = spokenDigits(orderNumber(o));
     const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
     sp(g, ctx, "phonepay_approved", { number });
