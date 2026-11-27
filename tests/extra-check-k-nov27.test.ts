@@ -49,3 +49,41 @@ describe("K1: 4th Sunday free is every 4th Sunday, not every Sunday after the th
     await saveSetting("offerFourthSundayOn", false);
   });
 });
+
+describe("K2: one shared stock lock, in id order, laser gun packs included", () => {
+  it("locks the item, its maze group and every laser item (sorted); a plain item locks only itself", async () => {
+    const { lockUnits } = await import("@/lib/availability");
+    const [laser] = await db.insert(schema.categories).values({ name: "Laser Tag and Inflatable Mazes", ivrDigit: 2, sortOrder: 2, active: true }).returning();
+    // ids made out of order on purpose: the maze items come after the plain guns
+    const [guns] = await db.insert(schema.products).values({ categoryId: laser.id, name: "6 Laser Guns", priceCents: 11000, quantity: 3, active: true }).returning();
+    const [m6, m4] = await db
+      .insert(schema.products)
+      .values([
+        { categoryId: laser.id, name: "Inflatable Maze with 6 Laser Guns", priceCents: 20000, quantity: 1, active: true, stockGroup: "maze" },
+        { categoryId: laser.id, name: "Inflatable Maze with 4 Laser Guns", priceCents: 17500, quantity: 1, active: true, stockGroup: "maze" },
+      ])
+      .returning();
+    const [addons] = await db.select().from(schema.categories).where(eq(schema.categories.name, "Laser tag add-ons"));
+    const [pack] = await db.insert(schema.products).values({ categoryId: addons.id, name: "Additional 6-Pack Laser Guns", priceCents: 7500, quantity: 10, active: true }).returning();
+    const allLaser = [guns.id, m6.id, m4.id, pack.id].sort((a, b) => a - b);
+
+    await db.transaction(async (tx) => {
+      // the maze item and the plain guns lock exactly the same rows in the same order: no deadlock between them
+      expect(await lockUnits(tx as never, [m6.id])).toEqual(allLaser);
+      expect(await lockUnits(tx as never, [guns.id])).toEqual(allLaser);
+      expect(await lockUnits(tx as never, [pack.id])).toEqual(allLaser);
+      expect(await lockUnits(tx as never, [balloon])).toEqual([balloon]);
+      expect(await lockUnits(tx as never, [balloon, m4.id, balloon])).toEqual([...allLaser, balloon].sort((a, b) => a - b));
+      expect(await lockUnits(tx as never, [])).toEqual([]);
+    });
+  });
+
+  it("every booking path uses the shared lock (no path locks only its own item or its maze group)", async () => {
+    const { readFileSync } = await import("node:fs");
+    for (const f of ["src/lib/orders.ts", "src/lib/late-payment.ts", "src/app/admin/(app)/orders/actions.ts"]) {
+      const src = readFileSync(f, "utf8");
+      expect(src, f).not.toContain("stock_group = (SELECT stock_group FROM products WHERE id =");
+      expect(src, f).toContain("lockUnits(");
+    }
+  });
+});

@@ -122,6 +122,25 @@ export function bookableQty(quantity: number, usage: UsageMap, productId: number
   return free;
 }
 
+/**
+ * Extra check K2 (Nov 27, 2026): lock the stock these items draw on, in ONE step and in id order: the items, every item
+ * in their shared-unit group (the maze), and every laser item when one of them is laser (the shared gun packs). Every
+ * booking path uses it, so two bookings at once never lock in different orders (no deadlock) and never both take the
+ * last unit of a shared pool. Run inside the transaction, before checkBookable. Returns the ids locked.
+ */
+export async function lockUnits(exec: Executor, productIds: number[]): Promise<number[]> {
+  const ids = [...new Set(productIds.map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (!ids.length) return [];
+  const list = sql.join(ids.map((id) => sql`${id}`), sql`, `);
+  const r = await exec.execute(sql`
+    SELECT p.id FROM products p LEFT JOIN categories c ON c.id = p.category_id
+    WHERE p.id IN (${list})
+       OR p.stock_group IN (SELECT q.stock_group FROM products q WHERE q.id IN (${list}) AND q.stock_group IS NOT NULL)
+       OR (c.name ~* 'laser' AND EXISTS (SELECT 1 FROM products q JOIN categories qc ON qc.id = q.category_id WHERE q.id IN (${list}) AND qc.name ~* 'laser'))
+    ORDER BY p.id FOR UPDATE OF p`);
+  return (r.rows as { id: number }[]).map((x) => Number(x.id)); // the rows locked, in the order they were locked
+}
+
 /** The items that share this item's unit (its stock group), itself included; just itself when it has no group. */
 export async function stockGroupIds(productId: number, exec: Executor = db): Promise<number[]> {
   const r = await exec.execute(sql`

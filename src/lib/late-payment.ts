@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { checkBookable, getUsage, pickupDateFor, usedOn, lastHeldDay } from "@/lib/availability";
+import { checkBookable, getUsage, lockUnits, pickupDateFor, usedOn, lastHeldDay } from "@/lib/availability";
 import { addDays, todayISO } from "@/lib/dates";
 import { nearbyDays, nearestSize } from "@/lib/alternatives";
 import { nextOpenDay } from "@/lib/jewish-calendar";
@@ -103,8 +103,7 @@ export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now
     const pids = [...new Set(items.map((i) => i.productId))].sort((a, b) => a - b);
     // Code audit L9 (Nov 24, 2026): items sharing one unit (the maze group) are locked as a whole group first, in id
     // order, like a phone booking, so a late payment and a new booking can never both take the shared unit
-    for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
-    for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+    await lockUnits(tx, pids); // extra check K2: the items, their maze group and the laser gun packs, in one id-ordered step
     const removed: { productId: number; qty: number; eventDate: string; name: string }[] = [];
     const today = todayISO(now);
     for (const o of ended) {
@@ -228,8 +227,7 @@ export async function chooseLinkOption(primaryId: number, index: number, product
   if (date < todayISO(now)) return false;
   const ok = await db.transaction(async (tx) => {
     // the whole unit group (maze, laser pools) is locked, as for a phone booking
-    await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${productId}) ORDER BY id FOR UPDATE`);
-    await tx.execute(sql`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`);
+    await lockUnits(tx, [productId]); // extra check K2: the items, their maze group and the laser gun packs, in one id-ordered step
     const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, productId)).limit(1);
     const [primary] = await tx.select().from(schema.orders).where(eq(schema.orders.id, primaryId)).limit(1);
     if (!p?.active || !primary) return false;
@@ -321,8 +319,7 @@ export async function claimIfStillFree(orderId: number, now = new Date()): Promi
   return withFitCheck(db, async (tx) => {
     const lines = await tx.select({ productId: schema.orderItems.productId }).from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
     const pids = [...new Set(lines.map((l) => l.productId))].sort((a, b) => a - b);
-    for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
-    for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+    await lockUnits(tx, pids); // extra check K2: the items, their maze group and the laser gun packs, in one id-ordered step
     if (!lines.length) return true;
     // the order counts while its lines are checked one after another
     await tx.update(schema.orders).set({ status: "PENDING_PAYMENT", holdExpiresAt: inMinutes(IDLE_MINUTES, now) }).where(eq(schema.orders.id, orderId));
@@ -379,10 +376,7 @@ export async function confirmAttentionOrder(orderId: number): Promise<boolean> {
     if (!o || o.status !== "NEEDS_ATTENTION") return false;
     const items = await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
     // the items and their shared groups locked in id order, like a phone booking
-    for (const id of [...new Set(items.map((i) => i.productId))].sort((a, b) => a - b)) {
-      await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
-      await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
-    }
+    await lockUnits(tx, items.map((i) => i.productId)); // extra check K2: one id-ordered step, laser gun packs included
     // Hark's Admin list 4 and 12 (Nov 26, 2026): the whole order is checked (the maze group and laser pools too)
     await assertOrderFits(tx, o);
     await tx.update(schema.orders).set({ status: "CONFIRMED", holdExpiresAt: null, updatedAt: new Date() }).where(eq(schema.orders.id, orderId));
