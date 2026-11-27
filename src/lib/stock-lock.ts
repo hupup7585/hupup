@@ -20,9 +20,19 @@ export async function lockStock(tx: Exec, productIds: number[]): Promise<number[
     ids.map((i) => sql`${i}`),
     sql`, `,
   );
+  // Deep check 09:00 P12 (M48 completed): the shared gun-pack pools are the ones availability counts. With Catalog >
+  // Item types set, a laser item is found by its type (availability.ts laserPoolInfo), not only by a category named
+  // "laser"; every item of those pools is locked too. Nothing set: exactly the same rows as before.
+  const { laserPoolInfo } = await import("@/lib/availability");
+  const pools = (await laserPoolInfo(tx as never)).items;
+  const poolIds = ids.some((i) => pools.has(i)) ? [...pools.keys()] : [];
+  const all = sql.join(
+    [...new Set([...ids, ...poolIds])].map((i) => sql`${i}`),
+    sql`, `,
+  );
   const r = await tx.execute(sql`
     SELECT p.id FROM products p LEFT JOIN categories c ON c.id = p.category_id
-    WHERE p.id IN (${list})
+    WHERE p.id IN (${all})
        OR (p.stock_group IS NOT NULL AND p.stock_group IN (SELECT stock_group FROM products WHERE id IN (${list}) AND stock_group IS NOT NULL))
        OR (c.name ~* 'laser' AND EXISTS (SELECT 1 FROM products q JOIN categories qc ON qc.id = q.category_id WHERE q.id IN (${list}) AND qc.name ~* 'laser'))
     ORDER BY p.id
