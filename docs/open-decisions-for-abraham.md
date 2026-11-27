@@ -46,6 +46,9 @@ card form, and the server rejects any payment attempt. Right after Shabbes / Yom
    session). Until then, if you set a type that differs from an item's name, New booking and the phone can disagree, so
    please leave the list as it is until that is done.
 
+5. **Driver screen: how early a stop can be marked done (deep check 06:00 M55).** Delivered or Picked up can be
+   pressed from the day before the stop (so an evening-before delivery works), not earlier. Is one day early right?
+
 ## Phone, payments, texts and delivery (phone/payments session, Nov 27, 2026)
 
 1. **4th Sunday + extra items.** Delivery on the 4th Sunday is 2x the zone price. Is the $5 for each additional item
