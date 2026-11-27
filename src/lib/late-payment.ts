@@ -47,6 +47,16 @@ export function holdEnded(o: HoldFields, now = new Date()) {
 }
 
 /**
+ * The payment link has expired (deep check Nov 27 #3): a day whose hold ran out. A day staff cancelled on purpose does
+ * not count (it is never brought back, A2), so the customer can still pay for the other days.
+ */
+export async function linkExpired(days: { order: HoldFields & { id: number } }[], now = new Date()): Promise<boolean> {
+  const { cancelledByStaff } = await import("@/lib/orders");
+  for (const d of days) if (holdEnded(d.order, now) && !(d.order.status === "CANCELLED" && (await cancelledByStaff(d.order.id)))) return true;
+  return false;
+}
+
+/**
  * The customer opened the payment link (Abraham, Nov 17, 2026): 4 more minutes added to the hold, once per link sent
  * (never revives an ended hold). Opening it again, or pressing "Agree and pay", adds nothing more.
  */
@@ -248,9 +258,22 @@ export async function chooseLinkOption(primaryId: number, index: number, product
     const left = (primary.linkRemoved ?? []).filter((_, i) => i !== index);
     await tx.update(schema.orders).set({ linkRemoved: left }).where(eq(schema.orders.id, primaryId));
     touched.add(target.id);
+    // Deep check Nov 27 #12: one delivery charge per booking. The booking's days still waiting with nothing paid are
+    // priced again together, so a new (or earlier) first day carries the one charge and the old first day loses it
+    const gidNow = target.paymentGroupId ?? primary.paymentGroupId;
+    if (gidNow) {
+      const again = await tx
+        .update(schema.orders)
+        .set({ totalCents: null })
+        .where(and(eq(schema.orders.paymentGroupId, gidNow), eq(schema.orders.status, "PENDING_PAYMENT"), eq(schema.orders.paidCents, 0)))
+        .returning({ id: schema.orders.id });
+      for (const r of again) touched.add(r.id);
+    }
     return true;
   });
-  for (const id of touched) await ensurePriced(id);
+  // in date order, so the first day is priced (and takes the delivery charge) with every day of the booking known
+  const touchedRows = touched.size ? await db.select({ id: schema.orders.id, d: schema.orders.eventDate }).from(schema.orders).where(inArray(schema.orders.id, [...touched])) : [];
+  for (const r of touchedRows.sort((a, b) => a.d.localeCompare(b.d) || a.id - b.id)) await ensurePriced(r.id);
   return ok;
 }
 
@@ -278,6 +301,29 @@ export async function itemsStillFree(orderId: number): Promise<boolean> {
     if (!p || (await checkBookable(p.id, p.quantity, o.eventDate, db, o.pickupDate)) < i.qty) return false;
   }
   return true;
+}
+
+/**
+ * A late payment's stock check (deep check Nov 27 #4), the same as "Check availability again" (A1): the whole order is
+ * checked as one in a locked transaction (stock group, then product, in id order), so two items sharing one unit (maze,
+ * laser pools) can never both pass when only one is free. When it fits, the order counts again right away (a short hold)
+ * so nobody can take the units before the payment confirms it; when it does not, nothing changes.
+ */
+export async function claimIfStillFree(orderId: number, now = new Date()): Promise<boolean> {
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
+  if (!o) return false;
+  const { assertOrderFits, withFitCheck } = await import("@/lib/recheck-lines");
+  return withFitCheck(db, async (tx) => {
+    const lines = await tx.select({ productId: schema.orderItems.productId }).from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
+    const pids = [...new Set(lines.map((l) => l.productId))].sort((a, b) => a - b);
+    for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
+    for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+    if (!lines.length) return true;
+    // the order counts while its lines are checked one after another
+    await tx.update(schema.orders).set({ status: "PENDING_PAYMENT", holdExpiresAt: inMinutes(IDLE_MINUTES, now) }).where(eq(schema.orders.id, orderId));
+    await assertOrderFits(tx, o);
+    return true;
+  });
 }
 
 /** After a late payment was recorded: the Owner's email, and the customer's when the items were taken. */

@@ -451,10 +451,15 @@ export async function markPaid(orderId: number, cents: number, method: string, r
     await tx.execute(sql`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`);
     const [cur] = await tx.select().from(orders).where(eq(orders.id, orderId));
     if (!cur) return { o: null, dupe: false };
-    if (ref && cur.solaRefNum === ref) return { o: cur, dupe: true };
     if (ref) {
       const [seen] = await tx.select({ id: schema.bookEntries.id }).from(schema.bookEntries).where(and(eq(schema.bookEntries.orderId, orderId), eq(schema.bookEntries.ref, ref)));
       if (seen) return { o: cur, dupe: true };
+    }
+    if (ref && cur.solaRefNum === ref) {
+      // Deep check Nov 27 #7: this payment's amount was saved but the rest (status, Books) did not finish (an error in
+      // between). The repeat notice finishes it, without adding the amount again; a finished order is a duplicate.
+      const unfinished = (cur.status === "PENDING_PAYMENT" || cur.status === "HOLD" || cur.status === "CANCELLED") && cur.paidCents >= cents;
+      return unfinished ? { o: { ...cur, paidCents: cur.paidCents - cents }, dupe: false } : { o: cur, dupe: true };
     }
     await tx.update(orders).set({ paidCents: sql`${orders.paidCents} + ${cents}`, solaRefNum: ref ?? cur.solaRefNum }).where(eq(orders.id, orderId));
     return { o: cur, dupe: false };
@@ -478,12 +483,13 @@ export async function markPaid(orderId: number, cents: number, method: string, r
     return same ? { ...same, overpaid: true as const } : same;
   }
   // Late payment (Abraham, Nov 13, 2026): the hold had already ended. Still free: confirm. Taken: never confirm.
-  const { handleLatePayment, holdEnded, itemsStillFree } = await import("@/lib/late-payment");
+  const { handleLatePayment, holdEnded, claimIfStillFree } = await import("@/lib/late-payment");
   // Code audit M1 (Nov 24, 2026): an order staff cancelled on purpose (Cancel order in Admin) is never brought back by
   // a payment; it goes to Needs attention and the Owner is emailed to refund or re-book. Only an ended hold revives.
   const staffCancelled = o.status === "CANCELLED" && (await cancelledByStaff(orderId));
   const late = !staffCancelled && holdEnded(o);
-  const stillFree = late ? await itemsStillFree(orderId) : true;
+  // Deep check Nov 27 #4: the whole order checked as one, locked (shared units counted), as "Check availability again"
+  const stillFree = late ? await claimIfStillFree(orderId) : true;
   // Audit C1 (Nov 24, 2026): confirmed only when paid in full; less than the total needs staff attention
   const owed = o.totalCents ?? o.subtotalCents;
   const short = paid < owed;
@@ -637,6 +643,16 @@ const dueOf = (o: FullOrder["order"]) => Math.max(0, (o.totalCents ?? o.subtotal
  */
 const fullyPaid = (list: FullOrder[]) => list.length > 0 && list.every((x) => (x.order.totalCents ?? x.order.subtotalCents) > 0 && x.order.paidCents >= (x.order.totalCents ?? x.order.subtotalCents));
 
+/**
+ * The days a customer is paying for (deep check Nov 27 #24): a day cancelled with nothing paid on it (staff cancelled
+ * it, or its hold was released) is not listed on the card page or in the "paid" notices. Never empty: the primary stays
+ * when every day is like that.
+ */
+export function payingDays<T extends { order: { status: string; paidCents: number } }>(days: T[], primary: T): T[] {
+  const live = days.filter((d) => !(d.order.status === "CANCELLED" && d.order.paidCents === 0));
+  return live.length ? live : [primary];
+}
+
 export async function getPaymentGroup(orderId: number): Promise<{ primary: FullOrder; orders: FullOrder[]; due: number; paid: boolean } | null> {
   const first = await getOrderWithItems(orderId);
   if (!first) return null;
@@ -662,12 +678,32 @@ export async function markGroupPaid(orderId: number, cents: number, method: stri
     const one = await markPaid(orderId, cents, method, ref);
     return one ? [one] : [];
   }
-  if (ref && group.primary.order.solaRefNum === ref) return []; // duplicate webhook
+  // duplicate webhook (deep check Nov 27 #7: unless the first try stopped halfway; markPaid finishes it then)
+  const primaryDone = (x: FullOrder) => !(x.order.status === "PENDING_PAYMENT" || x.order.status === "HOLD" || x.order.status === "CANCELLED");
+  if (ref && group.primary.order.solaRefNum === ref) {
+    if (primaryDone(group.primary)) return [];
+    // Retry after a halfway stop: only the days that already carry this payment are finished (status and Books), each
+    // with the amount already saved on it; no money is moved again
+    const out = [];
+    for (const x of group.orders) if (x.order.solaRefNum === ref && !primaryDone(x) && x.order.paidCents > 0) {
+      const u = await markPaid(x.order.id, x.order.paidCents, method, ref);
+      if (u) out.push(u);
+    }
+    return out;
+  }
   // Hark's website list 9 (Nov 26, 2026): the payment goes to the days still waiting for it, never to a day that was
   // cancelled or is already paid (the primary first when it is waiting; nothing waiting: the primary, as before)
-  const waiting = (x: FullOrder) => x.order.status !== "CANCELLED" && dueOf(x.order) > 0;
   const all = [group.primary, ...group.orders.filter((x) => x.order.id !== group.primary.order.id)];
-  const ordered = all.filter(waiting).length ? all.filter(waiting) : [group.primary];
+  const open = (x: FullOrder) => x.order.status !== "CANCELLED" && dueOf(x.order) > 0;
+  // Deep check Nov 27 #2: when every day's hold ran out (released, paid nothing), the late payment goes to each released
+  // day with its own amount, so each day is checked and confirmed on its own (never all of it to the first day while the
+  // other days stay cancelled). A day staff cancelled is never one of them.
+  const released: FullOrder[] = [];
+  if (!all.some(open)) {
+    const { holdEnded } = await import("@/lib/late-payment");
+    for (const x of all) if (x.order.status === "CANCELLED" && holdEnded(x.order) && dueOf(x.order) > 0 && !(await cancelledByStaff(x.order.id))) released.push(x);
+  }
+  const ordered = all.some(open) ? all.filter(open) : released.length ? released : [group.primary];
   let remaining = cents;
   const out = [];
   for (let i = 0; i < ordered.length; i++) {

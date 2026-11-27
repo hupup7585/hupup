@@ -4,14 +4,14 @@ import { prefillFor } from "@/lib/pay-prefill";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { config } from "@/lib/config";
-import { getPaymentGroup, orderNumber } from "@/lib/orders";
+import { getPaymentGroup, orderNumber, payingDays } from "@/lib/orders";
 import { ensureGroupPriced } from "@/lib/order-pricing";
 import { PAYMENT_UNAVAILABLE, onlinePaymentReady, paymentLink } from "@/lib/sola";
 import { CURRENT_TERMS_VERSION, recordTermsAcceptance, verifyPayToken } from "@/lib/rental-terms";
 import { TERMS_TEXT } from "@/lib/terms-content";
 import { PAY_AGREE_LABEL } from "./label";
 import { recordBookingConsents } from "@/lib/booking-consent";
-import { LINK_TEXT, chooseLinkOption, linkOptionsActive, holdAgain, holdEnded, holdForCardPage, linkRulesActive } from "@/lib/late-payment";
+import { LINK_TEXT, chooseLinkOption, linkOptionsActive, holdAgain, linkExpired, holdForCardPage, linkRulesActive } from "@/lib/late-payment";
 
 
 /** Customer checked the (unchecked-by-default) box: record the acceptance, then continue to Sola. */
@@ -33,13 +33,15 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
   if (!group) return { error: "Order not found." };
   const full = group.primary;
   // The link rule (preview until Abraham approves the wording): an ended hold can't be paid
-  if (linkRulesActive() && group.orders.some((d) => holdEnded(d.order))) return { error: LINK_TEXT.expiredTitle + "." };
-  if (full.order.status !== "PENDING_PAYMENT") return { error: "This order is not waiting for payment. Please call us." };
+  // Deep check Nov 27 #3: a day staff cancelled does not make the link expired, and does not stop paying for the others
+  if (linkRulesActive() && (await linkExpired(group.orders))) return { error: LINK_TEXT.expiredTitle + "." };
+  if (!group.orders.some((d) => d.order.status === "PENDING_PAYMENT")) return { error: "This order is not waiting for payment. Please call us." };
   const due = group.due;
   if (due <= 0) return { error: "Nothing left to pay." };
   const h = await headers();
   // One record per rental day paid together (Abraham: every reservation), each with date, time, IP and version
-  for (const day of group.orders.filter((x) => x.order.status === "PENDING_PAYMENT")) {
+  const pendingDays = group.orders.filter((x) => x.order.status === "PENDING_PAYMENT");
+  for (const day of pendingDays) {
     await recordTermsAcceptance({
       orderId: day.order.id,
       customerId: full.customer?.id ?? null,
@@ -48,7 +50,7 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
       termsText: TERMS_TEXT,
       method: "web_checkbox",
       acceptanceStatement: `Checked "${PAY_AGREE_LABEL}" (unchecked by default) and continued to payment`,
-      amountCents: day.order.id === full.order.id ? due : null,
+      amountCents: day.order.id === pendingDays[0].order.id ? due : null, // the amount once, on the first day paid
       ip: (h.get("x-forwarded-for") || "").split(",")[0].trim() || null,
       userAgent: h.get("user-agent")?.slice(0, 500) ?? null,
       pageUrl: `${config.siteUrl()}/pay/${orderNumber(orderId)}`, // the address the customer opened
@@ -67,14 +69,20 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
   });
   // 10 minutes to finish on the secure card page (Sola can't tell us about typing there)
   if (linkRulesActive()) await holdForCardPage(group.orders.map((d) => d.order.id));
-  const link = paymentLink({ orderId: full.order.id, amountCents: due, prefill: prefillFor(full, group.orders, `#${orderNumber(full.order.id)}`) });
+  const link = paymentLink({ orderId: full.order.id, amountCents: due, prefill: prefillFor(full, payingDays(group.orders, full), `#${orderNumber(full.order.id)}`) });
   if (!link) return { error: PAYMENT_UNAVAILABLE };
   redirect(link);
 }
 
 /** Expired link: "Check availability again". Free items are held again; taken ones get their nearest options. */
+/** Deep check Nov 27 #11: on Shabbes and Yom Tov nothing is held or re-booked from the link (the page shows the closed line). */
+async function paymentsClosedNow() {
+  const { paymentsClosedLine } = await import("@/lib/payments-closed");
+  return Boolean(await paymentsClosedLine());
+}
+
 export async function checkAgainAction(orderId: number, token: string) {
-  if (!linkRulesActive() || !verifyPayToken(orderId, token)) redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}`);
+  if (!linkRulesActive() || !verifyPayToken(orderId, token) || (await paymentsClosedNow())) redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}`);
   const group = await getPaymentGroup(orderId);
   if (group) await holdAgain(group.orders.map((d) => d.order.id), orderId);
   redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}&held=1`);
@@ -82,7 +90,7 @@ export async function checkAgainAction(orderId: number, token: string) {
 
 /** A taken item: the customer tapped one of its nearest options (checked again on the server). */
 export async function chooseOptionAction(orderId: number, token: string, index: number, productId: number, date: string) {
-  if (!linkOptionsActive() || !verifyPayToken(orderId, token)) redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}`);
+  if (!linkOptionsActive() || !verifyPayToken(orderId, token) || (await paymentsClosedNow())) redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}`);
   await chooseLinkOption(orderId, index, productId, date);
   redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}&held=1`);
 }
