@@ -14,6 +14,11 @@ const r2Deleted: string[] = [];
 vi.mock("@/lib/twilio-client", () => ({ getTwilio: () => ({ recordings: (sid: string) => ({ remove: async () => void removed.push(sid) }) }) }));
 vi.mock("@/lib/r2", () => ({ r2Ready: () => true, r2Delete: async (k: string) => void r2Deleted.push(k), r2Get: async () => null, r2Put: async () => null }));
 
+const saved: Record<string, unknown> = {};
+vi.mock("@/lib/auth", () => ({ requireOwner: async () => ({ userId: 1 }) }));
+vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
+vi.mock("@/lib/settings", async (orig) => ({ ...(await orig<typeof import("@/lib/settings")>()), getSettings: async () => ({}), saveSetting: async (k: string, v: unknown) => void (saved[k] = v) }));
+
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { checkBoxPin } from "@/lib/vm-boxes";
@@ -136,5 +141,40 @@ describe("I3: a repeated recording callback keeps the staff message's number", (
     expect(went).toHaveLength(2);
     expect(went[0].id).toBeTruthy();
     expect(went[1].id).toBe(went[0].id);
+  });
+});
+
+describe("I4: Phone settings refuse an after-hours window that never rings", () => {
+  const form = (from: string, to: string, key = "6") => {
+    const f = new FormData();
+    for (const [k, v] of Object.entries({ ringKey: key, targets: "", afterHours: "on", afterFrom: from, afterTo: to, erevTo: "", erevToSummer: "", erevBefore: "0" })) f.set(k, v);
+    return f;
+  };
+  beforeEach(() => {
+    for (const k of Object.keys(saved)) delete saved[k];
+  });
+  it("Until earlier than From (6:00 PM until 1:00 AM) is not saved, with the reason", async () => {
+    const { saveRoutingAction } = await import("@/app/admin/(app)/settings/routing-actions");
+    const r = await saveRoutingAction(null, form("18:00", "01:00"));
+    expect(r.ok).toBe(false);
+    expect(r.message).toMatch(/Until time must be later than From/);
+    expect(saved).toEqual({});
+  });
+  it("the same time for both is not saved either", async () => {
+    const { saveRoutingAction } = await import("@/app/admin/(app)/settings/routing-actions");
+    expect((await saveRoutingAction(null, form("08:00", "08:00"))).ok).toBe(false);
+  });
+  it("a normal window (8:00 AM until 10:30 PM) and an empty window save as before, key 8 included", async () => {
+    const { saveRoutingAction } = await import("@/app/admin/(app)/settings/routing-actions");
+    expect((await saveRoutingAction(null, form("08:00", "22:30"))).ok).toBe(true);
+    expect(saved.ringAfterFrom6).toBe("08:00");
+    expect(saved.ringAfterTo6).toBe("22:30");
+    expect((await saveRoutingAction(null, form("", "", "8"))).ok).toBe(true);
+    expect(saved.ringAfterFrom8).toBe("");
+  });
+  it("an impossible time (25:99) is treated as empty, never stored", async () => {
+    const { saveRoutingAction } = await import("@/app/admin/(app)/settings/routing-actions");
+    expect((await saveRoutingAction(null, form("25:99", "22:00"))).ok).toBe(true);
+    expect(saved.ringAfterFrom6).toBe("");
   });
 });
