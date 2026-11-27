@@ -122,14 +122,14 @@ async function alertConflict(lead: string, conflicts: string[]) {
 }
 
 /** Book one free Available unit of an item for a day. The unique index makes two at once impossible. */
-async function bookFreeUnit(productId: number, day: string, orderId: number): Promise<number | null> {
-  const units = await db
+async function bookFreeUnit(productId: number, day: string, orderId: number, exec: Pick<typeof db, "select" | "execute"> = db): Promise<number | null> {
+  const units = await exec
     .select({ id: schema.equipmentUnits.id })
     .from(schema.equipmentUnits)
     .where(and(eq(schema.equipmentUnits.productId, productId), eq(schema.equipmentUnits.status, "available")))
     .orderBy(asc(schema.equipmentUnits.code));
   for (const u of units) {
-    const res = await db.execute(sql`INSERT INTO unit_bookings (unit_id, day, order_id) VALUES (${u.id}, ${day}::date, ${orderId}) ON CONFLICT (unit_id, day) DO NOTHING RETURNING id`);
+    const res = await exec.execute(sql`INSERT INTO unit_bookings (unit_id, day, order_id) VALUES (${u.id}, ${day}::date, ${orderId}) ON CONFLICT (unit_id, day) DO NOTHING RETURNING id`);
     if (res.rows.length) return u.id;
   }
   return null;
@@ -145,25 +145,33 @@ function orderDays(o: { eventDate: string; pickupDate: string | null }) {
 
 /** A confirmed booking: assign a unit for every item and day (items without units are skipped). Conflicts email the Owner. */
 export async function assignUnits(orderId: number, opts: { quiet?: boolean } = {}) {
-  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
-  if (!o) return { assigned: 0, missing: [] as string[] };
-  const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
-  const have = await db.select().from(schema.unitBookings).where(eq(schema.unitBookings.orderId, orderId));
-  let assigned = 0;
-  const missing: string[] = [];
-  for (const i of items) {
-    const [hasUnits] = await db.select({ n: count() }).from(schema.equipmentUnits).where(eq(schema.equipmentUnits.productId, i.productId));
-    if (!hasUnits?.n) continue;
-    const unitIds = (await db.select({ id: schema.equipmentUnits.id }).from(schema.equipmentUnits).where(eq(schema.equipmentUnits.productId, i.productId))).map((u) => u.id);
-    for (const day of orderDays(o).filter((d) => d >= todayISO())) {
-      const already = have.filter((h) => h.day === day && unitIds.includes(h.unitId)).length;
-      for (let n = already; n < i.qty; n++) {
-        const u = await bookFreeUnit(i.productId, day, orderId);
-        if (u) assigned++;
-        else missing.push(`order #${1000 + orderId} on ${day}`);
+  // Deep check A12 (Nov 27, 2026): two Confirm clicks at once could both see no units yet and each book a set. The
+  // order is locked while its units are counted and booked, so the second sees the first one's units.
+  const r = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`);
+    const [o] = await tx.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
+    if (!o) return null;
+    const items = await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
+    const have = await tx.select().from(schema.unitBookings).where(eq(schema.unitBookings.orderId, orderId));
+    let assigned = 0;
+    const missing: string[] = [];
+    for (const i of items) {
+      const [hasUnits] = await tx.select({ n: count() }).from(schema.equipmentUnits).where(eq(schema.equipmentUnits.productId, i.productId));
+      if (!hasUnits?.n) continue;
+      const unitIds = (await tx.select({ id: schema.equipmentUnits.id }).from(schema.equipmentUnits).where(eq(schema.equipmentUnits.productId, i.productId))).map((u) => u.id);
+      for (const day of orderDays(o).filter((d) => d >= todayISO())) {
+        const already = have.filter((h) => h.day === day && unitIds.includes(h.unitId)).length;
+        for (let n = already; n < i.qty; n++) {
+          const u = await bookFreeUnit(i.productId, day, orderId, tx);
+          if (u) assigned++;
+          else missing.push(`order #${1000 + orderId} on ${day}`);
+        }
       }
     }
-  }
+    return { assigned, missing };
+  });
+  if (!r) return { assigned: 0, missing: [] as string[] };
+  const { assigned, missing } = r;
   if (missing.length && !opts.quiet) await alertConflict("A booking was confirmed, but there are not enough units.", [...new Set(missing)]);
   return { assigned, missing: [...new Set(missing)] };
 }
