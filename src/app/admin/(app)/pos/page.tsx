@@ -35,6 +35,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
         initialDate={sp.date && isValidISO(sp.date) ? sp.date : ""}
         initialProduct={sp.product ? Number(sp.product) : null}
         categories={cats.map((c) => ({ id: c.id, name: c.name }))}
+        itemTypes={String((settings as { itemTypes?: unknown }).itemTypes ?? "")}
         products={prods.map((p) => ({ id: p.id, categoryId: p.categoryId, name: p.name, priceCents: p.priceCents, quantity: p.quantity }))}
         askTerms={termsActive()}
         offerThuSun={Boolean(settings.offerThuSunOn)}

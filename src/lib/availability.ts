@@ -152,12 +152,23 @@ export function laserPoolsFor(name: string, category: string): LaserPool[] {
 export type LaserPoolInfo = { items: Map<number, { quantity: number; pools: LaserPool[]; active?: boolean }>; sizes: Record<LaserPool, number> };
 
 export async function laserPoolInfo(exec: Executor = db): Promise<LaserPoolInfo> {
+  // Admin handoff Phase 4 (Nov 27, 2026): Catalog > Item types when the Owner set them; otherwise the names, as before.
+  // Read through the same connection (exec), so a locked booking step sees the same types.
+  const { parseItemTypes, categoryKind, laserRole, LASER_ROLE_POOLS } = await import("@/lib/item-types");
+  const raw = ((await exec.execute(sql`SELECT value FROM app_settings WHERE key = 'itemTypes' LIMIT 1`)).rows[0] as { value?: unknown } | undefined)?.value;
+  const types = parseItemTypes(raw);
+  const anySet = Object.keys(types.categories).length + Object.keys(types.products).length > 0;
   const r = await exec.execute(sql`
-    SELECT p.id, p.name, p.quantity, p.active, coalesce(c.name, '') AS cat FROM products p LEFT JOIN categories c ON c.id = p.category_id
-    WHERE c.name ~* 'laser'`);
+    SELECT p.id, p.name, p.quantity, p.active, coalesce(c.name, '') AS cat, c.id AS cat_id FROM products p LEFT JOIN categories c ON c.id = p.category_id
+    ${anySet ? sql`` : sql`WHERE c.name ~* 'laser'`}`);
   const items = new Map<number, { quantity: number; pools: LaserPool[]; active: boolean }>();
-  for (const x of r.rows as { id: number; name: string; quantity: number; active: boolean; cat: string }[]) {
-    const pools = laserPoolsFor(x.name, x.cat);
+  for (const x of r.rows as { id: number; name: string; quantity: number; active: boolean; cat: string; cat_id: number | null }[]) {
+    let pools: LaserPool[];
+    if (!anySet) pools = laserPoolsFor(x.name, x.cat);
+    else {
+      const kind = x.cat_id === null ? "other" : categoryKind({ id: Number(x.cat_id), name: x.cat }, types);
+      pools = kind === "laser_tag" || kind === "laser_addons" ? [...LASER_ROLE_POOLS[laserRole({ id: Number(x.id), name: x.name }, kind, types)]] : [];
+    }
     if (pools.length) items.set(Number(x.id), { quantity: Number(x.quantity), pools, active: Boolean(x.active) });
   }
   // a pool's size comes from the active items (an item switched off in Admin does not set it; its bookings still count)

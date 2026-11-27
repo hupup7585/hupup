@@ -1,5 +1,6 @@
 "use client";
 
+import { categoryKind, isMazeRole, laserRole, parseItemTypes } from "@/lib/item-types";
 import Link from "next/link";
 import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import TextConsentBoxes from "@/components/TextConsentBoxes";
@@ -28,6 +29,8 @@ export default function PosForm(props: {
   initialDate: string;
   initialProduct: number | null;
   categories: { id: number; name: string }[];
+  /** Catalog > Item types (Admin handoff Phase 4): the Owner's explicit types; empty = worked out from the names as before */
+  itemTypes?: string;
   products: P[];
   /** Ask how the customer accepted the Terms (off on the live site until the final Terms are in) */
   askTerms?: boolean;
@@ -51,15 +54,17 @@ export default function PosForm(props: {
   const [pending, start] = useTransition();
   // Ocean balls right after a jumping balloon is added (Abraham, Nov 19, 2026): asked under that balloon
   const [oceanFor, setOceanFor] = useState<number | null>(null);
-  const oceanCat = props.categories.find((c) => OCEAN.test(c.name.trim()));
+  const types = parseItemTypes(props.itemTypes ?? "");
+  const setKind = (c: { id: number }) => types.categories[String(c.id)];
+  const oceanCat = props.categories.find((c) => (setKind(c) ? setKind(c) === "ocean_balls" : OCEAN.test(c.name.trim())));
   const oceanItems = oceanCat ? props.products.filter((p) => p.categoryId === oceanCat.id) : [];
   // Inflatable mazes and the additional gun packs (Abraham, Nov 24, 2026: packs only with a maze on the booking)
-  const addonCatIds = new Set(props.categories.filter((c) => /^laser tag add-ons$/i.test(c.name.trim())).map((c) => c.id));
-  const laserCatIds = new Set(props.categories.filter((c) => /laser/i.test(c.name) && !addonCatIds.has(c.id)).map((c) => c.id));
-  const mazeIds = new Set(props.products.filter((p) => laserCatIds.has(p.categoryId) && /maze/i.test(p.name)).map((p) => p.id));
+  const addonCatIds = new Set(props.categories.filter((c) => categoryKind(c, types) === "laser_addons").map((c) => c.id));
+  const laserCatIds = new Set(props.categories.filter((c) => categoryKind(c, types) === "laser_tag").map((c) => c.id));
+  const mazeIds = new Set(props.products.filter((p) => laserCatIds.has(p.categoryId) && isMazeRole(laserRole(p, "laser_tag", types))).map((p) => p.id));
   const addonIds = new Set(props.products.filter((p) => addonCatIds.has(p.categoryId)).map((p) => p.id));
   const mazePicked = [...mazeIds].some((id) => (qty[id] || 0) > 0);
-  const balloonCats = new Set(props.categories.filter((c) => BALLOON.test(c.name) && !OCEAN.test(c.name.trim())).map((c) => c.id));
+  const balloonCats = new Set(props.categories.filter((c) => (setKind(c) ? setKind(c) === "jumping_balloon" : BALLOON.test(c.name) && !OCEAN.test(c.name.trim()))).map((c) => c.id));
 
   useEffect(() => {
     calendarFor(props.today, 14).then(setDays);

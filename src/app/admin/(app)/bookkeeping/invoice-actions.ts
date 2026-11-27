@@ -105,8 +105,8 @@ export async function quoteToInvoiceAction(f: FormData) {
 export async function emailDocAction(f: FormData) {
   const id = Number(s(f, "id"));
   return run(async (userId) => {
-    const { INVOICE_EMAIL_APPROVED, INVOICE_EMAIL_DRAFT } = await import("@/lib/invoice-share");
-    if (!INVOICE_EMAIL_APPROVED) throw new BooksError("Emailing invoices waits for Abraham's OK on the wording.");
+    const { INVOICE_EMAIL_DRAFT, invoiceEmailOn } = await import("@/lib/invoice-share");
+    if (!(await invoiceEmailOn())) throw new BooksError("Emailing invoices is turned off. The Owner can turn it on in Bookkeeping, Settings, Refunds and invoice emails.");
     const { docDetail } = await import("@/lib/invoices");
     const d = await docDetail(id);
     if (!d?.doc.customerEmail) throw new BooksError("This invoice has no customer email.");

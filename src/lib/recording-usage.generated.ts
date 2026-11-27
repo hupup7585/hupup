@@ -763,6 +763,8 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "lib/recording-flags.ts"
  ],
  "ocean_balls": [
+  "app/admin/(app)/pos/PosForm.tsx",
+  "lib/item-types.ts",
   "lib/recording-flags.ts"
  ],
  "ocean_offer": [

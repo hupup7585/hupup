@@ -56,6 +56,11 @@ const EXACT: Record<string, Spec> = {
   paidPromoSkipOptedIn: { mode: "edit", label: "After payment, Line 8: skip it for callers who already get promotions", group: "Phone: after payment", type: "bool" },
   offersStacking: { mode: "edit", label: "How offers combine", group: "Offers and discounts", type: "choice", choices: ["best", "add"] },
   disconnectSilenceMinutes: { mode: "edit", label: "Disconnect check: minutes of silence with items in the cart", group: "Phone: after payment", type: "int", min: 1, max: 10 },
+  // Admin handoff Phase 2 (Nov 27, 2026): switches that were set in code
+  staffPromoMode: { mode: "edit", label: "Staff promo sign-up box: Preview mark", group: "Texts and promotions", type: "choice", choices: ["owner_preview", "live"] },
+  liveRefundsOn: page("/admin/bookkeeping?tab=settings", "Payments", { label: "Live refunds (real money back to cards)", type: "bool" }),
+  invoiceEmailOn: page("/admin/bookkeeping?tab=settings", "Payments", { label: "Email invoices to customers", type: "bool" }),
+  itemTypes: page("/admin/catalog/types", "Catalog", { label: "Item types (what each category and laser item is)", type: "json" }),
   disconnectCheckSeconds: { mode: "edit", label: "Disconnect check: seconds to wait for a key", group: "Phone: after payment", type: "int", min: 1, max: 15 },
 
   // Locked

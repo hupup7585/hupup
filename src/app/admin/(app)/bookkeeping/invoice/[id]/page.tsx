@@ -7,7 +7,7 @@ import PrintButton from "../../print/PrintButton";
 import InvoiceDocument from "@/components/InvoiceDocument";
 import CopyLink from "@/components/CopyLink";
 import { invoiceCustomerLink } from "@/lib/signed-link";
-import { INVOICE_EMAIL_APPROVED, INVOICE_EMAIL_DRAFT } from "@/lib/invoice-share";
+import { INVOICE_EMAIL_DRAFT, invoiceEmailOn } from "@/lib/invoice-share";
 import * as I from "../../invoice-actions";
 import * as A from "../../actions";
 
@@ -35,7 +35,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
             {doc.customerEmail && (
               <form action={I.emailDocAction}>
                 <input type="hidden" name="id" value={doc.id} />
-                <button className="btn-ghost" disabled={!INVOICE_EMAIL_APPROVED} title={INVOICE_EMAIL_APPROVED ? "" : "Waiting for Abraham's OK on the email wording"}>Email to customer</button>
+                <button className="btn-ghost">Email to customer</button>
               </form>
             )}
           </span>
@@ -57,9 +57,9 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
 
       <InvoiceDocument d={d} />
 
-      {!INVOICE_EMAIL_APPROVED && doc.customerEmail && doc.status !== "draft" && (
+      {!(await invoiceEmailOn()) && doc.customerEmail && doc.status !== "draft" && (
         <p className="no-print mt-3 text-xs text-muted" data-invoice-email-draft>
-          Email to customer waits for Abraham&rsquo;s OK on this wording. Subject: &ldquo;{INVOICE_EMAIL_DRAFT.subject("INV-1001")}&rdquo;. Message: &ldquo;{INVOICE_EMAIL_DRAFT.body("INV-1001", "(link)")}&rdquo;
+          Email to customer is turned off (Bookkeeping, Settings, Refunds and invoice emails). The approved wording: Subject: &ldquo;{INVOICE_EMAIL_DRAFT.subject("INV-1001")}&rdquo;. Message: &ldquo;{INVOICE_EMAIL_DRAFT.body("INV-1001", "(link)")}&rdquo;
         </p>
       )}
       {doc.kind === "invoice" && d.payments.length > 0 && (
