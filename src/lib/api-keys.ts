@@ -122,7 +122,7 @@ async function emailCode(who: Who) {
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
   await db.update(schema.loginCodes).set({ usedAt: new Date() }).where(and(eq(schema.loginCodes.channel, CODE_CHANNEL), isNull(schema.loginCodes.usedAt)));
   await db.insert(schema.loginCodes).values({ userId: who.userId, channel: CODE_CHANNEL, codeHash: hmac(code), expiresAt: new Date(Date.now() + CODE_MINUTES * 60_000) });
-  await sendEmail(to, `Hup Up Attractions API Keys code: ${code}`, `Your code to open the API Keys page is ${code}. It works for ${CODE_MINUTES} minutes. If you did not ask for it, someone may know the page password: change it.`);
+  await sendEmail(to, `Hup Up Attractions API Keys code: ${code}`, `Your code to open the API Keys page is ${code}. It works for ${CODE_MINUTES} minutes. If you did not ask for it, someone may know the page password: change it.`, [], { kind: "code" }); // deep check 06:00 M65: the Sent copy hides the code
   await logKeys(who, "unlock_code_sent");
   const [u, d] = to.split("@");
   return `${u.slice(0, 1)}***@${d}`;
