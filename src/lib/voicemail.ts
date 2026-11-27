@@ -311,6 +311,17 @@ export async function notifyVoicemail(id: number): Promise<{ sent: number }> {
     .where(and(eq(schema.voicemails.id, id), isNull(schema.voicemails.notifiedAt)))
     .returning();
   if (!v) return { sent: 0 };
+  // Deep check 06:00 M71 (G1 leftover): an error anywhere between the claim and the sending frees the claim, so the
+  // scheduled job tries this alert again (the error is still reported)
+  try {
+    return await sendVoicemailAlert(v);
+  } catch (e) {
+    await db.update(schema.voicemails).set({ notifiedAt: null }).where(eq(schema.voicemails.id, v.id)).catch(() => null);
+    throw e;
+  }
+}
+
+async function sendVoicemailAlert(v: typeof schema.voicemails.$inferSelect): Promise<{ sent: number }> {
   const box = await boxById(v.boxId);
   const [session] = v.callSid ? await db.select({ data: schema.callSessions.data }).from(schema.callSessions).where(eq(schema.callSessions.callSid, v.callSid)).limit(1) : [];
   const phone = toE164(v.fromNumber || "");
@@ -366,7 +377,8 @@ export async function notifyStragglers() {
     .from(schema.voicemails)
     .where(and(isNull(schema.voicemails.notifiedAt), isNull(schema.voicemails.deletedAt), eq(schema.voicemails.state, "submitted"), lt(schema.voicemails.createdAt, sql`now() - interval '15 minutes'`)));
   let n = 0;
-  for (const r of rows) n += (await notifyVoicemail(r.id)).sent ? 1 : 0;
+  // One alert that fails never stops the others (deep check 06:00 M71); it is tried again next run
+  for (const r of rows) n += (await notifyVoicemail(r.id).catch((e) => (console.error("voicemail alert failed", e), { sent: 0 }))).sent ? 1 : 0;
   return n;
 }
 

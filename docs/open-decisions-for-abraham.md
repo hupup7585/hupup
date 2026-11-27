@@ -114,3 +114,10 @@ confirmation itself when Twilio doesn't. Nothing was changed, so a customer neve
     as 1 item, the New booking screen as 3 ($20 vs $10 delivery). Which is right? Both will be made the same once you say.
 22. **Same-day cut-off during checkout (deep check M66):** the cut-off is checked at the date step only. Re-checking at
     checkout needs the `same_day_closed` words (still waiting) so the caller hears why.
+
+## Invoice page description (deep check 06:00, Nov 27, 2026)
+
+The customer's invoice page (opened from the invoice link) now has its heading. It still has no page description
+(the short text a phone may show under a shared link). The page is hidden from Google, so this only matters for link
+previews. Suggested wording, not used until approved: "Your invoice from Hup Up Attractions. View or print it here."
+
