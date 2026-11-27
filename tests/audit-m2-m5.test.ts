@@ -71,8 +71,8 @@ describe("M7 and L9", () => {
     expect(readFileSync("src/lib/sola-phonepay.ts", "utf8")).toContain("isNotNull(schema.orders.solaRefNum)");
   });
   it("L9: a late payment locks the shared stock group first", () => {
-    // Extra check K2 (Nov 27, 2026): one shared lock (the items, their maze group and the laser gun packs, in id order)
-    expect(readFileSync("src/lib/late-payment.ts", "utf8")).toContain("await lockUnits(tx, pids);");
-    expect(readFileSync("src/lib/availability.ts", "utf8")).toContain("OR p.stock_group IN (SELECT q.stock_group FROM products q WHERE q.id IN (${list}) AND q.stock_group IS NOT NULL)");
+    // K2 (deep check 06:00 M48): one shared lock step (items, their stock group, laser pools) in id order
+    expect(readFileSync("src/lib/late-payment.ts", "utf8")).toContain("await lockStock(tx, pids);");
+    expect(readFileSync("src/lib/stock-lock.ts", "utf8")).toContain("p.stock_group IN (SELECT stock_group FROM products WHERE id IN");
   });
 });

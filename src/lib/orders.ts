@@ -1,7 +1,8 @@
 import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
+import { lockStock } from "@/lib/stock-lock";
 import { db, schema } from "@/lib/db";
 import { addDays } from "@/lib/dates";
-import { checkBookable, lockUnits, pickupDateFor } from "@/lib/availability";
+import { checkBookable, pickupDateFor } from "@/lib/availability";
 import { getSettings } from "@/lib/settings";
 import type { Channel, OrderStatus } from "@/lib/db/schema";
 import { orderPath } from "@/lib/order-path";
@@ -71,9 +72,11 @@ async function reserveInTx(
   },
 ): Promise<ReserveResult> {
   const pickupDate = opts.pickupDate ?? addDays(opts.eventDate, 1);
-  // Items that share one unit (the maze group) and the laser gun packs (Nov 24, 2026): the whole stock locked in one
-  // id-ordered step (extra check K2), so two callers can never both take the last unit, nor lock in different orders
-  await lockUnits(tx, [opts.productId]);
+  // Items that share one unit (the maze): lock the whole group first, in id order, so two callers can't take it at the
+  // same moment (and never lock the group in two different orders)
+  // Laser items share their gun packs (Nov 24, 2026): every laser item is locked too, so two callers can never both
+  // take the last six-pack. K2 (deep check 06:00 M48): all of it in one statement, in id order, like every other path
+  await lockStock(tx, [opts.productId]);
   const locked = await tx.execute(
     sql`SELECT id, quantity, price_cents, active FROM products WHERE id = ${opts.productId} FOR UPDATE`,
   );
@@ -300,9 +303,9 @@ export async function createOrderWithItems(opts: {
   }
   try {
     return await db.transaction(async (tx) => {
-      // Extra check K2: the whole booking's stock locked first, in one id-ordered step (each item's own lock is then
-      // already held), so a booking of several items never locks in a different order from another booking
-      await lockUnits(tx, items.map((i) => i.productId));
+      // K2 (deep check 06:00 M48): every item of the booking locked up front, in one id-ordered statement, so a later
+      // item never takes a lower-numbered lock after a higher one (two bookings at once could deadlock)
+      await lockStock(tx, items.map((it) => it.productId));
       let orderId: number | null = null;
       for (const it of items) {
         const r = await reserveInTx(tx, {
@@ -541,7 +544,7 @@ export async function markPaid(orderId: number, cents: number, method: string, r
 
 /**
  * Before a held phone cart becomes PENDING_PAYMENT (Audit C2, Nov 24, 2026): one locked transaction that re-checks
- * every line, the same locks as reserveInTx (lockUnits: the items, their stock group and the laser gun packs, in id order). The cart's own holds are taken out
+ * every line, the same locks as reserveInTx (stock group, then product, in id order). The cart's own holds are taken out
  * of the count, then put back day by day, so an expired hold whose unit someone else booked is caught. A taken line is
  * removed from the cart (never charged); the taken lines are returned. Holds that pass are renewed.
  */
@@ -551,7 +554,7 @@ export async function recheckHolds(orderIds: number[]): Promise<{ orderId: numbe
     const ords = (await tx.select().from(orders).where(and(inArray(orders.id, orderIds), eq(orders.status, "HOLD")))).sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.id - b.id);
     if (!ords.length) return [];
     const lines = await tx.select().from(orderItems).where(inArray(orderItems.orderId, ords.map((o) => o.id)));
-    await lockUnits(tx, lines.map((l) => l.productId)); // extra check K2: one id-ordered step, laser gun packs included
+    await lockStock(tx, lines.map((l) => l.productId)); // K2: items, groups and laser pools, one id-ordered step
     // Out of the count while checked (now() is the transaction's start time)
     await tx.update(orders).set({ holdExpiresAt: sql`now() - interval '1 second'` }).where(inArray(orders.id, ords.map((o) => o.id)));
     const taken: { orderId: number; productId: number; eventDate: string; qty: number }[] = [];
