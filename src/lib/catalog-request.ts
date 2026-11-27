@@ -12,12 +12,12 @@ export { CATALOG_EMAIL_BUTTON, CATALOG_TEXT_BUTTON, CATALOG_FORM_DRAFT } from "@
 
 export const validCatalogEmail = (e: string) => /^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]{2,}$/.test(e.trim()) && e.trim().length <= 200;
 
-/** Once per email address per day (from the audit log of catalog sends). */
+/** Once per email address per day (from the audit log of catalog sends). Only a send that went out counts (deep check C4). */
 export async function catalogEmailedToday(email: string, now = new Date()): Promise<boolean> {
   const rows = await db
     .select({ id: schema.auditLog.id })
     .from(schema.auditLog)
-    .where(and(eq(schema.auditLog.action, "catalog.website_request"), eq(schema.auditLog.entityId, email.toLowerCase()), gte(schema.auditLog.createdAt, new Date(now.getTime() - 24 * 3600_000))))
+    .where(and(eq(schema.auditLog.action, "catalog.website_request"), eq(schema.auditLog.entityId, email.toLowerCase()), sql`(${schema.auditLog.after}->>'sent') = 'true'`, gte(schema.auditLog.createdAt, new Date(now.getTime() - 24 * 3600_000))))
     .limit(1);
   return rows.length > 0;
 }

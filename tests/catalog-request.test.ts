@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
 /* Website: "Or text CATALOG to (845) 415-7585." and "Email me the catalog" (Abraham, Nov 18, 2026). In-memory database. */
-const h = vi.hoisted(() => ({ sent: [] as string[] }));
+const h = vi.hoisted(() => ({ sent: [] as string[], emailDown: false }));
 vi.mock("@/lib/db", async () => {
   const { createMemoryDb } = await import("./helpers/memory-db");
   const m = await createMemoryDb();
@@ -10,7 +10,7 @@ vi.mock("@/lib/db", async () => {
 });
 vi.mock("@/lib/catalog-send", async (orig) => ({
   ...(await orig<typeof import("@/lib/catalog-send")>()),
-  sendCatalogEmail: async (to: string) => (h.sent.push(to), { sent: true }),
+  sendCatalogEmail: async (to: string) => (h.emailDown ? { sent: false } : (h.sent.push(to), { sent: true })),
   recordCatalogRequest: async () => null,
   // once per number per day, like the real one
   replyToCatalogText: async (to: string, o: { optedOut: boolean }) =>
@@ -96,3 +96,25 @@ describe("catalog by text: consent box", () => {
   });
 });
 
+describe("deep check C3, C4", () => {
+  it("C4: a catalog email that failed does not block a try again the same day", async () => {
+    h.emailDown = true;
+    expect((await requestCatalogAction(null, form({ email: "late@example.com" }))).ok).toBe(false);
+    h.emailDown = false;
+    expect(await requestCatalogAction(null, form({ email: "late@example.com" }))).toEqual({ ok: true, message: CATALOG_FORM_DRAFT.sent });
+    expect(h.sent).toContain("late@example.com");
+  });
+  it("C3: the preview site sends nothing and records nothing (it shares the live database)", async () => {
+    process.env.VERCEL_ENV = "preview";
+    try {
+      const before = (await db.select().from(schema.smsConsents)).length;
+      const sent = h.sent.length;
+      expect((await textCatalogAction(null, form({ phone: "845-555-0377", consent: "yes" }))).ok).toBe(false);
+      expect((await requestCatalogAction(null, form({ email: "preview@example.com" }))).ok).toBe(false);
+      expect((await db.select().from(schema.smsConsents)).length).toBe(before);
+      expect(h.sent.length).toBe(sent);
+    } finally {
+      delete process.env.VERCEL_ENV;
+    }
+  });
+});
