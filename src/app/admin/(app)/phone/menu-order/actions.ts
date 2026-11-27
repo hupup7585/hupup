@@ -26,5 +26,5 @@ export async function moveMenuPartAction(form: FormData) {
   }
   revalidatePath("/admin/phone/menu-order");
   // Phone audit 19 (Nov 24, 2026): the Owner sees that the new order saved
-  redirect(`/admin/phone/menu-order?${msgQuery(form.get("reset") === "1" ? "Saved: back to the first order." : "Saved. The phone plays the new order now.")}#${menu}`);
+  redirect(`/admin/phone/menu-order?${msgQuery(form.get("reset") === "1" ? "Saved: back to the first order." : "Saved. The phone plays the new order now.")}`);
 }
