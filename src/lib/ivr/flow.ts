@@ -1564,6 +1564,19 @@ async function clearSpan(ctx: Ctx, date: string) {
   if (ctx.session) ctx.session.data.spanDays = spans;
 }
 
+/**
+ * 09:00 deep check P17: a new item chosen from a list for the day already being shopped for ("same day, press 1", a
+ * menu key that books an item) is a plain booking: an earlier "next day too" (box 18 key 2) or closed-day span on that
+ * date stays with the rental it was chosen for and never spreads to this item. Add-ons of that rental (a second one,
+ * extra gun sets, ocean balls) go straight to "add" and keep it.
+ */
+async function newItemForDay(ctx: Ctx, vr: VR, productId: number) {
+  const day = ctx.session?.data.day;
+  if (!day) return back(vr, "date", { p: productId });
+  await clearSpan(ctx, day);
+  return back(vr, "qty", { p: productId, d: day });
+}
+
 /** This day becomes the one being shopped for on the call; an order already held for the same rental is reused. */
 async function chooseDay(ctx: Ctx, date: string) {
   const sameDay = await dayOrder(ctx, date);
@@ -1587,15 +1600,18 @@ async function sayFriMutzePrice(target: VR | Gather, ctx: Ctx, friday: string, p
  * Box 150 keys (Abraham, Nov 18, 2026): pound = Friday only; 1 = keep the rental for Mutze Shabbes (picked up Sunday
  * 9:00 AM), then box 149; 2 = a different date. The Friday only line is not approved yet (preview only).
  */
-async function friMutzeChoice(ctx: Ctx, vr: VR, p: string | undefined, date: string, d: string | undefined) {
+async function friMutzeChoice(ctx: Ctx, vr: VR, p: string | undefined, date: string, d: string | undefined, a?: string) {
   // Approved Nov 24, 2026: 1 = correct (Friday only), 2 = keep it for Mutze Shabbes, 3 or star = a different date;
-  // pound or any other key is not valid
-  if (d === "3" || d === "*") return back(vr, "date", { p });
+  // pound or any other key is not valid. P21: "another day" (a) stays on every way back.
+  if (d === "3" || d === "*") return back(vr, "date", { p, a });
   if (d !== "1" && d !== "2") {
     if (d) sp(vr, ctx, "not_valid");
-    return back(vr, "date-ask", { p, d: date });
+    return back(vr, "date-ask", { p, d: date, a });
   }
   d = d === "2" ? "1" : "#"; // the code below: "1" keeps it for Mutze Shabbes, "#" is Friday only
+  // P18: the caller chose here (Friday only, or Friday with Mutze Shabbes): no span left on this Friday from an earlier
+  // closed-day offer, so "Friday only" is never booked as Friday through Sunday
+  await clearSpan(ctx, date);
   await chooseDay(ctx, date);
   const kept = new Set(ctx.session?.data.mutzeDays ?? []);
   const prod = p ? await getProduct(Number(p)) : null;
@@ -2907,32 +2923,31 @@ const handlers: Record<string, Handler> = {
       return back(vr, "balloons", { c, f });
     }
     await track(ctx.callSid, "item_heard", `Chose ${p.name}`, { item: p.name, productId: p.id });
-    return back(vr, "balloon", { p: p.id });
+    return back(vr, "balloon", { p: p.id, f }); // P21: the list's "free that date" filter comes along for star
   },
 
   /** Box 154: "{Item}, item {item number}, {price}. To add it to your shopping cart, press 1. ..." */
   async balloon(ctx, vr) {
     const p = await getProduct(Number(ctx.query.get("p")));
     if (!p) return back(vr, "book");
-    const g = keypad(vr, url("balloon-choice", { p: p.id }));
+    const f = ctx.query.get("f") ?? undefined;
+    const g = keypad(vr, url("balloon-choice", { p: p.id, f }));
     // the whole item recording ("item seven two zero one") for "item {number}" when it is uploaded (Nov 24, 2026)
     const bn = balloonEntry(p.name)?.number;
     sp(g, ctx, "box154", { item: p.name, number: digitWords(bn ?? ""), price: spokenMoney(p.priceCents), ...(bn ? { "@number": `balloon_num_${bn}` } : {}) });
     menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
-    return bookNoInput(vr, ctx, "balloon", { p: p.id });
+    return bookNoInput(vr, ctx, "balloon", { p: p.id, f });
   },
 
   async "balloon-choice"(ctx, vr) {
     const p = await getProduct(Number(ctx.query.get("p")));
     if (!p) return back(vr, "book");
+    const f = ctx.query.get("f") ?? undefined; // P21
     const d = ctx.body.Digits;
-    if (!d) return bookNoInput(vr, ctx, "balloon", { p: p.id });
-    if (d === "*") return back(vr, "balloons", { c: p.categoryId });
+    if (!d) return bookNoInput(vr, ctx, "balloon", { p: p.id, f });
+    if (d === "*") return back(vr, "balloons", { c: p.categoryId, f });
     if (d === "0") return back(vr, "cart");
-    if (d === "1") {
-      const day = ctx.session?.data.day;
-      return day ? back(vr, "qty", { p: p.id, d: day }) : back(vr, "date", { p: p.id });
-    }
+    if (d === "1") return newItemForDay(ctx, vr, p.id);
     if (d === "2") {
       await track(ctx.callSid, "item_details", `Heard the details of ${p.name}`, { item: p.name, productId: p.id });
       const sizes = balloonSizes(p.dimensions);
@@ -2942,7 +2957,7 @@ const handlers: Record<string, Handler> = {
       if (description && !/[.!?]$/.test(description)) description += ".";
       if (description) description = description[0].toUpperCase() + description.slice(1);
       if (sizes || description) {
-        const g = keypad(vr, url("balloon-choice", { p: p.id }));
+        const g = keypad(vr, url("balloon-choice", { p: p.id, f }));
         if (sizes) sp(g, ctx, "box155", { description, item: p.name, ...sizes });
         else {
           say(g, description);
@@ -2950,15 +2965,15 @@ const handlers: Record<string, Handler> = {
           if (tail) say(g, tail);
         }
         menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
-        return bookNoInput(vr, ctx, "balloon", { p: p.id });
+        return bookNoInput(vr, ctx, "balloon", { p: p.id, f });
       }
       if (p.spokenDescription || p.description) say(vr, p.spokenDescription || p.description);
       else sp(vr, ctx, "product_default_desc", { item: p.name });
       pause(vr);
-      return back(vr, "balloon", { p: p.id });
+      return back(vr, "balloon", { p: p.id, f });
     }
     sp(vr, ctx, "not_valid");
-    return back(vr, "balloon", { p: p.id });
+    return back(vr, "balloon", { p: p.id, f });
   },
 
   async "category-choice"(ctx, vr) {
@@ -2966,17 +2981,17 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (!d) return bookNoInput(vr, ctx, "category", { c, f: ctx.query.get("f") ?? undefined }); // keeps the "free that date" filter (audit L3)
     if (d === "*") return back(vr, "cats"); // star: the categories menu (box 12a, Nov 22, 2026)
-    if (d === "0") return back(vr, "cart", { c }); // after the cart, the same item list plays again
+    const f = ctx.query.get("f") ?? undefined; // P21: the "free that date" filter stays on every way back
+    if (d === "0") return back(vr, "cart", { c, f }); // after the cart, the same item list plays again
     const items = await listItems(c, ctx.query.get("f"));
     const p = /^\d{1,2}$/.test(d) && !d.startsWith("0") ? ((await isLaserBase(c)) ? laserList(items).find((x) => x.key === Number(d))?.p : items[Number(d) - 1]) : undefined;
     if (!p) {
       sp(vr, ctx, "not_valid");
-      return back(vr, "category", { c });
+      return back(vr, "category", { c, f });
     }
     await track(ctx.callSid, "item_heard", `Chose ${p.name}`, { item: p.name, productId: p.id });
     // Item first, then the date (Abraham). Adding more items for a day already chosen on this call skips the date.
-    const day = ctx.session?.data.day;
-    return day ? back(vr, "qty", { p: p.id, d: day }) : back(vr, "date", { p: p.id });
+    return newItemForDay(ctx, vr, p.id);
   },
 
   async product(ctx, vr) {
@@ -3005,10 +3020,7 @@ const handlers: Record<string, Handler> = {
       pause(vr);
       return back(vr, "product", { p: p.id, again: 1 });
     }
-    if (d === "2") {
-      const day = ctx.session?.data.day;
-      return day ? back(vr, "qty", { p: p.id, d: day }) : back(vr, "date", { p: p.id });
-    }
+    if (d === "2") return newItemForDay(ctx, vr, p.id);
     sp(vr, ctx, "not_valid");
     return back(vr, "product", { p: p.id, again: 1 });
   },
@@ -3164,7 +3176,7 @@ const handlers: Record<string, Handler> = {
     const p = ctx.query.get("p") ?? undefined;
     const date = ctx.query.get("d")!;
     const d = ctx.body.Digits;
-    if (ctx.query.get("f") === "1") return friMutzeChoice(ctx, vr, p, date, d);
+    if (ctx.query.get("f") === "1") return friMutzeChoice(ctx, vr, p, date, d, ctx.query.get("a") ?? undefined);
     // Nov 23, 2026: 1 confirms; 2 tries again (the date step); star one step back; pound or another key is not valid
     const a = ctx.query.get("a") ?? undefined;
     if (d === "2" || d === "*") return back(vr, "date", { p, a });
@@ -3234,6 +3246,7 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     const pick = ({ "1": ctx.query.get("dn"), "2": ctx.query.get("up") } as Record<string, string | null>)[ctx.body.Digits ?? ""];
     if (pick) {
+      await clearSpan(ctx, date); // P17: another size is its own plain booking
       await chooseDay(ctx, date);
       return back(vr, "qty", { p: pick, d: date });
     }
@@ -3278,6 +3291,7 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d") ?? undefined;
     const pick = ({ "1": ctx.query.get("b"), "2": ctx.query.get("a") } as Record<string, string | null>)[ctx.body.Digits ?? ""];
     if (pick) {
+      await clearSpan(ctx, pick); // P17: the other date is a plain booking (no span left on it from earlier)
       await chooseDay(ctx, pick);
       return back(vr, "qty", { p, d: pick });
     }
@@ -3592,11 +3606,12 @@ const handlers: Record<string, Handler> = {
   async cart(ctx, vr) {
     const days = await callOrders(ctx);
     const c = ctx.query.get("c") ?? undefined; // the item list the caller came from (Abraham, Phone Menu v3)
+    const f = ctx.query.get("f") ?? undefined; // P21: and its "free that date" filter
     if (!days.length) {
       sp(vr, ctx, "cart_empty");
-      return c ? back(vr, "category", { c }) : back(vr, "book");
+      return c ? back(vr, "category", { c, f }) : back(vr, "book");
     }
-    const g = keypad(vr, url("cart-choice", { c }));
+    const g = keypad(vr, url("cart-choice", { c, f }));
     // Item removed (box 29a): "Here is your updated cart." then the cart from its date line
     sp(g, ctx, ctx.query.get("u") ? "cart_updated" : "cart_intro");
     for (const o of days) sp(g, ctx, "cart_day", { date: spokenDate(o.order.eventDate), items: itemsPhrase(o.items) });
@@ -3606,16 +3621,17 @@ const handlers: Record<string, Handler> = {
     if (await cartBalloonDay(ctx)) sp(g, ctx, "cart_ocean");
     backLine(g, ctx);
     // From an item list: once the cart has been read, the same item list plays again (Abraham, Phone Menu v3)
-    if (c) return back(vr, "category", { c });
+    if (c) return back(vr, "category", { c, f });
     return noInput(vr, ctx, "cart");
   },
 
   async "cart-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     const c = ctx.query.get("c") ?? undefined;
+    const f = ctx.query.get("f") ?? undefined; // P21
     // Star: one step back. With no list to return to, box 25 (when something is in the cart), else the bookings menu;
     // never the main menu (Hark's audit M6, Nov 24, 2026)
-    if (d === "*") return c ? back(vr, "category", { c }) : (await callOrders(ctx)).length ? back(vr, "added-menu", { n: 1 }) : back(vr, "book"); // n: keep-shopping only (Hark's bug 7)
+    if (d === "*") return c ? back(vr, "category", { c, f }) : (await callOrders(ctx)).length ? back(vr, "added-menu", { n: 1 }) : back(vr, "book"); // n: keep-shopping only (Hark's bug 7)
     if (d === "1") {
       sp(vr, ctx, "checkout_tax_note"); // Abraham (Phone Menu v3): before checkout
       // Nov 23, 2026 (Abraham): the address lookup comes BEFORE the name; a found family gives the name, no name question
@@ -3623,7 +3639,7 @@ const handlers: Record<string, Handler> = {
       if (addrStepsActive(ctx) && directoryLookupOn()) return back(vr, "addr-lookup");
       return back(vr, "ask", { f: "name" });
     }
-    if (d === "2") return c ? back(vr, "category", { c }) : back(vr, "cats"); // keep shopping: the categories menu (Batch 3 item 9, Nov 25, 2026)
+    if (d === "2") return c ? back(vr, "category", { c, f }) : back(vr, "cats"); // keep shopping: the categories menu (Batch 3 item 9, Nov 25, 2026)
     if (d === "3") return back(vr, "remove"); // remove an item (box 29b)
     if (d === "9") {
       const day = await cartBalloonDay(ctx);
@@ -3640,7 +3656,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "not_valid"); // # or any other key
       return back(vr, "cart", { c });
     }
-    return c ? back(vr, "category", { c }) : noInput(vr, ctx, "cart");
+    return c ? back(vr, "category", { c, f }) : noInput(vr, ctx, "cart");
   },
 
   /**
@@ -6113,10 +6129,8 @@ async function ownKey(ctx: Ctx, vr: VR, screen: string, k: KeyDef) {
       vr.dial({ callerId: staffCallerId(ctx.session?.fromNumber ?? ctx.from) }, n);
       return vr;
     }
-    case "item": {
-      const day = ctx.session?.data.day;
-      return day ? back(vr, "qty", { p: a.productId, d: day }) : back(vr, "date", { p: a.productId });
-    }
+    case "item":
+      return newItemForDay(ctx, vr, a.productId);
     case "back":
       return handlers[ctx.action]({ ...ctx, body: { ...ctx.body, Digits: "*" } }, vr);
   }
