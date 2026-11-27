@@ -53,4 +53,23 @@ describe("#12 one delivery charge per booking on the payment link", () => {
     expect(first.deliveryFeeCents).toBeGreaterThanOrEqual(feeBefore);
     expect(group.every((g) => g.totalCents !== null)).toBe(true);
   });
+  it("deep check 06:00 M52: a laser option chosen on the link is saved one line per set, like the phone and New booking", async () => {
+    const [c] = await db.insert(schema.categories).values({ name: "Laser Tag M52", sortOrder: 9 }).returning();
+    const [laser] = await db.insert(schema.products).values({ categoryId: c.id, name: "Laser Maze M52", priceCents: 30000, quantity: 2 }).returning();
+    const [other] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: "2027-08-09", pickupDate: "2027-08-10", subtotalCents: 60000 }).returning();
+    await db.insert(schema.orderItems).values({ orderId: other.id, productId: laser.id, qty: 2, unitPriceCents: 30000 });
+    const [a] = await db
+      .insert(schema.orders)
+      .values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-08-09", pickupDate: "2027-08-10", subtotalCents: 0, deliveryAddress: "5 Forest Rd, Kiryas Joel, NY 10950", holdExpiresAt: new Date(Date.now() + 600_000), linkRemoved: [{ productId: laser.id, qty: 2, eventDate: "2027-08-09", name: "Laser Maze M52" }] })
+      .returning();
+    await db.update(schema.orders).set({ paymentGroupId: a.id }).where(eq(schema.orders.id, a.id));
+    const [r] = await removedWithOptions(a.id);
+    const opt = r.options.find((o) => o.productId === laser.id);
+    expect(opt).toBeTruthy();
+    expect(await chooseLinkOption(a.id, r.index, opt!.productId, opt!.date)).toBe(true);
+    const group = await db.select().from(schema.orders).where(eq(schema.orders.paymentGroupId, a.id));
+    const lines = (await db.select().from(schema.orderItems)).filter((l) => l.productId === laser.id && group.some((g) => g.id === l.orderId));
+    expect(lines.map((l) => l.qty)).toEqual([1, 1]);
+  });
 });
+
