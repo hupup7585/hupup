@@ -64,3 +64,15 @@ describe("how offers combine", () => {
     expect(d.explain?.example).toMatch(/\$105\.00/);
   });
 });
+
+describe("extra check K3 / deep check 06:00 M49: a customer discount comes off the rentals only", () => {
+  it("10% off a $300 balloon with $50 of ocean balls is $30, never $35", async () => {
+    const ls = [
+      { id: 1, productId, qty: 1, unitPriceCents: 30000, category: "Jumping balloons", name: "Castle" },
+      { id: 2, productId, qty: 1, unitPriceCents: 5000, category: "Ocean balls", name: "Ocean balls" },
+    ];
+    const tenPercent = async () => ({ kind: "percent", amount_cents: null, percent: 10, note: "", ends_on: null });
+    const r = await bestOfferFor(db as never, { id: 0, customerId: null, eventDate: "2027-02-10", pickupDate: "2027-02-11", spanDays: 1 }, ls, {}, tenPercent);
+    expect(r.discountCents).toBe(3000);
+  });
+});
