@@ -91,6 +91,16 @@ describe("Shabbes cut-off", () => {
     expect(await checkBookable(p.id, 1, EVENT)).toBe(1);
   });
 
+  it("deep check 06:00 M45: a first item chosen after the cut-off (browsing started before it) is never put on hold", async () => {
+    const sid = "CAcut45";
+    await ensureSession(sid, FROM);
+    process.env.HUP_CALENDAR_NOW = new Date(candles.getTime() - 10 * 60_000).toISOString();
+    const xml = await call(sid, "add", {}, `p=${pid}&d=2027-01-25`);
+    expect(said(xml)).toContain("We are closed now for Shabbes");
+    const holds = await db.select().from(schema.orders).where(eq(schema.orders.eventDate, "2027-01-25"));
+    expect(holds).toHaveLength(0);
+    process.env.HUP_CALENDAR_NOW = PINNED;
+  });
   it("an empty cart at the cut-off: the closed greeting, as today", async () => {
     process.env.HUP_CALENDAR_NOW = new Date(candles.getTime() - 10 * 60_000).toISOString();
     const xml = await call("CAcut3", "book");

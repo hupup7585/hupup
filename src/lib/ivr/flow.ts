@@ -914,6 +914,8 @@ async function shabbesStop(ctx: Ctx, vr: VR, where: string): Promise<VR | null> 
 // like ring and operator: a caller already waiting for customer service is never hung up mid-wait, and no Record
 // lands inside a queue wait URL
 const CUTOFF_FREE = new Set(["music", "incoming", "record-start", "call-recording", "closed-key", "goodbye", "ring", "hours", "operator", "operator-done", "whisper", "whisper-accept", "phonepay-done", "pay-done", "disconnect-key", "cart-hold-release", "receipt-email", "receipt-email-choice"]);
+/** Steps that put an item on hold (deep check 06:00 M45): the Shabbes cut-off applies to them even with no cart yet. */
+const HOLD_STEPS = new Set(["add", "packs-choice", "ocean-choice", "resume-choice"]);
 const cutoffFree = (action: string) => CUTOFF_FREE.has(action) || /^(vm|vma|voicemail|pay-leg|pay-approved|pay-confirm-how|promo-|staff-)/.test(action);
 
 /** Item lists with 10 or more items: seconds to wait for a second key after the first (Abraham, Nov 17, 2026). */
@@ -6184,9 +6186,11 @@ async function handleVoiceInner(raw: Omit<Ctx, "session" | "prompts"> & { editor
   await trackStep(ctx.callSid, ctx.action, ctx.body, ctx.query);
   // The booking cut-off before Shabbes and Yom Tov (Abraham, Nov 26, 2026, 11:51 PM): a caller in the middle of a
   // booking is stopped at the next step (the cart saved), unless something on this call is already paid
-  if ((session?.data?.dayOrderIds?.length || session?.orderId) && !cutoffFree(ctx.action) && (await phoneCutoff()).cut.cut) {
-    const ids = [...new Set([...(session!.data?.dayOrderIds ?? []), ...(session!.orderId ? [session!.orderId] : [])])];
-    const paid = (await db.select({ p: orders.paidCents }).from(orders).where(inArray(orders.id, ids))).some((o) => o.p > 0);
+  // Deep check 06:00 M45: also the steps that put the first item on hold when there is no cart yet (a caller who started
+  // browsing before the cut-off could add an item after it, held over Shabbes); with no cart the closed message plays
+  if ((session?.data?.dayOrderIds?.length || session?.orderId || HOLD_STEPS.has(ctx.action)) && !cutoffFree(ctx.action) && (await phoneCutoff()).cut.cut) {
+    const ids = [...new Set([...(session?.data?.dayOrderIds ?? []), ...(session?.orderId ? [session.orderId] : [])])];
+    const paid = ids.length > 0 && (await db.select({ p: orders.paidCents }).from(orders).where(inArray(orders.id, ids))).some((o) => o.p > 0);
     if (!paid) {
       const stop = await shabbesStop({ ...ctx, session }, vr, ctx.action);
       if (stop) return vr.toString();
