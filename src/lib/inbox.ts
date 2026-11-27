@@ -437,6 +437,11 @@ export async function recordSentEmail(input: { to: string; subject: string; body
  */
 export async function sendScheduledEmails(now = new Date()) {
   const d = schema.inboxDrafts;
+  // Extra check G2 (Nov 27, 2026): nothing goes out on Shabbes or Yom Tov (Admin's calendar settings, like the phone);
+  // emails due then keep their time and go out on the first run after
+  const { bookingLock } = await import("@/lib/jewish-calendar");
+  const { getSettings } = await import("@/lib/settings");
+  if (bookingLock(now, (await getSettings()) as never).locked) return { due: 0, sent: 0, waiting: "Shabbes or Yom Tov" };
   const due = await db.select().from(d).where(and(isNull(d.discardedAt), isNull(d.sentReplyId), sql`${d.sendAt} IS NOT NULL AND ${d.sendAt} <= ${now}`));
   let sent = 0;
   for (const x of due) {
