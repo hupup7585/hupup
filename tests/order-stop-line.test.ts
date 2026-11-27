@@ -26,8 +26,17 @@ describe("STOP line on order texts", () => {
     await sendMessage({ to: PHONE, body: "Your order #1001 is confirmed.", kind: "transactional", now: day(0) });
     await sendMessage({ to: PHONE, body: "Your driver is on the way.", kind: "transactional", now: day(1) });
     await sendMessage({ to: PHONE, body: "Pickup reminder for tomorrow.", kind: "transactional", now: day(40) });
-    // The first text after the consent carries the full disclosure and the terms link (box 49, Nov 24, 2026)
-    expect(h.sent).toEqual([`Your order #1001 is confirmed. Msg frequency varies. Msg and data rates may apply. Reply STOP to opt out, HELP for help. Terms: ${process.env.PUBLIC_BASE_URL ?? "http://localhost:3000"}/sms-terms`, "Your driver is on the way.", "Pickup reminder for tomorrow. Reply STOP to opt out."]);
+    // Nov 27, 2026 (item 5): the first text this number ever gets ends with exactly " Reply STOP to stop, or HELP for help."
+    expect(h.sent).toEqual(["Your order #1001 is confirmed. Reply STOP to stop, or HELP for help.", "Your driver is on the way.", "Pickup reminder for tomorrow. Reply STOP to opt out."]);
+  });
+  it("a number already texted before its consent: the first text after the consent still carries the full disclosure and the terms link (box 49, Nov 24, 2026)", async () => {
+    const P2 = "+18455550502";
+    h.sent.length = 0;
+    await db.insert(schema.messages).values({ direction: "out", toNumber: P2, contactPhone: P2, body: "catalog", kind: "system", event: "catalog_request", status: "sent" });
+    const [c] = await db.insert(schema.customers).values({ phone: P2, name: "Test 2" }).returning();
+    await db.insert(schema.smsConsents).values({ customerId: c.id, phone: P2, scope: "transactional", action: "opt_in", source: "phone", method: "keypad", wording: "x" });
+    await sendMessage({ to: P2, body: "Your order #1002 is confirmed.", kind: "transactional" });
+    expect(h.sent).toEqual([`Your order #1002 is confirmed. Msg frequency varies. Msg and data rates may apply. Reply STOP to opt out, HELP for help. Terms: ${process.env.PUBLIC_BASE_URL ?? "http://localhost:3000"}/sms-terms`]);
   });
   it("never adds a second STOP line", () => {
     expect(withOrderStopLine("Order confirmed. Reply HELP for help, STOP to opt out.", true)).toBe("Order confirmed. Reply HELP for help, STOP to opt out.");

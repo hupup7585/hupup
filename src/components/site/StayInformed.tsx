@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { signUpForTexts, type SignUpState } from "@/app/text-alerts/actions";
 import ConsentText from "@/components/ConsentText";
 import { SectionTitle } from "@/components/site/parts";
+import { SMS_GREY_LINE } from "@/lib/sms-grey-line";
 import { PROMOS_PER_YEAR } from "@/lib/sms-consent-copy"; // 5 a year everywhere (Abraham, Nov 26, 2026, item 4)
 
 /**
@@ -48,6 +49,10 @@ export default function StayInformed({ marketingText, smsNumber, notActive, disa
                 <ConsentText text={marketingText} />
               </span>
             </label>
+            {/* Abraham, Nov 27, 2026 (item 5): the grey line is only this sentence; STOP and HELP come in the first text */}
+            <p className="text-sm text-hu-deep/60" data-sms-grey-line>
+              {SMS_GREY_LINE}
+            </p>
             {notActive ? (
               <p data-not-active="stay-informed" className="rounded-xl bg-hu-yellow/40 p-3 font-semibold">
                 {notActive}

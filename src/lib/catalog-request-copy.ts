@@ -17,7 +17,8 @@ export const CATALOG_FORM_DRAFT = {
 
 /* Catalog by text consent, Plan A (Abraham, Nov 27, 2026, 1:52 AM; his exact words). Website only. */
 export const CATALOG_TEXT_CONSENT = "Yes, text the Hup Up Attractions catalog to this number.";
-export const CATALOG_TEXT_FINE_PRINT = "One text with our catalog. Message and data rates may apply. Reply STOP to stop, or HELP for help.";
+/** The grey line under "Text me the catalog": only "Message and data rates may apply." (Abraham, Nov 27, 2026, item 5). */
+export const CATALOG_TEXT_FINE_PRINT = "Message and data rates may apply.";
 /** The version saved with each consent record (change it whenever the two lines above change). */
 export const CATALOG_TEXT_CONSENT_VERSION = "catalog-web-2026-11-27";
 

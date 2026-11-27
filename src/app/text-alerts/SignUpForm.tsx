@@ -1,5 +1,6 @@
 "use client";
 
+import { SMS_GREY_LINE } from "@/lib/sms-grey-line";
 import { useActionState } from "react";
 import { Check } from "lucide-react";
 import { PROMO_BENEFITS, PROMO_BENEFITS_NOTE, PROMO_HEADING, PROMO_TITLE, PROMOS_PER_YEAR } from "@/lib/sms-consent-copy"; // 5 a year everywhere (Abraham, Nov 26, 2026, item 4)
@@ -97,7 +98,7 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
             You can also text JOIN to {smsNumber} to request a confirmation text. You are signed up only when you reply YES to that text within 24 hours.
           </span>
         )}
-        Text HELP to {smsNumber} for help. Text STOP to opt out. See our{" "}
+        See our{" "}
         <a href="/sms-terms" className="font-semibold underline underline-offset-4">
           SMS Terms
         </a>{" "}
@@ -106,6 +107,11 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
           Privacy Policy
         </a>
         .
+      </p>
+
+      {/* Abraham, Nov 27, 2026 (item 5): the grey line is only this sentence; STOP and HELP come in the first text */}
+      <p className="text-sm text-hu-deep/60" data-sms-grey-line>
+        {SMS_GREY_LINE}
       </p>
 
       {notActive ? (

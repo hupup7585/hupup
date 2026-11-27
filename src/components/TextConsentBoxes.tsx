@@ -41,7 +41,7 @@ export default function TextConsentBoxes({
       {box(transactional, (v) => onChange({ transactional: v, marketing }), transactionalText, "smsTransactional")}
       {box(marketing, (v) => onChange({ transactional, marketing: v }), marketingText, "smsMarketing")}
       {helpLine && (
-        <p className="text-sm text-hu-deep/70" data-consent-help-line>
+        <p className="text-sm text-hu-deep/60" data-consent-help-line data-sms-grey-line>
           {helpLine}
         </p>
       )}

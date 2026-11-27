@@ -110,8 +110,10 @@ describe("website enrollment and SMS Terms page", () => {
     expect(form).not.toMatch(/defaultChecked|checked=\{?true/);
     expect(form).toContain('href="/sms-terms"');
     expect(form).toContain('href="/privacy"');
-    expect(form).toContain("Text HELP to");
-    expect(form).toContain("Text STOP to opt out");
+    // Nov 27, 2026 (item 5): the grey line is only "Message and data rates may apply."; STOP and HELP are in the
+    // consent wording of each box and in the first text each number gets
+    expect(form).toContain("{SMS_GREY_LINE}");
+    expect(form).not.toContain("Text STOP to opt out");
   });
   it("no ordering, cart or payment on the sign-up page", () => {
     const all = form + readFileSync("src/app/text-alerts/page.tsx", "utf8") + readFileSync("src/app/text-alerts/actions.ts", "utf8");

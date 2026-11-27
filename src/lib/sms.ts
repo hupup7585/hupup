@@ -178,6 +178,27 @@ export async function consentFooter(): Promise<string> {
   return messageText("msg_first_text_footer", { link: `${config.siteUrl()}/sms-terms` });
 }
 
+/** Abraham, Nov 27, 2026 (item 5): the ending of the first text a number ever gets from us, word for word. */
+export const FIRST_TEXT_STOP_HELP = " Reply STOP to stop, or HELP for help.";
+/** Customer texts that get the first-text ending: order and payment texts, and the catalog and other texts a customer asked for. */
+const FIRST_TEXT_SYSTEM_EVENTS = new Set(["catalog_request", "catalog_reply", "menu_key_request", "confirmation_resend", "join_invite"]);
+function FIRST_TEXT_KINDS(kind: MessageKind, event: string | undefined): boolean {
+  return kind === "transactional" || (kind === "system" && FIRST_TEXT_SYSTEM_EVENTS.has(event ?? ""));
+}
+/** The text already tells how to stop and get help (the sign-up confirmation, for one). */
+export const hasStopAndHelp = (body: string) => /\bSTOP\b/.test(body) && /\bHELP\b/.test(body);
+export function withFirstTextLine(body: string): string {
+  return `${body.trimEnd()}${FIRST_TEXT_STOP_HELP}`;
+}
+/** True when no text from us has ever gone out to this number (blocked, failed and canceled ones do not count). */
+export async function neverTexted(phone: string): Promise<boolean> {
+  const [r] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.messages)
+    .where(and(eq(schema.messages.contactPhone, phone), eq(schema.messages.direction, "out"), sql`${schema.messages.status} not in ('blocked', 'failed', 'undelivered', 'canceled')`));
+  return (r?.n ?? 0) === 0;
+}
+
 export function withOrderStopLine(body: string, needed: boolean): string {
   const b = body.trim();
   if (!needed || /\bSTOP\b/i.test(b)) return b;
@@ -291,7 +312,12 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   const kind = input.kind ?? "transactional";
   const log = input.log !== false;
   if (kind === "marketing") input = { ...input, body: marketingBody(input.body) };
-  if (kind === "transactional") {
+  // Abraham, Nov 27, 2026 (item 5): the FIRST text a number ever gets from us carries STOP and HELP (the website's grey
+  // lines say only "Message and data rates may apply."). Catalog, order and payment link texts to a number that never
+  // got a text from us end with exactly " Reply STOP to stop, or HELP for help."; later texts do not.
+  const first = FIRST_TEXT_KINDS(kind, input.event) && !hasStopAndHelp(input.body) && (await neverTexted(to));
+  if (first) input = { ...input, body: withFirstTextLine(input.body) };
+  else if (kind === "transactional") {
     // The first text after a texting consent carries the full disclosure and the terms link (Abraham, Nov 24, 2026)
     const footer = (await needsConsentFooter(to)) ? await consentFooter() : null;
     input = { ...input, body: footer ? `${input.body.trim()} ${footer}` : withOrderStopLine(input.body, await needsOrderStopLine(to, input.now)) };
