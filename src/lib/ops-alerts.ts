@@ -1,4 +1,4 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { sendEmail } from "@/lib/notify";
@@ -43,7 +43,9 @@ export async function failedSendsReport(now = new Date()) {
   const texts = await db
     .select({ to: schema.messages.contactPhone, code: schema.messages.errorCode, err: schema.messages.errorMessage, at: schema.messages.createdAt })
     .from(schema.messages)
-    .where(and(eq(schema.messages.direction, "out"), eq(schema.messages.status, "failed"), gte(schema.messages.createdAt, since)));
+    // Extra check G3 (Nov 27, 2026): carrier rejections come back as "undelivered" (30003, 30007...), the most common
+    // real failure; and a held text that failed today counts even if it was written days ago (send_after = when sent)
+    .where(and(eq(schema.messages.direction, "out"), inArray(schema.messages.status, ["failed", "undelivered"]), or(gte(schema.messages.createdAt, since), gte(schema.messages.sendAfter, since))));
   const emails = await db
     .select({ to: schema.inboxReplies.toAddress, err: schema.inboxReplies.error, subject: schema.inboxReplies.subject })
     .from(schema.inboxReplies)

@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   }
   const q = new URL(req.url).searchParams;
   try {
-    const r = await receiveRawPiece(q.get("id") ?? "", Number(q.get("i")), Number(q.get("n")), Buffer.from(await req.arrayBuffer()));
+    const r = await receiveRawPiece(q.get("id") ?? "", Number(q.get("i")), Number(q.get("n")), Buffer.from(await req.arrayBuffer()), req.headers.get("x-envelope-from"));
     // One line per piece, so a test email can be confirmed in the logs; no sender, subject or text is logged
     console.log(`[inbound email] piece ${q.get("i")} of ${q.get("n")} received${r.complete ? (r.duplicate ? ", already in the Admin inbox" : ", saved to the Admin inbox") : ""}`);
     return Response.json(r);
