@@ -48,16 +48,24 @@ export function discountNote(d: Pick<DiscountRow, "kind" | "amount_cents" | "per
 
 export type NewDiscount = { phone: string; kind: "amount" | "percent"; amountCents: number | null; percent: number | null; endsOn: string | null; note: string };
 
+/** True for a real YYYY-MM-DD calendar date. */
+export function realISODate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
 /** Admin form values to a discount, or the reason it can't be saved. */
 export function parseDiscountForm(f: { phone: string; kind: string; value: string; endsOn: string; note: string }): NewDiscount | { error: string } {
   const phone = toE164(f.phone);
   if (!phone) return { error: "Enter the customer's 10-digit phone number." };
   const v = Number(String(f.value).replace(/[$,%\s]/g, ""));
+  // Extra check F9 (Nov 27, 2026): the end date must be a real calendar date for both kinds (2026-02-30 is refused)
+  if (f.endsOn && !realISODate(f.endsOn)) return { error: "The end date is not a date." };
   if (f.kind === "percent") {
     if (!(v > 0 && v <= 100)) return { error: "A percent must be more than 0 and at most 100." };
     return { phone, kind: "percent", amountCents: null, percent: Math.round(v * 100) / 100, endsOn: f.endsOn || null, note: f.note.trim().slice(0, 200) };
   }
   if (!(v > 0 && v <= 100000)) return { error: "Enter the dollars off, for example 25." };
-  if (f.endsOn && !/^\d{4}-\d{2}-\d{2}$/.test(f.endsOn)) return { error: "The end date is not a date." };
   return { phone, kind: "amount", amountCents: Math.round(v * 100), percent: null, endsOn: f.endsOn || null, note: f.note.trim().slice(0, 200) };
 }

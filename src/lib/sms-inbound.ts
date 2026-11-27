@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, notInArray, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { LIVE_PUBLIC_EMAIL, NEW_EMAIL_LIVE, NEW_PUBLIC_EMAIL } from "@/lib/config";
@@ -227,12 +227,31 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
 /** Twilio message status callback. */
 export async function handleSmsStatus(body: Record<string, string>) {
   if (!body.MessageSid) return;
+  const status = body.MessageStatus || body.SmsStatus || "unknown";
+  // Extra check E8 (Nov 27, 2026): Twilio's status notices can arrive out of order. A late "sent" never moves a text
+  // that is already "delivered" (or failed) back; the update only applies while the saved status is still earlier.
+  const rank = smsStatusRank(status);
+  const sameOrLater = SMS_STATUS_ORDER.filter((s) => s !== status && smsStatusRank(s) >= rank);
   await db
     .update(schema.messages)
     .set({
-      status: body.MessageStatus || body.SmsStatus || "unknown",
+      status,
       errorCode: body.ErrorCode || null,
       ...(body.ErrorCode ? { errorMessage: body.ErrorMessage || `Twilio error ${body.ErrorCode}` } : {}),
     })
-    .where(eq(schema.messages.twilioSid, body.MessageSid));
+    .where(
+      and(
+        eq(schema.messages.twilioSid, body.MessageSid),
+        // an unknown status (or one the order doesn't list) is saved as before
+        rank < 0 || !sameOrLater.length ? undefined : or(isNull(schema.messages.status), notInArray(schema.messages.status, sameOrLater)),
+      ),
+    );
+}
+
+/** Twilio's message statuses, earliest first; the last four are final. */
+export const SMS_STATUS_ORDER = ["accepted", "scheduled", "queued", "sending", "sent", "receiving", "received", "read", "delivered", "undelivered", "failed", "canceled"];
+export function smsStatusRank(s: string | null | undefined): number {
+  const i = SMS_STATUS_ORDER.indexOf(String(s ?? ""));
+  if (i < 0) return -1;
+  return Math.min(i, SMS_STATUS_ORDER.indexOf("delivered")); // delivered, undelivered, failed and canceled rank the same
 }

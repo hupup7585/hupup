@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte, ne } from "drizzle-orm";
+import { and, eq, inArray, lte } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 
@@ -194,11 +194,23 @@ export async function runAddressChecks(deps: CheckDeps = {}): Promise<{ checked:
   const due = await db.select().from(schema.addressChecks).where(and(inArray(schema.addressChecks.status, ["unconfirmed", "problem"]), lte(schema.addressChecks.nextAt, now)));
   for (const r of due) await checkOne(r, deps).catch((e) => console.error("[address check]", r.orderId, (e as Error).message));
   // texts held for Shabbes on rows that are not due yet
-  const held = await db.select().from(schema.addressChecks).where(ne(schema.addressChecks.status, "stopped"));
+  // Extra check G6 (Nov 27, 2026): only addresses still unconfirmed or with a problem; a confirmed address (or a
+  // cancelled or finished order) no longer sends a problem text that waited over Shabbes. Each row on its own, so one
+  // error never stops the rest.
+  const held = await db.select().from(schema.addressChecks).where(inArray(schema.addressChecks.status, ["unconfirmed", "problem"]));
   for (const r of held) {
     if (!(r.alerts ?? []).some((a) => !a.sentAt)) continue;
-    const alerts = await sendWaiting(r.alerts, deps);
-    await db.update(schema.addressChecks).set({ alerts }).where(eq(schema.addressChecks.orderId, r.orderId));
+    try {
+      const [o] = await db.select({ status: schema.orders.status }).from(schema.orders).where(eq(schema.orders.id, r.orderId)).limit(1);
+      if (!o || DONE.includes(o.status)) {
+        await db.update(schema.addressChecks).set({ status: "stopped", updatedAt: now }).where(eq(schema.addressChecks.orderId, r.orderId));
+        continue;
+      }
+      const alerts = await sendWaiting(r.alerts, deps);
+      await db.update(schema.addressChecks).set({ alerts }).where(eq(schema.addressChecks.orderId, r.orderId));
+    } catch (e) {
+      console.error("[address check] held text", r.orderId, (e as Error).message);
+    }
   }
   const left = await db.select({ nextAt: schema.addressChecks.nextAt, alerts: schema.addressChecks.alerts }).from(schema.addressChecks).where(inArray(schema.addressChecks.status, ["unconfirmed", "problem"]));
   const nextAt = left.length ? new Date(Math.min(...left.map((r) => r.nextAt.getTime()))) : null;

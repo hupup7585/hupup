@@ -1,4 +1,4 @@
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, eq, gte, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, PUBLIC_PHONE_DISPLAY, config } from "@/lib/config";
 import { sendEmail, sendSms } from "@/lib/notify";
@@ -88,7 +88,7 @@ export function catalogEmailTemplate(s: Record<string, unknown>): { subject: str
 export const catalogText = () => `${BUSINESS_NAME}: Here is our catalog: hupupattractions.com/#rentals To book, call ${PUBLIC_PHONE_DISPLAY}.`;
 
 /** Log a catalog request on the contact (by the caller's phone, or the email address), and alert Abraham on failure. */
-export async function recordCatalogRequest(input: { callerPhone: string | null; channel: "text" | "email"; to: string; sent: boolean; source: "phone" | "email" | "text_keyword"; reason?: string }) {
+export async function recordCatalogRequest(input: { callerPhone: string | null; channel: "text" | "email"; to: string; sent: boolean; source: "phone" | "email" | "text_keyword"; reason?: string; quiet?: boolean }) {
   const phone = input.callerPhone ?? (input.channel === "text" ? toE164(input.to) : null);
   let customerId: number | null = null;
   if (phone) {
@@ -104,7 +104,7 @@ export async function recordCatalogRequest(input: { callerPhone: string | null; 
     entityId: customerId ? String(customerId) : input.to,
     after: { channel: input.channel, to: input.to, source: input.source, at: logStamp() },
   });
-  if (!input.sent) {
+  if (!input.sent && !input.quiet) {
     const msg = `${BUSINESS_NAME}: a catalog ${input.channel} to ${input.to} failed to send (${friendlyStamp()}).${input.reason ? ` ${input.reason}` : ""}`;
     const owner = process.env.ADMIN_EMAIL;
     if (owner) await sendEmail(owner, "Catalog failed to send", msg).catch(() => null);
@@ -135,16 +135,26 @@ export async function handleCatalogEmail(senderRaw: string, subject: string | nu
   if (!isCatalogSubject(subject)) return { replied: false, reason: "not_catalog" as const };
   if (!/^[^\s@<>]+@[^\s@<>]+\.[a-z]{2,}$/i.test(sender)) return { replied: false, reason: "bad_sender" as const };
   const nyDay = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-  const earlier = await db
-    .select()
-    .from(schema.catalogEmailRequests)
-    .where(and(eq(schema.catalogEmailRequests.sender, sender), eq(schema.catalogEmailRequests.replied, true), gte(schema.catalogEmailRequests.createdAt, new Date(now.getTime() - 36 * 3600_000))));
-  const today = earlier.some((r) => nyDay(r.createdAt) === nyDay(now));
-  const reason = !infoCatalogAutoreplyOn() ? "autoreply_off" : today ? "already_today" : null;
-  let replied = false;
-  if (!reason) replied = (await send(sender)).sent;
-  await db.insert(schema.catalogEmailRequests).values({ sender, subject: subject?.slice(0, 200) ?? null, replied, reason: reason ?? (replied ? null : "send_failed"), createdAt: now });
-  return { replied, reason: reason ?? (replied ? null : "send_failed") };
+  // Extra check E11 (Nov 27, 2026): the check and the request row happen under a lock on this sender, and the row is
+  // saved as "sending" before the email goes out, so two Catalog emails from one address at once send only one reply.
+  const claim = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"catalog-email:" + sender}))`);
+    const earlier = await tx
+      .select()
+      .from(schema.catalogEmailRequests)
+      .where(and(eq(schema.catalogEmailRequests.sender, sender), gte(schema.catalogEmailRequests.createdAt, new Date(now.getTime() - 36 * 3600_000))));
+    const today = earlier.some((r) => (r.replied || r.reason === "sending") && nyDay(r.createdAt) === nyDay(now));
+    const reason = !infoCatalogAutoreplyOn() ? "autoreply_off" : today ? "already_today" : null;
+    const [row] = await tx
+      .insert(schema.catalogEmailRequests)
+      .values({ sender, subject: subject?.slice(0, 200) ?? null, replied: false, reason: reason ?? "sending", createdAt: now })
+      .returning({ id: schema.catalogEmailRequests.id });
+    return { id: row.id, reason };
+  });
+  if (claim.reason) return { replied: false, reason: claim.reason };
+  const replied = (await send(sender).catch(() => ({ sent: false }))).sent;
+  await db.update(schema.catalogEmailRequests).set({ replied, reason: replied ? null : "send_failed" }).where(eq(schema.catalogEmailRequests.id, claim.id));
+  return { replied, reason: replied ? null : ("send_failed" as const) };
 }
 
 /** Section 18: texting CATALOG to the hotline gets the catalog text back. Not active yet: waits for Twilio texting. */
@@ -167,16 +177,38 @@ export async function replyToCatalogText(
   const now = opts.now ?? new Date();
   if (!on) return { replied: false, reason: "not_active" as const };
   if (opts.optedOut) return { replied: false, reason: "opted_out" as const };
+  // Extra check E7 (Nov 27, 2026): the once-a-day check and a "sending" mark happen under a lock on this number, so two
+  // requests at once (a double click, the website and the phone together) send the catalog only once.
+  const claimId = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"catalog-text:" + from}))`);
+    if (await catalogTextedToday(from, now, tx as unknown as typeof db)) return null;
+    const [row] = await tx.insert(schema.auditLog).values({ action: CATALOG_TEXT_CLAIM, entityType: "phone", entityId: from }).returning({ id: schema.auditLog.id });
+    return row.id;
+  });
+  if (claimId === null) return { replied: false, reason: "already_today" as const };
+  const { messageText } = await import("@/lib/ivr/prompts");
+  const r = await sendCatalogMessages(await messageText("msg_catalog_text"), (body, media) => opts.send(from, body, media)).catch((): { sent: boolean; reason?: string; quiet?: boolean } => ({ sent: false, reason: "send_failed" }));
+  // not sent: the mark is released, so a later try today can still send it
+  if (!r.sent) await db.update(schema.auditLog).set({ action: "catalog.text_claim_released" }).where(eq(schema.auditLog.id, claimId));
+  await recordCatalogRequest({ callerPhone: from, channel: "text", to: from, sent: r.sent, source: "text_keyword", reason: r.reason, quiet: r.quiet });
+  return { replied: r.sent, reason: r.sent ? null : ("send_failed" as const) };
+}
+
+const CATALOG_TEXT_CLAIM = "catalog.text_claimed";
+
+/** True when this number already got (or is getting) the catalog texts today, New York day. */
+export async function catalogTextedToday(phone: string, now = new Date(), exec: typeof db = db): Promise<boolean> {
   const nyDay = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-  const earlier = await db
+  const since = new Date(now.getTime() - 36 * 3600_000);
+  const sent = await exec
     .select({ at: schema.messages.createdAt })
     .from(schema.messages)
-    .where(and(eq(schema.messages.toNumber, from), eq(schema.messages.event, "catalog_reply"), gte(schema.messages.createdAt, new Date(now.getTime() - 36 * 3600_000))));
-  if (earlier.some((r) => nyDay(r.at) === nyDay(now))) return { replied: false, reason: "already_today" as const };
-  const { messageText } = await import("@/lib/ivr/prompts");
-  const r = await sendCatalogMessages(await messageText("msg_catalog_text"), (body, media) => opts.send(from, body, media));
-  await recordCatalogRequest({ callerPhone: from, channel: "text", to: from, sent: r.sent, source: "text_keyword", reason: r.reason });
-  return { replied: r.sent, reason: r.sent ? null : ("send_failed" as const) };
+    .where(and(eq(schema.messages.toNumber, phone), eq(schema.messages.event, "catalog_reply"), gte(schema.messages.createdAt, since)));
+  const claimed = await exec
+    .select({ at: schema.auditLog.createdAt })
+    .from(schema.auditLog)
+    .where(and(eq(schema.auditLog.action, CATALOG_TEXT_CLAIM), eq(schema.auditLog.entityId, phone), gte(schema.auditLog.createdAt, since)));
+  return [...sent, ...claimed].some((r) => nyDay(r.at) === nyDay(now));
 }
 
 /**
@@ -241,13 +273,16 @@ export async function catalogPhotos(s: Record<string, unknown>): Promise<{ photo
 }
 
 /** Send the catalog messages one after the other; the first decides whether it counts as sent. */
-export async function sendCatalogMessages(words: string, send: (body: string, mediaUrls: string[]) => Promise<{ sent: boolean }>): Promise<{ sent: boolean; reason?: string }> {
+export async function sendCatalogMessages(words: string, send: (body: string, mediaUrls: string[]) => Promise<{ sent: boolean }>): Promise<{ sent: boolean; reason?: string; quiet?: boolean }> {
   const msgs = await catalogTextMessages(words);
   if (!msgs.length) {
     // No catalog photos in Admin (Abraham, Nov 18, 2026): nothing is sent; the Owner sees it in Admin
-    const { saveSetting } = await import("@/lib/settings");
+    const { getSettings, saveSetting } = await import("@/lib/settings");
+    // Extra check E6 (Nov 27, 2026): the Owner is told at most once an hour, not on every request
+    const before = Date.parse(String((await getSettings()).catalogTextMissingAt ?? ""));
+    const quiet = Number.isFinite(before) && Date.now() - before < 3600_000;
     await saveSetting("catalogTextMissingAt", new Date().toISOString());
-    return { sent: false, reason: "No catalog photos are uploaded in Admin, so the catalog was not sent." };
+    return { sent: false, reason: "No catalog photos are uploaded in Admin, so the catalog was not sent.", quiet };
   }
   const first = await send(msgs[0].body, msgs[0].mediaUrls);
   if (first.sent) for (const m of msgs.slice(1)) await send(m.body, m.mediaUrls);

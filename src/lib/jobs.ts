@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, ne } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { sendEmail } from "@/lib/notify";
@@ -41,9 +41,17 @@ export async function runJob<T>(name: string, fn: () => Promise<T>, opts: { trie
   }
   const failed = await ensureRow();
   await db.update(schema.jobRuns).set({ ok: false, attempts: tries, finishedAt: new Date(), error: lastError }).where(eq(schema.jobRuns.id, failed.id));
+  // Extra check G5 (Nov 27, 2026): at most one failure email per job a day (a job checked every 5 minutes that keeps
+  // failing used to email every time); every failure is still in Admin > System status
+  const earlier = await db
+    .select({ id: schema.jobRuns.id })
+    .from(schema.jobRuns)
+    .where(and(eq(schema.jobRuns.name, name), eq(schema.jobRuns.ok, false), gte(schema.jobRuns.startedAt, new Date(startedAt.getTime() - 24 * 3600_000)), ne(schema.jobRuns.id, failed.id)))
+    .limit(1)
+    .catch(() => []);
   const to = config.adminEmail();
-  if (to)
-    await sendEmail(to, `Hup Up Attractions: the daily job "${name}" failed`, `The job "${name}" failed ${tries} times.\n\nLast error: ${lastError}\n\nIt will try again tomorrow. Details are in Admin > System status.\n${config.baseUrl()}/admin/status`).catch(() => null);
+  if (to && !earlier.length)
+    await sendEmail(to, `Hup Up Attractions: the job "${name}" failed`, `The job "${name}" failed ${tries} times.\n\nLast error: ${lastError}\n\nIt will try again on its next run. Further failures today are not emailed again. Details are in Admin > System status.\n${config.baseUrl()}/admin/status`).catch(() => null);
   return null;
 }
 

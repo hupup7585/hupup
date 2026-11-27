@@ -11,18 +11,20 @@ export async function saveCustomerAction(form: FormData) {
   const id = Number(form.get("id"));
   const clean = (k: string, max: number) => String(form.get(k) || "").trim().slice(0, max) || null;
   const email = clean("email", 200);
-  const after = {
-    name: clean("name", 120),
-    email: email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? email : null,
-    address: clean("address", 300),
-    notes: clean("notes", 2000),
-  };
   const [before] = await db
     .select({ name: schema.customers.name, email: schema.customers.email, address: schema.customers.address, notes: schema.customers.notes })
     .from(schema.customers)
     .where(eq(schema.customers.id, id))
     .limit(1);
   if (!before) return;
+  const after = {
+    name: clean("name", 120),
+    // Extra check F7 (Nov 27, 2026): an email the server can't use (like name@domain, no dot) keeps the saved email
+    // instead of erasing it; an empty box still clears it on purpose
+    email: !email ? null : /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? email : before.email,
+    address: clean("address", 300),
+    notes: clean("notes", 2000),
+  };
   await db.update(schema.customers).set(after).where(eq(schema.customers.id, id));
   await db.insert(schema.auditLog).values({ userId: s.userId, action: "customer.updated", entityType: "customer", entityId: String(id), before, after });
   revalidatePath(`/admin/customers/${id}`);
