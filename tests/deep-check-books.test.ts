@@ -155,3 +155,43 @@ describe("A20: income by item", () => {
     expect(await of("2026-11-01", "2026-11-30")).toBeUndefined();
   });
 });
+
+describe("deep check 0600 M29 + M30: recurring expenses", () => {
+  it("M29: monthly keeps its day, or the month's last day (Jan 31, Feb 28, Mar 31)", () => {
+    expect(B.nextRecurring("2027-01-31", "monthly", 31)).toBe("2027-02-28");
+    expect(B.nextRecurring("2027-02-28", "monthly", 31)).toBe("2027-03-31");
+    expect(B.nextRecurring("2028-01-30", "monthly", 30)).toBe("2028-02-29");
+    expect(B.nextRecurring("2027-11-30", "quarterly", 30)).toBe("2028-02-29");
+    expect(B.nextRecurring("2027-02-28", "monthly")).toBe("2027-03-28");
+    expect(B.nextRecurring("2027-12-15", "monthly")).toBe("2028-01-15");
+    expect(B.nextRecurring("2027-01-01", "weekly")).toBe("2027-01-08");
+  });
+  it("M30: when the expense can't be saved (locked month), the date stays and nothing is skipped", async () => {
+    await act(A.addRecurringAction(form({ vendor: "Storage unit", category: "Rent", amount: "100.00", frequency: "monthly", nextDate: "2026-04-30" })));
+    const [r] = (await db.select().from(schema.bookRecurring)).filter((x) => x.vendor === "Storage unit");
+    await db.insert(schema.bookLocks).values({ month: "2026-04", status: "locked" });
+    expect(await act(A.recordRecurringAction(form({ id: String(r.id) })))).toMatch(/locked/);
+    expect((await db.select().from(schema.bookRecurring).where(eq(schema.bookRecurring.id, r.id)))[0].nextDate).toBe("2026-04-30");
+    await db.update(schema.bookLocks).set({ status: "reopened" }).where(eq(schema.bookLocks.month, "2026-04"));
+    await act(A.recordRecurringAction(form({ id: String(r.id) })));
+    expect((await db.select().from(schema.bookRecurring).where(eq(schema.bookRecurring.id, r.id)))[0].nextDate).toBe("2026-05-30");
+    await act(A.recordRecurringAction(form({ id: String(r.id) })));
+    expect((await db.select().from(schema.bookRecurring).where(eq(schema.bookRecurring.id, r.id)))[0].nextDate).toBe("2026-06-30");
+  });
+});
+
+describe("deep check 0600 M31 + M35", () => {
+  it("M35: with two months locked, an automatic entry goes to the first open month (never dropped)", async () => {
+    await db.insert(schema.bookLocks).values([{ month: "2024-01", status: "locked" }, { month: "2024-02", status: "locked" }]);
+    expect(await B.firstOpenDate("2024-01-15")).toBe("2024-03-01");
+    await B.recordAutoMoneyOut({ kind: "processor_fee", amountCents: 87, category: "Card fees", method: "card", ref: "fee-M35", date: "2024-01-15" });
+    const [e] = (await db.select().from(schema.bookEntries)).filter((x) => x.ref === "fee-M35");
+    expect(e?.entryDate).toBe("2024-03-01");
+  });
+  it("M31: a double click adds a bank line to the books once", async () => {
+    const [l] = await db.insert(schema.bookBankLines).values({ account: "bank", lineDate: "2026-09-10", description: "HOME DEPOT", amountCents: -4599, status: "unmatched" }).returning();
+    await Promise.all([act(A.categorizeLineAction(form({ id: String(l.id), category: "Supplies" }))), act(A.categorizeLineAction(form({ id: String(l.id), category: "Supplies" })))]);
+    expect((await db.select().from(schema.bookEntries)).filter((x) => x.party === "HOME DEPOT")).toHaveLength(1);
+    expect((await db.select().from(schema.bookBankLines).where(eq(schema.bookBankLines.id, l.id)))[0].matchedEntryIds).toHaveLength(1);
+  });
+});

@@ -523,29 +523,36 @@ function callCartIds(ctx: Ctx): number[] {
  */
 async function reholdCart(ctx: Ctx): Promise<{ p: number; d: string } | null> {
   const { PHONE_HOLD_MINUTES, refreshOrderTotals } = await import("@/lib/orders");
-  let taken: { p: number; d: string } | null = null;
-  for (const id of callCartIds(ctx)) {
-    const full = await getOrderWithItems(id);
-    if (!full) continue;
-    const o = full.order;
-    const expiredRelease = o.status === "CANCELLED" && /Expired hold released/.test(o.notes ?? "");
-    if (o.status !== "HOLD" && !expiredRelease) continue;
-    let kept = 0;
-    for (const it of full.items) {
-      const prod = await getProduct(it.productId);
-      const free = prod ? await checkBookable(prod.id, prod.quantity, o.eventDate, db, o.pickupDate) : 0;
-      if (free >= it.qty) kept++;
-      else {
-        await db.delete(schema.orderItems).where(and(eq(schema.orderItems.orderId, id), eq(schema.orderItems.productId, it.productId)));
-        taken ??= { p: it.productId, d: o.eventDate };
-      }
+  const ids = callCartIds(ctx);
+  if (!ids.length) return null;
+  // Deep check 06:00 M53 (Nov 27, 2026): the whole cart is checked as ONE, in one locked step (items, groups and laser
+  // pools locked in id order, like checkout), so two items sharing a unit (the maze group, a laser pool, the same item
+  // on two days) can never both be held again when only one is free, and another caller can't take it in between.
+  const { lockStock } = await import("@/lib/stock-lock");
+  const { recheckOrderLines } = await import("@/lib/recheck-lines");
+  const r = await db.transaction(async (tx) => {
+    const ords = (await tx.select().from(orders).where(inArray(orders.id, ids)))
+      .filter((o) => o.status === "HOLD" || (o.status === "CANCELLED" && /Expired hold released/.test(o.notes ?? "")))
+      .sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.id - b.id);
+    if (!ords.length) return { taken: null as { p: number; d: string } | null, kept: [] as number[] };
+    const lines = await tx.select().from(schema.orderItems).where(inArray(schema.orderItems.orderId, ords.map((o) => o.id)));
+    await lockStock(tx, lines.map((l) => l.productId));
+    // Out of the count while checked, then each day back in, its items put back one at a time with the ones before counted
+    await tx.update(orders).set({ status: "HOLD", holdExpiresAt: sql`now() - interval '1 second'` }).where(inArray(orders.id, ords.map((o) => o.id)));
+    let taken: { p: number; d: string } | null = null;
+    const kept: number[] = [];
+    for (const o of ords) {
+      await tx.update(orders).set({ holdExpiresAt: new Date(Date.now() + PHONE_HOLD_MINUTES * 60_000), updatedAt: new Date() }).where(eq(orders.id, o.id));
+      const gone = await recheckOrderLines(tx as never, o);
+      if (gone.length) taken ??= { p: gone[0].productId, d: o.eventDate };
+      const [left] = await tx.select({ n: sql<number>`count(*)::int` }).from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id));
+      if (Number(left?.n ?? 0) > 0) kept.push(o.id);
+      else await tx.update(orders).set({ status: "CANCELLED", holdExpiresAt: null, updatedAt: new Date() }).where(eq(orders.id, o.id));
     }
-    if (kept) {
-      await db.update(orders).set({ status: "HOLD", holdExpiresAt: new Date(Date.now() + PHONE_HOLD_MINUTES * 60_000), updatedAt: new Date() }).where(eq(orders.id, id));
-      await refreshOrderTotals(id);
-    } else await db.update(orders).set({ status: "CANCELLED", updatedAt: new Date() }).where(eq(orders.id, id));
-  }
-  return taken;
+    return { taken, kept };
+  });
+  for (const id of r.kept) await refreshOrderTotals(id);
+  return r.taken;
 }
 
 /** Release this call's cart (Box 30, no key): every order still on hold for this call is released. */
@@ -1501,12 +1508,14 @@ export function staffCallerId(from: string | null | undefined, env: Record<strin
 export async function renewPaymentHold(ids: number[], minutes: number): Promise<number[]> {
   if (!ids.length) return [];
   const rows = await db.select({ id: orders.id, status: orders.status, holdExpiresAt: orders.holdExpiresAt }).from(orders).where(inArray(orders.id, ids));
-  const { itemsStillFree } = await import("@/lib/late-payment");
+  // Deep check 06:00 M7: an ended hold is checked as one whole order, locked (shared units and laser pools counted),
+  // the same check as a late payment; each line alone could pass when only one unit was free
+  const { claimIfStillFree } = await import("@/lib/late-payment");
   const ok: number[] = [];
   const taken: number[] = [];
   for (const r of rows) {
     if (r.status !== "PENDING_PAYMENT") continue;
-    if (r.holdExpiresAt && r.holdExpiresAt < new Date() && !(await itemsStillFree(r.id))) taken.push(r.id);
+    if (r.holdExpiresAt && r.holdExpiresAt < new Date() && !(await claimIfStillFree(r.id))) taken.push(r.id);
     else ok.push(r.id);
   }
   if (ok.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(minutes), updatedAt: new Date() }).where(inArray(orders.id, ok));
@@ -4405,7 +4414,7 @@ const handlers: Record<string, Handler> = {
       // Abraham, Nov 27, 2026, 1:15 AM: 1 item: the one price; 2 items: first and second item; 3 or more: first and
       // each additional item (the zone price, and the Admin "Each additional item" price)
       const { bookingItemCount, extraItemCents } = await import("@/lib/delivery-rule");
-      const count = bookingItemCount((await callOrders(ctx)).flatMap((o) => o.items.map((i) => ({ productId: i.productId, qty: i.qty }))));
+      const count = bookingItemCount((await callOrders(ctx)).flatMap((o) => o.items.map((i) => ({ productId: i.productId, qty: i.qty, day: o.order.id }))));
       const key = count <= 1 || cents <= 0 ? "addr_saved_price" : count === 2 ? "addr_saved_price_two" : "addr_saved_price_more";
       sp(vr, ctx, key, { town: townPhrase(d.town), price: spokenMoney(cents), extra: spokenMoney(extraItemCents(settings)) });
       // Same-day delivery notice (Abraham, Nov 27, 2026, 12:47 AM): right after the address is saved, when a day in the
@@ -4690,7 +4699,7 @@ const handlers: Record<string, Handler> = {
     const { bookingDeliveryCents, bookingItemCount } = await import("@/lib/delivery-rule");
     const firstDay = days[0].order;
     const firstItemCents = quote.kind ? deliveryFeeFor(quote.kind, settings, firstDay.eventDate, firstDay.offerNote) : quote.feeCents;
-    const bookingFee = bookingDeliveryCents(firstItemCents, bookingItemCount(days.flatMap((o) => o.items.map((i) => ({ productId: i.productId, qty: i.qty })))), settings);
+    const bookingFee = bookingDeliveryCents(firstItemCents, bookingItemCount(days.flatMap((o) => o.items.map((i) => ({ productId: i.productId, qty: i.qty, day: o.order.id })))), settings);
     const perDay = days.map((o, i) => ({ o, t: withServices(totalsWithFee(o.order.subtotalCents, quote.zone, i === 0 ? bookingFee : 0, settings), sumServices(svc.get(o.order.id) ?? [])) }));
     const primary = days[0].order;
     for (const { o, t } of perDay) {
@@ -4741,14 +4750,10 @@ const handlers: Record<string, Handler> = {
     // Admin, and then only on his own test calls until he opens it to everyone and approves its lines.
     // Card payment plan (Abraham, Nov 15, 2026): straight to the card, no payment link in this flow. The Owner picks
     // Sola PhonePay (the default) or Stripe in Admin; callers not offered a card get the payment link, as before.
-    const payCfg = await getSettings();
-    if (payCfg.phoneCardProvider === "stripe") {
-      if (keypadPayFor(caller, stripePhonePayMode(process.env, payCfg), process.env, payCfg.paymentTestNumbers) && PAY_PROMPTS.every((k) => stripePhonePayMode(process.env, payCfg) !== "live" || !promptWaiting(ctx.prompts, k)))
-        return back(vr, "pay-keypad", { o: primary.id });
-    } else if (phonePayOffered(caller, payCfg) && !(await isPhonePayBlocked(callerPhoneOf(ctx))) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k)))) {
-      // Abraham, Nov 24, 2026: box 140 first (5 seconds), then the hold line and the payment line (phonepay-go)
-      return back(vr, "phonepay-go", { o: primary.id, n: 1 });
-    }
+    const route = await cardPayRoute(ctx, caller);
+    if (route === "pay-keypad") return back(vr, "pay-keypad", { o: primary.id });
+    // Abraham, Nov 24, 2026: box 140 first (5 seconds), then the hold line and the payment line (phonepay-go)
+    if (route === "phonepay-go") return back(vr, "phonepay-go", { o: primary.id, n: 1 });
     // Card on the phone not offered to this caller: the payment link, by text or email (box 141)
     return back(vr, "paylink", { o: primary.id });
   },
@@ -4772,7 +4777,11 @@ const handlers: Record<string, Handler> = {
     if (d === "2") return back(vr, "catalog-email", { p: "pay", o });
     // Abraham (Nov 27, 2026, 12:47 AM): star goes back to the card payment offer (box 140: "If you would like to pay
     // by credit or debit card, please stay on the line. To receive a payment link instead, press 0."); the order stays
-    if (d === "*") {
+    // Deep check 06:00 M6: only when a card payment on the phone is offered to this caller (the same rule as checkout);
+    // with phone cards off, Stripe chosen or Owner-test only, star never dials Sola
+    const route = d === "*" ? await cardPayRoute(ctx, ctx.session?.fromNumber ?? ctx.from) : null;
+    if (route === "pay-keypad") return back(vr, "pay-keypad", { o });
+    if (route === "phonepay-go") {
       const g = keypad(vr, url("phonepay-option", { o }), { numDigits: 1, timeout: T(vr, "timerPhonePayOption") });
       sp(g, ctx, "pay_card_line");
       return back(vr, "phonepay-go", { o, c: 1 }); // no key: straight on to the payment line, as in box 140
@@ -5486,8 +5495,10 @@ const handlers: Record<string, Handler> = {
     // Abraham, Nov 14, 2026, every line: staff pressed 2 = pass the call on to the next number or round, exactly like
     // no answer; voicemail only after the last round. Checked first: Twilio may report that leg as completed.
     const rejectedAt = ctx.session?.data.rejectedAt;
-    const rejected = Boolean(rejectedAt && Date.now() - rejectedAt < 10 * 60_000);
-    if (rejected) await updateSession(ctx.callSid, { data: { rejectedAt: undefined } }, ctx.session);
+    const acceptedAt = Number(ctx.session?.data.acceptedAt ?? 0);
+    // Deep check M18: a staff member who pressed 1 after the "press 2" took the call; the conversation is what ended
+    const rejected = Boolean(rejectedAt && Date.now() - rejectedAt < 10 * 60_000) && !(acceptedAt && acceptedAt >= Number(rejectedAt));
+    if (rejectedAt || acceptedAt) await updateSession(ctx.callSid, { data: { rejectedAt: undefined, acceptedAt: undefined } }, ctx.session);
     if (!rejected && ctx.body.DialCallStatus === "completed") {
       vr.hangup();
       return vr;
@@ -5538,7 +5549,16 @@ const handlers: Record<string, Handler> = {
   },
 
   async "whisper-accept"(ctx, vr) {
-    if (ctx.body.Digits === "1") return vr; // empty response = connect the caller
+    if (ctx.body.Digits === "1") {
+      // Deep check M18 (Nov 27, 2026): in "ring all", someone took the call; remembered on the caller's call so an
+      // earlier "press 2" from another staff phone can't send the caller back to ringing after the conversation
+      const parent = ctx.body.ParentCallSid;
+      if (parent) {
+        const s = await getSession(parent);
+        if (s) await updateSession(parent, { data: { acceptedAt: Date.now() } }, s);
+      }
+      return vr; // empty response = connect the caller
+    }
     // Abraham (Nov 14, 2026): press 2 passes the call on to the next number or round (voicemail only after the last
     // round). Marked on the caller's call, so the next step moves on whatever Twilio reports for this leg.
     const parent = ctx.body.ParentCallSid;
@@ -6064,7 +6084,8 @@ function callerPhoneOf(ctx: { session?: { fromNumber?: string | null } | null; f
   return toE164(ctx.session?.fromNumber ?? ctx.from ?? "") || null;
 }
 
-const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music", "pay-leg", "pay-leg-status", "staff-leg", "staff-leg-accept", "staff-leg-status"]); // music: wait music pieces, not a step of the caller's journey
+// Deep check 06:00 M41: "pay-leg-wait" runs on our call to Sola (not the caller's), so it never makes a caller session
+const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music", "pay-leg", "pay-leg-wait", "pay-leg-status", "staff-leg", "staff-leg-accept", "staff-leg-status"]); // music: wait music pieces, not a step of the caller's journey
 
 /** What a key set in Admin does (Nov 26, 2026). */
 async function ownKey(ctx: Ctx, vr: VR, screen: string, k: KeyDef) {
@@ -6108,6 +6129,20 @@ export const handlerNames = () => Object.keys(handlers);
  * Hark's 2nd phone check, B11: a database or server problem in the set-up of a step (settings, prompts, session) gets
  * our own tech_error line and a hang-up, never Twilio's "An application error has occurred".
  */
+/**
+ * Where a card payment on the phone goes for this caller (Abraham, Nov 15, 2026 card plan): Stripe's keypad, Sola
+ * PhonePay, or null (not offered: the payment link). One rule for checkout and the star key on box 141 (deep check M6).
+ */
+async function cardPayRoute(ctx: Ctx, caller: string | null | undefined): Promise<"pay-keypad" | "phonepay-go" | null> {
+  const payCfg = await getSettings();
+  if (payCfg.phoneCardProvider === "stripe") {
+    const mode = stripePhonePayMode(process.env, payCfg);
+    return keypadPayFor(caller, mode, process.env, payCfg.paymentTestNumbers) && PAY_PROMPTS.every((k) => mode !== "live" || !promptWaiting(ctx.prompts, k)) ? "pay-keypad" : null;
+  }
+  if (phonePayOffered(caller, payCfg) && !(await isPhonePayBlocked(callerPhoneOf(ctx))) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k)))) return "phonepay-go";
+  return null;
+}
+
 export async function handleVoice(raw: Omit<Ctx, "session" | "prompts"> & { editorOverride?: Editor }): Promise<string> {
   try {
     return await handleVoiceInner(raw);

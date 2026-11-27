@@ -139,11 +139,30 @@ export async function sendCampaign(id: number, userId: number | null, now = new 
   const list = await promoSignups(now);
   // Extra check F2 (Nov 27, 2026): one text per phone number, even when two customer records share it
   const eligible = [...new Map(eligibleOf(list).map((x) => [x.phone, x])).values()];
-  const already = new Set((await db.select({ phone: schema.smsCampaignSends.phone }).from(schema.smsCampaignSends).where(eq(schema.smsCampaignSends.campaignId, id))).map((r) => r.phone));
+  const rowsBefore = await db.select().from(schema.smsCampaignSends).where(eq(schema.smsCampaignSends.campaignId, id));
+  // Deep check 06:00 M69 (F6 leftover): a run cut off between claiming a customer ("pending") and sending left them out
+  // for good. On a resume, a pending customer with no text for this campaign is sent it now; one whose text was saved
+  // gets that text's result.
+  const retry = new Map<string, (typeof rowsBefore)[number]>();
+  for (const r of rowsBefore.filter((x) => x.status === "pending")) {
+    const [m] = await db
+      .select({ id: schema.messages.id, status: schema.messages.status })
+      .from(schema.messages)
+      .where(and(eq(schema.messages.contactPhone, r.phone), eq(schema.messages.event, `campaign:${id}`), eq(schema.messages.direction, "out")))
+      .limit(1);
+    if (!m) retry.set(r.phone, r);
+    else {
+      const st = m.status === "held" ? "held" : ["blocked", "failed", "undelivered", "canceled"].includes(String(m.status)) ? "skipped" : "sent";
+      await db.update(schema.smsCampaignSends).set({ status: st, messageId: m.id }).where(eq(schema.smsCampaignSends.id, r.id));
+    }
+  }
+  const already = new Set(rowsBefore.filter((r) => !retry.has(r.phone)).map((r) => r.phone));
   let sent = 0, held = 0, skipped = 0;
   for (const s of eligible) {
     if (already.has(s.phone)) continue; // this number already got (or is getting) this campaign
-    const [claim] = await db.insert(schema.smsCampaignSends).values({ campaignId: id, customerId: s.customerId, phone: s.phone, status: "pending" }).onConflictDoNothing().returning();
+    const [claim] = retry.has(s.phone)
+      ? [retry.get(s.phone)!]
+      : await db.insert(schema.smsCampaignSends).values({ campaignId: id, customerId: s.customerId, phone: s.phone, status: "pending" }).onConflictDoNothing().returning();
     if (!claim) continue; // already sent this campaign to this customer
     const r = await sendMessage({ to: s.phone, body: msg.offer, mediaUrls: msg.mediaUrls, kind: "marketing", event: `campaign:${id}`, customerId: s.customerId, userId, now });
     const status = r.sent ? "sent" : r.held ? "held" : "skipped";

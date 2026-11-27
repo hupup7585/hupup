@@ -506,7 +506,7 @@ export const PROMPTS = {
   cart_summary: { group: "Cart", label: "Cart summary", text: "Here is your cart: {items}, for {date}. Your rental total is {total}, plus delivery and sales tax.", vars: ["items", "date", "total"] },
   // Key 1 booking, several days on one call (Abraham, Nov 8, 2026). day_choice and cart_key are Abraham's exact lines.
   day_choice: { group: "Cart", label: "After an item: same day or another day (Abraham)", text: "For the same day, press 1. For another day, press 2." },
-  cart_key: { group: "Cart", label: "Shared cart line: every booking step before the cart or checkout (not after row 11)", text: "To go to your shopping cart, press 0." },
+  cart_key: { group: "Cart", label: "Shared cart line: every booking step before the cart or checkout", text: "To go to your shopping cart, press 0." },
   cart_intro: { group: "Cart", label: "Cart: opening line", text: "Here is your cart." },
   // The cart (Abraham, Nov 19 and 22, 2026): "For {date}, {Qnt} {item}, and {Qnt} {item}." one line per rental day
   cart_day: { group: "Cart", label: "Cart: one rental day (each item with its number; and before the second item on)", text: "For {date}, {items}.", vars: ["date", "items"] },
@@ -952,7 +952,7 @@ export const PROMPTS = {
 
 /** Old lines no longer played anywhere (kept so nothing is lost; shown as "Not used"). */
 // Hark's audit items 12 and 14 (Nov 24, 2026): lines no step plays any more were still shown as Live
-export const RETIRED_PROMPTS = new Set<string>(["book_note", "book_corporate", "box153", "no_input", "idle_warning", "only_some_left", "day_choice", "item_taken", "addr_rb_again", "type_email_symbols", "email_unclear", "thanks_order", "consent_unclear", "attraction_menu_back", "menu_category", "menu_empty", "retry_spoken", "addr_readback", "resume_added", "instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard", "cart_expired", "addr_unit_skip", "ask_directions", "directions_saved", "addr_price", "addr_saved", "vma_charge_amount", "vma_charge_readback", "vma_charge_bad", "address_outside_area", "phonepay_approved_join", "phonepay_back", "ocean_balls", "cart_add_balls", "instr_laser", "automated_only", "nearest_date", "laser_second_set", "second_laser", "laser_third_set", "laser_packs", "whole_hours", "whole_pay_approved_text", "whole_pay_approved_optin"]);
+export const RETIRED_PROMPTS = new Set<string>(["book_note", "book_corporate", "box153", "no_input", "idle_warning", "only_some_left", "day_choice", "item_taken", "addr_rb_again", "type_email_symbols", "email_unclear", "thanks_order", "consent_unclear", "attraction_menu_back", "menu_category", "menu_empty", "retry_spoken", "addr_readback", "resume_added", "instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard", "cart_expired", "addr_unit_skip", "ask_directions", "directions_saved", "addr_price", "addr_saved", "vma_charge_amount", "vma_charge_readback", "vma_charge_bad", "address_outside_area", "phonepay_approved_join", "phonepay_back", "ocean_balls", "cart_add_balls", "instr_laser", "automated_only", "nearest_date", "laser_second_set", "second_laser", "laser_third_set", "laser_packs", "whole_hours", "whole_pay_approved_text", "whole_pay_approved_optin", "catalog_keypad_help", "address_keypad_help"]);
 
 /** The extension (or part of the call) each group of lines belongs to, for the Admin filter. New groups fall into "Other". */
 export const PROMPT_AREAS: Record<string, string> = {
@@ -1018,9 +1018,12 @@ export async function loadPromptOverrides(): Promise<PromptOverrides> {
       ? await db.select({ id: schema.promptRecordings.id, key: schema.promptRecordings.promptKey, complete: schema.promptRecordings.complete, source: schema.promptRecordings.source }).from(schema.promptRecordings).where(inArray(schema.promptRecordings.id, inUse))
       : [];
     const okRec = new Map(recs.map((r) => [r.id, r]));
+    // Extra check HP1 (Nov 27, 2026): an upload made on a line's earlier line (the old laser instructions for laser
+    // parts 1-3) counts as made for it, the same rule as "Use this one" in Admin, so what Admin shows live is played
+    const { recordingKeysFor } = await import("@/lib/prompt-recordings");
     const rows = rows0.map((r) => {
       const rec = r.recordingId ? okRec.get(r.recordingId) : undefined;
-      const good = Boolean(rec && rec.complete && rec.source === "upload" && rec.key === r.key);
+      const good = Boolean(rec && rec.complete && rec.source === "upload" && recordingKeysFor(r.key).includes(rec.key));
       if (r.recordingId && !good) console.warn(`[voice] slot ${r.key} points at recording #${r.recordingId}, which is not a finished upload for that slot: not played`);
       return good ? r : { ...r, recordingId: null };
     });

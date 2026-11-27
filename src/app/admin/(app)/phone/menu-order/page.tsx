@@ -4,6 +4,7 @@ import { getSettings } from "@/lib/settings";
 import { MENU_RECORDINGS, menuOrder, type MenuId } from "@/lib/ivr/menu-order";
 import { PROMPTS, type PromptKey } from "@/lib/ivr/prompts";
 import { moveMenuPartAction } from "./actions";
+import { trustedMsg } from "@/lib/url-message";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Menu order · Hup Up Attractions", robots: { index: false } };
@@ -15,17 +16,20 @@ const partText = (k: string) => (k === "balloon_items" ? "For the Soft Hop, item
  * Owner only (Hark for Abraham, Nov 19, 2026): menus made of several recordings play them in the order set here. The
  * wording of each recording is edited in Hotline prompts.
  */
-export default async function MenuOrderPage() {
+export default async function MenuOrderPage({ searchParams }: { searchParams?: Promise<{ m?: string; ms?: string }> }) {
   await requireOwner();
   const s = await getSettings();
+  const sp = (await searchParams) ?? {};
+  const saved = trustedMsg(sp.m, sp.ms);
   return (
     <div className="w-full" data-menu-order>
       <h1 className="text-2xl font-black sm:text-3xl">Menu order</h1>
       <p className="mb-4 mt-1 text-muted">Some phone menus are made of several recordings. They play one after the other in the order below. Use the arrows to change the order. The words of each recording are changed in Hotline prompts.</p>
+      {saved && <p role="status" className="mb-4 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]">{saved}</p>}
       {(Object.keys(MENU_RECORDINGS) as MenuId[]).map((menu) => {
         const order = menuOrder(menu, s.menuOrders);
         return (
-          <section key={menu} className="card mb-5 p-5" data-menu={menu}>
+          <section key={menu} id={menu} className="card mb-5 p-5" data-menu={menu}>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-bold">{MENU_RECORDINGS[menu].label}</h2>
               <form action={moveMenuPartAction}>

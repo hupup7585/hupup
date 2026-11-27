@@ -22,11 +22,21 @@ describe("Hark's bug check", () => {
     expect(redirect(await call("resume-added-choice", { Digits: "5" }, "d=2027-01-12&o=2027-01-12"))).toContain("o=2027-01-12");
   });
   it("Abraham, Nov 27, 12:47 AM (replaces A4): star on the payment link menu plays the card offer (box 140), never 'not valid' or the empty cart", async () => {
+    process.env.SOLA_PHONEPAY_PIN = "4321"; // phone card payment offered (Sola PhonePay, the default provider)
     const xml = await call("paylink-choice", { Digits: "*" }, "o=12");
     expect(xml).toContain("If you would like to pay by credit or debit card, please stay on the line.");
     expect(xml).toContain("phonepay-option?o=12");
     expect(xml).not.toContain("not a valid");
     expect(redirect(xml)).toBe("phonepay-go?o=12&c=1");
+  });
+  it("deep check 06:00 M6: with phone card payment not offered, star never dials Sola (not valid, then box 141 again)", async () => {
+    const pin = process.env.SOLA_PHONEPAY_PIN;
+    delete process.env.SOLA_PHONEPAY_PIN; // no PhonePay PIN = card on the phone not offered
+    const xml = await call("paylink-choice", { Digits: "*" }, "o=12");
+    process.env.SOLA_PHONEPAY_PIN = pin;
+    expect(xml).not.toContain("phonepay-option");
+    expect(xml).not.toContain("<Dial");
+    expect(redirect(xml)).toBe("paylink?o=12");
   });
   it("bug 12: a staff phone calling in is never rung itself; bug 22: the Terms line can play its recording", () => {
     const s = readFileSync("src/lib/ivr/flow.ts", "utf8");

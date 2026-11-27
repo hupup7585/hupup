@@ -13,7 +13,8 @@ vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { sendPayLinkAction, updateStatusAction } from "@/app/admin/(app)/orders/actions";
+import { addDays, todayISO } from "@/lib/dates";
+import { recordPaymentAction, sendPayLinkAction, updateDetailsAction, updateStatusAction } from "@/app/admin/(app)/orders/actions";
 
 let maze = 0, guns = 0;
 beforeAll(async () => {
@@ -66,11 +67,64 @@ describe("Admin status safety", () => {
     expect(await statusOf(d)).toBe("PICKED_UP");
   });
   it("deep check A2: delivered, moved back to Confirmed, then Cancel: still refused", async () => {
-    const d = await mk("CONFIRMED", maze, "2027-07-10");
+    const d = await mk("CONFIRMED", maze, "2026-11-20"); // a past event day: Delivered is refused before the event (extra check HD2)
+    await db.update(schema.orders).set({ pickupDate: "2026-11-21" }).where(eq(schema.orders.id, d)); // a one-day rental (never holding today's stock)
     expect((await updateStatusAction(d, "DELIVERED")).ok).toBe(true);
     expect((await updateStatusAction(d, "CONFIRMED")).ok).toBe(true);
     const r = await updateStatusAction(d, "CANCELLED", "customer asked");
     expect(r.ok).toBe(false);
     expect(await statusOf(d)).toBe("CONFIRMED");
+  });
+});
+
+describe("deep check 0600 M8 and M57", () => {
+  it("M8: re-activating a cancelled order checks the whole order (two lines on the one maze are refused)", async () => {
+    const [o] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "POS", eventDate: "2027-08-10", pickupDate: "2027-08-11", subtotalCents: 70000 }).returning();
+    await db.insert(schema.orderItems).values([{ orderId: o.id, productId: maze, qty: 1, unitPriceCents: 30000 }, { orderId: o.id, productId: guns, qty: 1, unitPriceCents: 40000 }]);
+    const r = await updateStatusAction(o.id, "CONFIRMED");
+    expect(r.ok).toBe(false);
+    expect(await statusOf(o.id)).toBe("CANCELLED");
+    expect((await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id)))).toHaveLength(2); // nothing changed
+    // one maze line alone fits
+    const [ok] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "POS", eventDate: "2027-08-20", pickupDate: "2027-08-21", subtotalCents: 30000 }).returning();
+    await db.insert(schema.orderItems).values({ orderId: ok.id, productId: maze, qty: 1, unitPriceCents: 30000 });
+    expect((await updateStatusAction(ok.id, "CONFIRMED")).ok).toBe(true);
+  });
+  it("M57: brought back straight to Delivered: its units are booked", async () => {
+    const day57 = new Date(`${todayISO()}T12:00:00Z`).getUTCDay() === 6 ? addDays(todayISO(), 1) : todayISO(); // never Shabbes
+    await db.insert(schema.equipmentUnits).values({ productId: guns, code: "G-1", status: "available" as const });
+    const [o] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "POS", eventDate: day57, pickupDate: addDays(day57, 1), subtotalCents: 40000 }).returning(); // today (or Sunday): Delivered is refused more than a day before the event (extra check HD2)
+    await db.insert(schema.orderItems).values({ orderId: o.id, productId: guns, qty: 1, unitPriceCents: 40000 });
+    expect((await updateStatusAction(o.id, "DELIVERED")).ok).toBe(true);
+    expect((await db.select().from(schema.unitBookings).where(eq(schema.unitBookings.orderId, o.id))).length).toBeGreaterThan(0);
+  });
+});
+
+describe("deep check 0600 M54 and M23", () => {
+  it("M54: a double click on Record payment counts the cash once", async () => {
+    const [o] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "POS", eventDate: "2027-10-10", pickupDate: "2027-10-11", subtotalCents: 10000, totalCents: 10000 }).returning();
+    const r = await Promise.all([recordPaymentAction(o.id, "40.00", "cash"), recordPaymentAction(o.id, "40.00", "cash")]);
+    expect(r.filter((x) => x.ok)).toHaveLength(1);
+    expect(r.find((x) => !x.ok)?.message).toMatch(/pressed twice/);
+    expect((await db.select().from(schema.orders).where(eq(schema.orders.id, o.id)))[0].paidCents).toBe(4000);
+    // a different amount right after is a real second payment
+    expect((await recordPaymentAction(o.id, "60.00", "cash")).ok).toBe(true);
+  });
+  it("M23: Save keeps a note the system added after the page opened", async () => {
+    const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "POS", eventDate: "2027-11-10", pickupDate: "2027-11-11", subtotalCents: 1, notes: "Gate code 12. " }).returning();
+    await db.update(schema.orders).set({ notes: "Gate code 12. Second payment of $5.00 on an order already paid in full: refund it. " }).where(eq(schema.orders.id, o.id));
+    const f = (notes: string) => {
+      const x = new FormData();
+      x.set("deliveryAddress", "");
+      x.set("notes", notes);
+      x.set("notesBefore", "Gate code 12. ");
+      return x;
+    };
+    await updateDetailsAction(o.id, f("Gate code 12. "));
+    expect((await db.select().from(schema.orders).where(eq(schema.orders.id, o.id)))[0].notes).toMatch(/refund it/);
+    await updateDetailsAction(o.id, f("Gate code 34."));
+    const n = (await db.select().from(schema.orders).where(eq(schema.orders.id, o.id)))[0].notes!;
+    expect(n).toMatch(/^Gate code 34\./);
+    expect(n).toMatch(/refund it/);
   });
 });

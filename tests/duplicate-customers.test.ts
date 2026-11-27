@@ -96,3 +96,19 @@ describe("Possible duplicate customers", () => {
     expect((await mergeCustomers(d, [d], 1)).ok).toBe(false);
   });
 });
+
+describe("deep check 0600 M22: promo sign-up on a merge", () => {
+  it("kept when the merged-in record has the same number; not moved from another number", async () => {
+    const ins = async (v: Partial<typeof schema.customers.$inferInsert>) => (await db.insert(schema.customers).values(v).returning())[0].id;
+    const keep = await ins({ name: "Rivka Weiss", phone: "+18455550701" });
+    const same = await ins({ name: null, phone: "+18455550701", marketingOptIn: true, marketingOptInAt: new Date("2026-10-01T12:00:00Z") });
+    const other = await ins({ name: "Rivka Weiss", phone: "+18455550799", marketingOptIn: true });
+    const r = await mergeCustomers(keep, [same, other], 1);
+    expect(r.ok).toBe(true);
+    expect(r.message).toMatch(/promo sign-up was kept/);
+    expect(r.message).toMatch(/not moved to the kept number/);
+    const [k] = await db.select().from(schema.customers).where(eq(schema.customers.id, keep));
+    expect(k.marketingOptIn).toBe(true);
+    expect(k.marketingOptInAt?.toISOString()).toBe("2026-10-01T12:00:00.000Z");
+  });
+});

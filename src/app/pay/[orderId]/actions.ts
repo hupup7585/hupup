@@ -82,15 +82,15 @@ async function paymentsClosedNow() {
 }
 
 export async function checkAgainAction(orderId: number, token: string) {
-  if (!linkRulesActive() || !verifyPayToken(orderId, token) || (await paymentsClosedNow())) redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}`);
+  if (!linkRulesActive() || !verifyPayToken(orderId, token) || (await paymentsClosedNow())) redirect(`/pay/${orderNumber(orderId)}?t=${encodeURIComponent(token)}`);
   const group = await getPaymentGroup(orderId);
   if (group) await holdAgain(group.orders.map((d) => d.order.id), orderId);
-  redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}&held=1`);
+  redirect(`/pay/${orderNumber(orderId)}?t=${encodeURIComponent(token)}&held=1`);
 }
 
 /** A taken item: the customer tapped one of its nearest options (checked again on the server). */
 export async function chooseOptionAction(orderId: number, token: string, index: number, productId: number, date: string) {
-  if (!linkOptionsActive() || !verifyPayToken(orderId, token) || (await paymentsClosedNow())) redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}`);
+  if (!linkOptionsActive() || !verifyPayToken(orderId, token) || (await paymentsClosedNow())) redirect(`/pay/${orderNumber(orderId)}?t=${encodeURIComponent(token)}`);
   await chooseLinkOption(orderId, index, productId, date);
-  redirect(`/pay/${orderId}?t=${encodeURIComponent(token)}&held=1`);
+  redirect(`/pay/${orderNumber(orderId)}?t=${encodeURIComponent(token)}&held=1`);
 }

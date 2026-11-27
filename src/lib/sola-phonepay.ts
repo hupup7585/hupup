@@ -75,6 +75,9 @@ export function buildSendDigits(template: string, v: { pin: string; amountCents:
 export function digitsTemplateError(template: string): string | null {
   try {
     buildSendDigits(template, { pin: "1234", amountCents: 23000, orderNumber: "1438" });
+    // Deep check 0600 M61: also with the longest values a real call can use (a 12-digit PIN, $99,999.00, a 7-digit
+    // order number), so a template that only fits short sample values is refused here, not in the middle of a call
+    buildSendDigits(template, { pin: "9".repeat(12), amountCents: 9_999_900, orderNumber: "9999999" });
     return null;
   } catch (e) {
     return (e as Error).message;
@@ -233,7 +236,15 @@ export const paymentSourceLabel = (m: string | null | undefined) =>
 export async function matchPhonePay(orderId: number, attemptId: number, dueCents: number, deps: { fetcher?: typeof fetch; waitMs?: number; now?: () => Date } = {}): Promise<{ paid: boolean; reason: string }> {
   const { getPaymentGroup, markGroupPaid, orderNumber } = await import("@/lib/orders");
   const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
-  const from = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
+  const started = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
+  // Deep check 06:00 M10: an earlier try of this order whose charge Sola could not be checked (check_failed) may have
+  // gone through. Its time is looked at too, so that charge is found (paid once) or, with a second charge, both are
+  // set aside as unclear (Owner emailed, voided after a later payment); never left unseen and never voided.
+  const unchecked = await db
+    .select({ startedAt: schema.phonepayAttempts.startedAt })
+    .from(schema.phonepayAttempts)
+    .where(and(eq(schema.phonepayAttempts.orderId, orderId), eq(schema.phonepayAttempts.result, "check_failed"), gte(schema.phonepayAttempts.startedAt, new Date(started.getTime() - 60 * 60_000))));
+  const from = new Date(Math.min(started.getTime(), ...unchecked.map((u) => u.startedAt.getTime())));
   const num = orderNumber(orderId);
   let reason = "not_found";
   let found: SolaTxn | null = null;
@@ -250,12 +261,12 @@ export async function matchPhonePay(orderId: number, attemptId: number, dueCents
   }
   if (found) {
     if (attemptId) await finishAttempt(attemptId, { matched: true, solaRef: found.refNum, last4: found.last4, cardType: found.cardType, note: "Paid" });
-    await markGroupPaid(orderId, found.amountCents, PHONEPAY_METHOD, found.refNum);
+    const counted = await markGroupPaid(orderId, found.amountCents, PHONEPAY_METHOD, found.refNum);
     const group = await getPaymentGroup(orderId);
     const ids = group?.orders.map((d) => d.order.id) ?? [orderId];
     const { recordPaymentResult, paymentReceivedNotices } = await import("@/lib/payment-result");
     await recordPaymentResult(ids, "approved", found.last4, found.refNum, found.at);
-    await paymentReceivedNotices(orderId, found.amountCents);
+    if (newlyCounted(counted)) await paymentReceivedNotices(orderId, found.amountCents);
     return { paid: true, reason: "found" };
   }
   if (attemptId) await finishAttempt(attemptId, { matched: false, note: reason });
@@ -335,6 +346,11 @@ export async function solaVoid(refNum: string, fetcher: typeof fetch = fetch, en
   }
 }
 
+/** Deep check 06:00 M26: did this call count the payment (not only find it already counted)? Then the paid notice goes out. */
+function newlyCounted(rows: object[]): boolean {
+  return rows.some((r) => !("duplicate" in r && r.duplicate));
+}
+
 /** Make sure the payments subaccount's call to Sola is fully hung up (and anything it dialed). Best effort, quiet. */
 export async function endPayLeg(paySid: string | null | undefined, fetcher: typeof fetch = fetch, env: Record<string, string | undefined> = process.env) {
   const acct = env.TWILIO_PAY_ACCOUNT_SID;
@@ -363,7 +379,15 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
   const { getPaymentGroup, markGroupPaid, orderNumber } = await import("@/lib/orders");
   const { recordPaymentResult, paymentReceivedNotices } = await import("@/lib/payment-result");
   const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
-  const from = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
+  const started = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
+  // Deep check 06:00 M10: an earlier try of this order whose charge Sola could not be checked (check_failed) may have
+  // gone through. Its time is looked at too, so that charge is found (paid once) or, with a second charge, both are
+  // set aside as unclear (Owner emailed, voided after a later payment); never left unseen and never voided.
+  const unchecked = await db
+    .select({ startedAt: schema.phonepayAttempts.startedAt })
+    .from(schema.phonepayAttempts)
+    .where(and(eq(schema.phonepayAttempts.orderId, orderId), eq(schema.phonepayAttempts.result, "check_failed"), gte(schema.phonepayAttempts.startedAt, new Date(started.getTime() - 60 * 60_000))));
+  const from = new Date(Math.min(started.getTime(), ...unchecked.map((u) => u.startedAt.getTime())));
   const num = orderNumber(orderId);
   const group = await getPaymentGroup(orderId);
   const ids = group?.orders.map((d) => d.order.id) ?? [orderId];
@@ -425,9 +449,9 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
   if (c?.kind === "paid" && c.paid) {
     await db.update(schema.phonepayAttempts).set({ result: "paid" }).where(eq(schema.phonepayAttempts.id, attemptId));
     await finishAttempt(attemptId, { matched: true, solaRef: c.paid.refNum, last4: c.paid.last4, cardType: c.paid.cardType, note: `${voids.length ? "Paid; a second charge was voided" : "Paid"}${c.paid.invoice ? ` (Sola Invoice field: ${c.paid.invoice})` : ""}` });
-    await markGroupPaid(orderId, c.paid.amountCents, PHONEPAY_METHOD, c.paid.refNum);
+    const counted = await markGroupPaid(orderId, c.paid.amountCents, PHONEPAY_METHOD, c.paid.refNum);
     await recordPaymentResult(ids, "approved", c.paid.last4, c.paid.refNum, c.paid.at);
-    await paymentReceivedNotices(orderId, c.paid.amountCents);
+    if (newlyCounted(counted)) await paymentReceivedNotices(orderId, c.paid.amountCents);
     await voidUnclearAfterPaid(orderId, c.paid.refNum, mail, deps.fetcher);
     return { result: "paid" };
   }

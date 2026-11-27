@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { PROMPTS, type PromptDef, type PromptKey } from "@/lib/ivr/prompts";
 import { googleTtsReady, makeGoogleRecording } from "@/lib/prompt-recordings";
@@ -67,28 +67,44 @@ export async function saveDraft(key: string, text: string, userId: number | null
 
 async function makeLive(key: string, text: string, userId: number | null, versionId: number) {
   const now = new Date();
-  // The wording before this one is kept as a version too (the first time, that's the original wording in the code)
-  const [current] = await db.select().from(schema.promptVersions).where(and(eq(schema.promptVersions.promptKey, key), eq(schema.promptVersions.status, "live"))).limit(1);
-  if (current) await db.update(schema.promptVersions).set({ status: "replaced" }).where(eq(schema.promptVersions.id, current.id));
-  else {
-    const before = await liveText(key as PromptKey);
-    // Dated just before this line's first version, so the history reads in order
-    const [first] = await db.select({ at: schema.promptVersions.createdAt }).from(schema.promptVersions).where(eq(schema.promptVersions.promptKey, key)).orderBy(schema.promptVersions.createdAt).limit(1);
-    await db.insert(schema.promptVersions).values({ promptKey: key, text: before, status: "replaced", note: before === PROMPTS[key as PromptKey].text ? "Original wording" : "Wording before version history", createdAt: new Date((first?.at ?? now).getTime() - 1000) });
-  }
   const def = PROMPTS[key as PromptKey] as PromptDef;
   const stored = text === def.text ? null : text;
-  await db
-    .insert(schema.voicePrompts)
-    .values({ key, text: stored, updatedBy: userId, ...(def.pending ? { approvedAt: now, approvedBy: userId } : {}) })
-    .onConflictDoUpdate({ target: schema.voicePrompts.key, set: { text: stored, updatedAt: now, updatedBy: userId, ...(def.pending ? { approvedAt: now, approvedBy: userId } : {}) } });
-  await db.update(schema.promptVersions).set({ status: "live", approvedBy: userId, approvedAt: now }).where(eq(schema.promptVersions.id, versionId));
+  // Extra check HP4 (Nov 27, 2026): one approval or restore at a time per line (a lock on the line), the version is
+  // checked again inside the lock, and EVERY live row of the line is set aside, so two clicks never leave two live
+  // versions or two "Original wording" rows
+  const recordingId = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"prompt-version:" + key}))`);
+    const [mine] = await tx.select({ status: schema.promptVersions.status }).from(schema.promptVersions).where(eq(schema.promptVersions.id, versionId)).limit(1);
+    if (!mine || mine.status !== "draft") throw new PromptError("That draft isn't waiting for approval.");
+    // The wording before this one is kept as a version too (the first time, that's the original wording in the code)
+    const live = await tx.update(schema.promptVersions).set({ status: "replaced" }).where(and(eq(schema.promptVersions.promptKey, key), eq(schema.promptVersions.status, "live"))).returning({ id: schema.promptVersions.id });
+    if (!live.length) {
+      const [row] = await tx.select().from(schema.voicePrompts).where(eq(schema.voicePrompts.key, key)).limit(1);
+      const before = row?.text?.trim() || PROMPTS[key as PromptKey].text;
+      // Dated just before this line's first version, so the history reads in order
+      const [first] = await tx.select({ at: schema.promptVersions.createdAt }).from(schema.promptVersions).where(eq(schema.promptVersions.promptKey, key)).orderBy(schema.promptVersions.createdAt).limit(1);
+      await tx.insert(schema.promptVersions).values({ promptKey: key, text: before, status: "replaced", note: before === PROMPTS[key as PromptKey].text ? "Original wording" : "Wording before version history", createdAt: new Date((first?.at ?? now).getTime() - 1000) });
+    }
+    const [vp] = await tx
+      .insert(schema.voicePrompts)
+      .values({ key, text: stored, updatedBy: userId, ...(def.pending ? { approvedAt: now, approvedBy: userId } : {}) })
+      .onConflictDoUpdate({ target: schema.voicePrompts.key, set: { text: stored, updatedAt: now, updatedBy: userId, ...(def.pending ? { approvedAt: now, approvedBy: userId } : {}) } })
+      .returning({ recordingId: schema.voicePrompts.recordingId });
+    await tx.update(schema.promptVersions).set({ status: "live", approvedBy: userId, approvedAt: now }).where(eq(schema.promptVersions.id, versionId));
+    return vp?.recordingId ?? null;
+  });
+  // Extra check HP7: an uploaded recording on the line keeps playing (with the old words) until a new one is put on
+  let hasUpload = false;
+  if (recordingId) {
+    const [rec] = await db.select({ source: schema.promptRecordings.source }).from(schema.promptRecordings).where(eq(schema.promptRecordings.id, recordingId)).limit(1);
+    hasUpload = rec?.source === "upload";
+  }
   // The new Google voice recording (same voice), once Google Text-to-Speech is set up; changing parts stay live voice
   let recorded = false;
   if (!def.message && !def.vars?.length && !def.textOnly && googleTtsReady()) {
     recorded = Boolean(await makeGoogleRecording(key, text, userId).catch(() => null));
   }
-  return { recorded };
+  return { recorded, hasUpload };
 }
 
 /** Approve the draft: it goes live (the live line until now is kept as an old version). */
@@ -113,7 +129,7 @@ export async function restoreVersion(versionId: number, userId: number | null) {
   const [old] = await db.select().from(schema.promptVersions).where(eq(schema.promptVersions.id, versionId)).limit(1);
   if (!old || old.status === "live" || old.status === "draft") throw new PromptError("Choose an older version.");
   validateWording(old.promptKey, old.text);
-  const [v] = await db.insert(schema.promptVersions).values({ promptKey: old.promptKey, text: old.text, status: "draft", note: `Restored from the version of ${old.createdAt.toISOString()}`, createdBy: userId }).returning();
+  const [v] = await db.insert(schema.promptVersions).values({ promptKey: old.promptKey, text: old.text, status: "draft", note: `Restored from the version of ${old.createdAt.toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" })}` /* HP10: New York time */, createdBy: userId }).returning();
   const r = await makeLive(old.promptKey, old.text, userId, v.id);
   await db.insert(schema.auditLog).values({ userId, action: "voice_prompt.restored", entityType: "voice_prompt", entityId: old.promptKey, after: { fromVersion: old.id, versionId: v.id } });
   return r;

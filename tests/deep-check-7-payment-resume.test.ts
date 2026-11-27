@@ -19,7 +19,7 @@ async function halfwayOrder(gid?: number) {
   // the state a failure leaves: the amount and reference saved, still waiting for payment, nothing in Books
   const [o] = await db
     .insert(schema.orders)
-    .values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-09-15", pickupDate: "2027-09-16", subtotalCents: 15000, totalCents: 15000, paidCents: 15000, solaRefNum: "HALF1", paymentGroupId: gid ?? null, updatedAt: new Date(Date.now() - 5 * 60_000), holdExpiresAt: new Date(Date.now() + 600_000) })
+    .values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-09-15", pickupDate: "2027-09-16", subtotalCents: 15000, totalCents: 15000, paidCents: 15000, solaRefNum: "HALF1", paymentGroupId: gid ?? null, holdExpiresAt: new Date(Date.now() + 600_000), updatedAt: new Date(Date.now() - 60_000) })
     .returning();
   return o.id;
 }
@@ -37,14 +37,17 @@ describe("payment that stopped halfway", () => {
     expect([o.status, o.paidCents]).toEqual(["CONFIRMED", 15000]);
     expect((await books(id)).filter((b) => b.ref === "HALF1")).toHaveLength(1);
   });
-  it("a copy arriving at the same moment as the first (saved seconds ago, not finished yet) is a duplicate", async () => {
-    const [o] = await db
-      .insert(schema.orders)
-      .values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-09-15", pickupDate: "2027-09-16", subtotalCents: 7000, totalCents: 7000, paidCents: 7000, solaRefNum: "NOW1", updatedAt: new Date(), holdExpiresAt: new Date(Date.now() + 600_000) })
-      .returning();
-    const r = await markPaid(o.id, 7000, "sola", "NOW1");
-    expect((r as { duplicate?: boolean }).duplicate).toBe(true);
-    expect((await books(o.id))).toHaveLength(0);
+  it("deep check 06:00 M26: two copies of a notice at the same moment: one counts, the other is a duplicate", async () => {
+    const [o] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-09-18", pickupDate: "2027-09-19", subtotalCents: 9000, totalCents: 9000, holdExpiresAt: new Date(Date.now() + 600_000) }).returning();
+    const r = await Promise.all([markPaid(o.id, 9000, "sola", "M26"), markPaid(o.id, 9000, "sola", "M26")]);
+    expect(r.filter((x) => x && "duplicate" in x && x.duplicate)).toHaveLength(1);
+    expect([(await get(o.id)).paidCents, (await get(o.id)).status]).toEqual([9000, "CONFIRMED"]);
+    expect((await books(o.id)).filter((b) => b.ref === "M26")).toHaveLength(1);
+  });
+  it("deep check 06:00 M26: a repeat notice while the first may still be running (amount saved seconds ago) is a duplicate", async () => {
+    const [o] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-09-18", pickupDate: "2027-09-19", subtotalCents: 9000, totalCents: 9000, paidCents: 9000, solaRefNum: "M26B", holdExpiresAt: new Date(Date.now() + 600_000) }).returning();
+    const r = await markPaid(o.id, 9000, "sola", "M26B");
+    expect(r && "duplicate" in r && r.duplicate).toBe(true);
   });
   it("a finished payment repeated is still a duplicate", async () => {
     const [o] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-09-15", pickupDate: "2027-09-16", subtotalCents: 9000, totalCents: 9000, holdExpiresAt: new Date(Date.now() + 600_000) }).returning();

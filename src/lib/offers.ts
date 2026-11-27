@@ -67,8 +67,9 @@ export async function fourthSundayDiscount(exec: Exec, o: { id: number; customer
   const r = await exec.execute(sql`
     SELECT o.id, o.event_date::text AS event_date, o.pickup_date::text AS pickup_date, o.offer_note
     FROM orders o
-    WHERE o.customer_id = ${o.customerId} AND o.id <> ${o.id} AND o.status NOT IN ('CANCELLED', 'HOLD')
+    WHERE o.customer_id = ${o.customerId} AND o.id <> ${o.id} AND o.status IN ('CONFIRMED', 'DELIVERED', 'PICKED_UP')
       AND o.event_date IN (${sql.join(prior.map((d) => sql`${d}::date`), sql`, `)})`);
+  // Deep check M16 (Nov 27, 2026): only booked and paid Sundays count, never ones still waiting for payment
   const rows = r.rows as { id: number; event_date: string; pickup_date: string; offer_note: string | null }[];
   // Extra check K1 (Nov 27, 2026): the free Sunday starts a new count of 3, so only every 4th Sunday is free (the 8th,
   // the 12th, ...), never every Sunday after the third
@@ -136,7 +137,9 @@ export async function bestOfferFor(
   // A customer discount (Abraham, Nov 18, 2026) is one more choice: never combined, the bigger saving applies
   const { discountCents, discountNote } = await import("@/lib/customer-discounts");
   const cd = await customerDiscount();
-  if (cd) options.push({ discountCents: discountCents(cd, full.reduce((t, l) => t + l.qty * l.unitPriceCents, 0)), note: discountNote(cd) });
+  // Extra check K3 / deep check 06:00 M49: "dollars or percent off the rentals" (Admin Discounts): worked out on the
+  // rental lines only, never on extras such as ocean balls
+  if (cd) options.push({ discountCents: discountCents(cd, full.filter(isRental).reduce((t, l) => t + l.qty * l.unitPriceCents, 0)), note: discountNote(cd) });
   if (on(s.offerFourthSundayOn)) options.push({ discountCents: await fourthSundayDiscount(exec, { id: o.id, customerId: o.customerId, eventDate: o.eventDate }, full), note: OFFER_NOTES.fourthSunday });
   // How offers combine (Admin handoff, Abraham, Nov 26, 2026): "best" (the default, as always) = only the biggest
   // saving; "add" = the customer discount and the 4th Sunday both apply, on top of the laser half price, never more

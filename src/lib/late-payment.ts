@@ -1,4 +1,5 @@
 import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { lockStock } from "@/lib/stock-lock";
 import { db, schema } from "@/lib/db";
 import { checkBookable, getUsage, pickupDateFor, usedOn, lastHeldDay } from "@/lib/availability";
 import { addDays, todayISO } from "@/lib/dates";
@@ -50,9 +51,13 @@ export function holdEnded(o: HoldFields, now = new Date()) {
  * The payment link has expired (deep check Nov 27 #3): a day whose hold ran out. A day staff cancelled on purpose does
  * not count (it is never brought back, A2), so the customer can still pay for the other days.
  */
-export async function linkExpired(days: { order: HoldFields & { id: number } }[], now = new Date()): Promise<boolean> {
+export async function linkExpired(days: { order: HoldFields & { id: number }; items?: unknown[] }[], now = new Date()): Promise<boolean> {
   const { cancelledByStaff } = await import("@/lib/orders");
-  for (const d of days) if (holdEnded(d.order, now) && !(d.order.status === "CANCELLED" && (await cancelledByStaff(d.order.id)))) return true;
+  for (const d of days) {
+    // Code audit H5: a day emptied by "Check availability again" (every item taken) has nothing to hold again
+    if (d.order.status === "CANCELLED" && Array.isArray(d.items) && d.items.length === 0) continue;
+    if (holdEnded(d.order, now) && !(d.order.status === "CANCELLED" && (await cancelledByStaff(d.order.id)))) return true;
+  }
   return false;
 }
 
@@ -99,8 +104,7 @@ export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now
     const pids = [...new Set(items.map((i) => i.productId))].sort((a, b) => a - b);
     // Code audit L9 (Nov 24, 2026): items sharing one unit (the maze group) are locked as a whole group first, in id
     // order, like a phone booking, so a late payment and a new booking can never both take the shared unit
-    for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
-    for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+    await lockStock(tx, pids); // K2 (deep check 06:00 M48): items, groups and laser pools, one id-ordered step
     const removed: { productId: number; qty: number; eventDate: string; name: string }[] = [];
     const today = todayISO(now);
     for (const o of ended) {
@@ -123,6 +127,15 @@ export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now
           updatedAt: now,
         })
         .where(eq(schema.orders.id, o.id));
+      // Code audit H5 (Nov 24, 2026): every item was taken, so nothing is left to pay for. The day is cancelled (never
+      // waiting for payment with only delivery and tax on it); the removed items stay listed for the options.
+      const [left] = await tx.select({ n: sql<number>`count(*)::int` }).from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id));
+      const [svc] = await tx.select({ n: sql<number>`count(*)::int` }).from(schema.orderServices).where(eq(schema.orderServices.orderId, o.id));
+      if (!left?.n && !svc?.n)
+        await tx
+          .update(schema.orders)
+          .set({ status: "CANCELLED", holdExpiresAt: null, deliveryFeeCents: 0, taxCents: 0, totalCents: 0, notes: sql`COALESCE(${schema.orders.notes}, '') || ${"All items were taken by other bookings after the link expired; nothing left to pay. "}` })
+          .where(eq(schema.orders.id, o.id));
     }
     if (removed.length) {
       const [primary] = await tx.select().from(schema.orders).where(eq(schema.orders.id, primaryId)).limit(1);
@@ -130,7 +143,11 @@ export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now
     }
     return { held: rows.map((o) => o.id), removed: removed.length };
   }).then(async (r) => {
-    for (const id of orderIds) await ensurePriced(id);
+    // an emptied day (H5) is cancelled above and is not priced again
+    for (const id of orderIds) {
+      const [o] = await db.select({ status: schema.orders.status }).from(schema.orders).where(eq(schema.orders.id, id)).limit(1);
+      if (o?.status !== "CANCELLED") await ensurePriced(id);
+    }
     return r;
   });
 }
@@ -211,8 +228,7 @@ export async function chooseLinkOption(primaryId: number, index: number, product
   if (date < todayISO(now)) return false;
   const ok = await db.transaction(async (tx) => {
     // the whole unit group (maze, laser pools) is locked, as for a phone booking
-    await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${productId}) ORDER BY id FOR UPDATE`);
-    await tx.execute(sql`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`);
+    await lockStock(tx, [productId]); // K2: with the laser pools too
     const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, productId)).limit(1);
     const [primary] = await tx.select().from(schema.orders).where(eq(schema.orders.id, primaryId)).limit(1);
     if (!p?.active || !primary) return false;
@@ -241,9 +257,16 @@ export async function chooseLinkOption(primaryId: number, index: number, product
         .returning();
       target = created;
     }
-    const [same] = await tx.select().from(schema.orderItems).where(and(eq(schema.orderItems.orderId, target.id), eq(schema.orderItems.productId, p.id)));
-    if (same) await tx.update(schema.orderItems).set({ qty: same.qty + entry.qty }).where(eq(schema.orderItems.id, same.id));
-    else await tx.insert(schema.orderItems).values({ orderId: target.id, productId: p.id, qty: entry.qty, unitPriceCents: p.priceCents });
+    // Deep check 06:00 M52: laser sets are saved one line per set (as the phone and New booking save them), so every
+    // third set's half price and the delivery item count work the same; other items keep one line with the quantity
+    const [cat] = p.categoryId ? await tx.select({ name: schema.categories.name }).from(schema.categories).where(eq(schema.categories.id, p.categoryId)).limit(1) : [];
+    if (/laser/i.test(cat?.name ?? "")) {
+      for (let n = 0; n < entry.qty; n++) await tx.insert(schema.orderItems).values({ orderId: target.id, productId: p.id, qty: 1, unitPriceCents: p.priceCents });
+    } else {
+      const [same] = await tx.select().from(schema.orderItems).where(and(eq(schema.orderItems.orderId, target.id), eq(schema.orderItems.productId, p.id)));
+      if (same) await tx.update(schema.orderItems).set({ qty: same.qty + entry.qty }).where(eq(schema.orderItems.id, same.id));
+      else await tx.insert(schema.orderItems).values({ orderId: target.id, productId: p.id, qty: entry.qty, unitPriceCents: p.priceCents });
+    }
     await tx
       .update(schema.orders)
       .set({
@@ -291,18 +314,6 @@ export const LATE_EMAIL = {
     `Thank you, we received your payment for order #${num}. Your hold ended just before it went through, so our team needs to check your booking. Please call customer service at (845) 777-7585, extension 3, and we will take care of it. If it is not available anymore, we will give you another option to book.\n\nHup Up Attractions`,
 };
 
-/** Are this order's items free on every day it needs (an ended hold isn't counted, so its own row is left out)? */
-export async function itemsStillFree(orderId: number): Promise<boolean> {
-  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
-  if (!o) return false;
-  const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
-  for (const i of items) {
-    const [p] = await db.select().from(schema.products).where(eq(schema.products.id, i.productId)).limit(1);
-    if (!p || (await checkBookable(p.id, p.quantity, o.eventDate, db, o.pickupDate)) < i.qty) return false;
-  }
-  return true;
-}
-
 /**
  * A late payment's stock check (deep check Nov 27 #4), the same as "Check availability again" (A1): the whole order is
  * checked as one in a locked transaction (stock group, then product, in id order), so two items sharing one unit (maze,
@@ -316,8 +327,7 @@ export async function claimIfStillFree(orderId: number, now = new Date()): Promi
   return withFitCheck(db, async (tx) => {
     const lines = await tx.select({ productId: schema.orderItems.productId }).from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
     const pids = [...new Set(lines.map((l) => l.productId))].sort((a, b) => a - b);
-    for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
-    for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+    await lockStock(tx, pids); // K2 (deep check 06:00 M48): items, groups and laser pools, one id-ordered step
     if (!lines.length) return true;
     // the order counts while its lines are checked one after another
     await tx.update(schema.orders).set({ status: "PENDING_PAYMENT", holdExpiresAt: inMinutes(IDLE_MINUTES, now) }).where(eq(schema.orders.id, orderId));
@@ -374,10 +384,7 @@ export async function confirmAttentionOrder(orderId: number): Promise<boolean> {
     if (!o || o.status !== "NEEDS_ATTENTION") return false;
     const items = await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
     // the items and their shared groups locked in id order, like a phone booking
-    for (const id of [...new Set(items.map((i) => i.productId))].sort((a, b) => a - b)) {
-      await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
-      await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
-    }
+    await lockStock(tx, items.map((i) => i.productId)); // K2: items, groups and laser pools, one id-ordered step
     // Hark's Admin list 4 and 12 (Nov 26, 2026): the whole order is checked (the maze group and laser pools too)
     await assertOrderFits(tx, o);
     await tx.update(schema.orders).set({ status: "CONFIRMED", holdExpiresAt: null, updatedAt: new Date() }).where(eq(schema.orders.id, orderId));

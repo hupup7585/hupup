@@ -105,7 +105,7 @@ export default function MusicUpload() {
         accept="audio/*"
         multiple
         className="sr-only"
-        aria-label="Upload songs"
+        aria-label="Choose song files"
         data-music-file
         disabled={busy}
         onChange={(e) => {

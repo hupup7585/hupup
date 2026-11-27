@@ -24,6 +24,7 @@ export default function BlockingForm({ initial }: { initial: string }) {
         <input name="number" placeholder="Test a number" className="input max-w-xs" />
         <button className="btn-ghost">Test</button>
         {test?.message && <span data-block-test className="text-sm font-semibold">{test.message}</span>}
+        <span className="w-full text-xs text-muted">Type a phone number to see whether a call from it would be blocked. Nothing is changed.</span>
       </form>
     </div>
   );

@@ -62,7 +62,7 @@ export async function ensurePriced(orderId: number): Promise<boolean> {
   const group = o.paymentGroupId ? await db.select().from(schema.orders).where(eq(schema.orders.paymentGroupId, o.paymentGroupId)) : [o];
   const live = group.filter((g) => g.status !== "CANCELLED").sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.id - b.id);
   const first = (live[0] ?? o).id === o.id;
-  const groupLines = await db.select({ productId: schema.orderItems.productId, qty: schema.orderItems.qty }).from(schema.orderItems).where(inArray(schema.orderItems.orderId, (live.length ? live : [o]).map((g) => g.id)));
+  const groupLines = await db.select({ productId: schema.orderItems.productId, qty: schema.orderItems.qty, day: schema.orderItems.orderId }).from(schema.orderItems).where(inArray(schema.orderItems.orderId, (live.length ? live : [o]).map((g) => g.id)));
   const t0 = await totalsFor(fresh.subtotalCents, fresh.offerNote, o.deliveryAddress, o.eventDate, s, bookingItemCount(groupLines));
   if (!t0) return false; // outside every zone, or not found: never guessed (pricingProblem says which)
   const { totalsWithFee } = await import("@/lib/pricing");

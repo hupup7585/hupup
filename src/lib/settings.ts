@@ -422,7 +422,8 @@ export async function saveSetting<K extends keyof Settings>(key: K, value: Setti
   else await write(db);
   clearSettingsCache();
   // A value spoken inside recordings changed (Nov 27, 2026): flag those recordings (after the save, never inside it)
-  if (key !== "recordingFlags" && key !== "recordingLinks" && !sameValue(was, value)) {
+  // (the Hours page flags its own recordings from the customer service hours only: extra check HP5)
+  if (key !== "recordingFlags" && key !== "recordingLinks" && key !== "hoursSchedules" && !sameValue(was, value)) {
     const { linkedValueChanged } = await import("@/lib/recording-flags");
     await linkedValueChanged(`setting:${String(key)}`, was ?? (SETTING_DEFAULTS as Record<string, unknown>)[key as string], value, userId ?? null);
   }

@@ -73,6 +73,24 @@ describe("#2: a late payment on a multi-day booking whose holds all ran out goes
     expect([oa.paidCents, ob.paidCents]).toEqual([10000, 10000]);
     expect([oa.status, ob.status]).toEqual(["CONFIRMED", "CONFIRMED"]);
   });
+  it("deep check 06:00 M9: one day released and one still open: each day gets its own amount (never the released day's money on the open day)", async () => {
+    const p = await product();
+    const a = await day(p, "CANCELLED", "2027-04-20", null, -30);
+    const b = await day(p, "PENDING_PAYMENT", "2027-04-21", a, 10);
+    await holdRelease(a);
+    await markGroupPaid(a, 20000, "sola", "M9");
+    const [oa, ob] = [await get(a), await get(b)];
+    expect([oa.paidCents, ob.paidCents]).toEqual([10000, 10000]);
+    expect([oa.status, ob.status]).toEqual(["CONFIRMED", "CONFIRMED"]);
+  });
+  it("deep check 06:00 M9: paying only the open day leaves the released day as it is", async () => {
+    const p = await product();
+    const a = await day(p, "CANCELLED", "2027-04-22", null, -30);
+    const b = await day(p, "PENDING_PAYMENT", "2027-04-23", a, 10);
+    await holdRelease(a);
+    await markGroupPaid(a, 10000, "sola", "M9B");
+    expect([(await get(a)).paidCents, (await get(a)).status, (await get(b)).paidCents, (await get(b)).status]).toEqual([0, "CANCELLED", 10000, "CONFIRMED"]);
+  });
   it("a staff-cancelled day is never revived by it", async () => {
     const p = await product();
     const a = await day(p, "CANCELLED", "2027-05-10", null, -30);
@@ -85,6 +103,17 @@ describe("#2: a late payment on a multi-day booking whose holds all ran out goes
 });
 
 describe("#24: the paid notices list only the days booked", () => {
+  it("deep check 06:00 M17: the box 148 confirmation text leaves out a released day with nothing paid", async () => {
+    const p = await product();
+    const a = await day(p, "PENDING_PAYMENT", "2027-06-20", null, 10);
+    const b = await day(p, "CANCELLED", "2027-06-21", a, -5);
+    await holdRelease(b);
+    await markGroupPaid(a, 10000, "sola", "M17");
+    const { confirmationText } = await import("@/lib/payment-result");
+    const t = (await confirmationText(a)) ?? "";
+    expect(t).toContain("June 20");
+    expect(t).not.toContain("June 21");
+  });
   it("a cancelled day with nothing paid is left out of the customer's text", async () => {
     const p = await product();
     const a = await day(p, "PENDING_PAYMENT", "2027-06-10", null, 10);

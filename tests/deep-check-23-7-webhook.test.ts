@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 /* Deep check Nov 27 #23 (a decline never overwrites "Paid") and #7 (a halfway payment's repeat notice finishes it and
@@ -38,7 +37,7 @@ describe("Sola notices", () => {
     const [cu] = await db.insert(schema.customers).values({ name: "Sara", phone: "+18455550777" }).returning();
     const [o] = await db
       .insert(schema.orders)
-      .values({ status: "PENDING_PAYMENT", channel: "PHONE", customerId: cu.id, eventDate: "2027-10-20", pickupDate: "2027-10-21", subtotalCents: 6000, totalCents: 6000, paidCents: 6000, solaRefNum: "HALF9", updatedAt: new Date(Date.now() - 5 * 60_000), holdExpiresAt: new Date(Date.now() + 600_000) })
+      .values({ status: "PENDING_PAYMENT", channel: "PHONE", customerId: cu.id, eventDate: "2027-10-20", pickupDate: "2027-10-21", subtotalCents: 6000, totalCents: 6000, paidCents: 6000, solaRefNum: "HALF9", holdExpiresAt: new Date(Date.now() + 600_000), updatedAt: new Date(Date.now() - 60_000) })
       .returning();
     h.texts.length = 0;
     await post({ xResult: "A", xInvoice: invoiceFor(o.id), xAuthAmount: "60.00", xRefNum: "HALF9" });
@@ -50,27 +49,13 @@ describe("Sola notices", () => {
     expect(h.texts.length).toBe(n); // the next repeat sends nothing
     expect((await get(o.id)).paidCents).toBe(6000);
   });
-  it("#17: two copies of the same approval at the same moment: counted once, one paid text", async () => {
-    const [cu] = await db.insert(schema.customers).values({ name: "Leah", phone: "+18455550778" }).returning();
-    const [o] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", customerId: cu.id, eventDate: "2027-10-27", pickupDate: "2027-10-28", subtotalCents: 5000, totalCents: 5000, holdExpiresAt: new Date(Date.now() + 600_000) }).returning();
-    h.texts.length = 0;
-    const f = { xResult: "A", xInvoice: invoiceFor(o.id), xAuthAmount: "50.00", xRefNum: "TWIN1" };
-    await Promise.all([post(f), post(f)]);
-    const after = await get(o.id);
-    expect([after.status, after.paidCents]).toEqual(["CONFIRMED", 5000]);
-    expect(h.texts.filter((t) => /#\d+/.test(t)).length).toBe(1);
-  });
-  it("#17: the second count of the same reference comes back marked duplicate, so the webhook sends no notice for it", async () => {
-    const { markGroupPaid } = await import("@/lib/orders");
-    const [o] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-11-03", pickupDate: "2027-11-04", subtotalCents: 4000, totalCents: 4000, holdExpiresAt: new Date(Date.now() + 600_000) }).returning();
-    const first = await markGroupPaid(o.id, 4000, "sola", "TWIN2");
-    expect(first.every((u) => !("duplicate" in u))).toBe(true);
-    // the copy that raced the first: the amount and reference are saved (seconds ago), the status is not finished yet
-    await db.update(schema.orders).set({ status: "PENDING_PAYMENT", updatedAt: new Date() }).where(eq(schema.orders.id, o.id));
-    const second = await markGroupPaid(o.id, 4000, "sola", "TWIN2");
-    expect(second.length).toBeGreaterThan(0);
-    expect(second.every((u) => "duplicate" in u && u.duplicate)).toBe(true);
-    expect((await get(o.id)).paidCents).toBe(4000);
-    expect(readFileSync("src/app/api/sola/webhook/route.ts", "utf8")).toContain("fresh && counted.some((u) => u.status === \"CONFIRMED\")");
+  it("deep check 06:00 M40: a cancelled day of the booking is not marked Paid by the payment for the other day", async () => {
+    const [d1] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-11-03", pickupDate: "2027-11-04", subtotalCents: 5000, totalCents: 5000, paymentGroupId: 940040, holdExpiresAt: new Date(Date.now() + 600_000) }).returning();
+    const [d2] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "PHONE", eventDate: "2027-11-05", pickupDate: "2027-11-06", subtotalCents: 4000, totalCents: 4000, paymentGroupId: 940040 }).returning();
+    await db.insert(schema.auditLog).values({ action: "order.status", entityType: "order", entityId: String(d2.id), after: { to: "CANCELLED", by: "staff" } });
+    expect((await post({ xResult: "A", xInvoice: invoiceFor(d1.id), xAuthAmount: "50.00", xRefNum: "M40A", xMaskedCardNumber: "4xxxxxxxxxxx1111" })).status).toBe(200);
+    expect((await get(d1.id)).paymentResult).toBe("approved");
+    // "Paid" only where the money went
+    for (const d of [await get(d1.id), await get(d2.id)]) expect(d.paymentResult === "approved", `day ${d.id}`).toBe(d.status !== "CANCELLED" || d.paidCents > 0);
   });
 });

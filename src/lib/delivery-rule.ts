@@ -7,12 +7,22 @@
  * several days of one booking counts once (its largest quantity on any day). A free delivery (promo price $0) stays
  * free: no additional-item charges then (also waiting for his decision).
  */
-export type ItemLine = { productId: number; qty: number };
+export type ItemLine = { productId: number; qty: number; day?: string | number };
 
-/** How many items a booking delivers: per item, its largest quantity on any day of the booking. */
+/**
+ * How many items a booking delivers: per item, its largest quantity on any day of the booking. Deep check 06:00 M15:
+ * lines of the same item on the same day are added up first (laser sets are saved as one line per set), so 3 sets
+ * count 3 on the saved order, the same as on the New booking screen. `day` is the line's day (or order); lines with
+ * no day are one day.
+ */
 export function bookingItemCount(lines: ItemLine[]): number {
+  const perDay = new Map<string, number>();
+  for (const l of lines) if (l.qty > 0) perDay.set(`${l.day ?? ""}|${l.productId}`, (perDay.get(`${l.day ?? ""}|${l.productId}`) ?? 0) + l.qty);
   const most = new Map<number, number>();
-  for (const l of lines) if (l.qty > 0) most.set(l.productId, Math.max(most.get(l.productId) ?? 0, l.qty));
+  for (const [k, q] of perDay) {
+    const pid = Number(k.split("|")[1]);
+    most.set(pid, Math.max(most.get(pid) ?? 0, q));
+  }
   return [...most.values()].reduce((n, q) => n + q, 0);
 }
 
