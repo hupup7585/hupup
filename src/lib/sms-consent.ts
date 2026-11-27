@@ -180,6 +180,8 @@ export async function recordConsentDetailed(input: RecordConsentInput, exec: Exe
       .update(schema.customers)
       .set({ marketingOptIn: on, marketingOptInAt: on ? new Date() : customer.marketingOptInAt })
       .where(eq(schema.customers.id, customer.id));
+    // Extra check J1: a "no" turns promotions off on every record with this number (a duplicate record must not keep them)
+    if (!on) await exec.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.phone, input.phone));
     // A promotional "no" cancels every promotion still waiting to go out.
     if (!on && exec === db) await cancelQueuedPromotions(input.phone);
   }
@@ -272,6 +274,7 @@ export async function correctConsent(input: { originalId: number; action: Consen
   });
   if (orig.scope === "marketing" && orig.customerId) {
     await db.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.id, orig.customerId));
+    await db.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.phone, orig.phone)); // extra check J1: every record with the number
     await cancelQueuedPromotions(orig.phone); // a correction to "no" cancels promotions still waiting
   }
 }
