@@ -89,3 +89,24 @@ The rule is never to delete live data, so these were not built. Both only free s
 The info@ email Worker (`cloudflare/info-inbox-worker.js`) was fixed: a Gmail forward error no longer stops the Admin
 inbox copy, and a missing piece is logged. The new code takes effect once it is put on Cloudflare (free).
 
+## Opt-out words with a space (extra check J5, Nov 27, 2026)
+
+When someone texts "Opt out" or "Stop all" (with a space), the app records the opt-out but sends no confirmation,
+expecting Twilio to send it (as Twilio does for STOP). If Twilio does not answer these with a space, the customer gets
+no confirmation. One test text of "Opt out" from a test phone will show which it is; then the app can send the one
+confirmation itself when Twilio doesn't. Nothing was changed, so a customer never gets two confirmations.
+
+14. **Catalog email read-back (`catalog_got`, phone audit 2):** still "We got {letters}. To continue, press pound. To
+    start over, press 1. To add more, press 2." The pound rule (Nov 23) says confirm lines end with the shared confirm
+    ending (1 = correct, 2 = again). New words needed, including how "add more" fits.
+15. **"Something went wrong" line (`went_wrong`, phone audit 3):** it still says "Let us head back to the main menu", but
+    the phone now goes back one step instead. New words needed.
+16. **Sola PhonePay "Only test calls" (phone audit 5):** the box is unticked in Admin. Is card-by-phone meant to be live
+    for every caller now? (Nothing was changed.)
+17. **Terms notice (`terms_notice`, phone audit 15):** still says "press #". It is not active on the live line; new words
+    are needed before it is turned on.
+18. **Two after-hours voicemail greetings (phone audit 17):** `vm_after_hours` (approved Nov 13) and `vm_closed`. Pick
+    one; the other is retired.
+19. **"(pickup {date})" in delivery texts (phone audit 26):** keep, or a different word?
+20. **Slot file check (phone audit 16, Hark):** the "Address step 1 - house number" slot holds a file named "22 Address
+    step 2 - house number.mp3". Please listen in Admin and re-upload if it is the wrong recording.

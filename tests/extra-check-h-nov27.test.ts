@@ -16,15 +16,13 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { addDays, todayISO } from "@/lib/dates";
 import { markDoneAction, stageAction } from "@/app/admin/deliveries/actions";
-import { isStopDay } from "@/lib/delivery-stops";
 import { createDoc, isUniqueNumberClash } from "@/lib/invoices";
 
-let moshe: number, sara: number;
+let moshe: number;
 beforeEach(async () => {
   if (!moshe) {
-    const [a, b] = await db.insert(schema.adminUsers).values([{ name: "Moshe", role: "delivery", phone: "+18455550701" }, { name: "Sara", role: "secretary", phone: "+18455550702" }]).returning();
+    const [a] = await db.insert(schema.adminUsers).values([{ name: "Moshe", role: "delivery", phone: "+18455550701" }]).returning();
     moshe = a.id;
-    sara = b.id;
   }
   h.staff = { userId: moshe, role: "delivery", name: "Moshe" };
 });
@@ -49,22 +47,20 @@ describe("H1: Delivered / Picked up is one locked step", () => {
   });
 });
 
-describe("H2: a Delivery login updates only today's stop (or yesterday's late one)", () => {
-  it("next week's stop is refused for the driver; the Secretary can", async () => {
+describe("H2 (with M55): a stop more than a day ahead can't be updated", () => {
+  it("next week's stop: no Delivered and no Out for delivery; the order stays confirmed", async () => {
     const o = await order("CONFIRMED", addDays(todayISO(), 7));
-    expect(await markDoneAction(o.id, "delivery")).toEqual({ ok: false, message: "You can only update one of your own stops today." });
-    expect(await stageAction(o.id, "delivery", "out_for_delivery")).toEqual({ ok: false, message: "You can only update one of your own stops today." });
+    expect((await markDoneAction(o.id, "delivery")).ok).toBe(false);
+    expect((await stageAction(o.id, "delivery", "out_for_delivery")).ok).toBe(false);
     const [still] = await db.select().from(schema.orders).where(eq(schema.orders.id, o.id));
     expect(still.status).toBe("CONFIRMED");
-    h.staff = { userId: sara, role: "secretary", name: "Sara" };
-    expect((await markDoneAction(o.id, "delivery")).ok).toBe(true);
+    expect(await events(o.id, "out_for_delivery")).toBe(0);
   });
-  it("yesterday's late stop still works; the pickup is checked on its own day", async () => {
+  it("yesterday's late stop and tomorrow's (the evening before) still work", async () => {
     const y = await order("CONFIRMED", addDays(todayISO(), -1));
     expect((await markDoneAction(y.id, "delivery")).ok).toBe(true);
-    expect(isStopDay({ eventDate: todayISO(), pickupDate: addDays(todayISO(), 2) }, "pickup")).toBe(false);
-    expect(isStopDay({ eventDate: addDays(todayISO(), -2), pickupDate: todayISO() }, "pickup")).toBe(true);
-    expect(isStopDay({ eventDate: null, pickupDate: null }, "delivery")).toBe(false);
+    const t = await order("CONFIRMED", addDays(todayISO(), 1));
+    expect((await stageAction(t.id, "delivery", "out_for_delivery")).ok).toBe(true);
   });
 });
 

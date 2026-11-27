@@ -50,6 +50,11 @@ export const STEP_LABELS: Record<string, string> = {
   "product-choice": "Item menu: key pressed",
   date: "Asked for the rental date",
   "date-heard": "Gave a date",
+  // Phone audit 24 (Nov 24, 2026): steps that showed their raw name in the journey
+  "date-ask": "Asked to confirm the date",
+  "balloon-key2": "Jumping balloons: second digit of the balloon number",
+  "box18-choice": "Chose: one day, or keep it until the next day",
+  idle: "No key pressed (waiting)",
   "date-confirm": "Confirmed the date",
   qty: "Asked how many",
   "soldout-choice": "Sold out menu: key pressed",

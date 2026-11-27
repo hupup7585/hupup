@@ -81,6 +81,19 @@ describe("staff sign-in on the live site", () => {
     await db.update(schema.adminUsers).set({ failedLogins: 0, lockedUntil: null }).where(eq(schema.adminUsers.id, u.id));
   });
 
+  it("deep check 06:00 M21: a burst of 8 guesses with the right password last: it never gets in, and every answer after the 5th is the same", async () => {
+    h.cookies.clear();
+    await db.update(schema.adminUsers).set({ failedLogins: 0, lockedUntil: null }).where(eq(schema.adminUsers.phone, "+18457770101"));
+    const tries = [...Array.from({ length: 7 }, () => "wrong password!!"), PW];
+    const r = await Promise.all(tries.map((p) => passwordLogin("(845) 777-0101", p, false)));
+    expect(r.some((x) => x.ok)).toBe(false);
+    const late = r.slice(4).map((x) => ("error" in x ? x.error : ""));
+    expect(new Set(late).size).toBe(1);
+    expect(late[0]).toContain("Too many tries");
+    const [u] = await db.select().from(schema.adminUsers).where(eq(schema.adminUsers.phone, "+18457770101"));
+    await db.update(schema.adminUsers).set({ failedLogins: 0, lockedUntil: null }).where(eq(schema.adminUsers.id, u.id));
+  }, 30_000);
+
   it("Delivery: text code only, never a password (refused even if one was stored)", async () => {
     h.cookies.clear();
     expect((await passwordLogin("(845) 777-0102", PW, false)).ok).toBe(false);

@@ -63,3 +63,30 @@ describe("delivery statuses", () => {
     expect(await stageAction(orderId, "pickup", "out_for_pickup")).toEqual({ ok: false, message: "This stop isn't assigned to you." });
   });
 });
+
+describe("deep check 0600 M55: Delivered on the driver screen", () => {
+  it("a stop more than a day ahead is refused; a double click records it once", async () => {
+    const { addDays, todayISO } = await import("@/lib/dates");
+    const far = addDays(todayISO(), 5);
+    const [f] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: far, pickupDate: far, deliveryDriverId: moshe }).returning();
+    expect((await markDoneAction(f.id, "delivery")).message).toMatch(/It can be marked delivered from the day before/);
+    const t = todayISO();
+    const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: t, pickupDate: t, deliveryDriverId: moshe }).returning();
+    const r = await Promise.all([markDoneAction(o.id, "delivery"), markDoneAction(o.id, "delivery")]);
+    expect(r.filter((x) => x.ok)).toHaveLength(1);
+    const logs = (await db.select().from(schema.auditLog)).filter((a) => a.action === "delivery.delivered" && a.entityId === String(o.id));
+    expect(logs).toHaveLength(1);
+  });
+});
+
+describe("deep check 0600 M56: crafted bad ids", () => {
+  it("letters or 11+ digits are 'not found', never a database error", async () => {
+    const { isDbId } = await import("@/lib/db-id");
+    const { orderIdFromParam } = await import("@/lib/order-path");
+    expect([isDbId(1), isDbId(0), isDbId(NaN), isDbId(99999999999), isDbId(1.5)]).toEqual([true, false, false, false, false]);
+    expect(orderIdFromParam("99999999999")).toBe(0);
+    expect(orderIdFromParam("1031")).toBe(31);
+    expect((await markDoneAction(Number("abc"), "delivery")).message).toBe("Order not found.");
+    expect((await stageAction(99999999999, "delivery", "on_the_way" as never)).message).toBe("Order not found.");
+  });
+});

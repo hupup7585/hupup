@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { msgQuery } from "@/lib/url-message";
 import { eq } from "drizzle-orm";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
@@ -80,4 +82,6 @@ export async function savePlacesAction(fd: FormData) {
     await saveSetting(MUSIC_PLACES[place].setting as "musicStaffWait", ids.join(","), owner.userId);
   }
   revalidatePath("/admin/phone/music");
+  // Phone audit 23 (Nov 24, 2026): the Owner sees that it saved
+  redirect(`/admin/phone/music?${msgQuery("Saved.")}#places`);
 }

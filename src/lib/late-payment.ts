@@ -50,9 +50,13 @@ export function holdEnded(o: HoldFields, now = new Date()) {
  * The payment link has expired (deep check Nov 27 #3): a day whose hold ran out. A day staff cancelled on purpose does
  * not count (it is never brought back, A2), so the customer can still pay for the other days.
  */
-export async function linkExpired(days: { order: HoldFields & { id: number } }[], now = new Date()): Promise<boolean> {
+export async function linkExpired(days: { order: HoldFields & { id: number }; items?: unknown[] }[], now = new Date()): Promise<boolean> {
   const { cancelledByStaff } = await import("@/lib/orders");
-  for (const d of days) if (holdEnded(d.order, now) && !(d.order.status === "CANCELLED" && (await cancelledByStaff(d.order.id)))) return true;
+  for (const d of days) {
+    // Code audit H5: a day emptied by "Check availability again" (every item taken) has nothing to hold again
+    if (d.order.status === "CANCELLED" && Array.isArray(d.items) && d.items.length === 0) continue;
+    if (holdEnded(d.order, now) && !(d.order.status === "CANCELLED" && (await cancelledByStaff(d.order.id)))) return true;
+  }
   return false;
 }
 
@@ -123,6 +127,15 @@ export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now
           updatedAt: now,
         })
         .where(eq(schema.orders.id, o.id));
+      // Code audit H5 (Nov 24, 2026): every item was taken, so nothing is left to pay for. The day is cancelled (never
+      // waiting for payment with only delivery and tax on it); the removed items stay listed for the options.
+      const [left] = await tx.select({ n: sql<number>`count(*)::int` }).from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id));
+      const [svc] = await tx.select({ n: sql<number>`count(*)::int` }).from(schema.orderServices).where(eq(schema.orderServices.orderId, o.id));
+      if (!left?.n && !svc?.n)
+        await tx
+          .update(schema.orders)
+          .set({ status: "CANCELLED", holdExpiresAt: null, deliveryFeeCents: 0, taxCents: 0, totalCents: 0, notes: sql`COALESCE(${schema.orders.notes}, '') || ${"All items were taken by other bookings after the link expired; nothing left to pay. "}` })
+          .where(eq(schema.orders.id, o.id));
     }
     if (removed.length) {
       const [primary] = await tx.select().from(schema.orders).where(eq(schema.orders.id, primaryId)).limit(1);
@@ -130,7 +143,11 @@ export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now
     }
     return { held: rows.map((o) => o.id), removed: removed.length };
   }).then(async (r) => {
-    for (const id of orderIds) await ensurePriced(id);
+    // an emptied day (H5) is cancelled above and is not priced again
+    for (const id of orderIds) {
+      const [o] = await db.select({ status: schema.orders.status }).from(schema.orders).where(eq(schema.orders.id, id)).limit(1);
+      if (o?.status !== "CANCELLED") await ensurePriced(id);
+    }
     return r;
   });
 }
@@ -290,18 +307,6 @@ export const LATE_EMAIL = {
   body: (num: string) =>
     `Thank you, we received your payment for order #${num}. Your hold ended just before it went through, so our team needs to check your booking. Please call customer service at (845) 777-7585, extension 3, and we will take care of it. If it is not available anymore, we will give you another option to book.\n\nHup Up Attractions`,
 };
-
-/** Are this order's items free on every day it needs (an ended hold isn't counted, so its own row is left out)? */
-export async function itemsStillFree(orderId: number): Promise<boolean> {
-  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
-  if (!o) return false;
-  const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
-  for (const i of items) {
-    const [p] = await db.select().from(schema.products).where(eq(schema.products.id, i.productId)).limit(1);
-    if (!p || (await checkBookable(p.id, p.quantity, o.eventDate, db, o.pickupDate)) < i.qty) return false;
-  }
-  return true;
-}
 
 /**
  * A late payment's stock check (deep check Nov 27 #4), the same as "Check availability again" (A1): the whole order is

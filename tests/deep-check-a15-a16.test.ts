@@ -39,3 +39,10 @@ describe("A18: Tasks go back only to a Tasks page", () => {
     for (const bad of ["https://evil.example", "//evil.example", "/admin/tasks.evil", "/admin/orders", "/admin/tasks/\\evil", ""]) expect(safeTasksBack(bad, "/admin/tasks")).toBe("/admin/tasks");
   });
 });
+
+describe("deep check 0600: the customer's invoice page has one H1", () => {
+  it("the title is the H1 there; Admin invoice pages keep their own", () => {
+    expect(readFileSync("src/app/invoice/[id]/page.tsx", "utf8")).toContain("<InvoiceDocument d={d} h1 />");
+    expect(readFileSync("src/components/InvoiceDocument.tsx", "utf8")).toMatch(/h1 \? <h1 /);
+  });
+});

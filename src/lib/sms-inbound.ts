@@ -1,4 +1,4 @@
-import { and, eq, isNull, notInArray, or } from "drizzle-orm";
+import { and, eq, gte, isNull, notInArray, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { LIVE_PUBLIC_EMAIL, NEW_EMAIL_LIVE, NEW_PUBLIC_EMAIL } from "@/lib/config";
@@ -93,10 +93,23 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
   const numMedia = Number(body.NumMedia || 0);
   const mediaUrls = Array.from({ length: numMedia }, (_, i) => body[`MediaUrl${i}`]).filter(Boolean);
 
-  // Duplicate webhook delivery: return the existing row.
+  // Duplicate webhook delivery: return the existing row. Extra check J2: an opt-out (STOP or NOPROMO) whose first
+  // handling failed after the text was saved (no opt-out recorded since) is finished now, so Twilio's retry never loses it.
+  let resume: { id: number } | null = null;
   if (body.MessageSid) {
     const [dupe] = await db.select().from(schema.messages).where(eq(schema.messages.twilioSid, body.MessageSid));
-    if (dupe) return { messageId: dupe.id, keyword: null, reply: null, forwarded: false };
+    if (dupe) {
+      const optOut = dupe.event === "keyword_stop" || dupe.event === "keyword_nopromo";
+      const [done] = optOut
+        ? await db
+            .select({ id: schema.smsConsents.id })
+            .from(schema.smsConsents)
+            .where(and(eq(schema.smsConsents.phone, from), eq(schema.smsConsents.action, "opt_out"), gte(schema.smsConsents.createdAt, dupe.createdAt)))
+            .limit(1)
+        : [{ id: 0 }];
+      if (done) return { messageId: dupe.id, keyword: null, reply: null, forwarded: false };
+      resume = { id: dupe.id };
+    }
   }
 
   // Match (or create) the customer by phone.
@@ -106,7 +119,7 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
   }
 
   const { keyword, exact } = detectKeywordDetail(text);
-  const [row] = await db
+  const [row] = resume ? [resume] : await db
     .insert(schema.messages)
     .values({
       direction: "in",
@@ -125,7 +138,7 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
 
   // Pictures and files the customer sent (Abraham, Nov 16, 2026): our own copy in R2, saved with this message, the
   // customer and their booking. A file that can't be fetched never stops the text from being handled.
-  if (numMedia > 0) {
+  if (numMedia > 0 && !resume) {
     const media = Array.from({ length: numMedia }, (_, i) => ({ url: body[`MediaUrl${i}`], contentType: body[`MediaContentType${i}`] })).filter((m) => m.url);
     const { saveIncomingMedia } = await import("@/lib/message-files");
     await saveIncomingMedia({ messageId: row.id, from, customerId: customer?.id ?? null, media }).catch((e) => console.error("[incoming text file] failed:", (e as Error).message));
@@ -145,12 +158,16 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
   const effects = { cancelAll: false, cancelPromos: false, sendStartConfirmation: false, sendReenrolled: false, sendPromoEnrolled: false, sendPromoConfirm: false, sendCatalogJoined: false };
   if (customer && keyword) {
     await db.transaction(async (tx) => {
-      const [c] = await tx.select().from(schema.customers).where(eq(schema.customers.id, customer.id)).for("update");
+      const [row] = await tx.select().from(schema.customers).where(eq(schema.customers.id, customer.id)).for("update");
+      // Extra check J1/J3: the number counts, not one record. Every record with this phone is locked, a STOP on any of
+      // them counts for START and YES, and promotions count as on only while some record still has them on.
+      const all = await tx.select().from(schema.customers).where(eq(schema.customers.phone, from)).orderBy(schema.customers.id).for("update");
+      const c = { ...row, smsOptOut: all.some((x) => x.smsOptOut) || row.smsOptOut, marketingOptIn: all.some((x) => x.marketingOptIn) || row.marketingOptIn };
       const consent = (scope: string, action: string) =>
         tx.insert(schema.smsConsents).values({ customerId: c.id, phone: from, scope, action, source: "keyword", method: "keyword", keyword: text.trim().toUpperCase(), wording: text });
       if (keyword === "stop") {
         // STOP blocks both programs until the customer re-enrolls in each one.
-        await tx.update(schema.customers).set({ smsOptOut: true, marketingOptIn: false }).where(eq(schema.customers.id, c.id));
+        await tx.update(schema.customers).set({ smsOptOut: true, marketingOptIn: false }).where(eq(schema.customers.phone, from)); // every record (J1)
         await consent("transactional", "opt_out");
         await consent("marketing", "opt_out");
         await cancelPendingReenroll(tx, from); // a pending START confirmation dies; a late YES does nothing
@@ -176,7 +193,7 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
         effects.sendPromoConfirm = (await requestPromoConfirmation(tx, c, from, `texted "${text.trim()}"`)).sendConfirmation;
       } else if (keyword === "nopromo") {
         // Internal keyword: promotions only. It never clears or weakens a STOP (smsOptOut stays as it is).
-        await tx.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.id, c.id));
+        await tx.update(schema.customers).set({ marketingOptIn: false }).where(eq(schema.customers.phone, from)); // every record (J1)
         await consent("marketing", "opt_out");
         effects.cancelPromos = true;
         if (!c.smsOptOut) reply = NOPROMO_CONFIRMATION;

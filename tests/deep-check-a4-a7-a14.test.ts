@@ -93,3 +93,30 @@ describe("deep check 15a: refunded at the card company, then the save fails", ()
     await expect(refundOrder(id, 12975, 1, solaOk())).rejects.toThrow(/At most \$119\.75/);
   });
 });
+
+describe("deep check 0600 M33, M34, M37 (refunds)", () => {
+  it("M33: no answer from Sola: kept as 'unknown' (still counted), never 'nothing refunded'", async () => {
+    const id = await mkOrder("M33-1");
+    const timeout = (async () => { throw new Error("The operation was aborted due to timeout"); }) as unknown as typeof fetch;
+    await expect(refundOrder(id, 1000, 1, timeout)).rejects.toThrow(/may have gone through/);
+    const rows = await db.select().from(schema.orderRefunds).where(eq(schema.orderRefunds.orderId, id));
+    expect(rows.map((r) => r.status)).toEqual(["unknown"]);
+    // the unknown 10.00 still counts: at most 119.75 is left
+    await expect(refundOrder(id, 12975, 1, solaOk())).rejects.toThrow(/At most \$119\.75/);
+  });
+  it("M34: giving back an overpayment is its own entry and lowers neither taxable sales nor tax", async () => {
+    const [x] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-04-10", pickupDate: "2027-04-11", subtotalCents: 10000, deliveryFeeCents: 2000, taxCents: 975, totalCents: 12975, cardLast4: "1111" }).returning();
+    const { markPaid } = await import("@/lib/orders");
+    await markPaid(x.id, 12975, "sola", "88801");
+    await markPaid(x.id, 5000, "sola", "88802"); // a second charge: overpayment
+    await db.update(schema.orders).set({ solaRefNum: "88802" }).where(eq(schema.orders.id, x.id));
+    await refundOrder(x.id, 5000, 1, solaOk());
+    const refunds = (await db.select().from(schema.bookEntries).where(eq(schema.bookEntries.orderId, x.id))).filter((e) => e.kind === "refund");
+    expect(refunds.map((e) => [e.category, e.amountCents, e.taxCents])).toEqual([["Overpayment (refund due)", 5000, 0]]);
+  });
+  it("M37: the Sola sandbox setting is ignored on the live site", async () => {
+    const { refundsSandbox } = await import("@/lib/refunds");
+    expect(refundsSandbox("sola", { SOLA_REFUND_MODE: "sandbox" })).toBe(true);
+    expect(refundsSandbox("sola", { SOLA_REFUND_MODE: "sandbox", VERCEL_ENV: "production" })).toBe(false);
+  });
+});
