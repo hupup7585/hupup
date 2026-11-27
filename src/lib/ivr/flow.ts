@@ -522,37 +522,37 @@ function callCartIds(ctx: Ctx): number[] {
  * Only this call's orders whose hold simply ran out (still HOLD, or released by the hourly tidy-up) are held again.
  */
 async function reholdCart(ctx: Ctx): Promise<{ p: number; d: string } | null> {
-  return reholdOrders(callCartIds(ctx));
-}
-
-/**
- * Deep check 0600 M53: the cart is held again as ONE locked check (recheckHolds: the items, their stock groups and the
- * laser pools locked; each day's lines put back one at a time), not item by item, so two items sharing the maze or a
- * laser pool never both pass when only one is free. A line that no longer fits comes out (the first is returned for
- * the item-taken screen); a day left empty is cancelled.
- */
-export async function reholdOrders(ids: number[]): Promise<{ p: number; d: string } | null> {
-  const { refreshOrderTotals, recheckHolds } = await import("@/lib/orders");
-  const eligible: number[] = [];
-  const released: number[] = [];
-  for (const id of ids) {
-    const [o] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
-    if (!o) continue;
-    const expiredRelease = o.status === "CANCELLED" && /Expired hold released/.test(o.notes ?? "");
-    if (o.status !== "HOLD" && !expiredRelease) continue;
-    eligible.push(id);
-    if (expiredRelease) released.push(id);
-  }
-  if (!eligible.length) return null;
-  // a day released by the hourly tidy-up is a hold again (not counted yet: its time is over) so the check covers it
-  if (released.length) await db.update(orders).set({ status: "HOLD", holdExpiresAt: new Date(Date.now() - 1000), updatedAt: new Date() }).where(and(inArray(orders.id, released), eq(orders.status, "CANCELLED")));
-  const gone = await recheckHolds(eligible);
-  for (const id of eligible) {
-    const left = await db.select({ id: schema.orderItems.id }).from(schema.orderItems).where(eq(schema.orderItems.orderId, id)).limit(1);
-    if (left.length) await refreshOrderTotals(id);
-    else await db.update(orders).set({ status: "CANCELLED", updatedAt: new Date() }).where(and(eq(orders.id, id), eq(orders.status, "HOLD")));
-  }
-  return gone.length ? { p: gone[0].productId, d: gone[0].eventDate } : null;
+  const { PHONE_HOLD_MINUTES, refreshOrderTotals } = await import("@/lib/orders");
+  const ids = callCartIds(ctx);
+  if (!ids.length) return null;
+  // Deep check 06:00 M53 (Nov 27, 2026): the whole cart is checked as ONE, in one locked step (items, groups and laser
+  // pools locked in id order, like checkout), so two items sharing a unit (the maze group, a laser pool, the same item
+  // on two days) can never both be held again when only one is free, and another caller can't take it in between.
+  const { lockStock } = await import("@/lib/stock-lock");
+  const { recheckOrderLines } = await import("@/lib/recheck-lines");
+  const r = await db.transaction(async (tx) => {
+    const ords = (await tx.select().from(orders).where(inArray(orders.id, ids)))
+      .filter((o) => o.status === "HOLD" || (o.status === "CANCELLED" && /Expired hold released/.test(o.notes ?? "")))
+      .sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.id - b.id);
+    if (!ords.length) return { taken: null as { p: number; d: string } | null, kept: [] as number[] };
+    const lines = await tx.select().from(schema.orderItems).where(inArray(schema.orderItems.orderId, ords.map((o) => o.id)));
+    await lockStock(tx, lines.map((l) => l.productId));
+    // Out of the count while checked, then each day back in, its items put back one at a time with the ones before counted
+    await tx.update(orders).set({ status: "HOLD", holdExpiresAt: sql`now() - interval '1 second'` }).where(inArray(orders.id, ords.map((o) => o.id)));
+    let taken: { p: number; d: string } | null = null;
+    const kept: number[] = [];
+    for (const o of ords) {
+      await tx.update(orders).set({ holdExpiresAt: new Date(Date.now() + PHONE_HOLD_MINUTES * 60_000), updatedAt: new Date() }).where(eq(orders.id, o.id));
+      const gone = await recheckOrderLines(tx as never, o);
+      if (gone.length) taken ??= { p: gone[0].productId, d: o.eventDate };
+      const [left] = await tx.select({ n: sql<number>`count(*)::int` }).from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id));
+      if (Number(left?.n ?? 0) > 0) kept.push(o.id);
+      else await tx.update(orders).set({ status: "CANCELLED", holdExpiresAt: null, updatedAt: new Date() }).where(eq(orders.id, o.id));
+    }
+    return { taken, kept };
+  });
+  for (const id of r.kept) await refreshOrderTotals(id);
+  return r.taken;
 }
 
 /** Release this call's cart (Box 30, no key): every order still on hold for this call is released. */
