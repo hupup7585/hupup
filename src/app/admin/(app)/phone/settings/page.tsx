@@ -14,6 +14,8 @@ import { toE164 } from "@/lib/phone";
 import { phonePayStatus } from "@/lib/phone-pay";
 import { saveAfterPayAction } from "./after-pay-actions";
 
+export const metadata = { title: "Phone settings · Hup Up Attractions", robots: { index: false } };
+
 /** Phone System → Phone settings: ring lists (extensions, call routing, ring times), recording, caller blocking, Twilio setup. Owner only. */
 export default async function PhoneSettingsPage({ searchParams }: { searchParams?: Promise<{ ap?: string }> }) {
   await requireOwner();
@@ -38,7 +40,9 @@ export default async function PhoneSettingsPage({ searchParams }: { searchParams
         const pay = phonePayStatus();
         return (
           <section className="card mb-5 p-5" data-phone-pay-status>
-            <h2 className="text-lg font-extrabold">Phone payments (Stripe)</h2>
+            <h2 className="text-lg font-extrabold">Phone payments by Stripe (backup only)</h2>
+            {/* Phone audit 7 (Nov 24, 2026): the live choice for card payments on the phone is Sola PhonePay */}
+            <p className="mt-1 text-sm text-muted">The live choice for card payments on the phone is <a className="underline" href="/admin/phone/phonepay">Sola PhonePay</a>. Stripe is kept as a backup for Owner test calls only.</p>
             <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
               <dt className="font-semibold">Status</dt>
               <dd>
@@ -56,7 +60,7 @@ export default async function PhoneSettingsPage({ searchParams }: { searchParams
       <NotActive k="sms" />
       <NotActive k="recording" />
       <section className="card mb-6 p-5" id="routing">
-        <h2 className="mb-1 text-lg font-extrabold">Live employee ring lists (main menu keys 2, 4, 5, 6, 8 and 0)</h2>
+        <h2 className="mb-1 text-lg font-extrabold">Live employee ring lists (Extensions 2, 3, 4, 5 and 0, and Bookings menu key 9: Schools)</h2>
         <p className="mb-4 text-sm text-muted">Key 9 goes straight to the feedback and comments voicemail, no ringing.</p>
         <div className="grid gap-8">
           {RING_KEYS.map((k) => {

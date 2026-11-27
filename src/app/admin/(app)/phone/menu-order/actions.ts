@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { msgQuery } from "@/lib/url-message";
 import { requireOwner } from "@/lib/auth";
 import { getSettings, saveSetting } from "@/lib/settings";
 import { MENU_RECORDINGS, menuOrder, setMenuOrder, type MenuId } from "@/lib/ivr/menu-order";
@@ -24,5 +25,6 @@ export async function moveMenuPartAction(form: FormData) {
     }
   }
   revalidatePath("/admin/phone/menu-order");
-  redirect("/admin/phone/menu-order");
+  // Phone audit 19 (Nov 24, 2026): the Owner sees that the new order saved
+  redirect(`/admin/phone/menu-order?${msgQuery(form.get("reset") === "1" ? "Saved: back to the first order." : "Saved. The phone plays the new order now.")}#${menu}`);
 }
