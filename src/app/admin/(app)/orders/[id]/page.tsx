@@ -1,4 +1,5 @@
 import { paymentResultLabel } from "@/lib/payment-result";
+import { getSettings } from "@/lib/settings";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderWithItems, orderNumber } from "@/lib/orders";
@@ -9,13 +10,13 @@ import OrderActions from "./OrderActions";
 import ConsentPanel from "./ConsentPanel";
 import PromoSignupPanel from "./PromoSignupPanel";
 import { requireAdmin } from "@/lib/auth";
-import { STAFF_PROMO_MODE, staffPromoStep2, staffPromoVisible } from "@/lib/staff-promo";
+import { staffPromoStep2, staffPromoVisible } from "@/lib/staff-promo";
 import { staffDisclosure } from "@/lib/sms-terms-v2";
 import { NO_TEXT_CONSENT, hasTransactionalConsent } from "@/lib/sms";
 import DualDate from "@/components/DualDate";
 import StripePanel from "./StripePanel";
 import { disputesFor } from "@/lib/stripe-ops";
-import { LIVE_REFUNDS_APPROVED, refundStatus, refundsFor, refundsSandbox } from "@/lib/refunds";
+import { liveRefundsOn, refundStatus, refundsFor, refundsSandbox } from "@/lib/refunds";
 import RefundPanel from "./RefundPanel";
 import { inboxWhen } from "@/lib/inbox-format";
 import { db, schema } from "@/lib/db";
@@ -152,7 +153,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             const users = await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers);
             const who = (r: { source: string; userId: number | null }) => (r.source === "stripe_dashboard" ? "Stripe dashboard" : r.userId ? (users.find((u) => u.id === r.userId)?.name ?? "Staff") : "Owner");
             const provider = o.paymentMethod === "stripe" ? "stripe" : "sola";
-            const ready = LIVE_REFUNDS_APPROVED || refundsSandbox(provider);
+            const ready = (await liveRefundsOn()) || refundsSandbox(provider);
             const notReady =
               provider === "stripe"
                 ? process.env.STRIPE_REFUNDS_KEY
@@ -309,7 +310,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           )}
           {customer?.phone && <ConsentPanel orderId={o.id} phoneDisplay={formatPhone(customer.phone)} disclosures={staffDisclosure()} stopped={textStatus === "stopped"} scopes={["transactional"]} />}
           {staffPromoVisible(staff.role) && (
-            <PromoSignupPanel orderId={o.id} phoneDisplay={customer?.phone ? formatPhone(customer.phone) : ""} step2={customer?.phone ? staffPromoStep2(customer.phone) : "Should we text your number, or a different number?"} preview={STAFF_PROMO_MODE !== "live"} stopped={textStatus === "stopped"} />
+            <PromoSignupPanel orderId={o.id} phoneDisplay={customer?.phone ? formatPhone(customer.phone) : ""} step2={customer?.phone ? staffPromoStep2(customer.phone) : "Should we text your number, or a different number?"} preview={String((await getSettings()).staffPromoMode ?? "owner_preview") !== "live"} stopped={textStatus === "stopped"} />
           )}
         </div>
         <OrderActions
