@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { AwsClient } from "aws4fetch";
-import { sum } from "drizzle-orm";
+import { eq, sum } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 
 /**
@@ -44,12 +44,20 @@ async function r2(env: Record<string, string | undefined> = process.env, fetcher
   return cached;
 }
 
-/** Everything stored in the bucket: delivery photos and files sent or received with texts. */
+/**
+ * Everything stored in the bucket: delivery photos, files sent or received with texts, and (extra check HP2, Nov 27,
+ * 2026) the phone music (each song's original plus its phone pieces, removed songs too: their files are kept) and
+ * Inbox attachments kept in R2. Used by every upload's free-tier stop.
+ */
 export async function r2Used(): Promise<number> {
   const [row] = await db.select({ n: sum(schema.deliveryPhotos.sizeBytes) }).from(schema.deliveryPhotos);
   const [files] = await db.select({ n: sum(schema.messageFiles.sizeBytes) }).from(schema.messageFiles);
-  return Number(row?.n ?? 0) + Number(files?.n ?? 0);
+  // a phone piece is at most 8 kHz x 16-bit x 8 seconds (+ header), counted at that size
+  const [music] = await db.select({ orig: sum(schema.musicTracks.originalBytes), pieces: sum(schema.musicTracks.pieces) }).from(schema.musicTracks);
+  const [inbox] = await db.select({ n: sum(schema.inboxFiles.sizeBytes) }).from(schema.inboxFiles).where(eq(schema.inboxFiles.inR2, true));
+  return Number(row?.n ?? 0) + Number(files?.n ?? 0) + Number(music?.orig ?? 0) + Number(music?.pieces ?? 0) * MUSIC_PIECE_MAX_BYTES + Number(inbox?.n ?? 0);
 }
+const MUSIC_PIECE_MAX_BYTES = 8000 * 2 * 8 + 1024;
 
 export async function r2Put(key: string, data: Uint8Array, contentType: string) {
   const { client, base } = await r2();

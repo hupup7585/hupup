@@ -1018,9 +1018,12 @@ export async function loadPromptOverrides(): Promise<PromptOverrides> {
       ? await db.select({ id: schema.promptRecordings.id, key: schema.promptRecordings.promptKey, complete: schema.promptRecordings.complete, source: schema.promptRecordings.source }).from(schema.promptRecordings).where(inArray(schema.promptRecordings.id, inUse))
       : [];
     const okRec = new Map(recs.map((r) => [r.id, r]));
+    // Extra check HP1 (Nov 27, 2026): an upload made on a line's earlier line (the old laser instructions for laser
+    // parts 1-3) counts as made for it, the same rule as "Use this one" in Admin, so what Admin shows live is played
+    const { recordingKeysFor } = await import("@/lib/prompt-recordings");
     const rows = rows0.map((r) => {
       const rec = r.recordingId ? okRec.get(r.recordingId) : undefined;
-      const good = Boolean(rec && rec.complete && rec.source === "upload" && rec.key === r.key);
+      const good = Boolean(rec && rec.complete && rec.source === "upload" && recordingKeysFor(r.key).includes(rec.key));
       if (r.recordingId && !good) console.warn(`[voice] slot ${r.key} points at recording #${r.recordingId}, which is not a finished upload for that slot: not played`);
       return good ? r : { ...r, recordingId: null };
     });
