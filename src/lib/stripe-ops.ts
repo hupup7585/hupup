@@ -76,7 +76,7 @@ export async function stripeBooks(from: string, to: string) {
 /* ---------------- Disputes (webhook) ---------------- */
 
 type Dispute = { id: string; amount: number; reason: string; status: string; charge: string; payment_intent?: string | null; evidence_details?: { due_by?: number } };
-type Charge = { id: string; payment_intent?: string | null; refunds?: { data: { id: string; amount: number; status: string }[] } };
+type Charge = { id: string; payment_intent?: string | null; amount_refunded?: number; refunds?: { data: { id: string; amount: number; status: string }[] } };
 
 async function orderForPayment(...ids: (string | null | undefined)[]) {
   const list = ids.filter((x): x is string => Boolean(x));
@@ -112,7 +112,17 @@ export async function handleStripeEvent(event: { type: string; data: { object: R
     const c = event.data.object as unknown as Charge;
     const o = await orderForPayment(c.id, c.payment_intent);
     if (!o) return;
-    for (const r of c.refunds?.data ?? []) await applyRefund(o, { amountCents: r.amount, refundId: r.id, provider: "stripe", source: "stripe_dashboard", userId: null, status: r.status });
+    const list = c.refunds?.data ?? [];
+    for (const r of list) await applyRefund(o, { amountCents: r.amount, refundId: r.id, provider: "stripe", source: "stripe_dashboard", userId: null, status: r.status });
+    // Deep check 16 (Nov 27, 2026): newer Stripe API versions send no refunds list on the charge. Then the charge's
+    // total refunded is compared with what is already recorded on the order (Admin refunds included, also those still
+    // being sent), and only the part not recorded yet is added.
+    if (!list.length && (c.amount_refunded ?? 0) > 0) {
+      const { sql } = await import("drizzle-orm");
+      const rec = (await db.execute(sql`SELECT COALESCE(SUM(amount_cents), 0)::int AS c FROM order_refunds WHERE order_id = ${o.id} AND provider = 'stripe' AND status <> 'failed'`)).rows[0] as { c: number };
+      const missing = (c.amount_refunded ?? 0) - Number(rec?.c ?? 0);
+      if (missing > 0) await applyRefund(o, { amountCents: missing, refundId: `stripe-charge:${c.id}:${c.amount_refunded}`, provider: "stripe", source: "stripe_dashboard", userId: null, status: "succeeded" });
+    }
     return;
   }
   // Deep check Nov 27 (item 16): newer Stripe API versions leave the refunds out of the charge, so the refund's own
@@ -122,6 +132,9 @@ export async function handleStripeEvent(event: { type: string; data: { object: R
     if (!r?.id || !(r.status === "succeeded" || r.status === "pending")) return;
     const o = await orderForPayment(r.charge ?? "", r.payment_intent);
     if (!o) return;
+    // a charge.refunded notice with no list already recorded this charge's refunds by its total (fallback): not again
+    const { sql } = await import("drizzle-orm");
+    if ((await db.execute(sql`SELECT 1 FROM order_refunds WHERE order_id = ${o.id} AND stripe_refund_id LIKE ${`stripe-charge:${r.charge ?? ""}:%`} LIMIT 1`)).rows.length) return;
     await applyRefund(o, { amountCents: r.amount, refundId: r.id, provider: "stripe", source: "stripe_dashboard", userId: null, status: r.status });
   }
 }

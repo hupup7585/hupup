@@ -416,12 +416,18 @@ async function textOwnerAboutEmail(e: { id?: number; fromName: string | null; fr
 }
 
 /** A sent email (booking, payment, catalog, alerts...) kept under Sent in the Admin inbox, with its files. */
-export async function recordSentEmail(input: { to: string; subject: string; body: string; attachments: { filename: string; content: string }[]; sent: boolean; error: string | null; kind?: "code" | "catalog" | "auto" }) {
+export async function recordSentEmail(input: { to: string; subject: string; body: string; attachments: { filename: string; content: string }[]; sent: boolean; error: string | null; kind?: "code" | "catalog" | "auto" | "backup" }) {
+  // Deep check 30 (Nov 27, 2026): the Sent copy never keeps a working sign-in code (the digits are hidden), and the
+  // weekly backup's Sent copy is kept without its file (all customer data stays only in the Owner's email)
+  const hide = (t: string) => (input.kind === "code" ? t.replace(/\b\d{4,8}\b/g, "••••••") : t);
+  const backup = input.kind === "backup";
+  const files = backup ? [] : input.attachments;
+  const body = hide(input.body) + (backup && input.attachments.length ? `\n\n(The backup file, ${input.attachments.map((a) => a.filename).join(", ")}, is not kept here.)` : "");
   const [row] = await db
     .insert(schema.inboxReplies)
-    .values({ emailId: null, toAddress: input.to, subject: input.subject, body: input.body, sent: input.sent, error: input.sent ? null : (input.error ?? "not sent"), userId: null, kind: input.kind ?? "auto" })
+    .values({ emailId: null, toAddress: input.to, subject: hide(input.subject), body, sent: input.sent, error: input.sent ? null : (input.error ?? "not sent"), userId: null, kind: backup ? "auto" : (input.kind ?? "auto") })
     .returning();
-  for (const a of input.attachments) {
+  for (const a of files) {
     const data = Buffer.from(a.content, "base64");
     const name = a.filename.toLowerCase();
     const type = name.endsWith(".pdf") ? "application/pdf" : name.endsWith(".png") ? "image/png" : /\.jpe?g$/.test(name) ? "image/jpeg" : "application/octet-stream";
@@ -445,13 +451,18 @@ export async function sendScheduledEmails(now = new Date()) {
   const due = await db.select().from(d).where(and(isNull(d.discardedAt), isNull(d.sentReplyId), sql`${d.sendAt} IS NOT NULL AND ${d.sendAt} <= ${now}`));
   let sent = 0;
   for (const x of due) {
-    // Deep check Nov 27 (item 17): claimed first (its send time cleared), so two runs at the same moment never send it twice
-    const [claimed] = await db.update(d).set({ sendAt: null }).where(and(eq(d.id, x.id), isNull(d.sentReplyId), sql`${d.sendAt} IS NOT NULL`)).returning({ id: d.id });
+    // Deep check 17 (Nov 27, 2026): two runs at once could both send it. The draft is claimed first in one step (its
+    // send time taken off, only if still unsent and still at that time); a run that loses the claim skips it.
+    const [claimed] = await db
+      .update(d)
+      .set({ sendAt: null, sendError: "Sending now (if this stays, it may not have been sent: check Sent)" })
+      .where(and(eq(d.id, x.id), isNull(d.sentReplyId), isNull(d.discardedAt), sql`${d.sendAt} = ${x.sendAt}`))
+      .returning({ id: d.id });
     if (!claimed) continue;
     try {
       const r = await sendNewEmail({ to: x.toAddress, subject: x.subject, body: x.body, fileIds: x.fileIds ?? [], userId: x.userId, forwardOf: x.forwardOfEmailId, attachCatalog: x.attachCatalog, bodyHtml: x.bodyHtml });
       if (r.sent) {
-        await db.update(d).set({ sentReplyId: r.id, sendError: null }).where(eq(d.id, x.id));
+        await db.update(d).set({ sentReplyId: r.id, sendError: null, sendAt: x.sendAt }).where(eq(d.id, x.id));
         sent++;
       } else await db.update(d).set({ sendAt: null, sendError: r.error ?? "not sent" }).where(eq(d.id, x.id));
     } catch (e) {

@@ -152,7 +152,8 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
   const reserved = await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT id FROM orders WHERE id = ${o.id} FOR UPDATE`);
     const [cur] = await tx.select().from(schema.orders).where(eq(schema.orders.id, o.id));
-    const sending = (await tx.execute(sql`SELECT COALESCE(SUM(amount_cents), 0)::int AS c FROM order_refunds WHERE order_id = ${o.id} AND status = 'sending' AND created_at > now() - interval '10 minutes'`)).rows[0] as { c: number };
+    // also refunds that went through at the card company but could not be fully saved here (deep check 15a)
+    const sending = (await tx.execute(sql`SELECT COALESCE(SUM(amount_cents), 0)::int AS c FROM order_refunds WHERE order_id = ${o.id} AND ((status = 'sending' AND created_at > now() - interval '10 minutes') OR (status <> 'failed' AND error LIKE 'Refunded at the card company, but not fully saved%'))`)).rows[0] as { c: number };
     const left = Math.max(0, refundable(cur) - Number(sending?.c ?? 0));
     const amount = amountCents === "full" ? left : amountCents;
     if (!Number.isInteger(amount) || amount <= 0) return { error: left <= 0 && amountCents === "full" ? `At most ${money(0)} can be refunded on this order.` : "Enter an amount to refund." };
@@ -172,9 +173,18 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
     await alertOwner(o, amount, reason);
     throw new RefundError(reason);
   }
-  // Deep check Nov 27 (item 15a): the card company refunded it, so a problem while saving it here is never reported
-  // as "Nothing was refunded" (staff could refund again); it goes up as an ordinary error with the refund kept "sending"
-  return applyRefund(o, { amountCents: amount, refundId: r.id, provider: pay.provider, source: "admin", userId, status: r.status, reservedId: reserved.id });
+  // Deep check 15a (Nov 27, 2026): the card company refunded it. If saving it here fails, it is never shown as
+  // "nothing was refunded": the row keeps the refund (with its id) and the Owner is emailed to check the books.
+  try {
+    return await applyRefund(o, { amountCents: amount, refundId: r.id, provider: pay.provider, source: "admin", userId, status: r.status, reservedId: reserved.id });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    await db.update(schema.orderRefunds).set({ status: r.status === "pending" ? "pending" : "succeeded", stripeRefundId: r.id, error: `Refunded at the card company, but not fully saved here: ${err}`.slice(0, 300) }).where(eq(schema.orderRefunds.id, reserved.id)).catch(() => undefined);
+    await db.insert(schema.auditLog).values({ userId, action: "payment.refund_save_failed", entityType: "order", entityId: String(o.id), after: { amountCents: amount, provider: pay.provider, refundId: r.id, error: err } }).catch(() => undefined);
+    const owner = process.env.ADMIN_EMAIL;
+    if (owner) await sendEmail(owner, `Refund on order #${orderNumber(o.id)} went through but was not fully saved`, `A refund of ${money(amount)} on order #${orderNumber(o.id)} WENT THROUGH at ${pay.provider === "stripe" ? "Stripe" : "Sola"} (${r.id}), but saving it in Admin failed (${err}).\n\nDo not refund it again. Check the order's refunded amount and Bookkeeping.\n\n${config.baseUrl()}${orderPath(o.id)}`).catch(() => null);
+    throw new RefundError(`The refund went through (${r.id}), but it could not be fully saved here. Do not refund again; the Owner was emailed to check the books.`);
+  }
 }
 
 export async function refundsFor(orderId: number) {
