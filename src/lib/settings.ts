@@ -333,6 +333,10 @@ export const SETTING_DEFAULTS = {
   ...TIMER_DEFAULTS,
   /** Website words (Admin handoff website Phase W2, Nov 27, 2026): the home page's words, starting as Abraham's approved text. */
   ...SITE_WORD_DEFAULTS,
+  /** Website switches (website Phase W4, Nov 27, 2026): the catalog card on the home page (on, as today) and the most
+   *  catalog sends from one internet address in 24 hours (10, as today). */
+  siteCatalogCardOn: true,
+  siteCatalogSendsPerAddressPerDay: "10",
   /** Search listing (website Phase W3, Nov 27, 2026): each public page's title and description, starting as today's. */
   ...(SEO_DEFAULTS as Record<"seoHomeTitle" | "seoHomeDescription" | "seoPrivacyTitle" | "seoPrivacyDescription" | "seoTermsTitle" | "seoTermsDescription" | "seoSmsTermsTitle" | "seoSmsTermsDescription" | "seoTextAlertsTitle" | "seoTextAlertsDescription", string>),
   disconnectSilenceMinutes: "3",

@@ -824,6 +824,17 @@ const OTHER: Record<string, Explanation> = {
     where: "People searching on Google and other search engines (not shown on the page itself).",
     ifChanged: "The page carries the new description within about an hour; Google updates its results when it next visits the page. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting description is today's; Undo puts back the version before.",
   },
+  siteCatalogCardOn: {
+    what: "Shows the catalog card on the home page, with the \"Email me the catalog\" and \"Text me the catalog\" boxes. Off: the card and both boxes are gone, and only the approved line to email info@ for the catalog stays; a box sent from an old open page answers that it could not send.",
+    where: "Website visitors, under Our Rentals on the home page.",
+    ifChanged: "The home page changes within about a minute. Nothing else changes: the catalog by phone (key 8) and by texting CATALOG keep working.",
+  },
+  siteCatalogSendsPerAddressPerDay: {
+    what: "The most catalogs (by email and by text together) that one internet address can ask for from the website in 24 hours. It stops a robot from sending the catalog to many numbers or emails, since each text costs money. Each email address or number still gets the catalog once a day.",
+    where: "Website visitors using the catalog card. Past the limit, the visitor sees the approved line that the catalog could not be sent, with our phone number.",
+    ifChanged: "Takes effect at once. Higher lets more sends from one place (an office or school that shares one internet address); lower blocks robots sooner. Allowed from 1 to 100; the starting value was 10.",
+    example: "At 10: a visitor who already asked for 10 catalogs today gets the could-not-send line on the 11th.",
+  },
   hoursWebsiteNote: {
     what: "The note shown under the hours on the website.",
     where: "Website visitors, in the hours section.",

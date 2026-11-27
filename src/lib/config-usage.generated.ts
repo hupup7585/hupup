@@ -1049,6 +1049,14 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "offersStacking": [
   "lib/offers.ts"
  ],
+ "siteCatalogCardOn": [
+  "app/page.tsx",
+  "lib/catalog-request.ts",
+  "lib/feature-switches.ts"
+ ],
+ "siteCatalogSendsPerAddressPerDay": [
+  "lib/catalog-request.ts"
+ ],
  "disconnectSilenceMinutes": [
   "app/admin/(app)/phone/settings/after-pay-actions.ts",
   "app/admin/(app)/phone/settings/page.tsx",

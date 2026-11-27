@@ -7,6 +7,12 @@ import { db, schema } from "@/lib/db";
  */
 export const WEBSITE_CATALOG_FORM_LIVE_APPROVED = true; // Abraham approved the card, Nov 19, 2026
 export const websiteCatalogFormShown = (env: Record<string, string | undefined> = process.env) => WEBSITE_CATALOG_FORM_LIVE_APPROVED || env.VERCEL_ENV !== "production";
+/** The card is shown and its two boxes work: approved (above) and switched on in Admin (website Phase W4, on to start). */
+export async function catalogCardOn(env: Record<string, string | undefined> = process.env): Promise<boolean> {
+  if (!websiteCatalogFormShown(env)) return false;
+  const { getSettings } = await import("@/lib/settings");
+  return (await getSettings()).siteCatalogCardOn !== false;
+}
 
 export { CATALOG_EMAIL_BUTTON, CATALOG_TEXT_BUTTON, CATALOG_FORM_DRAFT } from "@/lib/catalog-request-copy";
 
@@ -34,11 +40,15 @@ export const CATALOG_REQUEST_ACTIONS = ["catalog.website_request", "catalog.webs
 /** True when this internet address already used up today's catalog sends (no address known: never limited). */
 export async function catalogIpLimitReached(ip: string | null, now = new Date()): Promise<boolean> {
   if (!ip) return false;
+  // website Phase W4: the number is an Admin setting (10 to start, as before)
+  const { getSettings } = await import("@/lib/settings");
+  const n = Math.round(Number((await getSettings()).siteCatalogSendsPerAddressPerDay));
+  const limit = Number.isFinite(n) && n >= 1 && n <= 100 ? n : MAX_CATALOG_REQUESTS_PER_IP_PER_DAY;
   const [row] = await db
     .select({ n: sql<number>`count(*)` })
     .from(schema.auditLog)
     .where(and(inArray(schema.auditLog.action, [...CATALOG_REQUEST_ACTIONS]), eq(schema.auditLog.ip, ip), gte(schema.auditLog.createdAt, new Date(now.getTime() - 24 * 3600_000))));
-  return Number(row?.n ?? 0) >= MAX_CATALOG_REQUESTS_PER_IP_PER_DAY;
+  return Number(row?.n ?? 0) >= limit;
 }
 
 /** The visitor's internet address, or null outside a web request. */

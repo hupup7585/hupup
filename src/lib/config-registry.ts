@@ -148,6 +148,10 @@ const SITE_WORD_LABELS: Record<SiteWordKey, string> = {
 for (const k of SITE_WORD_KEYS)
   EXACT[k] = { mode: "edit", label: SITE_WORD_LABELS[k], group: "Website: home page", type: k === "siteWhyList" ? "list" : "text", wording: true, rule: (v) => checkSiteWords(k, v) };
 
+/** Website switches (website Phase W4) */
+EXACT.siteCatalogCardOn = { mode: "edit", label: "Home page: catalog card (Email me / Text me the catalog)", group: "Website: switches", type: "bool" };
+EXACT.siteCatalogSendsPerAddressPerDay = { mode: "edit", label: "Catalog card: most sends from one internet address in 24 hours", group: "Website: switches", type: "int", min: 1, max: 100 };
+
 /** Search listing (website Phase W3): each public page's title and description, customer words. */
 for (const k of SEO_KEYS) {
   const p = SEO_PAGES[seoPageOf(k)!];

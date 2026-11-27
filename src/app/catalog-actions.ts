@@ -3,11 +3,11 @@
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { signUpsDisabledReason } from "@/app/text-alerts/actions";
-import { CATALOG_FORM_DRAFT, catalogEmailedToday, catalogIpLimitReached, requestIp, validCatalogEmail, websiteCatalogFormShown } from "@/lib/catalog-request";
+import { CATALOG_FORM_DRAFT, catalogEmailedToday, catalogCardOn, catalogIpLimitReached, requestIp, validCatalogEmail } from "@/lib/catalog-request";
 
 /** "Email me the catalog" on the website: the real catalog email (PDF attached), once per address per day. */
 export async function requestCatalogAction(_prev: { ok: boolean; message: string } | null, form: FormData): Promise<{ ok: boolean; message: string }> {
-  if (!websiteCatalogFormShown()) return { ok: false, message: CATALOG_FORM_DRAFT.failed };
+  if (!(await catalogCardOn())) return { ok: false, message: CATALOG_FORM_DRAFT.failed };
   if (String(form.get("website") ?? "")) return { ok: true, message: CATALOG_FORM_DRAFT.sent }; // a robot filled the hidden box
   // Deep check C3: the preview site shares the live database: nothing is sent or recorded from it
   const previewOff = await signUpsDisabledReason();
@@ -33,7 +33,7 @@ export async function requestCatalogAction(_prev: { ok: boolean; message: string
  * (the first text, then each photo), once per number per day, never after STOP; from the hotline number only.
  */
 export async function textCatalogAction(_prev: { ok: boolean; message: string } | null, form: FormData): Promise<{ ok: boolean; message: string }> {
-  if (!websiteCatalogFormShown()) return { ok: false, message: CATALOG_FORM_DRAFT.failed };
+  if (!(await catalogCardOn())) return { ok: false, message: CATALOG_FORM_DRAFT.failed };
   if (String(form.get("website") ?? "")) return { ok: true, message: CATALOG_FORM_DRAFT.textSent };
   const { toE164 } = await import("@/lib/phone");
   const digits = String(form.get("phone") ?? "").replace(/\D/g, "");

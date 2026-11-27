@@ -44,7 +44,7 @@ export function featureSwitches(settings: Record<string, unknown> = SETTING_DEFA
     { id: "options_wording", label: "Payment link: nearest options list", state: onOff(OPTIONS_WORDING_APPROVED), waitsFor: "Approved" },
     { id: "late_email", label: "Late payment email", state: onOff(LATE_EMAIL_APPROVED), waitsFor: "Approved Nov 13, 2026" },
     { id: "sms_catalog_reply", label: "Catalog reply to a CATALOG text", state: onOff(SMS_CATALOG_REPLY_ON), waitsFor: "On since Nov 16, 2026" },
-    { id: "website_catalog_form", label: "Website catalog request card", state: onOff(WEBSITE_CATALOG_FORM_LIVE_APPROVED), waitsFor: "Approved Nov 19, 2026" },
+    { id: "website_catalog_form", label: "Website catalog request card", state: onOff(WEBSITE_CATALOG_FORM_LIVE_APPROVED && settings.siteCatalogCardOn !== false), waitsFor: "Approved Nov 19, 2026", settingKey: "siteCatalogCardOn" },
     { id: "new_email", label: "Public email is info@hupupattractions.com", state: onOff(NEW_EMAIL_LIVE), waitsFor: "Approved Nov 10, 2026" },
     // Admin settings (links to their page through All settings)
     { id: "call_recording", label: "Call recording", state: yes("callRecording"), waitsFor: "Abraham's OK on the recording notice", settingKey: "callRecording" },
