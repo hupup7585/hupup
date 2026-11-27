@@ -28,6 +28,34 @@ card form, and the server rejects any payment attempt. Right after Shabbes / Yom
 - **Receipt "Total due".** The receipt email's grouped lines end with "Total due", which equals the amount just paid.
   Say if the receipt should use other words there (for example "Total paid").
 
+## Phone, payments, texts and delivery (phone/payments session, Nov 27, 2026)
+
+1. **4th Sunday + extra items.** Delivery on the 4th Sunday is 2x the zone price. Is the $5 for each additional item
+   doubled too? Today: not doubled.
+2. **Pack counting and the delivery promo with the $5 extra item.** Does a laser pack count as one item for the $5, and
+   does the free-delivery promo also waive the $5? Today: each line counts; the promo does not waive the $5.
+3. **Website catalog STOP message (preview only until approved):** "This number replied STOP to our texts, so we
+   cannot text it. To get our texts again, text START to (845) 415-7585." The live site shows the existing
+   "could not send" line meanwhile.
+4. **Website "tick the box" message (preview only):** "Please tick the box to get the catalog by text." (The button is
+   off until the box is ticked, so this only shows if the browser skips that.)
+5. **JOIN from a number that never got the catalog text:** still the older confirm-with-YES text, or sign up at once
+   like the catalog JOIN?
+6. **Catalog by text: one text or the photo series?** Today the approved first text, then each catalog photo as its
+   own text.
+7. **Address check: Google Maps key.** No Google Maps key is set, so the free US Census Bureau answers first, then
+   OpenStreetMap. A Google key needs a Google Cloud card (free credit, but a card), so it is off unless you want it.
+8. **Hold music for staff transfers: caller ID.** With hold music on, staff phones show the hotline number, not the
+   customer's (Twilio limit). The switch stays off until you decide.
+9. **Technical error after a payment:** today the caller hears the error line and then the before-payment goodbye.
+   Keep, or a different goodbye when the payment already went through?
+10. **Clear cart confirm step:** should "clear cart" ask "press 1 to confirm" first? Today it clears at once.
+11. **Same-day closed line** (`same_day_closed`) and the **Yom Tov cut-off words**: wording waits for you.
+12. **Voicemail access PIN (deep check 19):** default 1234, 4 digits. A longer PIN, or no phone access until a PIN is
+    set, changes what callers hear.
+13. **Separate preview database (deep check 22):** needs Hark to create the free Neon project `hupup-preview` and set
+    the Preview-only database settings in Vercel (steps were sent).
+
 ## Storage clean-up that would delete data (deep check B6 and C1, Nov 27, 2026)
 
 The rule is never to delete live data, so these were not built. Both only free storage space.
