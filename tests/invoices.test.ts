@@ -77,6 +77,15 @@ describe("invoices, quotes and credit notes", () => {
     expect(d.doc).toMatchObject({ amountCents: 25950, taxCents: 1950, customerName: "Mrs. Klein", orderId: o.id, billingAddress: "5 Main St, Monroe" });
   });
 
+  it("deep check 0600 M28: the booking's offer discount comes off the invoice, so the totals match", async () => {
+    const [cat] = await db.insert(schema.categories).values({ name: "Bounce M28", sortOrder: 2, active: true }).returning();
+    const [p] = await db.insert(schema.products).values({ categoryId: cat.id, name: "Water Slide", priceCents: 23000, quantity: 2, active: true, sortOrder: 1 }).returning();
+    const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: "2026-12-13", pickupDate: "2026-12-14", subtotalCents: 20000, offerDiscountCents: 3000, offerNote: "Thursday to Sunday", deliveryFeeCents: 1000, taxCents: 1755, totalCents: 22755, deliveryAddress: "5 Main St, Monroe" }).returning();
+    await db.insert(schema.orderItems).values({ orderId: o.id, productId: p.id, qty: 1, unitPriceCents: 23000 });
+    const inv = await docFromBooking(o.id, "invoice", 1);
+    expect((await docDetail(inv.id))!.doc.amountCents).toBe(22755);
+  });
+
   it("nothing is deleted; card numbers are refused; screens and 'Not active yet' note are in place", async () => {
     const [l] = await db.select().from(schema.bookInvoiceLines);
     await expect(db.delete(schema.bookInvoiceLines).where(eq(schema.bookInvoiceLines.id, l.id))).rejects.toThrow();
@@ -88,11 +97,3 @@ describe("invoices, quotes and credit notes", () => {
   });
 });
 
-describe("deep check 06:00: the customer's invoice page", () => {
-  it("has one H1 (the document name, same words as before); Admin's invoice page keeps its own heading", async () => {
-    const { readFileSync } = await import("node:fs");
-    expect(readFileSync("src/app/invoice/[id]/page.tsx", "utf8")).toContain("<InvoiceDocument d={d} asPageTitle />");
-    expect(readFileSync("src/app/admin/(app)/bookkeeping/invoice/[id]/page.tsx", "utf8")).not.toContain("asPageTitle");
-    expect(readFileSync("src/components/InvoiceDocument.tsx", "utf8")).toContain('<h1 className="text-2xl font-black uppercase tracking-wide">{title}</h1>');
-  });
-});

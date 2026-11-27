@@ -112,19 +112,21 @@ export async function handleStripeEvent(event: { type: string; data: { object: R
     const c = event.data.object as unknown as Charge;
     const o = await orderForPayment(c.id, c.payment_intent);
     if (!o) return;
-    const list = c.refunds?.data ?? [];
-    for (const r of list) await applyRefund(o, { amountCents: r.amount, refundId: r.id, provider: "stripe", source: "stripe_dashboard", userId: null, status: r.status });
-    // Deep check 16 (Nov 27, 2026): newer Stripe API versions send no refunds list on the charge. Then the charge's
-    // total refunded is compared with what is already recorded on the order (Admin refunds included, also those still
-    // being sent), and only the part not recorded yet is added.
-    if (!list.length && (c.amount_refunded ?? 0) > 0) {
-      const { sql } = await import("drizzle-orm");
-      // Deep check 06:00 M11: every day of a booking paid together carries the same payment id; refunds recorded on
-      // any of those days count (one day's refund was otherwise added again on another day)
-      const rec = (await db.execute(sql`SELECT COALESCE(SUM(amount_cents), 0)::int AS c FROM order_refunds WHERE order_id IN (SELECT id FROM orders WHERE id = ${o.id} OR (stripe_payment_id IS NOT NULL AND stripe_payment_id = ${o.stripePaymentId ?? null})) AND provider = 'stripe' AND status <> 'failed'`)).rows[0] as { c: number };
-      const missing = (c.amount_refunded ?? 0) - Number(rec?.c ?? 0);
-      if (missing > 0) await applyRefund(o, { amountCents: missing, refundId: `stripe-charge:${c.id}:${c.amount_refunded}`, provider: "stripe", source: "stripe_dashboard", userId: null, status: "succeeded" });
-    }
+    // Deep check 0600 M12: a charge's refund notices are handled one at a time (two arriving together both recorded it)
+    await oneAtATime(`stripe-refund:${c.id}`, async () => {
+      const list = c.refunds?.data ?? [];
+      for (const r of list) await applyRefund(o, { amountCents: r.amount, refundId: r.id, provider: "stripe", source: "stripe_dashboard", userId: null, status: r.status });
+      // Deep check 16 (Nov 27, 2026): newer Stripe API versions send no refunds list on the charge. Then the charge's
+      // total refunded is compared with what is already recorded, and only the part not recorded yet is added.
+      // Deep check 0600 M11: a payment that covered several days has the same payment id on every day, so what is
+      // already recorded is counted across all of them (it looked at one day only and recorded refunds twice).
+      if (!list.length && (c.amount_refunded ?? 0) > 0) {
+        const ids = (await db.select({ id: schema.orders.id }).from(schema.orders).where(inArray(schema.orders.stripePaymentId, [c.id, c.payment_intent].filter((x): x is string => Boolean(x))))).map((x) => x.id);
+        const rec = (await db.execute(sql`SELECT COALESCE(SUM(amount_cents), 0)::int AS c FROM order_refunds WHERE order_id IN (${sql.join((ids.length ? ids : [o.id]).map((i) => sql`${i}`), sql`, `)}) AND provider = 'stripe' AND status <> 'failed'`)).rows[0] as { c: number };
+        const missing = (c.amount_refunded ?? 0) - Number(rec?.c ?? 0);
+        if (missing > 0) await applyRefund(o, { amountCents: missing, refundId: `stripe-charge:${c.id}:${c.amount_refunded}`, provider: "stripe", source: "stripe_dashboard", userId: null, status: "succeeded" });
+      }
+    });
     return;
   }
   // Deep check Nov 27 (item 16): newer Stripe API versions leave the refunds out of the charge, so the refund's own
@@ -134,11 +136,35 @@ export async function handleStripeEvent(event: { type: string; data: { object: R
     if (!r?.id || !(r.status === "succeeded" || r.status === "pending")) return;
     const o = await orderForPayment(r.charge ?? "", r.payment_intent);
     if (!o) return;
-    // a charge.refunded notice with no list already recorded this charge's refunds by its total (fallback): not again
-    const { sql } = await import("drizzle-orm");
-    if ((await db.execute(sql`SELECT 1 FROM order_refunds WHERE order_id IN (SELECT id FROM orders WHERE id = ${o.id} OR (stripe_payment_id IS NOT NULL AND stripe_payment_id = ${o.stripePaymentId ?? null})) AND (stripe_refund_id = ${r.id} OR stripe_refund_id LIKE ${`stripe-charge:${r.charge ?? ""}:%`}) LIMIT 1`)).rows.length) return;
-    await applyRefund(o, { amountCents: r.amount, refundId: r.id, provider: "stripe", source: "stripe_dashboard", userId: null, status: r.status });
+    await oneAtATime(`stripe-refund:${r.charge ?? r.payment_intent ?? r.id}`, async () => {
+      // a charge.refunded notice with no list already recorded this charge's refunds by its total (fallback): not again
+      if ((await db.execute(sql`SELECT 1 FROM order_refunds WHERE stripe_refund_id LIKE ${`stripe-charge:${r.charge ?? ""}:%`} LIMIT 1`)).rows.length) return;
+      await applyRefund(o, { amountCents: r.amount, refundId: r.id, provider: "stripe", source: "stripe_dashboard", userId: null, status: r.status });
+    });
   }
+}
+
+/**
+ * Runs fn while holding a short lock row in app_settings (deep check 0600 M12): two Stripe notices for the same charge
+ * arriving together are handled one after the other. A lock older than 30 seconds (a run that crashed) is taken over.
+ * The lock row is only a marker and is removed when done.
+ */
+async function oneAtATime(key: string, fn: () => Promise<void>) {
+  const k = `lock:${key}`;
+  for (let i = 0; i < 100; i++) {
+    const got = await db.execute(sql`INSERT INTO app_settings (key, value, updated_at) VALUES (${k}, '"locked"'::jsonb, now())
+      ON CONFLICT (key) DO UPDATE SET updated_at = now() WHERE app_settings.updated_at < now() - interval '30 seconds' RETURNING key`);
+    if (got.rows.length) {
+      try {
+        await fn();
+      } finally {
+        await db.execute(sql`DELETE FROM app_settings WHERE key = ${k}`);
+      }
+      return;
+    }
+    await new Promise((res) => setTimeout(res, 100));
+  }
+  throw new Error(`Busy: ${key}`);
 }
 
 export async function disputesFor(orderId: number) {

@@ -183,12 +183,12 @@ export async function createBookingAction(input: {
     // the items only is "paid less" (Needs attention), and a full payment is booked as rentals + delivery + tax
     // (never as a tip). Not priced: the payment is kept, and the order waits for staff (never confirmed).
     const pricedFirst = await ensurePriced(r.orderId);
-    // Deep check 06:00 M70 (A1 leftover): not priced, the order is put in Needs attention BEFORE the payment is
-    // recorded, so the payment can never confirm it (or book the delivery and tax as a tip) against the rentals alone
+    // Deep check 0600 M70: not priced: the order goes to Needs attention BEFORE the money is recorded, so the payment
+    // can never confirm it against the items alone; the cash is still recorded (it was taken)
     if (!pricedFirst) {
       await db
         .update(schema.orders)
-        .set({ status: "NEEDS_ATTENTION", notes: sql`COALESCE(${schema.orders.notes}, '') || ${`Payment recorded before the order could be priced (${(await pricingProblem(r.orderId)) ?? "no price yet"}): check the total. `}`, updatedAt: new Date() })
+        .set({ status: "NEEDS_ATTENTION", notes: sql`COALESCE(${schema.orders.notes}, '') || ${`Payment recorded before the order could be priced (${(await pricingProblem(r.orderId)) ?? "no price yet"}): check the total and Bookkeeping. `}`, updatedAt: new Date() })
         .where(eq(schema.orders.id, r.orderId));
     }
     const { markPaid } = await import("@/lib/orders");
