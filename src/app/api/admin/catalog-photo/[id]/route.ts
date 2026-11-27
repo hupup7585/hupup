@@ -17,7 +17,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   // Photos stored as a path on our own site resolve against this same site.
   const url = new URL(p.imageUrl, new URL(req.url).origin);
   if (url.protocol !== "https:" && url.protocol !== "http:") return new Response("Not found", { status: 404 });
-  // Extra check H7: a photo site that does not answer gives the "couldn't be loaded" answer, not a crash
+  // Extra check K7: a photo site that does not answer gives the "couldn't be loaded" answer, not a crash
   const r = await fetch(url, { redirect: "follow" }).catch(() => null);
   if (!r) return new Response("That catalog photo couldn't be loaded.", { status: 502 });
   const type = r.headers.get("content-type") ?? "";

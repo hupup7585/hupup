@@ -10,7 +10,7 @@ import { db, schema } from "@/lib/db";
 /** Owner and Secretary: set the delivery and pickup drivers of an order (blank = not assigned). */
 export async function assignDriversAction(orderId: number, form: FormData) {
   const s = await requireStaff(["owner", "secretary"]);
-  // Extra check H5 + H6 (Nov 27, 2026): both choices are checked before anything is saved. A stop whose driver didn't
+  // Extra check K5 + K6 (Nov 27, 2026): both choices are checked before anything is saved. A stop whose driver didn't
   // change is left alone (a deactivated driver stays on it); a choice that is no longer an active driver (deactivated
   // while the page was open) leaves that stop as it was instead of a half-save and an error page.
   const [o] = await db.select({ d: schema.orders.deliveryDriverId, p: schema.orders.pickupDriverId }).from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);

@@ -253,11 +253,19 @@ export async function passwordLogin(rawPhone: string, password: string, trustDev
     return { ok: false, error: `${generic} Too many tries: try again later or use a texted code.` };
   }
   if (!(await bcrypt.compare(password, u.passwordHash))) {
-    const failures = u.failedLogins + 1;
+    // Deep check B2: counted in the database in one step, so guesses sent at the same moment all count
+    const [c] = await db.update(adminUsers).set({ failedLogins: sql`${adminUsers.failedLogins} + 1` }).where(eq(adminUsers.id, u.id)).returning({ failures: adminUsers.failedLogins });
+    const failures = c?.failures ?? u.failedLogins + 1;
     const lock = failures >= MAX_PASSWORD_FAILURES ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null;
-    await db.update(adminUsers).set({ failedLogins: lock ? 0 : failures, lockedUntil: lock }).where(eq(adminUsers.id, u.id));
+    if (lock) await db.update(adminUsers).set({ failedLogins: 0, lockedUntil: lock }).where(eq(adminUsers.id, u.id));
     await audit(lock ? "login.locked" : "login.password_failed", u.id, { failures });
     return { ok: false, error: lock ? `${generic} Too many tries: try again later or use a texted code.` : generic };
+  }
+  // Deep check B2: a right password never gets in once guesses checked at the same time have locked the account
+  const [fresh] = await db.select({ lockedUntil: adminUsers.lockedUntil }).from(adminUsers).where(eq(adminUsers.id, u.id)).limit(1);
+  if (fresh?.lockedUntil && fresh.lockedUntil > new Date()) {
+    await audit("login.password_locked", u.id, {});
+    return { ok: false, error: `${generic} Too many tries: try again later or use a texted code.` };
   }
   await startSession({ userId: u.id, role: u.role, name: u.name, phone: u.phone }, "password", trustDevice);
   return { ok: true, role: u.role };

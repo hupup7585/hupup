@@ -15,7 +15,14 @@ const PIECE = 3 * 1024 * 1024;
 
 export default {
   async email(message, env, ctx) {
-    await message.forward(GMAIL);
+    // Deep check C7: a Gmail forward error never stops the Admin inbox copy (the error is still reported at the end)
+    let forwardError = null;
+    try {
+      await message.forward(GMAIL);
+    } catch (e) {
+      forwardError = e;
+      console.error("info@ worker: Gmail forward failed", String(e));
+    }
     const raw = new Uint8Array(await new Response(message.raw).arrayBuffer());
     const id = crypto.randomUUID();
     const parts = Math.max(1, Math.ceil(raw.length / PIECE));
@@ -23,7 +30,9 @@ export default {
       (async () => {
         for (let i = 0; i < parts; i++) {
           const body = raw.slice(i * PIECE, (i + 1) * PIECE);
-          for (let attempt = 0; attempt < 3; attempt++) {
+          let ok = false;
+          let last = "";
+          for (let attempt = 0; attempt < 3 && !ok; attempt++) {
             try {
               const res = await fetch(`${env.SITE_URL}/api/email/inbound-raw?id=${id}&i=${i}&n=${parts}`, {
                 method: "POST",
@@ -32,13 +41,21 @@ export default {
                 headers: { "x-inbound-secret": env.INBOUND_EMAIL_SECRET, "x-envelope-from": String(message.from || ""), "content-type": "application/octet-stream" },
                 body,
               });
-              if (res.ok) break;
+              ok = res.ok;
+              last = `status ${res.status}`;
+              if (!ok && res.status >= 400 && res.status < 500) break; // refused (bad piece, too big, wrong secret): trying again won't help
             } catch (e) {
-              // try again
+              last = String(e); // network: try again
             }
+          }
+          // Deep check C7: a piece that never arrived stops the upload and says so in the Worker log (the Gmail copy has it)
+          if (!ok) {
+            console.error(`info@ worker: Admin inbox upload stopped at piece ${i + 1} of ${parts} (${last}); the email is in Gmail only`);
+            return;
           }
         }
       })(),
     );
+    if (forwardError) throw forwardError;
   },
 };

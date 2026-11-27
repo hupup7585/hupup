@@ -2,7 +2,7 @@ import { ORDER_STATUSES } from "@/lib/db/schema";
 import { isValidISO } from "@/lib/dates";
 
 /**
- * Extra check H8 (Nov 27, 2026): Orders and report filters from the address bar. A status that isn't one of ours, or a
+ * Extra check K8 (Nov 27, 2026): Orders and report filters from the address bar. A status that isn't one of ours, or a
  * date that isn't a real date, is ignored (the page used to crash with a database error).
  */
 export function cleanFilters<T extends { status?: string; from?: string; to?: string }>(f: T): T {
@@ -13,7 +13,7 @@ export function cleanFilters<T extends { status?: string; from?: string; to?: st
   return out;
 }
 
-/** Extra check H9: "contains" search text for ILIKE, with %, _ and \ taken as the characters themselves. */
+/** Extra check K9: "contains" search text for ILIKE, with %, _ and \ taken as the characters themselves. */
 export function likeContains(q: string): string {
   return `%${q.trim().replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
 }

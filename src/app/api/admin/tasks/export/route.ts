@@ -1,4 +1,5 @@
 import { csvCell } from "@/lib/csv-cell";
+import { todayISO } from "@/lib/dates";
 import { currentStaff } from "@/lib/auth";
 import { TASK_REPORTS, buildTaskReport, type TaskReport } from "@/lib/tasks-reports";
 import { XLSX_MIME, buildXlsx, type Cell } from "@/lib/xlsx";
@@ -14,7 +15,7 @@ export async function GET(req: Request) {
   if (!TASK_REPORTS.includes(report)) return new Response("Unknown report", { status: 400 });
   if (report === "projects" && s.role !== "owner") return new Response("Not allowed", { status: 403 });
   const sheets = await buildTaskReport(report, s);
-  const name = `hup-up-${report}-${new Date().toISOString().slice(0, 10)}`;
+  const name = `hup-up-${report}-${todayISO()}`;
   if (u.searchParams.get("format") === "xlsx")
     return new Response(new Uint8Array(buildXlsx(sheets)), { headers: { "Content-Type": XLSX_MIME, "Content-Disposition": `attachment; filename="${name}.xlsx"`, "Cache-Control": "no-store" } });
   const body = "﻿" + [sheets[0].header, ...sheets[0].rows].map((r) => r.map(csvCell).join(",")).join("\n");

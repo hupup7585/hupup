@@ -116,7 +116,7 @@ export type OrderListRow = {
 
 export async function listOrders(filters: { q?: string; status?: string; from?: string; to?: string; limit?: number }) {
   const { cleanFilters, likeContains } = await import("@/lib/filter-params");
-  const f = cleanFilters(filters); // Extra check H8: an unknown status or a bad date is ignored, never a crash
+  const f = cleanFilters(filters); // Extra check K8: an unknown status or a bad date is ignored, never a crash
   const conds = [sql`TRUE`];
   if (f.status === "OPEN") conds.push(sql`o.status IN ('PENDING_PAYMENT','CONFIRMED','DELIVERED')`);
   else if (f.status === "ALL" || !f.status) conds.push(sql`NOT (o.status = 'CANCELLED' AND o.customer_id IS NULL)`); // hide abandoned phone carts
@@ -124,7 +124,7 @@ export async function listOrders(filters: { q?: string; status?: string; from?: 
   if (f.from) conds.push(sql`o.event_date >= ${f.from}::date`);
   if (f.to) conds.push(sql`o.event_date <= ${f.to}::date`);
   if (f.q) {
-    const like = likeContains(f.q); // Extra check H9: % and _ are searched as typed
+    const like = likeContains(f.q); // Extra check K9: % and _ are searched as typed
     const digits = f.q.replace(/\D/g, "");
     // An order number (up to 7 digits) only; a 10-digit phone number used to overflow the id and crash the page
     const orderNo = digits.length >= 1 && digits.length <= 7 ? Number(digits) - 1000 : 0;

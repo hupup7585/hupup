@@ -18,7 +18,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ report: string 
     const v = u.searchParams.get(k);
     if (v) raw[k] = v.slice(0, 100);
   }
-  const p = cleanFilters(raw); // Extra check H8: a bad status or date is ignored
+  const p = cleanFilters(raw); // Extra check K8: a bad status or date is ignored
   let sheets;
   try {
     sheets = await found.report.build(p);

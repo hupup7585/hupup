@@ -186,7 +186,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           })())}
           {staff.role !== "delivery" && o.status !== "CANCELLED" && (await (async () => {
             const drivers: { id: number; name: string | null }[] = await activeDrivers();
-            // Extra check H5 (Nov 27, 2026): a deactivated driver still on a stop shows (marked), so saving keeps them
+            // Extra check K5 (Nov 27, 2026): a deactivated driver still on a stop shows (marked), so saving keeps them
             for (const id of [o.deliveryDriverId, o.pickupDriverId]) {
               if (!id || drivers.some((d) => d.id === id)) continue;
               const [gone] = await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers).where(eq(schema.adminUsers.id, id)).limit(1);

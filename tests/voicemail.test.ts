@@ -9,6 +9,7 @@ const h = vi.hoisted(() => ({
   sms: [] as { to: string; body: string; opts?: Record<string, unknown> }[],
   emails: [] as { to: string; subject: string; text?: string; attachments?: { filename: string; content: string }[] }[],
   open: false,
+  emailDown: false,
 }));
 
 vi.mock("@/lib/db", async () => {
@@ -27,7 +28,7 @@ vi.mock("@/lib/business-hours", async (orig) => ({ ...(await orig<typeof import(
 vi.mock("@/lib/hours-schedule", async (orig) => ({ ...(await orig<typeof import("@/lib/hours-schedule")>()), lineOpen: () => h.open })); // each line's hours follow the test's open/closed (Hours page, Nov 25, 2026)
 vi.mock("@/lib/notify", () => ({
   sendSms: async (to: string, body: string, opts?: Record<string, unknown>) => (h.sms.push({ to, body, opts }), { sent: true }),
-  sendEmail: async (to: string, subject: string, text: string, attachments: { filename: string; content: string }[] = []) => (h.emails.push({ to, subject, text, attachments }), { sent: true }),
+  sendEmail: async (to: string, subject: string, text: string, attachments: { filename: string; content: string }[] = []) => (h.emails.push({ to, subject, text, attachments }), { sent: !h.emailDown }),
 }));
 
 import { handleVoice } from "@/lib/ivr/flow";
@@ -192,6 +193,18 @@ describe("hotline voicemail", () => {
     const box = await mainBox();
     await db.insert(schema.voicemails).values({ boxId: box.id, recordingSid: "RE333", recordingUrl: "https://api.twilio.com/x/RE333", durationSec: 5, createdAt: new Date(Date.now() - 3600_000) });
     expect(await notifyStragglers()).toBe(1);
+    expect(await notifyStragglers()).toBe(0);
+  });
+
+  it("deep check B4: an alert that could not be sent is tried again by the scheduled job", async () => {
+    const box = await mainBox();
+    await db.insert(schema.voicemails).values({ boxId: box.id, recordingSid: "REB4X", recordingUrl: "https://api.twilio.com/x/REB4X", durationSec: 5, createdAt: new Date(Date.now() - 3600_000) });
+    h.emailDown = true;
+    expect(await notifyStragglers()).toBe(0); // email down: nothing went out
+    const [v] = await db.select().from(schema.voicemails).where(eq(schema.voicemails.recordingSid, "REB4X"));
+    expect(v.notifiedAt).toBeNull();
+    h.emailDown = false;
+    expect(await notifyStragglers()).toBe(1); // back up: sent once
     expect(await notifyStragglers()).toBe(0);
   });
 
