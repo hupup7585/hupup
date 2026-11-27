@@ -2282,7 +2282,9 @@ const handlers: Record<string, Handler> = {
     if (sttActive()) {
       // Speech to text (preview only): record the spoken letters, Google types them up while the soft clip plays
       vr.record({ maxLength: T(vr, "timerCatalogRecordMax"), timeout: T(vr, "timerCatalogRecordSilence"), playBeep: false, finishOnKey: "#", trim: "trim-silence", action: url("catalog-stt-recorded", { part, add }), method: "POST" });
-      return vr;
+      // Extra check (phone pass 2, #1): nothing said after the tone: Twilio skips the action for an empty recording and
+      // runs the next step, so it goes the same way as an empty recording (catalog-stt-recorded), never a hang-up
+      return back(vr, "catalog-said", { part, add, empty: 1 });
     }
     const s = vr.gather({ input: ["speech", "dtmf"], finishOnKey: "#", timeout: T(vr, "timerCatalogSpeech"), speechTimeout: "auto", language: "en-US", hints: "a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, dot, underscore, dash", action: url("catalog-said", { part, add }), method: "POST" });
     void s;

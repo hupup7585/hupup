@@ -145,6 +145,16 @@ describe("speech to text: the call", () => {
     expect(redirect(quiet)).toBe("heard?f=name&empty=1");
     expect(redirect(await call("heard", {}, "f=name&empty=1"))).toBe("ask?f=name&n=1");
   });
+  it("phone pass 2 #1: silence after the tone on the email question (payment link, receipt, catalog) goes the empty way, never a hang-up", async () => {
+    const xml = await call("catalog-part", {}, "part=local");
+    expect(xml).toMatch(/<Record [^>]*catalog-stt-recorded[^>]*\/>/);
+    expect(xml).not.toContain("<Hangup/>");
+    expect(redirect(xml)).toBe("catalog-said?part=local&empty=1");
+    // the same step an empty recording reaches
+    expect(redirect(await call("catalog-stt-recorded", { RecordingDuration: "0" }, "part=local"))).toBe("catalog-said?part=local&empty=1");
+    const after = await call("catalog-said", {}, "part=local&empty=1");
+    expect(after).not.toContain("<Hangup/>");
+  });
   it("key 8 catalog email: spoken letters are recorded and typed up the same way", async () => {
     const xml = await call("catalog-stt-recorded", { RecordingUrl: "https://api.twilio.com/2010-04-01/Accounts/AC1/Recordings/RE5", RecordingSid: "RE5", RecordingDuration: "3" }, "part=local");
     expect(xml).toContain("<Play>https://hupup.example/audio/stt-hold.wav</Play>");
