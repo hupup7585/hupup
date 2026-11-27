@@ -198,3 +198,90 @@ describe("item 8: welcome back leaves out days that can no longer be booked", ()
     expect(redirect(await s.c.call(s.back, "book"))).toBe("resume");
   });
 });
+
+describe("item 5: the closed-day offer never books today after the same-day cut-off", () => {
+  const p = () => String(castle);
+  const asks = async (c: ReturnType<typeof caller>, sid: string) => c.call(sid, "date-heard", { Digits: "0116" }, `p=${p()}`); // Saturday, Jan 16
+  it("Friday 10 AM (before chatzos): Saturday is closed, so 'get it Friday' is offered; 1 books Friday with the 1.5-day span", async () => {
+    await freeStock();
+    const c = caller();
+    at("2027-01-15T15:00:00Z");
+    await ensureSession("CAh" + n, c.from);
+    expect(redirect(await asks(c, "CAh" + n))).toBe(`closed-offer?p=${p()}&d=2027-01-16`);
+    const offer = await c.call("CAh" + n, "closed-offer", {}, `p=${p()}&d=2027-01-16`);
+    expect(gatherTo(offer)).toBe(`closed-offer-choice?p=${p()}&d=2027-01-16`);
+    expect(say(offer)).toContain("Friday, January fifteenth");
+    expect(redirect(await c.call("CAh" + n, "closed-offer-choice", { Digits: "1" }, `p=${p()}&d=2027-01-16`))).toBe(`qty?p=${p()}&d=2027-01-15`);
+    expect((await getSession("CAh" + n))!.data.spanDays?.["2027-01-15"]).toEqual({ after: "2027-01-17", days: 1.5 });
+  });
+  it("before chatzos: 2 another date, star back, a wrong key repeats the offer, no key the no-choice path", async () => {
+    const c = caller();
+    at("2027-01-15T15:00:00Z");
+    await ensureSession("CAi" + n, c.from);
+    const q = `p=${p()}&d=2027-01-16`;
+    expect(redirect(await c.call("CAi" + n, "closed-offer-choice", { Digits: "2" }, q))).toBe(`date?p=${p()}`);
+    const wrong = await c.call("CAi" + n, "closed-offer-choice", { Digits: "5" }, q);
+    expect(say(wrong)).toContain("Sorry, that is not a valid selection.");
+    expect(redirect(wrong)).toBe(`closed-offer?${q}`);
+    expect(await c.call("CAi" + n, "closed-offer-choice", {}, q)).toContain("closed-offer");
+    expect(await c.call("CAi" + n, "closed-offer-choice", { Digits: "*" }, q)).not.toContain("qty?");
+  });
+  it("Friday 1:30 PM (after chatzos): Saturday is closed and no offer is made (today can't be booked anymore)", async () => {
+    const c = caller();
+    at("2027-01-15T18:30:00Z");
+    await ensureSession("CAj" + n, c.from);
+    const xml = await asks(c, "CAj" + n);
+    expect(xml).not.toContain("closed-offer");
+    expect(redirect(xml)).toBe(`date?p=${p()}`);
+    expect(redirect(await c.call("CAj" + n, "closed-offer", {}, `p=${p()}&d=2027-01-16`))).toBe(`date?p=${p()}`);
+  });
+  it("heard before chatzos, pressed 1 after it: nothing is booked for today, back to the date", async () => {
+    const c = caller();
+    at("2027-01-15T16:59:00Z");
+    await ensureSession("CAk" + n, c.from);
+    expect(gatherTo(await c.call("CAk" + n, "closed-offer", {}, `p=${p()}&d=2027-01-16`))).toContain("closed-offer-choice");
+    at("2027-01-15T18:30:00Z");
+    expect(redirect(await c.call("CAk" + n, "closed-offer-choice", { Digits: "1" }, `p=${p()}&d=2027-01-16`))).toBe(`date?p=${p()}`);
+    expect((await getSession("CAk" + n))!.data.spanDays ?? {}).toEqual({});
+  });
+});
+
+describe("item 27: the keypad card retry never starts a new card try after the Shabbes cut-off", () => {
+  const PAY_ENV = { STRIPE_PHONE_PAY_MODE: "owner_test", TWILIO_PAY_ACCOUNT_SID: "ACpay", TWILIO_PAY_AUTH_TOKEN: "pay-token", TWILIO_PAY_SIP_DOMAIN: "hupup-pay.sip.twilio.com", TWILIO_PAY_SIP_USERNAME: "hotline", TWILIO_PAY_SIP_PASSWORD: "pw", AUTH_SECRET: "test-secret-0123456789abcdef" };
+  const saved: Record<string, string | undefined> = {};
+  beforeAll(() => {
+    for (const [k, v] of Object.entries(PAY_ENV)) (saved[k] = process.env[k]), (process.env[k] = v);
+  });
+  afterAll(() => {
+    for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  });
+  async function declined() {
+    const { handlePayVoice, _payLegToken } = await import("@/lib/stripe-pay-voice");
+    const [o] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-01-17", pickupDate: "2027-01-18", deliveryAddress: "12 Forest Road, Monroe", subtotalCents: 20000, deliveryZone: "area", deliveryFeeCents: 1500, taxPercent: "8.125", taxCents: 1747, totalCents: 23247, holdExpiresAt: new Date(Date.now() + 3600_000) }).returning();
+    const sub = (action: string, body: Record<string, string>, q: string) => handlePayVoice(action, new URLSearchParams(q), { AccountSid: "ACpay", CallSid: "CApay27", ...body });
+    const q = `o=${o.id}&n=1&t=${_payLegToken(o.id, "CApay27")}`;
+    return { o, sub, q };
+  }
+  it("Friday 10 AM: a declined card offers 'press 1 to try again'; 1 starts the second try (<Pay>)", async () => {
+    at("2027-01-15T15:00:00Z");
+    const { sub, q } = await declined();
+    const after = await sub("result", { Result: "payment-connector-error", PaymentError: "card_declined" }, q);
+    expect(after).toContain("/retry?");
+    const again = await sub("retry", { Digits: "1" }, q);
+    expect(again).toMatch(/<Pay [^>]*paymentConnector=/);
+  });
+  it("Friday 4:30 PM (after the cut-off): 1 never starts a new card try (back to the hotline call, which plays the cut-off)", async () => {
+    at("2027-01-15T21:30:00Z");
+    const { sub, q } = await declined();
+    const again = await sub("retry", { Digits: "1" }, q);
+    expect(again).not.toContain("<Pay");
+    expect(again).toContain("<Hangup/>");
+  });
+  it("2, no key, or a forged link: no new try either", async () => {
+    at("2027-01-15T15:00:00Z");
+    const { sub, q, o } = await declined();
+    for (const body of [{ Digits: "2" }, {}, { Digits: "9" }]) expect(await sub("retry", body, q)).not.toContain("<Pay");
+    expect(await sub("retry", { Digits: "1" }, `o=${o.id}&n=1&t=forged`)).not.toContain("<Pay");
+  });
+});
