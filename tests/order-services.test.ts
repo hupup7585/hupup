@@ -260,8 +260,10 @@ describe("Admin", () => {
     }
   });
   it("the review and pay page lists each service by name and amount", () => {
+    // Nov 27, 2026: the pay page's lines come from src/lib/pay-breakdown.ts (one line per service, the note when ticked)
     const pay = readFileSync("src/app/pay/[orderId]/page.tsx", "utf8");
-    expect(pay).toContain("data-pay-service");
-    expect(pay).toMatch(/s\.showNoteOnReceipt && s\.note/);
+    expect(pay).toContain("data-pay-line");
+    expect(pay).toContain("l.note ?");
+    expect(readFileSync("src/lib/pay-breakdown.ts", "utf8")).toMatch(/s\.showNoteOnReceipt && s\.note/);
   });
 });

@@ -1767,7 +1767,12 @@ async function deliverPayLink(ctx: Ctx, orderId: number, via: { phone?: string; 
     // The STOP line is added by the text system on the first order text (or after 30 days without one)
     sent = (await sendSms(via.phone, details, { kind: "transactional", event: "order_payment_link", customerId, orderId, callSid: ctx.callSid })).sent;
   } else if (via.email) {
-    sent = (await sendEmail(via.email, promptText(ctx.prompts, "msg_payment_link_subject", { number: num }), details)).sent;
+    // Abraham, Nov 27, 2026 (item 4): the email adds the pay page's grouping (Discount, Already paid, Partial payment, Total due)
+    const { payBreakdown, payBreakdownText, pickupSentence } = await import("@/lib/pay-breakdown");
+    const all = group?.orders ?? [];
+    const live = all.filter((d) => d.order.status !== "CANCELLED");
+    const grouped = payBreakdownText(payBreakdown(all), pickupSentence(live.map((d) => d.order), (await getSettings()) as never));
+    sent = (await sendEmail(via.email, promptText(ctx.prompts, "msg_payment_link_subject", { number: num }), `${details}\n\n${grouped}`)).sent;
     if (sent && customerId) await db.update(schema.customers).set({ email: via.email }).where(eq(schema.customers.id, customerId));
   }
   if (sent) {
