@@ -19,6 +19,7 @@ import {
   getOrderWithItems,
   orderTextPhone,
   getPaymentGroup,
+  payingDays,
   minutesFromNow,
   orderNumber,
   refreshOrderTotals,
@@ -5047,11 +5048,19 @@ const handlers: Record<string, Handler> = {
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "promo-consent");
     if (!group.paid) return back(vr, "goodbye"); // Hark's 2nd check, A2: "approved" only after a real payment
+    // Hark's payment check (Nov 27, 2026, bug 4): paid, but a day needs staff (a late payment whose item was taken by
+    // another booking, or a payment that did not cover every day): never "your booking is confirmed". The goodbye; the
+    // Owner was emailed and the customer gets the approved "please call us" email.
+    if (group.orders.some((x) => x.order.status === "NEEDS_ATTENTION")) {
+      await track(ctx.callSid, "step", "Payment counted but a day needs staff attention: no confirmation line, goodbye").catch(() => undefined);
+      return back(vr, "goodbye");
+    }
     const number = spokenDigits(orderNumber(o));
     const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
     sp(g, ctx, "phonepay_approved", { number });
     if (PAY_DATES_LIVE) {
-      const days = group.orders.map((x) => x.order); // sorted by date: the first delivery and the last pickup
+      // sorted by date: the first delivery and the last pickup; a released or cancelled day with nothing paid is not spoken
+      const days = payingDays(group.orders, group.primary).map((x) => x.order);
       sp(g, ctx, "pay_approved_dates", { date: spokenDate(days[0].eventDate), pickup: spokenDate(days.map((x) => x.pickupDate).sort().at(-1)!) });
     }
     sp(g, ctx, "phonepay_approved_star");
@@ -5151,6 +5160,20 @@ const handlers: Record<string, Handler> = {
     if (group.paid) return back(vr, "pay-approved", { o });
     // Hark's 2nd check, A2: the hold ran out during payment and nothing was paid: never "approved", no new try
     if (group.due <= 0) {
+      // Hark's payment check (Nov 27, 2026, bug 2): the hold can run out (10 minutes) while the caller is still on the
+      // call to Sola (up to 15). A card try that has no result yet is checked in Sola's record first, so a charge that
+      // went through is counted (a late payment: confirmed when the items are still free, else Needs attention and the
+      // Owner emailed) and never left unseen.
+      if (a) {
+        if (ctx.body.DialCallSid) await db.update(schema.phonepayAttempts).set({ payLegSid: ctx.body.DialCallSid }).where(eq(schema.phonepayAttempts.id, a));
+        const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1);
+        if (attempt && !attempt.result && attempt.amountCents > 0) {
+          await endMainPayLeg(attempt.payLegSid);
+          const r = await checkPhonePayTry(o, a, attempt.amountCents);
+          await track(ctx.callSid, "step", `Card payment try ${attempt.tryNumber ?? "?"} after the hold ran out: ${r.result}`, { attempt: a });
+          if (r.result === "paid") return back(vr, "pay-approved", { o });
+        }
+      }
       await track(ctx.callSid, "step", "Payment step reached after the hold ran out (nothing paid): unpaid goodbye").catch(() => undefined);
       return back(vr, "goodbye");
     }

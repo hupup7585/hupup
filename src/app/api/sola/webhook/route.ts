@@ -92,7 +92,8 @@ async function handle(req: Request): Promise<Response> {
   // Deep check 06:00 M40: "Paid" only on the days this payment went to; a day still released or cancelled (no money on
   // it) is not shown as paid (the activity log keeps the whole notice)
   const after = await db.select({ id: schema.orders.id, status: schema.orders.status, paidCents: schema.orders.paidCents }).from(schema.orders).where(inArray(schema.orders.id, days.map((d) => d.order.id)));
-  const paidDays = after.filter((d) => d.status !== "CANCELLED" || d.paidCents > 0).map((d) => d.id);
+  // Hark's payment check (Nov 27, bug 3): a day the payment did not reach (nothing paid on it) is never marked "Paid"
+  const paidDays = after.filter((d) => d.paidCents > 0).map((d) => d.id);
   await recordPaymentResult(paidDays.length ? paidDays : [orderId], "approved", last4Of(fields), field(fields, "xRefNum") || null);
   if (!updated.length && fresh) return new Response("unknown order", { status: 404 });
   // Evidence: tie this payment to the rental terms version the customer accepted (or record that none was).

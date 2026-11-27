@@ -33,6 +33,22 @@ function tokOk(orderId: number, sid: string, t: string | null) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/**
+ * The amount this <Pay> charges, signed into its result address (Hark's payment check, Nov 27, 2026, bug 5): the
+ * result records what Stripe charged, never the amount still due when the result arrives (the hold could have been
+ * released in between, which recorded $0 for a real charge).
+ */
+const amountTok = (orderId: number, sid: string, cents: number) => createHmac("sha256", signingSecret()).update(`pay-amount:${orderId}:${sid}:${cents}`).digest("hex").slice(0, 32);
+/** For tests: the signed amount on a result address. */
+export const _payAmountToken = (orderId: number, sid: string, cents: number) => amountTok(orderId, sid, cents);
+export function chargedCents(orderId: number, sid: string, c: string | null, ca: string | null): number | null {
+  const cents = Number(c);
+  if (!c || !ca || !Number.isInteger(cents) || cents <= 0) return null;
+  const a = Buffer.from(amountTok(orderId, sid, cents));
+  const b = Buffer.from(ca);
+  return a.length === b.length && timingSafeEqual(a, b) ? cents : null;
+}
+
 /** Pay drafts are heard only on the Owner's own test calls until he approves them (live mode needs them approved). */
 function line(prompts: PromptOverrides, key: PromptKey) {
   return promptText(prompts, key);
@@ -67,7 +83,7 @@ async function payTwiml(vr: VR, orderId: number, sid: string, tries: number, pro
     maxAttempts: 2,
     timeout: 10,
     description: `${BUSINESS_NAME} order #${orderNumber(orderId)}`,
-    action: payUrl("result", { o: orderId, n: tries, t: tok(orderId, sid) }),
+    action: payUrl("result", { o: orderId, n: tries, t: tok(orderId, sid), c: due, ca: amountTok(orderId, sid, due) }),
   });
   pay.prompt({ for: "payment-card-number" }).say(voice(), line(prompts, "pay_card_number"));
   pay.prompt({ for: "expiration-date" }).say(voice(), line(prompts, "pay_expiration"));
@@ -163,7 +179,7 @@ export async function handlePayVoice(action: string, query: URLSearchParams, bod
         ? await db.update(schema.orders).set({ stripePaymentId: code }).where(and(inArray(schema.orders.id, ids), isNull(schema.orders.stripePaymentId))).returning({ id: schema.orders.id })
         : [];
       if (claimed.length && group) {
-        const cents = group.due;
+        const cents = chargedCents(orderId, sid, query.get("c"), query.get("ca")) ?? group.due;
         await markGroupPaid(orderId, cents, "stripe", null);
         await recordPaymentResult(ids, "approved", last4, code);
         // Abraham: once approved, the receipt replaces the short "payment received" email (not both)
