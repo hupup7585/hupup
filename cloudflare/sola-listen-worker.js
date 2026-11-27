@@ -7,9 +7,11 @@
  *  - silence check: no Sola voice, no caller key tones and no result for N seconds (Admin setting, 20 to start): it asks
  *    our site to check Sola's record once more (our site hangs up and plays box 147 when there is still no result).
  * No card digits are kept or sent anywhere: the audio is only measured for loudness, never stored or transcribed.
- * Our site's addresses (signed by our site) arrive in the stream's start message, so no secret lives here.
- * The result notice must carry this try's key (deep check Nov 27, item 18): our site signs a key for each try and puts
- * it in the stream's start message (from Twilio) and in its result notice, so nobody else can end a payment call early.
+ * Our site's addresses (signed by our site) arrive in the stream's start message.
+ * Key (deep check Nov 27, item 18): every /stream and /result address carries a key made from the try number and the
+ * Worker secret LISTEN_KEY (the same value as SOLA_LISTEN_KEY in Vercel). Without the secret, or with a wrong key, the
+ * Worker answers 403, so nobody else can open a stream or end a payment call. Set it once (free):
+ *   npx wrangler secret put LISTEN_KEY --name hupup-sola-listen
  */
 
 const VOICE_RMS = 700; // 16-bit loudness that counts as someone talking (phone audio)
@@ -161,11 +163,29 @@ export class SolaListen {
   }
 }
 
+/** The key for one try: the first 32 hex characters of HMAC-SHA256(secret, "sola-listen:<try>") (same as our site). */
+export async function tryKey(secret, tryId) {
+  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(`sola-listen:${tryId}`)));
+  return Array.from(sig, (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+}
+
+/** Same length and same characters, without stopping at the first difference. */
+function sameKey(a, b) {
+  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
-    const m = url.pathname.match(/^\/(stream|result)\/(\d+)$/);
+    const m = url.pathname.match(/^\/(stream|result)\/(\d+)\/([0-9a-f]{32})$/);
     if (!m) return new Response("Hup Up Attractions", { status: 200 });
+    // No secret set, or a wrong key: nothing is opened or ended
+    const secret = env.LISTEN_KEY;
+    if (!secret || secret.length < 24 || !sameKey(await tryKey(secret, m[2]), m[3])) return new Response("Forbidden", { status: 403 });
     const stub = env.LISTEN.get(env.LISTEN.idFromName(`try-${m[2]}`));
     return stub.fetch(req);
   },
