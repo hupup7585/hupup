@@ -22,7 +22,7 @@ export async function totalsFor(subtotalCents: number, offerNote: string | null,
     const { totalsWithFee } = await import("@/lib/pricing");
     if (itemCount > 1) t = totalsWithFee(subtotalCents, t.zone, bookingDeliveryCents(t.deliveryFeeCents, itemCount, s), s);
   }
-  // A free 4th Sunday pays its own delivery ($20 / $30 / $40)
+  // A free 4th Sunday pays twice the zone's regular delivery price (Abraham, Nov 27, 2026, 1:36 AM)
   const { OFFER_NOTES } = await import("@/lib/offers");
   if (offerNote === OFFER_NOTES.fourthSunday) {
     const { deliveryQuote } = await import("@/lib/delivery-areas");

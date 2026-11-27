@@ -715,6 +715,13 @@
       "when": 1795820000000,
       "tag": "0101_voice_prompt_line_set",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1795830000000,
+      "tag": "0102_catalog_consent_scope",
+      "breakpoints": true
     }
   ]
 }

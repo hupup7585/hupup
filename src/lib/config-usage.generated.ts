@@ -67,7 +67,8 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/delivery-settings/area-actions.ts",
   "app/admin/(app)/delivery-settings/page.tsx",
   "lib/delivery-areas.ts",
-  "lib/feature-switches.ts"
+  "lib/feature-switches.ts",
+  "lib/offer-delivery.ts"
  ],
  "laserThirdSetHalfOn": [
   "app/admin/(app)/offers/actions.ts",

@@ -29,11 +29,42 @@ export async function textCatalogAction(_prev: { ok: boolean; message: string } 
   const digits = String(form.get("phone") ?? "").replace(/\D/g, "");
   const phone = digits.length === 10 || (digits.length === 11 && digits.startsWith("1")) ? toE164(digits) : null;
   if (!phone) return { ok: false, message: CATALOG_FORM_DRAFT.badPhone };
+  // Plan A (Abraham, Nov 27, 2026, 1:52 AM): nothing is sent unless the consent box was ticked
+  const { CATALOG_TEXT_CONSENT, CATALOG_TEXT_CONSENT_VERSION, CATALOG_TEXT_DRAFT } = await import("@/lib/catalog-request-copy");
+  const draftOk = process.env.VERCEL_ENV !== "production"; // unapproved lines show on preview only
+  if (String(form.get("consent") ?? "") !== "yes") return { ok: false, message: draftOk ? CATALOG_TEXT_DRAFT.noConsent : CATALOG_FORM_DRAFT.failed };
   const { replyToCatalogText } = await import("@/lib/catalog-send");
   const { sendMessage } = await import("@/lib/sms");
   const [c] = await db.select().from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1);
+  // A number that replied STOP gets nothing (and no consent record: only START and YES lift a STOP)
+  if (c?.smsOptOut) {
+    await db.insert(schema.auditLog).values({ action: "catalog.website_text_request", entityType: "phone", entityId: phone, after: { replied: false, reason: "opted_out" } });
+    return { ok: false, message: draftOk ? CATALOG_TEXT_DRAFT.stopped : CATALOG_FORM_DRAFT.failed };
+  }
+  // The consent record: number, time, page, the exact box wording and the IP
+  const { headers } = await import("next/headers");
+  let h: Headers | null = null;
+  try {
+    h = (await headers()) as unknown as Headers;
+  } catch {
+    // outside a web request (tests): no IP or page
+  }
+  await db.insert(schema.smsConsents).values({
+    customerId: c?.id ?? null,
+    phone,
+    scope: "catalog", // a one-time catalog text: not order texts, not promotions
+    action: "opt_in",
+    source: "web",
+    method: "checkbox",
+    wording: CATALOG_TEXT_CONSENT,
+    wordingVersion: CATALOG_TEXT_CONSENT_VERSION,
+    response: "checked",
+    ip: (h?.get("x-forwarded-for") || "").split(",")[0].trim() || null,
+    userAgent: h?.get("user-agent")?.slice(0, 500) || null,
+    pageUrl: h?.get("referer")?.slice(0, 500) || null,
+  });
   const r = await replyToCatalogText(phone, {
-    optedOut: Boolean(c?.smsOptOut),
+    optedOut: false,
     send: (to, body, media) => sendMessage({ to, body, ...(media?.length ? { mediaUrls: media } : {}), kind: "system", event: "catalog_reply", customerId: c?.id }),
   }).catch(() => ({ replied: false, reason: "send_failed" as const }));
   await db.insert(schema.auditLog).values({ action: "catalog.website_text_request", entityType: "phone", entityId: phone, after: r });

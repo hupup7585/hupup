@@ -1,3 +1,4 @@
+import { fourthSundayDeliveryCents } from "@/lib/offer-delivery";
 import { trustedMsg } from "@/lib/url-message";
 import { requireOwner } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
@@ -8,6 +9,8 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
   await requireOwner();
   const sp = await searchParams;
   const settings = await getSettings();
+  // Abraham, Nov 27, 2026, 1:36 AM: the 4th Sunday's delivery = twice the zone's regular price (Delivery settings)
+  const usd4 = (kind: "local" | "area" | "outside") => `$${(fourthSundayDeliveryCents(kind, settings as never) / 100).toFixed(2)}`;
   return (
     <div className="w-full">
       <h1 className="text-2xl font-black sm:text-3xl">Offers</h1>
@@ -17,7 +20,7 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
         <form action={saveOffersAction} className="grid gap-2">
           <label className="flex items-start gap-2"><input type="checkbox" name="laserThirdSetHalfOn" defaultChecked={settings.laserThirdSetHalfOn !== false} className="mt-1" /> <span><b>Laser tag: every third set half price.</b> On: every 3rd full set (maze with guns) is half price, and every 3rd extra gun set is half price, counted apart. It adds together with the other offers (Abraham, Nov 26, 2026): the half price is in the set price, and an offer such as Thursday to Sunday is worked out on top. Off: no third-set discount, and the phone does not offer the third gun set at half price.</span></label>
           <label className="flex items-start gap-2"><input type="checkbox" name="offerThuSunOn" defaultChecked={Boolean(settings.offerThuSunOn)} className="mt-1" /> <span><b>Thursday to Sunday: 1.5 times the rental.</b> One booking, delivered Thursday, picked up Monday (New booking shows the choice on a Thursday).</span></label>
-          <label className="flex items-start gap-2"><input type="checkbox" name="offerFourthSundayOn" defaultChecked={Boolean(settings.offerFourthSundayOn)} className="mt-1" /> <span><b>4th Sunday free.</b> After 3 Sundays in a row, the 4th Sunday&rsquo;s rental is free (the cheapest item). Delivery: $20 Kiryas Joel, $30 nearby towns, $40 anywhere else. Thursday to Sunday bookings don&rsquo;t count as Sundays.</span></label>
+          <label className="flex items-start gap-2"><input type="checkbox" name="offerFourthSundayOn" defaultChecked={Boolean(settings.offerFourthSundayOn)} className="mt-1" /> <span><b>4th Sunday free.</b> After 3 Sundays in a row, the 4th Sunday&rsquo;s rental is free (the cheapest item). Delivery on the 4th Sunday is exactly twice the regular delivery price of the house&rsquo;s zone (from Delivery settings), so it follows any price change: today Kiryas Joel {usd4("local")}, nearby towns {usd4("area")}, anywhere else in Orange County {usd4("outside")}. Thursday to Sunday bookings don&rsquo;t count as Sundays.</span></label>
           <button className="btn-dark mt-1 w-fit">Save offers</button>
         </form>
       </section>

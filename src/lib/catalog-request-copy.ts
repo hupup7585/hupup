@@ -15,3 +15,15 @@ export const CATALOG_FORM_DRAFT = {
   failed: "Sorry, we could not send it right now. Please call us at (845) 777-7585.",
 };
 
+/* Catalog by text consent, Plan A (Abraham, Nov 27, 2026, 1:52 AM; his exact words). Website only. */
+export const CATALOG_TEXT_CONSENT = "Yes, text the Hup Up Attractions catalog to this number.";
+export const CATALOG_TEXT_FINE_PRINT = "One text with our catalog. Message and data rates may apply. Reply STOP to stop, or HELP for help.";
+/** The version saved with each consent record (change it whenever the two lines above change). */
+export const CATALOG_TEXT_CONSENT_VERSION = "catalog-web-2026-11-27";
+
+/** Drafts waiting for Abraham's OK: shown on preview only; the live site shows `failed` until approved. */
+export const CATALOG_TEXT_DRAFT = {
+  stopped: "This number replied STOP to our texts, so we cannot text it. To get our texts again, text START to (845) 415-7585.",
+  noConsent: "Please tick the box to get the catalog by text.",
+};
+

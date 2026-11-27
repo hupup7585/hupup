@@ -24,7 +24,6 @@ export async function offerSwitches(exec: Exec): Promise<OfferSettings> {
 }
 
 /** Delivery on a free 4th Sunday (Abraham, Nov 17, 2026). */
-export const FOURTH_SUNDAY_DELIVERY_CENTS = { local: 2000, area: 3000, outside: 4000 } as const;
 export const OFFER_NOTES = { thuSun: "Thursday to Sunday: 1.5 times the rental", fourthSunday: "4th Sunday free", friMutze: "Friday and Mutze Shabbes: one and a half days" } as const;
 
 const RENTAL = /balloon|bounce|jump|inflatable|laser|paddle|boat/i;

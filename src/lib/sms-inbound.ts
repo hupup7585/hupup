@@ -142,7 +142,7 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
 
   // Consent changes run in one transaction that locks this customer's row, so a STOP and a START/YES arriving at
   // the same time are applied one after the other and a YES can never restore consent after a STOP.
-  const effects = { cancelAll: false, cancelPromos: false, sendStartConfirmation: false, sendReenrolled: false, sendPromoEnrolled: false, sendPromoConfirm: false };
+  const effects = { cancelAll: false, cancelPromos: false, sendStartConfirmation: false, sendReenrolled: false, sendPromoEnrolled: false, sendPromoConfirm: false, sendCatalogJoined: false };
   if (customer && keyword) {
     await db.transaction(async (tx) => {
       const [c] = await tx.select().from(schema.customers).where(eq(schema.customers.id, customer.id)).for("update");
@@ -166,6 +166,10 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
         const r = await handleYes(tx, c, from, text);
         if (r.confirmed && r.scope === "marketing") effects.sendPromoEnrolled = true;
         else effects.sendReenrolled = r.confirmed;
+      } else if (keyword === "join" && (await import("@/lib/catalog-join").then((m) => m.gotCatalogText(tx, from)))) {
+        // Abraham, Nov 27, 2026: JOIN in reply to the catalog text signs up straight away (no duplicates, never after STOP)
+        const { catalogJoin } = await import("@/lib/catalog-join");
+        effects.sendCatalogJoined = (await catalogJoin(tx, c, from, text)).sendConfirmation;
       } else if (keyword === "join") {
         // SMS v3: JOIN only requests the confirmation text; it never confirms. Only YES within 24 hours signs up.
         // A request already waiting isn't repeated (no duplicate confirmations); never after STOP.
@@ -192,6 +196,10 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
     await sendMessage({ to: from, body: TRANSACTIONAL_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId: customer.id });
   if (effects.sendPromoConfirm && customer)
     await sendMessage({ to: from, body: promoConfirmRequestSms(), kind: "system", event: "promo_confirm_request", customerId: customer.id });
+  if (effects.sendCatalogJoined && customer) {
+    const { CATALOG_JOIN_CONFIRM_DRAFT } = await import("@/lib/catalog-join");
+    await sendMessage({ to: from, body: CATALOG_JOIN_CONFIRM_DRAFT, kind: "system", event: "consent_confirmation", customerId: customer.id });
+  }
   if (effects.sendPromoEnrolled && customer)
     await sendMessage({ to: from, body: PROMO_ENROLLED_SMS, kind: "system", event: "consent_confirmation", customerId: customer.id });
 

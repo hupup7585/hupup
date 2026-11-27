@@ -187,3 +187,15 @@ describe("laser tag list (box 13b, Abraham, Nov 22, 2026)", () => {
     expect(redirect(await call("category-choice", { Digits: "3" }, `c=${cat.id}`))).toBe(`date?p=${guns6}`);
   });
 });
+
+describe("4th Sunday delivery = twice the zone price (Abraham, Nov 27, 2026, 1:36 AM)", () => {
+  it("KJ $20, nearby $30, rest of Orange County $40; KJ changed to $12 -> $24", async () => {
+    const { fourthSundayDeliveryCents, deliveryFeeFor } = await import("@/lib/offer-delivery");
+    const { OFFER_NOTES } = await import("@/lib/offers");
+    const s = { deliveryFeeKjCents: "1000", deliveryFeeAreaCents: "1500", deliveryFeeOutsideCents: "2000" };
+    expect([fourthSundayDeliveryCents("local", s), fourthSundayDeliveryCents("area", s), fourthSundayDeliveryCents("outside", s)]).toEqual([2000, 3000, 4000]);
+    expect(deliveryFeeFor("local", { ...s, deliveryFeeKjCents: "1200" }, "2027-01-10", OFFER_NOTES.fourthSunday)).toBe(2400);
+    // the regular price, even during the free-delivery promo
+    expect(fourthSundayDeliveryCents("local", { ...s, deliveryPromoOn: true })).toBe(2000);
+  });
+});
