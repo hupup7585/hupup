@@ -25,9 +25,8 @@ export async function saveScheduleAction(fd: FormData) {
   const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday night"];
   const days = {} as Schedule["days"];
   // Friday closing by season (Abraham, Nov 26, 2026; every department at 14:04): a Friday may end at "Season closing".
-  // Not for the website and office hours (the website would show new words)
-  const office = line === "office" || (group !== "" && data.groups.find((g) => g.id === group)?.members.includes("office"));
-  const season = fd.get("season") === "1" && !office;
+  // Every line, the website and office hours too (Abraham, Nov 26, 2026): the website shows the time in effect, not new words
+  const season = fd.get("season") === "1";
   let fridaySeason: Schedule["fridaySeason"];
   if (season) {
     const t = (k: string) => parseWindows(`00:00-${String(fd.get(k) ?? "").trim()}`)?.[0]?.to ?? null;

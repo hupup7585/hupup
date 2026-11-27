@@ -72,14 +72,19 @@ function ringFamily(k: string): Record<string, Explanation> {
       ifChanged: "A call after this time goes to voicemail instead of ringing staff.",
     },
     [`ringErevTo${k}`]: {
-      what: `On Friday and Erev Yom Tov, the latest time of day (Eastern time, 24-hour clock) that ${line} rings. Blank means the normal rule.`,
-      where: `${caller}, on a Friday or Erev Yom Tov afternoon.`,
-      ifChanged: "Today the phone uses the later of this time and the minutes-before-candle-lighting limit below (which one should win is being confirmed with the Owner); after that, callers go to voicemail.",
+      what: `In winter (no daylight saving time), on Friday and Erev Yom Tov, the latest time of day (Eastern time, 24-hour clock) that ${line} rings. Blank means only the candle lighting rule.`,
+      where: `${caller}, on a Friday or Erev Yom Tov afternoon in winter.`,
+      ifChanged: "The line stops at whichever comes first: this time or the minutes before candle lighting below (Abraham, Nov 26, 2026). It never rings after candle lighting. After that, callers go to voicemail.",
+    },
+    [`ringErevToSummer${k}`]: {
+      what: `In summer (daylight saving time), on Friday and Erev Yom Tov, the latest time of day (Eastern time, 24-hour clock) that ${line} rings. Blank means the winter time is used all year.`,
+      where: `${caller}, on a Friday or Erev Yom Tov afternoon in summer.`,
+      ifChanged: "The line stops at whichever comes first: this time or the minutes before candle lighting below. It never rings after candle lighting.",
     },
     [`ringErevBefore${k}`]: {
       what: `On Friday and Erev Yom Tov, how many minutes before candle lighting ${line} stops ringing. 0 means no extra limit.`,
       where: `${caller}, close to Shabbes or Yom Tov.`,
-      ifChanged: "A bigger number stops ringing earlier in the afternoon. For example, 60 stops ringing one hour before candle lighting.",
+      ifChanged: "A bigger number stops ringing earlier in the afternoon. For example, 90 stops ringing an hour and a half before candle lighting, if that is earlier than the Friday time above.",
     },
     [`ringAnnounce${k}`]: {
       what: `The words a staff member hears when they pick up a call forwarded from ${line}, before they accept it. Blank uses the standard announcement.`,
@@ -296,7 +301,7 @@ const OTHER: Record<string, Explanation> = {
     ifChanged: "The offer ends after the new day.",
   },
   laserThirdSetHalfOn: {
-    what: "Laser tag: every third set added to an order is half price (full sets and extra gun sets are counted separately).",
+    what: "Laser tag: every third set added to an order is half price (full sets and extra gun sets are counted separately). It adds together with the other offers: the half price is in the set price, and other offers are worked out on top (Abraham, Nov 26, 2026).",
     where: "Callers adding laser tag sets on the phone, the order total, the payment link, and New booking.",
     ifChanged: "Off: every set is full price. Orders already placed keep their price.",
   },
@@ -613,6 +618,11 @@ const OTHER: Record<string, Explanation> = {
     what: "Phone numbers that are blocked, one per line: an exact number, a pattern, or \"withheld\".",
     where: "Blocked callers hear a busy signal and are not connected.",
     ifChanged: "Takes effect on the next call. A wide pattern can block real customers.",
+  },
+  promosPerYear: {
+    what: "The most promotional texts one customer can get in a calendar year. Abraham decided 5.",
+    where: "Campaigns (who can still get a promo text this year) and every promo send. The text message terms page, the sign-up texts and the phone line say 5.",
+    ifChanged: "The limit changes right away. The words customers see and hear still say 5, so a new number needs new approved words and new recordings first.",
   },
   staffMutzeEveryWeek: {
     what: "When on, staff can book a Saturday night (Mutze Shabbes) on New booking every week of the year, not only during Chanukah and Chol Hamoed. Delivery is after Shabbes ends, pickup is Sunday morning, and it costs one day.",

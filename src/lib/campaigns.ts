@@ -1,6 +1,6 @@
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { PROMOS_PER_YEAR } from "@/lib/sms-consent-copy";
+import { promosPerYear } from "@/lib/promo-limit";
 import { marketingBody, promosThisYear, sendMessage } from "@/lib/sms";
 import { textingActive } from "@/lib/voicemail";
 import { config } from "@/lib/config";
@@ -10,7 +10,7 @@ import { pictureUrl, picturesByIds } from "@/lib/promo-pictures";
 /**
  * Seasonal promo campaigns (Abraham, Nov 9, 2026).
  * - The Owner writes the wording and approves it; the Secretary can only send approved campaigns.
- * - Only customers who signed up for promos (and didn't reply STOP or NO PROMO) get them, at most 6 a year.
+ * - Only customers who signed up for promos (and didn't reply STOP or NO PROMO) get them, at most 5 a year (Admin setting promosPerYear).
  * - Every text goes through sendMessage, which rechecks consent, the yearly limit and quiet hours at the moment of sending.
  */
 export type Campaign = typeof schema.smsCampaigns.$inferSelect;
@@ -54,7 +54,7 @@ export async function promoSignups(now = new Date()): Promise<PromoSignup[]> {
       signedUpAt: c.marketingOptInAt,
       source: src?.source ?? null,
       thisYear,
-      status: c.smsOptOut ? "Stopped all texts" : thisYear >= PROMOS_PER_YEAR ? "At yearly limit" : "Active",
+      status: c.smsOptOut ? "Stopped all texts" : thisYear >= (await promosPerYear()) ? "At yearly limit" : "Active",
     });
   }
   return out;
@@ -138,7 +138,7 @@ export async function sendCampaign(id: number, userId: number | null, now = new 
   for (const s of list.filter((x) => x.status !== "Active")) {
     const [row] = await db
       .insert(schema.smsCampaignSends)
-      .values({ campaignId: id, customerId: s.customerId, phone: s.phone, status: "skipped", reason: s.status === "At yearly limit" ? `Already got ${PROMOS_PER_YEAR} promo texts this year` : "Replied STOP (no texts)" })
+      .values({ campaignId: id, customerId: s.customerId, phone: s.phone, status: "skipped", reason: s.status === "At yearly limit" ? `Already got ${await promosPerYear()} promo texts this year` : "Replied STOP (no texts)" })
       .onConflictDoNothing()
       .returning();
     if (row) skipped++;

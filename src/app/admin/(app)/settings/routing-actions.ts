@@ -36,6 +36,7 @@ export async function saveRoutingAction(_prev: { ok?: boolean; message?: string 
   const afterFrom = time(form.get("afterFrom"));
   const afterTo = time(form.get("afterTo"));
   const erevTo = time(form.get("erevTo"));
+  const erevToSummer = time(form.get("erevToSummer"));
   const erevBefore = String(Math.min(240, Math.max(0, Math.round(Number(form.get("erevBefore")) || 0))));
   const before = await getSettings();
   const normalized = targets.map((t) => `${t.label} | ${t.phone} | ${t.ringSeconds}`).join("\n");
@@ -49,6 +50,7 @@ export async function saveRoutingAction(_prev: { ok?: boolean; message?: string 
   await saveSetting(`ringAfterFrom${k}` as keyof Settings, afterFrom as never, owner.userId);
   await saveSetting(`ringAfterTo${k}` as keyof Settings, afterTo as never, owner.userId);
   await saveSetting(`ringErevTo${k}` as keyof Settings, erevTo as never, owner.userId);
+  await saveSetting(`ringErevToSummer${k}` as keyof Settings, erevToSummer as never, owner.userId);
   await saveSetting(`ringErevBefore${k}` as keyof Settings, erevBefore as never, owner.userId);
   await db.insert(schema.auditLog).values({
     userId: owner.userId,
@@ -56,7 +58,7 @@ export async function saveRoutingAction(_prev: { ok?: boolean; message?: string 
     entityType: "settings",
     entityId: `ring_key_${k}`,
     before: { targets: before[n.targets], mode: before[n.mode], accept: before[n.accept], name: before[`ringName${k}` as keyof Settings] },
-    after: { targets: normalized, mode, accept, name, announce, attempts, afterHours, afterFrom, afterTo, erevTo, erevBefore },
+    after: { targets: normalized, mode, accept, name, announce, attempts, afterHours, afterFrom, afterTo, erevTo, erevToSummer, erevBefore },
   });
   revalidatePath("/admin", "layout");
   return { ok: true, message: "Saved." };

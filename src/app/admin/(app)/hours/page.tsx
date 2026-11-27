@@ -54,7 +54,7 @@ export default async function HoursPage({ searchParams }: { searchParams: Promis
               </li>
             ))}
           </ul>
-          <ScheduleForm schedule={g.schedule} on={g.on} group={g.id} seasonAllowed={!g.members.includes("office")} />
+          <ScheduleForm schedule={g.schedule} on={g.on} group={g.id} seasonAllowed />
         </section>
       ))}
 
@@ -64,7 +64,7 @@ export default async function HoursPage({ searchParams }: { searchParams: Promis
           <section key={id} className="card mb-5 p-5" data-hours-line={id}>
             <h2 className="text-xl font-black">{LINE_LABEL[id]}</h2>
             <p className="mb-3 text-sm text-muted">Now: {scheduleWords(e.schedule) || "Closed every day"}.</p>
-            <ScheduleForm schedule={e.schedule} on={e.on} line={id} seasonAllowed={id !== "office"} />
+            <ScheduleForm schedule={e.schedule} on={e.on} line={id} seasonAllowed />
           </section>
         );
       })}
@@ -136,8 +136,8 @@ function ScheduleForm({ schedule, on, line, group, seasonAllowed = true }: { sch
 
 /**
  * Friday closing by season (Abraham, Nov 26, 2026: the Operator first; 14:04, every department): a tick to use it,
- * the winter and summer times, the one in effect today, and the plain-English explanation. Not offered for the
- * website and office hours, because the website would then show new words ("Season closing").
+ * the winter and summer times, the one in effect today, and the plain-English explanation. Every line, the website and
+ * office hours too (Nov 26, 2026): the website shows the closing time in effect that day, never new words.
  */
 function FridaySeasonFields({ schedule }: { schedule: Schedule }) {
   const fs = schedule.fridaySeason ?? OPERATOR_FRIDAY_SEASON;

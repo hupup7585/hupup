@@ -584,6 +584,10 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/settings/routing-actions.ts",
   "lib/ivr/routing.ts"
  ],
+ "ringErevToSummer0": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
  "ringErevBefore0": [
   "app/admin/(app)/settings/routing-actions.ts",
   "lib/ivr/routing.ts"
@@ -597,6 +601,10 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "lib/ivr/routing.ts"
  ],
  "ringErevTo2": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevToSummer2": [
   "app/admin/(app)/settings/routing-actions.ts",
   "lib/ivr/routing.ts"
  ],
@@ -616,6 +624,10 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/settings/routing-actions.ts",
   "lib/ivr/routing.ts"
  ],
+ "ringErevToSummer4": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
  "ringErevBefore4": [
   "app/admin/(app)/settings/routing-actions.ts",
   "lib/ivr/routing.ts"
@@ -629,6 +641,10 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "lib/ivr/routing.ts"
  ],
  "ringErevTo5": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevToSummer5": [
   "app/admin/(app)/settings/routing-actions.ts",
   "lib/ivr/routing.ts"
  ],
@@ -648,6 +664,10 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/settings/routing-actions.ts",
   "lib/ivr/routing.ts"
  ],
+ "ringErevToSummer6": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
  "ringErevBefore6": [
   "app/admin/(app)/settings/routing-actions.ts",
   "lib/ivr/routing.ts"
@@ -661,6 +681,10 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "lib/ivr/routing.ts"
  ],
  "ringErevTo8": [
+  "app/admin/(app)/settings/routing-actions.ts",
+  "lib/ivr/routing.ts"
+ ],
+ "ringErevToSummer8": [
   "app/admin/(app)/settings/routing-actions.ts",
   "lib/ivr/routing.ts"
  ],
@@ -832,6 +856,11 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  ],
  "staffMutzeEveryWeek": [
   "lib/staff-mutze.ts"
+ ],
+ "promosPerYear": [
+  "lib/campaigns.ts",
+  "lib/promo-limit.ts",
+  "lib/sms.ts"
  ],
  "staffMutzeDeliveryAfterMin": [
   "lib/staff-mutze.ts"

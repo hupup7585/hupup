@@ -78,7 +78,7 @@ describe("campaigns", () => {
     expect(sends.map((s) => [s.status, s.reason])).toEqual([
       ["sent", null],
       ["skipped", "Replied STOP (no texts)"],
-      ["skipped", "Already got 6 promo texts this year"],
+      ["skipped", "Already got 5 promo texts this year"],
     ]);
     expect(done.skippedCount).toBe(2);
     const [msg] = await db.select().from(schema.messages).where(eq(schema.messages.id, sends[0].messageId!));

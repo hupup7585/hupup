@@ -11,7 +11,7 @@ export default function RoutingForm({
   summary,
 }: {
   ringKey: RingKey;
-  initial: { targets: string; mode: string; accept: boolean; name?: string; attempts?: string; afterHours?: boolean; announce?: string; afterFrom?: string; afterTo?: string; erevTo?: string; erevBefore?: string };
+  initial: { targets: string; mode: string; accept: boolean; name?: string; attempts?: string; afterHours?: boolean; announce?: string; erevToSummer?: string; afterFrom?: string; afterTo?: string; erevTo?: string; erevBefore?: string };
   summary: string;
 }) {
   const [state, action, pending] = useActionState(saveRoutingAction, null);
@@ -59,15 +59,19 @@ export default function RoutingForm({
           <input type="time" name="afterTo" defaultValue={initial.afterTo ?? ""} className="input" />
         </label>
         <label className="block">
-          <span className="label">Friday and Erev Yom Tov until</span>
+          <span className="label">Friday and Erev Yom Tov until (winter)</span>
           <input type="time" name="erevTo" defaultValue={initial.erevTo ?? ""} className="input" />
+        </label>
+        <label className="block">
+          <span className="label">Friday and Erev Yom Tov until (summer)</span>
+          <input type="time" name="erevToSummer" defaultValue={initial.erevToSummer ?? ""} className="input" />
         </label>
         <label className="block">
           <span className="label">Stop this many minutes before candle lighting</span>
           <input type="number" name="erevBefore" min={0} max={240} defaultValue={initial.erevBefore ?? "0"} className="input" />
         </label>
         <p className="text-xs text-muted sm:col-span-4">
-          Leave From and Until empty to ring the whole time the office is closed. On Friday and Erev Yom Tov the line rings until the Erev time, or until the minutes before candle lighting when that is later (summer). Example for delivery and pickup: from 8:00 AM until 10:30 PM; Friday until 4:00 PM, or 60 minutes before candle lighting when that is later.
+          Leave From and Until empty to ring the whole time the office is closed. On Friday and Erev Yom Tov the line stops at whichever comes first: the Friday time for the season (winter or summer, by daylight saving time) or the minutes before candle lighting. It never rings after candle lighting. Example for delivery and pickup: from 8:00 AM until 10:30 PM; Friday until 3:00 PM in winter and 4:00 PM in summer, or 90 minutes before candle lighting if that is earlier.
         </p>
       </fieldset>
       <p className="text-xs text-muted">Shabbes and Yom Tov: nothing rings; callers go to this line&rsquo;s voicemail.</p>

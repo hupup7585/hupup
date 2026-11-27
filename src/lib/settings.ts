@@ -208,12 +208,12 @@ export const SETTING_DEFAULTS = {
   ringAfterHours6: false,
   ringAfterHours8: false,
   /* After-hours window per line, editable in Phone settings (Abraham, Nov 14, 2026). Key 6 keeps the approved hours. */
-  ringAfterFrom0: "", ringAfterTo0: "", ringErevTo0: "", ringErevBefore0: "0",
-  ringAfterFrom2: "", ringAfterTo2: "", ringErevTo2: "", ringErevBefore2: "0",
-  ringAfterFrom4: "", ringAfterTo4: "", ringErevTo4: "", ringErevBefore4: "0",
-  ringAfterFrom5: "", ringAfterTo5: "", ringErevTo5: "", ringErevBefore5: "0",
-  ringAfterFrom6: "08:00", ringAfterTo6: "22:30", ringErevTo6: "16:00", ringErevBefore6: "60",
-  ringAfterFrom8: "", ringAfterTo8: "", ringErevTo8: "", ringErevBefore8: "0",
+  ringAfterFrom0: "", ringAfterTo0: "", ringErevTo0: "", ringErevToSummer0: "", ringErevBefore0: "0",
+  ringAfterFrom2: "", ringAfterTo2: "", ringErevTo2: "", ringErevToSummer2: "", ringErevBefore2: "0",
+  ringAfterFrom4: "", ringAfterTo4: "", ringErevTo4: "", ringErevToSummer4: "", ringErevBefore4: "0",
+  ringAfterFrom5: "", ringAfterTo5: "", ringErevTo5: "", ringErevToSummer5: "", ringErevBefore5: "0",
+  ringAfterFrom6: "08:00", ringAfterTo6: "22:30", ringErevTo6: "15:00", ringErevToSummer6: "16:00", ringErevBefore6: "90",
+  ringAfterFrom8: "", ringAfterTo8: "", ringErevTo8: "", ringErevToSummer8: "", ringErevBefore8: "0",
   ringAnnounce0: "",
   ringAnnounce2: "",
   ringAnnounce4: "",
@@ -259,6 +259,8 @@ export const SETTING_DEFAULTS = {
   sensitiveSwitchGuard: false,
   /** Abraham, Nov 26, 2026, 8:34 PM: staff may book Mutze Shabbes every week (not the phone, not the website) */
   staffMutzeEveryWeek: true,
+  /** Abraham, Nov 26, 2026: at most this many promo texts per customer per calendar year (the wording says 5) */
+  promosPerYear: "5",
   /** Mutze Shabbes by staff: delivery this many minutes after Shabbes ends (150 = two and a half hours) */
   staffMutzeDeliveryAfterMin: "150",
   /** Bookkeeping (Abraham T): Sola processing rate, to estimate fees and the net deposit per payment. Owner sets them from the Sola statement. */

@@ -253,9 +253,12 @@ export function scheduleWords(sch: Schedule): string {
 }
 
 /** Website / office hours as "Day: hours" lines (the website Hours card and main menu key 7). */
-export function officeLines(sch: Schedule): string[] {
+export function officeLines(sch: Schedule, at: Date = new Date()): string[] {
   const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday night"];
-  const words = (d: Day) => (d.closed ? "" : d.windows.map((w) => `${dashTime(w.from)} - ${dashTime(w.to)}`).join(", "));
+  // A season Friday (Abraham, Nov 26, 2026: the office closes Friday with customer service) shows the time in effect
+  // now, e.g. "3:00 PM" in winter, so the website never shows new words
+  const end = (to: string) => (to.trim().toLowerCase() === "season" ? (seasonClose(sch, at) ?? to) : to);
+  const words = (d: Day) => (d.closed ? "" : d.windows.map((w) => `${dashTime(w.from)} - ${dashTime(end(w.to))}`).join(", "));
   return grouped(sch, words, names, " - ").map(([day, w]) => `${day}: ${w}`);
 }
 /** "10:30 AM", "7:00 PM", "Chatzos" (the website's existing style). */

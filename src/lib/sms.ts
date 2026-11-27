@@ -92,6 +92,13 @@ function yearStart(now = new Date()): Date {
  * campaigns combined. A text counts once it is accepted (queued, held for the morning, sent, delivered, even if the
  * carrier later fails it); only texts we blocked or canceled before sending don't count, so retries never add more.
  */
+/** The yearly promo limit (Admin setting promosPerYear, 5), read through the same connection as the send. */
+async function yearlyLimit(exec: Pick<typeof db, "select"> = db): Promise<number> {
+  const [r] = await exec.select({ v: schema.appSettings.value }).from(schema.appSettings).where(eq(schema.appSettings.key, "promosPerYear")).limit(1);
+  const n = Math.round(Number(r?.v ?? PROMOS_PER_YEAR));
+  return Number.isFinite(n) && n >= 1 && n <= 12 ? n : PROMOS_PER_YEAR;
+}
+
 export async function promosThisYear(phone: string, now = new Date(), exec: Pick<typeof db, "select"> = db): Promise<number> {
   const [r] = await exec
     .select({ n: sql<number>`count(*)::int` })
@@ -246,7 +253,7 @@ export async function checkEligibility(input: { to: string; kind: MessageKind; e
   if (customer?.smsOptOut) return "opted_out";
   if (kind === "transactional") return (await hasTransactionalConsent(to)) ? null : "no_transactional_consent";
   if (!customer?.marketingOptIn) return "no_marketing_consent";
-  if (!input.heldRecheck && (await promosThisYear(to, input.now, input.exec)) >= PROMOS_PER_YEAR) return "yearly_limit";
+  if (!input.heldRecheck && (await promosThisYear(to, input.now, input.exec)) >= (await yearlyLimit(input.exec))) return "yearly_limit";
   if (!inMarketingHours(to, input.now, customer.timeZone)) return "quiet_hours";
   return null;
 }

@@ -67,7 +67,7 @@ export default async function PhoneSettingsPage({ searchParams }: { searchParams
                 <h3 className="mb-2 font-extrabold">{RING_KEY_LABELS[k]}</h3>
                 <RoutingForm
                   ringKey={k}
-                  initial={{ ...own, name: settings[`ringName${k}`], attempts: settings[`ringAttempts${k}`], afterHours: settings[`ringAfterHours${k}`], announce: settings[`ringAnnounce${k}`], ...(() => { const w = afterHoursWindow(k, settings); return { afterFrom: w.from, afterTo: w.to, erevTo: w.erevTo, erevBefore: w.erevBefore }; })() }}
+                  initial={{ ...own, name: settings[`ringName${k}`], attempts: settings[`ringAttempts${k}`], afterHours: settings[`ringAfterHours${k}`], announce: settings[`ringAnnounce${k}`], ...(() => { const w = afterHoursWindow(k, settings); return { afterFrom: w.from, afterTo: w.to, erevTo: w.erevTo, erevToSummer: w.erevToSummer, erevBefore: w.erevBefore }; })() }}
                   summary={`${list.usesOperatorList ? "No numbers yet, so it uses the operator list: " : ""}${routeSummary(list.targets, list.mode)}`}
                 />
               </div>

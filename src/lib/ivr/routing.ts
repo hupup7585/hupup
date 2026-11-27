@@ -148,6 +148,16 @@ export function ringAttempts(s: Partial<Record<`ringAttempts${RingKey}`, string 
   return Number.isFinite(n) && n >= 1 && n <= 5 ? Math.round(n) : 3;
 }
 
+/** Winter (standard time) or summer (daylight saving time) in New York on that moment; same rule as the Hours page. */
+function seasonAt(at: Date): "winter" | "summer" {
+  const offset = (d: Date) => {
+    const p = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", timeZoneName: "longOffset" }).formatToParts(d).find((x) => x.type === "timeZoneName")?.value ?? "";
+    const r = /GMT([+-])(\d{2}):?(\d{2})?/.exec(p);
+    return r ? (r[1] === "-" ? -1 : 1) * (Number(r[2]) * 60 + Number(r[3] ?? 0)) : 0;
+  };
+  return offset(at) > offset(new Date(Date.UTC(at.getUTCFullYear(), 0, 1))) ? "summer" : "winter";
+}
+
 /** Minutes since local midnight in New York. */
 function nyMinutes(at: Date) {
   const [h, m] = new Intl.DateTimeFormat("en-GB", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(at).split(":").map(Number);
@@ -156,20 +166,20 @@ function nyMinutes(at: Date) {
 
 /**
  * After-hours ringing window per line (Abraham, Nov 14, 2026: every hour editable in Admin > Phone settings). Empty
- * "from"/"to" = the whole time the office is closed. On Friday and Erev Yom Tov the line rings until "Erev until", or
- * until the set minutes before candle lighting when that is later (empty "Erev until" = only the candle lighting rule).
- * Defaults keep what was approved: key 6 8:00 AM to 10:30 PM, Erev until 4:00 PM or 60 minutes before candles.
+ * "from"/"to" = the whole time the office is closed. On Friday and Erev Yom Tov (Abraham, Nov 26, 2026) the line stops
+ * at whichever comes FIRST: the Friday time for the season (winter 3:00 PM, summer 4:00 PM) or the set minutes before
+ * candle lighting (90); never past candle lighting. Empty Friday time = only the candle lighting rule.
  */
-export const AFTER_HOURS_DEFAULTS: Record<RingKey, { from: string; to: string; erevTo: string; erevBefore: string }> = {
-  "0": { from: "", to: "", erevTo: "", erevBefore: "0" },
-  "2": { from: "", to: "", erevTo: "", erevBefore: "0" },
-  "4": { from: "", to: "", erevTo: "", erevBefore: "0" },
-  "5": { from: "", to: "", erevTo: "", erevBefore: "0" },
-  "6": { from: "08:00", to: "22:30", erevTo: "16:00", erevBefore: "60" },
-  "8": { from: "", to: "", erevTo: "", erevBefore: "0" },
+export const AFTER_HOURS_DEFAULTS: Record<RingKey, { from: string; to: string; erevTo: string; erevToSummer: string; erevBefore: string }> = {
+  "0": { from: "", to: "", erevTo: "", erevToSummer: "", erevBefore: "0" },
+  "2": { from: "", to: "", erevTo: "", erevToSummer: "", erevBefore: "0" },
+  "4": { from: "", to: "", erevTo: "", erevToSummer: "", erevBefore: "0" },
+  "5": { from: "", to: "", erevTo: "", erevToSummer: "", erevBefore: "0" },
+  "6": { from: "08:00", to: "22:30", erevTo: "15:00", erevToSummer: "16:00", erevBefore: "90" },
+  "8": { from: "", to: "", erevTo: "", erevToSummer: "", erevBefore: "0" },
 };
 type AfterHoursSettings = Partial<Record<`ringAfterHours${RingKey}`, boolean>> &
-  Partial<Record<`ringAfterFrom${RingKey}` | `ringAfterTo${RingKey}` | `ringErevTo${RingKey}` | `ringErevBefore${RingKey}`, string>>;
+  Partial<Record<`ringAfterFrom${RingKey}` | `ringAfterTo${RingKey}` | `ringErevTo${RingKey}` | `ringErevToSummer${RingKey}` | `ringErevBefore${RingKey}`, string>>;
 
 const hhmm = (v: string | undefined): number | null => {
   const m = /^(\d{1,2}):(\d{2})$/.exec((v ?? "").trim());
@@ -186,6 +196,7 @@ export function afterHoursWindow(k: RingKey, s: AfterHoursSettings) {
     from: pick(`ringAfterFrom${k}`, d.from),
     to: pick(`ringAfterTo${k}`, d.to),
     erevTo: pick(`ringErevTo${k}`, d.erevTo),
+    erevToSummer: pick(`ringErevToSummer${k}`, d.erevToSummer),
     erevBefore: pick(`ringErevBefore${k}`, d.erevBefore),
   };
 }
@@ -204,11 +215,11 @@ export function lineRingsNow(k: RingKey, at: Date, s: AfterHoursSettings, cal: {
   const from = hhmm(w.from) ?? 0;
   let end = hhmm(w.to) ?? 24 * 60;
   if (cal.candleLighting) {
-    // Abraham, Nov 14, 2026: ring until the Erev time (4:00 PM), or until the set minutes before candle lighting when
-    // that is later (summer); never past candle lighting itself (checked above)
-    const erevTo = hhmm(w.erevTo);
+    // Abraham, Nov 26, 2026: stop at whichever comes FIRST, the season's Friday time or the minutes before candle
+    // lighting; never past candle lighting itself (checked above). No summer time set: the winter one all year.
+    const erevTo = seasonAt(at) === "summer" ? (hhmm(w.erevToSummer) ?? hhmm(w.erevTo)) : hhmm(w.erevTo);
     const beforeCandles = nyMinutes(new Date(cal.candleLighting.getTime() - (Number(w.erevBefore) || 0) * 60_000));
-    end = erevTo === null ? beforeCandles : Math.max(erevTo, beforeCandles);
+    end = erevTo === null ? beforeCandles : Math.min(erevTo, beforeCandles);
   }
   return now >= from && now < end;
 }

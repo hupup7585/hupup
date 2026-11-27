@@ -60,17 +60,17 @@ describe("section 2 and 3: ringing staff, after hours", () => {
     expect(lineRingsNow("8", night, S, weekday)).toBe(false);
     expect(lineRingsNow("4", night, S, { ...weekday, officeOpen: true })).toBe(true);
   });
-  it("6 rings 8:00 AM to 10:30 PM; Friday and Erev Yom Tov always until 4:00 PM, or an hour before candle lighting when that is later (Abraham, Nov 14)", () => {
+  it("6 rings 8:00 AM to 10:30 PM; Friday and Erev Yom Tov until whichever comes first: 3:00 PM winter / 4:00 PM summer, or 90 minutes before candle lighting (Abraham, Nov 26)", () => {
     expect(lineRingsNow("6", at("2026-11-17T12:59:00Z"), S, weekday)).toBe(false); // 7:59 AM
     expect(lineRingsNow("6", at("2026-11-17T13:00:00Z"), S, weekday)).toBe(true); // 8:00 AM
     expect(lineRingsNow("6", at("2026-11-18T03:29:00Z"), S, weekday)).toBe(true); // 10:29 PM
     expect(lineRingsNow("6", at("2026-11-18T03:30:00Z"), S, weekday)).toBe(false); // 10:30 PM
-    const fri = { ...weekday, candleLighting: at("2026-11-20T21:13:00Z") }; // winter, 4:13 PM candles -> until 4:00 PM
-    expect(lineRingsNow("6", at("2026-11-20T20:59:00Z"), S, fri)).toBe(true); // 3:59 PM
-    expect(lineRingsNow("6", at("2026-11-20T21:00:00Z"), S, fri)).toBe(false); // 4:00 PM
-    const summerFri = { ...weekday, candleLighting: at("2027-06-25T23:59:00Z") }; // summer, 7:59 PM candles -> until 6:59 PM
-    expect(lineRingsNow("6", at("2027-06-25T22:58:00Z"), S, summerFri)).toBe(true); // 6:58 PM
-    expect(lineRingsNow("6", at("2027-06-25T22:59:00Z"), S, summerFri)).toBe(false); // 6:59 PM
+    const fri = { ...weekday, candleLighting: at("2026-11-20T21:13:00Z") }; // winter, 4:13 PM candles -> 90 min before (2:43 PM) is first
+    expect(lineRingsNow("6", at("2026-11-20T19:42:00Z"), S, fri)).toBe(true); // 2:42 PM
+    expect(lineRingsNow("6", at("2026-11-20T19:43:00Z"), S, fri)).toBe(false); // 2:43 PM
+    const summerFri = { ...weekday, candleLighting: at("2027-06-25T23:59:00Z") }; // summer, 7:59 PM candles -> 4:00 PM is first
+    expect(lineRingsNow("6", at("2027-06-25T19:59:00Z"), S, summerFri)).toBe(true); // 3:59 PM
+    expect(lineRingsNow("6", at("2027-06-25T20:00:00Z"), S, summerFri)).toBe(false); // 4:00 PM
   });
   it("Shabbes and Yom Tov: nothing rings; Admin can turn after-hours ringing off per line", () => {
     const shabbos = { ...weekday, officeOpen: true, shabbosOrYomTov: true };
@@ -314,12 +314,12 @@ describe("after-hours ringing times in Admin (Abraham, Nov 14, 2026)", () => {
     expect(lineRingsNow("5", at("2026-11-17T08:00:00Z"), base, weekday)).toBe(true); // 3:00 AM, no window on 5
     expect(lineRingsNow("5", at("2026-11-17T08:00:00Z"), { ...base, ringAfterFrom5: "08:00", ringAfterTo5: "23:00" }, weekday)).toBe(false);
     const fri = { ...weekday, candleLighting: at("2026-11-20T21:13:00Z") }; // candles 4:13 PM
-    // Erev time set to noon: an hour before candles (3:13 PM) is later, so it rings until 3:13 PM
-    expect(lineRingsNow("6", at("2026-11-20T20:12:00Z"), { ...base, ringErevTo6: "12:00" }, fri)).toBe(true); // 3:12 PM
-    expect(lineRingsNow("6", at("2026-11-20T20:13:00Z"), { ...base, ringErevTo6: "12:00" }, fri)).toBe(false); // 3:13 PM
-    // Erev time set to 5:00 PM: never rings past candle lighting (4:13 PM)
-    expect(lineRingsNow("6", at("2026-11-20T21:12:00Z"), { ...base, ringErevTo6: "17:00" }, fri)).toBe(true); // 4:12 PM
-    expect(lineRingsNow("6", at("2026-11-20T21:13:00Z"), { ...base, ringErevTo6: "17:00" }, fri)).toBe(false); // 4:13 PM
+    // Erev time set to noon: noon comes before 90 minutes before candles (2:43 PM), so it stops at noon
+    expect(lineRingsNow("6", at("2026-11-20T16:59:00Z"), { ...base, ringErevTo6: "12:00" }, fri)).toBe(true); // 11:59 AM
+    expect(lineRingsNow("6", at("2026-11-20T17:00:00Z"), { ...base, ringErevTo6: "12:00" }, fri)).toBe(false); // 12:00 PM
+    // Erev time set to 5:00 PM: 90 minutes before candles (2:43 PM) comes first
+    expect(lineRingsNow("6", at("2026-11-20T19:42:00Z"), { ...base, ringErevTo6: "17:00" }, fri)).toBe(true); // 2:42 PM
+    expect(lineRingsNow("6", at("2026-11-20T19:43:00Z"), { ...base, ringErevTo6: "17:00" }, fri)).toBe(false); // 2:43 PM
   });
   it("key 6 rings after hours (switch on in the live database); the form shows the times", async () => {
     const { readFileSync } = await import("node:fs");

@@ -30,18 +30,30 @@ describe("winter and summer Friday closing for every department", () => {
     expect(parseWindows("09:30-Season closing", true, true)).toEqual([{ from: "09:30", to: "season" }]);
     expect(parseWindows("09:30-Season closing", true, false)).toBeNull();
   });
-  it("the Hours page offers it on every department (not the website and office hours), with the explanation", () => {
+  it("the Hours page offers it on every department, the website and office hours too (Abraham, Nov 26, 2026), with the explanation", () => {
     const page = readFileSync("src/app/admin/(app)/hours/page.tsx", "utf8");
-    expect(page).toContain('seasonAllowed={id !== "office"}');
-    expect(page).toContain('seasonAllowed={!g.members.includes("office")}');
+    expect(page).not.toContain('seasonAllowed={id !== "office"}');
     expect(page).toContain("{seasonAllowed && <FridaySeasonFields schedule={schedule} />}");
     expect(page).toContain('name="season" value="1" defaultChecked={Boolean(schedule.fridaySeason)}');
     for (const s of ["What it does:", "How to use it:", "If you change it:"]) expect(page).toContain(s);
     const actions = readFileSync("src/app/admin/(app)/hours/actions.ts", "utf8");
-    expect(actions).toContain('const season = fd.get("season") === "1" && !office;');
+    expect(actions).toContain('const season = fd.get("season") === "1";');
   });
   it("lines without the box keep Chatzos (customer service is unchanged)", () => {
     const h = withSeason();
     expect(h.lines.cs.schedule.fridaySeason).toBeUndefined();
+  });
+});
+
+describe("the website shows the season's Friday time, never new words (Nov 26, 2026)", () => {
+  it("a season Friday on the office hours prints the time in effect", async () => {
+    const { officeLines, OPERATOR_FRIDAY_SEASON } = await import("@/lib/hours-schedule");
+    const day = (from: string, to: string) => ({ closed: false, windows: [{ from, to }] });
+    const sch = { days: { "0": day("10:00", "19:00"), "1": day("10:00", "19:00"), "2": day("10:00", "19:00"), "3": day("10:00", "19:00"), "4": day("10:00", "19:00"), "5": day("10:00", "season"), "6": { closed: true, windows: [] } }, chanukah: {}, cholHamoed: {}, overrides: [], fridaySeason: { ...OPERATOR_FRIDAY_SEASON } } as never;
+    const winter = officeLines(sch, new Date("2026-12-04T15:00:00Z")).join(" | ");
+    const summer = officeLines(sch, new Date("2027-06-18T15:00:00Z")).join(" | ");
+    expect(winter).toContain("Friday: 10:00 AM - 3:00 PM");
+    expect(summer).toContain("Friday: 10:00 AM - 4:00 PM");
+    expect(winter + summer).not.toContain("Season closing");
   });
 });
