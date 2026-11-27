@@ -63,6 +63,27 @@ export async function matchDirectoryAddress(a: { house: string; street: string; 
 }
 
 /** Is any household listed at this house number and street (any unit; the zip too when given)? (Nov 25, 2026, unit step) */
+/**
+ * Hark's 2nd phone check, B7 (Nov 26, 2026): what the directory says about units at this house. "units" = every entry
+ * there has a unit (the unit is required); "none" = no entry has one (a one-family house: no unit asked); "mixed" =
+ * some do, some don't (the usual unit question); null = the house is not in the directory.
+ */
+export async function directoryHouseUnits(a: { house: string; street: string; zip?: string | null }): Promise<"units" | "none" | "mixed" | null> {
+  const { houseKey, streetKey } = await import("@/lib/street-search");
+  if (!houseKey(a.house) || !streetKey(a.street)) return null;
+  const zip = a.zip?.replace(/\D/g, "");
+  let rows: DirectoryEntry[] = [];
+  try {
+    rows = zip ? await db.select().from(schema.directoryEntries).where(eq(schema.directoryEntries.zip, zip)) : await db.select().from(schema.directoryEntries);
+  } catch {
+    return null;
+  }
+  const here = rows.filter((r) => houseKey(r.house) === houseKey(a.house) && streetKey(r.street) === streetKey(a.street));
+  if (!here.length) return null;
+  const withUnit = here.filter((r) => (r.unit ?? "").trim()).length;
+  return withUnit === here.length ? "units" : withUnit === 0 ? "none" : "mixed";
+}
+
 export async function directoryHasHouse(a: { house: string; street: string; zip?: string | null }): Promise<boolean> {
   const { houseKey, streetKey } = await import("@/lib/street-search");
   if (!houseKey(a.house) || !streetKey(a.street)) return false;

@@ -3853,8 +3853,14 @@ const handlers: Record<string, Handler> = {
   async "addr-unit-ask"(ctx, vr) {
     const d = ctx.session?.data ?? {};
     if (!d.house || !d.street) return back(vr, "addr-house");
-    const { directoryHasHouse } = await import("@/lib/directory");
-    if (await directoryHasHouse({ house: d.house, street: d.street, zip: d.zip })) return back(vr, "addr-unit");
+    const { directoryHouseUnits } = await import("@/lib/directory");
+    const units = await directoryHouseUnits({ house: d.house, street: d.street, zip: d.zip });
+    // Hark's 2nd phone check, B7: a one-family house in the directory (no units there) never asks for a unit
+    if (units === "none") {
+      await updateSession(ctx.callSid, { data: { unit: undefined } }, ctx.session);
+      return back(vr, "addr-check");
+    }
+    if (units === "units") return back(vr, "addr-unit");
     const g = keypad(vr, url("addr-unit-ask-choice"));
     menuRun(g, ctx, "addr_unit_ask", ["addr_unit_ask", "star"]);
     return repeatMenu(vr, ctx, "addr-unit-ask");
