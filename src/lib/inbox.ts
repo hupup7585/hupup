@@ -383,12 +383,18 @@ async function textOwnerAboutEmail(e: { id?: number; fromName: string | null; fr
 }
 
 /** A sent email (booking, payment, catalog, alerts...) kept under Sent in the Admin inbox, with its files. */
-export async function recordSentEmail(input: { to: string; subject: string; body: string; attachments: { filename: string; content: string }[]; sent: boolean; error: string | null; kind?: "code" | "catalog" | "auto" }) {
+export async function recordSentEmail(input: { to: string; subject: string; body: string; attachments: { filename: string; content: string }[]; sent: boolean; error: string | null; kind?: "code" | "catalog" | "auto" | "backup" }) {
+  // Deep check 30 (Nov 27, 2026): the Sent copy never keeps a working sign-in code (the digits are hidden), and the
+  // weekly backup's Sent copy is kept without its file (all customer data stays only in the Owner's email)
+  const hide = (t: string) => (input.kind === "code" ? t.replace(/\b\d{4,8}\b/g, "••••••") : t);
+  const backup = input.kind === "backup";
+  const files = backup ? [] : input.attachments;
+  const body = hide(input.body) + (backup && input.attachments.length ? `\n\n(The backup file, ${input.attachments.map((a) => a.filename).join(", ")}, is not kept here.)` : "");
   const [row] = await db
     .insert(schema.inboxReplies)
-    .values({ emailId: null, toAddress: input.to, subject: input.subject, body: input.body, sent: input.sent, error: input.sent ? null : (input.error ?? "not sent"), userId: null, kind: input.kind ?? "auto" })
+    .values({ emailId: null, toAddress: input.to, subject: hide(input.subject), body, sent: input.sent, error: input.sent ? null : (input.error ?? "not sent"), userId: null, kind: backup ? "auto" : (input.kind ?? "auto") })
     .returning();
-  for (const a of input.attachments) {
+  for (const a of files) {
     const data = Buffer.from(a.content, "base64");
     const name = a.filename.toLowerCase();
     const type = name.endsWith(".pdf") ? "application/pdf" : name.endsWith(".png") ? "image/png" : /\.jpe?g$/.test(name) ? "image/jpeg" : "application/octet-stream";
