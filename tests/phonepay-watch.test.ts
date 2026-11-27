@@ -42,6 +42,13 @@ describe("watching Sola while the call to Sola is up", () => {
     expect(watchDecision(a, [txn({ approved: false })], new Date(start.getTime() + 40_000))).toBe("declined");
     expect(watchDecision(a, [txn({})], new Date(start.getTime() + 40_000))).toBe("approved");
   });
+  it("deep check 06:00 M38: another caller's charge of the same amount (another phone in Invoice) never stops this call", () => {
+    const now = new Date(start.getTime() + 40_000);
+    const mine = { ...a, callerPhone: "+18455550100" };
+    expect(watchDecision(mine, [txn({ invoice: "8455550199", approved: false })], now)).toBe("wait");
+    expect(watchDecision(mine, [txn({ invoice: "8455550100", approved: false })], now)).toBe("declined");
+    expect(watchDecision(mine, [txn({ invoice: "" })], now)).toBe("approved"); // no phone in Invoice: still counts
+  });
   it("other amounts, our order numbers, older charges and used refs are ignored; no 4-minute timer (Nov 18, 2026)", () => {
     const now = new Date(start.getTime() + 40_000);
     expect(watchDecision(a, [txn({ amountCents: 999 }), txn({ invoice: "1042" }), txn({ at: new Date(start.getTime() - 5 * 60_000) })], now)).toBe("wait");

@@ -33,6 +33,15 @@ describe("Sola notices", () => {
     const after = await get(o.id);
     expect([after.paymentResult, after.status]).toEqual(["approved", "CONFIRMED"]);
   });
+  it("deep check 06:00 M40: 'Paid, card ending' only on the days this payment booked, never a released day with nothing paid", async () => {
+    const [a] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-10-27", pickupDate: "2027-10-28", subtotalCents: 5000, totalCents: 5000, holdExpiresAt: new Date(Date.now() + 600_000) }).returning();
+    await db.update(schema.orders).set({ paymentGroupId: a.id }).where(eq(schema.orders.id, a.id));
+    const [b] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "PHONE", eventDate: "2027-10-28", pickupDate: "2027-10-29", subtotalCents: 5000, totalCents: 5000, paymentGroupId: a.id }).returning();
+    await db.insert(schema.orderStatusHistory).values({ orderId: b.id, fromStatus: "PENDING_PAYMENT", toStatus: "CANCELLED", userId: 1, reason: "Cancelled by staff" });
+    expect((await post({ xResult: "A", xInvoice: invoiceFor(a.id), xAuthAmount: "50.00", xRefNum: "M40", xMaskedCardNumber: "4xxxxxxxxxxx1111" })).status).toBe(200);
+    expect((await get(a.id)).paymentResult).toBe("approved");
+    expect((await get(b.id)).paymentResult).toBeNull();
+  });
   it("#7: a payment saved halfway is confirmed by Sola's repeat notice, with one paid text", async () => {
     const [cu] = await db.insert(schema.customers).values({ name: "Sara", phone: "+18455550777" }).returning();
     const [o] = await db

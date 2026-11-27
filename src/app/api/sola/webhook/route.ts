@@ -1,6 +1,6 @@
 import { field, isApproved, isSaleCommand, last4Of, orderIdFromInvoice, paymentResultOf, verifyWebhookSignature } from "@/lib/sola";
 import { paymentReceivedNotices, recordPaymentResult } from "@/lib/payment-result";
-import { getPaymentGroup, markGroupPaid } from "@/lib/orders";
+import { getPaymentGroup, markGroupPaid, payingDays } from "@/lib/orders";
 import { linkPaymentToAcceptance } from "@/lib/rental-terms";
 import { parseMoneyToCents } from "@/lib/money";
 import { alertOwner, withCallbackAlert } from "@/lib/ops-alerts";
@@ -89,7 +89,11 @@ async function handle(req: Request): Promise<Response> {
   // Deep check 06:00 M26: two copies of the same notice at the same moment: the second finds the payment already
   // counted (duplicate) and sends nothing
   if (updated.length && updated.every((u) => "duplicate" in u && u.duplicate)) return new Response("ok (already recorded)");
-  await recordPaymentResult(days.map((d) => d.order.id), "approved", last4Of(fields), field(fields, "xRefNum") || null);
+  // Deep check 06:00 M40: "Paid, card ending ..." only on the days this payment booked (as the paid notices), never on a
+  // day released or cancelled with nothing paid on it
+  const after = await getPaymentGroup(orderId);
+  const paidDays = after ? payingDays(after.orders, after.primary) : days;
+  await recordPaymentResult(paidDays.map((d) => d.order.id), "approved", last4Of(fields), field(fields, "xRefNum") || null);
   if (!updated.length && fresh) return new Response("unknown order", { status: 404 });
   // Evidence: tie this payment to the rental terms version the customer accepted (or record that none was).
   if (fresh) await linkPaymentToAcceptance(orderId, field(fields, "xRefNum") || null, cents);
