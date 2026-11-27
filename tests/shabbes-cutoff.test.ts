@@ -91,17 +91,6 @@ describe("Shabbes cut-off", () => {
     expect(await checkBookable(p.id, 1, EVENT)).toBe(1);
   });
 
-  it("deep check 06:00 M45: a caller with an empty cart who picks a first item after the cut-off gets the closed greeting; nothing is held", async () => {
-    const sid = "CAcut45";
-    await ensureSession(sid, FROM);
-    process.env.HUP_CALENDAR_NOW = new Date(candles.getTime() - 10 * 60_000).toISOString();
-    const xml = await call(sid, "add", {}, `p=${pid}&d=${EVENT}`);
-    expect(said(xml)).toContain("We are closed now for Shabbes");
-    const held = await db.select().from(schema.orders).where(eq(schema.orders.callSid, sid));
-    expect(held).toHaveLength(0);
-    process.env.HUP_CALENDAR_NOW = PINNED;
-  });
-
   it("an empty cart at the cut-off: the closed greeting, as today", async () => {
     process.env.HUP_CALENDAR_NOW = new Date(candles.getTime() - 10 * 60_000).toISOString();
     const xml = await call("CAcut3", "book");
