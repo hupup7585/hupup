@@ -2661,12 +2661,10 @@ const handlers: Record<string, Handler> = {
    */
   async "resume-choice"(ctx, vr) {
     const rd = ctx.body.Digits;
-    if (rd === "*") {
-      // Hark's phone check (Nov 27, 2026, bug 4): star decides nothing, so the offer comes again the next time the caller
-      // goes into booking (the saved cart stayed held and blocked the caller's own items, with no welcome back)
-      await updateSession(ctx.callSid, { data: { resumeAsked: undefined } }, ctx.session);
-      return back(vr, "menu"); // star: one step back, the main menu
-    }
+    // Hark's phone check (Nov 27, 2026, bug 4): star decides nothing, so the offer comes again the next time the caller
+    // goes into booking (the saved cart stayed held and blocked the caller's own items, with no welcome back)
+    if (rd === "*") await updateSession(ctx.callSid, { data: { resumeAsked: undefined } }, ctx.session);
+    if (rd === "*") return back(vr, "menu"); // star: one step back, the main menu
     if (rd === "2") {
       await releaseSavedCart(ctx); // a new order instead: the cart saved over Shabbes goes back to stock
       return back(vr, "book"); // 2: a new order
