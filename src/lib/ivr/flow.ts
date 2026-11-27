@@ -1565,15 +1565,13 @@ async function clearSpan(ctx: Ctx, date: string) {
 }
 
 /**
- * 09:00 deep check P17: a new item chosen from a list for the day already being shopped for ("same day, press 1", a
- * menu key that books an item) is a plain booking: an earlier "next day too" (box 18 key 2) or closed-day span on that
- * date stays with the rental it was chosen for and never spreads to this item. Add-ons of that rental (a second one,
- * extra gun sets, ocean balls) go straight to "add" and keep it.
+ * Deep check 09:00 P17: another item for the day already chosen on this call (the date step is skipped). A "next day
+ * too" (Box 18 key 2) or closed-day choice belongs to the item it was made for: the new item is booked for that date
+ * only (its own pickup, no 1.5x), as when the date is entered again and confirmed.
  */
-async function newItemForDay(ctx: Ctx, vr: VR, productId: number) {
-  const day = ctx.session?.data.day;
-  if (!day) return back(vr, "date", { p: productId });
+async function sameDayItem(ctx: Ctx, vr: VR, productId: number, day: string) {
   await clearSpan(ctx, day);
+  await chooseDay(ctx, day);
   return back(vr, "qty", { p: productId, d: day });
 }
 
@@ -1769,12 +1767,12 @@ async function lineRingsNowFor(k: RingKey, settings: Awaited<ReturnType<typeof g
   const line = RING_KEY_LINE[k] ?? "office";
   if (!effectiveLine(hours, line).on) return false; // switched off: this line goes to its voicemail
   const inHours = line === "office" ? officeOpenNow(at, settings) : lineOpen(hours, line, at, settings);
-  // 09:00 deep check P16: a line's Saturday-night (Motzei Shabbes) window on the Hours page rings once Shabbes or Yom Tov
-  // is over (the same time-based lock the Hours page uses). The whole Saturday date used to count as Shabbes, so those
-  // windows never rang. After-hours ringing on that date stays off, as before.
-  const openNight = inHours && !bookingLock(at, settings as never).locked;
-  if (opts.hoursOnly) return inHours && (openNight || !isShabbosOrYomTov(iso)); // bookings key 0: the line's own hours only (no after-hours ringing)
-  return lineRingsNow(k, at, settings, { officeOpen: inHours, shabbosOrYomTov: isShabbosOrYomTov(iso) && !openNight, candleLighting: erevCandleLighting(iso, settings) });
+  // Deep check 09:00 P16: Shabbes and Yom Tov by the clock (candle lighting to the end), not by the date, so a line's
+  // own Saturday-night (Motzei Shabbes) hours on the Hours page ring once Shabbes is out. The after-hours switch still
+  // never rings on a Shabbes or Yom Tov date outside the line's own hours (as before).
+  const locked = bookingLock(at, settings).locked;
+  if (opts.hoursOnly) return inHours && !locked; // bookings key 0: the line's own hours only (no after-hours ringing)
+  return lineRingsNow(k, at, settings, { officeOpen: inHours && !locked, shabbosOrYomTov: locked || (isShabbosOrYomTov(iso) && !inHours), candleLighting: erevCandleLighting(iso, settings) });
 }
 
 /**
@@ -2951,7 +2949,10 @@ const handlers: Record<string, Handler> = {
     if (!d) return bookNoInput(vr, ctx, "balloon", { p: p.id, f });
     if (d === "*") return back(vr, "balloons", { c: p.categoryId, f });
     if (d === "0") return back(vr, "cart");
-    if (d === "1") return newItemForDay(ctx, vr, p.id);
+    if (d === "1") {
+      const day = ctx.session?.data.day;
+      return day ? sameDayItem(ctx, vr, p.id, day) : back(vr, "date", { p: p.id });
+    }
     if (d === "2") {
       await track(ctx.callSid, "item_details", `Heard the details of ${p.name}`, { item: p.name, productId: p.id });
       const sizes = balloonSizes(p.dimensions);
@@ -2991,11 +2992,12 @@ const handlers: Record<string, Handler> = {
     const p = /^\d{1,2}$/.test(d) && !d.startsWith("0") ? ((await isLaserBase(c)) ? laserList(items).find((x) => x.key === Number(d))?.p : items[Number(d) - 1]) : undefined;
     if (!p) {
       sp(vr, ctx, "not_valid");
-      return back(vr, "category", { c, f });
+      return back(vr, "category", { c, f: ctx.query.get("f") ?? undefined }); // deep check 09:00 P21: keeps the "free that date" filter, as no key does
     }
     await track(ctx.callSid, "item_heard", `Chose ${p.name}`, { item: p.name, productId: p.id });
     // Item first, then the date (Abraham). Adding more items for a day already chosen on this call skips the date.
-    return newItemForDay(ctx, vr, p.id);
+    const day = ctx.session?.data.day;
+    return day ? sameDayItem(ctx, vr, p.id, day) : back(vr, "date", { p: p.id });
   },
 
   async product(ctx, vr) {
@@ -3024,7 +3026,10 @@ const handlers: Record<string, Handler> = {
       pause(vr);
       return back(vr, "product", { p: p.id, again: 1 });
     }
-    if (d === "2") return newItemForDay(ctx, vr, p.id);
+    if (d === "2") {
+      const day = ctx.session?.data.day;
+      return day ? sameDayItem(ctx, vr, p.id, day) : back(vr, "date", { p: p.id });
+    }
     sp(vr, ctx, "not_valid");
     return back(vr, "product", { p: p.id, again: 1 });
   },
@@ -3250,7 +3255,6 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     const pick = ({ "1": ctx.query.get("dn"), "2": ctx.query.get("up") } as Record<string, string | null>)[ctx.body.Digits ?? ""];
     if (pick) {
-      await clearSpan(ctx, date); // P17: another size is its own plain booking
       await chooseDay(ctx, date);
       return back(vr, "qty", { p: pick, d: date });
     }
@@ -3295,7 +3299,8 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d") ?? undefined;
     const pick = ({ "1": ctx.query.get("b"), "2": ctx.query.get("a") } as Record<string, string | null>)[ctx.body.Digits ?? ""];
     if (pick) {
-      await clearSpan(ctx, pick); // P17: the other date is a plain booking (no span left on it from earlier)
+      // Deep check 09:00 P17: another date for this item: a next-day choice made earlier for that date (another item's) never carries over
+      if (pick !== date) await clearSpan(ctx, pick);
       await chooseDay(ctx, pick);
       return back(vr, "qty", { p, d: pick });
     }
@@ -5067,6 +5072,9 @@ const handlers: Record<string, Handler> = {
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "promo-consent");
     if (!group.paid) return back(vr, "goodbye"); // Hark's 2nd check, A2: "approved" only after a real payment
+    // Deep check 09:00 P3: a late payment whose items were taken (Needs attention) is paid but not booked: never "your
+    // booking is confirmed"; the Owner was emailed to call the customer (late payment rule, Abraham, Nov 13, 2026)
+    if (group.orders.some((x) => x.order.status === "NEEDS_ATTENTION")) return back(vr, "goodbye");
     const number = spokenDigits(orderNumber(o));
     const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
     sp(g, ctx, "phonepay_approved", { number });
@@ -5171,6 +5179,19 @@ const handlers: Record<string, Handler> = {
     if (group.paid) return back(vr, "pay-approved", { o });
     // Hark's 2nd check, A2: the hold ran out during payment and nothing was paid: never "approved", no new try
     if (group.due <= 0) {
+      // Deep check 09:00 P3: the hold ran out (released) while the caller was on the Sola line. The charge of this try is
+      // still looked for: found = a late payment (confirmed when the items are still free, else Needs attention and
+      // the Owner told), never a charge left unseen. Only a booking that is now paid hears the approved lines.
+      if (a) {
+        const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1);
+        if (attempt && !attempt.result && attempt.amountCents > 0) {
+          if (ctx.body.DialCallSid) await db.update(schema.phonepayAttempts).set({ payLegSid: ctx.body.DialCallSid }).where(eq(schema.phonepayAttempts.id, a));
+          await endMainPayLeg(ctx.body.DialCallSid ?? attempt.payLegSid);
+          const r = await checkPhonePayTry(o, a, attempt.amountCents);
+          await track(ctx.callSid, "step", `Card payment try ${attempt.tryNumber} after the hold ran out: ${r.result}`, { attempt: a }).catch(() => undefined);
+          if (r.result === "paid") return back(vr, "pay-approved", { o }); // it checks paid and booked (not Needs attention)
+        }
+      }
       await track(ctx.callSid, "step", "Payment step reached after the hold ran out (nothing paid): unpaid goodbye").catch(() => undefined);
       return back(vr, "goodbye");
     }
@@ -6133,8 +6154,10 @@ async function ownKey(ctx: Ctx, vr: VR, screen: string, k: KeyDef) {
       vr.dial({ callerId: staffCallerId(ctx.session?.fromNumber ?? ctx.from) }, n);
       return vr;
     }
-    case "item":
-      return newItemForDay(ctx, vr, a.productId);
+    case "item": {
+      const day = ctx.session?.data.day;
+      return day ? sameDayItem(ctx, vr, a.productId, day) : back(vr, "date", { p: a.productId });
+    }
     case "back":
       return handlers[ctx.action]({ ...ctx, body: { ...ctx.body, Digits: "*" } }, vr);
   }

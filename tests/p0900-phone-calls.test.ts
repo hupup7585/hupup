@@ -113,13 +113,14 @@ describe("P17: a 'next day too' choice stays with its rental", () => {
     expect(all).toHaveLength(1);
     expect((await itemsOf(spanned.id)).reduce((t, i) => t + i.qty, 0)).toBe(2);
   });
-  it("item taken, another size (1) or another date (1/2): a plain booking, no span from earlier", async () => {
+  it("item taken: another date never takes over an earlier span on that date; another size is the same rental and keeps its own", async () => {
     const c = caller();
     await ensureSession(c.sid, c.from);
     await updateSession(c.sid, { data: { spanDays: { "2027-01-18": { after: "2027-01-20", days: 1.5 }, "2027-01-19": { after: "2027-01-21", days: 1.5 } } } });
     expect(redirect(await c.call("taken-size-choice", { Digits: "2" }, `p=${castle}&d=2027-01-18&up=${bigCastle}`))).toBe(`qty?p=${bigCastle}&d=2027-01-18`);
+    expect((await getSession(c.sid))!.data.spanDays?.["2027-01-18"]).toEqual({ after: "2027-01-20", days: 1.5 });
     expect(redirect(await c.call("nearest-choice", { Digits: "2" }, `p=${castle}&d=2027-01-18&b=2027-01-17&a=2027-01-19`))).toBe(`qty?p=${castle}&d=2027-01-19`);
-    expect((await getSession(c.sid))!.data.spanDays).toEqual({});
+    expect((await getSession(c.sid))!.data.spanDays?.["2027-01-19"]).toBeUndefined();
   });
   it("box 18 key 2 itself, and the closed-day offer, still set the span (unchanged)", async () => {
     const c = caller();

@@ -391,13 +391,20 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
   const num = orderNumber(orderId);
   const group = await getPaymentGroup(orderId);
   const ids = group?.orders.map((d) => d.order.id) ?? [orderId];
+  // Deep check 09:00 P1 (M10 completed): charges an earlier try of this order already set aside as unclear are not
+  // counted again (they are voided once a try goes through), so one unclear try never makes every later try unclear
+  const setAside = (await db.select({ id: schema.phonepayAttempts.id, refs: schema.phonepayAttempts.unclearRefs }).from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.orderId, orderId)))
+    .filter((r) => r.id !== attemptId)
+    .flatMap((r) => (r.refs ?? "").split(",").filter(Boolean));
   let c: ReturnType<typeof classifyTry> | null = null;
   let failed = "";
   for (let i = 0; i < 3 && c?.kind !== "paid"; i++) {
     if (i) await new Promise((r) => setTimeout(r, deps.waitMs ?? 3000));
     try {
       const now = deps.now?.() ?? new Date();
-      c = classifyTry(await solaApprovedBetween(new Date(from.getTime() - 60_000), now, deps.fetcher), { amountCents: dueCents, from, to: now, phone: attempt?.callerPhone }, await usedSolaRefs());
+      const used = await usedSolaRefs();
+      for (const r of setAside) used.add(r);
+      c = classifyTry(await solaApprovedBetween(new Date(from.getTime() - 60_000), now, deps.fetcher), { amountCents: dueCents, from, to: now, phone: attempt?.callerPhone }, used);
       failed = "";
     } catch (e) {
       failed = (e as Error).message.slice(0, 200);
@@ -418,6 +425,21 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
     .from(schema.phonepayAttempts)
     .where(gte(schema.phonepayAttempts.startedAt, new Date(from.getTime() - 15 * 60_000)));
   const rivalSameAmount = sameTime.some((o) => o.callSid !== attempt?.callSid && o.amountCents === dueCents && (!o.endedAt || o.endedAt >= from));
+  // Deep check 09:00 P1 (M10 completed): two charges of the total only because the window reached back to an earlier
+  // try of this order that Sola could not check: both are this order's (no other caller paying the same amount, or
+  // this caller's phone on them). This try's own charge is the payment; the earlier try's charge is set aside on this
+  // try and voided right after (voidUnclearAfterPaid), so the caller is charged once, never once per try
+  let reachedBack: string[] = [];
+  if (c?.kind === "ambiguous" && unchecked.length && (c.byPhone || !rivalSameAmount)) {
+    const ownFrom = started.getTime() - 30_000;
+    const own = c.matches.filter((t) => t.at.getTime() >= ownFrom);
+    const earlier = c.matches.filter((t) => t.at.getTime() < ownFrom);
+    if (own.length === 1 && earlier.length) {
+      reachedBack = earlier.map((t) => t.refNum);
+      await db.update(schema.phonepayAttempts).set({ unclearRefs: reachedBack.join(",") }).where(eq(schema.phonepayAttempts.id, attemptId));
+      c = { ...c, kind: "paid", paid: own[0] };
+    }
+  }
   if (c && (c.kind === "ambiguous" || (c.kind === "paid" && !c.byPhone && rivalSameAmount))) {
     const refs = c.matches.map((t) => t.refNum);
     await db.update(schema.phonepayAttempts).set({ result: "unclear", unclearRefs: refs.join(",") }).where(eq(schema.phonepayAttempts.id, attemptId));
@@ -448,7 +470,7 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
   if (voids.length) await mail(`Hup Up Attractions: wrong phone payment amount, order #${num}`, `A caller paying order #${num} by phone was charged an amount that is not the order total ($${(dueCents / 100).toFixed(2)}).\n\n${voids.join("\n")}\n\nThat charge does not count as payment.`);
   if (c?.kind === "paid" && c.paid) {
     await db.update(schema.phonepayAttempts).set({ result: "paid" }).where(eq(schema.phonepayAttempts.id, attemptId));
-    await finishAttempt(attemptId, { matched: true, solaRef: c.paid.refNum, last4: c.paid.last4, cardType: c.paid.cardType, note: `${voids.length ? "Paid; a second charge was voided" : "Paid"}${c.paid.invoice ? ` (Sola Invoice field: ${c.paid.invoice})` : ""}` });
+    await finishAttempt(attemptId, { matched: true, solaRef: c.paid.refNum, last4: c.paid.last4, cardType: c.paid.cardType, note: `${voids.length || reachedBack.length ? "Paid; a second charge was voided" : "Paid"}${c.paid.invoice ? ` (Sola Invoice field: ${c.paid.invoice})` : ""}` });
     const counted = await markGroupPaid(orderId, c.paid.amountCents, PHONEPAY_METHOD, c.paid.refNum);
     await recordPaymentResult(ids, "approved", c.paid.last4, c.paid.refNum, c.paid.at);
     if (newlyCounted(counted)) await paymentReceivedNotices(orderId, c.paid.amountCents);
