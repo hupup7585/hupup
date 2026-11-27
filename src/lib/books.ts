@@ -198,6 +198,10 @@ export async function reverseEntry(id: number, reason: string, userId: number | 
 export async function recordBookingPayment(orderId: number, cents: number, method: string, ref?: string | null, date = todayISO()) {
   try {
     if (cents <= 0) return;
+    // Deep check 06:00 (Nov 27): two notices for the same payment at the same moment both passed the "already booked"
+    // check (read, then insert) and booked the income twice. The check and the insert now run as one step per order.
+    await db.transaction(async (db) => {
+    await db.execute(sql`select pg_advisory_xact_lock(hashtext(${"book-payment:" + orderId}))`);
     if (ref) {
       const [dupe] = await db.select({ id: schema.bookEntries.id }).from(schema.bookEntries).where(and(eq(schema.bookEntries.orderId, orderId), eq(schema.bookEntries.ref, ref), eq(schema.bookEntries.source, "auto")));
       if (dupe) return;
@@ -224,7 +228,7 @@ export async function recordBookingPayment(orderId: number, cents: number, metho
     const tipCents = overpayment ? 0 : cents - toTotal;
     await addEntry(
       {
-        entryDate: (await isLocked(date)) ? nextOpenDate(date) : date,
+        entryDate: (await isLocked(date, db)) ? nextOpenDate(date) : date,
         kind: "income",
         category: overpayment ? "Overpayment (refund due)" : "Bookings",
         ...(overpayment ? { notes: "Second payment on an order already paid in full: refund due." } : {}),
@@ -242,7 +246,9 @@ export async function recordBookingPayment(orderId: number, cents: number, metho
         source: "auto",
       },
       null,
+      db,
     );
+    });
   } catch (e) {
     console.error("books: could not record booking payment", orderId, e);
   }
@@ -498,8 +504,15 @@ export async function recordAutoMoneyOut(input: { kind: "refund" | "processor_fe
     const [dupe] = await db.select({ id: schema.bookEntries.id }).from(schema.bookEntries).where(and(eq(schema.bookEntries.ref, input.ref), eq(schema.bookEntries.kind, input.kind), eq(schema.bookEntries.source, "auto")));
     if (dupe) return;
     const date = input.date ?? todayISO();
+    // Deep check 06:00 (Nov 27): a refund on a tax-exempt order is an exempt sale given back (never negative taxable
+    // sales), in the order's county, the same as the payment it gives back
+    let orderTax: { taxExempt?: boolean; county?: string } = {};
+    if (input.kind === "refund" && input.orderId) {
+      const [o] = await db.select({ taxCents: schema.orders.taxCents, subtotalCents: schema.orders.subtotalCents, deliveryAddress: schema.orders.deliveryAddress }).from(schema.orders).where(eq(schema.orders.id, input.orderId));
+      if (o) orderTax = { taxExempt: o.taxCents === 0 && o.subtotalCents > 0, county: countyFor(o.deliveryAddress) };
+    }
     await addEntry(
-      { entryDate: (await isLocked(date)) ? nextOpenDate(date) : date, kind: input.kind, category: input.category, amountCents: input.amountCents, ...(input.taxCents ? { taxCents: input.taxCents } : {}), method: input.method, orderId: input.orderId ?? null, ref: input.ref, notes: input.notes ?? null, source: "auto" },
+      { entryDate: (await isLocked(date)) ? nextOpenDate(date) : date, kind: input.kind, category: input.category, amountCents: input.amountCents, ...(input.taxCents ? { taxCents: input.taxCents } : {}), ...orderTax, method: input.method, orderId: input.orderId ?? null, ref: input.ref, notes: input.notes ?? null, source: "auto" },
       null,
     );
   } catch (e) {
