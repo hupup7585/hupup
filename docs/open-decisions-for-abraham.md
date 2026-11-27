@@ -27,3 +27,17 @@ card form, and the server rejects any payment attempt. Right after Shabbes / Yom
   text after consent for a number we texted before.
 - **Receipt "Total due".** The receipt email's grouped lines end with "Total due", which equals the amount just paid.
   Say if the receipt should use other words there (for example "Total paid").
+
+## Admin and Bookkeeping (Admin session, Nov 27, 2026)
+
+1. **Possible duplicate customers: consent and terms records on a merge.** Hark's item 2 said a merge moves the
+   consent records to the kept record. The texting-consent and Terms records are locked by the database as legal
+   records (they can never be edited), so a merge leaves them exactly as written on the merged record. They are still
+   found by phone number as before, and the kept customer's page links to every record merged into it. Is that OK?
+   (Orders, payments, texts, invoices, emails and notes do move; nothing is deleted; a STOP on any record wins.)
+2. **Overpayments in Bookkeeping.** A second charge on an order already paid in full is now booked as
+   "Overpayment (refund due)" (not a tip, not a taxable sale), and refunding it gives back no sales tax. Say if your
+   accountant wants it shown another way.
+3. **Same-day area settings.** "Same-day delivery time close by", "surrounding areas" and "Close-by areas" in
+   Hours and calendar are not used since the Nov 27 same-day notice (two versions by customer service hours). They
+   are kept and labelled "Not used now". Remove them, or use areas again?
