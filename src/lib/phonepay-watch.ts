@@ -174,12 +174,26 @@ export const helperUrl = (attemptId: number, what: "hangup" | "silence") => `${c
 export const verifyHelper = (attemptId: number, what: string, s: string | null) => (what === "hangup" || what === "silence") && attemptId > 0 && same(signFor(`sola-listen-${what}`, attemptId), s);
 
 /**
+ * The helper's key for one try (deep check Nov 27, item 18): HMAC-SHA256 of "sola-listen:<try>" with SOLA_LISTEN_KEY
+ * (the same value as the Worker secret LISTEN_KEY). The Worker refuses any /stream or /result address without it.
+ * Null when SOLA_LISTEN_KEY is not set (24+ characters): the helper is then not used and the watcher's own timing is
+ * (option c), so a payment call is never left waiting on it.
+ */
+export function listenKey(attemptId: number, env: Record<string, string | undefined> = process.env): string | null {
+  const k = env.SOLA_LISTEN_KEY;
+  if (!k || k.length < 24) return null;
+  return createHmac("sha256", k).update(`sola-listen:${attemptId}`).digest("hex").slice(0, 32);
+}
+
+/**
  * TwiML: send the audio of the call to Sola to the helper (Twilio Media Streams, about 1 cent per payment call,
  * approved by Abraham). `solaTrack`: "inbound" on our separate call to Sola (Sola is who answered), "outbound" on the
  * caller's own call (Sola's voice is what we send to the caller). Never recorded; the helper only measures loudness.
  */
 export function startSolaListen(vr: { start: () => { stream: (a: Record<string, unknown>) => { parameter: (p: { name: string; value: string }) => unknown } } }, attemptId: number, solaTrack: "inbound" | "outbound", s: Record<string, unknown>) {
-  const stream = vr.start().stream({ url: `wss://${LISTEN_HOST}/stream/${attemptId}`, track: "both_tracks", name: `sola-${attemptId}` });
+  // Without SOLA_LISTEN_KEY the Worker refuses the stream (Twilio only logs it; the call goes on) and the watcher's own
+  // timing is used. The stream is still started so the later <Stop><Stream> by name always has one to stop.
+  const stream = vr.start().stream({ url: `wss://${LISTEN_HOST}/stream/${attemptId}/${listenKey(attemptId) ?? "0".repeat(32)}`, track: "both_tracks", name: `sola-${attemptId}` });
   stream.parameter({ name: "hangup", value: helperUrl(attemptId, "hangup") });
   stream.parameter({ name: "silence", value: helperUrl(attemptId, "silence") });
   stream.parameter({ name: "solaTrack", value: solaTrack });
@@ -188,9 +202,11 @@ export function startSolaListen(vr: { start: () => { stream: (a: Record<string, 
 }
 
 /** Tell the helper Sola's record shows the result; true = it is listening to this call and will hang up. */
-export async function tellHelper(attemptId: number, fetcher: typeof fetch = fetch): Promise<boolean> {
+export async function tellHelper(attemptId: number, fetcher: typeof fetch = fetch, env: Record<string, string | undefined> = process.env): Promise<boolean> {
+  const key = listenKey(attemptId, env);
+  if (!key) return false; // no key: the helper can't be listening; the watcher's own timing is used
   try {
-    const r = await fetcher(`https://${LISTEN_HOST}/result/${attemptId}`, { method: "POST", signal: AbortSignal.timeout(3000) });
+    const r = await fetcher(`https://${LISTEN_HOST}/result/${attemptId}/${key}`, { method: "POST", signal: AbortSignal.timeout(3000) });
     const j = (await r.json().catch(() => ({}))) as { listening?: boolean };
     return r.ok && j.listening === true;
   } catch {

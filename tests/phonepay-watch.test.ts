@@ -262,7 +262,8 @@ describe("Sola hang-up helper (Abraham, Nov 18, 2026, option a)", () => {
     const vr = new twilio.twiml.VoiceResponse();
     startSolaListen(vr as never, 12, "outbound", { phonePaySilenceSeconds: "25" });
     const x = vr.toString();
-    expect(x).toContain('<Stream url="wss://hupup-sola-listen.hupup-attractions.workers.dev/stream/12" track="both_tracks" name="sola-12">');
+    // No SOLA_LISTEN_KEY in tests: a key the Worker refuses (the call goes on; the watcher's own timing is used)
+    expect(x).toContain(`<Stream url="wss://hupup-sola-listen.hupup-attractions.workers.dev/stream/12/${"0".repeat(32)}" track="both_tracks" name="sola-12">`);
     expect(x).toContain('<Parameter name="solaTrack" value="outbound"/>');
     expect(x).toContain('<Parameter name="silenceSec" value="25"/>');
     expect(x).toContain('<Parameter name="pauseMs" value="500"/>');
@@ -340,5 +341,45 @@ describe("the helper itself (cloudflare/sola-listen-worker.js)", () => {
       globalThis.fetch = realFetch;
       Date.now = realNow;
     }
+  });
+});
+
+describe("deep check Nov 27, item 18: the helper needs its key", () => {
+  const SECRET = "test-listen-key-0123456789abcdef";
+  const env = { LISTEN_KEY: SECRET, LISTEN: { idFromName: (n: string) => n, get: () => ({ fetch: async () => Response.json({ listening: true }) }) } };
+
+  it("our site and the Worker make the same key for a try; different tries get different keys", async () => {
+    const { listenKey } = await import("@/lib/phonepay-watch");
+    const { tryKey } = await import("../cloudflare/sola-listen-worker.js");
+    const k = listenKey(7, { SOLA_LISTEN_KEY: SECRET });
+    expect(k).toMatch(/^[0-9a-f]{32}$/);
+    expect(await tryKey(SECRET, "7")).toBe(k);
+    expect(listenKey(8, { SOLA_LISTEN_KEY: SECRET })).not.toBe(k);
+    expect(listenKey(7, {})).toBeNull();
+    expect(listenKey(7, { SOLA_LISTEN_KEY: "short" })).toBeNull();
+  });
+
+  it("the Worker refuses /result and /stream without the right key, or when its secret is not set", async () => {
+    const worker = (await import("../cloudflare/sola-listen-worker.js")).default;
+    const { listenKey } = await import("@/lib/phonepay-watch");
+    const good = listenKey(7, { SOLA_LISTEN_KEY: SECRET })!;
+    const post = (path: string, e: unknown = env) => worker.fetch(new Request(`https://h${path}`, { method: "POST" }), e);
+    expect((await post(`/result/7/${good}`)).status).toBe(200);
+    expect((await post(`/result/7/${"a".repeat(32)}`)).status).toBe(403);
+    expect((await post(`/result/8/${good}`)).status).toBe(403); // a key for another try
+    expect((await post(`/stream/7/${"0".repeat(32)}`)).status).toBe(403);
+    expect((await post(`/result/7/${good}`, { ...env, LISTEN_KEY: undefined })).status).toBe(403); // no secret: closed
+    expect((await post(`/result/7`)).status).toBe(200); // the old keyless address is not a stream or result at all
+    expect(await (await post(`/result/7`)).text()).toBe("Hup Up Attractions");
+  });
+
+  it("tellHelper sends the key, and without SOLA_LISTEN_KEY never calls the helper (the watcher's own timing is used)", async () => {
+    const { tellHelper, listenKey } = await import("@/lib/phonepay-watch");
+    const urls: string[] = [];
+    const fetcher = (async (u: string) => (urls.push(String(u)), Response.json({ listening: true }))) as unknown as typeof fetch;
+    expect(await tellHelper(7, fetcher, {})).toBe(false);
+    expect(urls).toEqual([]);
+    expect(await tellHelper(7, fetcher, { SOLA_LISTEN_KEY: SECRET })).toBe(true);
+    expect(urls).toEqual([`https://hupup-sola-listen.hupup-attractions.workers.dev/result/7/${listenKey(7, { SOLA_LISTEN_KEY: SECRET })}`]);
   });
 });

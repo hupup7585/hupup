@@ -1,3 +1,12 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": {
+      "*": false,
+      "**": false,
+      "claude/nifty-mendel-7hlzdb": true,
+      "claude/nifty-mendel-7hlzdb-website": true
+    }
+  },
   "crons": [{ "path": "/api/cron/release-holds", "schedule": "0 9 * * *" }]
 }
