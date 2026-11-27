@@ -932,11 +932,32 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "lib/system-status.ts"
  ],
  "sensitiveSwitchGuard": [
+  "app/admin/(app)/bookkeeping/page.tsx",
   "app/admin/(app)/phone/phonepay/page.tsx",
   "app/admin/(app)/phone/prompts/slots/page.tsx",
   "app/admin/(app)/phone/settings/page.tsx",
   "lib/feature-switches.ts",
   "lib/switch-guard.ts"
+ ],
+ "liveRefundsOn": [
+  "app/admin/(app)/bookkeeping/actions.ts",
+  "app/admin/(app)/bookkeeping/page.tsx",
+  "app/admin/(app)/orders/[id]/page.tsx",
+  "lib/feature-switches.ts",
+  "lib/refunds.ts",
+  "lib/switch-guard.ts"
+ ],
+ "invoiceEmailOn": [
+  "app/admin/(app)/bookkeeping/actions.ts",
+  "app/admin/(app)/bookkeeping/invoice-actions.ts",
+  "app/admin/(app)/bookkeeping/invoice/[id]/page.tsx",
+  "app/admin/(app)/bookkeeping/page.tsx",
+  "lib/feature-switches.ts",
+  "lib/invoice-share.ts"
+ ],
+ "staffPromoMode": [
+  "app/admin/(app)/orders/[id]/page.tsx",
+  "lib/feature-switches.ts"
  ],
  "staffMutzeEveryWeek": [
   "lib/staff-mutze.ts"

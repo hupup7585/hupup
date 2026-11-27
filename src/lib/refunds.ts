@@ -13,7 +13,14 @@ import { orderPath } from "@/lib/order-path";
  * its own dated entry; the original payment is never edited or deleted. Sandbox only until Abraham approves live
  * refunds (LIVE_REFUNDS_APPROVED). A failed refund shows the reason in plain words and emails Abraham.
  */
-export const LIVE_REFUNDS_APPROVED = false;
+export const LIVE_REFUNDS_APPROVED = false; // the starting value of the Owner setting liveRefundsOn (Bookkeeping > Settings)
+
+/** Admin handoff Phase 2: live refunds are an Owner setting now (off until Abraham turns it on, with the safety check). */
+export async function liveRefundsOn(): Promise<boolean> {
+  const { getSettings } = await import("@/lib/settings");
+  const s = (await getSettings()) as { liveRefundsOn?: unknown };
+  return s.liveRefundsOn === true || s.liveRefundsOn === "true";
+}
 
 export type Provider = "stripe" | "sola";
 type Ord = typeof schema.orders.$inferSelect;
@@ -144,7 +151,7 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
   if (!o) throw new RefundError("Order not found.");
   const pay = await paymentRef(o);
   if (!pay) throw new RefundError("This order has no card payment to refund (only Stripe phone payments and Sola website payments can be refunded here).");
-  if (!LIVE_REFUNDS_APPROVED && !refundsSandbox(pay.provider))
+  if (!(await liveRefundsOn()) && !refundsSandbox(pay.provider))
     throw new RefundError(pay.provider === "stripe" && !stripeKey("refunds") ? "Not active yet: STRIPE_REFUNDS_KEY isn't in Vercel." : "Live refunds are off until Abraham approves them. Use the sandbox (test) keys for now.");
   // Deep check A7 (Nov 27, 2026): two Refund clicks at once could both pass the "at most" check and refund twice. The
   // order is locked, refunds still being sent (the last 10 minutes) count as taken, and this refund's row is saved as

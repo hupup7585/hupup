@@ -290,6 +290,10 @@ export const SETTING_DEFAULTS = {
   /** Hark's review item 9 (Nov 26, 2026): a fresh code and typed words before turning on call recording, the Google
    *  voice, PhonePay or Stripe. Off until Abraham approves the screenshots. */
   sensitiveSwitchGuard: false,
+  /** Admin handoff Phase 2 (Nov 27, 2026): switches that were set in code, now Owner settings, each at today's value. */
+  liveRefundsOn: false,
+  invoiceEmailOn: true,
+  staffPromoMode: "owner_preview",
   /** Abraham, Nov 26, 2026, 8:34 PM: staff may book Mutze Shabbes every week (not the phone, not the website) */
   staffMutzeEveryWeek: true,
   /** Abraham, Nov 26, 2026: at most this many promo texts per customer per calendar year (the wording says 5) */
