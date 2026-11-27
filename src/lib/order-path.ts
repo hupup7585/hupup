@@ -5,7 +5,8 @@
 export function orderIdFromParam(param: string | number | null | undefined): number {
   const n = Number(String(param ?? "").replace(/[^\d]/g, ""));
   if (!Number.isInteger(n) || n <= 0) return 0;
-  return n > 1000 ? n - 1000 : n;
+  const id = n > 1000 ? n - 1000 : n;
+  return id < 2 ** 31 ? id : 0; // Extra check H7: a number too big for the database is "not found", not a crash
 }
 
 /** The Admin page of an order, by its order number. */

@@ -1,6 +1,7 @@
 import { csvCell } from "@/lib/csv-cell";
 import { currentStaff } from "@/lib/auth";
 import { reportFor, type ReportParams } from "@/lib/reports";
+import { cleanFilters } from "@/lib/filter-params";
 import { XLSX_MIME, buildXlsx, type Cell } from "@/lib/xlsx";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +13,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ report: string 
   const found = reportFor((await ctx.params).report, staff.role);
   if ("error" in found) return new Response(found.error, { status: found.status });
   const u = new URL(req.url);
-  const p: ReportParams = {};
+  const raw: ReportParams = {};
   for (const k of ["q", "status", "from", "to"] as const) {
     const v = u.searchParams.get(k);
-    if (v) p[k] = v.slice(0, 100);
+    if (v) raw[k] = v.slice(0, 100);
   }
+  const p = cleanFilters(raw); // Extra check H8: a bad status or date is ignored
   let sheets;
   try {
     sheets = await found.report.build(p);

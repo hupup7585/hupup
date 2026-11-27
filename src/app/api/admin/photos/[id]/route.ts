@@ -1,3 +1,4 @@
+import { idParam } from "@/lib/id-param";
 import { eq } from "drizzle-orm";
 import { currentStaff } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const staff = await currentStaff();
   if (!staff) return new Response("Unauthorized", { status: 401 });
-  const [p] = await db.select().from(schema.deliveryPhotos).where(eq(schema.deliveryPhotos.id, Number((await params).id))).limit(1);
+  const [p] = await db.select().from(schema.deliveryPhotos).where(eq(schema.deliveryPhotos.id, idParam((await params).id) ?? 0)).limit(1);
   if (!p) return new Response("Not found", { status: 404 });
   if (staff.role === "delivery") {
     const full = await getOrderWithItems(p.orderId);

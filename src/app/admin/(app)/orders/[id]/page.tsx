@@ -19,6 +19,7 @@ import { LIVE_REFUNDS_APPROVED, refundStatus, refundsFor, refundsSandbox } from 
 import RefundPanel from "./RefundPanel";
 import { inboxWhen } from "@/lib/inbox-format";
 import { db, schema } from "@/lib/db";
+import { eq } from "drizzle-orm";
 import { spokenAnswersFor } from "@/lib/speech-to-text";
 import { activeDrivers, overlapsFor } from "@/lib/drivers";
 import { assignDriversAction } from "./driver-actions";
@@ -184,7 +185,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             );
           })())}
           {staff.role !== "delivery" && o.status !== "CANCELLED" && (await (async () => {
-            const drivers = await activeDrivers();
+            const drivers: { id: number; name: string | null }[] = await activeDrivers();
+            // Extra check H5 (Nov 27, 2026): a deactivated driver still on a stop shows (marked), so saving keeps them
+            for (const id of [o.deliveryDriverId, o.pickupDriverId]) {
+              if (!id || drivers.some((d) => d.id === id)) continue;
+              const [gone] = await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name }).from(schema.adminUsers).where(eq(schema.adminUsers.id, id)).limit(1);
+              if (gone) drivers.push({ id: gone.id, name: `${gone.name ?? "Driver"} (deactivated)` });
+            }
             const warn = [...(await overlapsFor(o, "delivery")).map((w) => `Delivery driver also has: ${w}`), ...(await overlapsFor(o, "pickup")).map((w) => `Pickup driver also has: ${w}`)];
             const pick = (name: "delivery" | "pickup", current: number | null) => (
               <label className="block">
