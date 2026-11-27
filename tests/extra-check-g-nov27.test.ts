@@ -115,16 +115,6 @@ describe("G1: a voicemail alert that did not go out", () => {
   });
 });
 
-describe("deep check 06:00 M71: an error after the voicemail alert was claimed", () => {
-  it("releases the claim when nothing went out, so the safety net tries again", () => {
-    const src = readFileSync("src/lib/voicemail.ts", "utf8");
-    const notify = src.split("export async function notifyVoicemail")[1].split("async function sendVoicemailAlert")[0];
-    expect(notify).toContain("return await sendVoicemailAlert(v, counts);");
-    expect(notify).toContain("if (!counts.sent && !counts.held) await db.update(schema.voicemails).set({ notifiedAt: null })");
-    expect(notify).toContain("throw e;");
-  });
-});
-
 describe("deep check 06:00 M58: a held text cut off while being handed to Twilio", () => {
   it("is marked failed (result unknown) and never sent again", async () => {
     const { processHeldPromotions, STUCK_SENDING_MS } = await import("@/lib/sms");

@@ -93,3 +93,17 @@ describe("deep check B3", () => {
     expect(r).toEqual({ ok: false, message: "That Google account is already saved on another staff member." });
   });
 });
+
+describe("deep check 06:00 M69 (B3 leftover)", () => {
+  it("two saves at the same moment giving two people the same username: the second gets the plain message, not a database error", async () => {
+    const r1 = await createStaffAction({ name: "Leah", phone: "845-415-0021", role: "secretary" });
+    const r2 = await createStaffAction({ name: "Rivky", phone: "845-415-0022", role: "secretary" });
+    expect(r1.ok && r2.ok).toBe(true);
+    const id = async (p: string) => (await db.select().from(schema.adminUsers).where(eq(schema.adminUsers.phone, p)))[0].id;
+    const [a, b] = [await id("+18454150021"), await id("+18454150022")];
+    const save = (uid: number, name: string, phone: string) => saveStaffAction(uid, { name, phone, role: "secretary", username: "sameuser", password: "", googleEmail: "" });
+    const results = await Promise.all([save(a, "Leah", "8454150021"), save(b, "Rivky", "8454150022")]);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    expect(results.find((r) => !r.ok)?.message).toBe("That username is already taken.");
+  });
+});

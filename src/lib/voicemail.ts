@@ -311,18 +311,17 @@ export async function notifyVoicemail(id: number): Promise<{ sent: number }> {
     .where(and(eq(schema.voicemails.id, id), isNull(schema.voicemails.notifiedAt)))
     .returning();
   if (!v) return { sent: 0 };
-  // Deep check 06:00 M71: an error after the claim (settings, database, the box) released nothing, so that alert was
-  // lost for good. Now the claim is released when nothing went out, and the safety net tries again.
-  const counts = { sent: 0, held: 0 };
+  // Deep check 06:00 M71 (G1 leftover): an error anywhere between the claim and the sending frees the claim, so the
+  // scheduled job tries this alert again (the error is still reported)
   try {
-    return await sendVoicemailAlert(v, counts);
+    return await sendVoicemailAlert(v);
   } catch (e) {
-    if (!counts.sent && !counts.held) await db.update(schema.voicemails).set({ notifiedAt: null }).where(eq(schema.voicemails.id, v.id)).catch(() => undefined);
+    await db.update(schema.voicemails).set({ notifiedAt: null }).where(eq(schema.voicemails.id, v.id)).catch(() => null);
     throw e;
   }
 }
 
-async function sendVoicemailAlert(v: typeof schema.voicemails.$inferSelect, counts: { sent: number; held: number }): Promise<{ sent: number }> {
+async function sendVoicemailAlert(v: typeof schema.voicemails.$inferSelect): Promise<{ sent: number }> {
   const box = await boxById(v.boxId);
   const [session] = v.callSid ? await db.select({ data: schema.callSessions.data }).from(schema.callSessions).where(eq(schema.callSessions.callSid, v.callSid)).limit(1) : [];
   const phone = toE164(v.fromNumber || "");
@@ -345,7 +344,7 @@ async function sendVoicemailAlert(v: typeof schema.voicemails.$inferSelect, coun
   let tried = 0;
   for (const to of box.notifyEmail) {
     tried++;
-    if ((await sendEmail(to, alert.subject, alert.email, attachments).catch(() => ({ sent: false }))).sent) counts.sent = ++sent;
+    if ((await sendEmail(to, alert.subject, alert.email, attachments).catch(() => ({ sent: false }))).sent) sent++;
   }
   // Text alerts start by themselves once Twilio approves texting. The MP3 rides along as an MMS only when the Owner
   // has turned that on (it costs more per message) and the file is small enough for carriers; the link is always there.
@@ -354,8 +353,8 @@ async function sendVoicemailAlert(v: typeof schema.voicemails.$inferSelect, coun
     for (const to of box.notifySms) {
       tried++;
       const r = await sendSms(to, alert.text, { kind: "system", event: "owner_alert", ...(mms ? { mediaUrls: [playLink] } : {}) }).catch(() => ({ sent: false, blocked: undefined }));
-      if (r.sent) counts.sent = ++sent;
-      else if (r.blocked === "quiet_hours") counts.held = ++held; // held for Shabbes or Yom Tov: it goes out after, by itself
+      if (r.sent) sent++;
+      else if (r.blocked === "quiet_hours") held++; // held for Shabbes or Yom Tov: it goes out after, by itself
     }
   }
   // Extra check G1 (Nov 27, 2026): when there was someone to tell but nothing went out (and nothing is waiting for
@@ -378,7 +377,8 @@ export async function notifyStragglers() {
     .from(schema.voicemails)
     .where(and(isNull(schema.voicemails.notifiedAt), isNull(schema.voicemails.deletedAt), eq(schema.voicemails.state, "submitted"), lt(schema.voicemails.createdAt, sql`now() - interval '15 minutes'`)));
   let n = 0;
-  for (const r of rows) n += (await notifyVoicemail(r.id)).sent ? 1 : 0;
+  // One alert that fails never stops the others (deep check 06:00 M71); it is tried again next run
+  for (const r of rows) n += (await notifyVoicemail(r.id).catch((e) => (console.error("voicemail alert failed", e), { sent: 0 }))).sent ? 1 : 0;
   return n;
 }
 
