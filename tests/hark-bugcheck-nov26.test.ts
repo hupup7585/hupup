@@ -40,7 +40,12 @@ describe("Hark's bug check", () => {
   });
   it("bug 12: a staff phone calling in is never rung itself; bug 22: the Terms line can play its recording", () => {
     const s = readFileSync("src/lib/ivr/flow.ts", "utf8");
-    expect(s).toContain("const others = list.targets.filter((t) => toE164(t.phone) !== self);");
+    expect(s).toContain("const others = targets.filter((t) => toE164(t.phone) !== self);");
+    // deep check 06:00 M47: the ring steps are counted from the same list (the caller's own phone left out)
+    expect(s).toContain("ringTargetsFor(list.targets, from)");
+    expect(s).toContain("ringTargetsFor(list.targets, self).length");
+    expect(s).toContain("const rung = ringTargetsFor(list.targets, ctx.session?.fromNumber ?? ctx.from);");
+    expect(s).not.toContain("list.targets.length) * ringAttempts");
     expect(s).toContain('sp(g, ctx, "terms_notice");');
   });
 });

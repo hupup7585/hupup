@@ -792,10 +792,8 @@ async function startStaffLegs(callerSid: string, k: RingKey, i: number, settings
   const from = process.env.TWILIO_PHONE_NUMBER;
   if (!client || !from) return false;
   const s = await getSession(callerSid);
-  const self = toE164(s?.fromNumber);
   const list = ringListFor(settings, k);
-  const others = list.targets.filter((t) => toE164(t.phone) !== self);
-  const targets = others.length ? others : list.targets;
+  const targets = ringTargetsFor(list.targets, s?.fromNumber);
   if (!targets.length) return false;
   const ring = list.mode === "simultaneous" ? targets : [targets[i % targets.length]];
   const legs: string[] = [];
@@ -856,7 +854,8 @@ async function staffLegEnded(callerSid: string, k: RingKey, i: number, legSid: s
   if (Number((r.rows[0] as { n?: number } | undefined)?.n ?? 0) > 0) return;
   const settings = await getSettings();
   const list = ringListFor(settings, k);
-  const steps = (list.mode === "simultaneous" ? 1 : list.targets.length) * ringAttempts(settings, k);
+  const self = (await getSession(callerSid))?.fromNumber;
+  const steps = (list.mode === "simultaneous" ? 1 : ringTargetsFor(list.targets, self).length) * ringAttempts(settings, k);
   if (i + 1 < steps && (await lineRingsNowFor(k, settings)) && (await startStaffLegs(callerSid, k, i + 1, settings))) return;
   // nobody answered on any number or round: the caller leaves the queue to the extension's voicemail, as today
   await updateSession(callerSid, { data: { missed: "no_answer" } }); // read fresh (the leg list changed above)
@@ -1515,13 +1514,22 @@ export async function renewPaymentHold(ids: number[], minutes: number): Promise<
   return taken;
 }
 
+/**
+ * The numbers a key's list really rings for this caller: everyone but the caller's own staff phone (Hark's bug 12),
+ * or the whole list when that leaves nobody. Deep check 06:00 M47: the number of ring steps is counted from this list
+ * too (it counted the caller's own phone, so someone was rung one extra time).
+ */
+function ringTargetsFor<T extends { phone: string }>(targets: T[], from: string | null | undefined): T[] {
+  const self = toE164(from);
+  const others = targets.filter((t) => toE164(t.phone) !== self);
+  return others.length ? others : targets;
+}
+
 /** Ring one step of a key's list (one after another) or everyone at once. */
 function dialTargets(vr: VR, list: ReturnType<typeof ringListFor>, k: RingKey, i: number, from?: string | null): VR {
   const simultaneous = list.mode === "simultaneous";
   // Hark's bug 12 (Nov 26, 2026): a staff phone calling in is never rung itself (it would be busy and waste a step)
-  const self = toE164(from);
-  const others = list.targets.filter((t) => toE164(t.phone) !== self);
-  const targets = others.length ? others : list.targets;
+  const targets = ringTargetsFor(list.targets, from);
   // Abraham (Phone Menu v3): the list rings several times over (3 by default); step i goes round the list
   const ring = simultaneous ? targets : [targets[i % targets.length]];
   const dial = vr.dial({
@@ -5498,11 +5506,12 @@ const handlers: Record<string, Handler> = {
     const list = ringListFor(settings, k);
     const i = Number(ctx.query.get("i") ?? -1);
     const next = i + 1;
-    const steps = (list.mode === "simultaneous" ? 1 : list.targets.length) * ringAttempts(settings, k);
+    const rung = ringTargetsFor(list.targets, ctx.session?.fromNumber ?? ctx.from);
+    const steps = (list.mode === "simultaneous" ? 1 : rung.length) * ringAttempts(settings, k);
     // Customer service (Abraham, Nov 25, 2026, 4:14 PM): every call lasts its full ring time; a call that ends early
     // (rejected, key 2, busy, failed) is waited out with the same ringing, then a new call
-    if (k === "4" && ctx.query.get("w") !== "1" && i >= 0 && list.targets.length) {
-      const ring = list.mode === "simultaneous" ? list.targets : [list.targets[i % list.targets.length]];
+    if (k === "4" && ctx.query.get("w") !== "1" && i >= 0 && rung.length) {
+      const ring = list.mode === "simultaneous" ? rung : [rung[i % rung.length]];
       const perCall = Math.max(...ring.map((t) => t.ringSeconds));
       const started = Number(ctx.session?.data.ringStart ?? 0);
       const elapsed = started ? Math.floor((Date.now() - started) / 1000) : perCall;
