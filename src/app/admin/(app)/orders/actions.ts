@@ -21,6 +21,12 @@ export type ActionResult = { ok: boolean; message: string };
 // Code audit M2: NEEDS_ATTENTION holds its items too (availability counts it), so moving it on is not a re-booking
 const OCCUPYING: OrderStatus[] = ["HOLD", "PENDING_PAYMENT", "CONFIRMED", "DELIVERED", "NEEDS_ATTENTION"];
 
+/** Deep check A2: this order was delivered at some point (its status history says so). */
+async function wasDelivered(orderId: number): Promise<boolean> {
+  const rows = (await db.execute(sql`SELECT 1 FROM order_status_history WHERE order_id = ${orderId} AND to_status IN ('DELIVERED', 'PICKED_UP') LIMIT 1`)).rows;
+  return rows.length > 0;
+}
+
 export async function updateStatusAction(orderId: number, status: OrderStatus, reason = ""): Promise<ActionResult> {
   const staff = await requireAdmin();
   if (!ORDER_STATUSES.includes(status)) return { ok: false, message: "Unknown status" };
@@ -29,7 +35,9 @@ export async function updateStatusAction(orderId: number, status: OrderStatus, r
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found" };
   // Hark's Admin list 5 (Nov 26, 2026): a delivered order is out with the customer; it can't be cancelled
-  if (status === "CANCELLED" && full.order.status === "DELIVERED") return { ok: false, message: "This order was already delivered, so it can't be cancelled. If it needs a refund or a change, handle it on the order (payments) and write a note." };
+  // Deep check A2 (Nov 27, 2026): also after the pickup, and never by moving it back to Confirmed first (any order that
+  // was ever delivered, from its status history, can't be cancelled)
+  if (status === "CANCELLED" && (["DELIVERED", "PICKED_UP"].includes(full.order.status) || (await wasDelivered(orderId)))) return { ok: false, message: "This order was already delivered, so it can't be cancelled. If it needs a refund or a change, handle it on the order (payments) and write a note." };
   // Hark's Admin list 4: "Needs staff attention" becomes Confirmed only after the whole order is checked again, locked
   if (full.order.status === "NEEDS_ATTENTION" && (status === "CONFIRMED" || status === "DELIVERED")) {
     const { confirmAttentionOrder } = await import("@/lib/late-payment");

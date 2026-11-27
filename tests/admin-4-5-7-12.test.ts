@@ -59,4 +59,18 @@ describe("Admin status safety", () => {
     expect(r.ok).toBe(false);
     expect(r.message).toMatch(/cancelled|priced/);
   });
+  it("deep check A2: a picked-up order can't be cancelled", async () => {
+    const d = await mk("DELIVERED", maze, "2027-06-10");
+    expect((await updateStatusAction(d, "PICKED_UP")).ok).toBe(true);
+    expect((await updateStatusAction(d, "CANCELLED", "customer asked")).ok).toBe(false);
+    expect(await statusOf(d)).toBe("PICKED_UP");
+  });
+  it("deep check A2: delivered, moved back to Confirmed, then Cancel: still refused", async () => {
+    const d = await mk("CONFIRMED", maze, "2027-07-10");
+    expect((await updateStatusAction(d, "DELIVERED")).ok).toBe(true);
+    expect((await updateStatusAction(d, "CONFIRMED")).ok).toBe(true);
+    const r = await updateStatusAction(d, "CANCELLED", "customer asked");
+    expect(r.ok).toBe(false);
+    expect(await statusOf(d)).toBe("CONFIRMED");
+  });
 });

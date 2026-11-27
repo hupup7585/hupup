@@ -180,4 +180,17 @@ describe("cash or check taken at New booking (Hark's Admin list 1-3, Nov 26, 202
     expect([b.status, b.paidCents]).toEqual(["NEEDS_ATTENTION", 5000]);
     expect((await db.select().from(schema.bookEntries).where(eq(schema.bookEntries.orderId, short.orderId!))).length).toBeGreaterThan(0);
   });
+
+  it("deep check A1: priced before the payment: the items only is Needs attention; full is delivery + tax, never a tip", async () => {
+    const q = await quoteAction({ date: "2026-12-16", items: { [castle]: 1 }, phone: "845-555-0163", address: "12 Forest Road, Monroe", thuSun: false });
+    const itemsOnly = await createBookingAction({ ...base, date: "2026-12-16", items: { [castle]: 1 }, phone: "845-555-0163", address: "12 Forest Road, Monroe", payment: "cash", amountPaid: "189.99" });
+    const [a] = await db.select().from(schema.orders).where(eq(schema.orders.id, itemsOnly.orderId!));
+    expect(a.totalCents).toBe(q!.totalCents);
+    expect(a.status).toBe("NEEDS_ATTENTION");
+    const full = await createBookingAction({ ...base, date: "2026-12-16", items: { [castle]: 1 }, phone: "845-555-0164", address: "12 Forest Road, Monroe", payment: "check", amountPaid: (q!.totalCents! / 100).toFixed(2) });
+    const entries = await db.select().from(schema.bookEntries).where(eq(schema.bookEntries.orderId, full.orderId!));
+    expect(entries.reduce((s, e) => s + (e.tipCents ?? 0), 0)).toBe(0);
+    expect(entries.reduce((s, e) => s + (e.taxCents ?? 0), 0)).toBe(q!.taxCents);
+    expect(entries.some((e) => e.taxExempt)).toBe(false);
+  });
 });

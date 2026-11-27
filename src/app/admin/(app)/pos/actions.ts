@@ -7,7 +7,7 @@ import { ensurePriced, pricingProblem } from "@/lib/order-pricing";
 import { headers } from "next/headers";
 import { recordBookingConsents } from "@/lib/booking-consent";
 import { revalidatePath } from "next/cache";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { applyLaserPools, getUsage, bookableQty, laserPoolInfo, pickupDateFor } from "@/lib/availability";
@@ -179,8 +179,18 @@ export async function createBookingAction(input: {
   if (status === "CONFIRMED") await (await import("@/lib/units")).assignUnits(r.orderId);
   // Cash or check taken now (Admin list 1-3): paid in full confirms it (and assigns units); less is Needs attention
   if (paysNow) {
+    // Deep check A1 (Nov 27, 2026): price the order (items, delivery, tax) BEFORE the payment is recorded, so paying
+    // the items only is "paid less" (Needs attention), and a full payment is booked as rentals + delivery + tax
+    // (never as a tip). Not priced: the payment is kept, and the order waits for staff (never confirmed).
+    const pricedFirst = await ensurePriced(r.orderId);
     const { markPaid } = await import("@/lib/orders");
     await markPaid(r.orderId, paidCents, input.payment);
+    if (!pricedFirst) {
+      await db
+        .update(schema.orders)
+        .set({ status: "NEEDS_ATTENTION", notes: sql`COALESCE(${schema.orders.notes}, '') || ${`Payment recorded before the order could be priced (${(await pricingProblem(r.orderId)) ?? "no price yet"}): check the total. `}`, updatedAt: new Date() })
+        .where(eq(schema.orders.id, r.orderId));
+    }
     await db.insert(schema.auditLog).values({ userId: session.userId ?? null, action: "order.payment_recorded", entityType: "order", entityId: String(r.orderId), after: { cents: paidCents, method: input.payment, at: "new booking" } });
   }
 
