@@ -729,6 +729,13 @@
       "when": 1795840000000,
       "tag": "0103_address_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1795860000000,
+      "tag": "0104_paid_notice_claim",
+      "breakpoints": true
     }
   ]
 }

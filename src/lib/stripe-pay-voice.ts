@@ -53,6 +53,10 @@ async function payTwiml(vr: VR, orderId: number, sid: string, tries: number, pro
     vr.hangup();
     return vr;
   }
+  // Deep check M19 (Nov 27, 2026): never record card numbers. The call recording (when on) is paused before the keypad
+  // card entry, like the Sola PhonePay path; no recording running = nothing to pause (the error is ignored)
+  const { pauseRecording } = await import("@/lib/call-recording");
+  await pauseRecording(sid).catch(() => null);
   const pay = vr.pay({
     paymentConnector: payConnector(),
     chargeAmount: (due / 100).toFixed(2),

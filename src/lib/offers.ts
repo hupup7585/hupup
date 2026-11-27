@@ -67,8 +67,9 @@ export async function fourthSundayDiscount(exec: Exec, o: { id: number; customer
   const r = await exec.execute(sql`
     SELECT o.id, o.event_date::text AS event_date, o.pickup_date::text AS pickup_date, o.offer_note
     FROM orders o
-    WHERE o.customer_id = ${o.customerId} AND o.id <> ${o.id} AND o.status NOT IN ('CANCELLED', 'HOLD')
+    WHERE o.customer_id = ${o.customerId} AND o.id <> ${o.id} AND o.status IN ('CONFIRMED', 'DELIVERED', 'PICKED_UP')
       AND o.event_date IN (${sql.join(prior.map((d) => sql`${d}::date`), sql`, `)})`);
+  // Deep check M16 (Nov 27, 2026): only booked and paid Sundays count, never ones still waiting for payment
   const rows = r.rows as { id: number; event_date: string; pickup_date: string; offer_note: string | null }[];
   // Extra check K1 (Nov 27, 2026): the free Sunday starts a new count of 3, so only every 4th Sunday is free (the 8th,
   // the 12th, ...), never every Sunday after the third
