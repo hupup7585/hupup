@@ -93,6 +93,27 @@ describe("box 30: the cart hold", () => {
     await db.delete(schema.orderItems).where(eq(schema.orderItems.orderId, other.id));
     await db.insert(schema.orderItems).values({ orderId, productId: mine.productId, qty: 1, unitPriceCents: 6500 });
   });
+  it("deep check 06:00 M53: two items sharing one unit (the maze group) are not both held again when only one is free", async () => {
+    const [c] = await db.insert(schema.categories).values({ name: "Mazes M53", ivrDigit: 7, sortOrder: 7, active: true }).returning();
+    const [a, b] = await db
+      .insert(schema.products)
+      .values([
+        { categoryId: c.id, name: "Maze A", priceCents: 30000, quantity: 1, stockGroup: "maze53", active: true },
+        { categoryId: c.id, name: "Maze B", priceCents: 30000, quantity: 1, stockGroup: "maze53", active: true },
+      ])
+      .returning();
+    const [cart] = await db.insert(schema.orders).values({ status: "HOLD", channel: "PHONE", eventDate: "2026-12-14", pickupDate: "2026-12-15", holdExpiresAt: minutesAgo(1) }).returning();
+    await db.insert(schema.orderItems).values([
+      { orderId: cart.id, productId: a.id, qty: 1, unitPriceCents: 30000 },
+      { orderId: cart.id, productId: b.id, qty: 1, unitPriceCents: 30000 },
+    ]);
+    const before = h.session.orderId;
+    h.session.orderId = cart.id;
+    await call("cart-hold-key", { Digits: "1" }, "to=ask&q=f%3Dname");
+    h.session.orderId = before;
+    expect(await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, cart.id))).toHaveLength(1);
+    expect((await holdOf(cart.id)).status).toBe("HOLD");
+  });
   it("the wait comes from Admin (Phone timing)", async () => {
     const { saveSetting } = await import("@/lib/settings");
     await db.update(schema.orders).set({ status: "HOLD", holdExpiresAt: minutesAgo(1) }).where(eq(schema.orders.id, orderId));
