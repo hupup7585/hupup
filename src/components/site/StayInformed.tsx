@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { signUpForTexts, type SignUpState } from "@/app/text-alerts/actions";
 import ConsentText from "@/components/ConsentText";
 import { SectionTitle } from "@/components/site/parts";
-import { SMS_GREY_LINE } from "@/lib/sms-grey-line";
+import { SAMPLE_PHONE_CLASS, SAMPLE_PHONE_PLACEHOLDER, SMS_GREY_LINE } from "@/lib/sms-grey-line";
 import { PROMOS_PER_YEAR } from "@/lib/sms-consent-copy"; // 5 a year everywhere (Abraham, Nov 26, 2026, item 4)
 
 /**
@@ -40,7 +40,7 @@ export default function StayInformed({ marketingText, smsNumber, notActive, disa
             )}
             <label className="block" htmlFor="stay-phone">
               <span className="font-bold">Mobile number</span>
-              <input id="stay-phone" name="phone" type="tel" inputMode="tel" autoComplete="tel-national" required className="mt-1 block w-full rounded-xl border-2 border-hu-deep/30 bg-white px-4 py-3 text-lg focus:border-hu-deep focus:outline-none" />
+              <input id="stay-phone" name="phone" type="tel" inputMode="tel" autoComplete="tel-national" required placeholder={SAMPLE_PHONE_PLACEHOLDER} className={`mt-1 block w-full rounded-xl border-2 border-hu-deep/30 bg-white px-4 py-3 text-lg focus:border-hu-deep focus:outline-none ${SAMPLE_PHONE_CLASS}`} />
             </label>
             <input name="company" type="text" tabIndex={-1} autoComplete="off" aria-hidden className="absolute left-[-9999px] h-px w-px opacity-0" />
             <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-white p-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import { SMS_GREY_LINE } from "@/lib/sms-grey-line";
+import { SAMPLE_PHONE_CLASS, SAMPLE_PHONE_PLACEHOLDER, SMS_GREY_LINE } from "@/lib/sms-grey-line";
 import { useActionState } from "react";
 import { Check } from "lucide-react";
 import { PROMO_BENEFITS, PROMO_BENEFITS_NOTE, PROMO_HEADING, PROMO_TITLE, PROMOS_PER_YEAR } from "@/lib/sms-consent-copy"; // 5 a year everywhere (Abraham, Nov 26, 2026, item 4)
@@ -48,7 +48,7 @@ export default function SignUpForm({ transactionalText, marketingText, smsNumber
       )}
       <label className="block">
         <span className="font-bold">Mobile phone number</span>
-        <input name="phone" type="tel" inputMode="tel" autoComplete="tel-national" required placeholder="845-415-7585" className="mt-1 block w-full rounded-xl border-2 border-hu-deep/30 px-4 py-3 text-lg focus:border-hu-deep focus:outline-none" />
+        <input name="phone" type="tel" inputMode="tel" autoComplete="tel-national" required placeholder={SAMPLE_PHONE_PLACEHOLDER} className={`mt-1 block w-full rounded-xl border-2 border-hu-deep/30 px-4 py-3 text-lg focus:border-hu-deep focus:outline-none ${SAMPLE_PHONE_CLASS}`} />
       </label>
       <label className="block">
         <span className="font-bold">First name</span> <span className="opacity-70">(optional)</span>
