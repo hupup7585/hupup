@@ -71,6 +71,16 @@ describe("staff sign-in on the live site", () => {
     expect((await passwordLogin("(845) 777-0101", "wrong password!!", false)).ok).toBe(false);
   });
 
+  it("deep check B2: guesses sent at the same moment all count; the right password is refused once locked", async () => {
+    h.cookies.clear();
+    await db.update(schema.adminUsers).set({ failedLogins: 0, lockedUntil: null }).where(eq(schema.adminUsers.phone, "+18457770101"));
+    await Promise.all(Array.from({ length: 6 }, () => passwordLogin("(845) 777-0101", "wrong password!!", false)));
+    const [u] = await db.select().from(schema.adminUsers).where(eq(schema.adminUsers.phone, "+18457770101"));
+    expect(u.lockedUntil && u.lockedUntil > new Date()).toBe(true);
+    expect((await passwordLogin("(845) 777-0101", PW, false)).ok).toBe(false);
+    await db.update(schema.adminUsers).set({ failedLogins: 0, lockedUntil: null }).where(eq(schema.adminUsers.id, u.id));
+  });
+
   it("Delivery: text code only, never a password (refused even if one was stored)", async () => {
     h.cookies.clear();
     expect((await passwordLogin("(845) 777-0102", PW, false)).ok).toBe(false);
