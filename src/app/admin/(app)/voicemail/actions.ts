@@ -8,6 +8,8 @@ import { requireOwner, requireStaff } from "@/lib/auth";
 import { deleteVoicemail, purgeVoicemail, restoreVoicemail } from "@/lib/voicemail";
 import { toE164 } from "@/lib/phone";
 import { setVmPin, validPin } from "@/lib/vm-access";
+import { redirect } from "next/navigation";
+import { msgQuery } from "@/lib/url-message";
 
 async function audit(userId: number | null, action: string, entityId: number, after: Record<string, unknown> = {}) {
   await db.insert(schema.auditLog).values({ userId, action, entityType: "voicemail", entityId: String(entityId), after });
@@ -85,4 +87,26 @@ export async function setVmPinAction(form: FormData) {
   await setVmPin(pin, s.userId);
   await audit(s.userId, "voicemail.pin_changed", 0); // the PIN itself is never logged
   revalidatePath("/admin/voicemail");
+}
+
+/**
+ * Deep check 0600 M63 (Nov 27, 2026): Owner sets or resets a personal box password in Admin (a forgotten password,
+ * or replacing the default 1234). Only the bcrypt hash is stored; it also clears wrong tries and any lock. Audited,
+ * never with the password itself.
+ */
+export async function setBoxPinAction(form: FormData) {
+  const s = await requireOwner();
+  const back = (m: string) => redirect(`/admin/voicemail?${msgQuery(m)}#vm-box-passwords`);
+  const boxId = Number(form.get("boxId"));
+  const pin = String(form.get("pin") ?? "").trim();
+  const again = String(form.get("pinAgain") ?? "").trim();
+  const { getBox, setBoxPin } = await import("@/lib/vm-boxes");
+  const box = Number.isSafeInteger(boxId) && boxId > 0 ? await getBox(boxId) : null;
+  if (!box || !box.ownerUserId) return back("Not saved: choose a box.");
+  if (!validPin(pin)) return back("Not saved: a password is 4 to 8 digits.");
+  if (pin !== again) return back("Not saved: the two passwords are not the same.");
+  await setBoxPin(box.id, pin);
+  await db.insert(schema.auditLog).values({ userId: s.userId, action: "voicemail_box.password_set", entityType: "voicemail_box", entityId: String(box.id), after: { box: box.boxNumber } });
+  revalidatePath("/admin/voicemail");
+  return back(`Saved: the password for ${box.name}'s box (${box.boxNumber}) is changed, and the box is unlocked.`);
 }
