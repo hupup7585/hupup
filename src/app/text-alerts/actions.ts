@@ -38,7 +38,7 @@ export async function signUpForTexts(_prev: SignUpState, form: FormData): Promis
   const h = await headers();
   const ip = (h.get("x-forwarded-for") || "").split(",")[0].trim() || h.get("x-real-ip") || null;
   const userAgent = h.get("user-agent")?.slice(0, 500) ?? null;
-  const pageUrl = `${config.baseUrl()}/text-alerts`;
+  const pageUrl = `${config.siteUrl()}/text-alerts`; // the page the customer saw
 
   const since = new Date(Date.now() - 24 * 3600 * 1000);
   const count = async (cond: ReturnType<typeof eq>) =>

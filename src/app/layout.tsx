@@ -3,13 +3,15 @@ import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import PhoneAutoFormat from "@/components/PhoneAutoFormat";
 import { isLiveSite } from "@/lib/seo";
+import { config } from "@/lib/config";
 
 // Code audit L3 (Nov 24, 2026): Inter is self-hosted by Next (no blocking request to Google Fonts on every page)
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800", "900"], variable: "--font-inter", display: "swap", preload: false });
 const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-poppins", display: "swap" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.PUBLIC_BASE_URL || "https://hupupattractions.com"),
+  // canonical and share links use the real site address, never a vercel.app one (item 7, Nov 25, 2026)
+  metadataBase: new URL(config.siteUrl()),
   title: "Bounce House & Party Rentals in Kiryas Joel, NY | Hup Up Attractions",
   description:
     "Hup Up Attractions makes party planning easy with bounce house, laser tag, inflatable maze and paddle boat rentals in Kiryas Joel and Orange County, NY. Call (845) 777-7585.",

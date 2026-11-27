@@ -531,7 +531,6 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "hoursMonThu": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "app/page.tsx",
   "lib/business-hours.ts",
   "lib/hours-schedule.ts"
  ],
@@ -544,7 +543,6 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "hoursSunday": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "app/page.tsx",
   "lib/business-hours.ts",
   "lib/hours-schedule.ts"
  ],

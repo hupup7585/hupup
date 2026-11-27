@@ -51,7 +51,7 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
       amountCents: day.order.id === full.order.id ? due : null,
       ip: (h.get("x-forwarded-for") || "").split(",")[0].trim() || null,
       userAgent: h.get("user-agent")?.slice(0, 500) ?? null,
-      pageUrl: `${config.baseUrl()}/pay/${orderId}`,
+      pageUrl: `${config.siteUrl()}/pay/${orderNumber(orderId)}`, // the address the customer opened
     });
   }
   // The two optional text-consent boxes (never required to pay); saved like every other consent
@@ -63,7 +63,7 @@ export async function agreeAndPayAction(orderId: number, token: string, agreed: 
     orderId,
     ip: (h.get("x-forwarded-for") || "").split(",")[0].trim() || null,
     userAgent: h.get("user-agent")?.slice(0, 500) ?? null,
-    pageUrl: `${config.baseUrl()}/pay/${orderId}`,
+    pageUrl: `${config.siteUrl()}/pay/${orderNumber(orderId)}`, // the address the customer opened
   });
   // 10 minutes to finish on the secure card page (Sola can't tell us about typing there)
   if (linkRulesActive()) await holdForCardPage(group.orders.map((d) => d.order.id));

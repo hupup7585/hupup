@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { customerServiceHours, websiteHoursLines } from "@/lib/business-hours";
+import { customerServiceHours, websiteHoursLines, websiteOpeningHoursSpec } from "@/lib/business-hours";
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
+import { config } from "@/lib/config";
 import { BUSINESS_NAME_NB, CATALOG_LINE, keepName, whyLabel, whyRows, HOW_IT_WORKS_DELIVERY, WEBSITE_HOURS_NOTE, keepTimesTogether, noLonelyWord, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces, SERVICE_AREA_MAP_URL } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
@@ -45,9 +46,6 @@ const INTRO_REST = INTRO.slice(INTRO.indexOf("!") + 1).trim();
 export default async function Home() {
   const c = await getSiteContent();
   const settings = await getSettings();
-  const span = (v: string) => v.split("-").map((t) => t.trim());
-  const [monOpen, monClose] = span(settings.hoursMonThu);
-  const [sunOpen, sunClose] = span(settings.hoursSunday);
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
@@ -56,7 +54,7 @@ export default async function Home() {
       "Jumping Balloon (bounce house) rental in Kiryas Joel, plus laser tag, inflatable maze and paddle boat rentals for birthday parties, schools and celebrations across Orange County, NY. Reservations by phone; delivery available for an additional fee.",
     telephone: "+1-845-777-7585",
     email: c.email,
-    url: process.env.PUBLIC_BASE_URL || "https://hupupattractions.com",
+    url: config.siteUrl(),
     ...(c.logoUrl ? { logo: c.logoUrl } : {}),
     address: { "@type": "PostalAddress", addressLocality: "Kiryas Joel", addressRegion: "NY", addressCountry: "US" },
     areaServed: [
@@ -66,11 +64,9 @@ export default async function Home() {
         .map((name) => ({ "@type": "Place", name: `${name}, NY` })),
       { "@type": "AdministrativeArea", name: c.serviceArea.region.replace(", NY", ", New York") },
     ],
-    // Regular weekly hours (Friday closes at midday, so it is listed in the Hours section; closed Shabbes, Yom Tov and the night after them).
-    openingHoursSpecification: [
-      { "@type": "OpeningHoursSpecification", dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday"], opens: monOpen, closes: monClose },
-      { "@type": "OpeningHoursSpecification", dayOfWeek: "Sunday", opens: sunOpen, closes: sunClose },
-    ],
+    // Regular weekly hours from the Hours page, the same schedule as the Our Hours list (Friday closes at midday, so it is
+    // listed in the Hours section; closed Shabbes, Yom Tov and the night after them).
+    openingHoursSpecification: websiteOpeningHoursSpec(settings),
   };
 
   return (

@@ -3,7 +3,7 @@ import { config } from "@/lib/config";
 
 /** SMS Terms v3, Abraham's final text (Nov 10, 2026), word for word; only the Privacy Policy link is filled in. */
 export default function SmsTermsV3() {
-  const privacy = `${config.baseUrl()}/privacy`;
+  const privacy = `${config.siteUrl()}/privacy`; // the real site address (item 7, Nov 25, 2026)
   return (
     <LegalPage title="SMS Terms" updated="November 2026">
       <div data-sms-terms="v3">
