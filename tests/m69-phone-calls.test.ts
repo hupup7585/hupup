@@ -285,3 +285,67 @@ describe("item 27: the keypad card retry never starts a new card try after the S
     expect(await sub("retry", { Digits: "1" }, `o=${o.id}&n=1&t=forged`)).not.toContain("<Pay");
   });
 });
+
+describe("item 13: a caller waiting for staff with hold music is never cut off by the Shabbes check", () => {
+  it("Friday 4:30 PM, with a cart: the wait keeps playing (no closed greeting, no Record inside the queue wait); a booking step is cut off", async () => {
+    await freeStock();
+    const c = caller();
+    at("2027-01-15T21:22:00Z");
+    const sid = "CAl" + n;
+    await c.cart(sid, "2027-01-17");
+    at("2027-01-15T21:30:00Z");
+    const wait = await c.call(sid, "staff-hold", { QueueTime: "30" }, "k=0");
+    expect(wait).not.toContain("<Record");
+    expect(wait).not.toContain("closed now for Shabbes");
+    expect(wait).not.toContain("save your items");
+    expect(wait).toMatch(/<Play>|<Pause/);
+    expect(await c.call(sid, "staff-queue-exit", { QueueResult: "bridged" }, "k=0")).toContain("<Hangup/>");
+    expect(say(await c.call(sid, "cart"))).toContain("We will save your items until one hour after Shabbes");
+  });
+});
+
+describe("item 26: the hold-music safety limit counts the staff accept waits", () => {
+  it("still in the queue a little past the old limit; out to voicemail past the new one", async () => {
+    const { getSettings } = await import("@/lib/settings");
+    const { ringAttempts, ringListFor } = await import("@/lib/ivr/routing");
+    const s = await getSettings();
+    const list = ringListFor(s as never, "0");
+    const rounds = (list.mode === "simultaneous" ? 1 : Math.max(1, list.targets.length)) * ringAttempts(s as never, "0");
+    const ring = Math.max(20, ...list.targets.map((t) => t.ringSeconds));
+    const oldLimit = ring * rounds + 60;
+    const newLimit = (ring + 8 + 6 + 10) * rounds + 60;
+    const c = caller();
+    at("2027-01-13T17:00:00Z"); // an open weekday
+    await ensureSession("CAm" + n, c.from);
+    const stay = await c.call("CAm" + n, "staff-hold", { QueueTime: String(oldLimit + 5) }, "k=0");
+    expect(stay).not.toContain("<Leave");
+    expect(await c.call("CAm" + n, "staff-hold", { QueueTime: String(newLimit) }, "k=0")).not.toContain("<Leave");
+    expect(await c.call("CAm" + n, "staff-hold", { QueueTime: String(newLimit + 1) }, "k=0")).toContain("<Leave");
+    expect(redirect(await c.call("CAm" + n, "staff-queue-exit", { QueueResult: "leave" }, "k=0"))).toBe("voicemail?x=0");
+  });
+});
+
+describe("item 25: two staff phones ending at the same moment never stall the rounds", () => {
+  it("both legs come off the list; with no more rounds the caller is sent on to voicemail (missed: no answer)", async () => {
+    const c = caller();
+    at("2027-01-13T17:00:00Z");
+    const sid = "CAn" + n;
+    await ensureSession(sid, c.from);
+    await updateSession(sid, { data: { staffLegs: ["CAleg1", "CAleg2"] } });
+    const q = `c=${sid}&k=0&i=99`; // the last round already rang
+    await Promise.all([handleVoice({ action: "staff-leg-status", query: new URLSearchParams(q), body: { CallSid: "CAleg1" }, callSid: "CAleg1", from: "+18455550001" }), handleVoice({ action: "staff-leg-status", query: new URLSearchParams(q), body: { CallSid: "CAleg2" }, callSid: "CAleg2", from: "+18455550002" })]);
+    const s = await getSession(sid);
+    expect(s!.data.staffLegs).toEqual([]);
+    expect(s!.data.missed).toBe("no_answer");
+  });
+  it("one leg of two ending: the other is still ringing, nothing moves on", async () => {
+    const c = caller();
+    const sid = "CAo" + n;
+    await ensureSession(sid, c.from);
+    await updateSession(sid, { data: { staffLegs: ["CAleg3", "CAleg4"] } });
+    await handleVoice({ action: "staff-leg-status", query: new URLSearchParams(`c=${sid}&k=0&i=99`), body: { CallSid: "CAleg3" }, callSid: "CAleg3", from: "+18455550003" });
+    const s = await getSession(sid);
+    expect(s!.data.staffLegs).toEqual(["CAleg4"]);
+    expect(s!.data.missed).toBeUndefined();
+  });
+});
