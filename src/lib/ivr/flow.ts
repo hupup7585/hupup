@@ -1501,12 +1501,14 @@ export function staffCallerId(from: string | null | undefined, env: Record<strin
 export async function renewPaymentHold(ids: number[], minutes: number): Promise<number[]> {
   if (!ids.length) return [];
   const rows = await db.select({ id: orders.id, status: orders.status, holdExpiresAt: orders.holdExpiresAt }).from(orders).where(inArray(orders.id, ids));
-  const { itemsStillFree } = await import("@/lib/late-payment");
+  // Deep check 06:00 M7: an ended hold is checked as one whole order, locked (shared units and laser pools counted),
+  // the same check as a late payment; each line alone could pass when only one unit was free
+  const { claimIfStillFree } = await import("@/lib/late-payment");
   const ok: number[] = [];
   const taken: number[] = [];
   for (const r of rows) {
     if (r.status !== "PENDING_PAYMENT") continue;
-    if (r.holdExpiresAt && r.holdExpiresAt < new Date() && !(await itemsStillFree(r.id))) taken.push(r.id);
+    if (r.holdExpiresAt && r.holdExpiresAt < new Date() && !(await claimIfStillFree(r.id))) taken.push(r.id);
     else ok.push(r.id);
   }
   if (ok.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(minutes), updatedAt: new Date() }).where(inArray(orders.id, ok));
