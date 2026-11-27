@@ -2975,12 +2975,12 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (!d) return bookNoInput(vr, ctx, "category", { c, f: ctx.query.get("f") ?? undefined }); // keeps the "free that date" filter (audit L3)
     if (d === "*") return back(vr, "cats"); // star: the categories menu (box 12a, Nov 22, 2026)
-    if (d === "0") return back(vr, "cart", { c }); // after the cart, the same item list plays again
+    if (d === "0") return back(vr, "cart", { c, f: ctx.query.get("f") ?? undefined }); // after the cart, the same item list plays again (extra check P5: still only what is free that day)
     const items = await listItems(c, ctx.query.get("f"));
     const p = /^\d{1,2}$/.test(d) && !d.startsWith("0") ? ((await isLaserBase(c)) ? laserList(items).find((x) => x.key === Number(d))?.p : items[Number(d) - 1]) : undefined;
     if (!p) {
       sp(vr, ctx, "not_valid");
-      return back(vr, "category", { c });
+      return back(vr, "category", { c, f: ctx.query.get("f") ?? undefined }); // extra check P5: a wrong key keeps the "free that day" list
     }
     await track(ctx.callSid, "item_heard", `Chose ${p.name}`, { item: p.name, productId: p.id });
     // Item first, then the date (Abraham). Adding more items for a day already chosen on this call skips the date.
@@ -3605,7 +3605,7 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "cart_empty");
       return c ? back(vr, "category", { c }) : back(vr, "book");
     }
-    const g = keypad(vr, url("cart-choice", { c }));
+    const g = keypad(vr, url("cart-choice", { c, f: ctx.query.get("f") ?? undefined }));
     // Item removed (box 29a): "Here is your updated cart." then the cart from its date line
     sp(g, ctx, ctx.query.get("u") ? "cart_updated" : "cart_intro");
     for (const o of days) sp(g, ctx, "cart_day", { date: spokenDate(o.order.eventDate), items: itemsPhrase(o.items) });
@@ -3615,7 +3615,7 @@ const handlers: Record<string, Handler> = {
     if (await cartBalloonDay(ctx)) sp(g, ctx, "cart_ocean");
     backLine(g, ctx);
     // From an item list: once the cart has been read, the same item list plays again (Abraham, Phone Menu v3)
-    if (c) return back(vr, "category", { c });
+    if (c) return back(vr, "category", { c, f: ctx.query.get("f") ?? undefined }); // extra check P5: the same list, filter kept
     return noInput(vr, ctx, "cart");
   },
 
@@ -3624,7 +3624,7 @@ const handlers: Record<string, Handler> = {
     const c = ctx.query.get("c") ?? undefined;
     // Star: one step back. With no list to return to, box 25 (when something is in the cart), else the bookings menu;
     // never the main menu (Hark's audit M6, Nov 24, 2026)
-    if (d === "*") return c ? back(vr, "category", { c }) : (await callOrders(ctx)).length ? back(vr, "added-menu", { n: 1 }) : back(vr, "book"); // n: keep-shopping only (Hark's bug 7)
+    if (d === "*") return c ? back(vr, "category", { c, f: ctx.query.get("f") ?? undefined }) : (await callOrders(ctx)).length ? back(vr, "added-menu", { n: 1 }) : back(vr, "book"); // n: keep-shopping only (Hark's bug 7)
     if (d === "1") {
       sp(vr, ctx, "checkout_tax_note"); // Abraham (Phone Menu v3): before checkout
       // Nov 23, 2026 (Abraham): the address lookup comes BEFORE the name; a found family gives the name, no name question
@@ -3632,7 +3632,7 @@ const handlers: Record<string, Handler> = {
       if (addrStepsActive(ctx) && directoryLookupOn()) return back(vr, "addr-lookup");
       return back(vr, "ask", { f: "name" });
     }
-    if (d === "2") return c ? back(vr, "category", { c }) : back(vr, "cats"); // keep shopping: the categories menu (Batch 3 item 9, Nov 25, 2026)
+    if (d === "2") return c ? back(vr, "category", { c, f: ctx.query.get("f") ?? undefined }) : back(vr, "cats"); // keep shopping: the categories menu (Batch 3 item 9, Nov 25, 2026)
     if (d === "3") return back(vr, "remove"); // remove an item (box 29b)
     if (d === "9") {
       const day = await cartBalloonDay(ctx);

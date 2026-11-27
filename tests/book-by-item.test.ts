@@ -173,4 +173,14 @@ describe("item taken, key 2 (Nov 20, 2026)", () => {
       vi.useRealTimers();
     }
   });
+  it("extra check P5: on the 'free that day' list (f=date), a wrong key, the cart (0) and back keep the same list", async () => {
+    const f = "2027-05-03";
+    expect(redirect(await call("category-choice", { Digits: "8" }, `c=${catId}&f=${f}`))).toBe(`category?c=${catId}&f=${f}`);
+    expect(redirect(await call("category-choice", { Digits: "0" }, `c=${catId}&f=${f}`))).toBe(`cart?c=${catId}&f=${f}`);
+    expect(redirect(await call("cart-choice", { Digits: "*" }, `c=${catId}&f=${f}`))).toBe(`category?c=${catId}&f=${f}`);
+    expect(redirect(await call("cart-choice", { Digits: "2" }, `c=${catId}&f=${f}`))).toBe(`category?c=${catId}&f=${f}`);
+    // without the filter, as before
+    expect(redirect(await call("category-choice", { Digits: "8" }, `c=${catId}`))).toBe(`category?c=${catId}`);
+  });
 });
+
