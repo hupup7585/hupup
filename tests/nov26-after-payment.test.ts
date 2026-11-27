@@ -234,3 +234,16 @@ describe("disconnect ending: items in the cart, silent", () => {
     expect(flow).toMatch(/async goodbye\(ctx, vr\)[\s\S]{0,400}group\?\.paid\) sp\(vr, ctx, "disconnect_goodbye"\)/); // Hark's 2nd check A2: only after a real payment
   });
 });
+
+describe("extra check HT6: Line 2 names only the days this payment is for", () => {
+  it("a day staff cancelled meanwhile (nothing paid on it) is left out of the dates", async () => {
+    const gid = 960606;
+    const [cancelled] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "PHONE", customerId, eventDate: "2026-12-14", pickupDate: "2026-12-15", subtotalCents: 20000, totalCents: 21625, paidCents: 0, paymentGroupId: gid }).returning();
+    const [paid] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", customerId, eventDate: "2026-12-21", pickupDate: "2026-12-22", subtotalCents: 20000, totalCents: 21625, paidCents: 21625, paymentGroupId: gid }).returning();
+    void cancelled;
+    const x = await call("pay-approved", {}, `o=${paid.id}`);
+    expect(said(x)).toContain("We will deliver on Monday, December twenty-first and pick up on Tuesday, December twenty-second.");
+    expect(said(x).join(" ")).not.toContain("December fourteenth");
+  });
+});
+

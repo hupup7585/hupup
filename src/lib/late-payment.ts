@@ -4,7 +4,7 @@ import { db, schema } from "@/lib/db";
 import { checkBookable, getUsage, pickupDateFor, usedOn, lastHeldDay } from "@/lib/availability";
 import { addDays, todayISO } from "@/lib/dates";
 import { nearbyDays, nearestSize } from "@/lib/alternatives";
-import { nextOpenDay } from "@/lib/jewish-calendar";
+import { nextOpenDay, sameDayOpen } from "@/lib/jewish-calendar";
 import { getSettings, linkHoldMinutes } from "@/lib/settings";
 import { ensurePriced } from "@/lib/order-pricing";
 import { config } from "@/lib/config";
@@ -112,7 +112,11 @@ export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now
       // two items sharing the maze or a laser pool can't both pass when only one is free)
       await tx.update(schema.orders).set({ status: "PENDING_PAYMENT", holdExpiresAt: inMinutes(holdFor[linkHoldKindOf(o)], now) }).where(eq(schema.orders.id, o.id));
       // Hark's website list A3: a day that has passed, or a phone booking on a day we are closed, is never held again
-      const badDay = o.eventDate < today || (linkHoldKindOf(o) === "phone" && nextOpenDay(o.eventDate, cal) !== o.eventDate);
+      // Extra check HT2 (Nov 27, 2026): and a phone booking for today after the same-day cut-off (3:30 PM, chatzos on
+      // Friday and Erev Yom Tov, both in Admin), like the phone itself and the options list
+      const badDay =
+        o.eventDate < today ||
+        (linkHoldKindOf(o) === "phone" && (nextOpenDay(o.eventDate, cal) !== o.eventDate || !sameDayOpen(o.eventDate, now, cal as never)));
       const gone = badDay ? items.filter((x) => x.orderId === o.id) : await recheckOrderLines(tx, o);
       if (badDay) await tx.delete(schema.orderItems).where(eq(schema.orderItems.orderId, o.id));
       for (const i of gone) {

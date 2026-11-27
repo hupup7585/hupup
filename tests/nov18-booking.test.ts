@@ -67,6 +67,21 @@ describe("box 150 and box 149 (approved Nov 18, 2026)", () => {
     expect(o.subtotalCents).toBe(30000);
     expect(o.offerNote).toBe("Friday and Mutze Shabbes: one and a half days");
   });
+  it("extra check HT1: box 150 'Friday only' after an earlier Friday + Mutze Shabbes span (box 17) sets the span aside (one day's price, not 1.5)", async () => {
+    h.session.orderId = null;
+    // an earlier box 17 key 1 saved this Friday as the day before Shabbes, picked up Sunday
+    h.session.data = { spanDays: { [CHANUKAH_FRIDAY]: { after: "2026-12-13" } } };
+    const xml = await call("date-confirm", { Digits: "1" }, `p=${boat}&d=${CHANUKAH_FRIDAY}&f=1`); // 1 = Friday only
+    expect(redirect(xml)).toBe(`qty?p=${boat}&d=${CHANUKAH_FRIDAY}`);
+    expect((h.session.data.spanDays as Record<string, unknown>)[CHANUKAH_FRIDAY]).toBeUndefined();
+    await call("add", {}, `p=${boat}&d=${CHANUKAH_FRIDAY}&q=1`);
+    const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, h.session.orderId!));
+    expect(o.pickupDate).not.toBe("2026-12-13"); // not the Sunday pickup
+    expect(o.subtotalCents).toBe(10000); // one day's price
+    await db.update(schema.orders).set({ status: "CANCELLED" }).where(eq(schema.orders.id, o.id));
+    h.session.orderId = null;
+    h.session.data = {};
+  });
   it("box 150: pound = Friday only (picked up after Shabbes, one day's price); the Friday only line is preview only", async () => {
     h.session.orderId = null;
     h.session.data = {};

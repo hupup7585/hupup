@@ -66,4 +66,21 @@ describe("Check availability again", () => {
     expect(r.removed).toBe(1);
     expect(await items(id)).toEqual([]);
   });
+  it("extra check HT2: a phone booking for today is not held again after the same-day cut-off (3:30 PM); before it, it is", async () => {
+    const { x } = await products();
+    // Tuesday Dec 1, 2026: 3:40 PM New York is after the 3:30 PM cut-off
+    const after = new Date("2026-12-01T20:40:00Z");
+    const id = await expiredOrder([x], "2026-12-01");
+    const r = await holdAgain([id], id, after);
+    expect(r.removed).toBe(1);
+    expect(await items(id)).toEqual([]);
+    // 3:00 PM: still bookable today
+    const before = new Date("2026-12-01T20:00:00Z");
+    const id2 = await expiredOrder([x], "2026-12-01");
+    await db.update(schema.orders).set({ holdExpiresAt: new Date("2026-12-01T19:50:00Z") }).where(eq(schema.orders.id, id2));
+    const r2 = await holdAgain([id2], id2, before);
+    expect(r2.removed).toBe(0);
+    expect(await items(id2)).toEqual([x]);
+  });
 });
+

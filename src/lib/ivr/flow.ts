@@ -1596,6 +1596,9 @@ async function friMutzeChoice(ctx: Ctx, vr: VR, p: string | undefined, date: str
     return back(vr, "date-ask", { p, d: date });
   }
   d = d === "2" ? "1" : "#"; // the code below: "1" keeps it for Mutze Shabbes, "#" is Friday only
+  // Extra check HT1 (Nov 27, 2026): a Friday + Mutze Shabbes span saved earlier for this Friday (box 17) is set aside,
+  // like the date step and box 18 do, so "Friday only" never lands on the 1.5-day order
+  await clearSpan(ctx, date);
   await chooseDay(ctx, date);
   const kept = new Set(ctx.session?.data.mutzeDays ?? []);
   const prod = p ? await getProduct(Number(p)) : null;
@@ -5051,7 +5054,10 @@ const handlers: Record<string, Handler> = {
     const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
     sp(g, ctx, "phonepay_approved", { number });
     if (PAY_DATES_LIVE) {
-      const days = group.orders.map((x) => x.order); // sorted by date: the first delivery and the last pickup
+      // Extra check HT6 (Nov 27, 2026): only the days this payment is for (a day cancelled meanwhile is left out, like the
+      // paid text and email, deep check 0600 M17)
+      const { payingDays } = await import("@/lib/orders");
+      const days = payingDays(group.orders, group.primary).map((x) => x.order); // sorted by date: the first delivery and the last pickup
       sp(g, ctx, "pay_approved_dates", { date: spokenDate(days[0].eventDate), pickup: spokenDate(days.map((x) => x.pickupDate).sort().at(-1)!) });
     }
     sp(g, ctx, "phonepay_approved_star");
