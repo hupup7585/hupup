@@ -1,0 +1,44 @@
+# Opens a GitHub issue the moment Vercel reports a failed (or rate-limited) deployment
+# on the live branch or the website preview branch. Free: public repo, no paid services.
+# See docs/vercel-rules.md.
+name: Vercel deploy alert
+
+on:
+  status
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  alert:
+    if: >-
+      github.event.context == 'Vercel' &&
+      (github.event.state == 'failure' || github.event.state == 'error')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Open an issue for a failed live or preview deploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.sha }}
+          DESC: ${{ github.event.description }}
+          URL: ${{ github.event.target_url }}
+          BRANCHES: ${{ toJSON(github.event.branches.*.name) }}
+        run: |
+          branch=""
+          for b in claude/nifty-mendel-7hlzdb claude/nifty-mendel-7hlzdb-website; do
+            if echo "$BRANCHES" | grep -q "\"$b\""; then branch="$branch $b"; fi
+          done
+          if [ -z "$branch" ]; then echo "Not a live or preview branch: $BRANCHES"; exit 0; fi
+          short="${SHA:0:7}"
+          title="Vercel deploy failed: ${short} on${branch}"
+          if gh issue list --repo "$REPO" --state open --search "\"Vercel deploy failed: ${short}\" in:title" --json number --jq '.[0].number' | grep -q .; then
+            echo "Issue already open for ${short}"; exit 0
+          fi
+          gh label create vercel-deploy-failed --repo "$REPO" --color B60205 \
+            --description "Vercel build or deploy failed on the live or preview branch" 2>/dev/null || true
+          body=$(printf '%s\n\n- Commit: %s\n- Branch:%s\n- Vercel says: %s\n- Details: %s\n\nThe site keeps serving the last good deployment. Fix on a session branch, run `npm run typecheck`, `npm test` and `npm run build`, then merge once. If Vercel says "rate limited", stop merging: see docs/vercel-rules.md.\n' \
+            "Vercel reported a failed deployment." "$SHA" "$branch" "$DESC" "$URL")
+          gh issue create --repo "$REPO" --title "$title" --label vercel-deploy-failed --body "$body"
