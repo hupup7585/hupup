@@ -114,7 +114,8 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
             {week.map((d) => {
               const other = d.date.slice(0, 7) !== month;
               const past = d.date < today;
-              const off = d.closed || past;
+              // Mutze Shabbes by staff (Nov 26, 2026): a Saturday can be booked for Saturday night
+              const off = (d.closed && !d.mutze) || past;
               // Closed days get their own color and a "Closed" tag; past days stay grey
               const chosen = d.date === value;
               const label = d.closed ? d.reason : d.closesAtLabel ? "Closes early" : d.names[0] ?? "";
@@ -136,7 +137,9 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
                   className={`min-h-[4.25rem] min-w-0 overflow-hidden rounded-lg border p-1 text-left text-[11px] leading-tight sm:p-1.5 sm:text-xs ${
                     chosen
                       ? "border-navy bg-navy text-white"
-                      : d.closed && !past
+                      : d.mutze && !past
+                        ? "border-navy bg-white hover:border-navy"
+                        : d.closed && !past
                         ? "cursor-not-allowed border-[#f5c2bd] bg-[#ffe6e4] text-[#b3261e]" // closed: its own light red color (Abraham)
                         : past
                           ? "cursor-not-allowed border-line bg-bg text-muted"
@@ -148,10 +151,16 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
                   {/* Day number with "Closed" next to it (Abraham, Nov 17, 2026: no crossed-out days) */}
                   <span className="flex flex-wrap items-center justify-between gap-1">
                     <span className="text-sm font-bold">{Number(d.date.slice(8))}</span>
-                    {d.closed && !past && (
-                      <span className="text-[10px] font-black leading-none sm:text-[11px]" data-closed-tag>
-                        Closed
+                    {d.mutze && !past ? (
+                      <span className="text-[10px] font-black leading-none text-navy sm:text-[11px]" data-mutze-tag>
+                        Mutze Shabbes
                       </span>
+                    ) : (
+                      d.closed && !past && (
+                        <span className="text-[10px] font-black leading-none sm:text-[11px]" data-closed-tag>
+                          Closed
+                        </span>
+                      )
                     )}
                   </span>
                   {/* Hebrew date: the full date on wider screens, the day only on a phone (the months are in the heading) */}

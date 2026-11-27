@@ -14,6 +14,7 @@ import { applyLaserPools, getUsage, bookableQty, laserPoolInfo, pickupDateFor } 
 import { getSettings } from "@/lib/settings";
 import { checkEventDate, dayInfo } from "@/lib/jewish-calendar";
 import { holidayWeek } from "@/lib/holiday-rentals";
+import { staffMutze } from "@/lib/staff-mutze";
 import { addDays, isValidISO, todayISO } from "@/lib/dates";
 import { createOrderWithItems, getOrderWithItems, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES, POS_LINK_HOLD_MINUTES } from "@/lib/orders";
 import { parseMoneyToCents } from "@/lib/money";
@@ -37,8 +38,8 @@ export async function availabilityFor(date: string) {
   return Object.fromEntries(prods.map((p) => [p.id, bookableQty(p.quantity, usage, p.id, date, pickup)]));
 }
 
-export type CalendarDay = { date: string; hebrew: string; hebrewHe: string; names: string[]; closed: boolean; reason: string | null; closesAtLabel: string | null; /** Chanukah or Chol Hamoed week (Nov 24, 2026: light blue on the calendar) */ holidayWeek?: "chanukah" | "cholHamoed" | null };
-export type DateCheck = { ok: boolean; message: string | null; pickupWarning: string | null; pickup: string; day: CalendarDay };
+export type CalendarDay = { date: string; hebrew: string; hebrewHe: string; names: string[]; closed: boolean; reason: string | null; closesAtLabel: string | null; /** Chanukah or Chol Hamoed week (Nov 24, 2026: light blue on the calendar) */ holidayWeek?: "chanukah" | "cholHamoed" | null; /** Closed Saturday that staff can book for Saturday night (Mutze Shabbes, Nov 26, 2026) */ mutze?: boolean };
+export type DateCheck = { ok: boolean; message: string | null; pickupWarning: string | null; pickup: string; day: CalendarDay; /** Mutze Shabbes by staff (Nov 26, 2026): the delivery and pickup times for this Saturday night */ mutze?: { deliveryLabel: string; pickupLabel: string } };
 
 // Staff screen: Hebrew-letter holiday names (Abraham); days without one keep the calendar name
 const plainDay = (d: ReturnType<typeof dayInfo>): CalendarDay => ({ date: d.date, hebrew: d.hebrew, hebrewHe: d.hebrewHe, names: d.namesYi, closed: d.closed, reason: d.reasonYi ?? d.reason, closesAtLabel: d.closesAtLabel, holidayWeek: holidayWeek(d.date) });
@@ -48,7 +49,10 @@ export async function calendarFor(start: string, days = 14): Promise<CalendarDay
   await requireAdmin();
   if (!isValidISO(start)) return [];
   const cal = await getSettings();
-  return Array.from({ length: Math.min(days, 60) }, (_, i) => plainDay(dayInfo(addDays(start, i), cal)));
+  return Array.from({ length: Math.min(days, 60) }, (_, i) => {
+    const d = plainDay(dayInfo(addDays(start, i), cal));
+    return d.closed && staffMutze(d.date, cal as never).ok ? { ...d, mutze: true } : d;
+  });
 }
 
 export async function checkDateFor(date: string): Promise<DateCheck | null> {
@@ -56,6 +60,9 @@ export async function checkDateFor(date: string): Promise<DateCheck | null> {
   if (!isValidISO(date)) return null;
   const cal = await getSettings();
   const c = checkEventDate(date, cal);
+  // Mutze Shabbes by staff every week (Abraham, Nov 26, 2026, 8:34 PM): a Saturday is open for Saturday night
+  const m = c.ok ? null : staffMutze(date, cal as never);
+  if (m?.ok) return { ok: true, message: null, pickupWarning: null, pickup: m.pickupDate, day: plainDay(c.day), mutze: { deliveryLabel: m.deliveryLabel, pickupLabel: m.pickupLabel } };
   return { ok: c.ok, message: c.message, pickupWarning: c.pickupWarning, pickup: pickupDateFor(date, cal), day: plainDay(c.day) };
 }
 
@@ -107,7 +114,10 @@ export async function createBookingAction(input: {
   if (!isValidISO(input.date)) return { ok: false, message: "Pick an event date." };
   if (input.date < todayISO()) return { ok: false, message: "That date is in the past." };
   const dateCheck = checkEventDate(input.date, await getSettings());
-  if (!dateCheck.ok) return { ok: false, message: dateCheck.message ?? "We're closed on that day." };
+  // Mutze Shabbes by staff every week (Abraham, Nov 26, 2026, 8:34 PM): Saturday night, delivered after Shabbes,
+  // picked up Sunday morning, one day's price. Only staff here; the phone and the website keep their own rules.
+  const mutze = dateCheck.ok ? null : staffMutze(input.date, (await getSettings()) as never);
+  if (!dateCheck.ok && !mutze?.ok) return { ok: false, message: dateCheck.message ?? "We're closed on that day." };
   const items = Object.entries(input.items)
     .map(([id, qty]) => ({ productId: Number(id), qty: Number(qty) }))
     .filter((i) => i.qty !== 0);
@@ -140,15 +150,15 @@ export async function createBookingAction(input: {
   const holdMin = await linkHoldMinutes("admin"); // Admin New booking link hold, its own setting (25)
   const thuSun = Boolean(input.thuSun) && Boolean(s.offerThuSunOn) && new Date(`${input.date}T12:00:00Z`).getUTCDay() === 4;
   const r = await createOrderWithItems({
-    ...(thuSun ? { pickupDate: addDays(input.date, 4) } : {}),
+    ...(thuSun ? { pickupDate: addDays(input.date, 4) } : mutze?.ok ? { pickupDate: mutze.pickupDate } : {}),
     items,
     eventDate: input.date,
     channel: "POS",
     status,
     holdExpiresAt: input.payment === "link" || input.payment === "card" ? minutesFromNow(holdMin) /* New booking link (Abraham, Nov 13, 2026: 25 minutes) */ : null,
     customer: { name: input.name.trim(), phone, email: input.email.trim() || null, address: input.address.trim() || null },
-    deliveryTime: input.deliveryTime || null,
-    notes: input.notes || null,
+    deliveryTime: input.deliveryTime || (mutze?.ok ? mutze.deliveryLabel : null),
+    notes: mutze?.ok ? [`Mutze Shabbes: ${mutze.deliveryLabel.replace("Mutze Shabbes, d", "D")}; pickup ${mutze.pickupLabel}.`, input.notes].filter(Boolean).join(" ") : input.notes || null,
     paymentMethod: paidCents ? input.payment : null,
     paidCents,
   });

@@ -175,14 +175,14 @@ export default function PosForm(props: {
             <button
               key={d.date}
               type="button"
-              disabled={d.closed}
+              disabled={d.closed && !d.mutze}
               onClick={() => setDate(d.date)}
               title={d.closed ? `Closed: ${d.reason}` : d.names.join(", ") || d.hebrew}
-              className={`min-w-[5.5rem] shrink-0 rounded-lg border px-2 py-1.5 text-left text-xs ${d.date === date ? "border-navy bg-navy text-white" : d.closed ? "border-line bg-bg text-muted line-through" : d.holidayWeek ? "border-[#CFE6FB] bg-[#EEF7FF] hover:border-navy" : "border-line bg-white hover:border-navy"}`}
+              className={`min-w-[5.5rem] shrink-0 rounded-lg border px-2 py-1.5 text-left text-xs ${d.date === date ? "border-navy bg-navy text-white" : d.mutze ? "border-navy bg-white hover:border-navy" : d.closed ? "border-line bg-bg text-muted line-through" : d.holidayWeek ? "border-[#CFE6FB] bg-[#EEF7FF] hover:border-navy" : "border-line bg-white hover:border-navy"}`}
             >
               <span className="block font-bold">{englishDate(d.date, "short")}</span>
               <HebrewDay yi iso={d.date} className="block" />
-              <span className="block truncate">{d.closed ? d.reason : d.closesAtLabel ? "Closes early" : d.names[0] ?? ""}</span>
+              <span className="block truncate">{d.mutze ? "Mutze Shabbes" : d.closed ? d.reason : d.closesAtLabel ? "Closes early" : d.names[0] ?? ""}</span>
             </button>
           ))}
         </div>
@@ -196,6 +196,11 @@ export default function PosForm(props: {
             </div>
             {!check.ok && <div>{check.message}</div>}
             {check.day.closesAtLabel && <div className="badge badge-pending mt-1">{check.day.closesAtLabel}</div>}
+            {check.mutze && (
+              <div className="mt-2 rounded-lg border-2 border-navy bg-white p-2 font-semibold text-navy" data-mutze-staff>
+                Mutze Shabbes (after Shabbes): {check.mutze.deliveryLabel.replace("Mutze Shabbes, d", "D")}. Pickup {check.mutze.pickupLabel}. One day&apos;s price.
+              </div>
+            )}
             {check.ok && !(thuSun && isThursday) && <div className="mt-1">Pickup: <DualDate yi iso={check.pickup} /></div>}
             {check.ok && props.offerThuSun && isThursday && (
               <label className="mt-2 flex items-center gap-2 font-semibold" data-thu-sun>

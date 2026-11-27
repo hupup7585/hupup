@@ -236,7 +236,8 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "holidaySundayPickup": [
   "app/admin/(app)/offers/actions.ts",
   "app/admin/(app)/offers/page.tsx",
-  "lib/holiday-rentals.ts"
+  "lib/holiday-rentals.ts",
+  "lib/staff-mutze.ts"
  ],
  "holidayFridayMutzeDays": [
   "app/admin/(app)/offers/actions.ts",
@@ -247,7 +248,8 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "holidayMutzeAloneDays": [
   "app/admin/(app)/offers/actions.ts",
   "app/admin/(app)/offers/page.tsx",
-  "lib/holiday-rentals.ts"
+  "lib/holiday-rentals.ts",
+  "lib/staff-mutze.ts"
  ],
  "phonePayDeclineHangupSeconds": [
   "app/admin/(app)/phone/phonepay/actions.ts",
@@ -370,11 +372,13 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  ],
  "calendarLatitude": [
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/jewish-calendar.ts"
+  "lib/jewish-calendar.ts",
+  "lib/staff-mutze.ts"
  ],
  "calendarLongitude": [
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/jewish-calendar.ts"
+  "lib/jewish-calendar.ts",
+  "lib/staff-mutze.ts"
  ],
  "erevShabbosClose": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
@@ -825,6 +829,12 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/phone/settings/page.tsx",
   "lib/feature-switches.ts",
   "lib/switch-guard.ts"
+ ],
+ "staffMutzeEveryWeek": [
+  "lib/staff-mutze.ts"
+ ],
+ "staffMutzeDeliveryAfterMin": [
+  "lib/staff-mutze.ts"
  ],
  "solaFeePercent": [
   "app/admin/(app)/bookkeeping/actions.ts",

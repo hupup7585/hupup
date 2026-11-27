@@ -257,6 +257,10 @@ export const SETTING_DEFAULTS = {
   /** Hark's review item 9 (Nov 26, 2026): a fresh code and typed words before turning on call recording, the Google
    *  voice, PhonePay or Stripe. Off until Abraham approves the screenshots. */
   sensitiveSwitchGuard: false,
+  /** Abraham, Nov 26, 2026, 8:34 PM: staff may book Mutze Shabbes every week (not the phone, not the website) */
+  staffMutzeEveryWeek: true,
+  /** Mutze Shabbes by staff: delivery this many minutes after Shabbes ends (150 = two and a half hours) */
+  staffMutzeDeliveryAfterMin: "150",
   /** Bookkeeping (Abraham T): Sola processing rate, to estimate fees and the net deposit per payment. Owner sets them from the Sola statement. */
   solaFeePercent: "0",
   solaFeeCents: "0",

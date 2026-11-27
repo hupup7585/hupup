@@ -614,6 +614,16 @@ const OTHER: Record<string, Explanation> = {
     where: "Blocked callers hear a busy signal and are not connected.",
     ifChanged: "Takes effect on the next call. A wide pattern can block real customers.",
   },
+  staffMutzeEveryWeek: {
+    what: "When on, staff can book a Saturday night (Mutze Shabbes) on New booking every week of the year, not only during Chanukah and Chol Hamoed. Delivery is after Shabbes ends, pickup is Sunday morning, and it costs one day.",
+    where: "Admin New booking only. The phone system and the website do not change: callers get Mutze Shabbes only during Chanukah and Chol Hamoed, as before.",
+    ifChanged: "Off: a Saturday shows as closed on New booking again. Bookings already made stay as they are.",
+  },
+  staffMutzeDeliveryAfterMin: {
+    what: "For a Mutze Shabbes booking made by staff: how many minutes after Shabbes ends (nightfall in Monroe) the delivery starts. 150 is two and a half hours.",
+    where: "Admin New booking: the delivery time shown and saved on a Mutze Shabbes booking.",
+    ifChanged: "New Mutze Shabbes bookings show the new delivery time. Bookings already made keep theirs.",
+  },
   sensitiveSwitchGuard: {
     what: "When on, turning on call recording, the paid Google voice, phone card payments or Stripe asks for a fresh code sent to the Owner's own phone and typed words, so none of them can be turned on by a stray click or on a device left signed in.",
     where: "Owner only: the Phone settings, Hotline prompts slots and phone card payment pages, at the moment one of those is turned on. Turning them off is never blocked.",
