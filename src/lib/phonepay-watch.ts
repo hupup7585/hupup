@@ -69,7 +69,7 @@ export async function solaTransactionsBetween(from: Date, to: Date, fetcher: typ
   return [...ok, ...no];
 }
 
-export type WatchAttempt = { startedAt: Date; endedAt: Date | null; amountCents: number; result: string | null; solaSeen?: string | null; callerPhone?: string | null };
+export type WatchAttempt = { startedAt: Date; endedAt: Date | null; amountCents: number; result: string | null; solaSeen?: string | null; callerPhone?: string | null; notBefore?: Date | null };
 
 /**
  * One look while the call to Sola is up: "stop" (the caller is already back, the silence check hung up, or the call to
@@ -84,7 +84,10 @@ export function watchDecision(a: WatchAttempt, txns: SolaTxn[], now: Date, used:
   // this line on (the payment check after the call still matches the charge as before).
   const phone = (a.callerPhone ?? "").replace(/\D/g, "").slice(-10);
   const invPhone = (t: SolaTxn) => (t.invoice ?? "").replace(/\D/g, "").slice(-10);
-  let mine = txns.filter((t) => t.refNum && !used.has(t.refNum) && t.amountCents === a.amountCents && isPhonePayInvoice(t.invoice) && t.at >= new Date(a.startedAt.getTime() - 60_000));
+  // Extra check HS1 (Nov 27, 2026): a charge from before this call's previous try ended belongs to that try (its decline
+  // is never seen again as this try's, which used to hang up every later try during Sola's PIN tones)
+  const from = Math.max(a.startedAt.getTime() - 60_000, a.notBefore?.getTime() ?? 0);
+  let mine = txns.filter((t) => t.refNum && !used.has(t.refNum) && t.amountCents === a.amountCents && isPhonePayInvoice(t.invoice) && t.at.getTime() >= from);
   const byPhone = Boolean(phone) && mine.some((t) => invPhone(t) === phone);
   if (byPhone) mine = mine.filter((t) => invPhone(t) === phone);
   else if (sameAmountElsewhere) mine = [];
@@ -93,6 +96,23 @@ export function watchDecision(a: WatchAttempt, txns: SolaTxn[], now: Date, used:
   if (now.getTime() - a.startedAt.getTime() >= WATCH_STOP_MS) return "stop";
   return "wait";
 }
+
+/** When this call's previous card try ended (its charges are its own), or null for the first try. */
+export async function previousTryEnd(a: { id: number; callSid: string; startedAt: Date }): Promise<Date | null> {
+  const { desc: d, lt } = await import("drizzle-orm");
+  const [prev] = await db
+    .select({ endedAt: schema.phonepayAttempts.endedAt })
+    .from(schema.phonepayAttempts)
+    .where(and(eq(schema.phonepayAttempts.callSid, a.callSid), lt(schema.phonepayAttempts.id, a.id)))
+    .orderBy(d(schema.phonepayAttempts.id))
+    .limit(1);
+  if (!prev) return null;
+  // 5 seconds of slack: Sola's times are whole seconds; the earlier try's own charge is always well before its end (the
+  // decline, then the 6-second wait, then the payment check)
+  const end = prev.endedAt && prev.endedAt < a.startedAt ? prev.endedAt : a.startedAt;
+  return new Date(end.getTime() - PREVIOUS_TRY_SLACK_MS);
+}
+export const PREVIOUS_TRY_SLACK_MS = 5_000;
 
 /**
  * Another caller's card try of the same amount still going around the same time (deep check 06:00 M38): a try from a
@@ -157,7 +177,7 @@ export async function runWatchChunk(
     } catch {
       /* Sola could not be checked this time: look again */
     }
-    const d = watchDecision(a, txns, now(), await usedSolaRefs(), await sameAmountElsewhere(a));
+    const d = watchDecision({ ...a, notBefore: await previousTryEnd(a) }, txns, now(), await usedSolaRefs(), await sameAmountElsewhere(a));
     if (d === "stop") return false;
     if (d !== "wait") {
       await db.update(schema.phonepayAttempts).set({ solaSeen: d }).where(eq(schema.phonepayAttempts.id, attemptId));
@@ -285,7 +305,7 @@ export async function helperSilence(attemptId: number, deps: { fetcher?: typeof 
     /* Sola could not be checked: no result (the payment check on our line looks again) */
   }
   const { usedSolaRefs } = await import("@/lib/sola-phonepay");
-  const d = watchDecision(a, txns, now, await usedSolaRefs(), await sameAmountElsewhere(a));
+  const d = watchDecision({ ...a, notBefore: await previousTryEnd(a) }, txns, now, await usedSolaRefs(), await sameAmountElsewhere(a));
   if (d === "approved" || d === "declined") {
     await db.update(schema.phonepayAttempts).set({ solaSeen: d }).where(eq(schema.phonepayAttempts.id, attemptId));
     return { result: d };

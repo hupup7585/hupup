@@ -408,3 +408,43 @@ describe("deep check 06:00 M38: two callers paying the same amount at once", () 
     expect(await sameAmountElsewhere(me)).toBe(false);
   });
 });
+
+describe("extra check HS1: a declined card on try 1 never cuts try 2 short", () => {
+  it("watchDecision: a charge from before the previous try ended is not this try's", () => {
+    const t2start = new Date(start.getTime() + 50_000);
+    const a2 = { startedAt: t2start, endedAt: null, amountCents: 15000, result: null, notBefore: new Date(start.getTime() + 40_000) };
+    const now = new Date(start.getTime() + 60_000);
+    // try 1's decline at +30 s (inside the old 60-second window of try 2)
+    expect(watchDecision(a2, [txn({ refNum: "D1", approved: false, at: new Date(start.getTime() + 30_000) })], now)).toBe("wait");
+    // try 2's own decline at +55 s is still seen
+    expect(watchDecision(a2, [txn({ refNum: "D2", approved: false, at: new Date(start.getTime() + 55_000) })], now)).toBe("declined");
+    // without a previous try, the 60-second slack stays as before
+    expect(watchDecision({ ...a2, notBefore: null }, [txn({ refNum: "D1", approved: false, at: new Date(start.getTime() + 30_000) })], now)).toBe("declined");
+  });
+  it("runWatchChunk on try 2 of the same call keeps the Sola line up while only try 1's decline is in Sola", async () => {
+    const t1 = new Date("2026-11-18T15:10:00Z"); // 10:10:00 New York
+    const [one] = await db.insert(schema.phonepayAttempts).values({ callSid: "CAhs1", amountCents: 15000, startedAt: t1, endedAt: new Date(t1.getTime() + 40_000), result: "declined", tryNumber: 1, payLegSid: "CAhs1leg1" }).returning();
+    const [two] = await db.insert(schema.phonepayAttempts).values({ callSid: "CAhs1", amountCents: 15000, startedAt: new Date(t1.getTime() + 50_000), tryNumber: 2, payLegSid: "CAhs1leg2" }).returning();
+    void one;
+    const fetcher = (async (_u: string, init: { body: string }) => {
+      const cmd = JSON.parse(init.body).xCommand;
+      // try 1's decline at 10:10:30 New York
+      const rows = cmd === "Report:Declined" ? [{ xRefNum: "HS1D", xAmount: "150.00", xEnteredDate: "2026-11-18 10:10:30", xInvoice: "8454157585" }] : [];
+      return new Response(JSON.stringify({ xResult: "S", xReportData: rows }));
+    }) as unknown as typeof fetch;
+    process.env.SOLA_API_KEY = "test";
+    let t = t1.getTime() + 55_000;
+    const ended: string[] = [];
+    const more = await runWatchChunk(two.id, 10_000, { fetcher, declineWaitMs: 6000, helperOn: false, now: () => new Date(t), sleep: async (ms) => void (t += ms), end: async (x) => void ended.push(x.payLegSid ?? "") });
+    expect(more).toBe(true); // still watching: nothing of try 2 in Sola yet
+    expect(ended).toEqual([]);
+    const [after] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, two.id));
+    expect(after.solaSeen).toBeNull();
+  });
+  it("classifyTry: a wrong-amount charge from before the previous try ended is not voided again", () => {
+    const want = { amountCents: 15000, from: new Date(start.getTime() + 50_000), to: new Date(start.getTime() + 90_000), notBefore: new Date(start.getTime() + 40_000) };
+    const old = txn({ refNum: "W1", amountCents: 999, at: new Date(start.getTime() + 25_000) });
+    expect(classifyTry([old], want, new Set()).kind).toBe("none");
+    expect(classifyTry([old], { ...want, notBefore: null }, new Set()).kind).toBe("wrong_amount");
+  });
+});

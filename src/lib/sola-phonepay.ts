@@ -245,6 +245,10 @@ export async function matchPhonePay(orderId: number, attemptId: number, dueCents
     .from(schema.phonepayAttempts)
     .where(and(eq(schema.phonepayAttempts.orderId, orderId), eq(schema.phonepayAttempts.result, "check_failed"), gte(schema.phonepayAttempts.startedAt, new Date(started.getTime() - 60 * 60_000))));
   const from = new Date(Math.min(started.getTime(), ...unchecked.map((u) => u.startedAt.getTime())));
+  // Extra check HS1: charges from before this call's previous try ended are that try's (not when an earlier try's check
+  // failed: then its charge must still be found here, deep check 06:00 M10)
+  const { previousTryEnd } = await import("@/lib/phonepay-watch");
+  const notBefore = attempt && !unchecked.length ? await previousTryEnd(attempt) : null;
   const num = orderNumber(orderId);
   let reason = "not_found";
   let found: SolaTxn | null = null;
@@ -299,12 +303,14 @@ export async function matchPhonePay(orderId: number, attemptId: number, dueCents
  */
 export function classifyTry(
   txns: SolaTxn[],
-  want: { amountCents: number; from: Date; to: Date; phone?: string | null },
+  want: { amountCents: number; from: Date; to: Date; phone?: string | null; notBefore?: Date | null },
   used: Set<string>,
 ): { kind: "paid" | "ambiguous" | "wrong_amount" | "none"; paid: SolaTxn | null; matches: SolaTxn[]; wrong: SolaTxn[]; byPhone: boolean } {
   // This try's own window: from when its call to Sola started to now (Abraham, Nov 18, 2026: never guess)
   let mine = txns
-    .filter((t) => t.approved && t.refNum && !used.has(t.refNum) && isPhonePayInvoice(t.invoice) && t.at >= new Date(want.from.getTime() - 30_000) && t.at <= new Date(want.to.getTime() + 60_000))
+    // Extra check HS1: never a charge from before this call's previous try ended (that try already handled it: a wrong
+    // amount it voided is not voided again, with a false "could NOT be voided" email)
+    .filter((t) => t.approved && t.refNum && !used.has(t.refNum) && isPhonePayInvoice(t.invoice) && t.at >= new Date(want.from.getTime() - 30_000) && (!want.notBefore || t.at >= want.notBefore) && t.at <= new Date(want.to.getTime() + 60_000))
     .sort((a, b) => a.at.getTime() - b.at.getTime());
   // The customer's phone in Sola's Invoice field: only charges with that phone are this caller's
   const phone = (want.phone ?? "").replace(/\D/g, "").slice(-10);
@@ -388,6 +394,10 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
     .from(schema.phonepayAttempts)
     .where(and(eq(schema.phonepayAttempts.orderId, orderId), eq(schema.phonepayAttempts.result, "check_failed"), gte(schema.phonepayAttempts.startedAt, new Date(started.getTime() - 60 * 60_000))));
   const from = new Date(Math.min(started.getTime(), ...unchecked.map((u) => u.startedAt.getTime())));
+  // Extra check HS1: charges from before this call's previous try ended are that try's (not when an earlier try's check
+  // failed: then its charge must still be found here, deep check 06:00 M10)
+  const { previousTryEnd } = await import("@/lib/phonepay-watch");
+  const notBefore = attempt && !unchecked.length ? await previousTryEnd(attempt) : null;
   const num = orderNumber(orderId);
   const group = await getPaymentGroup(orderId);
   const ids = group?.orders.map((d) => d.order.id) ?? [orderId];
@@ -397,7 +407,7 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
     if (i) await new Promise((r) => setTimeout(r, deps.waitMs ?? 3000));
     try {
       const now = deps.now?.() ?? new Date();
-      c = classifyTry(await solaApprovedBetween(new Date(from.getTime() - 60_000), now, deps.fetcher), { amountCents: dueCents, from, to: now, phone: attempt?.callerPhone }, await usedSolaRefs());
+      c = classifyTry(await solaApprovedBetween(new Date(from.getTime() - 60_000), now, deps.fetcher), { amountCents: dueCents, from, to: now, phone: attempt?.callerPhone, notBefore }, await usedSolaRefs());
       failed = "";
     } catch (e) {
       failed = (e as Error).message.slice(0, 200);
