@@ -77,11 +77,35 @@ export async function createDoc(d: NewDoc, userId: number | null) {
     if (t.totalCents + credited > inv.amountCents) throw new BooksError("The credit is more than the invoice total.");
   }
   const due = d.dueDate && isoDate(d.dueDate) ? d.dueDate : addDays(d.issueDate, d.termsDays ?? 0);
+  // Extra check H4 (Nov 27, 2026): two documents made at the same moment could read the same last number; the
+  // database refuses the second (unique number), so it simply takes the next number and tries again.
+  let doc: Invoice | undefined;
+  for (let attempt = 0; !doc; attempt++) {
+    try {
+      doc = await insertDoc(d, await nextNumber(d.kind), due, t, discount, tax, userId);
+    } catch (e) {
+      if (attempt < 4 && isUniqueNumberClash(e)) continue;
+      throw e;
+    }
+  }
+  await db.insert(schema.bookInvoiceLines).values(lines.map((l, i) => ({ invoiceId: doc.id, description: l.description.trim(), qty: l.qty, unitCents: l.unitCents, lineCents: l.qty * l.unitCents, productId: l.productId ?? null, sortOrder: i })));
+  await bookAudit(userId, `${d.kind}_created`, "book_invoice", doc.id, { number: doc.number, total: t.totalCents, lines, issued: Boolean(d.issue) });
+  return doc;
+}
+
+/** The database's "this number is taken" answer (unique constraint on book_invoices.number). */
+export function isUniqueNumberClash(e: unknown): boolean {
+  const x = e as { code?: string; constraint?: string; message?: string; cause?: { code?: string; constraint?: string; message?: string } } | null;
+  const all = [x, x?.cause].filter(Boolean) as { code?: string; constraint?: string; message?: string }[];
+  return all.some((c) => c.code === "23505" || c.constraint === "book_invoices_number_unique" || /book_invoices_number_unique|duplicate key/i.test(c.message ?? ""));
+}
+
+async function insertDoc(d: NewDoc, number: string, due: string, t: { subtotalCents: number; totalCents: number }, discount: number, tax: number, userId: number | null): Promise<Invoice> {
   const [doc] = await db
     .insert(schema.bookInvoices)
     .values({
       kind: d.kind,
-      number: await nextNumber(d.kind),
+      number,
       customerName: d.customerName.trim(),
       customerId: d.customerId ?? null,
       customerEmail: d.customerEmail?.trim() || null,
@@ -106,8 +130,6 @@ export async function createDoc(d: NewDoc, userId: number | null) {
       createdBy: userId,
     })
     .returning();
-  await db.insert(schema.bookInvoiceLines).values(lines.map((l, i) => ({ invoiceId: doc.id, description: l.description.trim(), qty: l.qty, unitCents: l.unitCents, lineCents: l.qty * l.unitCents, productId: l.productId ?? null, sortOrder: i })));
-  await bookAudit(userId, `${d.kind}_created`, "book_invoice", doc.id, { number: doc.number, total: t.totalCents, lines, issued: Boolean(d.issue) });
   return doc;
 }
 
