@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 /* Large files by link (Abraham, Nov 18, 2026): over 18 MB, up to 100 MB, sent as a 30-day download link. In-memory database; R2 is a stand-in. */
@@ -51,6 +52,10 @@ describe("large files by link", () => {
     const r = await download(new Request(url), { params: Promise.resolve({ id: String(f.id) }) });
     expect(r.status).toBe(200);
     expect(r.headers.get("content-disposition")).toContain('filename="party video.mp4"');
+    // deep check C6: a plain type keeps its type; never sniffed; a web page type would download as a file
+    expect(r.headers.get("content-type")).toBe("video/mp4");
+    expect(r.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(readFileSync("src/app/api/files/[id]/route.ts", "utf8")).toContain('SAFE_TYPES.has(f.contentType) ? f.contentType : "application/octet-stream"');
     const got = new Uint8Array(await r.arrayBuffer());
     expect(got.length).toBe(size);
     expect(got[size - 1]).toBe(data[size - 1]);
