@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["pg", "twilio"],
+  // Which site this build is (production, preview or empty locally), for client parts that must differ on preview only
+  env: { HUP_SITE_ENV: process.env.VERCEL_ENV ?? "" },
   // Bookkeeping receipts and tax-exempt certificates (up to 4 MB, under Vercel's 4.5 MB request limit).
   experimental: { serverActions: { bodySizeLimit: "4.5mb" } },
   // The Terms and SMS Terms link to /privacy-policy; the page lives at /privacy.
