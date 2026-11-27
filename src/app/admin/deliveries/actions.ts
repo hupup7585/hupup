@@ -8,7 +8,7 @@ import { getOrderWithItems, orderNumber } from "@/lib/orders";
 import { sendOrderText } from "@/lib/notify";
 import { BUSINESS_NAME } from "@/lib/config";
 import { DELIVERY_TEMPLATES, type TemplateKey } from "@/lib/delivery-templates";
-import { isCurrentStop } from "@/lib/delivery-stops";
+import { NOT_CURRENT_STOP, isCurrentStop, isCurrentStopFor } from "@/lib/delivery-stops";
 import { hasAnyStop, isMyStop } from "@/lib/drivers";
 import { recordStage, type Stage } from "@/lib/delivery-stages";
 
@@ -80,6 +80,7 @@ export async function uploadPhotoAction(form: FormData): Promise<DeliveryResult>
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found." };
   if (staff.role === "delivery" && !isMyStop(full.order, stop, staff.userId)) return { ok: false, message: "This stop isn't assigned to you." };
+  if (staff.role === "delivery" && !isCurrentStopFor(full.order, stop)) return { ok: false, message: NOT_CURRENT_STOP }; // Extra check HD3
   try {
     const { saveDeliveryPhoto } = await import("@/lib/delivery-photos");
     const p = await saveDeliveryPhoto(orderId, stop, new Uint8Array(await file.arrayBuffer()), { userId: staff.userId, name: staff.name });

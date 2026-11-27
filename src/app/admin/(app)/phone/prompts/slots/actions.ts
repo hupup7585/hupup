@@ -108,6 +108,13 @@ export async function renameSlotAction(key: string, name: string): Promise<R> {
 export async function deleteSlotAction(key: string): Promise<R> {
   const s = await requireOwner();
   if (s.role !== "owner") return { ok: false, message: "Only the Owner can delete a slot." };
+  // Extra check HP8 (Nov 27, 2026): a slot a phone screen still uses (a line, an added line or a "play" key, live or in
+  // the draft) can't be deleted; the next Publish would be refused until it was found
+  const { draftEditor, liveEditor } = await import("@/lib/screen-drafts");
+  const usedIn = [["the live phone screens", await liveEditor()], ["the draft phone screens", await draftEditor()]]
+    .filter(([, e]) => e && JSON.stringify(e).includes(JSON.stringify(key)))
+    .map(([where]) => where as string);
+  if (usedIn.length) return { ok: false, message: `This slot is still used in ${usedIn.join(" and ")}. Take it off the screens first (Phone > Screens), then delete it.` };
   const r = await deleteCustomSlot(key, s.userId);
   if (!r.ok) return r;
   await db.insert(schema.auditLog).values({ userId: s.userId, action: "recording_slot.deleted", entityType: "recording_slot", entityId: key });

@@ -5496,8 +5496,10 @@ const handlers: Record<string, Handler> = {
     // Abraham, Nov 14, 2026, every line: staff pressed 2 = pass the call on to the next number or round, exactly like
     // no answer; voicemail only after the last round. Checked first: Twilio may report that leg as completed.
     const rejectedAt = ctx.session?.data.rejectedAt;
-    const rejected = Boolean(rejectedAt && Date.now() - rejectedAt < 10 * 60_000);
-    if (rejected) await updateSession(ctx.callSid, { data: { rejectedAt: undefined } }, ctx.session);
+    const acceptedAt = Number(ctx.session?.data.acceptedAt ?? 0);
+    // Deep check M18: a staff member who pressed 1 after the "press 2" took the call; the conversation is what ended
+    const rejected = Boolean(rejectedAt && Date.now() - rejectedAt < 10 * 60_000) && !(acceptedAt && acceptedAt >= Number(rejectedAt));
+    if (rejectedAt || acceptedAt) await updateSession(ctx.callSid, { data: { rejectedAt: undefined, acceptedAt: undefined } }, ctx.session);
     if (!rejected && ctx.body.DialCallStatus === "completed") {
       vr.hangup();
       return vr;
@@ -5549,7 +5551,16 @@ const handlers: Record<string, Handler> = {
   },
 
   async "whisper-accept"(ctx, vr) {
-    if (ctx.body.Digits === "1") return vr; // empty response = connect the caller
+    if (ctx.body.Digits === "1") {
+      // Deep check M18 (Nov 27, 2026): in "ring all", someone took the call; remembered on the caller's call so an
+      // earlier "press 2" from another staff phone can't send the caller back to ringing after the conversation
+      const parent = ctx.body.ParentCallSid;
+      if (parent) {
+        const s = await getSession(parent);
+        if (s) await updateSession(parent, { data: { acceptedAt: Date.now() } }, s);
+      }
+      return vr; // empty response = connect the caller
+    }
     // Abraham (Nov 14, 2026): press 2 passes the call on to the next number or round (voicemail only after the last
     // round). Marked on the caller's call, so the next step moves on whatever Twilio reports for this leg.
     const parent = ctx.body.ParentCallSid;

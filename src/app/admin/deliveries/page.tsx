@@ -1,3 +1,4 @@
+import { driverNotes } from "@/lib/delivery-stops";
 import Link from "next/link";
 import { isValidISO } from "@/lib/dates";
 import { and, eq, inArray, or } from "drizzle-orm";
@@ -187,7 +188,11 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
                     </div>
                   )}
                   <div className="mt-0.5 text-sm text-muted">{its.map((i) => `${i.qty} × ${i.name}`).join(", ")}</div>
-                  {o.notes && <div className="mt-1 text-sm">Note: {o.notes}</div>}
+                  {(() => {
+                    // Extra check HD1: a Delivery login sees the delivery directions only, never money lines
+                    const note = staff.role === "delivery" ? driverNotes(o.notes) : o.notes;
+                    return note ? <div className="mt-1 text-sm">Note: {note}</div> : null;
+                  })()}
                   {photos.some((p) => p.orderId === o.id && p.stop === stop) && (
                     <div className="mt-2 flex flex-wrap gap-2" data-stop-photos>
                       {photos
