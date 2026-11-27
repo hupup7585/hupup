@@ -445,10 +445,39 @@ export async function releaseExpired(): Promise<number> {
 
 /** Mark an order paid (from Sola webhook or manual entry). Idempotent. */
 export async function markPaid(orderId: number, cents: number, method: string, ref?: string | null) {
-  const [o] = await db.select().from(orders).where(eq(orders.id, orderId));
+  // Hark's backend list 1 (Nov 26, 2026): two payment callbacks at the same moment could both read the old amount (one
+  // payment lost) or both count the same reference (counted twice). The amount is now added in one locked step: the
+  // order row is locked, a reference already recorded on this order is ignored, and paid = paid + this payment.
+  const counted = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`);
+    const [cur] = await tx.select().from(orders).where(eq(orders.id, orderId));
+    if (!cur) return { o: null, dupe: false };
+    if (ref && cur.solaRefNum === ref) return { o: cur, dupe: true };
+    if (ref) {
+      const [seen] = await tx.select({ id: schema.bookEntries.id }).from(schema.bookEntries).where(and(eq(schema.bookEntries.orderId, orderId), eq(schema.bookEntries.ref, ref)));
+      if (seen) return { o: cur, dupe: true };
+    }
+    await tx.update(orders).set({ paidCents: sql`${orders.paidCents} + ${cents}`, solaRefNum: ref ?? cur.solaRefNum }).where(eq(orders.id, orderId));
+    return { o: cur, dupe: false };
+  });
+  const o = counted.o;
   if (!o) return null;
-  if (ref && o.solaRefNum === ref) return o; // duplicate webhook
+  if (counted.dupe) return o; // duplicate webhook
   const paid = o.paidCents + cents;
+  // Hark's backend list 2: money on an order that was already paid in full (a second charge). It is recorded, the
+  // booking stays as it is, the Owner is emailed to refund it, and the customer gets no new "paid" notice.
+  const owedBefore = o.totalCents ?? o.subtotalCents;
+  if (owedBefore > 0 && o.paidCents >= owedBefore && o.status !== "CANCELLED") {
+    const [same] = await db
+      .update(orders)
+      .set({ paymentMethod: method, updatedAt: new Date(), notes: sql`COALESCE(${orders.notes}, '') || ${`Second payment of $${(cents / 100).toFixed(2)} (${method}${ref ? `, ${ref}` : ""}) on an order already paid in full: refund it. `}` })
+      .where(eq(orders.id, orderId))
+      .returning();
+    await overpaidAlert(orderId, cents, method, ref ?? null).catch((e) => console.error("[overpaid alert]", e));
+    const { recordBookingPayment } = await import("@/lib/books");
+    await recordBookingPayment(orderId, cents, method, ref);
+    return same ? { ...same, overpaid: true as const } : same;
+  }
   // Late payment (Abraham, Nov 13, 2026): the hold had already ended. Still free: confirm. Taken: never confirm.
   const { handleLatePayment, holdEnded, itemsStillFree } = await import("@/lib/late-payment");
   // Code audit M1 (Nov 24, 2026): an order staff cancelled on purpose (Cancel order in Admin) is never brought back by
@@ -465,9 +494,7 @@ export async function markPaid(orderId: number, cents: number, method: string, r
   const [updated] = await db
     .update(orders)
     .set({
-      paidCents: paid,
       paymentMethod: method,
-      solaRefNum: ref ?? o.solaRefNum,
       status,
       holdExpiresAt: null,
       updatedAt: new Date(),
@@ -571,6 +598,20 @@ async function cancelledPaidAlert(orderId: number, cents: number, method: string
   );
 }
 
+/** Owner email: a payment on an order that was already paid in full (Hark's backend list 2, Nov 26, 2026). */
+async function overpaidAlert(orderId: number, cents: number, method: string, ref: string | null) {
+  const { config, BUSINESS_NAME } = await import("@/lib/config");
+  const to = config.adminEmail();
+  if (!to) return;
+  const { sendEmail } = await import("@/lib/notify");
+  const n = orderNumber(orderId);
+  await sendEmail(
+    to,
+    `${BUSINESS_NAME}: second payment on order #${n}, which was already paid`,
+    [`Order #${n} was already paid in full, and another payment of $${(cents / 100).toFixed(2)} came in.`, `Method: ${method}${ref ? `, reference ${ref}` : ""}.`, "", "Please refund the extra payment. The booking was not changed, and the customer was not sent another notice.", `${config.baseUrl()}${orderPath(orderId)}`].join("\n"),
+  );
+}
+
 async function underpaidAlert(orderId: number, paidCents: number, owedCents: number, method: string, ref: string | null) {
   const { config, BUSINESS_NAME } = await import("@/lib/config");
   const to = config.adminEmail();
@@ -623,7 +664,11 @@ export async function markGroupPaid(orderId: number, cents: number, method: stri
     return one ? [one] : [];
   }
   if (ref && group.primary.order.solaRefNum === ref) return []; // duplicate webhook
-  const ordered = [group.primary, ...group.orders.filter((x) => x.order.id !== group.primary.order.id)];
+  // Hark's website list 9 (Nov 26, 2026): the payment goes to the days still waiting for it, never to a day that was
+  // cancelled or is already paid (the primary first when it is waiting; nothing waiting: the primary, as before)
+  const waiting = (x: FullOrder) => x.order.status !== "CANCELLED" && dueOf(x.order) > 0;
+  const all = [group.primary, ...group.orders.filter((x) => x.order.id !== group.primary.order.id)];
+  const ordered = all.filter(waiting).length ? all.filter(waiting) : [group.primary];
   let remaining = cents;
   const out = [];
   for (let i = 0; i < ordered.length; i++) {

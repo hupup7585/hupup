@@ -83,6 +83,8 @@ async function handle(req: Request): Promise<Response> {
   if (before.order.solaRefNum !== field(fields, "xRefNum")) await linkPaymentToAcceptance(orderId, field(fields, "xRefNum") || null, cents);
 
   // The "paid" notice only when the booking is now confirmed (Audit C1: never for less than the total)
-  if (before.order.solaRefNum !== field(fields, "xRefNum") && updated.some((u) => u.status === "CONFIRMED")) await paymentReceivedNotices(orderId, cents);
+  // Hark's backend list 2 (Nov 26, 2026): money on an order that was already paid in full sends the customer nothing
+  // (the Owner is emailed to refund it)
+  if (!group.paid && before.order.solaRefNum !== field(fields, "xRefNum") && updated.some((u) => u.status === "CONFIRMED")) await paymentReceivedNotices(orderId, cents);
   return new Response("ok");
 }
