@@ -206,31 +206,15 @@ export async function runAddressChecks(deps: CheckDeps = {}): Promise<{ checked:
   return { checked: due.length, pending: left.length, nextAt };
 }
 
-/* ---- the free timing: a tiny file on our own free storage (Cloudflare R2) says when the next check is due ---- */
+/* ---- the free timing: see wake-flags.ts (a small file on free Cloudflare R2 says when the next check is due) ---- */
 
-export const RECHECK_FLAG_KEY = "flags/address-rechecks.json";
-
-/**
- * The free Cloudflare scheduler calls the site every 5 minutes; the site reads this small file (Cloudflare R2, not the
- * database) and wakes the database only when a re-check is due. Null = nothing waiting (the file is removed).
- */
 export async function armRechecks(nextAt: Date | null) {
-  const { r2Ready, r2Put, r2Delete } = await import("@/lib/r2");
-  if (!r2Ready()) return;
-  if (!nextAt) await r2Delete(RECHECK_FLAG_KEY).catch(() => undefined);
-  else await r2Put(RECHECK_FLAG_KEY, new TextEncoder().encode(JSON.stringify({ nextAt: nextAt.toISOString() })), "application/json").catch(() => undefined);
+  const { armWake } = await import("@/lib/wake-flags");
+  await armWake("address-rechecks", nextAt);
 }
 
-/** Is a re-check due now? Read from the small R2 file only (no database). Without R2: false (the 3-hourly run covers it). */
+/** Is a re-check due now? Read from the small R2 file only (no database). */
 export async function recheckDue(now = new Date()): Promise<boolean> {
-  const { r2Ready, r2Get } = await import("@/lib/r2");
-  if (!r2Ready()) return false;
-  try {
-    const r = await r2Get(RECHECK_FLAG_KEY);
-    if (!r.ok) return false;
-    const j = (await r.json()) as { nextAt?: string };
-    return Boolean(j.nextAt && new Date(j.nextAt).getTime() <= now.getTime());
-  } catch {
-    return false;
-  }
+  const { wakeDue } = await import("@/lib/wake-flags");
+  return wakeDue("address-rechecks", now);
 }

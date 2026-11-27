@@ -1,5 +1,6 @@
 import { publicEmail } from "@/lib/config";
 import { formatMoney } from "@/lib/money";
+import { orderNumber } from "@/lib/order-number";
 import { KIND_NAME, type DocKind, type docDetail } from "@/lib/invoices";
 
 const m = (c: number) => (c < 0 ? `-${formatMoney(-c)}` : formatMoney(c));
@@ -25,7 +26,7 @@ export default function InvoiceDocument({ d }: { d: NonNullable<Awaited<ReturnTy
           <div className="font-bold">{doc.number ?? `#${doc.id}`}</div>
           <div>Date: {doc.issueDate}</div>
           {doc.kind === "invoice" && <div>Due: {doc.dueDate}</div>}
-          {doc.orderId && <div>Booking #{doc.orderId}</div>}
+          {doc.orderId && <div data-order-number>Order {orderNumber(doc.orderId)}</div>}
           <div className="mt-1 inline-block rounded-full bg-bg px-3 py-0.5 text-xs font-bold" data-invoice-status>{d.status}</div>
         </div>
       </header>

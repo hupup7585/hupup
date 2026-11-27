@@ -32,7 +32,12 @@ export async function GET(req: Request) {
   // free Cloudflare storage says when the next one is due, so the database wakes only then (Neon free plan)
   const { recheckDue, runAddressChecks } = await import("@/lib/address-checks");
   if (!dueNow() && new URL(req.url).searchParams.get("all") !== "1") {
-    if (await recheckDue()) return Response.json({ addressChecks: await runJob("Address re-checks (when due)", () => runAddressChecks()) });
+    // Held offer texts and staff alerts (Abraham, Nov 27, 2026, option B): sent when their time has come, oldest first
+    const { wakeDue } = await import("@/lib/wake-flags");
+    const out: Record<string, unknown> = {};
+    if (await wakeDue("held-texts")) out.heldTexts = await runJob("Held texts (when due)", () => processHeldPromotions());
+    if (await recheckDue()) out.addressChecks = await runJob("Address re-checks (when due)", () => runAddressChecks());
+    if (Object.keys(out).length) return Response.json(out);
     return Response.json({ skipped: "not due: the jobs run every 3 hours, without waking the database in between" });
   }
   const addressChecks = await runJob("Address re-checks (every 3 hours, and when due)", () => runAddressChecks());

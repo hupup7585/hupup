@@ -76,6 +76,8 @@ export const customers = pgTable(
     smsOptOut: boolean("sms_opt_out").notNull().default(false),
     /** A test entry (Abraham marks these instead of deleting them); left out of campaigns */
     isTest: boolean("is_test").notNull().default(false),
+    /** Merged into this customer (Abraham, Nov 27, 2026): the record is kept, never deleted; its orders moved over */
+    mergedIntoId: integer("merged_into_id"),
     marketingOptIn: boolean("marketing_opt_in").notNull().default(false),
     marketingOptInAt: timestamp("marketing_opt_in_at", { withTimezone: true }),
     /** The customer's own time zone (IANA), as they told us; used for promotional quiet hours */

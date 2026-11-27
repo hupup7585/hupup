@@ -1,4 +1,5 @@
-import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { bookingLock } from "@/lib/jewish-calendar";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
@@ -64,8 +65,17 @@ export function containsCardNumber(text: string): boolean {
  * gave us, otherwise both the area-code zone(s) and New York time. See src/lib/area-code-tz.ts.
  */
 export function inMarketingHours(to: string, now = new Date(), customerTimeZone?: string | null): boolean {
-  return inRecipientPromoHours(to, now, customerTimeZone);
+  // Abraham, Nov 27, 2026 (option B): promotional texts also wait out Shabbes and Yom Tov, and go out after
+  return inRecipientPromoHours(to, now, customerTimeZone) && !restNow(now);
 }
+
+/** Shabbes or Yom Tov right now (from candle lighting until the hotline opens again after). */
+export function restNow(now = new Date()): boolean {
+  return bookingLock(now).locked;
+}
+
+/** Staff and Owner alert texts wait out Shabbes and Yom Tov (Abraham, Nov 27, 2026); sign-in codes never wait. */
+export const STAFF_ALERTS_HELD = new Set(["owner_alert", "owner_forward", "compliance_alert", "info_email_alert"]);
 
 /** Every promotional text begins with "Hup Up Attractions: Reply STOP to opt out." and then the offer. */
 export function marketingBody(body: string, v2 = smsTermsV2Active()): string {
@@ -308,9 +318,13 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   // never push a customer past the yearly limit.
   const decideAndSave = async (exec: typeof db) => {
     if (kind === "marketing" && typeof exec.execute === "function") await exec.execute(sql`select pg_advisory_xact_lock(hashtext(${"promo:" + to}))`);
-    const blocked: Blocked | null = a2pOff ? "not_active" : testOnly ? "test_only" : await checkEligibility({ to, kind, event: input.event, customer, now: input.now, exec });
+    let blocked: Blocked | null = a2pOff ? "not_active" : testOnly ? "test_only" : await checkEligibility({ to, kind, event: input.event, customer, now: input.now, exec });
+    // Staff and Owner alerts during Shabbes or Yom Tov: held, then sent right after (customer-requested texts never wait)
+    const lock = kind === "system" && !blocked && STAFF_ALERTS_HELD.has(String(input.event)) ? bookingLock(input.now ?? new Date()) : null;
+    if (lock?.locked) blocked = "quiet_hours";
     const held = blocked === "quiet_hours";
-    const sendAfter = held ? nextPromoWindow(to, input.now ?? new Date(), customer?.timeZone) : null;
+    const sendAfter = !held ? null : lock?.locked ? lock.opensAt : nextPromoWindow(to, input.now ?? new Date(), customer?.timeZone);
+    if (held && sendAfter) await (await import("@/lib/wake-flags")).armWake("held-texts", sendAfter, { earliest: true });
     let messageId: number | undefined;
     if (log || held || kind === "marketing") {
       const [row] = await exec
@@ -387,12 +401,24 @@ export async function processHeldPromotions(now = new Date()): Promise<{ sent: n
   const due = await db
     .select()
     .from(schema.messages)
-    .where(and(eq(schema.messages.status, "held"), eq(schema.messages.kind, "marketing"), lte(schema.messages.sendAfter, now)));
+    .where(and(eq(schema.messages.status, "held"), inArray(schema.messages.kind, ["marketing", "system"]), lte(schema.messages.sendAfter, now)))
+    .orderBy(asc(schema.messages.sendAfter), asc(schema.messages.id)); // oldest first
   const out = { sent: 0, canceled: 0, rescheduled: 0 };
   for (const m of due) {
     const to = m.toNumber || m.contactPhone || "";
     const customer = m.customerId ? ((await db.select().from(schema.customers).where(eq(schema.customers.id, m.customerId)))[0] ?? null) : await customerByPhone(to);
-    const blocked = await checkEligibility({ to, kind: "marketing", customer, now, heldRecheck: true }); // already counted toward the yearly limit
+    if (m.kind === "system") {
+      // a staff alert held for Shabbes or Yom Tov
+      const lock = bookingLock(now);
+      if (lock.locked) {
+        await db.update(schema.messages).set({ sendAfter: lock.opensAt }).where(eq(schema.messages.id, m.id));
+        out.rescheduled++;
+      } else if ((await deliver({ messageId: m.id, to, body: m.body, mediaUrls: m.mediaUrls ?? [], customer, logBody: true })).sent) out.sent++;
+      continue;
+    }
+    let blocked = await checkEligibility({ to, kind: "marketing", customer, now, heldRecheck: true });
+    // The yearly limit again, at sending (Abraham, Nov 27, 2026): this held text already counts, so the others must be under it
+    if (!blocked && (await promosThisYear(to, now)) - 1 >= (await yearlyLimit())) blocked = "yearly_limit";
     if (blocked === "quiet_hours") {
       await db.update(schema.messages).set({ sendAfter: nextPromoWindow(to, now, customer?.timeZone) }).where(eq(schema.messages.id, m.id));
       out.rescheduled++;
@@ -404,6 +430,9 @@ export async function processHeldPromotions(now = new Date()): Promise<{ sent: n
       if (r.sent) out.sent++;
     }
   }
+  // the free timer: when the next held text is due (or nothing waiting)
+  const [next] = await db.select({ at: schema.messages.sendAfter }).from(schema.messages).where(eq(schema.messages.status, "held")).orderBy(asc(schema.messages.sendAfter)).limit(1);
+  await (await import("@/lib/wake-flags")).armWake("held-texts", next?.at ?? null);
   return out;
 }
 
