@@ -6,6 +6,10 @@ name: Vercel deploy alert
 on:
   status
 
+concurrency:
+  group: vercel-deploy-alert
+  cancel-in-progress: false
+
 permissions:
   issues: write
   contents: read
@@ -34,11 +38,17 @@ jobs:
           if [ -z "$branch" ]; then echo "Not a live or preview branch: $BRANCHES"; exit 0; fi
           short="${SHA:0:7}"
           title="Vercel deploy failed: ${short} on${branch}"
-          if gh issue list --repo "$REPO" --state open --search "\"Vercel deploy failed: ${short}\" in:title" --json number --jq '.[0].number' | grep -q .; then
-            echo "Issue already open for ${short}"; exit 0
-          fi
           gh label create vercel-deploy-failed --repo "$REPO" --color B60205 \
             --description "Vercel build or deploy failed on the live or preview branch" 2>/dev/null || true
           body=$(printf '%s\n\n- Commit: %s\n- Branch:%s\n- Vercel says: %s\n- Details: %s\n\nThe site keeps serving the last good deployment. Fix on a session branch, run `npm run typecheck`, `npm test` and `npm run build`, then merge once. If Vercel says "rate limited", stop merging: see docs/vercel-rules.md.\n' \
             "Vercel reported a failed deployment." "$SHA" "$branch" "$DESC" "$URL")
-          gh issue create --repo "$REPO" --title "$title" --label vercel-deploy-failed --body "$body"
+          # One open alert at a time: later failures are added as comments, so a run of failures is one issue.
+          open=$(gh issue list --repo "$REPO" --state open --label vercel-deploy-failed --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then
+            if gh issue view "$open" --repo "$REPO" --json body,comments --jq '[.body, .comments[].body] | join("\n")' | grep -q "$SHA"; then
+              echo "Already reported ${short} on #${open}"; exit 0
+            fi
+            gh issue comment "$open" --repo "$REPO" --body "$body"
+          else
+            gh issue create --repo "$REPO" --title "$title" --label vercel-deploy-failed --body "$body"
+          fi

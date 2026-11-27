@@ -35,9 +35,6 @@ export async function requestCatalogAction(_prev: { ok: boolean; message: string
 export async function textCatalogAction(_prev: { ok: boolean; message: string } | null, form: FormData): Promise<{ ok: boolean; message: string }> {
   if (!websiteCatalogFormShown()) return { ok: false, message: CATALOG_FORM_DRAFT.failed };
   if (String(form.get("website") ?? "")) return { ok: true, message: CATALOG_FORM_DRAFT.textSent };
-  // Deep check C3: the preview site shares the live database: no consent record and no texts from it
-  const previewOff = await signUpsDisabledReason();
-  if (previewOff) return { ok: false, message: previewOff };
   const { toE164 } = await import("@/lib/phone");
   const digits = String(form.get("phone") ?? "").replace(/\D/g, "");
   const phone = digits.length === 10 || (digits.length === 11 && digits.startsWith("1")) ? toE164(digits) : null;
@@ -58,6 +55,10 @@ export async function textCatalogAction(_prev: { ok: boolean; message: string } 
   // new consent record is written (the send itself is also checked under a lock)
   const { catalogTextedToday } = await import("@/lib/catalog-send");
   if (await catalogTextedToday(phone)) return { ok: true, message: CATALOG_FORM_DRAFT.textAgain };
+  // Deep check C3: the preview site shares the live database: its draft lines above still show for review, but no
+  // consent record is written and no text is sent from it
+  const previewOff = await signUpsDisabledReason();
+  if (previewOff) return { ok: false, message: previewOff };
   // One internet address: at most 10 catalog sends a day (robots), before any consent record or text
   const req = await requestIp();
   if (await catalogIpLimitReached(req.ip)) {
