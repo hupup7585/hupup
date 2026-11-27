@@ -196,6 +196,19 @@ describe("hotline voicemail", () => {
     expect(await notifyStragglers()).toBe(0);
   });
 
+  it("deep check 06:00 M71: an error between the claim and the sending frees the claim, so the job tries again", async () => {
+    const box = await mainBox();
+    const [v] = await db.insert(schema.voicemails).values({ boxId: box.id, recordingSid: "REM71", recordingUrl: "https://api.twilio.com/x/REM71", durationSec: 5, createdAt: new Date(Date.now() - 3600_000) }).returning();
+    const { notifyVoicemail } = await import("@/lib/voicemail");
+    const settings = await import("@/lib/settings");
+    const spy = vi.spyOn(settings, "getSettings").mockRejectedValueOnce(new Error("database blip"));
+    await expect(notifyVoicemail(v.id)).rejects.toThrow("database blip");
+    spy.mockRestore();
+    const [after] = await db.select().from(schema.voicemails).where(eq(schema.voicemails.id, v.id));
+    expect(after.notifiedAt).toBeNull();
+    expect(await notifyStragglers()).toBe(1);
+  });
+
   it("deep check B4: an alert that could not be sent is tried again by the scheduled job", async () => {
     const box = await mainBox();
     await db.insert(schema.voicemails).values({ boxId: box.id, recordingSid: "REB4X", recordingUrl: "https://api.twilio.com/x/REB4X", durationSec: 5, createdAt: new Date(Date.now() - 3600_000) });

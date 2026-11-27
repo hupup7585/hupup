@@ -41,14 +41,16 @@ export async function saveHolidayRentalsAction(fd: FormData) {
   };
   const timeRaw = String(fd.get("holidaySundayPickup") ?? "").trim();
   const time = timeRaw === "" ? String(cur.holidaySundayPickup ?? "09:00") : timeRaw;
-  if (!/^\d{2}:\d{2}$/.test(time)) bad.push(`${timeRaw} (a time like 09:00)`);
+  // Deep check 06:00 M69 (F8 leftover): a real clock time only (00:00 to 23:59), never 25:99
+  const realTime = (t: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+  if (!realTime(time)) bad.push(`${timeRaw} (a time like 09:00)`);
   const after = {
     holidayPerDayChanukah: fd.get("holidayPerDayChanukah") === "on",
     holidayPerDayCholHamoed: fd.get("holidayPerDayCholHamoed") === "on",
     holidayNoPromos: fd.get("holidayNoPromos") === "on",
     holidayPickupAfterShabbesMin: num("holidayPickupAfterShabbesMin", 0, 300, "60"),
     holidayMutzeDeliveryAfterMin: num("holidayMutzeDeliveryAfterMin", 0, 360, "150"),
-    holidaySundayPickup: /^\d{2}:\d{2}$/.test(time) ? time : "09:00",
+    holidaySundayPickup: realTime(time) ? time : "09:00",
     holidayFridayMutzeDays: num("holidayFridayMutzeDays", 1, 3, "1.5"),
     holidayMutzeAloneDays: num("holidayMutzeAloneDays", 0.5, 3, "1"),
   };
