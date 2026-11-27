@@ -70,6 +70,24 @@ async function storeFile(input: { emailId?: number | null; fileName: string; con
   return f;
 }
 
+/** The address a reply goes to: the email's Reply-To when it has a usable one (like Gmail), otherwise From. */
+export function replyToOf(mail: { replyTo?: { address?: string }[] | null }, from: string): string {
+  const r = (mail.replyTo ?? []).map((a) => (a.address ?? "").trim().toLowerCase()).find((a) => /^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]{2,}$/.test(a));
+  return r ?? from;
+}
+
+/** Deep check C5: Reply-To from the original email (kept in pieces), read when replying; From when there is none. */
+export async function replyAddressFor(e: { uploadId: string | null; fromAddress: string }): Promise<string> {
+  if (!e.uploadId) return e.fromAddress;
+  try {
+    const chunks = await db.select().from(schema.inboxRawChunks).where(eq(schema.inboxRawChunks.uploadId, e.uploadId)).orderBy(asc(schema.inboxRawChunks.idx));
+    if (!chunks.length) return e.fromAddress;
+    return replyToOf(await PostalMime.parse(Buffer.concat(chunks.map((c) => c.data))), e.fromAddress);
+  } catch {
+    return e.fromAddress;
+  }
+}
+
 /** Read the email, keep it (and its attachments up to 18 MB), link the contact, tell Abraham, check for Catalog. */
 export async function fileEmail(bytes: Buffer, uploadId: string | null = null, now = new Date()): Promise<InboxEmail> {
   const mail = await PostalMime.parse(bytes);
@@ -112,7 +130,7 @@ export async function fileEmail(bytes: Buffer, uploadId: string | null = null, n
   // Every info@ email texted to the Owner's cell with the sender, subject and message (Abraham, Nov 17, 2026)
   await textOwnerAboutEmail(email).catch((e) => console.error("inbox text alert failed", e));
   // The info@ "Catalog" auto-reply (off until Abraham approves its wording)
-  await handleCatalogEmail(email.fromAddress, email.subject).catch((e) => console.error("catalog check failed", e));
+  await handleCatalogEmail(replyToOf(mail, email.fromAddress), email.subject).catch((e) => console.error("catalog check failed", e));
   return email;
 }
 
@@ -243,10 +261,11 @@ export async function sendReply(input: { emailId: number; body: string; fileIds:
   const subject = /^re:/i.test(e.subject ?? "") ? e.subject! : `Re: ${e.subject ?? ""}`.trim();
   const text = body + linkText; // the logo and signature are added to every email (src/lib/email-brand.ts)
   const headers = e.messageId ? { "In-Reply-To": e.messageId, References: e.messageId } : undefined;
-  const res = await sendEmail(e.fromAddress, subject, text, files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), { headers, record: false, bodyHtml: htmlWithLinks(input.bodyHtml, linkText) });
+  const to = await replyAddressFor(e); // deep check C5: the email's Reply-To, like Gmail
+  const res = await sendEmail(to, subject, text, files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), { headers, record: false, bodyHtml: htmlWithLinks(input.bodyHtml, linkText) });
   const [reply] = await db
     .insert(schema.inboxReplies)
-    .values({ emailId: e.id, toAddress: e.fromAddress, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })
+    .values({ emailId: e.id, toAddress: to, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })
     .returning();
   for (const id of [...files.map((f) => f.file.id), ...linked]) await db.update(schema.inboxFiles).set({ replyId: reply.id }).where(eq(schema.inboxFiles.id, id));
   if (!e.readAt) await setRead(e.id, true);
