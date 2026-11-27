@@ -61,6 +61,8 @@ const EXACT: Record<string, Spec> = {
   calendarEnabled: lock(PROTECTED, "Hours and calendar", { label: "Shabbes and Yom Tov closing" }),
   googleLiveVoice: lock("Switched only on Hotline prompts, slots page, and it costs money; with the safety check on it needs a fresh code there.", "Phone: voice", { label: "Google voice for the changing parts", page: "/admin/phone/prompts/slots" }),
   promosPerYear: { mode: "edit", label: "Promo texts per customer per year (most)", group: "Offers and discounts", type: "int", min: 1, max: 12 },
+  recordingFlags: lock(SYSTEM, "Phone: voice", { label: "Recordings that need a new recording (automatic)" }),
+  recordingLinks: page("/admin/phone/prompts/slots", "Phone: voice", { label: "Settings spoken inside recordings", type: "json" }),
   addressTriesBeforeMenu: { mode: "edit", label: "Address tries before going back to the address menu", group: "Phone: menus", type: "int", min: 1, max: 20 },
   staffMutzeEveryWeek: { mode: "edit", label: "Allow Mutze Shabbes bookings by staff every week", group: "Bookings", type: "bool" },
   staffMutzeDeliveryAfterMin: { mode: "edit", label: "Mutze Shabbes by staff: delivery minutes after Shabbes ends", group: "Bookings", type: "int", min: 0, max: 360 },

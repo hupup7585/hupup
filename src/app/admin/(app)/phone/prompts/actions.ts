@@ -105,6 +105,7 @@ export async function selectRecordingAction(key: string, id: number): Promise<R>
     return { ok: false, message: (e as Error).message };
   }
   await log(s.userId, "voice_prompt.recording_used", key, { recordingId: id });
+  await (await import("@/lib/recording-flags")).clearRecordingFlag(key, s.userId); // a new recording: no longer flagged
   revalidatePath("/admin/phone/prompts");
   revalidatePath("/admin/phone/prompts/slots");
   return { ok: true, message: "Callers hear this recording now." };

@@ -132,3 +132,20 @@ export async function setNameSlotTextAction(key: string, text: string): Promise<
   await db.insert(schema.auditLog).values({ userId: s.userId, action: "recording_slot.text", entityType: "recording_slot", entityId: key, after: { text: t || null } });
   return done(t ? "Saved. The slot shows the new text; Abraham confirms it before Hark uploads." : "Saved. The slot shows the rental's name again.");
 }
+
+/** The settings spoken inside recordings (Abraham, Nov 27, 2026): "source | name = slot, slot" per line. Owner only. */
+export async function saveRecordingLinksAction(form: FormData) {
+  const s = await requireOwner();
+  const lines = String(form.get("links") ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const links = lines
+    .map((l) => {
+      const [left, right = ""] = l.split("=");
+      const [source, label] = left.split("|").map((x) => x.trim());
+      return { source, label: label || source, slots: right.split(",").map((x) => x.trim()).filter(Boolean) };
+    })
+    .filter((l) => /^(setting:[A-Za-z0-9]+|product:[^:]+:\d+)$/.test(l.source) && l.slots.length);
+  const { saveSetting } = await import("@/lib/settings");
+  await saveSetting("recordingLinks", JSON.stringify(links), s.userId);
+  await db.insert(schema.auditLog).values({ userId: s.userId, action: "recording_links.saved", entityType: "settings", entityId: "recordingLinks", after: { count: links.length } });
+  revalidatePath("/admin/phone/prompts/slots");
+}

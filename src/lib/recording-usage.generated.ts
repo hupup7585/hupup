@@ -549,7 +549,8 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "lib/recording-slots.ts"
  ],
  "key7_cs_hours": [
-  "lib/ivr/flow.ts"
+  "lib/ivr/flow.ts",
+  "lib/recording-flags.ts"
  ],
  "laser_item_1": [
   "lib/ivr/flow.ts"
@@ -747,15 +748,20 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "lib/ivr/flow.ts"
  ],
  "ocean_200": [
-  "lib/ivr/flow.ts"
+  "lib/ivr/flow.ts",
+  "lib/recording-flags.ts"
  ],
  "ocean_500": [
-  "lib/ivr/flow.ts"
+  "lib/ivr/flow.ts",
+  "lib/recording-flags.ts"
  ],
  "ocean_700": [
-  "lib/ivr/flow.ts"
+  "lib/ivr/flow.ts",
+  "lib/recording-flags.ts"
  ],
- "ocean_balls": [],
+ "ocean_balls": [
+  "lib/recording-flags.ts"
+ ],
  "ocean_offer": [
   "lib/ivr/flow.ts"
  ],
@@ -956,10 +962,12 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "lib/ivr/flow.ts"
  ],
  "same_day_notice_after": [
-  "lib/ivr/flow.ts"
+  "lib/ivr/flow.ts",
+  "lib/recording-flags.ts"
  ],
  "same_day_notice_open": [
-  "lib/ivr/flow.ts"
+  "lib/ivr/flow.ts",
+  "lib/recording-flags.ts"
  ],
  "second_laser": [
   "lib/ivr/flow.ts"
@@ -1048,6 +1056,9 @@ export const RECORDING_USAGE: Record<string, string[]> = {
  ],
  "thanks_order": [],
  "transfer_connecting": [
+  "lib/ivr/flow.ts"
+ ],
+ "transfer_connecting_cs": [
   "lib/ivr/flow.ts"
  ],
  "transfer_failed": [],
@@ -1451,6 +1462,7 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "app/admin/(app)/phone/screens/[id]/page.tsx",
   "lib/ivr/flow.ts",
   "lib/ivr/menu-editor.ts",
+  "lib/recording-flags.ts",
   "lib/recording-library.ts"
  ],
  "whole_product_options": [

@@ -769,7 +769,9 @@ export const PROMPTS = {
   link_call_back: { group: "Checkout", label: "No texts and no email", text: "No problem, we will not text you. Someone from our team will call you shortly to finish your payment." },
 
   // Talk to a person
-  transfer_connecting: { group: "Talk to a person", label: "Connecting", text: "Sure thing! Hang tight while I connect you to our team." },
+  transfer_connecting: { group: "Talk to a person", label: "Connecting", text: "One moment, please. We are connecting you to our team." }, // the live words (Abraham, Nov 27, 2026)
+  // Abraham, Nov 27, 2026, 1:20 AM: customer service transfers only (main menu key 3, bookings menu key 0)
+  transfer_connecting_cs: { group: "Talk to a person", label: "Connecting to customer service", text: "One moment, please. We are connecting you to our customer service." },
   // Abraham's own wording (same line for both), followed straight by the voicemail beep
   transfer_failed: { group: "Talk to a person", label: "No one answered (then voicemail)", text: "Sorry, we missed your call, our team is busy helping others right now. Please leave a message after the tone and someone will get back to you shortly. Thank you and have a wonderful day!" },
   operator_unavailable: { group: "Talk to a person", label: "No one available (then voicemail)", text: "Sorry, we missed your call, our team is busy helping others right now. Please leave a message after the tone and someone will get back to you shortly. Thank you and have a wonderful day!" },

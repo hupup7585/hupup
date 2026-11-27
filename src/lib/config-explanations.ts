@@ -584,6 +584,16 @@ const OTHER: Record<string, Explanation> = {
     where: "The same-day delivery notice on the phone.",
     ifChanged: "Callers in the listed areas hear the close-by time; everyone else hears the surrounding-area time.",
   },
+  recordingLinks: {
+    what: "Which settings and prices are spoken inside which recordings (for example the ocean ball prices inside the ocean ball lines). When one of them is saved with a new value, those recordings are marked \"Needs a new recording\", their text gets a draft with the new value, a red banner lists them, and the Owner gets an email.",
+    where: "The Recording text list (Phone recordings) and the Admin home page.",
+    ifChanged: "A different set of recordings is watched for changed values.",
+  },
+  recordingFlags: {
+    what: "The recordings that need a new recording because a value spoken inside them changed. Filled in automatically; it clears when a new recording is put on the line or the value is changed back.",
+    where: "The red banner on the Recording text list and the Admin home page.",
+    ifChanged: "Nothing to change by hand.",
+  },
   addressTriesBeforeMenu: {
     what: "How many times a caller's address can fail (street not found, or the map cannot find the house) before the phone takes them back to the menu where they choose how to find the address (by their phone number or by entering it). The count starts over when they choose again; there is no limit on rounds, and they are never sent to customer service for this.",
     where: "The phone, during the delivery address steps.",

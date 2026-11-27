@@ -1,3 +1,4 @@
+import RecordingFlagsBanner from "@/components/staff/RecordingFlagsBanner";
 import InboxCard from "./InboxCard";
 import FailedTextsCard from "./FailedTextsCard";
 import SearchBar from "@/components/SearchBar";
@@ -65,6 +66,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
   return (
     <div className="w-full" data-dashboard>
+      <RecordingFlagsBanner />
       {solaGaps.length > 0 && (
         // Nov 24, 2026: online payments off until both Sola settings are in Vercel
         <div role="alert" className="mb-4 rounded-xl border-2 border-[#b3261e] bg-[#ffe6e4] p-4 text-[#b3261e]" data-sola-warning>

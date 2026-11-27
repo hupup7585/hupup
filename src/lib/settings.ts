@@ -19,6 +19,10 @@ export const SETTING_DEFAULTS = {
   deliveryFeeKjCents: "1000",
   /** Abraham, Nov 27, 2026, 1:06 AM: delivery is the zone price for the first item plus this for each more item */
   deliveryExtraItemCents: "500",
+  /** Abraham, Nov 27, 2026, 1:20 AM: which settings and prices are spoken inside which recordings (JSON; empty = the
+   *  starting list), and the slots that need a new recording because one of them changed (filled in automatically) */
+  recordingLinks: "",
+  recordingFlags: "[]",
   deliveryFeeAreaCents: "1500",
   /** Anywhere else in Orange County (outside every colored area on the map), Owner-editable (Abraham, Nov 17, 2026). */
   deliveryFeeOutsideCents: "2000",
@@ -385,8 +389,10 @@ export async function writeSettingValue(tx: Tx, key: string, value: unknown, use
  * Undo always knows the real value before. A save that changes nothing writes no history.
  */
 export async function saveSetting<K extends keyof Settings>(key: K, value: Settings[K], userId?: number | null, source = "Saved on its Admin page") {
+  let was: unknown;
   const write = async (tx: Tx) => {
     const before = await rawSetting(key, tx);
+    was = before;
     await writeSettingValue(tx, key, value, userId ?? null);
     if (sameValue(before, value)) return;
     await tx.update(schema.configVersions).set({ status: "replaced" }).where(and(eq(schema.configVersions.key, key), eq(schema.configVersions.status, "live")));
@@ -395,6 +401,11 @@ export async function saveSetting<K extends keyof Settings>(key: K, value: Setti
   if (typeof db.transaction === "function") await db.transaction((tx) => write(tx as unknown as Tx));
   else await write(db);
   clearSettingsCache();
+  // A value spoken inside recordings changed (Nov 27, 2026): flag those recordings (after the save, never inside it)
+  if (key !== "recordingFlags" && key !== "recordingLinks" && !sameValue(was, value)) {
+    const { linkedValueChanged } = await import("@/lib/recording-flags");
+    await linkedValueChanged(`setting:${String(key)}`, was ?? (SETTING_DEFAULTS as Record<string, unknown>)[key as string], value, userId ?? null);
+  }
 }
 
 export async function deleteSetting(key: string) {

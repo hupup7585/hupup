@@ -41,6 +41,15 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/delivery-settings/page.tsx",
   "lib/delivery-rule.ts"
  ],
+ "recordingLinks": [
+  "app/admin/(app)/phone/prompts/slots/RecordingLinksForm.tsx",
+  "app/admin/(app)/phone/prompts/slots/actions.ts",
+  "lib/recording-flags.ts"
+ ],
+ "recordingFlags": [
+  "components/staff/RecordingFlagsBanner.tsx",
+  "lib/recording-flags.ts"
+ ],
  "deliveryFeeAreaCents": [
   "app/admin/(app)/delivery-settings/area-actions.ts",
   "app/admin/(app)/delivery-settings/page.tsx",
@@ -142,7 +151,8 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  ],
  "phoneLinkHoldMinutes": [
   "app/admin/(app)/settings/hold-actions.ts",
-  "app/admin/(app)/settings/page.tsx"
+  "app/admin/(app)/settings/page.tsx",
+  "lib/recording-flags.ts"
  ],
  "adminLinkHoldMinutes": [
   "app/admin/(app)/settings/hold-actions.ts",
@@ -407,11 +417,13 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  ],
  "sameDayHoursClose": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-keys.ts"
+  "app/admin/(app)/settings/calendar-keys.ts",
+  "lib/recording-flags.ts"
  ],
  "sameDayHoursFar": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-keys.ts"
+  "app/admin/(app)/settings/calendar-keys.ts",
+  "lib/recording-flags.ts"
  ],
  "sameDayCloseAreas": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
@@ -482,7 +494,8 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "hoursSchedules": [
   "app/admin/(app)/hours/actions.ts",
   "lib/business-hours.ts",
-  "lib/hours-schedule.ts"
+  "lib/hours-schedule.ts",
+  "lib/recording-flags.ts"
  ],
  "hoursMonThu": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",

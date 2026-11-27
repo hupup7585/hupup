@@ -70,8 +70,14 @@ export async function saveProductAction(fd: FormData) {
     })(),
     active: fd.get("active") === "on",
   };
+  const [was] = id ? await db.select({ priceCents: schema.products.priceCents, sizeOrder: schema.products.sizeOrder, categoryId: schema.products.categoryId }).from(schema.products).where(eq(schema.products.id, id)) : [];
   if (id) await db.update(schema.products).set(values).where(eq(schema.products.id, id));
   else await db.insert(schema.products).values(values);
+  // A price spoken inside recordings (ocean balls, Nov 27, 2026): changed = those recordings are flagged
+  if (was && was.priceCents !== values.priceCents) {
+    const [cat] = await db.select({ name: schema.categories.name }).from(schema.categories).where(eq(schema.categories.id, values.categoryId));
+    if (cat) await (await import("@/lib/recording-flags")).linkedValueChanged(`product:${cat.name}:${values.sizeOrder ?? was.sizeOrder ?? ""}`, was.priceCents, values.priceCents);
+  }
   done(id ? "Item saved" : "Item added");
 }
 

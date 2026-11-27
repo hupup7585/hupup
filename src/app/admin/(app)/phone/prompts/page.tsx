@@ -1,3 +1,4 @@
+import RecordingFlagsBanner from "@/components/staff/RecordingFlagsBanner";
 import Link from "next/link";
 import { requireOwner } from "@/lib/auth";
 import { PROMPTS, loadPromptOverrides, promptArea, promptRecordable, type PromptDef, type PromptKey } from "@/lib/ivr/prompts";
@@ -76,6 +77,7 @@ export default async function PromptsPage({ searchParams }: { searchParams: Prom
   const link = (a?: string) => `/admin/phone/prompts${a || term ? `?${new URLSearchParams({ ...(a ? { area: a } : {}), ...(term ? { q: term } : {}) })}` : ""}`;
   return (
     <div className="w-full">
+      <RecordingFlagsBanner />
       <h1 className="text-2xl font-black sm:text-3xl">Hotline prompts</h1>
       <p className="mb-3 mt-1 text-muted">
         Every line the phone system says, and every text and email it sends. Voice: <b className="text-navy">{config.voice().replace(/^Google\./, "")}</b>. Edit saves a

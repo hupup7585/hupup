@@ -5252,7 +5252,8 @@ const handlers: Record<string, Handler> = {
       return back(vr, "voicemail", { x: k }); // the extension's own box, with the approved greeting
     }
     await updateSession(ctx.callSid, { outcome: ctx.session?.outcome === "carted" ? "carted" : "forwarded", data: { ringStart: Date.now() } }, ctx.session);
-    sp(vr, ctx, "transfer_connecting");
+    // Abraham, Nov 27, 2026, 1:20 AM: customer service (main menu key 3, bookings key 0) has its own connecting line
+    sp(vr, ctx, k === "4" ? "transfer_connecting_cs" : "transfer_connecting");
     return dialTargets(vr, list, k, 0, ctx.session?.fromNumber ?? ctx.from);
   },
 
@@ -5914,6 +5915,7 @@ export async function handleVoice(raw: Omit<Ctx, "session" | "prompts"> & { edit
     console.error("IVR set-up error", raw.action, e);
     const err = new twilio.twiml.VoiceResponse();
     sp(err, { prompts: {} }, "tech_error");
+    sp(err, { prompts: {} }, "goodbye_thanks_calling"); // Abraham, Nov 27, 2026: the before-payment goodbye, then hang up
     err.hangup();
     return err.toString();
   }
@@ -5986,6 +5988,7 @@ async function handleVoiceInner(raw: Omit<Ctx, "session" | "prompts"> & { editor
     console.error("IVR handler error", ctx.action, e);
     const err = new twilio.twiml.VoiceResponse();
     sp(err, ctx, "tech_error");
+    sp(err, ctx, "goodbye_thanks_calling"); // Abraham, Nov 27, 2026: the before-payment goodbye, then hang up
     err.hangup();
     return err.toString();
   }

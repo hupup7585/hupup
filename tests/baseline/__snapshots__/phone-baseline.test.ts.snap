@@ -354,7 +354,7 @@ exports[`baseline: every phone step as it plays today > resume-items 1`] = `"<?x
 
 exports[`baseline: every phone step as it plays today > resume-pick 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/resume-items</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > ring 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Sure thing! Hang tight while I connect you to our team.</Say><Dial callerId="+18455550100" timeout="25" action="https://hupup.example/api/voice/operator-done?i=0&amp;k=0" method="POST"><Number url="https://hupup.example/api/voice/whisper?k=0" method="POST">+18452135239</Number></Dial></Response>"`;
+exports[`baseline: every phone step as it plays today > ring 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">One moment, please. We are connecting you to our team.</Say><Dial callerId="+18455550100" timeout="25" action="https://hupup.example/api/voice/operator-done?i=0&amp;k=0" method="POST"><Number url="https://hupup.example/api/voice/whisper?k=0" method="POST">+18452135239</Number></Dial></Response>"`;
 
 exports[`baseline: every phone step as it plays today > second-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/added-second?p=null&amp;d=null</Redirect></Response>"`;
 

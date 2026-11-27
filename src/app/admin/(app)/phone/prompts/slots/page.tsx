@@ -1,3 +1,5 @@
+import RecordingFlagsBanner from "@/components/staff/RecordingFlagsBanner";
+import RecordingLinksForm from "./RecordingLinksForm";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { requireOwner } from "@/lib/auth";
@@ -37,6 +39,7 @@ export default async function SlotsPage({ searchParams }: { searchParams: Promis
   return (
     <div className="w-full">
       <Link href="/admin/phone/prompts" className="text-sm font-bold text-navy underline-offset-2 hover:underline">← Hotline prompts</Link>
+      <RecordingFlagsBanner />
       <h1 className="mb-1 mt-2 text-2xl font-black sm:text-3xl">Recording text list</h1>
       <p className="mb-4 text-muted">
         Every recording on the hotline, with its exact text. Abraham confirms each text word for word, with every comma, period and exclamation mark. Hark records it in Puck only after that, then uploads it here. A line without a recording keeps playing in the live voice (Puck).
@@ -50,6 +53,7 @@ export default async function SlotsPage({ searchParams }: { searchParams: Promis
         ))}
       </div>
       <VoiceSwitches achird={settings.achirdWholeLine} allUploaded={allUploaded} missing={slots.length - count("uploaded")} google={settings.googleLiveVoice} googleKey={Boolean(process.env.GOOGLE_TTS_API_KEY)} guard={settings.sensitiveSwitchGuard} />
+      <RecordingLinksForm />
       <AddSlotForm groups={[...new Set([...SLOT_GROUPS, ...groups])]} slots={slots.map((x) => ({ key: x.key, label: x.label, text: x.text, lookup: custom.get(x.key)?.lookup ?? null }))} />
       <form className="mb-3 flex flex-wrap items-end gap-2">
         {sp.s && <input type="hidden" name="s" value={sp.s} />}
