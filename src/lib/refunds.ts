@@ -233,6 +233,35 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
   }
 }
 
+/**
+ * Deep check 0600 M12 (second half, Nov 27, 2026): Stripe says a refund failed or was canceled after it was recorded
+ * (pending or succeeded). The money never went back, so: the refund row is marked failed (kept, with the reason), the
+ * order's refunded amount goes down again, each Bookkeeping refund entry of it gets a correction (the originals stay),
+ * and the Owner is emailed. Runs once per refund (a row already failed is left alone). A refund recorded only by the
+ * charge total (no refund id) can't be matched, so the Owner is emailed to check it.
+ */
+export async function reverseFailedRefund(refundId: string, reason: string, chargeOrIntent: string | null) {
+  const owner = process.env.ADMIN_EMAIL;
+  const [row] = await db.select().from(schema.orderRefunds).where(eq(schema.orderRefunds.stripeRefundId, refundId)).limit(1);
+  if (!row) {
+    const fallback = chargeOrIntent ? (await db.execute(sql`SELECT order_id FROM order_refunds WHERE stripe_refund_id LIKE ${`stripe-charge:${chargeOrIntent}:%`} LIMIT 1`)).rows[0] as { order_id: number } | undefined : undefined;
+    if (fallback && owner) await sendEmail(owner, `A Stripe refund failed on order #${orderNumber(Number(fallback.order_id))}: check it`, `Stripe says refund ${refundId} failed (${reason}). It was recorded from the charge total, so it could not be matched to one refund automatically.\n\nCheck the order's refunded amount and Bookkeeping.\n\n${config.baseUrl()}${orderPath(Number(fallback.order_id))}`).catch(() => null);
+    return null;
+  }
+  if (row.status === "failed") return row;
+  const counted = row.status === "succeeded" || row.status === "pending" || row.status === "unknown";
+  const [updated] = await db.update(schema.orderRefunds).set({ status: "failed", error: `Failed at Stripe after it was recorded: ${reason}`.slice(0, 300) }).where(eq(schema.orderRefunds.id, row.id)).returning();
+  if (counted) {
+    await db.update(schema.orders).set({ refundedCents: sql`GREATEST(0, ${schema.orders.refundedCents} - ${row.amountCents})`, updatedAt: new Date() }).where(eq(schema.orders.id, row.orderId));
+    const { reverseEntry } = await import("@/lib/books");
+    const entries = (await db.execute(sql`SELECT e.id FROM book_entries e WHERE e.kind = 'refund' AND e.ref IN (${refundId}, ${`${refundId}:overpayment`}) AND e.corrects_id IS NULL AND NOT EXISTS (SELECT 1 FROM book_entries c WHERE c.corrects_id = e.id)`)).rows as { id: number }[];
+    for (const e of entries) await reverseEntry(Number(e.id), `Stripe refund ${refundId} failed (${reason})`, null).catch((err) => console.error("[refund reverse]", err));
+  }
+  await db.insert(schema.auditLog).values({ action: "payment.refund_failed_later", entityType: "order", entityId: String(row.orderId), before: { status: row.status }, after: { refundId, reason, amountCents: row.amountCents } });
+  if (owner) await sendEmail(owner, `Refund failed on order #${orderNumber(row.orderId)}`, `Stripe says the refund of ${money(row.amountCents)} on order #${orderNumber(row.orderId)} (${refundId}) failed after it was recorded (${reason}). The money did not go back to the customer.\n\nThe order and Bookkeeping were corrected. Decide whether to refund again.\n\n${config.baseUrl()}${orderPath(row.orderId)}`).catch(() => null);
+  return updated;
+}
+
 export async function refundsFor(orderId: number) {
   return db.select().from(schema.orderRefunds).where(eq(schema.orderRefunds.orderId, orderId)).orderBy(desc(schema.orderRefunds.createdAt));
 }

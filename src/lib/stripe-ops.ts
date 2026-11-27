@@ -132,7 +132,16 @@ export async function handleStripeEvent(event: { type: string; data: { object: R
   // Deep check Nov 27 (item 16): newer Stripe API versions leave the refunds out of the charge, so the refund's own
   // notice records it (the same refund from either notice is recorded once)
   if (event.type === "refund.created" || event.type === "refund.updated" || event.type === "charge.refund.updated") {
-    const r = event.data.object as unknown as { id: string; amount: number; status: string; charge: string | null; payment_intent: string | null };
+    const r = event.data.object as unknown as { id: string; amount: number; status: string; charge: string | null; payment_intent: string | null; failure_reason?: string | null };
+    // Deep check 0600 M12 (second half, Nov 27, 2026): a refund that was pending and then failed (or was canceled)
+    // never went back to the customer, so it is taken off the order and corrected in Bookkeeping
+    if (r?.id && (r.status === "failed" || r.status === "canceled")) {
+      const { reverseFailedRefund } = await import("@/lib/refunds");
+      await oneAtATime(`stripe-refund:${r.charge ?? r.payment_intent ?? r.id}`, async () => {
+        await reverseFailedRefund(r.id, r.failure_reason || r.status, r.charge ?? r.payment_intent ?? null);
+      });
+      return;
+    }
     if (!r?.id || !(r.status === "succeeded" || r.status === "pending")) return;
     const o = await orderForPayment(r.charge ?? "", r.payment_intent);
     if (!o) return;

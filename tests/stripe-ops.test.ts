@@ -208,3 +208,42 @@ describe("deep check 0600 M11 + M12 (Stripe refund notices)", () => {
     expect((await db.select().from(schema.appSettings)).filter((s) => s.key.startsWith("lock:"))).toHaveLength(0);
   });
 });
+
+describe("deep check 0600 M12 second half: a pending Stripe refund that later fails", () => {
+  const mk = async (pay: string, date: string) =>
+    (await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: date, pickupDate: date, subtotalCents: 10000, totalCents: 10000, paidCents: 10000, paymentMethod: "stripe", stripePaymentId: pay }).returning())[0];
+  const refundsOn = async (orderId: number) => (await db.select().from(schema.bookEntries).where(eq(schema.bookEntries.orderId, orderId))).filter((e) => e.kind === "refund");
+  it("is taken off the order, corrected in Bookkeeping, marked failed and the Owner emailed; once only", async () => {
+    process.env.ADMIN_EMAIL = "owner@example.com";
+    const o = await mk("ch_fail", "2027-07-01");
+    await handleStripeEvent({ type: "refund.created", data: { object: { id: "re_fail", amount: 2500, status: "pending", charge: "ch_fail", payment_intent: null } } });
+    expect((await db.select().from(schema.orders).where(eq(schema.orders.id, o.id)))[0].refundedCents).toBe(2500);
+    h.emails.length = 0;
+    const failed = { type: "refund.updated", data: { object: { id: "re_fail", amount: 2500, status: "failed", failure_reason: "expired_or_canceled_card", charge: "ch_fail", payment_intent: null } } };
+    await handleStripeEvent(failed);
+    await handleStripeEvent(failed); // a repeated notice changes nothing more
+    expect((await db.select().from(schema.orders).where(eq(schema.orders.id, o.id)))[0].refundedCents).toBe(0);
+    const [row] = await db.select().from(schema.orderRefunds).where(eq(schema.orderRefunds.stripeRefundId, "re_fail"));
+    expect(row.status).toBe("failed");
+    expect(row.error).toMatch(/expired_or_canceled_card/);
+    const books = await refundsOn(o.id);
+    expect(books.reduce((s, e) => s + e.amountCents, 0)).toBe(0); // the refund and its correction
+    expect(books).toHaveLength(2);
+    expect(h.emails.filter((e) => /Refund failed on order/.test(e.subject))).toHaveLength(1);
+  });
+  it("an Admin refund that later fails is reversed the same way", async () => {
+    const o = await mk("ch_fail2", "2027-07-02");
+    const { applyRefund } = await import("@/lib/refunds");
+    await applyRefund(o, { amountCents: 1000, refundId: "re_admin_fail", provider: "stripe", source: "admin", userId: 1, status: "pending" });
+    await handleStripeEvent({ type: "charge.refund.updated", data: { object: { id: "re_admin_fail", amount: 1000, status: "canceled", charge: "ch_fail2", payment_intent: null } } });
+    expect((await db.select().from(schema.orders).where(eq(schema.orders.id, o.id)))[0].refundedCents).toBe(0);
+  });
+  it("recorded only by the charge total: the Owner is emailed to check (nothing guessed)", async () => {
+    const o = await mk("ch_fail3", "2027-07-03");
+    await handleStripeEvent({ type: "charge.refunded", data: { object: { id: "ch_fail3", amount_refunded: 700 } } });
+    h.emails.length = 0;
+    await handleStripeEvent({ type: "refund.updated", data: { object: { id: "re_unknown", amount: 700, status: "failed", charge: "ch_fail3", payment_intent: null } } });
+    expect((await db.select().from(schema.orders).where(eq(schema.orders.id, o.id)))[0].refundedCents).toBe(700);
+    expect(h.emails.some((e) => /A Stripe refund failed on order/.test(e.subject))).toBe(true);
+  });
+});
