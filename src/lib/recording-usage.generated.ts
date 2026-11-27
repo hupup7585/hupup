@@ -963,11 +963,13 @@ export const RECORDING_USAGE: Record<string, string[]> = {
  ],
  "same_day_notice_after": [
   "lib/ivr/flow.ts",
-  "lib/recording-flags.ts"
+  "lib/recording-flags.ts",
+  "lib/same-day-notice.ts"
  ],
  "same_day_notice_open": [
   "lib/ivr/flow.ts",
-  "lib/recording-flags.ts"
+  "lib/recording-flags.ts",
+  "lib/same-day-notice.ts"
  ],
  "second_laser": [
   "lib/ivr/flow.ts"
