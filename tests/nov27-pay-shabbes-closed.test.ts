@@ -68,6 +68,14 @@ describe("payment links on Shabbes and Yom Tov", () => {
     expect(h.redirected).toBe(""); // never sent to the card page
   });
 
+  it("deep check 06:00 M39: an expired link (its hold released, nothing due) on Shabbes shows the closed notice, not a button that does nothing", async () => {
+    setNow(tenBefore);
+    // a released day keeps its items; nothing is due on it (the mock's due is total - paid, so the total is 0 here)
+    h.order = { order: { id: 7, status: "CANCELLED", subtotalCents: 0, totalCents: 0, paidCents: 0, holdExpiresAt: new Date(tenBefore.getTime() - 3600_000), eventDate: "2026-11-23", pickupDate: "2026-11-24", deliveryFeeCents: 0, taxCents: 0, taxPercent: "8.125", offerDiscountCents: 0, offerNote: null }, items: [{ id: 1, orderId: 7, productId: 1, qty: 1, unitPriceCents: 25000, name: "Castle" }], services: [], customer: { id: 3, phone: "+18455550100", name: "Y F", email: null } };
+    const html = await page();
+    expect(html).toContain("data-payments-closed");
+    expect(html).not.toContain("data-link-expired");
+  });
   it("right after Shabbes ends the same link works again automatically", async () => {
     setNow(new Date(shabbesEnds.getTime() + 60_000));
     expect(await page()).not.toContain("data-payments-closed");

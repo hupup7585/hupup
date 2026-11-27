@@ -40,7 +40,10 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   if (!before) notFound();
   // Abraham, Nov 27, 2026: payment links do not work from the phone cut-off (15 minutes before candle lighting) until
   // the phone reopens after Shabbes / Yom Tov: a closed notice, no card form
-  const closedLine = before.due > 0 ? await paymentsClosedLine() : null;
+  // Deep check 06:00 M39: also an expired link (nothing due once its holds were released): "Check availability again"
+  // does nothing on Shabbes and Yom Tov, so the same closed notice shows instead of a button that only reloads the page
+  const expiredNow = linkRulesActive() && (await linkExpired(before.orders));
+  const closedLine = before.due > 0 || expiredNow ? await paymentsClosedLine() : null;
   if (closedLine)
     return (
       <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">
@@ -60,7 +63,7 @@ export default async function PayPage({ params, searchParams }: { params: Promis
     );
   // The link rule (Abraham, Nov 13, 2026; preview until he approves the wording)
   const rules = linkRulesActive();
-  if (rules && (await linkExpired(before.orders))) {
+  if (rules && expiredNow) {
     const count = payingDays(before.orders, before.primary).reduce((n, d) => n + d.items.reduce((m, i) => m + i.qty, 0), 0);
     return (
       <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">
