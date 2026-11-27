@@ -4,7 +4,7 @@ import { getPaymentGroup, markGroupPaid } from "@/lib/orders";
 import { linkPaymentToAcceptance } from "@/lib/rental-terms";
 import { parseMoneyToCents } from "@/lib/money";
 import { alertOwner, withCallbackAlert } from "@/lib/ops-alerts";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 
 /**
@@ -89,7 +89,11 @@ async function handle(req: Request): Promise<Response> {
   // Deep check 06:00 M26: two copies of the same notice at the same moment: the second finds the payment already
   // counted (duplicate) and sends nothing
   if (updated.length && updated.every((u) => "duplicate" in u && u.duplicate)) return new Response("ok (already recorded)");
-  await recordPaymentResult(days.map((d) => d.order.id), "approved", last4Of(fields), field(fields, "xRefNum") || null);
+  // Deep check 06:00 M40: "Paid" only on the days this payment went to; a day still released or cancelled (no money on
+  // it) is not shown as paid (the activity log keeps the whole notice)
+  const after = await db.select({ id: schema.orders.id, status: schema.orders.status, paidCents: schema.orders.paidCents }).from(schema.orders).where(inArray(schema.orders.id, days.map((d) => d.order.id)));
+  const paidDays = after.filter((d) => d.status !== "CANCELLED" || d.paidCents > 0).map((d) => d.id);
+  await recordPaymentResult(paidDays.length ? paidDays : [orderId], "approved", last4Of(fields), field(fields, "xRefNum") || null);
   if (!updated.length && fresh) return new Response("unknown order", { status: 404 });
   // Evidence: tie this payment to the rental terms version the customer accepted (or record that none was).
   if (fresh) await linkPaymentToAcceptance(orderId, field(fields, "xRefNum") || null, cents);

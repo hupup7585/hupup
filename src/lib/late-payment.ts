@@ -257,9 +257,16 @@ export async function chooseLinkOption(primaryId: number, index: number, product
         .returning();
       target = created;
     }
-    const [same] = await tx.select().from(schema.orderItems).where(and(eq(schema.orderItems.orderId, target.id), eq(schema.orderItems.productId, p.id)));
-    if (same) await tx.update(schema.orderItems).set({ qty: same.qty + entry.qty }).where(eq(schema.orderItems.id, same.id));
-    else await tx.insert(schema.orderItems).values({ orderId: target.id, productId: p.id, qty: entry.qty, unitPriceCents: p.priceCents });
+    // Deep check 06:00 M52: laser sets are saved one line per set (as the phone and New booking save them), so every
+    // third set's half price and the delivery item count work the same; other items keep one line with the quantity
+    const [cat] = p.categoryId ? await tx.select({ name: schema.categories.name }).from(schema.categories).where(eq(schema.categories.id, p.categoryId)).limit(1) : [];
+    if (/laser/i.test(cat?.name ?? "")) {
+      for (let n = 0; n < entry.qty; n++) await tx.insert(schema.orderItems).values({ orderId: target.id, productId: p.id, qty: 1, unitPriceCents: p.priceCents });
+    } else {
+      const [same] = await tx.select().from(schema.orderItems).where(and(eq(schema.orderItems.orderId, target.id), eq(schema.orderItems.productId, p.id)));
+      if (same) await tx.update(schema.orderItems).set({ qty: same.qty + entry.qty }).where(eq(schema.orderItems.id, same.id));
+      else await tx.insert(schema.orderItems).values({ orderId: target.id, productId: p.id, qty: entry.qty, unitPriceCents: p.priceCents });
+    }
     await tx
       .update(schema.orders)
       .set({

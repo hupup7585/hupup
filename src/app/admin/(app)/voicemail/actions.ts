@@ -86,3 +86,23 @@ export async function setVmPinAction(form: FormData) {
   await audit(s.userId, "voicemail.pin_changed", 0); // the PIN itself is never logged
   revalidatePath("/admin/voicemail");
 }
+
+/**
+ * Deep check 06:00 M63: the Owner sets or resets a staff box's password in Admin (4 to 8 digits, stored hashed only;
+ * the box's wrong-try lock is cleared). The password itself is never logged.
+ */
+export async function setBoxPasswordAction(boxId: number, form: FormData) {
+  const s = await requireOwner();
+  const pin = String(form.get("pin") || "").trim();
+  if (!Number.isInteger(boxId) || boxId <= 0 || !validPin(pin)) {
+    revalidatePath("/admin/voicemail");
+    return;
+  }
+  const { getBox, setBoxPin, logAction } = await import("@/lib/vm-boxes");
+  if (!(await getBox(boxId))) return;
+  await setBoxPin(boxId, pin);
+  await logAction({ boxId, userId: s.userId ?? null, action: "password set in Admin" });
+  await audit(s.userId, "voicemail_box.password_set", boxId);
+  revalidatePath("/admin/voicemail");
+}
+
