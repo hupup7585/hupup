@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
+import { SEASONAL_JOIN_CONFIRM_TEXT } from "@/lib/seasonal-confirm";
 import { renderToStaticMarkup } from "react-dom/server";
 
 /* SMS Terms Version 2 (Abraham Q): preview only. Written promotional consent = website box or a YES reply. Nothing is sent. */
@@ -90,7 +91,7 @@ describe("written promotional consent (phone keypress only sends a confirmation 
     expect(rows[0].response).toContain("call CAv2");
     expect(rows[0].response).toContain("number chosen: caller's number +18455550177");
     expect((await customer()).marketingOptIn).toBe(true);
-    expect(h.sent.map((m) => m.body)).toEqual([v2.PROMO_ENROLLED_SMS]);
+    expect(h.sent.map((m) => m.body)).toEqual([SEASONAL_JOIN_CONFIRM_TEXT]); // Nov 27, 2026: the approved sign-up confirmation
     expect(v2.PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You are signed up for seasonal promo texts, up to 5 per year. Msg & data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, HELP for help.");
 
     h.sent.length = 0;
@@ -193,7 +194,7 @@ describe("JOIN by text, end to end (SMS Terms v2)", () => {
     expect(h.sent.length).toBe(before); // no duplicate confirmation while one is waiting
     await t("YES", "SMj2b");
     expect((await promo()).map((r) => r.action)).toEqual(["opt_in"]);
-    expect(h.sent.at(-1)!.body).toBe(v2.PROMO_ENROLLED_SMS);
+    expect(h.sent.at(-1)!.body).toBe(SEASONAL_JOIN_CONFIRM_TEXT);
   });
   it("after STOP, JOIN signs nothing up and sends nothing", async () => {
     await t("STOP", "SMj3");

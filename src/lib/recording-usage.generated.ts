@@ -732,6 +732,9 @@ export const RECORDING_USAGE: Record<string, string[]> = {
  "msg_receipt_subject": [
   "lib/phone-receipt.ts"
  ],
+ "msg_seasonal_join_confirm": [
+  "lib/seasonal-confirm.ts"
+ ],
  "msg_terms_link": [
   "lib/ivr/flow.ts",
   "lib/prompt-status.ts"

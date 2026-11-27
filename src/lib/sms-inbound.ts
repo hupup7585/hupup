@@ -6,7 +6,7 @@ import { getSettings } from "@/lib/settings";
 import { emailIncomingText } from "@/lib/owner-alerts";
 import { cancelQueuedMessages, cancelQueuedPromotions, sendMessage } from "@/lib/sms";
 import { TRANSACTIONAL_CONFIRMATION_SMS } from "@/lib/sms-consent";
-import { PROMO_ENROLLED_SMS, promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
+import { promoConfirmRequestSms, smsTermsV2Active } from "@/lib/sms-terms-v2";
 import { cancelPendingReenroll, handleStart, handleYes, requestPromoConfirmation } from "@/lib/sms-reenroll";
 
 export const STOP_WORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "REVOKE", "OPTOUT"];
@@ -196,12 +196,12 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
     await sendMessage({ to: from, body: TRANSACTIONAL_CONFIRMATION_SMS, kind: "system", event: "consent_confirmation", customerId: customer.id });
   if (effects.sendPromoConfirm && customer)
     await sendMessage({ to: from, body: promoConfirmRequestSms(), kind: "system", event: "promo_confirm_request", customerId: customer.id });
-  if (effects.sendCatalogJoined && customer) {
-    const { CATALOG_JOIN_CONFIRM_DRAFT } = await import("@/lib/catalog-join");
-    await sendMessage({ to: from, body: CATALOG_JOIN_CONFIRM_DRAFT, kind: "system", event: "consent_confirmation", customerId: customer.id });
+  // Abraham, Nov 27, 2026: the approved seasonal offers sign-up confirmation, once per number, also on Shabbes. A JOIN
+  // reply to the catalog text, and a YES that confirms the website sign-up box (or a JOIN / staff request), both join.
+  if ((effects.sendCatalogJoined || effects.sendPromoEnrolled) && customer) {
+    const { sendSeasonalJoinConfirm } = await import("@/lib/seasonal-confirm");
+    await sendSeasonalJoinConfirm(from, { customerId: customer.id });
   }
-  if (effects.sendPromoEnrolled && customer)
-    await sendMessage({ to: from, body: PROMO_ENROLLED_SMS, kind: "system", event: "consent_confirmation", customerId: customer.id });
 
   // Texting CATALOG no longer sends the catalog (Abraham, Nov 24, 2026): it is a normal message in the staff inbox
 

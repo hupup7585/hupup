@@ -221,6 +221,7 @@ export const SYSTEM_EVENTS: Record<string, { afterStop: boolean }> = {
   info_email_alert: { afterStop: false }, // every info@ email, texted to the owner (Abraham, Nov 17, 2026)
   compliance_alert: { afterStop: false }, // compliance report to the owner
   consent_confirmation: { afterStop: false }, // confirmation right after a customer opts in
+  seasonal_join_confirm: { afterStop: false }, // Nov 27, 2026: the approved seasonal offers sign-up confirmation, once per number (src/lib/seasonal-confirm.ts)
   opt_out_confirmation: { afterStop: true }, // the single permitted confirmation of an opt-out
   reenroll_request: { afterStop: true }, // the START confirmation asking the customer to reply YES
   promo_confirm_request: { afterStop: false }, // SMS Terms v2: asks for a YES reply (written promotional consent)
@@ -505,7 +506,7 @@ export const NO_TEXT_CONSENT = "No text consent; call or email.";
 export const TEXTING_NOT_ACTIVE = "Not active yet: waiting for Twilio A2P approval";
 /** Texts to our own staff (not customers): allowed before A2P approval. */
 const STAFF_EVENTS = new Set(["owner_alert", "owner_forward", "compliance_alert", "login_code", "switch_code", "info_email_alert"]);
-const REQUESTED_EVENTS = new Set(["catalog_request", "catalog_reply", "menu_key_request"]); // + a text the caller asked for with a key set in Admin (Nov 26, 2026)
+const REQUESTED_EVENTS = new Set(["catalog_request", "catalog_reply", "menu_key_request", "seasonal_join_confirm"]); // + a text the caller asked for with a key set in Admin (Nov 26, 2026)
 
 const BLOCK_REASON: Record<Blocked, string> = {
   opted_out: "Customer replied STOP. They must text START and reply YES to receive order texts again.",

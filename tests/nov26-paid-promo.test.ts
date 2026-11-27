@@ -30,7 +30,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { handleVoice } from "@/lib/ivr/flow";
 import { PROMPTS } from "@/lib/ivr/prompts";
-import { PROMO_ENROLLED_SMS } from "@/lib/sms-terms-v2";
+import { SEASONAL_JOIN_CONFIRM_TEXT } from "@/lib/seasonal-confirm";
 
 // Line 8 (Abraham, Nov 26, 2026, 15:00 ET, replacing the 09:38 words): no pound key; 1 goes on to the which-number step
 const ASK = "To stay informed, join our seasonal offers by text. You will never miss a deal, a special, or a new rental, with up to 5 messages a year. To sign up, press 1. To stop, you can reply stop at any time.";
@@ -91,10 +91,9 @@ describe("after a paid order", () => {
     expect((await customer()).marketingOptIn).toBe(true);
     // order-text consent unchanged: no transactional row written
     expect((await db.select().from(schema.smsConsents)).filter((r) => r.phone === PHONE && r.scope === "transactional")).toHaveLength(0);
-    // the sign-up confirmation text is switched off until Abraham approves its words (Nov 26, 2026, 3:56 PM ET)
+    // Nov 27, 2026: the approved seasonal offers sign-up confirmation goes out once
     const texts = (await db.select().from(schema.messages)).filter((m) => m.contactPhone === PHONE && m.direction === "out");
-    expect(texts).toEqual([]);
-    expect(PROMO_ENROLLED_SMS).toBeTruthy();
+    expect(texts.map((m) => [m.event, m.body])).toEqual([["seasonal_join_confirm", SEASONAL_JOIN_CONFIRM_TEXT]]);
   });
   it("pound (any other key): on to the goodbye, no change", async () => {
     const xml = await call("promo-consent-answer", { Digits: "#" });

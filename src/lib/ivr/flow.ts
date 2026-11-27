@@ -1797,13 +1797,14 @@ async function deliverPayLink(ctx: Ctx, orderId: number, via: { phone?: string; 
  * chosen), the one sign-up confirmation text goes out, then the joined line and Line 7. A number that replied STOP
  * stays blocked (only START and YES undo it).
  */
-/** Line 8's sign-up confirmation text: off until Abraham approves the exact words (then set to true). */
-export const PHONE_PROMO_TEXT_APPROVED = false;
+/** Line 8's sign-up confirmation text: approved word for word and switched on (Abraham, Nov 27, 2026). */
+export const PHONE_PROMO_TEXT_APPROVED = true;
 
 async function promoJoin(ctx: Ctx, vr: VR, to: string) {
   const caller = toE164(ctx.from);
   const wording = promptText(ctx.prompts, "paid_promo_offer");
   const chosen = to === caller ? "the number calling (pressed 1)" : "a different number, entered and confirmed (pressed 2, then 1)";
+  const alreadySignedUp = Boolean((await customerByPhone(to))?.marketingOptIn); // already signed up = no second text
   try {
     await recordConsent({
       phone: to,
@@ -1824,10 +1825,10 @@ async function promoJoin(ctx: Ctx, vr: VR, to: string) {
     return back(vr, "goodbye");
   }
   await track(ctx.callSid, "step", `Seasonal offers: joined after a paid order (${to === caller ? "number calling" : "entered number"})`, { phone: to });
-  // The one sign-up confirmation text: switched OFF until Abraham approves its exact words (Hark, Nov 26, 2026, 3:56 PM)
+  // The one sign-up confirmation text (Abraham, Nov 27, 2026: approved word for word, sent once, also on Shabbes)
   if (PHONE_PROMO_TEXT_APPROVED) {
-    const { PROMO_ENROLLED_SMS } = await import("@/lib/sms-terms-v2");
-    await sendMessage({ to, body: PROMO_ENROLLED_SMS, kind: "system", event: "consent_confirmation", customerId: (await customerByPhone(to))?.id ?? null, callSid: ctx.callSid });
+    const { sendSeasonalJoinConfirm } = await import("@/lib/seasonal-confirm");
+    await sendSeasonalJoinConfirm(to, { customerId: (await customerByPhone(to))?.id ?? null, callSid: ctx.callSid, alreadySignedUp });
   } else await track(ctx.callSid, "step", "Seasonal offers: confirmation text not sent (its wording waits for Abraham's approval)", { phone: to });
   sp(vr, ctx, "promo_joined");
   return back(vr, "goodbye"); // Line 7, then the call ends

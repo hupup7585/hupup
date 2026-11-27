@@ -32,6 +32,7 @@ import { db, schema } from "@/lib/db";
 import { handleVoice } from "@/lib/ivr/flow";
 import { PROMPTS } from "@/lib/ivr/prompts";
 import { saveSetting } from "@/lib/settings";
+import { SEASONAL_JOIN_CONFIRM_TEXT } from "@/lib/seasonal-confirm";
 
 const CALLER = "+18455550611";
 const call = (action: string, body: Record<string, string> = {}, q = "") =>
@@ -116,7 +117,7 @@ describe("Line 8: seasonal offers by text after a paid order", () => {
     expect(row).toMatchObject({ scope: "marketing", action: "opt_in", source: "phone", method: "keypad", wording: LINE8, callerPhone: CALLER, callSid: "CAPROMO" });
     expect(row.response).toContain("phone after paid order");
     expect(row.response).toContain("a different number");
-    expect(h.sent).toEqual([]); // the confirmation text is switched off until Abraham approves its words
+    expect(h.sent).toEqual([{ to: OTHER, body: SEASONAL_JOIN_CONFIRM_TEXT }]); // Nov 27, 2026: the approved text, once
   });
   it("press 1 -> the number calling -> step 3 -> Line 7; opt-in row with time, source and the exact step 1 words", async () => {
     const before = Date.now() - 1000;
@@ -129,7 +130,7 @@ describe("Line 8: seasonal offers by text after a paid order", () => {
     expect(row.createdAt.getTime()).toBeGreaterThanOrEqual(before);
     const [c] = await db.select().from(schema.customers).where(eq(schema.customers.id, customerId));
     expect(c.marketingOptIn).toBe(true);
-    expect(h.sent).toEqual([]); // confirmation text off until approved
+    expect(h.sent).toEqual([{ to: CALLER, body: SEASONAL_JOIN_CONFIRM_TEXT }]); // Nov 27, 2026: the approved text, once
   });
   it("a caller already signed up skips straight to the goodbye", async () => {
     expect(redirect(await call("promo-consent"))).toBe("goodbye");
@@ -144,14 +145,14 @@ describe("Line 8: seasonal offers by text after a paid order", () => {
     expect(await db.select().from(schema.smsConsents).where(eq(schema.smsConsents.phone, blocked))).toEqual([]);
     expect(h.sent).toEqual([]);
   });
-  it("the confirmation text stays off until Abraham approves its words", async () => {
+  it("the confirmation text is switched on (Abraham approved its words, Nov 27, 2026)", async () => {
     const { PHONE_PROMO_TEXT_APPROVED } = await import("@/lib/ivr/flow");
-    expect(PHONE_PROMO_TEXT_APPROVED).toBe(false);
+    expect(PHONE_PROMO_TEXT_APPROVED).toBe(true);
   });
   it("the confirmation text is the sign-up confirmation (a system text the caller asked for on this call, sent right away), never a promotion held for quiet hours; Shabbes and Yom Tov: the phone line is closed, so no paid order and no sign-up can happen then", () => {
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
     const join = flow.slice(flow.indexOf("async function promoJoin"), flow.indexOf("function txPurpose"));
-    expect(join).toContain('kind: "system", event: "consent_confirmation"');
+    expect(join).toContain("sendSeasonalJoinConfirm(to,"); // kind "system", event "seasonal_join_confirm" (src/lib/seasonal-confirm.ts)
     expect(join).not.toContain('kind: "marketing"');
   });
   it("both slots are in Admin with their labels; the screen explanation describes the new keys", () => {
