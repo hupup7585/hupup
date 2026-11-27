@@ -26,6 +26,8 @@ const payUrl = (action: string, q: Record<string, string | number>) => `${config
 
 /** Token for the follow-up steps on this payment leg (order + the subaccount's call). */
 const tok = (orderId: number, sid: string) => createHmac("sha256", signingSecret()).update(`pay-leg:${orderId}:${sid}`).digest("hex").slice(0, 32);
+/** Extra check HS4: the charged amount in the result address, signed (it can't be changed on the way). */
+const amountTok = (orderId: number, sid: string, cents: number) => createHmac("sha256", signingSecret()).update(`pay-amount:${orderId}:${sid}:${cents}`).digest("hex").slice(0, 32);
 function tokOk(orderId: number, sid: string, t: string | null) {
   if (!t) return false;
   const a = Buffer.from(tok(orderId, sid));
@@ -67,7 +69,8 @@ async function payTwiml(vr: VR, orderId: number, sid: string, tries: number, pro
     maxAttempts: 2,
     timeout: 10,
     description: `${BUSINESS_NAME} order #${orderNumber(orderId)}`,
-    action: payUrl("result", { o: orderId, n: tries, t: tok(orderId, sid) }),
+    // Extra check HS4 (Nov 27, 2026): the amount charged goes with the result (signed), so that amount is what is recorded
+    action: payUrl("result", { o: orderId, n: tries, t: tok(orderId, sid), c: due, cs: amountTok(orderId, sid, due) }),
   });
   pay.prompt({ for: "payment-card-number" }).say(voice(), line(prompts, "pay_card_number"));
   pay.prompt({ for: "expiration-date" }).say(voice(), line(prompts, "pay_expiration"));
@@ -163,7 +166,9 @@ export async function handlePayVoice(action: string, query: URLSearchParams, bod
         ? await db.update(schema.orders).set({ stripePaymentId: code }).where(and(inArray(schema.orders.id, ids), isNull(schema.orders.stripePaymentId))).returning({ id: schema.orders.id })
         : [];
       if (claimed.length && group) {
-        const cents = group.due;
+        // the amount charged (signed with the result address); the amount due now only when the address has none
+        const charged = Number(query.get("c"));
+        const cents = Number.isInteger(charged) && charged > 0 && amountTok(orderId, sid, charged) === query.get("cs") ? charged : group.due;
         await markGroupPaid(orderId, cents, "stripe", null);
         await recordPaymentResult(ids, "approved", last4, code);
         // Abraham: once approved, the receipt replaces the short "payment received" email (not both)

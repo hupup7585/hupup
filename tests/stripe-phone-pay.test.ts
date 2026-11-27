@@ -139,6 +139,22 @@ describe("the payment subaccount: Twilio <Pay> through Stripe", () => {
     expect((await order(orderId)).paidCents).toBe(23247);
     expect(h.emails.filter((e) => e.to === "caller@example.com")).toHaveLength(1);
   });
+  it("extra check HS4: the amount charged is what is recorded, even when the hold was released while the card was keyed", async () => {
+    const xml = await sub("incoming", sipHeaders(paySipUri(orderId, "CAmain")));
+    const action = new URL((xml.match(/<Pay [^>]*action="([^"]+)"/)![1]).replace(/&amp;/g, "&"));
+    expect(action.searchParams.get("c")).toBe("23247");
+    // released while the card was being keyed: nothing is "due" any more
+    await db.update(schema.orders).set({ status: "CANCELLED", holdExpiresAt: null }).where(eq(schema.orders.id, orderId));
+    await sub("result", { Result: "success", PaymentConfirmationCode: "ch_HS4", PaymentCardNumber: "xxxx-xxxx-xxxx-4242" }, action.searchParams.toString());
+    expect((await order(orderId)).paidCents).toBe(23247);
+  });
+  it("extra check HS4: a changed amount in the address is not trusted", async () => {
+    const xml = await sub("incoming", sipHeaders(paySipUri(orderId, "CAmain")));
+    const action = new URL((xml.match(/<Pay [^>]*action="([^"]+)"/)![1]).replace(/&amp;/g, "&"));
+    action.searchParams.set("c", "1");
+    await sub("result", { Result: "success", PaymentConfirmationCode: "ch_HS4b", PaymentCardNumber: "xxxx-xxxx-xxxx-4242" }, action.searchParams.toString());
+    expect((await order(orderId)).paidCents).toBe(23247); // the amount due, not the changed one
+  });
   it("declined: recorded with last 4, then 1 tries again or 2 gets the Sola link by email", async () => {
     const t = _payLegToken(orderId, "CApay");
     const xml = await sub("result", { Result: "payment-connector-error", PaymentError: "card_declined", PaymentCardNumber: "xxxx-xxxx-xxxx-0002" }, `o=${orderId}&n=1&t=${t}`);
