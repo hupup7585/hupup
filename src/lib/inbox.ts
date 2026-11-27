@@ -407,10 +407,18 @@ export async function sendScheduledEmails(now = new Date()) {
   const due = await db.select().from(d).where(and(isNull(d.discardedAt), isNull(d.sentReplyId), sql`${d.sendAt} IS NOT NULL AND ${d.sendAt} <= ${now}`));
   let sent = 0;
   for (const x of due) {
+    // Deep check 17 (Nov 27, 2026): two runs at once could both send it. The draft is claimed first in one step (its
+    // send time taken off, only if still unsent and still at that time); a run that loses the claim skips it.
+    const [claimed] = await db
+      .update(d)
+      .set({ sendAt: null, sendError: "Sending now (if this stays, it may not have been sent: check Sent)" })
+      .where(and(eq(d.id, x.id), isNull(d.sentReplyId), isNull(d.discardedAt), sql`${d.sendAt} = ${x.sendAt}`))
+      .returning({ id: d.id });
+    if (!claimed) continue;
     try {
       const r = await sendNewEmail({ to: x.toAddress, subject: x.subject, body: x.body, fileIds: x.fileIds ?? [], userId: x.userId, forwardOf: x.forwardOfEmailId, attachCatalog: x.attachCatalog, bodyHtml: x.bodyHtml });
       if (r.sent) {
-        await db.update(d).set({ sentReplyId: r.id, sendError: null }).where(eq(d.id, x.id));
+        await db.update(d).set({ sentReplyId: r.id, sendError: null, sendAt: x.sendAt }).where(eq(d.id, x.id));
         sent++;
       } else await db.update(d).set({ sendAt: null, sendError: r.error ?? "not sent" }).where(eq(d.id, x.id));
     } catch (e) {
