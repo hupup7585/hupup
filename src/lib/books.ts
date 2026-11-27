@@ -364,13 +364,29 @@ export function agingBucket(due: string, today = todayISO()): "current" | "1-30"
 }
 
 /** Next date of a recurring expense. */
-export function nextRecurring(date: string, frequency: string) {
+export function nextRecurring(date: string, frequency: string, anchorDay?: number) {
   const d = new Date(`${date}T12:00:00Z`);
-  if (frequency === "weekly") d.setUTCDate(d.getUTCDate() + 7);
-  else if (frequency === "quarterly") d.setUTCMonth(d.getUTCMonth() + 3);
-  else if (frequency === "yearly") d.setUTCFullYear(d.getUTCFullYear() + 1);
-  else d.setUTCMonth(d.getUTCMonth() + 1);
-  return d.toISOString().slice(0, 10);
+  if (frequency === "weekly") {
+    d.setUTCDate(d.getUTCDate() + 7);
+    return d.toISOString().slice(0, 10);
+  }
+  // Deep check 0600 M29 (Nov 27, 2026): monthly, quarterly and yearly keep their own day of the month (the day the
+  // expense was first set for), or the month's last day when the month is shorter: Jan 31, Feb 28, Mar 31 (it used to
+  // run over into the next month and drift: Jan 31, Mar 3)
+  const months = frequency === "quarterly" ? 3 : frequency === "yearly" ? 12 : 1;
+  const total = d.getUTCFullYear() * 12 + d.getUTCMonth() + months;
+  const y = Math.floor(total / 12);
+  const m = total % 12;
+  const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const day = Math.min(anchorDay && anchorDay >= 1 && anchorDay <= 31 ? anchorDay : d.getUTCDate(), last);
+  return `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** The day of the month a recurring expense was first set for (from its "added" record), for nextRecurring. */
+export async function recurringAnchorDay(recurringId: number): Promise<number | undefined> {
+  const [row] = (await db.execute(sql`SELECT after->>'nextDate' AS d FROM audit_log WHERE action = 'books.recurring_added' AND entity_id = ${String(recurringId)} ORDER BY id LIMIT 1`)).rows as { d: string | null }[];
+  const day = row?.d ? Number(String(row.d).slice(8, 10)) : NaN;
+  return Number.isFinite(day) && day > 0 ? day : undefined;
 }
 
 /**

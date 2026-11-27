@@ -249,19 +249,24 @@ export async function recordRecurringAction(f: FormData) {
     // Deep check A10 (Nov 27, 2026): never after it was stopped, and a double click records it once: the next date
     // moves on first, only if it is still the date read here
     if (!r.active) throw new BooksError("This recurring expense was stopped. Nothing was recorded.");
-    const next = nextRecurring(r.nextDate, r.frequency);
-    const [claimed] = await db
-      .update(schema.bookRecurring)
-      .set({ nextDate: next })
-      .where(and(eq(schema.bookRecurring.id, r.id), eq(schema.bookRecurring.nextDate, r.nextDate), eq(schema.bookRecurring.active, true)))
-      .returning({ id: schema.bookRecurring.id });
-    if (!claimed) throw new BooksError("This one was already recorded. Reload the page.");
-    if (s(f, "as") === "bill") {
-      const [b] = await db.insert(schema.bookBills).values({ vendor: r.vendor, category: r.category, billDate: r.nextDate, dueDate: r.nextDate, amountCents: r.amountCents, recurringId: r.id, createdBy: userId }).returning();
-      await bookAudit(userId, "bill_added", "book_bill", b.id, { fromRecurring: r.id });
-    } else {
-      await addEntry({ entryDate: r.nextDate <= todayISO() ? r.nextDate : todayISO(), kind: "expense", category: r.category, amountCents: r.amountCents, method: r.method, party: r.vendor, notes: `Recurring (${r.frequency})` }, userId);
-    }
+    const { recurringAnchorDay } = await import("@/lib/books");
+    const next = nextRecurring(r.nextDate, r.frequency, await recurringAnchorDay(r.id));
+    // Deep check 0600 M30: moving the date and recording the bill or expense are one step: if the entry can't be saved
+    // (for example a locked month), the date stays and nothing is skipped
+    await db.transaction(async (tx) => {
+      const [claimed] = await tx
+        .update(schema.bookRecurring)
+        .set({ nextDate: next })
+        .where(and(eq(schema.bookRecurring.id, r.id), eq(schema.bookRecurring.nextDate, r.nextDate), eq(schema.bookRecurring.active, true)))
+        .returning({ id: schema.bookRecurring.id });
+      if (!claimed) throw new BooksError("This one was already recorded. Reload the page.");
+      if (s(f, "as") === "bill") {
+        const [b] = await tx.insert(schema.bookBills).values({ vendor: r.vendor, category: r.category, billDate: r.nextDate, dueDate: r.nextDate, amountCents: r.amountCents, recurringId: r.id, createdBy: userId }).returning();
+        await bookAudit(userId, "bill_added", "book_bill", b.id, { fromRecurring: r.id }, tx);
+      } else {
+        await addEntry({ entryDate: r.nextDate <= todayISO() ? r.nextDate : todayISO(), kind: "expense", category: r.category, amountCents: r.amountCents, method: r.method, party: r.vendor, notes: `Recurring (${r.frequency})` }, userId, tx);
+      }
+    });
     await bookAudit(userId, "recurring_recorded", "book_recurring", r.id, { next });
     return `Recorded ${r.vendor}. Next one: ${next}.`;
   });
