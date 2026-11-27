@@ -67,9 +67,9 @@ describe("deep check 09:00 P16: Saturday-night hours", () => {
   });
 
   it("a line with no Saturday hours and its after-hours switch on still never rings on Saturday night", async () => {
-    await saveSetting("ringAfterHours6", "true");
+    await saveSetting("ringAfterHours6", true);
     await saveSetting("ringTargets6", "Yoel | +18455550125 | 25");
     expect(rings(await ringAt("6", SAT_NIGHT))).toBe(false);
-    await saveSetting("ringAfterHours6", "");
+    await saveSetting("ringAfterHours6", false);
   });
 });
