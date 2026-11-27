@@ -69,3 +69,27 @@ describe("deep check A14: a Sola void after a refund", () => {
     expect(o.refundedCents).toBe(12975);
   });
 });
+
+describe("deep check 15a: refunded at the card company, then the save fails", () => {
+  it("never says nothing was refunded; the row keeps the refund id; a second refund is not allowed by mistake", async () => {
+    const id = await mkOrder("15A-1");
+    const { vi: v } = await import("vitest");
+    const real = db.update.bind(db);
+    let fail = true;
+    const spy = v.spyOn(db, "update").mockImplementation(((t: unknown) => {
+      if (t === schema.orders && fail) {
+        fail = false;
+        throw new Error("database went away");
+      }
+      return real(t as never);
+    }) as never);
+    await expect(refundOrder(id, 1000, 1, solaOk())).rejects.toThrow(/went through/);
+    spy.mockRestore();
+    const rows = await db.select().from(schema.orderRefunds).where(eq(schema.orderRefunds.orderId, id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("succeeded");
+    expect(rows[0].stripeRefundId).toMatch(/^sola:/);
+    expect(rows[0].error).toMatch(/not fully saved/);
+    await expect(refundOrder(id, 12975, 1, solaOk())).rejects.toThrow(/At most \$119\.75/);
+  });
+});
