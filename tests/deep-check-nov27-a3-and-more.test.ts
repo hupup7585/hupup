@@ -43,14 +43,15 @@ describe("deep check Nov 27", () => {
     const read = (f: string) => readFileSync(f, "utf8");
     expect(read("src/lib/stripe-ops.ts")).toContain('event.type === "refund.created"');
     expect(read("src/lib/sms.ts")).toContain("async function claimHeld(");
-    expect(read("src/lib/inbox.ts")).toContain("claimed first (its send time cleared)");
+    expect(read("src/lib/inbox.ts")).toContain("The draft is claimed first in one step"); // Admin session's version (tests/deep-check-17-inbox.test.ts)
     expect(read("src/app/api/preview/email-sender-check/route.ts")).toContain('role !== "owner"');
     expect(read("scripts/migrate.ts")).toContain("async function reportSkipped(");
     const flow = read("src/lib/ivr/flow.ts");
     expect(flow).toContain("UPDATE call_sessions SET data = jsonb_set(data, '{staffLegs}'");
     expect(flow).toContain("timerStaffAcceptAgain ?? 6) + 10");
     expect(read("src/lib/stripe-pay-voice.ts")).toContain("no new card try once the Shabbes / Yom Tov cut-off");
-    expect(read("src/app/api/cron/release-holds/route.ts")).toContain("{ record: false }");
+    // Admin session's version: the Sent copy is kept (Abraham's rule) without the backup file (tests/deep-check-30-sent-copies.test.ts)
+    expect(read("src/app/api/cron/release-holds/route.ts")).toContain('{ kind: "backup" }');
     expect(read("src/lib/system-status.ts")).toContain("active: sttActive(env)");
   });
 });

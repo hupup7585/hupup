@@ -602,17 +602,17 @@ const OTHER: Record<string, Explanation> = {
   sameDayHoursClose: {
     what: "How long a same-day delivery takes close by, in hours from-to (2.5-3.5 means about two and a half to three and a half hours).",
     where: "The same-day delivery notice on the phone, right after a close-by address is saved.",
-    ifChanged: "Callers close by hear the new time.",
+    ifChanged: "Nothing today (deep check 31, Nov 27, 2026): since Nov 27 the same-day notice is one of the two approved versions by customer service hours, the same for every area, so this setting is not read. It is kept in case Abraham wants areas again.",
   },
   sameDayHoursFar: {
     what: "How long a same-day delivery takes in the surrounding areas, in hours from-to (3.5-4.5 means about three and a half to four and a half hours).",
     where: "The same-day delivery notice on the phone, right after an address in a surrounding area is saved.",
-    ifChanged: "Callers in the surrounding areas hear the new time.",
+    ifChanged: "Nothing today (deep check 31, Nov 27, 2026): since Nov 27 the same-day notice is one of the two approved versions by customer service hours, the same for every area, so this setting is not read. It is kept in case Abraham wants areas again.",
   },
   sameDayCloseAreas: {
     what: "Which delivery map areas count as close by for the same-day notice, one area name per line, exactly as on the Delivery areas map. Empty means only the Kiryas Joel zone; every other area is a surrounding area.",
     where: "The same-day delivery notice on the phone.",
-    ifChanged: "Callers in the listed areas hear the close-by time; everyone else hears the surrounding-area time.",
+    ifChanged: "Nothing today (deep check 31, Nov 27, 2026): since Nov 27 the same-day notice is one of the two approved versions by customer service hours, the same for every area, so this setting is not read. It is kept in case Abraham wants areas again.",
   },
   recordingLinks: {
     what: "Which settings and prices are spoken inside which recordings (for example the ocean ball prices inside the ocean ball lines). When one of them is saved with a new value, those recordings are marked \"Needs a new recording\", their text gets a draft with the new value, a red banner lists them, and the Owner gets an email.",
