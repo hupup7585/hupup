@@ -524,7 +524,9 @@ export function makeVmHandlers(h: VmHelpers): Record<string, (ctx: Ctx, vr: VR) 
         .values({ boxId: Number(pr.to), callSid: ctx.callSid, fromNumber: null, recordingSid: ctx.body.RecordingSid, recordingUrl: ctx.body.RecordingUrl, durationSec: Number(ctx.body.RecordingDuration || 0), transcriptionStatus: "off", state: "reviewing", fromBoxId: ownBox(ctx) })
         .onConflictDoNothing({ target: schema.voicemails.recordingSid })
         .returning();
-      return h.back(vr, "vm-rec-review", { ...pr, id: row?.id });
+      // Extra check I3 (Nov 27, 2026): a repeated Twilio callback for the same recording finds the saved message
+      const id = row?.id ?? (await db.select({ id: schema.voicemails.id }).from(schema.voicemails).where(eq(schema.voicemails.recordingSid, ctx.body.RecordingSid)).limit(1))[0]?.id;
+      return h.back(vr, "vm-rec-review", { ...pr, id });
     },
     "vm-rec-review"(ctx, vr) {
       const pr = { to: q(ctx, "to"), k: q(ctx, "k"), b: q(ctx, "b"), m: q(ctx, "m"), v: q(ctx, "v"), id: q(ctx, "id") };
