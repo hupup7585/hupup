@@ -62,3 +62,18 @@ describe("delivery statuses", () => {
     expect(await stageAction(orderId, "pickup", "out_for_pickup")).toEqual({ ok: false, message: "This stop isn't assigned to you." });
   });
 });
+
+describe("deep check 0600 M55: Delivered on the driver screen", () => {
+  it("a stop more than a day ahead is refused; a double click records it once", async () => {
+    const { addDays, todayISO } = await import("@/lib/dates");
+    const far = addDays(todayISO(), 5);
+    const [f] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: far, pickupDate: far, deliveryDriverId: moshe }).returning();
+    expect((await markDoneAction(f.id, "delivery")).message).toMatch(/It can be marked delivered from the day before/);
+    const t = todayISO();
+    const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: t, pickupDate: t, deliveryDriverId: moshe }).returning();
+    const r = await Promise.all([markDoneAction(o.id, "delivery"), markDoneAction(o.id, "delivery")]);
+    expect(r.filter((x) => x.ok)).toHaveLength(1);
+    const logs = (await db.select().from(schema.auditLog)).filter((a) => a.action === "delivery.delivered" && a.entityId === String(o.id));
+    expect(logs).toHaveLength(1);
+  });
+});
