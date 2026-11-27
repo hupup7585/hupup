@@ -4323,7 +4323,15 @@ const handlers: Record<string, Handler> = {
     const caller = ctx.session?.fromNumber ?? ctx.from;
     const settings = await getSettings();
     // Delivery fee by the price map (Abraham, Nov 15, 2026); no price = never guessed
-    const quote = await deliveryQuote(data.address, settings);
+    // Code audit L11 (Nov 24, 2026): the fee is checked for the first delivery day, so a date-based offer is right
+    const quote = await deliveryQuote(data.address, settings, fetch, days[0]?.order.eventDate ?? new Date());
+    if (!quote.ok && quote.reason === "not_found") {
+      // Code audit M10: an address the map could not find is not "outside the area". The approved addr_not_found line,
+      // then only the street is asked again (house number, unit and zip are kept), as in the address steps.
+      await updateSession(ctx.callSid, { data: { street: undefined, town: undefined, address: undefined, dirArea: undefined, dirPick: undefined } }, ctx.session);
+      sp(vr, ctx, "addr_not_found");
+      return back(vr, "addr-street");
+    }
     if (!quote.ok) {
       return back(vr, "addr-outside"); // Batch 2 item 6: approved addr_outside line
     }
