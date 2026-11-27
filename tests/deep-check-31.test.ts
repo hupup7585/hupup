@@ -6,7 +6,7 @@ describe("deep check 31", () => {
   it("System status shows speech to text as Abraham turned it on (live with its keys)", async () => {
     const { blockers } = await import("@/lib/system-status").catch(() => ({ blockers: null }));
     const src = readFileSync("src/lib/system-status.ts", "utf8");
-    expect(src).toMatch(/key: "speech-text",[\s\S]{0,200}active: sttActiveNow\(env\)/);
+    expect(src).toMatch(/key: "speech-text",[\s\S]{0,200}active: sttActive\(env\)/);
     expect(blockers).toBeTruthy();
   });
   it("Open in Google Sheets is never greyed out; it says what is missing", () => {

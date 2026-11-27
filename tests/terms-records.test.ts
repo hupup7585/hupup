@@ -31,7 +31,7 @@ describe("Terms acceptance records", () => {
     expect(flow).toContain("callerPhone: toE164(ctx.from)");
     expect(flow).toContain("callSid: ctx.callSid,");
     const pay = readFileSync("src/app/pay/[orderId]/actions.ts", "utf8");
-    expect(pay).toContain('for (const day of group.orders.filter((x) => x.order.status === "PENDING_PAYMENT")) {');
+    expect(pay).toContain('const pendingDays = group.orders.filter((x) => x.order.status === "PENDING_PAYMENT");\n  for (const day of pendingDays) {');
     expect(pay).toContain('ip: (h.get("x-forwarded-for")');
     const pos = readFileSync("src/app/admin/(app)/pos/actions.ts", "utf8");
     expect(pos).toContain('ip: (reqHeaders.get("x-forwarded-for")');

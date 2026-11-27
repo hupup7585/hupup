@@ -5,7 +5,7 @@ import { linkPaymentToAcceptance } from "@/lib/rental-terms";
 import { parseMoneyToCents } from "@/lib/money";
 import { alertOwner, withCallbackAlert } from "@/lib/ops-alerts";
 import { sql } from "drizzle-orm";
-import { db } from "@/lib/db";
+import { db, schema } from "@/lib/db";
 
 /**
  * A payment Sola already told us about (gap review, Nov 26, 2026): any earlier approved notice with the same Sola
@@ -54,7 +54,11 @@ async function handle(req: Request): Promise<Response> {
     if (!orderId) return new Response("ignored (no invoice)");
     const group = await getPaymentGroup(orderId);
     if (!group) return new Response("unknown order", { status: 404 });
-    await recordPaymentResult(group.orders.map((d) => d.order.id), "declined", last4Of(fields), field(fields, "xRefNum") || null);
+    // Deep check Nov 27 #23: a decline never overwrites "Paid" on a day already paid (a second try on another card, or
+    // a late notice); it is marked only on the days still waiting, and always kept in the activity log
+    const waitingIds = group.orders.filter((d) => d.order.paymentResult !== "approved" && d.order.status === "PENDING_PAYMENT").map((d) => d.order.id);
+    if (waitingIds.length) await recordPaymentResult(waitingIds, "declined", last4Of(fields), field(fields, "xRefNum") || null);
+    else await db.insert(schema.auditLog).values({ action: "payment.declined", entityType: "order", entityId: String(orderId), after: { orders: [], note: "declined notice on an order already paid or not waiting; order unchanged", solaRef: field(fields, "xRefNum") || null } });
     return new Response("ok (declined)");
   }
   if (!isApproved(fields)) return new Response("ignored (not approved)");
@@ -76,15 +80,20 @@ async function handle(req: Request): Promise<Response> {
   }
   const before = group.primary;
   const days = group.orders;
+  // Deep check Nov 27 #7: a payment saved halfway before (same reference, order still waiting) is finished now, with
+  // its paid notice, as if new
+  const ref = field(fields, "xRefNum") || null;
+  const resumed = Boolean(ref) && before.order.solaRefNum === ref && ["PENDING_PAYMENT", "HOLD", "CANCELLED"].includes(before.order.status);
+  const fresh = before.order.solaRefNum !== ref || resumed;
   const updated = await markGroupPaid(orderId, cents, "sola", field(fields, "xRefNum") || null);
   await recordPaymentResult(days.map((d) => d.order.id), "approved", last4Of(fields), field(fields, "xRefNum") || null);
-  if (!updated.length && before.order.solaRefNum !== field(fields, "xRefNum")) return new Response("unknown order", { status: 404 });
+  if (!updated.length && fresh) return new Response("unknown order", { status: 404 });
   // Evidence: tie this payment to the rental terms version the customer accepted (or record that none was).
-  if (before.order.solaRefNum !== field(fields, "xRefNum")) await linkPaymentToAcceptance(orderId, field(fields, "xRefNum") || null, cents);
+  if (fresh) await linkPaymentToAcceptance(orderId, field(fields, "xRefNum") || null, cents);
 
   // The "paid" notice only when the booking is now confirmed (Audit C1: never for less than the total)
   // Hark's backend list 2 (Nov 26, 2026): money on an order that was already paid in full sends the customer nothing
   // (the Owner is emailed to refund it)
-  if (!group.paid && before.order.solaRefNum !== field(fields, "xRefNum") && updated.some((u) => u.status === "CONFIRMED")) await paymentReceivedNotices(orderId, cents);
+  if ((!group.paid || resumed) && fresh && updated.some((u) => u.status === "CONFIRMED")) await paymentReceivedNotices(orderId, cents);
   return new Response("ok");
 }

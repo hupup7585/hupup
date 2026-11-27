@@ -4,7 +4,7 @@ import { prefillFor } from "@/lib/pay-prefill";
 import { paymentsClosedLine } from "@/lib/payments-closed";
 import { notFound, redirect } from "next/navigation";
 import { PAYMENT_UNAVAILABLE, onlinePaymentReady, paymentLink } from "@/lib/sola";
-import { getPaymentGroup, orderNumber } from "@/lib/orders";
+import { getPaymentGroup, orderNumber, payingDays } from "@/lib/orders";
 import { ensureGroupPriced } from "@/lib/order-pricing";
 import { termsActive, verifyPayToken } from "@/lib/rental-terms";
 import PayForm from "./PayForm";
@@ -12,7 +12,7 @@ import { getSettings, linkHoldMinutes } from "@/lib/settings";
 import { webConsentCopy } from "@/lib/sms-terms-v2";
 import { smsNumberDisplay } from "@/lib/sms-number";
 import DualDate from "@/components/DualDate";
-import { LINK_TEXT, linkHoldKindOf, holdEnded, holdForCardPage, keepHoldWhileActive, linkOptionsActive, linkRulesActive, removedWithOptions } from "@/lib/late-payment";
+import { LINK_TEXT, linkHoldKindOf, linkExpired, holdForCardPage, keepHoldWhileActive, linkOptionsActive, linkRulesActive, removedWithOptions } from "@/lib/late-payment";
 import { checkAgainAction, chooseOptionAction } from "./actions";
 import { orderIdFromParam } from "@/lib/order-path";
 import { BREAKDOWN_LABELS, DELIVERY_SENTENCE, payBreakdown, pickupSentence } from "@/lib/pay-breakdown";
@@ -60,8 +60,8 @@ export default async function PayPage({ params, searchParams }: { params: Promis
     );
   // The link rule (Abraham, Nov 13, 2026; preview until he approves the wording)
   const rules = linkRulesActive();
-  if (rules && before.orders.some((d) => holdEnded(d.order))) {
-    const count = before.orders.reduce((n, d) => n + d.items.reduce((m, i) => m + i.qty, 0), 0);
+  if (rules && (await linkExpired(before.orders))) {
+    const count = payingDays(before.orders, before.primary).reduce((n, d) => n + d.items.reduce((m, i) => m + i.qty, 0), 0);
     return (
       <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">
         <div className="mx-auto max-w-md rounded-2xl border-2 border-hu-deep bg-white p-6" data-link-expired>
@@ -79,7 +79,10 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   const group = await getPaymentGroup(id);
   if (!group) notFound();
   const full = group.primary;
-  const o = full.order;
+  // Deep check Nov 27 #3/#24: the days being paid for (a day cancelled with nothing paid is not listed); the first day
+  // still waiting decides the hold shown, so a cancelled first day never blocks paying for the others
+  const days = payingDays(group.orders, full);
+  const o = (days.find((d) => d.order.status === "PENDING_PAYMENT") ?? full).order;
   const due = group.due; // every rental day booked together, one charge
   // Items someone else booked (taken out when the customer checked availability again), with their nearest options
   const removed = rules && linkOptionsActive() ? await removedWithOptions(id) : [];
@@ -87,11 +90,11 @@ export default async function PayPage({ params, searchParams }: { params: Promis
   // Live site while the Terms are still a draft: no Terms box, straight to the secure payment page (as before)
   if (!termsActive() && o.status === "PENDING_PAYMENT" && due > 0) {
     if (rules) await holdForCardPage(group.orders.map((d) => d.order.id)); // straight to the card page: 10 minutes there
-    const link = paymentLink({ orderId: o.id, amountCents: due, prefill: prefillFor(full, group.orders, `#${orderNumber(o.id)}`) });
+    const link = paymentLink({ orderId: full.order.id, amountCents: due, prefill: prefillFor(full, days, `#${orderNumber(full.order.id)}`) });
     if (link) redirect(link);
   }
   // Same-day orders (Abraham, Nov 27, 2026, 12:47 AM): the same notice as the phone, by customer service hours
-  const sameDay = await (await import("@/lib/same-day-notice")).sameDayNoticeText(group.orders.map((d) => d.order.eventDate));
+  const sameDay = await (await import("@/lib/same-day-notice")).sameDayNoticeText(days.map((d) => d.order.eventDate));
   const breakdown = payBreakdown(group.orders);
   const pickupLine = pickupSentence(group.orders.filter((d) => d.order.status !== "CANCELLED").map((d) => d.order), (await getSettings()) as never);
   return (
