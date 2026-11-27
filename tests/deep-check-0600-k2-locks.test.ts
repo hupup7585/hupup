@@ -37,3 +37,15 @@ describe("K2: one lock step for items, their stock group and the laser pools", (
     }
   });
 });
+
+describe("deep check 06:00 M67: a skipped database update emails the Owner once per new list", () => {
+  it("the build script records the list and alerts only when it changed; its SQL runs on the real schema", async () => {
+    const src = readFileSync("scripts/migrate.ts", "utf8");
+    expect(src).toContain("if (last?.tags !== tags)");
+    expect(src).toContain('alertOwner("database updates were skipped by a deploy"');
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql.raw(`INSERT INTO audit_log (action, entity_type, entity_id, after) VALUES ('deploy.migrations_skipped', 'system', '0', '{"tags":"0075_phonepay_limits"}')`));
+    const r = await db.execute(sql.raw(`SELECT after->>'tags' AS tags FROM audit_log WHERE action = 'deploy.migrations_skipped' ORDER BY id DESC LIMIT 1`));
+    expect((r.rows[0] as { tags: string }).tags).toBe("0075_phonepay_limits");
+  });
+});

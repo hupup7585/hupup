@@ -37,7 +37,18 @@ async function reportSkipped(pool: Pool) {
     const journal = JSON.parse(readFileSync("./drizzle/meta/_journal.json", "utf8")).entries as { tag: string }[];
     const done = new Set((await pool.query(`SELECT hash FROM drizzle.__drizzle_migrations`)).rows.map((r: { hash: string }) => r.hash));
     const missing = journal.filter((e) => e.tag !== "0016_call_events" && !done.has(createHash("sha256").update(readFileSync(`./drizzle/${e.tag}.sql`).toString()).digest("hex")));
-    if (missing.length) console.warn(`WARNING: database updates never applied (dated too early?): ${missing.map((e) => e.tag).join(", ")}`);
+    if (missing.length) {
+      const tags = missing.map((e) => e.tag).join(", ");
+      console.warn(`WARNING: database updates never applied (dated too early?): ${tags}`);
+      // Deep check 06:00 M67: a build-log warning is read by nobody. The Owner is emailed (staff-only alert, in the
+      // activity log) once for each new list of skipped updates, never on every build.
+      const last = (await pool.query(`SELECT after->>'tags' AS tags FROM audit_log WHERE action = 'deploy.migrations_skipped' ORDER BY id DESC LIMIT 1`)).rows[0] as { tags?: string } | undefined;
+      if (last?.tags !== tags) {
+        await pool.query(`INSERT INTO audit_log (action, entity_type, entity_id, after) VALUES ('deploy.migrations_skipped', 'system', '0', $1)`, [JSON.stringify({ tags })]);
+        const { alertOwner } = await import("../src/lib/ops-alerts");
+        await alertOwner("database updates were skipped by a deploy", `These database updates are in the code but were never applied to the live database: ${tags}.\n\nThe site may be missing a table or column they add. A developer needs to apply them (they are additive) or give them a later date in drizzle/meta/_journal.json.`).catch(() => false);
+      }
+    }
   } catch (e) {
     console.warn("Could not check for skipped database updates:", (e as Error).message);
   }
