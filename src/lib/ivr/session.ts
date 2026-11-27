@@ -31,10 +31,16 @@ export async function updateSession(
   patch: Partial<Omit<CallSession, "callSid" | "data">> & { data?: Partial<CallData> },
   current?: CallSession | null,
 ) {
-  if (isPreviewCall(callSid)) return;
-  const base = current ?? (await getSession(callSid));
+  const base = current ?? (isPreviewCall(callSid) ? null : await getSession(callSid));
   const data = patch.data ? { ...(base?.data ?? {}), ...patch.data } : undefined;
   const { data: _ignored, ...rest } = patch;
+  // Hark's bug check, Nov 26, 2026, bug 1: the session object passed in is kept in step with what was written, so a
+  // second write in the same request (e.g. oceanOffered after the first balloon) never puts back old cart data
+  if (current) {
+    Object.assign(current, rest);
+    if (data) current.data = data;
+  }
+  if (isPreviewCall(callSid)) return;
   await db
     .update(callSessions)
     .set({ ...rest, ...(data ? { data } : {}) })

@@ -348,7 +348,7 @@ exports[`baseline: every phone step as it plays today > resume-added 1`] = `"<?x
 
 exports[`baseline: every phone step as it plays today > resume-added-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/resume-items</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > resume-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/book</Redirect></Response>"`;
+exports[`baseline: every phone step as it plays today > resume-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=resume</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > resume-items 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/book</Redirect></Response>"`;
 

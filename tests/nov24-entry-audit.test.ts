@@ -49,7 +49,7 @@ describe("H1: another day goes on to the categories, never the bookings menu", (
     expect(redirect(await call("date-confirm", { Digits: "2" }, `d=${D}&a=1`))).toBe("date?a=1");
   });
   it("star on that date step goes back to box 25", async () => {
-    expect(redirect(await call("date-heard", { Digits: "*" }, "a=1"))).toBe("added-menu");
+    expect(redirect(await call("date-heard", { Digits: "*" }, "a=1"))).toBe("added-menu?n=1") // Hark's bug 7: no "Successfully added" again;
   });
 });
 
@@ -107,7 +107,7 @@ describe("M2: phone numbers take 10 digits and the pound", () => {
 
 describe("M6 and L items: star and no key never land in the main menu", () => {
   it("cart star with no list: box 25 when something is in the cart", async () => {
-    expect(redirect(await call("cart-choice", { Digits: "*" }))).toBe("added-menu");
+    expect(redirect(await call("cart-choice", { Digits: "*" }))).toBe("added-menu?n=1") // Hark's bug 7;
   });
   it("L5: star on the zip entry goes back to the zip menu; L4: '1 845 ...' is a phone number", async () => {
     expect(redirect(await call("addr-zip-heard", { Digits: "*" }))).toBe("addr-zip");

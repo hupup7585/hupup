@@ -180,7 +180,7 @@ export async function laserAddonPrices(tx: { execute: typeof db.execute }, rows:
       if (n) {
         const reg = await tx.execute(sql`
           SELECT p.price_cents FROM products p JOIN categories c ON c.id = p.category_id
-          WHERE c.name <> ${LASER_ADDONS_GROUP} AND c.name ~* 'laser' AND p.name !~* 'maze' AND p.name ~* ${`^[[:space:]]*${n}[[:space:]]+laser guns`}
+          WHERE c.name <> ${LASER_ADDONS_GROUP} AND c.name ~* 'laser' AND p.name !~* 'maze' AND p.name ~* ${`(^|[^0-9])${n}[[:space:]]+laser guns`}
           ORDER BY p.active DESC, p.id LIMIT 1`);
         const price = (reg.rows[0] as { price_cents: number } | undefined)?.price_cents;
         if (price) target = price;

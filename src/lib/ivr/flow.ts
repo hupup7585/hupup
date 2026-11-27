@@ -1262,8 +1262,12 @@ export function staffCallerId(from: string | null | undefined, env: Record<strin
 /** Ring one step of a key's list (one after another) or everyone at once. */
 function dialTargets(vr: VR, list: ReturnType<typeof ringListFor>, k: RingKey, i: number, from?: string | null): VR {
   const simultaneous = list.mode === "simultaneous";
+  // Hark's bug 12 (Nov 26, 2026): a staff phone calling in is never rung itself (it would be busy and waste a step)
+  const self = toE164(from);
+  const others = list.targets.filter((t) => toE164(t.phone) !== self);
+  const targets = others.length ? others : list.targets;
   // Abraham (Phone Menu v3): the list rings several times over (3 by default); step i goes round the list
-  const ring = simultaneous ? list.targets : [list.targets[i % list.targets.length]];
+  const ring = simultaneous ? targets : [targets[i % targets.length]];
   const dial = vr.dial({
     callerId: staffCallerId(from), // Abraham: staff phones show the customer's own number (hotline if blocked or unknown)
     timeout: Math.max(...ring.map((t) => t.ringSeconds)),
@@ -2362,7 +2366,8 @@ const handlers: Record<string, Handler> = {
     const items = [...days.slice(0, -1).map((d) => `${dayItems(d)} for ${spokenDate(d)}`), dayItems(last)].join(", and ");
     sp(g, ctx, "resume_offer", { items, date: spokenDate(last) });
     backLine(g, ctx);
-    return idleNoKey(vr, ctx, "book");
+    // Hark's bug 5 (Nov 26, 2026): no key = the no-choice line, then this same welcome back screen (not the bookings menu)
+    return idleNoKey(vr, ctx, "resume");
   },
 
   /**
@@ -2372,7 +2377,8 @@ const handlers: Record<string, Handler> = {
   async "resume-choice"(ctx, vr) {
     const rd = ctx.body.Digits;
     if (rd === "*") return back(vr, "menu"); // star: one step back, the main menu
-    if (rd === "2" || !rd) return back(vr, "book"); // 2 (or no key): a new order
+    if (rd === "2") return back(vr, "book"); // 2: a new order
+    if (!rd) return idleNoKey(vr, ctx, "resume"); // no key: the no-choice line, then the same offer (Hark's bug 5)
     if (rd !== "1") {
       sp(vr, ctx, "not_valid"); // wrong key (Abraham, Nov 16, 2026): the shared line, then the same menu again
       return back(vr, "resume");
@@ -2402,7 +2408,8 @@ const handlers: Record<string, Handler> = {
       const session = ctx.session ?? (await ensureSession(ctx.callSid, ctx.from));
       const day = (await callOrders(ctx)).find((o) => o.order.eventDate === l.d);
       let cartOrder = l.holdId!;
-      if (day) {
+      // Hark's bug check, bug 2: never move an order onto itself and then cancel it (the resumed item would vanish)
+      if (day && day.order.id !== l.holdId) {
         await db.update(orderItems).set({ orderId: day.order.id }).where(eq(orderItems.orderId, l.holdId!));
         await cancelHold(l.holdId!);
         await refreshOrderTotals(day.order.id);
@@ -2461,7 +2468,7 @@ const handlers: Record<string, Handler> = {
     if (k === "9" && o) return back(vr, "ocean", { d: o, n: "resume" });
     if (k) {
       sp(vr, ctx, "not_valid");
-      return back(vr, "resume-added", { d: ctx.query.get("d") ?? undefined, n: ctx.query.get("n") ?? undefined });
+      return back(vr, "resume-added", { d: ctx.query.get("d") ?? undefined, n: ctx.query.get("n") ?? undefined, o }); // key 9 keeps working (Hark's bug 8)
     }
     return back(vr, "resume-items");
   },
@@ -2748,7 +2755,7 @@ const handlers: Record<string, Handler> = {
     if (digits.includes("*")) {
       // Star goes back one step: the rentals in that item's category, box 25 for another day, or the bookings menu
       const prod = p ? await getProduct(Number(p)) : null;
-      return prod ? back(vr, "category", { c: prod.categoryId }) : a ? back(vr, "added-menu") : back(vr, "book");
+      return prod ? back(vr, "category", { c: prod.categoryId }) : a ? back(vr, "added-menu", { n: 1 }) : back(vr, "book"); // n: no "Successfully added" again (Hark's bug 7)
     }
     const today = todayISO();
     const r = parseDateInput({ digits }, today);
@@ -3325,7 +3332,7 @@ const handlers: Record<string, Handler> = {
     const c = ctx.query.get("c") ?? undefined;
     // Star: one step back. With no list to return to, box 25 (when something is in the cart), else the bookings menu;
     // never the main menu (Hark's audit M6, Nov 24, 2026)
-    if (d === "*") return c ? back(vr, "category", { c }) : (await callOrders(ctx)).length ? back(vr, "added-menu") : back(vr, "book");
+    if (d === "*") return c ? back(vr, "category", { c }) : (await callOrders(ctx)).length ? back(vr, "added-menu", { n: 1 }) : back(vr, "book"); // n: keep-shopping only (Hark's bug 7)
     if (d === "1") {
       sp(vr, ctx, "checkout_tax_note"); // Abraham (Phone Menu v3): before checkout
       // Nov 23, 2026 (Abraham): the address lookup comes BEFORE the name; a found family gives the name, no name question
@@ -4166,7 +4173,7 @@ const handlers: Record<string, Handler> = {
 
   terms(ctx, vr) {
     const g = keypad(vr, url("terms-answer", { n: ctx.query.get("n") ?? undefined }), { timeout: T(vr, "timerCheckoutAnswer") });
-    say(g, promptText(ctx.prompts, "terms_notice"));
+    sp(g, ctx, "terms_notice"); // its recording when uploaded (Hark's bug 22); same words
     backLine(g, ctx);
     return back(vr, "terms-answer", { n: ctx.query.get("n") ?? undefined });
   },
@@ -4447,6 +4454,7 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "tx-which", { p: "pay", o }); // texting approved (Nov 15, 2026)
     if (d === "2") return back(vr, "catalog-email", { p: "pay", o });
+    if (d === "*") return back(vr, "cart"); // star: one step back, the cart (Hark's bug 13)
     sp(vr, ctx, "not_valid");
     return back(vr, "paylink", { o });
   },
