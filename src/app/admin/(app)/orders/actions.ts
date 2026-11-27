@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/db/schema";
 import { recheckOrderLines } from "@/lib/recheck-lines";
+import { lockStock } from "@/lib/stock-lock";
 import { getOrderWithItems, markPaid, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES, setOrderStatus } from "@/lib/orders";
 import { payPageLink } from "@/lib/rental-terms";
 import { sendOrderText } from "@/lib/notify";
@@ -64,8 +65,7 @@ export async function updateStatusAction(orderId: number, status: OrderStatus, r
     let problem: string | null = null;
     try {
       await db.transaction(async (tx) => {
-        for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
-        for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+        await lockStock(tx, ids); // K2 (deep check 06:00 M48): items, groups and laser pools, one id-ordered step
         await tx.update(schema.orders).set({ status, updatedAt: new Date(), ...(status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}) }).where(eq(schema.orders.id, orderId));
         const out = await recheckOrderLines(tx as never, full.order);
         if (out.length) throw new NoLongerFree(`${out.map((l) => full.items.find((i) => i.productId === l.productId)?.name ?? "An item").join(", ")} ${out.length === 1 ? "is" : "are"} no longer available for ${dualDate(full.order.eventDate)}.`);
