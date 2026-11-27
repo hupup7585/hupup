@@ -53,6 +53,12 @@ describe("mail in (from the Cloudflare Email Worker, in pieces)", () => {
     const res = await inbound(new Request("https://hupup.example/api/email/inbound-raw?id=aaaaaaaa1&i=0&n=1", { method: "POST", body: "x" }));
     expect(res.status).toBe(403);
   });
+  it("deep check 06:00 M25: a refused piece is a 400 (never tried again); a server error is a 500 (the Worker tries again)", async () => {
+    const bad = await inbound(new Request("https://hupup.example/api/email/inbound-raw?id=x&i=0&n=1", { method: "POST", body: "x", headers: { "x-inbound-secret": "worker-secret" } }));
+    expect(bad.status).toBe(400);
+    const src = (await import("node:fs")).readFileSync("src/app/api/email/inbound-raw/route.ts", "utf8");
+    expect(src).toContain('["bad piece", "bad size", "too big"].includes(msg) ? 400 : 500');
+  });
   it("puts the pieces together, keeps the email and its attachment, links the contact, and emails Abraham", async () => {
     const bytes = Buffer.from(MAIL);
     const half = Math.floor(bytes.length / 2);

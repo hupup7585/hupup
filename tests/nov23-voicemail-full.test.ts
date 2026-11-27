@@ -4,7 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   session: { callSid: "CAvmf", fromNumber: "+18457777585", orderId: null as number | null, data: {} as Record<string, unknown>, status: "in_progress", outcome: "browsing" },
   from: "+18457777585",
-  emails: [] as { to: string; subject: string; body: string; files: string[] }[],
+  emails: [] as { to: string; subject: string; body: string; files: string[]; base64?: boolean }[],
   r2: new Map<string, number>(),
 }));
 vi.mock("@/lib/db", async () => {
@@ -20,7 +20,7 @@ vi.mock("@/lib/ivr/session", () => ({
 vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
 vi.mock("@/lib/notify", () => ({
   sendSms: async () => ({ sent: true }),
-  sendEmail: async (to: string, subject: string, body: string, files: { filename: string }[] = []) => (h.emails.push({ to, subject, body, files: files.map((f) => f.filename) }), { sent: true }),
+  sendEmail: async (to: string, subject: string, body: string, files: { filename: string; content: unknown }[] = []) => (h.emails.push({ to, subject, body, files: files.map((f) => f.filename), base64: files.every((f) => typeof f.content === "string") }), { sent: true }),
 }));
 vi.mock("@/lib/r2", () => ({
   r2Ready: () => true,
@@ -190,7 +190,7 @@ describe("forward, reply, send", () => {
     expect(copy.noteKey).toMatch(/^voicemail\/note\//);
     // by email
     await call("vm-fwd-do", {}, `b=${ownerBox}&m=saved&v=${m1}&t=mail&to=${owner}`);
-    expect(h.emails[0]).toMatchObject({ to: "owner@example.com", files: [`voicemail-${m1}.mp3`] });
+    expect(h.emails[0]).toMatchObject({ to: "owner@example.com", files: [`voicemail-${m1}.mp3`], base64: true }); // deep check 06:00 M14
     expect(h.emails[0].body).toContain("Received: Monday, November twenty-third, at 2:42 PM");
   });
   it("reply: a voice reply only to a message from a box; call back stays off", async () => {

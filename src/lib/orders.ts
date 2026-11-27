@@ -707,18 +707,20 @@ export async function markGroupPaid(orderId: number, cents: number, method: stri
   // Deep check Nov 27 #2: when every day's hold ran out (released, paid nothing), the late payment goes to each released
   // day with its own amount, so each day is checked and confirmed on its own (never all of it to the first day while the
   // other days stay cancelled). A day staff cancelled is never one of them.
+  // Deep check 06:00 M9: also when some days are still open and others were released (a day added by "Choose this
+  // option" holds longer than the old day): the open days are paid first, then each released day with its own amount,
+  // so a released day's money is never put on an open day (paid twice, a "tip") while the released day stays cancelled.
   const released: FullOrder[] = [];
-  if (!all.some(open)) {
-    const { holdEnded } = await import("@/lib/late-payment");
-    for (const x of all) if (x.order.status === "CANCELLED" && holdEnded(x.order) && dueOf(x.order) > 0 && !(await cancelledByStaff(x.order.id))) released.push(x);
-  }
-  const ordered = all.some(open) ? all.filter(open) : released.length ? released : [group.primary];
+  const { holdEnded } = await import("@/lib/late-payment");
+  for (const x of all) if (x.order.status === "CANCELLED" && holdEnded(x.order) && dueOf(x.order) > 0 && !(await cancelledByStaff(x.order.id))) released.push(x);
+  const ordered = all.some(open) || released.length ? [...all.filter(open), ...released] : [group.primary];
   let remaining = cents;
   const out = [];
   for (let i = 0; i < ordered.length; i++) {
     const o = ordered[i].order;
     const pay = i === ordered.length - 1 ? remaining : Math.min(remaining, dueOf(o));
     remaining -= pay;
+    if (pay <= 0 && i > 0) continue; // nothing left for a later day: it stays as it is
     const u = await markPaid(o.id, pay, method, ref);
     if (u) out.push(u);
   }
