@@ -6,7 +6,8 @@ import { KIND_NAME, type DocKind, type docDetail } from "@/lib/invoices";
 const m = (c: number) => (c < 0 ? `-${formatMoney(-c)}` : formatMoney(c));
 
 /** The printed invoice, quote or credit note: the same in Admin and on the customer's own page. */
-export default function InvoiceDocument({ d }: { d: NonNullable<Awaited<ReturnType<typeof docDetail>>> }) {
+/** `asPageTitle`: the customer's own invoice page shows the document name as its one H1 (deep check 06:00); Admin keeps its own. */
+export default function InvoiceDocument({ d, asPageTitle = false }: { d: NonNullable<Awaited<ReturnType<typeof docDetail>>>; asPageTitle?: boolean }) {
   const { doc } = d;
   const title = KIND_NAME[doc.kind as DocKind] ?? "Invoice";
   return (
@@ -22,7 +23,7 @@ export default function InvoiceDocument({ d }: { d: NonNullable<Awaited<ReturnTy
           </div>
         </div>
         <div className="text-right text-sm leading-6">
-          <div className="text-2xl font-black uppercase tracking-wide">{title}</div>
+          {asPageTitle ? <h1 className="text-2xl font-black uppercase tracking-wide">{title}</h1> : <div className="text-2xl font-black uppercase tracking-wide">{title}</div>}
           <div className="font-bold">{doc.number ?? `#${doc.id}`}</div>
           <div>Date: {doc.issueDate}</div>
           {doc.kind === "invoice" && <div>Due: {doc.dueDate}</div>}

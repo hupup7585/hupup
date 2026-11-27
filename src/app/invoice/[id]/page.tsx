@@ -20,7 +20,7 @@ export default async function CustomerInvoicePage({ params, searchParams }: { pa
         <div className="mb-4 flex justify-end print:hidden">
           <PrintButton />
         </div>
-        <InvoiceDocument d={d} />
+        <InvoiceDocument d={d} asPageTitle />
       </div>
     </main>
   );

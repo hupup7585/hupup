@@ -87,3 +87,12 @@ describe("invoices, quotes and credit notes", () => {
     expect(readFileSync("src/app/admin/(app)/bookkeeping/statement/page.tsx", "utf8")).toContain("await requireBooks()");
   });
 });
+
+describe("deep check 06:00: the customer's invoice page", () => {
+  it("has one H1 (the document name, same words as before); Admin's invoice page keeps its own heading", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/app/invoice/[id]/page.tsx", "utf8")).toContain("<InvoiceDocument d={d} asPageTitle />");
+    expect(readFileSync("src/app/admin/(app)/bookkeeping/invoice/[id]/page.tsx", "utf8")).not.toContain("asPageTitle");
+    expect(readFileSync("src/components/InvoiceDocument.tsx", "utf8")).toContain('<h1 className="text-2xl font-black uppercase tracking-wide">{title}</h1>');
+  });
+});
