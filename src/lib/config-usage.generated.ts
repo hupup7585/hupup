@@ -189,7 +189,8 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/phone/phonepay/page.tsx",
   "lib/feature-switches.ts",
   "lib/sola-phonepay.ts",
-  "lib/stripe-pay-voice.ts"
+  "lib/stripe-pay-voice.ts",
+  "lib/switch-guard.ts"
  ],
  "phonePayTriesPerCall": [
   "app/admin/(app)/phone/phonepay/actions.ts",
@@ -333,11 +334,13 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "lib/ivr/prompts.ts"
  ],
  "googleLiveVoice": [
+  "app/admin/(app)/phone/prompts/slots/VoiceSwitches.tsx",
   "app/admin/(app)/phone/prompts/slots/actions.ts",
   "app/admin/(app)/phone/prompts/slots/page.tsx",
   "app/api/voice-audio/live/route.ts",
   "lib/feature-switches.ts",
-  "lib/ivr/prompts.ts"
+  "lib/ivr/prompts.ts",
+  "lib/switch-guard.ts"
  ],
  "smsTestOnly": [
   "app/admin/(app)/phone/settings/page.tsx",
@@ -813,7 +816,14 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/settings/recording-actions.ts",
   "lib/feature-switches.ts",
   "lib/ivr/flow.ts",
+  "lib/switch-guard.ts",
   "lib/system-status.ts"
+ ],
+ "sensitiveSwitchGuard": [
+  "app/admin/(app)/phone/phonepay/page.tsx",
+  "app/admin/(app)/phone/prompts/slots/page.tsx",
+  "app/admin/(app)/phone/settings/page.tsx",
+  "lib/switch-guard.ts"
  ],
  "solaFeePercent": [
   "app/admin/(app)/bookkeeping/actions.ts",

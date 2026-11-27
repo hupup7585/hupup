@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { achirdSwitchAction, googleLiveSwitchAction } from "./actions";
+import { SwitchConfirm } from "@/components/staff/SwitchConfirm";
 
 /** The two Owner-only voice switches (Abraham, Nov 15, 2026). Both start off. */
-export default function VoiceSwitches(p: { achird: boolean; allUploaded: boolean; missing: number; google: boolean; googleKey: boolean }) {
+export default function VoiceSwitches(p: { achird: boolean; allUploaded: boolean; missing: number; google: boolean; googleKey: boolean; guard?: boolean }) {
   const [msg, setMsg] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, start] = useTransition();
   const run = (fn: () => Promise<{ ok: boolean; message: string }>) => start(async () => setMsg(await fn()));
@@ -38,14 +39,17 @@ export default function VoiceSwitches(p: { achird: boolean; allUploaded: boolean
         <button
           className="btn-ghost !py-1 text-xs"
           disabled={pending || (!p.google && !p.googleKey)}
-          onClick={() => {
+          onClick={(e) => {
             if (!p.google && !confirm("Turn on Google Achird for the changing parts? Google may charge for this.")) return;
-            run(() => googleLiveSwitchAction(!p.google));
+            const box = (e.currentTarget.closest("[data-voice-switches]") as HTMLElement | null)?.querySelector("[data-switch-confirm]");
+            const val = (n: string) => (box?.querySelector(`input[name="${n}"]`) as HTMLInputElement | null)?.value ?? "";
+            run(() => googleLiveSwitchAction(!p.google, { code: val("switchCode"), typed: val("switchTyped") }));
           }}
         >
           {p.google ? "Turn off" : "Turn on"}
         </button>
       </div>
+      {p.guard && !p.google && p.googleKey && <SwitchConfirm sw="googleLiveVoice" label="the paid Google voice" phrase="TURN ON GOOGLE VOICE" />}
       {msg && <p className={`text-xs font-semibold ${msg.ok ? "text-navy" : "text-[#b3261e]"}`}>{msg.message}</p>}
     </section>
   );

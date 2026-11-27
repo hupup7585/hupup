@@ -2,9 +2,10 @@
 
 import { useActionState } from "react";
 import { saveRecordingAction } from "./recording-actions";
+import { SwitchConfirm } from "@/components/staff/SwitchConfirm";
 
 /** Owner: call recording switch (default OFF). */
-export default function RecordingForm({ on, notice }: { on: boolean; notice: string }) {
+export default function RecordingForm({ on, notice, guard = false }: { on: boolean; notice: string; guard?: boolean }) {
   const [state, action, pending] = useActionState(saveRecordingAction, null);
   return (
     <form action={action} className="grid gap-3" data-recording-form>
@@ -25,6 +26,7 @@ export default function RecordingForm({ on, notice }: { on: boolean; notice: str
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="approveNotice" /> I approve the notice wording above
       </label>
+      {guard && !on && <SwitchConfirm sw="callRecording" label="call recording" phrase="TURN ON CALL RECORDING" />}
       <div className="flex items-center gap-3">
         <button className="btn-dark" disabled={pending}>{pending ? "Saving..." : "Save"}</button>
         {state?.message && <span role="status" className={`text-sm font-semibold ${state.ok ? "text-[#13895C]" : "text-[#C83A2F]"}`}>{state.message}</span>}

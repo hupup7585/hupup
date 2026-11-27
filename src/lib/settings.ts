@@ -254,6 +254,9 @@ export const SETTING_DEFAULTS = {
    * in Settings). When on, every call hears the recording notice first; recording starts only after it.
    */
   callRecording: false,
+  /** Hark's review item 9 (Nov 26, 2026): a fresh code and typed words before turning on call recording, the Google
+   *  voice, PhonePay or Stripe. Off until Abraham approves the screenshots. */
+  sensitiveSwitchGuard: false,
   /** Bookkeeping (Abraham T): Sola processing rate, to estimate fees and the net deposit per payment. Owner sets them from the Sola statement. */
   solaFeePercent: "0",
   solaFeeCents: "0",

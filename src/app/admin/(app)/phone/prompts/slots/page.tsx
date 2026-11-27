@@ -49,7 +49,7 @@ export default async function SlotsPage({ searchParams }: { searchParams: Promis
           </a>
         ))}
       </div>
-      <VoiceSwitches achird={settings.achirdWholeLine} allUploaded={allUploaded} missing={slots.length - count("uploaded")} google={settings.googleLiveVoice} googleKey={Boolean(process.env.GOOGLE_TTS_API_KEY)} />
+      <VoiceSwitches achird={settings.achirdWholeLine} allUploaded={allUploaded} missing={slots.length - count("uploaded")} google={settings.googleLiveVoice} googleKey={Boolean(process.env.GOOGLE_TTS_API_KEY)} guard={settings.sensitiveSwitchGuard} />
       <AddSlotForm groups={[...new Set([...SLOT_GROUPS, ...groups])]} slots={slots.map((x) => ({ key: x.key, label: x.label, text: x.text, lookup: custom.get(x.key)?.lookup ?? null }))} />
       <form className="mb-3 flex flex-wrap items-end gap-2">
         {sp.s && <input type="hidden" name="s" value={sp.s} />}

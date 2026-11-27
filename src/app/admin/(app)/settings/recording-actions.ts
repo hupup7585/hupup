@@ -11,6 +11,10 @@ export async function saveRecordingAction(_prev: { ok?: boolean; message?: strin
   const on = form.get("callRecording") === "on";
   if (on && form.get("approveNotice") !== "on") return { ok: false, message: "To turn recording on, first approve the notice wording above." };
   const before = (await getSettings()).callRecording;
+  // Hark's review item 9: with the safety check on, turning recording on needs a fresh code and the typed words
+  const { sensitiveRefusal } = await import("@/lib/switch-guard");
+  const refusal = await sensitiveRefusal(owner.userId ?? null, "callRecording", on && !before, form);
+  if (refusal) return { ok: false, message: `Not saved. ${refusal}` };
   await saveSetting("callRecording", on, owner.userId);
   await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.call_recording_updated", entityType: "settings", entityId: "call_recording", before: { callRecording: before }, after: { callRecording: on } });
   revalidatePath("/admin", "layout");

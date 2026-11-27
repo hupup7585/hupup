@@ -7,6 +7,7 @@ import { db, schema } from "@/lib/db";
 import { getSettings, saveSetting } from "@/lib/settings";
 import { digitsTemplateError } from "@/lib/sola-phonepay";
 import { toE164 } from "@/lib/phone";
+import { guardOn, sensitiveRefusal } from "@/lib/switch-guard";
 
 /** Owner only: Sola PhonePay settings (Abraham, Nov 14, 2026). Every change is in the audit log; the PIN is never here. */
 export async function savePhonePayAction(form: FormData) {
@@ -41,6 +42,13 @@ export async function savePhonePayAction(form: FormData) {
   const silence = Math.floor(Number(form.get("silenceSeconds")));
   if (!(silence >= 5 && silence <= 120)) return back("The silence check must be a number of seconds from 5 to 120.");
   const before = await getSettings();
+  // Hark's review item 9: with the safety check on, turning on PhonePay or Stripe needs a fresh code and the typed words
+  const provider = form.get("provider") === "stripe" ? "stripe" : "sola";
+  const payOn = on && !before.solaPhonePayOn;
+  const stripeOn = provider === "stripe" && before.phoneCardProvider !== "stripe";
+  if (payOn && stripeOn && (await guardOn())) return back("Not saved. Turn on one at a time: first PhonePay, Save, then choose Stripe and Save again.");
+  const refusal = (await sensitiveRefusal(owner.userId ?? null, "solaPhonePayOn", payOn, form)) ?? (await sensitiveRefusal(owner.userId ?? null, "stripeProvider", stripeOn, form));
+  if (refusal) return back(`Not saved. ${refusal}`);
   await saveSetting("phonePayTriesPerCall", String(tries), owner.userId);
   await saveSetting("phonePayCallsPerDay", String(declines), owner.userId);
   if (waitRaw !== "") await saveSetting("phonePayDeclineHangupSeconds", String(waitSec), owner.userId);
@@ -54,7 +62,6 @@ export async function savePhonePayAction(form: FormData) {
   await saveSetting("solaPhonePayCustomDigits", customDigits, owner.userId);
   await saveSetting("solaPhonePayCustomCapCents", customCap, owner.userId);
   await saveSetting("paymentTestNumbers", testNumbers.join("\n"), owner.userId);
-  const provider = form.get("provider") === "stripe" ? "stripe" : "sola";
   await saveSetting("phoneCardProvider", provider, owner.userId);
   await db.insert(schema.auditLog).values({
     userId: owner.userId,

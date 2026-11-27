@@ -53,9 +53,16 @@ export async function achirdSwitchAction(on: boolean): Promise<R> {
 }
 
 /** Option B: Google speaks the changing parts in Achird. Owner only, default off. It costs money once on. */
-export async function googleLiveSwitchAction(on: boolean): Promise<R> {
+export async function googleLiveSwitchAction(on: boolean, confirm?: { code: string; typed: string }): Promise<R> {
   const s = await requireOwner();
   if (on && !process.env.GOOGLE_TTS_API_KEY) return { ok: false, message: "GOOGLE_TTS_API_KEY is not in Vercel, so this can't be turned on yet." };
+  // Hark's review item 9: with the safety check on, turning it on needs a fresh code and the typed words
+  const { getSettings } = await import("@/lib/settings");
+  const { sensitiveRefusal } = await import("@/lib/switch-guard");
+  const was = (await getSettings()).googleLiveVoice;
+  const form = new Map<string, string>([["switchCode", confirm?.code ?? ""], ["switchTyped", confirm?.typed ?? ""]]);
+  const refusal = await sensitiveRefusal(s.userId ?? null, "googleLiveVoice", on && !was, form);
+  if (refusal) return { ok: false, message: `Not turned on. ${refusal}` };
   await saveSetting("googleLiveVoice", on, s.userId);
   await db.insert(schema.auditLog).values({ userId: s.userId, action: on ? "voice.google_live_on" : "voice.google_live_off", entityType: "settings", entityId: "googleLiveVoice" });
   return done(on ? "Google Achird for the changing parts is on." : "Google Achird for the changing parts is off.");

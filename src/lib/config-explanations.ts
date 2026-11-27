@@ -614,6 +614,11 @@ const OTHER: Record<string, Explanation> = {
     where: "Blocked callers hear a busy signal and are not connected.",
     ifChanged: "Takes effect on the next call. A wide pattern can block real customers.",
   },
+  sensitiveSwitchGuard: {
+    what: "When on, turning on call recording, the paid Google voice, phone card payments or Stripe asks for a fresh code sent to the Owner's own phone and typed words, so none of them can be turned on by a stray click or on a device left signed in.",
+    where: "Owner only: the Phone settings, Hotline prompts slots and phone card payment pages, at the moment one of those is turned on. Turning them off is never blocked.",
+    ifChanged: "On: those four need the code and the typed words to turn on. Off: they turn on with their own checks only, as before.",
+  },
   callRecording: {
     what: "Records calls. Every caller would hear the recording notice first.",
     where: "Every caller.",

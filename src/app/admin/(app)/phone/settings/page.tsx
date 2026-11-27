@@ -109,7 +109,7 @@ export default async function PhoneSettingsPage({ searchParams }: { searchParams
       </section>
       <section className="card mb-6 p-5" id="recording">
         <h2 className="mb-3 text-lg font-extrabold">Call recording</h2>
-        <RecordingForm on={settings.callRecording} notice={PROMPTS.recording_notice.text} />
+        <RecordingForm on={settings.callRecording} notice={PROMPTS.recording_notice.text} guard={settings.sensitiveSwitchGuard} />
       </section>
 
       <section className="card mb-6 p-5" id="blocking">

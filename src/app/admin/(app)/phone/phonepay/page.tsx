@@ -6,6 +6,8 @@ import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { dualDateTime } from "@/lib/dual-date";
 import { savePhonePayAction } from "./actions";
+import { SwitchConfirm } from "@/components/staff/SwitchConfirm";
+import { SENSITIVE_SWITCHES } from "@/lib/switch-guard";
 import PayMusicWarning from "@/components/PayMusicWarning";
 import { orderPath } from "@/lib/order-path";
 
@@ -109,6 +111,8 @@ export default async function PhonePayPage({ searchParams }: { searchParams: Pro
           <label className="block"><span className="label">Highest amount allowed, in dollars</span><input name="customCap" inputMode="decimal" defaultValue={(Number(s.solaPhonePayCustomCapCents) / 100).toFixed(2)} className="input" placeholder="5000.00" /></label>
           <label className="block"><span className="label">Digits sent to PhonePay for a custom charge</span><input name="customDigits" defaultValue={s.solaPhonePayCustomDigits} className="input font-mono" /><span className="mt-1 block text-xs text-muted">Same rules as above. Leave {"{amount}"} out if PhonePay should let you type the amount yourself.</span></label>
         </div>
+        {s.sensitiveSwitchGuard && !s.solaPhonePayOn && <SwitchConfirm sw="solaPhonePayOn" label={SENSITIVE_SWITCHES.solaPhonePayOn.label} phrase={SENSITIVE_SWITCHES.solaPhonePayOn.phrase} />}
+        {s.sensitiveSwitchGuard && s.solaPhonePayOn && s.phoneCardProvider !== "stripe" && <SwitchConfirm sw="stripeProvider" label={SENSITIVE_SWITCHES.stripeProvider.label} phrase={SENSITIVE_SWITCHES.stripeProvider.phrase} />}
         <button className="btn-dark w-fit">Save</button>
       </form>
 
