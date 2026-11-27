@@ -1599,10 +1599,12 @@ async function sayFriMutzePrice(target: VR | Gather, ctx: Ctx, friday: string, p
 async function friMutzeChoice(ctx: Ctx, vr: VR, p: string | undefined, date: string, d: string | undefined) {
   // Approved Nov 24, 2026: 1 = correct (Friday only), 2 = keep it for Mutze Shabbes, 3 or star = a different date;
   // pound or any other key is not valid
-  if (d === "3" || d === "*") return back(vr, "date", { p });
+  // Phone pass 2 #5: "another day" (a) keeps its way back (star at the date step: box 25, never the bookings menu)
+  const a = ctx.query.get("a") ?? undefined;
+  if (d === "3" || d === "*") return back(vr, "date", { p, a });
   if (d !== "1" && d !== "2") {
     if (d) sp(vr, ctx, "not_valid");
-    return back(vr, "date-ask", { p, d: date });
+    return back(vr, "date-ask", { p, d: date, a });
   }
   d = d === "2" ? "1" : "#"; // the code below: "1" keeps it for Mutze Shabbes, "#" is Friday only
   await chooseDay(ctx, date);

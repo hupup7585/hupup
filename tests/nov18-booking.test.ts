@@ -54,6 +54,10 @@ describe("box 150 and box 149 (approved Nov 18, 2026)", () => {
   });
   it("box 150: 2 = a different date", async () => {
     expect(redirect(await call("date-confirm", { Digits: "3" }, `p=${castle}&d=${CHANUKAH_FRIDAY}&f=1`))).toBe(`date?p=${castle}`);
+    // phone pass 2 #5: from "another day" (a=1) the way back is kept on 3, star and a wrong key
+    expect(redirect(await call("date-confirm", { Digits: "3" }, `d=${CHANUKAH_FRIDAY}&f=1&a=1`))).toBe(`date?a=1`);
+    expect(redirect(await call("date-confirm", { Digits: "*" }, `d=${CHANUKAH_FRIDAY}&f=1&a=1`))).toBe(`date?a=1`);
+    expect(redirect(await call("date-confirm", { Digits: "7" }, `d=${CHANUKAH_FRIDAY}&f=1&a=1`))).toBe(`date-ask?d=${CHANUKAH_FRIDAY}&a=1`);
   });
   it("box 150: 1 = Mutze Shabbes, then box 149 with the real price for one and a half days and the Sunday pickup", async () => {
     const xml = await call("date-confirm", { Digits: "2" }, `p=${castle}&d=${CHANUKAH_FRIDAY}&f=1`); // 2 = Mutze Shabbes (Nov 24, 2026)
