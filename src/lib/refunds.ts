@@ -112,13 +112,15 @@ export function plainReason(raw: string): string {
   return `The card company didn't accept the refund (${raw}).`;
 }
 
-async function stripeRefund(ref: string, amount: number, o: Ord, fetcher?: typeof fetch) {
+async function stripeRefund(ref: string, amount: number, o: Ord, reservedId: number, fetcher?: typeof fetch) {
   const re = await stripeApi<{ id: string; status: string; failure_reason?: string }>(
     "refunds",
     "POST",
     "/v1/refunds",
     { ...(ref.startsWith("pi_") ? { payment_intent: ref } : { charge: ref }), amount, reason: "requested_by_customer", metadata: { order_number: orderNumber(o.id) } },
-    { idempotencyKey: `refund-${o.id}-${o.refundedCents}-${amount}`, fetcher },
+    // Deep check 06:00 M32: one key per refund row, so a new refund is never answered with an earlier refund's (or an
+    // earlier failure's) saved reply, and a retry of the same row is never sent twice
+    { idempotencyKey: `refund-row-${reservedId}`, fetcher },
   );
   if (re.status === "failed" || re.status === "canceled") throw new RefundError(plainReason(re.failure_reason ?? re.status));
   return { id: re.id, status: re.status };
@@ -162,11 +164,15 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
     await tx.execute(sql`SELECT id FROM orders WHERE id = ${o.id} FOR UPDATE`);
     const [cur] = await tx.select().from(schema.orders).where(eq(schema.orders.id, o.id));
     // also refunds that went through at the card company but could not be fully saved here (deep check 15a)
-    const sending = (await tx.execute(sql`SELECT COALESCE(SUM(amount_cents), 0)::int AS c FROM order_refunds WHERE order_id = ${o.id} AND ((status = 'sending' AND created_at > now() - interval '10 minutes') OR (status <> 'failed' AND error LIKE 'Refunded at the card company, but not fully saved%'))`)).rows[0] as { c: number };
+    // Deep check 06:00 M33: a refund still marked "sending" always counts as taken (it stopped counting after 10
+    // minutes, so a refund cut off after the card company approved it could be sent again); one older than 10 minutes
+    // is named in the answer so the Owner checks it at the card company
+    const sending = (await tx.execute(sql`SELECT COALESCE(SUM(amount_cents), 0)::int AS c, COALESCE(SUM(amount_cents) FILTER (WHERE status = 'sending' AND created_at <= now() - interval '10 minutes'), 0)::int AS stuck FROM order_refunds WHERE order_id = ${o.id} AND (status = 'sending' OR (status <> 'failed' AND error LIKE 'Refunded at the card company, but not fully saved%'))`)).rows[0] as { c: number; stuck: number };
     const left = Math.max(0, refundable(cur) - Number(sending?.c ?? 0));
+    const stuckNote = Number(sending?.stuck ?? 0) > 0 ? ` A refund of ${money(Number(sending.stuck))} was started earlier and never finished: check it at the card company before refunding again.` : "";
     const amount = amountCents === "full" ? left : amountCents;
-    if (!Number.isInteger(amount) || amount <= 0) return { error: left <= 0 && amountCents === "full" ? `At most ${money(0)} can be refunded on this order.` : "Enter an amount to refund." };
-    if (amount > left) return { error: `At most ${money(left)} can be refunded on this order.` };
+    if (!Number.isInteger(amount) || amount <= 0) return { error: left <= 0 && amountCents === "full" ? `At most ${money(0)} can be refunded on this order.${stuckNote}` : "Enter an amount to refund." };
+    if (amount > left) return { error: `At most ${money(left)} can be refunded on this order.${stuckNote}` };
     const [row] = await tx.insert(schema.orderRefunds).values({ orderId: o.id, amountCents: amount, status: "sending", provider: pay.provider, userId }).returning();
     return { id: row.id, amount };
   });
@@ -174,7 +180,7 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
   const amount = reserved.amount;
   let r: { id: string; status: string };
   try {
-    r = pay.provider === "stripe" ? await stripeRefund(pay.ref, amount, o, fetcher) : await solaRefund(pay.ref, amount, fetcher);
+    r = pay.provider === "stripe" ? await stripeRefund(pay.ref, amount, o, reserved.id, fetcher) : await solaRefund(pay.ref, amount, fetcher);
   } catch (e) {
     const reason = e instanceof RefundError ? e.message : plainReason(e instanceof StripeError || e instanceof Error ? e.message : String(e));
     await db.update(schema.orderRefunds).set({ status: "failed", error: reason.slice(0, 300) }).where(eq(schema.orderRefunds.id, reserved.id));
