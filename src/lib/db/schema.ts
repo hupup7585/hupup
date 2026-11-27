@@ -133,6 +133,8 @@ export const orders = pgTable(
     deliveryFeeCents: integer("delivery_fee_cents").notNull().default(0),
     /** Which map service placed the house (google | census | openstreetmap | town = not confirmed yet) (Nov 27, 2026) */
     addressSource: text("address_source"),
+    /** Deep check M26 (Nov 27, 2026): the Sola reference whose "paid" notice went out (claimed once) */
+    paidNoticeRef: text("paid_notice_ref"),
     /** Sales tax rate used (percent, e.g. "8.125") and amount, on items + delivery */
     taxPercent: text("tax_percent"),
     taxCents: integer("tax_cents").notNull().default(0),

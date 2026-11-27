@@ -149,7 +149,12 @@ export async function recordConsentDetailed(input: RecordConsentInput, exec: Exe
   if (!customer) [customer] = await exec.insert(schema.customers).values({ phone: input.phone, name: null }).returning();
   // STOP can only be undone by START + YES. No form, staff action, correction or automation may opt in a number
   // that replied STOP (the YES confirmation path clears the block itself, in the same locked transaction).
-  if (input.action === "opt_in" && customer.smsOptOut && !input.viaStartConfirmation) {
+  // Deep check M27 (Nov 27, 2026): a STOP on ANY customer record with this number counts, not only the first record
+  const [stoppedElsewhere] =
+    input.action === "opt_in" && !input.viaStartConfirmation
+      ? await exec.select({ id: schema.customers.id }).from(schema.customers).where(and(eq(schema.customers.phone, input.phone), eq(schema.customers.smsOptOut, true))).limit(1)
+      : [];
+  if (input.action === "opt_in" && (customer.smsOptOut || stoppedElsewhere) && !input.viaStartConfirmation) {
     throw new ConsentBlockedError("This customer replied STOP. They must text START and reply YES to receive order texts again; promotions need a new sign-up after that.");
   }
   const [row] = await exec.insert(schema.smsConsents).values({

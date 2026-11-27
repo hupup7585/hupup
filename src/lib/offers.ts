@@ -57,7 +57,8 @@ export function thuSunAdjustment(ls: Line[]): number {
 
 /**
  * 4th Sunday free: this booking is on a Sunday, and the same customer has bookings (not cancelled, not Thursday to
- * Sunday) on each of the 3 Sundays right before it. The free amount is the cheapest rental item across the 4 Sundays,
+ * Sunday) on each of the 3 Sundays right before it. Deep check M16 (Nov 27, 2026): only booked and paid Sundays count
+ * (confirmed, delivered or picked up), never one still waiting for payment. The free amount is the cheapest rental item across the 4 Sundays,
  * never more than this booking's rentals. A Sunday that was itself the free one does not count toward the next 3.
  * Returns 0 when it doesn't apply.
  */
@@ -67,7 +68,7 @@ export async function fourthSundayDiscount(exec: Exec, o: { id: number; customer
   const r = await exec.execute(sql`
     SELECT o.id, o.event_date::text AS event_date, o.pickup_date::text AS pickup_date, o.offer_note
     FROM orders o
-    WHERE o.customer_id = ${o.customerId} AND o.id <> ${o.id} AND o.status NOT IN ('CANCELLED', 'HOLD')
+    WHERE o.customer_id = ${o.customerId} AND o.id <> ${o.id} AND o.status IN ('CONFIRMED', 'DELIVERED', 'PICKED_UP')
       AND o.event_date IN (${sql.join(prior.map((d) => sql`${d}::date`), sql`, `)})`);
   const rows = r.rows as { id: number; event_date: string; pickup_date: string; offer_note: string | null }[];
   // Extra check K1 (Nov 27, 2026): the free Sunday starts a new count of 3, so only every 4th Sunday is free (the 8th,
@@ -136,7 +137,8 @@ export async function bestOfferFor(
   // A customer discount (Abraham, Nov 18, 2026) is one more choice: never combined, the bigger saving applies
   const { discountCents, discountNote } = await import("@/lib/customer-discounts");
   const cd = await customerDiscount();
-  if (cd) options.push({ discountCents: discountCents(cd, full.reduce((t, l) => t + l.qty * l.unitPriceCents, 0)), note: discountNote(cd) });
+  // Deep check M49 (Nov 27, 2026): the customer discount comes off the rentals only, never the extras
+  if (cd) options.push({ discountCents: discountCents(cd, full.filter(isRental).reduce((t, l) => t + l.qty * l.unitPriceCents, 0)), note: discountNote(cd) });
   if (on(s.offerFourthSundayOn)) options.push({ discountCents: await fourthSundayDiscount(exec, { id: o.id, customerId: o.customerId, eventDate: o.eventDate }, full), note: OFFER_NOTES.fourthSunday });
   // How offers combine (Admin handoff, Abraham, Nov 26, 2026): "best" (the default, as always) = only the biggest
   // saving; "add" = the customer discount and the 4th Sunday both apply, on top of the laser half price, never more
