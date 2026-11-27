@@ -241,6 +241,9 @@ export async function chooseLinkOption(primaryId: number, index: number, product
     const counts = async (id: number) => (await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, id))).length;
     // 1. an order of this payment for that day; 2. the removed item's own order if it has nothing left; 3. a new one
     let target = group.find((g) => g.eventDate === date && g.status === "PENDING_PAYMENT");
+    // Deep check 09:00 P4: that day's hold has ended (its other items no longer counted, someone may have booked them):
+    // never held again here unchecked; "Check availability again" checks the whole day first
+    if (target && holdEnded(target, now)) return false;
     if (!target) {
       const own = group.find((g) => g.eventDate === entry.eventDate);
       if (own && (await counts(own.id)) === 0) {
