@@ -39,8 +39,8 @@ export const REPORTS: Record<string, Report> = {
     file: "hupup-payments",
     roles: ["owner"],
     build: async (p) => {
-      const list = await rows<{ id: number; event_date: string; status: string; name: string | null; phone: string | null; subtotal_cents: number; paid_cents: number; payment_method: string | null; sola_ref_num: string | null; updated_at: string }>(sql`
-        SELECT o.id, o.event_date::text, o.status, c.name, c.phone, o.subtotal_cents, o.paid_cents, o.payment_method, o.sola_ref_num, o.updated_at::text
+      const list = await rows<{ id: number; event_date: string; status: string; name: string | null; phone: string | null; subtotal_cents: number; total_cents: number; paid_cents: number; refunded_cents: number; payment_method: string | null; sola_ref_num: string | null; updated_at: string }>(sql`
+        SELECT o.id, o.event_date::text, o.status, c.name, c.phone, o.subtotal_cents, COALESCE(o.total_cents, o.subtotal_cents) AS total_cents, o.paid_cents, o.refunded_cents, o.payment_method, o.sola_ref_num, o.updated_at::text
         FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
         WHERE o.paid_cents > 0
           ${p.from ? sql`AND o.event_date >= ${p.from}::date` : sql``}
@@ -49,8 +49,10 @@ export const REPORTS: Record<string, Report> = {
       return [
         {
           name: "Payments",
-          header: ["Order", "Event date", "Status", "Customer", "Phone", "Subtotal ($)", "Paid ($)", "Balance ($)", "Method", "Sola reference", "Last updated"],
-          rows: list.map((o) => [orderNumber(o.id), o.event_date, o.status, o.name, o.phone, money(o.subtotal_cents), money(o.paid_cents), money(o.subtotal_cents - o.paid_cents), o.payment_method, o.sola_ref_num, o.updated_at?.slice(0, 16)]),
+          // Deep check A5 (Nov 27, 2026): the balance is the order total (rentals, delivery, services and tax) less what
+          // was paid and kept (paid minus refunded); refunds have their own column
+          header: ["Order", "Event date", "Status", "Customer", "Phone", "Subtotal ($)", "Total ($)", "Paid ($)", "Refunded ($)", "Balance ($)", "Method", "Sola reference", "Last updated"],
+          rows: list.map((o) => [orderNumber(o.id), o.event_date, o.status, o.name, o.phone, money(o.subtotal_cents), money(o.total_cents), money(o.paid_cents), money(o.refunded_cents), money(o.total_cents - (o.paid_cents - o.refunded_cents)), o.payment_method, o.sola_ref_num, o.updated_at?.slice(0, 16)]),
         },
       ];
     },

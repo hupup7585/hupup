@@ -48,8 +48,8 @@ export async function canUseBooks(s: { role: string; userId: number | null }) {
   return !!o?.allowed;
 }
 
-export async function bookAudit(userId: number | null, action: string, entityType: string, entityId: string | number | null, after: Record<string, unknown>) {
-  await db.insert(schema.auditLog).values({ userId, action: `books.${action}`, entityType, entityId: entityId === null ? null : String(entityId), after });
+export async function bookAudit(userId: number | null, action: string, entityType: string, entityId: string | number | null, after: Record<string, unknown>, exec: Pick<typeof db, "insert"> = db) {
+  await exec.insert(schema.auditLog).values({ userId, action: `books.${action}`, entityType, entityId: entityId === null ? null : String(entityId), after });
 }
 
 /** "$1,234.56", "1234.5", "12" -> cents. Null when not a valid amount. */
@@ -81,8 +81,8 @@ export function assertNoCardNumber(...texts: (string | null | undefined)[]) {
 
 export const isoDate = (v: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v ?? "")) ? String(v) : null);
 
-export async function isLocked(dateIso: string) {
-  const [l] = await db.select().from(schema.bookLocks).where(eq(schema.bookLocks.month, dateIso.slice(0, 7)));
+export async function isLocked(dateIso: string, exec: Pick<typeof db, "select"> = db) {
+  const [l] = await exec.select().from(schema.bookLocks).where(eq(schema.bookLocks.month, dateIso.slice(0, 7)));
   return l?.status === "locked";
 }
 
@@ -115,7 +115,8 @@ export type NewEntry = {
   correctsId?: number | null;
 };
 
-export async function addEntry(e: NewEntry, userId: number | null) {
+/** `exec`: a transaction to add the entry inside (every read and write of this entry then uses it). */
+export async function addEntry(e: NewEntry, userId: number | null, exec: Pick<typeof db, "insert" | "select"> = db) {
   if (!isoDate(e.entryDate)) throw new BooksError("Enter a date.");
   if (![...MONEY_IN, ...MONEY_OUT].includes(e.kind)) throw new BooksError("Choose a type.");
   if (!Number.isInteger(e.amountCents) || (e.amountCents <= 0 && !e.correctsId)) throw new BooksError("Enter an amount greater than zero.");
@@ -126,8 +127,8 @@ export async function addEntry(e: NewEntry, userId: number | null) {
   if (e.method === "check" && e.kind !== "expense" && !e.checkNo && !e.correctsId && !autoCheck) throw new BooksError("Enter the check number.");
   if (autoCheck) e = { ...e, notes: [e.notes, "Check number not entered on the booking."].filter(Boolean).join(" ") };
   assertNoCardNumber(e.notes, e.party, e.checkNo, e.ref, e.personName, e.category);
-  if (await isLocked(e.entryDate)) throw new BooksError(`${e.entryDate.slice(0, 7)} is locked. Date the entry in an open month.`);
-  const [row] = await db
+  if (await isLocked(e.entryDate, exec)) throw new BooksError(`${e.entryDate.slice(0, 7)} is locked. Date the entry in an open month.`);
+  const [row] = await exec
     .insert(schema.bookEntries)
     .values({
       ...e,
@@ -141,46 +142,53 @@ export async function addEntry(e: NewEntry, userId: number | null) {
       createdBy: userId,
     })
     .returning();
-  await bookAudit(userId, e.correctsId ? "correction" : "entry_added", "book_entry", row.id, { ...e });
+  await bookAudit(userId, e.correctsId ? "correction" : "entry_added", "book_entry", row.id, { ...e }, exec);
   return row;
 }
 
 /** A correction: a new row with the opposite amounts, dated today (or the given open-month date). The original stays. */
 export async function reverseEntry(id: number, reason: string, userId: number | null, date = todayISO()) {
-  const [o] = await db.select().from(schema.bookEntries).where(eq(schema.bookEntries.id, id));
-  if (!o) throw new BooksError("Entry not found.");
-  const [already] = await db.select({ id: schema.bookEntries.id }).from(schema.bookEntries).where(eq(schema.bookEntries.correctsId, id));
-  if (already) throw new BooksError("This entry was already corrected.");
   if (!reason.trim()) throw new BooksError("Say why it's being corrected.");
-  return addEntry(
-    {
-      entryDate: date,
-      kind: o.kind as EntryKind,
-      category: o.category,
-      amountCents: -o.amountCents,
-      rentalCents: -o.rentalCents,
-      deliveryCents: -o.deliveryCents,
-      taxCents: -o.taxCents,
-      tipCents: -o.tipCents,
-      servicesCents: -o.servicesCents,
-      method: o.method,
-      checkNo: o.checkNo,
-      party: o.party,
-      orderId: o.orderId,
-      invoiceId: o.invoiceId,
-      billId: o.billId,
-      productId: o.productId,
-      projectId: o.projectId,
-      personName: o.personName,
-      county: o.county,
-      taxExempt: o.taxExempt,
-      ref: o.ref,
-      notes: `Correction of entry #${o.id}: ${reason.trim()}`,
-      source: "manual",
-      correctsId: o.id,
-    },
-    userId,
-  );
+  // Deep check A8 (Nov 27, 2026): the original is locked while it is checked and its correction is added, so two
+  // clicks at once can't both correct it; a correction itself is never corrected again
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM book_entries WHERE id = ${id} FOR UPDATE`);
+    const [o] = await tx.select().from(schema.bookEntries).where(eq(schema.bookEntries.id, id));
+    if (!o) throw new BooksError("Entry not found.");
+    if (o.correctsId) throw new BooksError("This entry is itself a correction. Add a new entry instead.");
+    const [already] = await tx.select({ id: schema.bookEntries.id }).from(schema.bookEntries).where(eq(schema.bookEntries.correctsId, id));
+    if (already) throw new BooksError("This entry was already corrected.");
+    return addEntry(
+      {
+        entryDate: date,
+        kind: o.kind as EntryKind,
+        category: o.category,
+        amountCents: -o.amountCents,
+        rentalCents: -o.rentalCents,
+        deliveryCents: -o.deliveryCents,
+        taxCents: -o.taxCents,
+        tipCents: -o.tipCents,
+        servicesCents: -o.servicesCents,
+        method: o.method,
+        checkNo: o.checkNo,
+        party: o.party,
+        orderId: o.orderId,
+        invoiceId: o.invoiceId,
+        billId: o.billId,
+        productId: o.productId,
+        projectId: o.projectId,
+        personName: o.personName,
+        county: o.county,
+        taxExempt: o.taxExempt,
+        ref: o.ref,
+        notes: `Correction of entry #${o.id}: ${reason.trim()}`,
+        source: "manual",
+        correctsId: o.id,
+      },
+      userId,
+      tx,
+    );
+  });
 }
 
 /**
@@ -328,7 +336,8 @@ async function paidBy(col: "invoice_id" | "bill_id", ids: number[]) {
   const m = new Map<number, number>();
   if (!ids.length) return m;
   const rows = (
-    await db.execute(sql`SELECT ${sql.raw(col)} AS id, sum(amount_cents)::int AS cents FROM book_entries WHERE ${sql.raw(col)} IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)}) GROUP BY 1`)
+    // Deep check A6 (Nov 27, 2026): a refund linked to an invoice is money given back, so it lowers what was received
+    await db.execute(sql`SELECT ${sql.raw(col)} AS id, sum(CASE WHEN ${col === "invoice_id" ? sql`kind = 'refund'` : sql`false`} THEN -amount_cents ELSE amount_cents END)::int AS cents FROM book_entries WHERE ${sql.raw(col)} IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)}) GROUP BY 1`)
   ).rows as { id: number; cents: number }[];
   for (const r of rows) m.set(Number(r.id), Number(r.cents));
   return m;

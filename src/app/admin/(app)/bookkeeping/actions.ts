@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { todayISO } from "@/lib/dates";
 import { saveSetting } from "@/lib/settings";
@@ -152,6 +152,9 @@ export async function payInvoiceAction(f: FormData) {
   return run("invoices", async (userId) => {
     const [inv] = await db.select().from(schema.bookInvoices).where(eq(schema.bookInvoices.id, Number(s(f, "invoiceId"))));
     if (!inv) throw new BooksError("Invoice not found.");
+    // Deep check A11 (Nov 27, 2026): a payment only on an issued invoice (never a void one, a draft, a quote or a credit note)
+    if (inv.kind !== "invoice") throw new BooksError(`This is a ${inv.kind === "quote" ? "quote" : "credit note"}, not an invoice. Payments are recorded on an invoice.`);
+    if (inv.status !== "open") throw new BooksError(inv.status === "void" ? "This invoice was voided. A payment can't be recorded on it." : "Issue the invoice first, then record the payment.");
     const row = await addEntry(
       {
         entryDate: date(f, "date"),
@@ -204,6 +207,7 @@ export async function payBillAction(f: FormData) {
   return run("bills", async (userId) => {
     const [b] = await db.select().from(schema.bookBills).where(eq(schema.bookBills.id, Number(s(f, "billId"))));
     if (!b) throw new BooksError("Bill not found.");
+    if (b.status === "void") throw new BooksError("This bill was voided. A payment can't be recorded on it."); // deep check A11
     const row = await addEntry(
       { entryDate: date(f, "date"), kind: "expense", category: b.category, amountCents: money(f, "amount"), method: s(f, "method") || null, checkNo: s(f, "checkNo") || null, party: b.vendor, billId: b.id, notes: s(f, "notes") || null },
       userId,
@@ -242,14 +246,22 @@ export async function recordRecurringAction(f: FormData) {
   return run("expenses", async (userId) => {
     const [r] = await db.select().from(schema.bookRecurring).where(eq(schema.bookRecurring.id, Number(s(f, "id"))));
     if (!r) throw new BooksError("Not found.");
+    // Deep check A10 (Nov 27, 2026): never after it was stopped, and a double click records it once: the next date
+    // moves on first, only if it is still the date read here
+    if (!r.active) throw new BooksError("This recurring expense was stopped. Nothing was recorded.");
+    const next = nextRecurring(r.nextDate, r.frequency);
+    const [claimed] = await db
+      .update(schema.bookRecurring)
+      .set({ nextDate: next })
+      .where(and(eq(schema.bookRecurring.id, r.id), eq(schema.bookRecurring.nextDate, r.nextDate), eq(schema.bookRecurring.active, true)))
+      .returning({ id: schema.bookRecurring.id });
+    if (!claimed) throw new BooksError("This one was already recorded. Reload the page.");
     if (s(f, "as") === "bill") {
       const [b] = await db.insert(schema.bookBills).values({ vendor: r.vendor, category: r.category, billDate: r.nextDate, dueDate: r.nextDate, amountCents: r.amountCents, recurringId: r.id, createdBy: userId }).returning();
       await bookAudit(userId, "bill_added", "book_bill", b.id, { fromRecurring: r.id });
     } else {
       await addEntry({ entryDate: r.nextDate <= todayISO() ? r.nextDate : todayISO(), kind: "expense", category: r.category, amountCents: r.amountCents, method: r.method, party: r.vendor, notes: `Recurring (${r.frequency})` }, userId);
     }
-    const next = nextRecurring(r.nextDate, r.frequency);
-    await db.update(schema.bookRecurring).set({ nextDate: next }).where(eq(schema.bookRecurring.id, r.id));
     await bookAudit(userId, "recurring_recorded", "book_recurring", r.id, { next });
     return `Recorded ${r.vendor}. Next one: ${next}.`;
   });
@@ -316,7 +328,11 @@ export async function lockMonthAction(f: FormData) {
     const month = s(f, "month");
     if (!/^\d{4}-\d{2}$/.test(month)) throw new BooksError("Choose a month.");
     if (month >= todayISO().slice(0, 7)) throw new BooksError("Only months that have ended can be locked.");
-    await db.insert(schema.bookLocks).values({ month, lockedBy: userId }).onConflictDoNothing();
+    // Deep check A17 (Nov 27, 2026): a month that was reopened is locked again too (it was left open before)
+    await db
+      .insert(schema.bookLocks)
+      .values({ month, lockedBy: userId })
+      .onConflictDoUpdate({ target: schema.bookLocks.month, set: { status: "locked", lockedBy: userId, lockedAt: new Date() } });
     await bookAudit(userId, "month_locked", "book_lock", month, {});
     return `${month} is locked. Nothing dated in it can be added.`;
   });
@@ -402,14 +418,22 @@ export async function addMileageAction(f: FormData) {
 
 export async function reverseMileageAction(f: FormData) {
   return run("mileage", async (userId) => {
-    const [t] = await db.select().from(schema.bookMileage).where(eq(schema.bookMileage.id, Number(s(f, "id"))));
-    if (!t) throw new BooksError("Not found.");
     if (!s(f, "reason")) throw new BooksError("Say why it's being corrected.");
-    const [c] = await db
-      .insert(schema.bookMileage)
-      .values({ tripDate: todayISO(), vehicle: t.vehicle, driver: t.driver, milesTenths: -t.milesTenths, purpose: t.purpose, orderId: t.orderId, notes: `Correction of trip number ${t.id}: ${s(f, "reason")}`, correctsId: t.id, createdBy: userId })
-      .returning();
-    await bookAudit(userId, "mileage_corrected", "book_mileage", c.id, { corrects: t.id, reason: s(f, "reason") });
+    // Deep check A9 (Nov 27, 2026): a trip is corrected once (locked while checked); a correction is never corrected
+    const c = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM book_mileage WHERE id = ${Number(s(f, "id"))} FOR UPDATE`);
+      const [t] = await tx.select().from(schema.bookMileage).where(eq(schema.bookMileage.id, Number(s(f, "id"))));
+      if (!t) throw new BooksError("Not found.");
+      if (t.correctsId) throw new BooksError("This trip is itself a correction. Add a new trip instead.");
+      const [already] = await tx.select({ id: schema.bookMileage.id }).from(schema.bookMileage).where(eq(schema.bookMileage.correctsId, t.id));
+      if (already) throw new BooksError("This trip was already corrected.");
+      const [row] = await tx
+        .insert(schema.bookMileage)
+        .values({ tripDate: todayISO(), vehicle: t.vehicle, driver: t.driver, milesTenths: -t.milesTenths, purpose: t.purpose, orderId: t.orderId, notes: `Correction of trip number ${t.id}: ${s(f, "reason")}`, correctsId: t.id, createdBy: userId })
+        .returning();
+      return { ...row, corrects: t.id };
+    });
+    await bookAudit(userId, "mileage_corrected", "book_mileage", c.id, { corrects: c.corrects, reason: s(f, "reason") });
     return "Correction added.";
   });
 }
