@@ -5194,6 +5194,13 @@ const handlers: Record<string, Handler> = {
       phonePayDirectDial(vr, { number: s.solaPhonePayBackup, digits, action: url("phonepay-done", { o, a, b: 1, ...(s.solaListenOn ? { ls: 1 } : {}) }), hangupOnStar: true });
       return vr;
     }
+    // Phone pass 2 #4: the backup number did not answer either: no card was typed, so nothing is recorded as declined
+    // and the caller is not told "did not go through"; they get the payment link menu (box 141), existing lines
+    if (a && ctx.query.get("b") === "1" && PHONEPAY_NOT_REACHED.includes(status)) {
+      await db.update(schema.phonepayAttempts).set({ endedAt: new Date(), matched: false, note: `Payment line and backup did not answer (${status})` }).where(eq(schema.phonepayAttempts.id, a));
+      await track(ctx.callSid, "step", `Payment line and backup did not answer (${status}): no card try; the payment link menu`, { attempt: a });
+      return back(vr, "paylink", { o });
+    }
     if (a) {
       if (ctx.body.DialCallSid) await db.update(schema.phonepayAttempts).set({ payLegSid: ctx.body.DialCallSid }).where(eq(schema.phonepayAttempts.id, a));
       const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1);

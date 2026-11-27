@@ -110,6 +110,24 @@ describe("card payment on the phone line", () => {
     await db.delete(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.orderId, o2.id));
   });
 
+  it("phone pass 2 #4: the payment line and the backup both did not answer: no decline, no 'did not go through', the payment link menu", async () => {
+    const { eq } = await import("drizzle-orm");
+    const [o3] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2026-11-23", pickupDate: "2026-11-23", subtotalCents: 50000, totalCents: 50000, holdExpiresAt: new Date(Date.now() + 600_000) }).returning();
+    const [t] = await db.insert(schema.phonepayAttempts).values({ orderId: o3.id, callSid: "CApp", tryNumber: 1, amountCents: 50000 }).returning();
+    for (const st of ["no-answer", "busy", "failed"]) {
+      await db.update(schema.phonepayAttempts).set({ endedAt: null }).where(eq(schema.phonepayAttempts.id, t.id));
+      const x = await call("phonepay-done", { DialCallStatus: st }, `o=${o3.id}&a=${t.id}&b=1`);
+      expect(redirect(x), st).toBe(`paylink?o=${o3.id}`);
+      expect(said(x).join(" ")).not.toMatch(/did not go through/);
+    }
+    const [after] = await db.select().from(schema.orders).where(eq(schema.orders.id, o3.id));
+    expect(after.paymentResult).not.toBe("declined");
+    // the backup line answered (completed): the usual check, as before
+    const done = await call("phonepay-done", { DialCallStatus: "completed" }, `o=${o3.id}&a=${t.id}&b=1`);
+    expect(redirect(done)).toMatch(/^phonepay-retry/);
+    await db.delete(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.orderId, o3.id));
+  });
+
   it("no charge: the try-again menu on our line; a wrong amount is voided and the Owner is emailed", async () => {
     const tries = await db.select().from(schema.phonepayAttempts);
     // PhonePay did not answer: the backup number on the same try, no retry menu
