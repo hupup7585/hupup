@@ -277,8 +277,8 @@ export async function hasTransactionalConsent(phone: string): Promise<boolean> {
 /** Did any customer record with this phone number reply STOP? */
 async function numberOptedOut(to: string, exec: Pick<typeof db, "select"> = db): Promise<boolean> {
   if (!to) return false;
-  const [row] = await exec.select({ id: schema.customers.id }).from(schema.customers).where(and(eq(schema.customers.phone, to), eq(schema.customers.smsOptOut, true))).limit(1);
-  return Boolean(row);
+  const rows = await exec.select({ phone: schema.customers.phone, optOut: schema.customers.smsOptOut }).from(schema.customers).where(and(eq(schema.customers.phone, to), eq(schema.customers.smsOptOut, true))).limit(1);
+  return rows.some((r) => r.optOut === true && r.phone === to);
 }
 
 export async function checkEligibility(input: { to: string; kind: MessageKind; event?: string | null; customer: Customer | null; now?: Date; heldRecheck?: boolean; exec?: Pick<typeof db, "select"> }): Promise<Blocked | null> {
