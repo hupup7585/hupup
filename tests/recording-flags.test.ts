@@ -45,3 +45,39 @@ describe("needs a new recording", () => {
     expect((await flags()).map((x) => [x.slot, x.from, x.to])).toEqual([["ocean_200", "$12.00", "$10.00"]]);
   });
 });
+
+describe("needs a new recording: drafts and repeat changes (fix, Nov 27, 2026)", () => {
+  it("replaces a spoken value only as a whole word or amount", async () => {
+    const { replaceSpoken } = await import("@/lib/recording-flags");
+    expect(replaceSpoken("Please listen. You have ten minutes.", "ten", "twelve")).toBe("Please listen. You have twelve minutes.");
+    expect(replaceSpoken("200 for $10, 500 for $100.", "$10", "$12")).toBe("200 for $12, 500 for $100.");
+    expect(replaceSpoken("Only $10.50 today", "$10", "$12")).toBe("Only $10.50 today");
+  });
+  it("changed back: the automatic draft is set aside", async () => {
+    const { db, schema } = await import("@/lib/db");
+    await saveSetting("phoneLinkHoldMinutes", "15");
+    const open = async () => (await db.select().from(schema.promptVersions)).filter((d) => d.promptKey === "pay_link_sent" && d.status === "draft");
+    expect((await open())[0].text).toMatch(/fifteen minutes/);
+    await saveSetting("phoneLinkHoldMinutes", "10");
+    expect(await open()).toEqual([]);
+  });
+  it("the draft starts from the wording live now, and keeps an earlier change to the same line", async () => {
+    const { db, schema } = await import("@/lib/db");
+    const { saveDraft, approveDraft } = await import("@/lib/prompt-versions");
+    // The Owner's own live wording for the line, with the price in it
+    const v = await saveDraft("ocean_balls", "Our own words: 200 balls for $10, 500 balls for $20.", null);
+    await approveDraft(v.id, null);
+    await linkedValueChanged("product:Ocean balls:1", 1000, 1500);
+    await linkedValueChanged("product:Ocean balls:2", 2000, 2500);
+    const drafts = (await db.select().from(schema.promptVersions)).filter((d) => d.promptKey === "ocean_balls" && d.status === "draft");
+    expect(drafts.map((d) => d.text)).toEqual(["Our own words: 200 balls for $15, 500 balls for $25."]);
+  });
+  it("hours changed twice: still flagged (both read 'new hours'); back to the first: cleared", async () => {
+    const a = "x".repeat(70), b = "y".repeat(70), c = "z".repeat(70);
+    await linkedValueChanged("setting:hoursSchedules", a, b);
+    await linkedValueChanged("setting:hoursSchedules", b, c);
+    expect((await flags()).some((f) => f.slot === "key7_cs_hours")).toBe(true);
+    await linkedValueChanged("setting:hoursSchedules", c, a);
+    expect((await flags()).some((f) => f.slot === "key7_cs_hours")).toBe(false);
+  });
+});

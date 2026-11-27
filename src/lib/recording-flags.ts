@@ -13,7 +13,7 @@ import { numberWords } from "@/lib/spoken-words";
 
 /** A source is "setting:<key>" or "product:<category>:<size order>" (that item's price). */
 export type RecordingLink = { source: string; label: string; slots: string[] };
-export type RecordingFlag = { slot: string; source: string; label: string; from: string; to: string; at: string };
+export type RecordingFlag = { slot: string; source: string; label: string; from: string; to: string; at: string; fromRaw?: string };
 
 const tenMinuteLines = () => (Object.entries(PROMPTS) as [PromptKey, { text: string }][]).filter(([, d]) => /\bten minutes\b/i.test(d.text)).map(([k]) => k);
 
@@ -67,6 +67,15 @@ function spokenForms(source: string, v: string): string[] {
   return [];
 }
 
+/** Replaces a spoken value only as a whole word or amount ("ten" never inside "listen", "$10" never inside "$100"). */
+export function replaceSpoken(text: string, oldWord: string, newWord: string): string {
+  const esc = oldWord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text.replace(new RegExp(`(?<![A-Za-z0-9$])${esc}(?![A-Za-z0-9]|[.,]\\d)`, "g"), () => newWord);
+}
+export function hasSpoken(text: string, word: string) {
+  return replaceSpoken(text, word, "\u0000") !== text;
+}
+
 /** The value as staff read it in the banner and email. */
 function shown(source: string, v: string) {
   if (source.startsWith("product:")) return `$${(Number(v) / 100).toFixed(2)}`;
@@ -92,28 +101,21 @@ export async function linkedValueChanged(source: string, before: unknown, after:
       for (const slot of link.slots) {
         const old = flags.find((f) => f.slot === slot && f.source === source);
         if (old) {
-          if (old.from === shown(source, to)) {
+          // Changed back to the value the recording says (raw values: two different hours lists both read "new hours")
+          if (old.fromRaw !== undefined ? old.fromRaw === to : old.from === shown(source, to)) {
             flags = flags.filter((f) => f !== old); // changed back: the recording is right again
+            await draftWithNewValue(slot, source, from, to, userId); // and its automatic draft is set aside
             continue;
           }
           old.to = shown(source, to);
           old.at = now;
           touched.push(old);
         } else {
-          const f = { slot, source, label: link.label, from: shown(source, from), to: shown(source, to), at: now };
+          const f: RecordingFlag = { slot, source, label: link.label, from: shown(source, from), to: shown(source, to), at: now, fromRaw: from };
           flags.push(f);
           touched.push(f);
         }
-        // a draft of the slot's text with the new value, waiting for Abraham (only when the old value is in the text)
-        const def = (PROMPTS as Record<string, { text: string }>)[slot];
-        if (def) {
-          const [oldWord] = spokenForms(source, from).filter((w) => def.text.includes(w));
-          const [newWord] = spokenForms(source, to);
-          if (oldWord && newWord) {
-            const { saveDraft } = await import("@/lib/prompt-versions");
-            await saveDraft(slot, def.text.split(oldWord).join(newWord), userId).catch(() => undefined);
-          }
-        }
+        await draftWithNewValue(slot, source, from, to, userId);
       }
     }
     await saveSetting("recordingFlags" as never, JSON.stringify(flags) as never, userId, "Needs a new recording (automatic)");
@@ -121,6 +123,37 @@ export async function linkedValueChanged(source: string, before: unknown, after:
   } catch (e) {
     console.error("[recording flags]", source, e);
   }
+}
+
+/**
+ * A draft of the slot's text with the new value, waiting for Abraham (only when the old value is in the text). It
+ * starts from the open draft (another linked value may have changed in the same line, e.g. the ocean ball prices),
+ * else from the wording live now (the Owner's own edits stay), never from the original wording in the code. When the
+ * value goes back and the draft becomes the live wording again, the draft is set aside.
+ */
+async function draftWithNewValue(slot: string, source: string, from: string, to: string, userId: number | null) {
+  if (!(slot in PROMPTS)) return;
+  const { liveText, saveDraft, discardDraft } = await import("@/lib/prompt-versions");
+  const { db, schema } = await import("@/lib/db");
+  const { and, desc, eq } = await import("drizzle-orm");
+  const [open] = await db
+    .select()
+    .from(schema.promptVersions)
+    .where(and(eq(schema.promptVersions.promptKey, slot), eq(schema.promptVersions.status, "draft")))
+    .orderBy(desc(schema.promptVersions.id))
+    .limit(1);
+  const live = await liveText(slot as PromptKey);
+  const base = open?.text ?? live;
+  const [oldWord] = spokenForms(source, from).filter((w) => hasSpoken(base, w));
+  const [newWord] = spokenForms(source, to);
+  if (!oldWord || !newWord) return;
+  const next = replaceSpoken(base, oldWord, newWord);
+  if (next === base) return;
+  if (next.trim() === live.trim()) {
+    if (open) await discardDraft(open.id, userId).catch(() => undefined);
+    return;
+  }
+  await saveDraft(slot, next, userId).catch(() => undefined);
 }
 
 /** A new recording was put on the line ("Use this one"): its flag is cleared. */

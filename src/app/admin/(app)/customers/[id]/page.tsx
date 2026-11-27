@@ -64,10 +64,30 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     ...vms.map((v) => ({ at: v.at, kind: "Voicemail", text: v.transcription || `${v.durationSec}s message`, href: "/admin/voicemail" })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
   const showMoney = staff.role === "owner";
+  const { mergeLinks } = await import("@/lib/duplicate-customers");
+  const merges = await mergeLinks(c.id).catch(() => ({ mergedIn: [] as number[], mergedInto: null as number | null }));
 
   return (
     <div className="w-full">
       <Link href="/admin/customers" className="text-sm font-semibold text-navy hover:underline">← Customers</Link>
+      {(merges.mergedInto || merges.mergedIn.length > 0) && (
+        <div className="card mt-2 p-3 text-sm" data-merge-links>
+          {merges.mergedInto && (
+            <div className="font-semibold">
+              This record was merged into <Link className="text-navy underline" href={`/admin/customers/${merges.mergedInto}`}>customer number {merges.mergedInto}</Link>. Its consent and terms records stay here as written.
+            </div>
+          )}
+          {merges.mergedIn.length > 0 && (
+            <div>
+              Merged into this record:{" "}
+              {merges.mergedIn.map((m, i) => (
+                <span key={m}>{i ? ", " : ""}<Link className="font-semibold text-navy underline" href={`/admin/customers/${m}`}>customer number {m}</Link></span>
+              ))}{" "}
+              (their consent and terms records stay on those pages as written).
+            </div>
+          )}
+        </div>
+      )}
       <div className="mb-5 mt-1 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black sm:text-3xl">
           {c.name || "Unknown caller"}
