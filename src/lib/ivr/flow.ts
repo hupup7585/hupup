@@ -2688,6 +2688,12 @@ const handlers: Record<string, Handler> = {
     const spans = { ...(ctx.session?.data.spanDays ?? {}) };
     for (const l of lines) if (l.state === "free" && l.span && l.pk && !spans[l.d]) spans[l.d] = { after: l.pk, days: l.span };
     if (Object.keys(spans).length) await updateSession(ctx.callSid, { data: { spanDays: spans } }, ctx.session);
+    // Extra check P3: a Friday kept for Mutze Shabbes on the last call (picked up Sunday) stays kept, so an item added
+    // for that Friday on this call goes on the same order with the same Sunday pickup (never a second, Friday-only order)
+    const mutze = new Set(ctx.session?.data.mutzeDays ?? []);
+    const hs = (await getSettings()) as never;
+    for (const l of lines) if (l.state === "free" && !l.span && l.pk && friMutzeOffered(l.d, hs) && l.pk === friMutzePickup(l.d)) mutze.add(l.d);
+    if (mutze.size !== (ctx.session?.data.mutzeDays ?? []).length) await updateSession(ctx.callSid, { data: { mutzeDays: [...mutze] } }, ctx.session);
     await track(ctx.callSid, "step", `Unfinished cart checked again: ${lines.filter((l) => l.state === "free").length} free, ${lines.filter((l) => l.state === "taken").length} no longer free`, { lines });
     await updateSession(ctx.callSid, { data: { resumeLines: lines } }, ctx.session);
     return back(vr, "resume-items");
