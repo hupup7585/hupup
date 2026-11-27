@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { todayISO } from "@/lib/dates";
 import { KIND_LABEL, agingBucket, countyFor, openBills, openInvoices, salesTaxPeriods, solaFee, type EntryKind } from "@/lib/books";
@@ -142,10 +142,21 @@ export async function incomeByChannel(entries: Entry[]) {
  * purchase cost, for profit per item.
  */
 export async function incomeByItem(entries: Entry[]) {
-  const orderIds = [...new Set(entries.filter((e) => e.kind === "income" && e.source === "auto" && e.orderId && e.amountCents > 0).map((e) => e.orderId!))];
+  const paidIn = entries.filter((e) => e.kind === "income" && e.source === "auto" && e.orderId && e.amountCents > 0);
+  // Deep check A20 (Nov 27, 2026): an order counts once, in the period of its first booking payment (not again when
+  // the rest is paid later); a fully refunded order doesn't count, a partly refunded one counts what was kept
+  const candidates = [...new Set(paidIn.map((e) => e.orderId!))];
+  const firsts = candidates.length
+    ? ((await db.execute(sql`SELECT order_id, MIN(id)::int AS first_id FROM book_entries WHERE kind = 'income' AND source = 'auto' AND amount_cents > 0 AND order_id IN (${sql.join(candidates.map((i) => sql`${i}`), sql`, `)}) GROUP BY order_id`)).rows as { order_id: number; first_id: number }[])
+    : [];
+  const here = new Set(paidIn.map((e) => e.id));
+  const counted = firsts.filter((f) => here.has(Number(f.first_id))).map((f) => Number(f.order_id));
+  const money = counted.length ? await db.select({ id: schema.orders.id, paid: schema.orders.paidCents, refunded: schema.orders.refundedCents }).from(schema.orders).where(inArray(schema.orders.id, counted)) : [];
+  const kept = new Map(money.map((o) => [o.id, o.paid > 0 ? Math.max(0, o.paid - o.refunded) / o.paid : 1]));
+  const orderIds = counted.filter((id) => (kept.get(id) ?? 1) > 0);
   const items = orderIds.length
     ? await db
-        .select({ productId: schema.orderItems.productId, qty: schema.orderItems.qty, unit: schema.orderItems.unitPriceCents, name: schema.products.name })
+        .select({ orderId: schema.orderItems.orderId, productId: schema.orderItems.productId, qty: schema.orderItems.qty, unit: schema.orderItems.unitPriceCents, name: schema.products.name })
         .from(schema.orderItems)
         .innerJoin(schema.products, eq(schema.products.id, schema.orderItems.productId))
         .where(inArray(schema.orderItems.orderId, orderIds))
@@ -156,7 +167,7 @@ export async function incomeByItem(entries: Entry[]) {
   for (const i of items) {
     const r = row(i.productId, i.name);
     r.rentals += i.qty;
-    r.incomeCents += i.qty * i.unit;
+    r.incomeCents += Math.round(i.qty * i.unit * (kept.get(i.orderId) ?? 1));
   }
   for (const e of entries) if (e.kind === "expense" && e.productId) row(e.productId, e.party || `Item ${e.productId}`).repairsCents += e.amountCents;
   for (const q of equipment) if (q.productId) row(q.productId, q.name).costCents += q.costCents * q.qty;

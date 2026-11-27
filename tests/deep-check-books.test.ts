@@ -134,3 +134,24 @@ describe("A13: a second charge on a paid order", () => {
     expect(last).toMatchObject({ category: "Bookings", taxCents: 894, tipCents: 0 });
   });
 });
+
+describe("A20: income by item", () => {
+  it("an order paid in two periods counts once (first payment's period); a fully refunded order doesn't count", async () => {
+    const [cat] = await db.insert(schema.categories).values({ name: "Slides", sortOrder: 9, active: true }).returning();
+    const [p] = await db.insert(schema.products).values({ categoryId: cat.id, name: "Wave Slide A20", priceCents: 20000, quantity: 1, active: true }).returning();
+    const mk = async (paid: number, refunded: number) => {
+      const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "POS", eventDate: "2026-10-20", pickupDate: "2026-10-21", subtotalCents: 20000, totalCents: 20000, paidCents: paid, refundedCents: refunded }).returning();
+      await db.insert(schema.orderItems).values({ orderId: o.id, productId: p.id, qty: 1, unitPriceCents: 20000 });
+      return o.id;
+    };
+    const split = await mk(20000, 0);
+    await B.addEntry({ entryDate: "2026-10-05", kind: "income", category: "Bookings", amountCents: 10000, method: "cash", orderId: split, source: "auto" }, null);
+    await B.addEntry({ entryDate: "2026-11-05", kind: "income", category: "Bookings", amountCents: 10000, method: "cash", orderId: split, source: "auto" }, null);
+    const gone = await mk(20000, 20000);
+    await B.addEntry({ entryDate: "2026-10-06", kind: "income", category: "Bookings", amountCents: 20000, method: "cash", orderId: gone, source: "auto" }, null);
+    const R = await import("@/lib/books-reports");
+    const of = async (from: string, to: string) => (await R.incomeByItem(await R.entriesBetween(from, to))).find((r) => r.name === "Wave Slide A20");
+    expect(await of("2026-10-01", "2026-10-31")).toMatchObject({ rentals: 1, incomeCents: 20000 });
+    expect(await of("2026-11-01", "2026-11-30")).toBeUndefined();
+  });
+});
