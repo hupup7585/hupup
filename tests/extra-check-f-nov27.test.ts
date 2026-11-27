@@ -74,6 +74,20 @@ describe("F1 + F2: duplicate customers and campaigns", () => {
     const rows = await db.select().from(schema.smsCampaignSends).where(eq(schema.smsCampaignSends.campaignId, c.id));
     expect(rows).toHaveLength(2); // nothing deleted
   });
+  it("deep check 06:00 M69 (F6 leftover): a run cut off after claiming a customer sends to them on the resume", async () => {
+    const [chana] = await db.insert(schema.customers).values({ name: "Chana", phone: "+18455550711", marketingOptIn: true, marketingOptInAt: NOON, timeZone: "America/New_York" }).returning();
+    const { approveCampaign, createCampaign, sendCampaign } = await import("@/lib/campaigns");
+    const c = await createCampaign({ name: "Cut off", body: "Winter deal: 10% off slides booked this week." }, null);
+    await approveCampaign(c.id, null);
+    // the first run claimed Chana and stopped before the text went out
+    await db.insert(schema.smsCampaignSends).values({ campaignId: c.id, customerId: chana.id, phone: "+18455550711", status: "pending" });
+    await db.update(schema.smsCampaigns).set({ status: "sending", sentAt: new Date(Date.now() - 60 * 60_000) }).where(eq(schema.smsCampaigns.id, c.id));
+    const before = h.texts.filter((t) => t === "+18455550711").length;
+    await sendCampaign(c.id, null, NOON);
+    expect(h.texts.filter((t) => t === "+18455550711").length).toBe(before + 1);
+    const rows = await db.select().from(schema.smsCampaignSends).where(eq(schema.smsCampaignSends.campaignId, c.id));
+    expect(rows.filter((r) => r.phone === "+18455550711").map((r) => r.status)).toEqual(["sent"]);
+  });
   it("F6: a campaign too long to send stays approved (not stranded as sent)", async () => {
     const { approveCampaign, createCampaign, sendCampaign } = await import("@/lib/campaigns");
     const c = await createCampaign({ name: "Long", body: "x ".repeat(900) }, null).catch(() => null);
