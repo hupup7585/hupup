@@ -14,8 +14,13 @@ type Exec = { execute: (q: ReturnType<typeof sql>) => Promise<{ rows: unknown[] 
  * paths that lock again later (reserveInTx per item) keep working.
  */
 export async function lockStock(tx: Exec, productIds: number[]): Promise<number[]> {
-  const ids = [...new Set(productIds.filter((n) => Number.isInteger(n) && n > 0))];
-  if (!ids.length) return [];
+  const asked = [...new Set(productIds.filter((n) => Number.isInteger(n) && n > 0))];
+  if (!asked.length) return [];
+  // Extra check (09:00 P12): the laser gun pools as availability counts them (Catalog > Item types once the Owner sets
+  // them, else the names), so a laser item outside a "laser" category is locked too; the category-name rule below stays
+  const { laserPoolInfo } = await import("@/lib/availability");
+  const pools = await laserPoolInfo(tx as never);
+  const ids = asked.some((i) => pools.items.has(i)) ? [...new Set([...asked, ...pools.items.keys()])] : asked;
   const list = sql.join(
     ids.map((i) => sql`${i}`),
     sql`, `,
