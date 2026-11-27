@@ -142,7 +142,7 @@ describe("matching each charge to its own call (Abraham, Nov 18, 2026): never gu
     const { PROMPTS } = await import("@/lib/ivr/prompts");
     expect(PROMPTS.phonepay_unclear.text).toBe("Sorry, we could not confirm your payment. To try again, press 1.");
     const f = readFileSync("src/lib/ivr/flow.ts", "utf8");
-    expect(f).toContain('if (r.result === "unclear") return back(vr, "phonepay-retry", { o, n, u: 1 });');
+    expect(f).toContain('if (r.result === "unclear" || r.result === "check_failed") return back(vr, "phonepay-retry", { o, n, u: 1 });');
     expect(f).toContain('sp(g, ctx, "phonepay_unclear"');
   });
 });

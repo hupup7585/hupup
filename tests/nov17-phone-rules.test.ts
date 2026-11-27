@@ -61,6 +61,8 @@ describe("payment link hold", () => {
     expect(PAYMENT_HOLD_MINUTES).toBe(10);
     expect(IDLE_MINUTES).toBe(4);
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
-    expect(flow).toContain('holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")), linkHoldKind: "phone", linkOpenedAt: null'); // the phone hold setting (10)
+    // the phone hold setting (10), renewed only while the items are still free (Hark's 2nd phone check, A3)
+    expect(flow).toContain('const taken = await renewPaymentHold(ids, await linkHoldMinutes("phone"));');
+    expect(flow).toContain('.set({ linkHoldKind: "phone", linkOpenedAt: null })');
   });
 });

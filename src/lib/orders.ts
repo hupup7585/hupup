@@ -597,16 +597,24 @@ const dueOf = (o: FullOrder["order"]) => Math.max(0, (o.totalCents ?? o.subtotal
  * Orders paid together with one charge (several rental days booked on one call; Abraham, Nov 8, 2026).
  * A single order is its own group. `due` counts only orders still waiting for payment.
  */
-export async function getPaymentGroup(orderId: number): Promise<{ primary: FullOrder; orders: FullOrder[]; due: number } | null> {
+/**
+ * Paid means paid (Hark's 2nd phone check, A2, Nov 26, 2026): every day of the group has received its full total. A
+ * hold that ran out (CANCELLED, nothing paid) has nothing "due" but is NOT paid.
+ */
+const fullyPaid = (list: FullOrder[]) => list.length > 0 && list.every((x) => (x.order.totalCents ?? x.order.subtotalCents) > 0 && x.order.paidCents >= (x.order.totalCents ?? x.order.subtotalCents));
+
+export async function getPaymentGroup(orderId: number): Promise<{ primary: FullOrder; orders: FullOrder[]; due: number; paid: boolean } | null> {
   const first = await getOrderWithItems(orderId);
   if (!first) return null;
   const gid = first.order.paymentGroupId;
-  if (!gid) return { primary: first, orders: [first], due: first.order.status === "PENDING_PAYMENT" ? dueOf(first.order) : 0 };
+  if (!gid) return { primary: first, orders: [first], due: first.order.status === "PENDING_PAYMENT" ? dueOf(first.order) : 0, paid: fullyPaid([first]) };
   const rows = await db.select({ id: orders.id }).from(orders).where(eq(orders.paymentGroupId, gid));
   const list = (await Promise.all(rows.map((r) => getOrderWithItems(r.id)))).filter((x): x is FullOrder => Boolean(x));
   list.sort((a, b) => a.order.eventDate.localeCompare(b.order.eventDate) || a.order.id - b.order.id);
   const primary = list.find((x) => x.order.id === gid) ?? first;
-  return { primary, orders: list, due: list.filter((x) => x.order.status === "PENDING_PAYMENT").reduce((n, x) => n + dueOf(x.order), 0) };
+  // a day staff cancelled (and never paid) does not stop the rest of the group counting as paid
+  const live = list.filter((x) => !(x.order.status === "CANCELLED" && x.order.paidCents === 0));
+  return { primary, orders: list, due: list.filter((x) => x.order.status === "PENDING_PAYMENT").reduce((n, x) => n + dueOf(x.order), 0), paid: fullyPaid(live) };
 }
 
 /**

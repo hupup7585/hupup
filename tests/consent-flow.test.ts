@@ -98,7 +98,8 @@ vi.mock("@/lib/orders", async (orig) => ({
   // The payment link reads the reservation as priced at checkout (KJ: $10 delivery + 8.125% tax)
   getPaymentGroup: async () => {
     const o = { order: { id: 7, status: "PENDING_PAYMENT", eventDate: "2026-11-15", pickupDate: "2026-11-16", subtotalCents: 25000, deliveryFeeCents: 1000, taxCents: 2113, totalCents: 28113, paidCents: 0 }, items: [{ qty: 1, name: "Castle Bouncer" }], customer: { id: 42 } };
-    return { primary: o, orders: [o], due: (globalThis as { __due?: number }).__due ?? 28113 };
+    const due = (globalThis as { __due?: number }).__due ?? 28113;
+    return { primary: o, orders: [o], due, paid: due === 0 }; // stand-in: nothing due here means fully paid
   },
 }));
 

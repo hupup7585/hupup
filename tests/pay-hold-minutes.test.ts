@@ -41,7 +41,7 @@ describe("the pay page says the link's own hold", () => {
   });
   it("whoever sends the link records which hold it has; the page never shows a fixed number", () => {
     expect(readFileSync("src/app/admin/(app)/orders/actions.ts", "utf8")).toMatch(/linkHoldMinutes\("admin"\)\)[^}]*linkHoldKind: "admin"/);
-    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toMatch(/linkHoldMinutes\("phone"\)\), linkHoldKind: "phone"/);
+    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toMatch(/renewPaymentHold\(ids, await linkHoldMinutes\("phone"\)\)[\s\S]{0,400}linkHoldKind: "phone"/); // Hark's 2nd check A3
     const page = readFileSync("src/app/pay/[orderId]/page.tsx", "utf8");
     expect(page).toContain("LINK_TEXT.cardNote(await linkHoldMinutes(linkHoldKindOf(o)))");
     expect(page.split("\n").filter((l) => !l.trim().startsWith("//") && !/\/\/.*10 minutes/.test(l)).join("\n")).not.toMatch(/\b10 minutes\b/); // shown text only (comments aside)

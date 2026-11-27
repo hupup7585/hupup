@@ -231,6 +231,6 @@ describe("disconnect ending: items in the cart, silent", () => {
   it("Line 7 plays only at the end of a paid call (after Line 8), never on a silent or dropped call", () => {
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(flow.match(/"disconnect_goodbye"/g)).toHaveLength(1);
-    expect(flow).toMatch(/async goodbye\(ctx, vr\)[\s\S]{0,400}group\.due <= 0\) sp\(vr, ctx, "disconnect_goodbye"\)/);
+    expect(flow).toMatch(/async goodbye\(ctx, vr\)[\s\S]{0,400}group\?\.paid\) sp\(vr, ctx, "disconnect_goodbye"\)/); // Hark's 2nd check A2: only after a real payment
   });
 });

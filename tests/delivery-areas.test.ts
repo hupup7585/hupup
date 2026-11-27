@@ -71,8 +71,9 @@ describe("delivery price map", () => {
     let calls = 0;
     const counting = (async () => (calls++, new Response(JSON.stringify({ result: { addressMatches: [{ coordinates: { x: -74.11, y: 41.31 } }] } })))) as unknown as typeof fetch;
     await deliveryQuote("9 Saved Lane, Monroe", s, counting);
+    const first = calls; // both map services are asked at the same time (Hark's 2nd phone check, B8)
     await deliveryQuote("9 saved lane,  monroe", s, counting);
-    expect(calls).toBe(1);
+    expect(calls).toBe(first); // the second lookup is read from what was saved
     expect((await db.select().from(schema.geocodeCache)).some((r) => r.address === "9 saved lane, monroe")).toBe(true);
     expect(withState("12 Forest Road, Monroe")).toBe("12 Forest Road, Monroe, NY");
     expect(withState("12 Forest Road, Monroe, NY 10950")).toBe("12 Forest Road, Monroe, NY 10950");

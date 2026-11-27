@@ -155,28 +155,39 @@ export async function geocode(address: string, fetcher: typeof fetch = fetch): P
     GEO_MEMO.set(key, v);
     return v;
   }
-  let found: { lng: number; lat: number; source: string } | null = null;
-  try {
-    const r = await fetcher(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=${encodeURIComponent(withState(address))}`, { signal: AbortSignal.timeout(8000) });
-    const j = (await r.json().catch(() => ({}))) as { result?: { addressMatches?: { coordinates?: { x: number; y: number } }[] } };
-    const c = j.result?.addressMatches?.[0]?.coordinates;
-    if (c) found = { lng: c.x, lat: c.y, source: "census" };
-  } catch {
-    /* try the backup */
-  }
-  if (!found) {
+  // Hark's 2nd phone check, B8 (Nov 26, 2026): both map services at the same time with a short limit (a phone step must
+  // answer well within Twilio's 15 seconds), and "not found" is remembered ONLY when both really answered "no match";
+  // a timeout or an error is never saved, so the same address works again once the service is back
+  type Look = { found: { lng: number; lat: number; source: string } | null; answered: boolean };
+  const census = async (): Promise<Look> => {
     try {
-      const r = await fetcher(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(withState(address))}`, { headers: { "user-agent": "HupUpAttractionsBookings/1.0" }, signal: AbortSignal.timeout(8000) });
-      const j = (await r.json().catch(() => [])) as { lat?: string; lon?: string }[];
-      if (j[0]?.lat && j[0]?.lon) found = { lng: Number(j[0].lon), lat: Number(j[0].lat), source: "openstreetmap" };
+      const r = await fetcher(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=${encodeURIComponent(withState(address))}`, { signal: AbortSignal.timeout(5000) });
+      if (!r.ok) return { found: null, answered: false };
+      const j = (await r.json()) as { result?: { addressMatches?: { coordinates?: { x: number; y: number } }[] } };
+      const c = j.result?.addressMatches?.[0]?.coordinates;
+      return { found: c ? { lng: c.x, lat: c.y, source: "census" } : null, answered: Boolean(j.result) };
     } catch {
-      /* not found */
+      return { found: null, answered: false };
     }
+  };
+  const osm = async (): Promise<Look> => {
+    try {
+      const r = await fetcher(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(withState(address))}`, { headers: { "user-agent": "HupUpAttractionsBookings/1.0" }, signal: AbortSignal.timeout(5000) });
+      if (!r.ok) return { found: null, answered: false };
+      const j = (await r.json()) as { lat?: string; lon?: string }[];
+      return { found: j[0]?.lat && j[0]?.lon ? { lng: Number(j[0].lon), lat: Number(j[0].lat), source: "openstreetmap" } : null, answered: Array.isArray(j) };
+    } catch {
+      return { found: null, answered: false };
+    }
+  };
+  const [a, b] = await Promise.all([census(), osm()]);
+  const found = a.found ?? b.found;
+  if (found || (a.answered && b.answered)) {
+    await db
+      .insert(schema.geocodeCache)
+      .values({ address: key, lat: found?.lat ?? null, lng: found?.lng ?? null, source: found?.source ?? "none" })
+      .onConflictDoNothing();
   }
-  await db
-    .insert(schema.geocodeCache)
-    .values({ address: key, lat: found?.lat ?? null, lng: found?.lng ?? null, source: found?.source ?? "none" })
-    .onConflictDoNothing();
   return found;
 }
 

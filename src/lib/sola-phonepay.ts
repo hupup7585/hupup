@@ -435,7 +435,8 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
   const label = result === "check_failed" ? `Sola could not be checked (${failed})` : result === "wrong_amount" ? "Wrong amount, voided" : "No charge";
   await db.update(schema.phonepayAttempts).set({ result: result === "wrong_amount" ? (voids.every((v) => v.includes(": voided")) ? "wrong_amount_voided" : "wrong_amount_not_voided") : result === "check_failed" ? "check_failed" : "declined" }).where(eq(schema.phonepayAttempts.id, attemptId));
   await finishAttempt(attemptId, { matched: false, note: label });
-  await recordPaymentResult(ids, "declined", null, null);
+  // Hark's 2nd phone check, A1: "Sola could not be checked" is never recorded as declined on the order
+  if (result !== "check_failed") await recordPaymentResult(ids, "declined", null, null);
   if (result === "check_failed") await mail(`Hup Up Attractions: phone payment could not be checked, order #${num}`, `A caller tried to pay order #${num} ($${(dueCents / 100).toFixed(2)}) by phone, but Sola could not be checked (${failed}). Please look in Sola before the caller tries again.`);
   return { result };
 }

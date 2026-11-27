@@ -130,7 +130,7 @@ describe("the payment subaccount: Twilio <Pay> through Stripe", () => {
     expect(toCaller[0].text).toContain("Card: ending in 4242");
     // the hotline carries on without a payment link
     const back = await mainCall("pay-done", {}, `o=${orderId}`);
-    expect(redirect(back)).toBe("promo-consent");
+    expect(redirect(back)).toMatch(/^pay-approved\?o=\d+$/); // Hark's 2nd check A5: the same after-payment lines as Sola
     expect(h.emails.filter((e) => e.text.includes("Pay securely"))).toHaveLength(0);
     // Duplicate protection: the same result twice at the same moment never pays or emails twice
     const again = { Result: "success", PaymentConfirmationCode: "ch_3Test123", PaymentCardNumber: "xxxx-xxxx-xxxx-4242", PaymentCardType: "visa" };

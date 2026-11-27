@@ -1259,6 +1259,25 @@ export function staffCallerId(from: string | null | undefined, env: Record<strin
   return toE164(from) ?? env.TWILIO_PHONE_NUMBER ?? undefined;
 }
 
+/**
+ * Renew the payment hold on these orders (Hark's 2nd phone check, A3): an order whose hold already ran out is renewed
+ * only when its items are still free (someone else may have booked the unit meanwhile). Returns the orders NOT renewed.
+ */
+export async function renewPaymentHold(ids: number[], minutes: number): Promise<number[]> {
+  if (!ids.length) return [];
+  const rows = await db.select({ id: orders.id, status: orders.status, holdExpiresAt: orders.holdExpiresAt }).from(orders).where(inArray(orders.id, ids));
+  const { itemsStillFree } = await import("@/lib/late-payment");
+  const ok: number[] = [];
+  const taken: number[] = [];
+  for (const r of rows) {
+    if (r.status !== "PENDING_PAYMENT") continue;
+    if (r.holdExpiresAt && r.holdExpiresAt < new Date() && !(await itemsStillFree(r.id))) taken.push(r.id);
+    else ok.push(r.id);
+  }
+  if (ok.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(minutes), updatedAt: new Date() }).where(inArray(orders.id, ok));
+  return taken;
+}
+
 /** Ring one step of a key's list (one after another) or everyone at once. */
 function dialTargets(vr: VR, list: ReturnType<typeof ringListFor>, k: RingKey, i: number, from?: string | null): VR {
   const simultaneous = list.mode === "simultaneous";
@@ -1541,9 +1560,21 @@ async function deliverPayLink(ctx: Ctx, orderId: number, via: { phone?: string; 
   }
   if (sent) {
     const ids = days.map((d) => d.order.id);
-    await db.update(orders).set({ holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")), linkHoldKind: "phone", linkOpenedAt: null, updatedAt: new Date() }).where(and(inArray(orders.id, ids), eq(orders.status, "PENDING_PAYMENT")));
+    const taken = await renewPaymentHold(ids, await linkHoldMinutes("phone")); // Hark's 2nd check, A3
+    await db.update(orders).set({ linkHoldKind: "phone", linkOpenedAt: null }).where(and(inArray(orders.id, ids), eq(orders.status, "PENDING_PAYMENT")));
+    if (taken.length) await track(ctx.callSid, "step", `Payment link sent, but the hold had run out and an item was booked by someone else meanwhile (order${taken.length > 1 ? "s" : ""} ${taken.map(orderNumber).join(", ")}): not held again`).catch(() => undefined);
   }
   await track(ctx.callSid, "step", `Payment link ${sent ? "sent" : "could not be sent"} by ${via.phone ? "text" : "email"} (order #${num})`, { orderId, sent });
+  if (!sent) {
+    // Hark's 2nd phone check, A6: the caller was promised a call back, so the Owner is told right away (order and number)
+    const to = config.adminEmail();
+    if (to)
+      await sendEmail(
+        to,
+        `Hup Up Attractions: payment link could not be sent, order #${num}: please call the customer back`,
+        `The payment link for order #${num} could not be sent by ${via.phone ? `text to ${via.phone}` : `email to ${via.email}`}. The caller was told someone will call back to finish up.\n\nCaller: ${ctx.session?.fromNumber ?? ctx.from ?? "unknown"}\n${config.baseUrl()}${orderPath(orderId)}`,
+      ).catch(() => null);
+  }
   return sent;
 }
 
@@ -2154,7 +2185,7 @@ const handlers: Record<string, Handler> = {
       const o = ctx.session.data.payOrder ?? 0;
       await updateSession(ctx.callSid, { data: { emailFor: undefined } }, ctx.session);
       const group = o ? await getPaymentGroup(o) : null;
-      if (group && group.due <= 0) {
+      if (group && group.paid) { // paid means paid (Hark's 2nd check, A2)
         const c = group.primary.customer;
         if (c?.id && !c.email) await db.update(schema.customers).set({ email }).where(eq(schema.customers.id, c.id));
         const { sendPhoneReceipt } = await import("@/lib/phone-receipt");
@@ -2224,7 +2255,7 @@ const handlers: Record<string, Handler> = {
   async "receipt-email"(ctx, vr) {
     const o = Number(ctx.query.get("o")) || ctx.session?.data.payOrder || 0;
     const group = o ? await getPaymentGroup(o) : null;
-    if (!group || group.due > 0) return back(vr, "promo-consent"); // only once paid
+    if (!group || !group.paid) return back(vr, "promo-consent"); // only once paid (Hark's 2nd check, A2: really paid)
     const g = keypad(vr, url("receipt-email-choice", { o }));
     sp(g, ctx, "box35_receipt");
     return repeatMenu(vr, ctx, "receipt-email", { o });
@@ -4454,7 +4485,8 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "tx-which", { p: "pay", o }); // texting approved (Nov 15, 2026)
     if (d === "2") return back(vr, "catalog-email", { p: "pay", o });
-    if (d === "*") return back(vr, "cart"); // star: one step back, the cart (Hark's bug 13)
+    // Hark's 2nd check, A4: after box 56 the cart is empty (the order waits for payment), so star is not valid here
+    // until Abraham decides where it goes
     sp(vr, ctx, "not_valid");
     return back(vr, "paylink", { o });
   },
@@ -4514,7 +4546,9 @@ const handlers: Record<string, Handler> = {
   async "phonepay-go"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     const group = o ? await getPaymentGroup(o) : null;
-    if (!group || group.due <= 0) return back(vr, "promo-consent");
+    if (group?.paid) return back(vr, "promo-consent");
+    // Hark's 2nd check, A2: the hold ran out during payment (nothing due, nothing paid): no new try, the unpaid goodbye
+    if (!group || group.due <= 0) return back(vr, "goodbye");
     // Any Sola call from an earlier try is hung up first
     const earlier = await db.select().from(schema.phonepayAttempts).where(and(eq(schema.phonepayAttempts.callSid, ctx.callSid), eq(schema.phonepayAttempts.orderId, o)));
     // Box 140 (Abraham, Nov 17, 2026): card on the call is the default; 0 = a payment link (text or email) instead
@@ -4543,7 +4577,11 @@ const handlers: Record<string, Handler> = {
     }
     // The rentals stay held for the whole payment
     const waiting = group.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id);
-    if (waiting.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")), updatedAt: new Date() }).where(inArray(orders.id, waiting));
+    // Hark's 2nd check, A3: a hold that ran out is renewed only when its items are still free; otherwise no card try
+    if ((await renewPaymentHold(waiting, await linkHoldMinutes("phone"))).length) {
+      await track(ctx.callSid, "step", "Card payment stopped: the hold had run out and an item was booked by someone else meanwhile").catch(() => undefined);
+      return back(vr, "goodbye");
+    }
     // Never record card tones: pause a running call recording first (resumed when the caller comes back)
     if (ctx.session?.data.recording) {
       try {
@@ -4707,6 +4745,7 @@ const handlers: Record<string, Handler> = {
     const o = Number(ctx.query.get("o"));
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "promo-consent");
+    if (!group.paid) return back(vr, "goodbye"); // Hark's 2nd check, A2: "approved" only after a real payment
     const number = spokenDigits(orderNumber(o));
     const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
     sp(g, ctx, "phonepay_approved", { number });
@@ -4804,7 +4843,12 @@ const handlers: Record<string, Handler> = {
     if (a && listening) vr.stop().stream({ name: `sola-${a}` });
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "goodbye");
-    if (group.due <= 0) return back(vr, "pay-approved", { o });
+    if (group.paid) return back(vr, "pay-approved", { o });
+    // Hark's 2nd check, A2: the hold ran out during payment and nothing was paid: never "approved", no new try
+    if (group.due <= 0) {
+      await track(ctx.callSid, "step", "Payment step reached after the hold ran out (nothing paid): unpaid goodbye").catch(() => undefined);
+      return back(vr, "goodbye");
+    }
     let n = await triesSoFar(ctx.callSid, o);
     // PhonePay never answered: the backup number once, on the same card try (no "try" is used up)
     const status = ctx.body.DialCallStatus ?? "";
@@ -4827,7 +4871,9 @@ const handlers: Record<string, Handler> = {
       n = attempt?.tryNumber ?? n;
       // Box 147 (Abraham, Nov 18, 2026): not certain which charge is this caller's: "Sorry, we could not confirm your
       // payment. To try again, press 1."
-      if (r.result === "unclear") return back(vr, "phonepay-retry", { o, n, u: 1 });
+      // Hark's 2nd phone check, A1: Sola could not be checked = the same box 147 line ("could not confirm"), never the
+      // declined line and never an automatic new try (the first charge may have gone through)
+      if (r.result === "unclear" || r.result === "check_failed") return back(vr, "phonepay-retry", { o, n, u: 1 });
       // Silence check (Abraham, Nov 18, 2026): 20 seconds with no Sola voice, no keys and no result in Sola's record, and
       // still none on the last look = the same box 147 line
       if (attempt?.solaSeen === "silence") return back(vr, "phonepay-retry", { o, n, u: 1 });
@@ -4892,7 +4938,10 @@ const handlers: Record<string, Handler> = {
     // The rentals stay held for the whole payment (a fresh hold now; each try in the payment line renews it)
     const group = await getPaymentGroup(o);
     const waiting = group?.orders.filter((d) => d.order.status === "PENDING_PAYMENT").map((d) => d.order.id) ?? [];
-    if (waiting.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(await linkHoldMinutes("phone")), updatedAt: new Date() }).where(inArray(orders.id, waiting));
+    if ((await renewPaymentHold(waiting, await linkHoldMinutes("phone"))).length) {
+      await track(ctx.callSid, "step", "Card payment stopped: the hold had run out and an item was booked by someone else meanwhile").catch(() => undefined);
+      return back(vr, "goodbye"); // Hark's 2nd check, A3
+    }
     sp(vr, ctx, "pay_start", undefined, { draftOk: true });
     const dial = vr.dial({ action: url("pay-done", { o }), method: "POST", timeLimit: 900, answerOnBridge: true });
     dial.sip({ username: process.env.TWILIO_PAY_SIP_USERNAME, password: process.env.TWILIO_PAY_SIP_PASSWORD }, paySipUri(o, ctx.callSid));
@@ -4905,7 +4954,9 @@ const handlers: Record<string, Handler> = {
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "goodbye");
     if (group.due > 0) return back(vr, "paylink", { o }); // not paid: the payment link, text or email (box 141)
-    return back(vr, "promo-consent");
+    // Hark's 2nd check, A5: paid by card (Stripe) = the same after-payment lines as Sola (Lines 1 to 5); A2: really paid
+    if (group.paid) return back(vr, "pay-approved", { o });
+    return back(vr, "goodbye");
   },
 
   /*
@@ -4924,7 +4975,7 @@ const handlers: Record<string, Handler> = {
     const caller = toE164(ctx.from);
     const id = ctx.session?.data.placedOrderId;
     const group = id ? await getPaymentGroup(id) : null;
-    if (!caller || !group || group.due > 0) return back(vr, "goodbye");
+    if (!caller || !group || !group.paid) return back(vr, "goodbye"); // only after a real payment (Hark's 2nd check, A2)
     const customer = await customerByPhone(caller);
     if (customer?.smsOptOut) return back(vr, "goodbye");
     // Already gets promotions: skipped while the Admin switch is on (the default; Abraham has not decided, Nov 26, 2026)
@@ -5007,7 +5058,7 @@ const handlers: Record<string, Handler> = {
     const id = ctx.session?.data.placedOrderId;
     // After a paid order, Line 7 ends the call (Abraham, Nov 26, 2026, 09:45 ET); goodbye_order no longer plays
     const group = id ? await getPaymentGroup(id) : null;
-    if (group && group.due <= 0) sp(vr, ctx, "disconnect_goodbye");
+    if (group?.paid) sp(vr, ctx, "disconnect_goodbye"); // the paid goodbye only after a real payment (Hark's 2nd check, A2)
     vr.hangup();
     return vr;
   },
@@ -5677,7 +5728,23 @@ async function ownKey(ctx: Ctx, vr: VR, screen: string, k: KeyDef) {
 /** Every phone step's name (the baseline snapshot test and the Admin screen inventory read it). */
 export const handlerNames = () => Object.keys(handlers);
 
+/**
+ * Hark's 2nd phone check, B11: a database or server problem in the set-up of a step (settings, prompts, session) gets
+ * our own tech_error line and a hang-up, never Twilio's "An application error has occurred".
+ */
 export async function handleVoice(raw: Omit<Ctx, "session" | "prompts"> & { editorOverride?: Editor }): Promise<string> {
+  try {
+    return await handleVoiceInner(raw);
+  } catch (e) {
+    console.error("IVR set-up error", raw.action, e);
+    const err = new twilio.twiml.VoiceResponse();
+    sp(err, { prompts: {} }, "tech_error");
+    err.hangup();
+    return err.toString();
+  }
+}
+
+async function handleVoiceInner(raw: Omit<Ctx, "session" | "prompts"> & { editorOverride?: Editor }): Promise<string> {
   const { editorOverride, ...input } = raw;
   const vr = new twilio.twiml.VoiceResponse();
   TIMING.set(vr, timerValues((await getSettings()) as Record<string, unknown>)); // Phase 3: every wait from Admin

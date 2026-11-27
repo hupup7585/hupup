@@ -298,7 +298,7 @@ exports[`baseline: every phone step as it plays today > phone-heard 1`] = `"<?xm
 
 exports[`baseline: every phone step as it plays today > phonepay-done 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > phonepay-go 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/promo-consent</Redirect></Response>"`;
+exports[`baseline: every phone step as it plays today > phonepay-go 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > phonepay-option 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/goodbye</Redirect></Response>"`;
 

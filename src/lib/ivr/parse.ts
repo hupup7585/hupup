@@ -61,7 +61,10 @@ function checkRange(iso: string, todayISO: string): DateParse {
 
 /** Keypad: MMDD (e.g. 1108) or MMDDYYYY. */
 export function parseDigitsDate(digits: string, todayISO: string): DateParse {
-  const d = digits.replace(/\D/g, "");
+  const raw = digits.replace(/\D/g, "");
+  // Abraham, Nov 26, 2026, 11:03 PM: 3 digits = M-DD (month 1 to 9): 105 = January 5th. Same rules as 4 digits; a day
+  // the month does not have (931) is not valid, and the caller tries again. Never guessed from fewer digits.
+  const d = raw.length === 3 && raw[0] !== "0" ? `0${raw}` : raw;
   if (d.length === 4) {
     const m = Number(d.slice(0, 2));
     const day = Number(d.slice(2));
