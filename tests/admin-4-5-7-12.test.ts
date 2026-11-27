@@ -74,3 +74,25 @@ describe("Admin status safety", () => {
     expect(await statusOf(d)).toBe("CONFIRMED");
   });
 });
+
+describe("deep check 0600 M8 and M57", () => {
+  it("M8: re-activating a cancelled order checks the whole order (two lines on the one maze are refused)", async () => {
+    const [o] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "POS", eventDate: "2027-08-10", pickupDate: "2027-08-11", subtotalCents: 70000 }).returning();
+    await db.insert(schema.orderItems).values([{ orderId: o.id, productId: maze, qty: 1, unitPriceCents: 30000 }, { orderId: o.id, productId: guns, qty: 1, unitPriceCents: 40000 }]);
+    const r = await updateStatusAction(o.id, "CONFIRMED");
+    expect(r.ok).toBe(false);
+    expect(await statusOf(o.id)).toBe("CANCELLED");
+    expect((await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id)))).toHaveLength(2); // nothing changed
+    // one maze line alone fits
+    const [ok] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "POS", eventDate: "2027-08-20", pickupDate: "2027-08-21", subtotalCents: 30000 }).returning();
+    await db.insert(schema.orderItems).values({ orderId: ok.id, productId: maze, qty: 1, unitPriceCents: 30000 });
+    expect((await updateStatusAction(ok.id, "CONFIRMED")).ok).toBe(true);
+  });
+  it("M57: brought back straight to Delivered: its units are booked", async () => {
+    await db.insert(schema.equipmentUnits).values({ productId: guns, code: "G-1", status: "available" as const });
+    const [o] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "POS", eventDate: "2030-09-10", pickupDate: "2030-09-11", subtotalCents: 40000 }).returning();
+    await db.insert(schema.orderItems).values({ orderId: o.id, productId: guns, qty: 1, unitPriceCents: 40000 });
+    expect((await updateStatusAction(o.id, "DELIVERED")).ok).toBe(true);
+    expect((await db.select().from(schema.unitBookings).where(eq(schema.unitBookings.orderId, o.id))).length).toBeGreaterThan(0);
+  });
+});

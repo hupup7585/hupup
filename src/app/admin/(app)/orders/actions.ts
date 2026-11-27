@@ -57,20 +57,32 @@ export async function updateStatusAction(orderId: number, status: OrderStatus, r
     // pickup day, and the check and the change in one locked step (the items and their shared groups locked in id
     // order, like a phone booking), so two staff can never both re-book the last unit.
     const ids = [...new Set(full.items.map((i) => i.productId))].sort((x, y) => x - y);
-    const problem = await db.transaction(async (tx) => {
-      for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
-      for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
-      for (const it of full.items) {
-        const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, it.productId));
-        const free = await checkBookable(it.productId, p.quantity, full.order.eventDate, tx as never, full.order.pickupDate);
-        if (free < it.qty) return `${it.name} is no longer available for ${dualDate(full.order.eventDate)} (${free} free).`;
-      }
-      await tx.update(schema.orders).set({ status, updatedAt: new Date(), ...(status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}) }).where(eq(schema.orders.id, orderId));
-      return null;
-    });
+    // Deep check 0600 M8 (Nov 27, 2026): the WHOLE order is checked (two lines sharing the maze group or a laser gun
+    // pool, or the same item twice, counted together), not each line alone. The order counts first, every line is
+    // put back one at a time, and if any no longer fits nothing changes.
+    class NoFit extends Error {}
+    let problem: string | null = null;
+    try {
+      await db.transaction(async (tx) => {
+        for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
+        for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+        await tx.update(schema.orders).set({ status, updatedAt: new Date(), ...(status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}) }).where(eq(schema.orders.id, orderId));
+        const { recheckOrderLines } = await import("@/lib/recheck-lines");
+        const out = await recheckOrderLines(tx as never, full.order);
+        if (out.length) {
+          const names = out.map((l) => full.items.find((i) => i.id === l.id)?.name ?? "An item");
+          problem = `${[...new Set(names)].join(", ")} ${names.length === 1 ? "is" : "are"} no longer available for ${dualDate(full.order.eventDate)}.`;
+          throw new NoFit();
+        }
+      });
+    } catch (e) {
+      if (!(e instanceof NoFit)) throw e;
+    }
     if (problem) return { ok: false, message: problem };
   }
   await setOrderStatus(orderId, status, status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}, { reason: why || "Changed by staff in Admin", userId: staff.userId });
+  // Deep check 0600 M57: an order brought back straight to Delivered gets its units too (Confirmed already does)
+  if (status === "DELIVERED" && !wasOccupying) await (await import("@/lib/units")).assignUnits(orderId, { quiet: true });
   await db.insert(schema.auditLog).values({ userId: staff.userId, action: "order.status", entityType: "order", entityId: String(orderId), before: { status: full.order.status }, after: { status, reason: why || null } });
   revalidatePath("/admin", "layout");
   return { ok: true, message: "Status updated" };
