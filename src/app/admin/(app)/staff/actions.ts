@@ -25,6 +25,19 @@ async function usernameTaken(v: string, exceptId: number | null) {
   return exceptId !== -1 && (await getSettings()).ownerUsername === v;
 }
 
+/**
+ * Deep check 06:00 M69 (B3 leftover): two saves at the same moment both pass the checks, and the second hits one of the
+ * database's one-per-account rules (phone, username, Google account). This turns that into the usual plain message.
+ */
+function duplicateMessage(e: unknown): string | null {
+  const x = e as { code?: string; detail?: string; constraint?: string; cause?: { code?: string; detail?: string; constraint?: string } };
+  if ((x.code ?? x.cause?.code) !== "23505") return null;
+  const what = `${x.detail ?? x.cause?.detail ?? ""} ${x.constraint ?? x.cause?.constraint ?? ""}`;
+  if (/google/i.test(what)) return "That Google account is already saved on another staff member.";
+  if (/username/i.test(what)) return "That username is already taken.";
+  return "That phone number already has an account.";
+}
+
 async function log(userId: number | null, action: string, entityId: number, after: Record<string, unknown>) {
   await db.insert(schema.auditLog).values({ userId, action, entityType: "staff", entityId: String(entityId), after });
 }
@@ -72,10 +85,9 @@ export async function createStaffAction(form: { name: string; phone: string; rol
       .values({ name, phone, role: form.role, email: form.email?.trim() || null, username: un.value, passwordHash, passwordSetAt: passwordHash ? new Date() : null, googleEmail: google })
       .returning({ id: schema.adminUsers.id });
   } catch (e) {
-    const code = (e as { code?: string; cause?: { code?: string } }).code ?? (e as { cause?: { code?: string } }).cause?.code;
-    if (code !== "23505") throw e;
-    const detail = String((e as { detail?: string; cause?: { detail?: string } }).detail ?? (e as { cause?: { detail?: string } }).cause?.detail ?? "");
-    return { ok: false, message: /username/i.test(detail) ? "That username is already taken." : "That phone number already has an account." };
+    const message = duplicateMessage(e);
+    if (!message) throw e;
+    return { ok: false, message };
   }
   await log(owner.userId, "staff.created", u.id, { name, role: form.role, password: Boolean(passwordHash) });
   revalidatePath("/admin/staff");
@@ -137,7 +149,13 @@ export async function setGoogleEmailAction(userId: number, googleEmail: string):
     const [other] = await db.select({ id: schema.adminUsers.id }).from(schema.adminUsers).where(sql`lower(${schema.adminUsers.googleEmail}) = ${g.value}`).limit(1);
     if (other && other.id !== userId) return { ok: false, message: "That Google account is already saved on another staff member." };
   }
-  await db.update(schema.adminUsers).set({ googleEmail: g.value }).where(eq(schema.adminUsers.id, userId));
+  try {
+    await db.update(schema.adminUsers).set({ googleEmail: g.value }).where(eq(schema.adminUsers.id, userId));
+  } catch (e) {
+    const message = duplicateMessage(e);
+    if (!message) throw e;
+    return { ok: false, message };
+  }
   await log(owner.userId, g.value ? "staff.google_email_set" : "staff.google_email_removed", userId, { googleEmail: g.value });
   revalidatePath("/admin/staff");
   return { ok: true, message: g.value ? "Saved. This Google account can now sign in to Admin." : "Removed. No Google account can sign in as this person." };
@@ -195,18 +213,24 @@ export async function saveStaffAction(userId: number, form: { name: string; phon
     }
   }
   const toDelivery = form.role === "delivery" && u.role !== "delivery";
-  await db
-    .update(schema.adminUsers)
-    .set({
-      name,
-      phone,
-      role: form.role,
-      username: un.value,
-      googleEmail: g.value,
-      ...(passwordHash ? { passwordHash, passwordSetAt: new Date(), failedLogins: 0, lockedUntil: null } : {}),
-      ...(toDelivery ? { passwordHash: null } : {}), // Delivery signs in with a texted code only
-    })
-    .where(eq(schema.adminUsers.id, userId));
+  try {
+    await db
+      .update(schema.adminUsers)
+      .set({
+        name,
+        phone,
+        role: form.role,
+        username: un.value,
+        googleEmail: g.value,
+        ...(passwordHash ? { passwordHash, passwordSetAt: new Date(), failedLogins: 0, lockedUntil: null } : {}),
+        ...(toDelivery ? { passwordHash: null } : {}), // Delivery signs in with a texted code only
+      })
+      .where(eq(schema.adminUsers.id, userId));
+  } catch (e) {
+    const message = duplicateMessage(e);
+    if (!message) throw e;
+    return { ok: false, message };
+  }
   const signOut = Boolean(passwordHash) || u.role !== form.role || u.phone !== phone;
   if (signOut) await revokeSessions(userId);
   await log(owner.userId, "staff.saved", userId, { name, role: form.role, phoneChanged: u.phone !== phone, roleChanged: u.role !== form.role, username: un.value, googleEmail: g.value, password: Boolean(passwordHash) });

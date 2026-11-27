@@ -144,6 +144,10 @@ describe("F8: blank and out-of-range numbers", () => {
     const bad = await redirectTo(saveHolidayRentalsAction(fd({ holidayPickupAfterShabbesMin: "900", holidaySundayPickup: "09:00" })));
     expect(bad).toContain("Not saved");
     expect(String((await getSettings()).holidayPickupAfterShabbesMin)).toBe("45");
+    // deep check 06:00 M69 (F8 leftover): not a real clock time
+    const clock = await redirectTo(saveHolidayRentalsAction(fd({ holidaySundayPickup: "25:99" })));
+    expect(clock).toContain("Not saved");
+    expect(String((await getSettings()).holidaySundayPickup)).not.toBe("25:99");
   });
   it("Address check: a blank box keeps the saved value; out of range saves nothing", async () => {
     const { saveSetting, getSettings } = await import("@/lib/settings");
