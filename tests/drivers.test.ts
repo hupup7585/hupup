@@ -14,6 +14,7 @@ vi.mock("@/lib/notify", () => ({ sendOrderText: async () => ({ texted: true, ema
 
 import { readFileSync } from "node:fs";
 import { eq } from "drizzle-orm";
+import { todayISO } from "@/lib/dates";
 import { db, schema } from "@/lib/db";
 import { assignDriver, isMyStop, overlapsFor } from "@/lib/drivers";
 import { markDoneAction } from "@/app/admin/deliveries/actions";
@@ -66,7 +67,7 @@ describe("assigning drivers", () => {
 
 describe("a Delivery login sees and acts on only its own stops (server side)", () => {
   it("own stop only", async () => {
-    const o = await order(new Date().toISOString().slice(0, 10));
+    const o = await order(todayISO());
     await assignDriver(o.id, "delivery", moshe, null);
     expect(isMyStop({ deliveryDriverId: moshe, pickupDriverId: null }, "delivery", moshe)).toBe(true);
     expect(isMyStop({ deliveryDriverId: moshe, pickupDriverId: null }, "pickup", moshe)).toBe(false);

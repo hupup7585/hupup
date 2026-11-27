@@ -5,3 +5,4 @@ export function isCurrentStop(o: { status: string; eventDate: string | null; pic
   const days = [todayISO(now), addDays(todayISO(now), -1)];
   return ["CONFIRMED", "DELIVERED", "PICKED_UP"].includes(o.status) && (days.includes(o.eventDate ?? "") || days.includes(o.pickupDate ?? ""));
 }
+
