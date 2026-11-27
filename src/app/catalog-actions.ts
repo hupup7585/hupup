@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { signUpsDisabledReason } from "@/app/text-alerts/actions";
 import { CATALOG_FORM_DRAFT, catalogEmailedToday, catalogIpLimitReached, requestIp, validCatalogEmail, websiteCatalogFormShown } from "@/lib/catalog-request";
@@ -47,7 +47,9 @@ export async function textCatalogAction(_prev: { ok: boolean; message: string } 
   const { sendMessage } = await import("@/lib/sms");
   const [c] = await db.select().from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1);
   // A number that replied STOP gets nothing (and no consent record: only START and YES lift a STOP)
-  if (c?.smsOptOut) {
+  // Deep check 09:00 P11 (M27 completed): a STOP on ANY record with this number counts (duplicate records)
+  const [stopped] = await db.select({ id: schema.customers.id }).from(schema.customers).where(and(eq(schema.customers.phone, phone), eq(schema.customers.smsOptOut, true))).limit(1);
+  if (c?.smsOptOut || stopped) {
     await db.insert(schema.auditLog).values({ action: "catalog.website_text_request", entityType: "phone", entityId: phone, after: { replied: false, reason: "opted_out" } });
     return { ok: false, message: draftOk ? CATALOG_TEXT_DRAFT.stopped : CATALOG_FORM_DRAFT.failed };
   }
