@@ -6,7 +6,7 @@ import { msgQuery } from "@/lib/url-message";
 import { eq } from "drizzle-orm";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { r2Put } from "@/lib/r2";
+import { R2_STOP_BYTES, r2Put, r2Used } from "@/lib/r2";
 import { saveSetting } from "@/lib/settings";
 import { MUSIC_PLACES, ORIGINAL_MAX_BYTES, ORIGINAL_PIECE_BYTES, PIECE_SECONDS, originalKey, pieceKey, type MusicPlace } from "@/lib/music";
 
@@ -14,8 +14,14 @@ import { MUSIC_PLACES, ORIGINAL_MAX_BYTES, ORIGINAL_PIECE_BYTES, PIECE_SECONDS, 
 
 const MAX_PIECE_BYTES = 8000 * 2 * PIECE_SECONDS + 1024; // 8 kHz, 16-bit, mono WAV
 
+/** Extra check HP2 (Nov 27, 2026): no new song once the free file storage (R2) is near its free limit. */
+async function storageFull(adding = 0) {
+  return (await r2Used()) + adding > R2_STOP_BYTES;
+}
+
 export async function startTrackAction(name: string): Promise<{ id: number }> {
   await requireOwner();
+  if (await storageFull()) throw new Error("The free file storage is nearly full, so no new song can be uploaded. Remove old files or ask Hark.");
   const clean = name.replace(/\.[a-z0-9]+$/i, "").trim().slice(0, 120) || "Song";
   const [t] = await db.insert(schema.musicTracks).values({ name: clean, pieceSeconds: PIECE_SECONDS }).returning({ id: schema.musicTracks.id });
   return t;
@@ -44,6 +50,8 @@ export async function saveOriginalPieceAction(fd: FormData): Promise<{ ok: boole
   if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(n) || n < 0 || n > ORIGINAL_MAX_BYTES / ORIGINAL_PIECE_BYTES || !(file instanceof File)) return { ok: false };
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!bytes.length || bytes.length > ORIGINAL_PIECE_BYTES) return { ok: false };
+  // Extra check HP2: an original of up to 200 MB is checked against the free limit as it arrives (every 10 pieces)
+  if (n % 10 === 0 && (await storageFull(10 * ORIGINAL_PIECE_BYTES))) return { ok: false };
   await r2Put(originalKey(id, n), bytes, "application/octet-stream");
   return { ok: true };
 }
