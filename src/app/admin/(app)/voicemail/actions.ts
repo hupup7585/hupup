@@ -9,12 +9,21 @@ import { deleteVoicemail, purgeVoicemail, restoreVoicemail } from "@/lib/voicema
 import { toE164 } from "@/lib/phone";
 import { setVmPin, validPin } from "@/lib/vm-access";
 
+/** M64 (Abraham, Nov 27, 2026): a message in the Owner's personal box is never changed by anyone else. */
+async function allowed(s: { role: string }, id: number): Promise<boolean> {
+  if (!Number.isInteger(id) || id <= 0) return false;
+  const [v] = await db.select({ boxId: schema.voicemails.boxId }).from(schema.voicemails).where(eq(schema.voicemails.id, id)).limit(1);
+  const { canSeeVoicemail } = await import("@/lib/vm-privacy");
+  return canSeeVoicemail(s, v);
+}
+
 async function audit(userId: number | null, action: string, entityId: number, after: Record<string, unknown> = {}) {
   await db.insert(schema.auditLog).values({ userId, action, entityType: "voicemail", entityId: String(entityId), after });
 }
 
 export async function setHeardAction(id: number, heard: boolean) {
   const s = await requireStaff(["owner", "secretary"]);
+  if (!(await allowed(s, id))) return;
   await db.update(schema.voicemails).set({ heardAt: heard ? new Date() : null, heardBy: heard ? s.userId : null }).where(eq(schema.voicemails.id, id));
   await audit(s.userId, heard ? "voicemail.heard" : "voicemail.unheard", id);
   revalidatePath("/admin/voicemail");
@@ -22,6 +31,7 @@ export async function setHeardAction(id: number, heard: boolean) {
 
 export async function setUrgentAction(id: number, urgent: boolean) {
   const s = await requireStaff(["owner", "secretary"]);
+  if (!(await allowed(s, id))) return;
   await db.update(schema.voicemails).set({ urgent }).where(eq(schema.voicemails.id, id));
   await audit(s.userId, "voicemail.urgent", id, { urgent });
   revalidatePath("/admin/voicemail");
@@ -29,6 +39,7 @@ export async function setUrgentAction(id: number, urgent: boolean) {
 
 export async function deleteVoicemailAction(id: number) {
   const s = await requireStaff(["owner", "secretary"]);
+  if (!(await allowed(s, id))) return;
   await deleteVoicemail(id);
   await audit(s.userId, "voicemail.hidden", id);
   revalidatePath("/admin/voicemail");

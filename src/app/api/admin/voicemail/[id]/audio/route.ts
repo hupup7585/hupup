@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { currentStaff } from "@/lib/auth";
 import { fetchRecordingAudio } from "@/lib/voicemail";
+import { canSeeVoicemail } from "@/lib/vm-privacy";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const [v] = Number.isInteger(id) ? await db.select().from(schema.voicemails).where(eq(schema.voicemails.id, id)).limit(1) : [];
   // Deleted messages are hidden, not gone: only the Owner can still play them, until deleted for good
   if (!v || v.purgedAt || (v.deletedAt && staff.role !== "owner")) return new Response("Not found", { status: 404 });
+  // M64 (Abraham, Nov 27, 2026): the Owner's personal box is Owner only: play and download too
+  if (!(await canSeeVoicemail(staff, v))) return new Response("Not found", { status: 404 });
   const audio = await fetchRecordingAudio(v);
   if (!audio?.body) return new Response("Recording unavailable", { status: 502 });
   const download = new URL(req.url).searchParams.has("download");

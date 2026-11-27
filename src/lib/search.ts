@@ -1,3 +1,4 @@
+import { visibleBoxSql } from "@/lib/vm-privacy";
 import { phoneQueryDigits } from "@/lib/phone-search";
 import { phoneMatchSql, phoneRankSql } from "@/lib/phone-search-sql";
 import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
@@ -54,7 +55,8 @@ export async function searchEverything(raw: string, opts: { owner: boolean }) {
       ? db
           .select()
           .from(schema.voicemails)
-          .where(and(isNull(schema.voicemails.deletedAt), or(digits ? phoneMatchSql(schema.voicemails.fromNumber, digits) : undefined, ilike(schema.voicemails.transcription, like))))
+          // M64 (Abraham, Nov 27, 2026): the Owner's personal box never shows in anyone else's search
+          .where(and(isNull(schema.voicemails.deletedAt), visibleBoxSql(schema.voicemails.boxId, { role: opts.owner ? "owner" : "staff" }), or(digits ? phoneMatchSql(schema.voicemails.fromNumber, digits) : undefined, ilike(schema.voicemails.transcription, like))))
           .orderBy(desc(schema.voicemails.createdAt))
           .limit(10)
       : Promise.resolve([]),

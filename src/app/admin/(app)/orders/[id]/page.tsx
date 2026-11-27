@@ -279,7 +279,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
           {/* Box 34 (Abraham, Nov 25, 2026): the caller's recorded delivery instructions, kept with the booking */}
           {await (async () => {
             const { deliveryInstructionsFor } = await import("@/lib/voicemail");
-            const msgs = await deliveryInstructionsFor(o.id);
+            const msgs = await deliveryInstructionsFor(o.id, staff);
             if (!msgs.length) return null;
             return (
               <div className="card p-5" data-delivery-instructions>

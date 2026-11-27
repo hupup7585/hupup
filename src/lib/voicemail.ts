@@ -97,8 +97,10 @@ export async function saveDeliveryInstructions(input: { orderId: number | null; 
 }
 
 /** The delivery-instructions messages of one booking (newest first), for the order page. */
-export async function deliveryInstructionsFor(orderId: number) {
-  return db.select().from(schema.voicemails).where(and(eq(schema.voicemails.orderId, orderId), isNull(schema.voicemails.deletedAt))).orderBy(desc(schema.voicemails.createdAt));
+export async function deliveryInstructionsFor(orderId: number, staff?: { role: string } | null) {
+  // M64: never a message from the Owner's personal box for anyone else (Box 34 messages are in their own box anyway)
+  const { visibleBoxSql } = await import("@/lib/vm-privacy");
+  return db.select().from(schema.voicemails).where(and(eq(schema.voicemails.orderId, orderId), isNull(schema.voicemails.deletedAt), visibleBoxSql(schema.voicemails.boxId, staff ?? null))).orderBy(desc(schema.voicemails.createdAt));
 }
 
 /** Note on the alert when the caller pressed # and then hung up without pressing 1 (Abraham, word for word). */
@@ -342,7 +344,11 @@ async function sendVoicemailAlert(v: typeof schema.voicemails.$inferSelect): Pro
   let sent = 0;
   let held = 0;
   let tried = 0;
-  for (const to of box.notifyEmail) {
+  // M64 (Abraham, Nov 27, 2026): alerts for the Owner's personal box go only to the Owner (the Owner accounts' own email
+  // and phone, and the business owner address and phone), never to anyone else, even if added to the box
+  const { ownerOnlyRecipients } = await import("@/lib/vm-privacy");
+  const rcpt = await ownerOnlyRecipients(box.id, box.notifyEmail, box.notifySms);
+  for (const to of rcpt.emails) {
     tried++;
     if ((await sendEmail(to, alert.subject, alert.email, attachments).catch(() => ({ sent: false }))).sent) sent++;
   }
@@ -350,7 +356,7 @@ async function sendVoicemailAlert(v: typeof schema.voicemails.$inferSelect): Pro
   // has turned that on (it costs more per message) and the file is small enough for carriers; the link is always there.
   if (textingActive()) {
     const mms = Boolean((await getSettings()).voicemailMms) && Boolean(mp3?.length) && mp3!.length <= MMS_AUDIO_MAX_BYTES;
-    for (const to of box.notifySms) {
+    for (const to of rcpt.phones) {
       tried++;
       const r = await sendSms(to, alert.text, { kind: "system", event: "owner_alert", ...(mms ? { mediaUrls: [playLink] } : {}) }).catch(() => ({ sent: false, blocked: undefined }));
       if (r.sent) sent++;

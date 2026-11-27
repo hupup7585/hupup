@@ -1,3 +1,4 @@
+import { OWNER_BOX_PRIVATE_NOTE } from "@/lib/vm-privacy";
 import ConfirmSubmit from "@/components/ConfirmSubmit";
 import { Download, Phone } from "lucide-react";
 import { desc } from "drizzle-orm";
@@ -28,6 +29,10 @@ export default async function VoicemailPage() {
   try {
     box = await mainBox();
     list = await listVoicemails(); // every box: Main and each extension
+    // M64 (Abraham, Nov 27, 2026): the Owner's personal box is Owner only (the Secretary never sees its messages)
+    const { hiddenBoxIds } = await import("@/lib/vm-privacy");
+    const hiddenBoxes = await hiddenBoxIds(staff);
+    list = list.filter((v) => !hiddenBoxes.includes(v.boxId));
   } catch (e) {
     console.error("[voicemail page]", e);
     return (
@@ -51,6 +56,7 @@ export default async function VoicemailPage() {
       <p className="mb-5 text-muted">
         Messages left on the hotline, from every box (Main and each extension). {unheard ? <b>{unheard} new.</b> : "No new messages."}
       </p>
+      <p className="mb-5 text-sm text-muted" data-owner-box-private>{OWNER_BOX_PRIVATE_NOTE}</p>
 
       {!list.length && <p className="card p-6 text-muted">No messages yet.</p>}
       <ul className="space-y-3">

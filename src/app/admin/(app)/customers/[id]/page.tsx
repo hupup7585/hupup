@@ -1,7 +1,8 @@
 import ConfirmSubmit from "@/components/ConfirmSubmit";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { visibleBoxSql } from "@/lib/vm-privacy";
 import { db, schema } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";
 import { formatPhone } from "@/lib/phone";
@@ -49,7 +50,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const vms = await db
     .select({ id: schema.voicemails.id, at: schema.voicemails.createdAt, durationSec: schema.voicemails.durationSec, transcription: schema.voicemails.transcription })
     .from(schema.voicemails)
-    .where(eq(schema.voicemails.fromNumber, phone))
+    // M64 (Abraham, Nov 27, 2026): the Owner's personal box never shows on a customer page for anyone else
+    .where(and(eq(schema.voicemails.fromNumber, phone), visibleBoxSql(schema.voicemails.boxId, staff)))
     .limit(50)
     .catch(() => []);
   const consent = await customerConsent({ id: c.id, phone: c.phone, smsOptOut: c.smsOptOut });
