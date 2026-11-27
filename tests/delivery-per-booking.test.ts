@@ -52,7 +52,12 @@ async function cart(days: { date: string; items: number[] }[]) {
 describe("one delivery charge per booking", () => {
   it("the rule: 1 item 2 days KJ = $10; 3 items nearby = $25; KJ 3 items 2 days = $20; Orange County 3 items = $30", () => {
     const s = { deliveryExtraItemCents: "500" };
-    expect(bookingDeliveryCents(1000, bookingItemCount([{ productId: 1, qty: 1 }, { productId: 1, qty: 1 }]), s)).toBe(1000);
+    expect(bookingDeliveryCents(1000, bookingItemCount([{ productId: 1, qty: 1, day: 1 }, { productId: 1, qty: 1, day: 2 }]), s)).toBe(1000);
+    // deep check 06:00 M15: 3 laser sets of one kind on one day are saved as 3 lines: 3 items, as on the New booking screen
+    expect(bookingItemCount([{ productId: 7, qty: 1, day: 1 }, { productId: 7, qty: 1, day: 1 }, { productId: 7, qty: 1, day: 1 }])).toBe(3);
+    expect(bookingItemCount([{ productId: 7, qty: 3 }])).toBe(3);
+    // the same 3 sets on a second day of the booking still count 3
+    expect(bookingItemCount([1, 1, 1, 2, 2, 2].map((day) => ({ productId: 7, qty: 1, day })))).toBe(3);
     expect(bookingDeliveryCents(1500, bookingItemCount([{ productId: 1, qty: 1 }, { productId: 2, qty: 1 }, { productId: 3, qty: 1 }]), s)).toBe(2500);
     expect(bookingDeliveryCents(1000, 3, s)).toBe(2000);
     expect(bookingDeliveryCents(2000, 3, s)).toBe(3000);

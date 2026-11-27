@@ -64,3 +64,4 @@ describe("deep check 06:00 M8: Admin re-activating a cancelled order", () => {
     expect((await get(id)).status).toBe("CONFIRMED");
   });
 });
+

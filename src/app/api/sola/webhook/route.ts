@@ -86,6 +86,9 @@ async function handle(req: Request): Promise<Response> {
   const resumed = Boolean(ref) && before.order.solaRefNum === ref && ["PENDING_PAYMENT", "HOLD", "CANCELLED"].includes(before.order.status);
   const fresh = before.order.solaRefNum !== ref || resumed;
   const updated = await markGroupPaid(orderId, cents, "sola", field(fields, "xRefNum") || null);
+  // Deep check 06:00 M26: two copies of the same notice at the same moment: the second finds the payment already
+  // counted (duplicate) and sends nothing
+  if (updated.length && updated.every((u) => "duplicate" in u && u.duplicate)) return new Response("ok (already recorded)");
   await recordPaymentResult(days.map((d) => d.order.id), "approved", last4Of(fields), field(fields, "xRefNum") || null);
   if (!updated.length && fresh) return new Response("unknown order", { status: 404 });
   // Evidence: tie this payment to the rental terms version the customer accepted (or record that none was).

@@ -443,6 +443,9 @@ export async function releaseExpired(): Promise<number> {
   return res.length;
 }
 
+/** A payment saved halfway (amount saved, the rest not) is finished by a repeat notice only after this long (M26). */
+export const RESUME_AFTER_MS = 20_000;
+
 /** Mark an order paid (from Sola webhook or manual entry). Idempotent. */
 export async function markPaid(orderId: number, cents: number, method: string, ref?: string | null) {
   // Hark's backend list 1 (Nov 26, 2026): two payment callbacks at the same moment could both read the old amount (one
@@ -459,15 +462,17 @@ export async function markPaid(orderId: number, cents: number, method: string, r
     if (ref && cur.solaRefNum === ref) {
       // Deep check Nov 27 #7: this payment's amount was saved but the rest (status, Books) did not finish (an error in
       // between). The repeat notice finishes it, without adding the amount again; a finished order is a duplicate.
-      const unfinished = (cur.status === "PENDING_PAYMENT" || cur.status === "HOLD" || cur.status === "CANCELLED") && cur.paidCents >= cents;
+      // Deep check 06:00 M26: only once the first handling has had time to finish (20 seconds since the amount was
+      // saved); a copy arriving while the first is still running is a duplicate, so the paid text goes out once
+      const unfinished = (cur.status === "PENDING_PAYMENT" || cur.status === "HOLD" || cur.status === "CANCELLED") && cur.paidCents >= cents && cur.updatedAt.getTime() < Date.now() - RESUME_AFTER_MS;
       return unfinished ? { o: { ...cur, paidCents: cur.paidCents - cents }, dupe: false } : { o: cur, dupe: true };
     }
-    await tx.update(orders).set({ paidCents: sql`${orders.paidCents} + ${cents}`, solaRefNum: ref ?? cur.solaRefNum }).where(eq(orders.id, orderId));
+    await tx.update(orders).set({ paidCents: sql`${orders.paidCents} + ${cents}`, solaRefNum: ref ?? cur.solaRefNum, updatedAt: new Date() }).where(eq(orders.id, orderId));
     return { o: cur, dupe: false };
   });
   const o = counted.o;
   if (!o) return null;
-  if (counted.dupe) return o; // duplicate webhook
+  if (counted.dupe) return { ...o, duplicate: true as const }; // duplicate webhook (deep check M26: the caller sends no notice)
   const paid = o.paidCents + cents;
   // Hark's backend list 2: money on an order that was already paid in full (a second charge). It is recorded, the
   // booking stays as it is, the Owner is emailed to refund it, and the customer gets no new "paid" notice.

@@ -37,7 +37,7 @@ describe("Sola notices", () => {
     const [cu] = await db.insert(schema.customers).values({ name: "Sara", phone: "+18455550777" }).returning();
     const [o] = await db
       .insert(schema.orders)
-      .values({ status: "PENDING_PAYMENT", channel: "PHONE", customerId: cu.id, eventDate: "2027-10-20", pickupDate: "2027-10-21", subtotalCents: 6000, totalCents: 6000, paidCents: 6000, solaRefNum: "HALF9", holdExpiresAt: new Date(Date.now() + 600_000) })
+      .values({ status: "PENDING_PAYMENT", channel: "PHONE", customerId: cu.id, eventDate: "2027-10-20", pickupDate: "2027-10-21", subtotalCents: 6000, totalCents: 6000, paidCents: 6000, solaRefNum: "HALF9", holdExpiresAt: new Date(Date.now() + 600_000), updatedAt: new Date(Date.now() - 60_000) })
       .returning();
     h.texts.length = 0;
     await post({ xResult: "A", xInvoice: invoiceFor(o.id), xAuthAmount: "60.00", xRefNum: "HALF9" });

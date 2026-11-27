@@ -155,6 +155,17 @@ describe("disputes", () => {
     await handleStripeEvent({ type: "refund.created", data: { object: { id: "re_late", amount: 700, status: "succeeded", charge: "ch_test_1", payment_intent: null } } });
     expect((await order()).refundedCents).toBe(before + 700);
   });
+  it("deep check 06:00 M11: a booking of two days paid together: a refund recorded on day 2 is not added again on day 1", async () => {
+    const mk = async (d: string) => (await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: d, pickupDate: d, subtotalCents: 10000, totalCents: 10000, paidCents: 10000, stripePaymentId: "pi_m11" }).returning())[0];
+    const a = await mk("2027-05-02");
+    const b = await mk("2027-05-03");
+    const { applyRefund } = await import("@/lib/refunds");
+    await applyRefund(b, { amountCents: 4000, refundId: "re_m11_admin", provider: "stripe", source: "admin", userId: null });
+    await handleStripeEvent({ type: "charge.refunded", data: { object: { id: "ch_m11", payment_intent: "pi_m11", amount_refunded: 4000 } } });
+    const both = (await db.select().from(schema.orders).where(eq(schema.orders.stripePaymentId, "pi_m11"))).reduce((n, o) => n + o.refundedCents, 0);
+    expect(both).toBe(4000);
+    expect(a.id).toBeGreaterThan(0);
+  });
   it("nested params are encoded the way Stripe expects", () => {
     expect(formEncode({ evidence: { customer_name: "A B" }, submit: true })).toEqual(["evidence%5Bcustomer_name%5D=A%20B", "submit=true"]);
   });
