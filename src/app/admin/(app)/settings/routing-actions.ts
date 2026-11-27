@@ -31,10 +31,15 @@ export async function saveRoutingAction(_prev: { ok?: boolean; message?: string 
   const afterHours = form.get("afterHours") === "on";
   const time = (v: FormDataEntryValue | null) => {
     const t = String(v ?? "").trim();
-    return /^\d{1,2}:\d{2}$/.test(t) ? t : "";
+    const m = /^(\d{1,2}):(\d{2})$/.exec(t);
+    return m && Number(m[1]) < 24 && Number(m[2]) < 60 ? t : "";
   };
   const afterFrom = time(form.get("afterFrom"));
   const afterTo = time(form.get("afterTo"));
+  // Extra check I4 (Nov 27, 2026): a window that ends before it starts would never ring, so it is not saved
+  const minutes = (t: string) => Number(t.split(":")[0]) * 60 + Number(t.split(":")[1]);
+  if (afterFrom && afterTo && minutes(afterTo) <= minutes(afterFrom))
+    return { ok: false, message: "Not saved: the after-hours Until time must be later than From on the same day (the window cannot go past midnight)." };
   const erevTo = time(form.get("erevTo"));
   const erevToSummer = time(form.get("erevToSummer"));
   const erevBefore = String(Math.min(240, Math.max(0, Math.round(Number(form.get("erevBefore")) || 0))));
