@@ -1,9 +1,10 @@
+import { trustedMsg } from "@/lib/url-message";
 import { requireOwner } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { saveHolidayRentalsAction, saveOffersAction, saveOffersIntroAction } from "./actions";
 
 /** Offers (Owner only): its own page in the side menu, under Catalog (Abraham, Nov 17, 2026). */
-export default async function OffersPage({ searchParams }: { searchParams: Promise<{ ok?: string }> }) {
+export default async function OffersPage({ searchParams }: { searchParams: Promise<{ ok?: string; oks?: string }> }) {
   await requireOwner();
   const sp = await searchParams;
   const settings = await getSettings();
@@ -11,7 +12,7 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
     <div className="w-full">
       <h1 className="text-2xl font-black sm:text-3xl">Offers</h1>
       <p className="mb-5 mt-1 text-muted" data-offers-intro>{String(settings.offersIntro || "").trim() || "Turn each offer on or off here. Customers only get the offers that are on."}</p>
-      {sp.ok && <p className="mb-4 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]">{sp.ok}</p>}
+      {trustedMsg(sp.ok, sp.oks) && <p className="mb-4 rounded-xl bg-mint/15 p-3 font-semibold text-[#13895C]">{trustedMsg(sp.ok, sp.oks)}</p>}
       <section className="card mb-5 p-5" data-offers>
         <form action={saveOffersAction} className="grid gap-2">
           <label className="flex items-start gap-2"><input type="checkbox" name="laserThirdSetHalfOn" defaultChecked={settings.laserThirdSetHalfOn !== false} className="mt-1" /> <span><b>Laser tag: every third set half price.</b> On: every 3rd full set (maze with guns) is half price, and every 3rd extra gun set is half price, counted apart, never twice. Off: no third-set discount, and the phone does not offer the third gun set at half price.</span></label>

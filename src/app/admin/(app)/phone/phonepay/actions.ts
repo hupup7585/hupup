@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { msgQuery } from "@/lib/url-message";
 import { revalidatePath } from "next/cache";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
@@ -12,7 +13,7 @@ import { guardOn, sensitiveRefusal } from "@/lib/switch-guard";
 /** Owner only: Sola PhonePay settings (Abraham, Nov 14, 2026). Every change is in the audit log; the PIN is never here. */
 export async function savePhonePayAction(form: FormData) {
   const owner = await requireOwner();
-  const back = (m: string) => redirect(`/admin/phone/phonepay?m=${encodeURIComponent(m)}`);
+  const back = (m: string) => redirect(`/admin/phone/phonepay?${msgQuery(m)}`);
   const on = form.get("on") === "on";
   const ownerOnly = form.get("ownerOnly") === "on";
   const number = toE164(String(form.get("number") ?? ""));

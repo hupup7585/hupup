@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { msgQuery } from "@/lib/url-message";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { UNIT_STATUSES, type UnitStatus } from "@/lib/db/schema";
@@ -35,7 +36,7 @@ export async function addUnitAction(fd: FormData) {
     m = /unique|duplicate/i.test(String(e)) ? "That unit ID is already used." : (e as Error).message;
   }
   revalidatePath("/admin/units");
-  redirect(`/admin/units?m=${encodeURIComponent(m)}`);
+  redirect(`/admin/units?${msgQuery(m)}`);
 }
 
 export async function unitStatusAction(fd: FormData) {
@@ -50,5 +51,5 @@ export async function unitStatusAction(fd: FormData) {
     m = (e as Error).message;
   }
   revalidatePath("/admin/units");
-  redirect(`/admin/units?m=${encodeURIComponent(m)}`);
+  redirect(`/admin/units?${msgQuery(m)}`);
 }

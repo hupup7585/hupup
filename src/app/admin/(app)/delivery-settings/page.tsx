@@ -1,3 +1,4 @@
+import { trustedMsg } from "@/lib/url-message";
 import { getSettings } from "@/lib/settings";
 import { requireOwner } from "@/lib/auth";
 import StockAddressForm from "../settings/StockAddressForm";
@@ -9,10 +10,11 @@ import { checkAddressAction, reloadMapAction, saveAreasAction, saveLocalStreetsA
 const usd = (c: number | string) => `$${(Number(c) / 100).toFixed(2)}`;
 
 /** Deliveries → Delivery settings: delivery area, fees, stock address and the approved delivery texts. Owner only. */
-export default async function DeliverySettingsPage({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
+export default async function DeliverySettingsPage({ searchParams }: { searchParams: Promise<{ m?: string; ms?: string }> }) {
   await requireOwner();
   const settings = await getSettings();
-  const m = (await searchParams).m;
+  const sp0 = await searchParams;
+  const m = trustedMsg(sp0.m, sp0.ms);
   const areas = savedAreas(settings.deliveryAreas);
   return (
     <div className="w-full">

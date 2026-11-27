@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { msgQuery } from "@/lib/url-message";
 import { redirect } from "next/navigation";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
@@ -19,7 +20,7 @@ export async function saveOffersAction(fd: FormData) {
   for (const [k, v] of Object.entries(after)) await saveSetting(k as keyof typeof after, v, owner.userId);
   await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.offers_updated", entityType: "settings", entityId: "offers", before, after });
   revalidatePath("/admin", "layout");
-  redirect(`/admin/offers?ok=${encodeURIComponent("Offers saved. They apply to new bookings.")}`);
+  redirect(`/admin/offers?${msgQuery("Offers saved. They apply to new bookings.", "ok")}`);
 }
 
 /** Chanukah and Chol Hamoed rentals (Abraham, Nov 18, 2026): switches and numbers, Owner only, audited. */
@@ -45,7 +46,7 @@ export async function saveHolidayRentalsAction(fd: FormData) {
   for (const [k, v] of Object.entries(after)) await saveSetting(k as keyof typeof after, v as never, owner.userId);
   await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.holiday_rentals", entityType: "settings", entityId: "holiday_rentals", before, after });
   revalidatePath("/admin", "layout");
-  redirect(`/admin/offers?ok=${encodeURIComponent("Chanukah and Chol Hamoed settings saved. They apply to new bookings.")}`);
+  redirect(`/admin/offers?${msgQuery("Chanukah and Chol Hamoed settings saved. They apply to new bookings.", "ok")}`);
 }
 
 
@@ -57,5 +58,5 @@ export async function saveOffersIntroAction(fd: FormData) {
   await saveSetting("offersIntro", text || "Turn each offer on or off here. Customers only get the offers that are on.", owner.userId);
   await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.offers_intro_updated", entityType: "settings", entityId: "offers", before: { offersIntro: s.offersIntro }, after: { offersIntro: text } });
   revalidatePath("/admin/offers");
-  redirect(`/admin/offers?ok=${encodeURIComponent("Saved.")}`);
+  redirect(`/admin/offers?${msgQuery("Saved.", "ok")}`);
 }

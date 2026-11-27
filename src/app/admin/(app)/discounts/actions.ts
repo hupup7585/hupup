@@ -1,13 +1,14 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
+import { msgQuery } from "@/lib/url-message";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { parseDiscountForm } from "@/lib/customer-discounts";
 
-const back = (m: string) => redirect(`/admin/discounts?m=${encodeURIComponent(m)}`);
+const back = (m: string) => redirect(`/admin/discounts?${msgQuery(m)}`);
 
 /** Owner: a discount for a customer's phone number (Abraham, Nov 17-18, 2026). Logged. */
 export async function addDiscountAction(form: FormData) {

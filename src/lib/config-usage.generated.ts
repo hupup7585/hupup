@@ -823,6 +823,7 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/phone/phonepay/page.tsx",
   "app/admin/(app)/phone/prompts/slots/page.tsx",
   "app/admin/(app)/phone/settings/page.tsx",
+  "lib/feature-switches.ts",
   "lib/switch-guard.ts"
  ],
  "solaFeePercent": [

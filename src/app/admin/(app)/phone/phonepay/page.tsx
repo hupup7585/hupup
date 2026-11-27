@@ -1,3 +1,4 @@
+import { trustedMsg } from "@/lib/url-message";
 import { requireOwner } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { recentAttempts } from "@/lib/sola-phonepay";
@@ -22,9 +23,10 @@ const NOTE: Record<string, string> = {
 };
 
 /** Owner only (Abraham, Nov 14, 2026): callers pay by card through Sola's free PhonePay line. No card data, ever. */
-export default async function PhonePayPage({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
+export default async function PhonePayPage({ searchParams }: { searchParams: Promise<{ m?: string; ms?: string }> }) {
   await requireOwner();
-  const { m } = await searchParams;
+  const { m: rawM, ms } = await searchParams;
+  const m = trustedMsg(rawM, ms);
   const [s, attempts] = await Promise.all([getSettings(), recentAttempts(20)]);
   const ready = {
     pin: Boolean(process.env.SOLA_PHONEPAY_PIN),

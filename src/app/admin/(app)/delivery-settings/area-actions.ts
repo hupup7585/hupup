@@ -1,13 +1,14 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { msgQuery } from "@/lib/url-message";
 import { revalidatePath } from "next/cache";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { getSettings, saveSetting } from "@/lib/settings";
 import { QUOTE_WHY, deliveryQuote, reloadDeliveryMap, savedAreas } from "@/lib/delivery-areas";
 
-const back = (m: string) => redirect(`/admin/delivery-settings?m=${encodeURIComponent(m)}#areas`);
+const back = (m: string) => redirect(`/admin/delivery-settings?${msgQuery(m)}#areas`);
 
 /** Owner only: names of the delivery areas (shapes from the Google map; prices follow Abraham's rule). Audited. */
 export async function saveAreasAction(form: FormData) {
@@ -82,5 +83,5 @@ export async function saveLocalStreetsAction(form: FormData) {
   await saveSetting("localStreets", list.join("\n"), owner.userId);
   await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.local_streets_updated", entityType: "settings", entityId: "local_streets", before: { count: String(before ?? "").split("\n").filter(Boolean).length }, after: { count: list.length } });
   revalidatePath("/admin/delivery-settings");
-  redirect(`/admin/delivery-settings?m=${encodeURIComponent(`Saved (${list.length} streets).`)}#streets`);
+  redirect(`/admin/delivery-settings?${msgQuery(`Saved (${list.length} streets).`)}#streets`);
 }

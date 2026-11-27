@@ -1,3 +1,4 @@
+import { trustedMsg } from "@/lib/url-message";
 import Link from "next/link";
 import { desc, inArray, lte, sql } from "drizzle-orm";
 import { requireOwner } from "@/lib/auth";
@@ -21,9 +22,11 @@ const show = (v: unknown) => (v === true ? "On" : v === false ? "Off" : String(v
  * live value, default, explanation and where it is used. Changes are drafts until published; every change is kept
  * (history and Undo). Structured values link to their own pages. Feature switches show what is still set in code.
  */
-export default async function ConfigPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string; q?: string; k?: string; v?: string; r?: string }> }) {
+export default async function ConfigPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string; errs?: string; q?: string; k?: string; v?: string; r?: string }> }) {
   await requireOwner();
-  const sp = await searchParams;
+  const sp0 = await searchParams;
+  // Hark's review L11: a "Not saved" line shows only when our own Save wrote it (signed), never typed text
+  const sp = { ...sp0, err: trustedMsg(sp0.err, sp0.errs) ?? undefined };
   const live = (await getSettings()) as Record<string, unknown>;
   const q = (sp.q ?? "").trim().toLowerCase();
   const defs = configDefs().filter((d) => !q || `${d.key} ${d.label} ${d.help} ${d.group}`.toLowerCase().includes(q));

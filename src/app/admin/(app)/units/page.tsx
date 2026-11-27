@@ -1,3 +1,4 @@
+import { trustedMsg } from "@/lib/url-message";
 import { asc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
@@ -13,10 +14,11 @@ export const metadata = { title: "Equipment units · Hup Up Attractions", robots
 const money = (c: number | null) => (c == null ? "" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
 
 /** Equipment units (Abraham, Nov 15, 2026). One row per physical unit; only Available units can be booked. */
-export default async function UnitsPage({ searchParams }: { searchParams: Promise<{ m?: string; unit?: string }> }) {
+export default async function UnitsPage({ searchParams }: { searchParams: Promise<{ m?: string; ms?: string; unit?: string }> }) {
   const staff = await requireAdmin();
   const owner = staff.role === "owner";
-  const { m, unit } = await searchParams;
+  const { m: rawM, ms, unit } = await searchParams;
+  const m = trustedMsg(rawM, ms);
   const [rows, products] = await Promise.all([
     listUnits(),
     db.select({ id: schema.products.id, name: schema.products.name }).from(schema.products).orderBy(asc(schema.products.name)),

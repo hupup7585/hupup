@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireOwner } from "@/lib/auth";
 import { ConfigError, discardDraft, publishDraft, saveDraft, undoLast } from "@/lib/config-versions";
 import type { OkCode } from "./messages";
+import { msgQuery } from "@/lib/url-message";
 
 /** The link mark that jumps to one setting's box on the page */
 const ANCHOR = "\u0023";
@@ -28,7 +29,7 @@ async function run(key: string, fn: (userId: number | null) => Promise<unknown>,
   // Hark's review L2: back to the same setting (not the top of the page), and a rejected value stays typed in the box
   const keep = !ok && typed ? `&v=${encodeURIComponent(typed.value.slice(0, 1000))}&r=${encodeURIComponent(typed.reason.slice(0, 300))}` : "";
   const at = `${ANCHOR}${encodeURIComponent(key)}`; // the setting's own place on the page
-  redirect(ok ? `/admin/config?ok=${done}&k=${encodeURIComponent(key)}${at}` : `/admin/config?err=${encodeURIComponent(msg)}&k=${encodeURIComponent(key)}${keep}${at}`);
+  redirect(ok ? `/admin/config?ok=${done}&k=${encodeURIComponent(key)}${at}` : `/admin/config?${msgQuery(msg, "err")}&k=${encodeURIComponent(key)}${keep}${at}`);
 }
 
 export async function saveDraftAction(f: FormData) {

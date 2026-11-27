@@ -1,3 +1,4 @@
+import { trustedMsg } from "@/lib/url-message";
 import { desc } from "drizzle-orm";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
@@ -12,9 +13,10 @@ export const metadata = { title: "Discounts · Hup Up Attractions", robots: { in
  * Customer discounts (Abraham, Nov 17-18, 2026): Owner only. By phone number, dollars or percent off the rentals,
  * before tax; stays until turned off, with an optional end date; never combined with an offer (the bigger saving).
  */
-export default async function DiscountsPage({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
+export default async function DiscountsPage({ searchParams }: { searchParams: Promise<{ m?: string; ms?: string }> }) {
   await requireOwner();
-  const { m } = await searchParams;
+  const { m: rawM, ms } = await searchParams;
+  const m = trustedMsg(rawM, ms);
   const rows = await db.select().from(schema.customerDiscounts).orderBy(desc(schema.customerDiscounts.id)).limit(200);
   const on = rows.filter((r) => r.active);
   const off = rows.filter((r) => !r.active);

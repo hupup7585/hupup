@@ -59,6 +59,7 @@ export function featureSwitches(settings: Record<string, unknown> = SETTING_DEFA
     { id: "laser_half", label: "Laser tag: every third set half price", state: yes("laserThirdSetHalfOn"), waitsFor: "", settingKey: "laserThirdSetHalfOn" },
     { id: "offer_thu_sun", label: "Offer: Thursday to Sunday", state: yes("offerThuSunOn"), waitsFor: "", settingKey: "offerThuSunOn" },
     { id: "offer_4th_sunday", label: "Offer: 4th Sunday free", state: yes("offerFourthSundayOn"), waitsFor: "", settingKey: "offerFourthSundayOn" },
+    { id: "switch_guard", label: "Safety check (code + typed words) before turning on recording, Google voice, PhonePay or Stripe", state: yes("sensitiveSwitchGuard"), waitsFor: "Abraham's OK on the screenshots", settingKey: "sensitiveSwitchGuard" },
     { id: "sms_test_only", label: "Texts to test numbers only", state: yes("smsTestOnly"), waitsFor: "", settingKey: "smsTestOnly" },
   ];
 }
