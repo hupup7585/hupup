@@ -4972,11 +4972,15 @@ const handlers: Record<string, Handler> = {
   async "phonepay-done"(ctx, vr) {
     const o = Number(ctx.query.get("o"));
     const a = Number(ctx.query.get("a"));
-    if (ctx.session?.data.recording) await resumeRecording(ctx.callSid).catch(() => null);
     // The helper stops listening once the caller is back on our line (it never hears our own prompts)
     const listening = ctx.query.get("ls") === "1";
     if (a && listening) vr.stop().stream({ name: `sola-${a}` });
     const group = o ? await getPaymentGroup(o) : null;
+    // Hark's backend list 3 (Nov 26, 2026, card security): when PhonePay did not answer, the backup number is dialed
+    // for the same card try, so the call recording stays paused (the caller types the card there). It resumes only
+    // on the paths that do not dial Sola again.
+    const dialsBackup = Boolean(a && (PHONEPAY_NOT_REACHED.includes(ctx.body.DialCallStatus ?? "") || ctx.query.get("nr") === "1") && ctx.query.get("b") !== "1" && group && !group.paid && group.due > 0);
+    if (ctx.session?.data.recording && !dialsBackup) await resumeRecording(ctx.callSid).catch(() => null);
     if (!group) return back(vr, "goodbye");
     if (group.paid) return back(vr, "pay-approved", { o });
     // Hark's 2nd check, A2: the hold ran out during payment and nothing was paid: never "approved", no new try
@@ -4992,6 +4996,8 @@ const handlers: Record<string, Handler> = {
       const s = await getSettings();
       const digits = buildSendDigits(s.solaPhonePayDigits, { pin: process.env.SOLA_PHONEPAY_PIN ?? "", amountCents: group.due, orderNumber: orderNumber(o) });
       if (s.solaListenOn) startSolaListen(vr, a, "outbound", s); // a new stream for the backup number
+      // never dial Sola while the call is being recorded (the recording is paused for card tones)
+      if (ctx.session?.data.recording) await pauseRecording(ctx.callSid).catch(() => null);
       phonePayDirectDial(vr, { number: s.solaPhonePayBackup, digits, action: url("phonepay-done", { o, a, b: 1, ...(s.solaListenOn ? { ls: 1 } : {}) }), hangupOnStar: true });
       return vr;
     }
