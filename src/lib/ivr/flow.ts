@@ -1564,6 +1564,17 @@ async function clearSpan(ctx: Ctx, date: string) {
   if (ctx.session) ctx.session.data.spanDays = spans;
 }
 
+/**
+ * Deep check 09:00 P17: another item for the day already chosen on this call (the date step is skipped). A "next day
+ * too" (Box 18 key 2) or closed-day choice belongs to the item it was made for: the new item is booked for that date
+ * only (its own pickup, no 1.5x), as when the date is entered again and confirmed.
+ */
+async function sameDayItem(ctx: Ctx, vr: VR, productId: number, day: string) {
+  await clearSpan(ctx, day);
+  await chooseDay(ctx, day);
+  return back(vr, "qty", { p: productId, d: day });
+}
+
 /** This day becomes the one being shopped for on the call; an order already held for the same rental is reused. */
 async function chooseDay(ctx: Ctx, date: string) {
   const sameDay = await dayOrder(ctx, date);
@@ -2931,7 +2942,7 @@ const handlers: Record<string, Handler> = {
     if (d === "0") return back(vr, "cart");
     if (d === "1") {
       const day = ctx.session?.data.day;
-      return day ? back(vr, "qty", { p: p.id, d: day }) : back(vr, "date", { p: p.id });
+      return day ? sameDayItem(ctx, vr, p.id, day) : back(vr, "date", { p: p.id });
     }
     if (d === "2") {
       await track(ctx.callSid, "item_details", `Heard the details of ${p.name}`, { item: p.name, productId: p.id });
@@ -2971,12 +2982,12 @@ const handlers: Record<string, Handler> = {
     const p = /^\d{1,2}$/.test(d) && !d.startsWith("0") ? ((await isLaserBase(c)) ? laserList(items).find((x) => x.key === Number(d))?.p : items[Number(d) - 1]) : undefined;
     if (!p) {
       sp(vr, ctx, "not_valid");
-      return back(vr, "category", { c });
+      return back(vr, "category", { c, f: ctx.query.get("f") ?? undefined }); // deep check 09:00 P21: keeps the "free that date" filter, as no key does
     }
     await track(ctx.callSid, "item_heard", `Chose ${p.name}`, { item: p.name, productId: p.id });
     // Item first, then the date (Abraham). Adding more items for a day already chosen on this call skips the date.
     const day = ctx.session?.data.day;
-    return day ? back(vr, "qty", { p: p.id, d: day }) : back(vr, "date", { p: p.id });
+    return day ? sameDayItem(ctx, vr, p.id, day) : back(vr, "date", { p: p.id });
   },
 
   async product(ctx, vr) {
@@ -3007,7 +3018,7 @@ const handlers: Record<string, Handler> = {
     }
     if (d === "2") {
       const day = ctx.session?.data.day;
-      return day ? back(vr, "qty", { p: p.id, d: day }) : back(vr, "date", { p: p.id });
+      return day ? sameDayItem(ctx, vr, p.id, day) : back(vr, "date", { p: p.id });
     }
     sp(vr, ctx, "not_valid");
     return back(vr, "product", { p: p.id, again: 1 });
@@ -3278,6 +3289,8 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d") ?? undefined;
     const pick = ({ "1": ctx.query.get("b"), "2": ctx.query.get("a") } as Record<string, string | null>)[ctx.body.Digits ?? ""];
     if (pick) {
+      // Deep check 09:00 P17: another date for this item: a next-day choice made earlier for that date (another item's) never carries over
+      if (pick !== date) await clearSpan(ctx, pick);
       await chooseDay(ctx, pick);
       return back(vr, "qty", { p, d: pick });
     }
@@ -6131,7 +6144,7 @@ async function ownKey(ctx: Ctx, vr: VR, screen: string, k: KeyDef) {
     }
     case "item": {
       const day = ctx.session?.data.day;
-      return day ? back(vr, "qty", { p: a.productId, d: day }) : back(vr, "date", { p: a.productId });
+      return day ? sameDayItem(ctx, vr, a.productId, day) : back(vr, "date", { p: a.productId });
     }
     case "back":
       return handlers[ctx.action]({ ...ctx, body: { ...ctx.body, Digits: "*" } }, vr);
