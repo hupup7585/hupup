@@ -2,7 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { CATALOG_FORM_DRAFT, catalogEmailedToday, validCatalogEmail, websiteCatalogFormShown } from "@/lib/catalog-request";
+import { CATALOG_FORM_DRAFT, catalogEmailedToday, catalogIpLimitReached, requestIp, validCatalogEmail, websiteCatalogFormShown } from "@/lib/catalog-request";
 
 /** "Email me the catalog" on the website: the real catalog email (PDF attached), once per address per day. */
 export async function requestCatalogAction(_prev: { ok: boolean; message: string } | null, form: FormData): Promise<{ ok: boolean; message: string }> {
@@ -11,9 +11,15 @@ export async function requestCatalogAction(_prev: { ok: boolean; message: string
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   if (!validCatalogEmail(email)) return { ok: false, message: CATALOG_FORM_DRAFT.bad };
   if (await catalogEmailedToday(email)) return { ok: true, message: CATALOG_FORM_DRAFT.again };
+  // One internet address: at most 10 catalog sends a day (robots), with the usual "could not send" line
+  const req = await requestIp();
+  if (await catalogIpLimitReached(req.ip)) {
+    await db.insert(schema.auditLog).values({ action: "catalog.website_limit", entityType: "email", entityId: email, ip: req.ip, after: { reason: "ip_daily_limit" } });
+    return { ok: false, message: CATALOG_FORM_DRAFT.failed };
+  }
   const { sendCatalogEmail, recordCatalogRequest } = await import("@/lib/catalog-send");
   const r = await sendCatalogEmail(email).catch(() => ({ sent: false }));
-  await db.insert(schema.auditLog).values({ action: "catalog.website_request", entityType: "email", entityId: email, after: { sent: r.sent } });
+  await db.insert(schema.auditLog).values({ action: "catalog.website_request", entityType: "email", entityId: email, ip: req.ip, userAgent: req.userAgent, after: { sent: r.sent } });
   await recordCatalogRequest({ callerPhone: null, channel: "email", to: email, sent: r.sent, source: "email" }).catch(() => null);
   return r.sent ? { ok: true, message: CATALOG_FORM_DRAFT.sent } : { ok: false, message: CATALOG_FORM_DRAFT.failed };
 }
@@ -41,14 +47,13 @@ export async function textCatalogAction(_prev: { ok: boolean; message: string } 
     await db.insert(schema.auditLog).values({ action: "catalog.website_text_request", entityType: "phone", entityId: phone, after: { replied: false, reason: "opted_out" } });
     return { ok: false, message: draftOk ? CATALOG_TEXT_DRAFT.stopped : CATALOG_FORM_DRAFT.failed };
   }
-  // The consent record: number, time, page, the exact box wording and the IP
-  const { headers } = await import("next/headers");
-  let h: Headers | null = null;
-  try {
-    h = (await headers()) as unknown as Headers;
-  } catch {
-    // outside a web request (tests): no IP or page
+  // One internet address: at most 10 catalog sends a day (robots), before any consent record or text
+  const req = await requestIp();
+  if (await catalogIpLimitReached(req.ip)) {
+    await db.insert(schema.auditLog).values({ action: "catalog.website_limit", entityType: "phone", entityId: phone, ip: req.ip, after: { reason: "ip_daily_limit" } });
+    return { ok: false, message: CATALOG_FORM_DRAFT.failed };
   }
+  // The consent record: number, time, page, the exact box wording and the IP
   await db.insert(schema.smsConsents).values({
     customerId: c?.id ?? null,
     phone,
@@ -59,15 +64,15 @@ export async function textCatalogAction(_prev: { ok: boolean; message: string } 
     wording: CATALOG_TEXT_CONSENT,
     wordingVersion: CATALOG_TEXT_CONSENT_VERSION,
     response: "checked",
-    ip: (h?.get("x-forwarded-for") || "").split(",")[0].trim() || null,
-    userAgent: h?.get("user-agent")?.slice(0, 500) || null,
-    pageUrl: h?.get("referer")?.slice(0, 500) || null,
+    ip: req.ip,
+    userAgent: req.userAgent,
+    pageUrl: req.referer,
   });
   const r = await replyToCatalogText(phone, {
     optedOut: false,
     send: (to, body, media) => sendMessage({ to, body, ...(media?.length ? { mediaUrls: media } : {}), kind: "system", event: "catalog_reply", customerId: c?.id }),
   }).catch(() => ({ replied: false, reason: "send_failed" as const }));
-  await db.insert(schema.auditLog).values({ action: "catalog.website_text_request", entityType: "phone", entityId: phone, after: r });
+  await db.insert(schema.auditLog).values({ action: "catalog.website_text_request", entityType: "phone", entityId: phone, ip: req.ip, userAgent: req.userAgent, after: r });
   if (r.replied) return { ok: true, message: CATALOG_FORM_DRAFT.textSent };
   if (r.reason === "already_today") return { ok: true, message: CATALOG_FORM_DRAFT.textAgain };
   return { ok: false, message: CATALOG_FORM_DRAFT.failed };
