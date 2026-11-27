@@ -43,7 +43,7 @@ describe("the lock is used everywhere booking or paying can happen", () => {
     expect(readFileSync("src/app/pay/[orderId]/page.tsx", "utf8")).toContain("await paymentsClosedLine()");
     expect(readFileSync("src/app/pay/[orderId]/actions.ts", "utf8")).toContain("await paymentsClosedLine()");
     const { paymentsClosedLine } = await import("@/lib/payments-closed");
-    expect(await paymentsClosedLine(new Date("2026-11-21T17:00:00Z"))).toBe("Payments open after Shabbes.");
+    expect(await paymentsClosedLine(new Date("2026-11-21T17:00:00Z"))).toBe("Payments are closed at this time."); // placeholder (Nov 27, 2026)
     expect(await paymentsClosedLine(new Date("2026-11-17T17:00:00Z"))).toBeNull();
     expect(readFileSync("src/app/admin/(app)/pos/actions.ts", "utf8")).toContain("Booking is closed on ${lock.reason}");
     expect(readFileSync("src/app/admin/(app)/pos/page.tsx", "utf8")).toContain("data-booking-locked");

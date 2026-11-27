@@ -466,7 +466,8 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  "phoneCutoffMinutes": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/ivr/flow.ts"
+  "lib/ivr/flow.ts",
+  "lib/payments-closed.ts"
  ],
  "shabbesSaveMinutes": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",

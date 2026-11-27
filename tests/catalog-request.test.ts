@@ -60,10 +60,9 @@ describe("catalog by text: consent box", () => {
     const src = readFileSync("src/components/site/CatalogRequest.tsx", "utf8");
     expect(src).toContain("useState(false)");
     expect(src).toMatch(/disabled=\{tPending \|\| !agreed\}/);
-    expect(src).toContain('href="/sms-terms"');
-    expect(src).toContain('href="/privacy"');
+    expect(src).toContain("data-sms-grey-line");
     expect(CATALOG_TEXT_CONSENT).toBe("Yes, text the Hup Up Attractions catalog to this number.");
-    expect(`${CATALOG_TEXT_FINE_PRINT} SMS Terms and Privacy Policy.`).toBe("One text with our catalog. Message and data rates may apply. Reply STOP to stop, or HELP for help. SMS Terms and Privacy Policy.");
+    expect(CATALOG_TEXT_FINE_PRINT).toBe("Message and data rates may apply."); // Nov 27, 2026 (item 5): only this sentence
   });
   it("unticked: nothing sent, no record", async () => {
     const before = h.sent.length;

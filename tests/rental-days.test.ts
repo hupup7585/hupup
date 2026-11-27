@@ -65,6 +65,10 @@ describe("whole rental days", () => {
     expect(PROMPTS.date_confirm_day.text).toBe(
       "Got it, {date}! We will deliver that day between 9 AM and noon, and pick up on {pickup}. Please have the rental outside your door by 9 AM that morning. If that is right, press pound to continue. To pick a different date, press 1.",
     );
-    expect(readFileSync("src/app/pay/[orderId]/page.tsx", "utf8")).toContain("We deliver between 9:00 AM and 12:00 PM on your delivery day. On your pickup day, please have the rental outside your door by 9:00 AM.");
+    // Nov 27, 2026: the sentences live in src/lib/pay-breakdown.ts (a Saturday-night pickup gets the Mutze Shabbes one)
+    expect(readFileSync("src/app/pay/[orderId]/page.tsx", "utf8")).toContain("{DELIVERY_SENTENCE} {pickupLine}");
+    const pb = readFileSync("src/lib/pay-breakdown.ts", "utf8");
+    expect(pb).toContain('"We deliver between 9:00 AM and 12:00 PM on your delivery day."');
+    expect(pb).toContain('"On your pickup day, please have the rental outside your door by 9:00 AM."');
   });
 });

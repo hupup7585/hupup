@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useState } from "react";
 import { requestCatalogAction, textCatalogAction } from "@/app/catalog-actions";
 import { CATALOG_EMAIL_BUTTON, CATALOG_FORM_DRAFT, CATALOG_TEXT_BUTTON, CATALOG_TEXT_CONSENT, CATALOG_TEXT_FINE_PRINT } from "@/lib/catalog-request-copy";
@@ -47,9 +46,8 @@ export default function CatalogRequest() {
           <input type="checkbox" name="consent" value="yes" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-hu-deep" />
           <span>{CATALOG_TEXT_CONSENT}</span>
         </label>
-        <p className="mt-1 text-xs text-[#5B6B7F] sm:text-sm" data-catalog-fine-print>
-          {CATALOG_TEXT_FINE_PRINT}{" "}
-          <Link href="/sms-terms" className="underline">SMS Terms</Link> and <Link href="/privacy" className="underline">Privacy Policy</Link>.
+        <p className="mt-1 text-xs text-[#5B6B7F] sm:text-sm" data-catalog-fine-print data-sms-grey-line>
+          {CATALOG_TEXT_FINE_PRINT}
         </p>
       </form>
       {tState?.message && (

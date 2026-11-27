@@ -12,9 +12,8 @@ export const CATALOG_JOIN_SOURCE = "catalog text JOIN reply";
 export const CATALOG_JOIN_INVITE = "To join our seasonal offers, reply JOIN. You will never miss a deal, special, or new rentals, up to 5 messages a year.";
 export const CATALOG_JOIN_VERSION = "catalog-join-2026-11-27";
 
-/** The confirmation reply is NOT approved yet: built and switched OFF (decision for Abraham). */
-export const CATALOG_JOIN_CONFIRM_ON = false;
-export const CATALOG_JOIN_CONFIRM_DRAFT = "Hup Up Attractions: You're signed up for our seasonal offers, up to 5 messages a year. Msg & data rates may apply. Reply STOP to opt out, HELP for help.";
+/** The confirmation reply: Abraham approved the seasonal offers sign-up text on Nov 27, 2026 (src/lib/seasonal-confirm.ts). */
+export const CATALOG_JOIN_CONFIRM_ON = true;
 
 /** Did this number get the catalog by text? (key 8, the website, or a CATALOG reply all log "catalog_reply") */
 export async function gotCatalogText(exec: Exec, phone: string): Promise<boolean> {

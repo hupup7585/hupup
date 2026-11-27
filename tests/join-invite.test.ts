@@ -63,7 +63,7 @@ describe("JOIN invitation", () => {
     const r = await sendJoinInvites(NOON, true);
     expect(r.sent).toBe(1);
     expect(h.sent.map((m) => m.to)).toEqual([P.ok]);
-    expect(h.sent[0].body).toBe(joinInviteText());
+    expect(h.sent[0].body).toBe(`${joinInviteText()} Reply STOP to stop, or HELP for help.`); // first text to this number (Nov 27, 2026, item 5)
     const again = await sendJoinInvites(NOON, true);
     expect(again.sent).toBe(0);
     expect(h.sent).toHaveLength(1);

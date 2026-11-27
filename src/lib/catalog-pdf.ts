@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 
 /** Abraham's catalog PDF (Phone Menu v3, section 9). Up to about 10 MB; sent in 3 MB pieces. */
@@ -31,6 +31,14 @@ export async function saveCatalogChunk(fileId: number, idx: number, data: Buffer
 export async function currentCatalog() {
   const [f] = await db.select().from(schema.catalogFiles).where(eq(schema.catalogFiles.current, true)).limit(1);
   return f ?? null;
+}
+
+/**
+ * Every finished catalog PDF, newest first, for the Owner's history in Admin (Abraham, Nov 27, 2026). Old files stay
+ * stored here and in /api/admin/catalog-pdf/<id> (Owner only); the public never sees them.
+ */
+export async function catalogHistory() {
+  return db.select().from(schema.catalogFiles).where(eq(schema.catalogFiles.complete, true)).orderBy(desc(schema.catalogFiles.createdAt), desc(schema.catalogFiles.id));
 }
 
 export async function catalogPdfBytes(fileId: number): Promise<Buffer | null> {

@@ -10,6 +10,7 @@ vi.mock("@/lib/jobs", () => ({ runJob: async (_n: string, f: () => Promise<unkno
 vi.mock("@/lib/vm-boxes", () => ({ purgeOldDeleted: async () => 0 }));
 vi.mock("@/lib/inbox", () => ({ sendScheduledEmails: async () => 0 }));
 vi.mock("@/lib/address-checks", () => ({ recheckDue: async () => false, runAddressChecks: async () => ({ checked: 0 }) }));
+vi.mock("@/lib/wake-flags", () => ({ wakeDue: async () => false }));
 
 describe("the short jobs", () => {
   it("refuses without the secret; runs the short jobs with it", async () => {

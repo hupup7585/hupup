@@ -15,9 +15,8 @@ export const PAYMENT_HOLD_MINUTES = 10; // Abraham, Nov 13, 2026: rentals are he
 /** Admin New booking payment link: rentals held 25 minutes (Abraham, Nov 13, 2026; was 60). */
 export const POS_LINK_HOLD_MINUTES = 25;
 
-export function orderNumber(id: number): string {
-  return String(1000 + id);
-}
+import { orderNumber } from "@/lib/order-number";
+export { orderNumber };
 
 export function minutesFromNow(m: number): Date {
   return new Date(Date.now() + m * 60_000);

@@ -116,7 +116,7 @@ describe("names and the public website", () => {
     const grepSrc = (dir: string): string[] =>
       require("node:fs").readdirSync(dir, { withFileTypes: true }).flatMap((e: { name: string; isDirectory: () => boolean }) => (e.isDirectory() ? grepSrc(`${dir}/${e.name}`) : [`${dir}/${e.name}`]));
     for (const f of grepSrc("src")) expect(readFileSync(f, "utf8"), f).not.toContain("@hebcal");
-    for (const f of ["src/app/page.tsx", "src/components/site/SiteFooter.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/ServiceAreaC.tsx"]) {
+    for (const f of ["src/app/page.tsx", "src/components/site/SiteFooterView.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/ServiceAreaC.tsx"]) {
       expect(readFileSync(f, "utf8"), f).not.toMatch(/hup-calendar|jewish-calendar|officeHours/);
     }
   });

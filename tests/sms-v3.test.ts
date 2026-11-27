@@ -25,6 +25,7 @@ import { handleInboundSms, handleSmsStatus, HELP_REPLY } from "@/lib/sms-inbound
 import { inMarketingHours, marketingBodyV2, promosThisYear, sendMessage } from "@/lib/sms";
 import { approveCampaign, createCampaign, segments, sendCampaign } from "@/lib/campaigns";
 import { PROMO_ENROLLED_SMS, promoConfirmRequestSms } from "@/lib/sms-terms-v2";
+import { SEASONAL_JOIN_CONFIRM_TEXT } from "@/lib/seasonal-confirm";
 import { requestPromoByCustomer } from "@/lib/sms-reenroll";
 
 let sid = 0;
@@ -69,7 +70,7 @@ describe("JOIN and YES", () => {
     expect(rows[0].response).toMatch(/texted "Yes" to the promotional confirmation sent .* \(requested by texted "JOIN"\)/);
     const [req] = await db.select().from(schema.smsReenrollRequests).where(eq(schema.smsReenrollRequests.phone, P));
     expect(req).toMatchObject({ status: "confirmed", confirmConsentId: rows[0].id }); // confirmation linked to the original request
-    expect(sentTo(P).at(-1)).toBe(PROMO_ENROLLED_SMS);
+    expect(sentTo(P).at(-1)).toBe(SEASONAL_JOIN_CONFIRM_TEXT); // Nov 27, 2026: the approved sign-up confirmation
     expect(PROMO_ENROLLED_SMS).toBe("Hup Up Attractions: You are signed up for seasonal promo texts, up to 5 per year. Msg & data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, HELP for help.");
     expect((await customer(P)).marketingOptIn).toBe(true);
   });

@@ -46,7 +46,7 @@ describe("public phone number", () => {
     const { PUBLIC_PHONE_DISPLAY, PUBLIC_PHONE_E164 } = await import("@/lib/config");
     expect(PUBLIC_PHONE_DISPLAY).toBe("(845) 777-7585");
     expect(PUBLIC_PHONE_E164).toBe("+18457777585");
-    for (const f of ["src/app/page.tsx", "src/app/opengraph-image.tsx", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/SiteFooter.tsx", "src/lib/site-content.ts"]) {
+    for (const f of ["src/app/page.tsx", "src/app/opengraph-image.tsx", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/SiteFooterView.tsx", "src/lib/site-content.ts"]) {
       expect(readFileSync(f, "utf8"), f).not.toMatch(/415-?7585|4157585/);
     }
   });
@@ -124,7 +124,7 @@ describe("delivery fee wording", () => {
     expect(WHY).not.toContain("Options for different types of events");
     expect(WHY).toContain("Friendly customer service");
     expect(WHY).not.toContain("Professional customer service");
-    const files = ["src/app/page.tsx", "src/lib/site-copy.ts", "src/app/terms/page.tsx", "src/components/site/SiteFooter.tsx"];
+    const files = ["src/app/page.tsx", "src/lib/site-copy.ts", "src/app/terms/page.tsx", "src/components/site/SiteFooterView.tsx"];
     for (const f of files) {
       const t = readFileSync(f, "utf8");
       expect(t, f).not.toMatch(/free delivery|delivery (is )?free|free of charge|no delivery fee|includes delivery/i);
@@ -153,12 +153,12 @@ describe("business name never splits across lines", () => {
     const page = readFileSync("src/app/page.tsx", "utf8");
     expect(page).toContain("{keepName(INTRO_REST)}"); // hero subtitle: first sentence has no business name
     expect(page).toContain("{keepName(FINAL_CTA_TEXT)}");
-    expect(readFileSync("src/components/site/SiteFooter.tsx", "utf8")).toContain("{BUSINESS_NAME_NB}");
+    expect(readFileSync("src/components/site/SiteFooterView.tsx", "utf8")).toContain("{BUSINESS_NAME_NB}");
   });
 });
 
 describe("Jumping Balloons and no slashes", () => {
-  const visible = ["src/app/page.tsx", "src/components/site/SiteFooter.tsx", "src/components/site/SiteHeader.tsx", "src/lib/site-copy.ts", "src/lib/site-content.ts", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/app/layout.tsx"];
+  const visible = ["src/app/page.tsx", "src/components/site/SiteFooterView.tsx", "src/components/site/SiteHeader.tsx", "src/lib/site-copy.ts", "src/lib/site-content.ts", "src/app/privacy/page.tsx", "src/app/terms/page.tsx", "src/app/layout.tsx"];
   it("'bounce house' appears only as a search-engine hint (page titles, meta descriptions, structured data)", () => {
     // Exception: Abraham's approved /terms section C names the business-terms section "Bounce Houses and Inflatable
     // Attractions" verbatim (legal section title), so that one phrase is allowed there.
@@ -190,7 +190,7 @@ describe("Jumping Balloons and no slashes", () => {
 
 describe("Kiryas Joel is one place", () => {
   it("never shows 'Kiryas Joel and Town of Palm Tree' or a slash between them anywhere", () => {
-    for (const f of ["src/app/page.tsx", "src/components/site/SiteFooter.tsx", "src/lib/site-copy.ts", "src/app/privacy/page.tsx", "src/app/terms/page.tsx"]) {
+    for (const f of ["src/app/page.tsx", "src/components/site/SiteFooterView.tsx", "src/lib/site-copy.ts", "src/app/privacy/page.tsx", "src/app/terms/page.tsx"]) {
       expect(readFileSync(f, "utf8"), f).not.toMatch(/Kiryas Joel (and|\/) Town of Palm Tree/);
     }
   });
@@ -387,7 +387,7 @@ describe("Middletown: served, but not shown on the public website (Abraham)", ()
 
 describe("footer contact block (Abraham)", () => {
   it("holds contact info only: no service area or hours lines", () => {
-    const footer = readFileSync("src/components/site/SiteFooter.tsx", "utf8");
+    const footer = readFileSync("src/components/site/SiteFooterView.tsx", "utf8");
     const contact = footer.slice(footer.indexOf(">Contact</h3>"), footer.indexOf("border-t border-white/15"));
     expect(contact).toContain("tel:");
     expect(contact).toContain("mailto:");
@@ -472,7 +472,7 @@ describe("logo mock-up (Abraham)", () => {
     expect(m).toContain('const LOGO_TILE = "inline-flex items-center justify-center rounded-2xl bg-[#8CCBFF]"');
     for (const part of ["Header", "Footer", "favicon", "Section break", "Final call to book"]) expect(m).toContain(part);
     expect(readFileSync("src/app/mockups/layout.tsx", "utf8")).toMatch(/index: false/);
-    for (const f of ["src/app/page.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/SiteFooter.tsx"]) expect(readFileSync(f, "utf8")).not.toContain("8CCBFF");
+    for (const f of ["src/app/page.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/SiteFooterView.tsx"]) expect(readFileSync(f, "utf8")).not.toContain("8CCBFF");
   });
 });
 
@@ -520,7 +520,7 @@ describe("website Hours (Abraham's simple list)", () => {
     expect(note).not.toContain("bg-hu-yellow");
     expect(hours).not.toMatch(/officeHours|openNow|data-today/); // no "closed today (holiday)" line
     const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\/|\{\/\*[\s\S]*?\*\/\}|\/\/[^\n]*/g, "");
-    for (const f of ["src/app/page.tsx", "src/lib/site-copy.ts", "src/components/site/SiteFooter.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/ServiceAreaC.tsx", "src/app/text-alerts/page.tsx"]) {
+    for (const f of ["src/app/page.tsx", "src/lib/site-copy.ts", "src/components/site/SiteFooterView.tsx", "src/components/site/SiteHeader.tsx", "src/components/site/ServiceAreaC.tsx", "src/app/text-alerts/page.tsx"]) {
       expect(strip(readFileSync(f, "utf8")), f).not.toMatch(/yom tov|chol hamoed|purim|tisha|chanukah|lag ba|holiday/i);
     }
   });

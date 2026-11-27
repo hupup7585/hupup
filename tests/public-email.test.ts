@@ -21,7 +21,7 @@ describe("public email: info@hupupattractions.com everywhere (Abraham, Nov 10, 2
     }
     const home = readFileSync("src/app/page.tsx", "utf8");
     expect(home).toContain("email: c.email");
-    expect(readFileSync("src/components/site/SiteFooter.tsx", "utf8")).toContain("c.email");
+    expect(readFileSync("src/components/site/SiteFooterView.tsx", "utf8")).toContain("c.email");
   });
   it("the HELP text message and the SMS Terms give info@hupupattractions.com", () => {
     expect(HELP_REPLY).toContain("info@hupupattractions.com");

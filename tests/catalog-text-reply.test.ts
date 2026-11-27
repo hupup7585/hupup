@@ -33,7 +33,9 @@ describe("CATALOG by text", () => {
     expect(r.replied).toBe(true);
     const out = (await db.select().from(schema.messages)).filter((m) => m.direction === "out" && m.toNumber === "+18455550114");
     expect(out).toHaveLength(2); // the first text, then the photo
-    expect(out[0].body).toBe("Hup Up Attractions: Here is our catalog! You can call us anytime to book with our automated system at (845) 777-7585 Ext. 1.");
+    // Nov 27, 2026 (item 5): the first text this number ever gets ends with the STOP/HELP sentence; the photo after it does not
+    expect(out[0].body).toBe("Hup Up Attractions: Here is our catalog! You can call us anytime to book with our automated system at (845) 777-7585 Ext. 1. Reply STOP to stop, or HELP for help.");
+    expect(out[1].body ?? "").not.toContain("Reply STOP to stop, or HELP for help.");
   });
   it("never after STOP", async () => {
     const { replyToCatalogText } = await import("@/lib/catalog-send");

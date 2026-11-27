@@ -9,14 +9,14 @@ import PayForm from "@/app/pay/[orderId]/PayForm";
 import TextConsentBoxes from "@/components/TextConsentBoxes";
 import { PAY_SMS_HELP_LINE } from "@/app/pay/[orderId]/label";
 
-const LINE = "Message and data rates may apply. Reply STOP to stop, or HELP for help.";
+const LINE = "Message and data rates may apply."; // Nov 27, 2026 (item 5): only this sentence
 const page = () => renderToStaticMarkup(createElement(PayForm as never, { orderId: 7, token: "t", consent: { transactionalText: "Order texts.", marketingText: "Promo texts.", smsNumber: "(845) 415-7585" } }));
 
 describe("pay page: the line under the texting consent boxes", () => {
   it("reads exactly the approved words, small and grey", () => {
     expect(PAY_SMS_HELP_LINE).toBe(LINE);
     const html = page();
-    expect(html).toContain(`<p class="text-sm text-hu-deep/70" data-consent-help-line="true">${LINE}</p>`);
+    expect(html).toContain(`<p class="text-sm text-hu-deep/60" data-consent-help-line="true" data-sms-grey-line="true">${LINE}</p>`);
     expect(html).not.toContain("Text STOP to opt out");
   });
   it("the boxes stay unticked by default; the Terms box too; the SMS Terms and Privacy links are kept", () => {

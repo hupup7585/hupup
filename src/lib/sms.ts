@@ -1,4 +1,5 @@
-import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { bookingLock } from "@/lib/jewish-calendar";
 import { db, schema } from "@/lib/db";
 import { config } from "@/lib/config";
 import { toE164 } from "@/lib/phone";
@@ -64,8 +65,17 @@ export function containsCardNumber(text: string): boolean {
  * gave us, otherwise both the area-code zone(s) and New York time. See src/lib/area-code-tz.ts.
  */
 export function inMarketingHours(to: string, now = new Date(), customerTimeZone?: string | null): boolean {
-  return inRecipientPromoHours(to, now, customerTimeZone);
+  // Abraham, Nov 27, 2026 (option B): promotional texts also wait out Shabbes and Yom Tov, and go out after
+  return inRecipientPromoHours(to, now, customerTimeZone) && !restNow(now);
 }
+
+/** Shabbes or Yom Tov right now (from candle lighting until the hotline opens again after). */
+export function restNow(now = new Date()): boolean {
+  return bookingLock(now).locked;
+}
+
+/** Staff and Owner alert texts wait out Shabbes and Yom Tov (Abraham, Nov 27, 2026); sign-in codes never wait. */
+export const STAFF_ALERTS_HELD = new Set(["owner_alert", "owner_forward", "compliance_alert", "info_email_alert"]);
 
 /** Every promotional text begins with "Hup Up Attractions: Reply STOP to opt out." and then the offer. */
 export function marketingBody(body: string, v2 = smsTermsV2Active()): string {
@@ -168,6 +178,27 @@ export async function consentFooter(): Promise<string> {
   return messageText("msg_first_text_footer", { link: `${config.siteUrl()}/sms-terms` });
 }
 
+/** Abraham, Nov 27, 2026 (item 5): the ending of the first text a number ever gets from us, word for word. */
+export const FIRST_TEXT_STOP_HELP = " Reply STOP to stop, or HELP for help.";
+/** Customer texts that get the first-text ending: order and payment texts, and the catalog and other texts a customer asked for. */
+const FIRST_TEXT_SYSTEM_EVENTS = new Set(["catalog_request", "catalog_reply", "menu_key_request", "confirmation_resend", "join_invite"]);
+function FIRST_TEXT_KINDS(kind: MessageKind, event: string | undefined): boolean {
+  return kind === "transactional" || (kind === "system" && FIRST_TEXT_SYSTEM_EVENTS.has(event ?? ""));
+}
+/** The text already tells how to stop and get help (the sign-up confirmation, for one). */
+export const hasStopAndHelp = (body: string) => /\bSTOP\b/.test(body) && /\bHELP\b/.test(body);
+export function withFirstTextLine(body: string): string {
+  return `${body.trimEnd()}${FIRST_TEXT_STOP_HELP}`;
+}
+/** True when no text from us has ever gone out to this number (blocked, failed and canceled ones do not count). */
+export async function neverTexted(phone: string): Promise<boolean> {
+  const [r] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.messages)
+    .where(and(eq(schema.messages.contactPhone, phone), eq(schema.messages.direction, "out"), sql`${schema.messages.status} not in ('blocked', 'failed', 'undelivered', 'canceled')`));
+  return (r?.n ?? 0) === 0;
+}
+
 export function withOrderStopLine(body: string, needed: boolean): string {
   const b = body.trim();
   if (!needed || /\bSTOP\b/i.test(b)) return b;
@@ -211,6 +242,7 @@ export const SYSTEM_EVENTS: Record<string, { afterStop: boolean }> = {
   info_email_alert: { afterStop: false }, // every info@ email, texted to the owner (Abraham, Nov 17, 2026)
   compliance_alert: { afterStop: false }, // compliance report to the owner
   consent_confirmation: { afterStop: false }, // confirmation right after a customer opts in
+  seasonal_join_confirm: { afterStop: false }, // Nov 27, 2026: the approved seasonal offers sign-up confirmation, once per number (src/lib/seasonal-confirm.ts)
   opt_out_confirmation: { afterStop: true }, // the single permitted confirmation of an opt-out
   reenroll_request: { afterStop: true }, // the START confirmation asking the customer to reply YES
   promo_confirm_request: { afterStop: false }, // SMS Terms v2: asks for a YES reply (written promotional consent)
@@ -280,7 +312,12 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   const kind = input.kind ?? "transactional";
   const log = input.log !== false;
   if (kind === "marketing") input = { ...input, body: marketingBody(input.body) };
-  if (kind === "transactional") {
+  // Abraham, Nov 27, 2026 (item 5): the FIRST text a number ever gets from us carries STOP and HELP (the website's grey
+  // lines say only "Message and data rates may apply."). Catalog, order and payment link texts to a number that never
+  // got a text from us end with exactly " Reply STOP to stop, or HELP for help."; later texts do not.
+  const first = FIRST_TEXT_KINDS(kind, input.event) && !hasStopAndHelp(input.body) && (await neverTexted(to));
+  if (first) input = { ...input, body: withFirstTextLine(input.body) };
+  else if (kind === "transactional") {
     // The first text after a texting consent carries the full disclosure and the terms link (Abraham, Nov 24, 2026)
     const footer = (await needsConsentFooter(to)) ? await consentFooter() : null;
     input = { ...input, body: footer ? `${input.body.trim()} ${footer}` : withOrderStopLine(input.body, await needsOrderStopLine(to, input.now)) };
@@ -308,9 +345,13 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   // never push a customer past the yearly limit.
   const decideAndSave = async (exec: typeof db) => {
     if (kind === "marketing" && typeof exec.execute === "function") await exec.execute(sql`select pg_advisory_xact_lock(hashtext(${"promo:" + to}))`);
-    const blocked: Blocked | null = a2pOff ? "not_active" : testOnly ? "test_only" : await checkEligibility({ to, kind, event: input.event, customer, now: input.now, exec });
+    let blocked: Blocked | null = a2pOff ? "not_active" : testOnly ? "test_only" : await checkEligibility({ to, kind, event: input.event, customer, now: input.now, exec });
+    // Staff and Owner alerts during Shabbes or Yom Tov: held, then sent right after (customer-requested texts never wait)
+    const lock = kind === "system" && !blocked && STAFF_ALERTS_HELD.has(String(input.event)) ? bookingLock(input.now ?? new Date()) : null;
+    if (lock?.locked) blocked = "quiet_hours";
     const held = blocked === "quiet_hours";
-    const sendAfter = held ? nextPromoWindow(to, input.now ?? new Date(), customer?.timeZone) : null;
+    const sendAfter = !held ? null : lock?.locked ? lock.opensAt : nextPromoWindow(to, input.now ?? new Date(), customer?.timeZone);
+    if (held && sendAfter) await (await import("@/lib/wake-flags")).armWake("held-texts", sendAfter, { earliest: true });
     let messageId: number | undefined;
     if (log || held || kind === "marketing") {
       const [row] = await exec
@@ -387,12 +428,24 @@ export async function processHeldPromotions(now = new Date()): Promise<{ sent: n
   const due = await db
     .select()
     .from(schema.messages)
-    .where(and(eq(schema.messages.status, "held"), eq(schema.messages.kind, "marketing"), lte(schema.messages.sendAfter, now)));
+    .where(and(eq(schema.messages.status, "held"), inArray(schema.messages.kind, ["marketing", "system"]), lte(schema.messages.sendAfter, now)))
+    .orderBy(asc(schema.messages.sendAfter), asc(schema.messages.id)); // oldest first
   const out = { sent: 0, canceled: 0, rescheduled: 0 };
   for (const m of due) {
     const to = m.toNumber || m.contactPhone || "";
     const customer = m.customerId ? ((await db.select().from(schema.customers).where(eq(schema.customers.id, m.customerId)))[0] ?? null) : await customerByPhone(to);
-    const blocked = await checkEligibility({ to, kind: "marketing", customer, now, heldRecheck: true }); // already counted toward the yearly limit
+    if (m.kind === "system") {
+      // a staff alert held for Shabbes or Yom Tov
+      const lock = bookingLock(now);
+      if (lock.locked) {
+        await db.update(schema.messages).set({ sendAfter: lock.opensAt }).where(eq(schema.messages.id, m.id));
+        out.rescheduled++;
+      } else if ((await deliver({ messageId: m.id, to, body: m.body, mediaUrls: m.mediaUrls ?? [], customer, logBody: true })).sent) out.sent++;
+      continue;
+    }
+    let blocked = await checkEligibility({ to, kind: "marketing", customer, now, heldRecheck: true });
+    // The yearly limit again, at sending (Abraham, Nov 27, 2026): this held text already counts, so the others must be under it
+    if (!blocked && (await promosThisYear(to, now)) - 1 >= (await yearlyLimit())) blocked = "yearly_limit";
     if (blocked === "quiet_hours") {
       await db.update(schema.messages).set({ sendAfter: nextPromoWindow(to, now, customer?.timeZone) }).where(eq(schema.messages.id, m.id));
       out.rescheduled++;
@@ -404,6 +457,9 @@ export async function processHeldPromotions(now = new Date()): Promise<{ sent: n
       if (r.sent) out.sent++;
     }
   }
+  // the free timer: when the next held text is due (or nothing waiting)
+  const [next] = await db.select({ at: schema.messages.sendAfter }).from(schema.messages).where(eq(schema.messages.status, "held")).orderBy(asc(schema.messages.sendAfter)).limit(1);
+  await (await import("@/lib/wake-flags")).armWake("held-texts", next?.at ?? null);
   return out;
 }
 
@@ -476,7 +532,7 @@ export const NO_TEXT_CONSENT = "No text consent; call or email.";
 export const TEXTING_NOT_ACTIVE = "Not active yet: waiting for Twilio A2P approval";
 /** Texts to our own staff (not customers): allowed before A2P approval. */
 const STAFF_EVENTS = new Set(["owner_alert", "owner_forward", "compliance_alert", "login_code", "switch_code", "info_email_alert"]);
-const REQUESTED_EVENTS = new Set(["catalog_request", "catalog_reply", "menu_key_request"]); // + a text the caller asked for with a key set in Admin (Nov 26, 2026)
+const REQUESTED_EVENTS = new Set(["catalog_request", "catalog_reply", "menu_key_request", "seasonal_join_confirm"]); // + a text the caller asked for with a key set in Admin (Nov 26, 2026)
 
 const BLOCK_REASON: Record<Blocked, string> = {
   opted_out: "Customer replied STOP. They must text START and reply YES to receive order texts again.",
