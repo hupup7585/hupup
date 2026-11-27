@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 /* Same-day bookings (Abraham, Nov 27, 2026, 12:19 AM): today only before 3:30 PM, on Friday and Erev Yom Tov only
    before chatzos (both from Admin); after that today is not offered; a same-day date gets the delivery notice. */
@@ -14,11 +14,21 @@ import { handleVoice } from "@/lib/ivr/flow";
 import { todayISO } from "@/lib/dates";
 import { PROMPTS } from "@/lib/ivr/prompts";
 import { readFileSync } from "node:fs";
+const PINNED = process.env.HUP_CALENDAR_NOW; // the test setup's pinned day, put back after each test
+afterAll(() => void (process.env.HUP_CALENDAR_NOW = PINNED));
 
 const cal = { ...calendarDefaults(), sameDayCutoff: "15:30", sameDayCutoffErev: "chatzos" };
 const call = (action: string, body: Record<string, string> = {}, q = "") => handleVoice({ action, query: new URLSearchParams(q), body: { CallSid: "CAsame", ...body }, callSid: "CAsame", from: "+18455550717" });
 const redirect = (xml: string) => xml.match(/<Redirect method="POST">([^<]+)<\/Redirect>/)?.[1].replace(/^.*\/api\/voice\//, "").replace(/&amp;/g, "&");
 const said = (xml: string) => [...xml.matchAll(/<Say [^>]*>([^<]+)<\/Say>/g)].map((m) => m[1]).join(" ");
+
+describe("same-day notice by zone (Abraham, Nov 27, 2026, 12:33 AM)", () => {
+  it("defaults: close by 2.5-3.5, surrounding 3.5-4.5, Kiryas Joel close by until areas are listed", async () => {
+    const { SETTING_DEFAULTS } = await import("@/lib/settings");
+    expect([SETTING_DEFAULTS.sameDayHoursClose, SETTING_DEFAULTS.sameDayHoursFar, SETTING_DEFAULTS.sameDayCloseAreas]).toEqual(["2.5-3.5", "3.5-4.5", ""]);
+    expect(PROMPTS.same_day_notice.text).toContain("about {from} to {to} hours");
+  });
+});
 
 describe("same-day cut-off", () => {
   it("Monday 3:29 PM today is open, 3:31 PM it is not; other days are never affected", () => {
@@ -46,12 +56,12 @@ describe("same-day cut-off", () => {
     process.env.HUP_CALENDAR_NOW = new Date(`${today}T00:30:00-05:00`).toISOString(); // just after midnight: open
     if (localISO(new Date(process.env.HUP_CALENDAR_NOW)) === today) {
       const ok = await call("date-confirm", { Digits: "1" }, `d=${today}`);
-      expect(redirect(ok)).toBe("cats"); // the notice plays here once Abraham approves its words
+      expect(redirect(ok)).toBe("cats"); // the notice is not here any more: it comes after the address (12:33 AM)
       expect(said(ok)).toBe("");
     }
-    delete process.env.HUP_CALENDAR_NOW;
+    process.env.HUP_CALENDAR_NOW = PINNED;
     expect([PROMPTS.same_day_closed.pending, PROMPTS.same_day_notice.pending]).toEqual([true, true]);
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
-    expect(flow).toContain('if (date === localISO(calendarNow())) sp(vr, ctx, "same_day_notice");');
+    expect(flow).toContain('sp(vr, ctx, "same_day_notice", { from, to });');
   });
 });

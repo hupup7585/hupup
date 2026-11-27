@@ -11,10 +11,11 @@ vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/
 vi.mock("@/lib/notify", () => ({ sendSms: async () => ({ sent: true }), sendEmail: async () => ({ sent: true }) }));
 
 import { handleVoice } from "@/lib/ivr/flow";
+const PINNED = process.env.HUP_CALENDAR_NOW; // the test setup's pinned day, put back after each test
 const call = (action: string, body: Record<string, string> = {}, q = "") => handleVoice({ action, query: new URLSearchParams(q), body: { CallSid: "CAshab", ...body }, callSid: "CAshab", from: "+18455550511" });
 
 const FRIDAY_NIGHT = "2027-01-15T23:30:00Z"; // Friday, Jan 15, 2027, 6:30 PM in New York: after candle lighting
-afterEach(() => void delete process.env.HUP_CALENDAR_NOW);
+afterEach(() => void (process.env.HUP_CALENDAR_NOW = PINNED));
 
 describe("Shabbes during a booking", () => {
   it("checkout, card payment, the payment link menu and the payment step are all stopped with the closed greeting", async () => {

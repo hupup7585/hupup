@@ -59,6 +59,21 @@ export default function CalendarSettingsForm({ initial }: { initial: Record<stri
           <span className="mt-1 block text-xs text-muted">&ldquo;chatzos&rdquo; (halachic midday) or a time like 11:30.</span>
         </label>
         <label className="block">
+          <span className="label">Same-day delivery time close by (hours)</span>
+          <input className="input" value={v.sameDayHoursClose} onChange={(e) => set("sameDayHoursClose", e.target.value)} />
+          <span className="mt-1 block text-xs text-muted">From-to, like 2.5-3.5. Said in the same-day notice after a close-by address.</span>
+        </label>
+        <label className="block">
+          <span className="label">Same-day delivery time, surrounding areas (hours)</span>
+          <input className="input" value={v.sameDayHoursFar} onChange={(e) => set("sameDayHoursFar", e.target.value)} />
+          <span className="mt-1 block text-xs text-muted">From-to, like 3.5-4.5. Said for every area that is not close by.</span>
+        </label>
+        <label className="block sm:col-span-2">
+          <span className="label">Close-by areas for the same-day notice</span>
+          <textarea className="input" rows={2} value={v.sameDayCloseAreas} onChange={(e) => set("sameDayCloseAreas", e.target.value)} />
+          <span className="mt-1 block text-xs text-muted">One delivery map area name per line. Empty = only the Kiryas Joel zone is close by.</span>
+        </label>
+        <label className="block">
           <span className="label">Phone stops bookings (minutes before candle lighting)</span>
           <input className="input" inputMode="numeric" value={v.phoneCutoffMinutes} onChange={(e) => set("phoneCutoffMinutes", e.target.value)} />
           <span className="mt-1 block text-xs text-muted">From this time no one can finish a booking or pay on the phone, even in the middle of a call.</span>

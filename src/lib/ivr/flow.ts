@@ -70,7 +70,7 @@ import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
 const PHONEPAY_PROMPTS = ["pay_hold_secure", "phonepay_paid", "phonepay_retry", "phonepay_retry_last", "phonepay_failed", "phonepay_unclear"] as const;
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
-import { pluralName } from "@/lib/spoken-words";
+import { numberWords, pluralName } from "@/lib/spoken-words";
 import { lastPhoneDate, normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { liveVoiceLink, nameVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
 import { FIRST_TIME_ONLY, menuOrder, type MenuId } from "./menu-order";
@@ -747,6 +747,20 @@ async function hotlineClosed(ctx: Ctx, vr: VR, n = 0, over?: { locked: boolean; 
   const g = vr.gather({ input: ["dtmf"], numDigits: 1, timeout: T(vr, "timerClosedKey"), finishOnKey: "#", actionOnEmptyResult: true, action: url("closed-key", { n: n || undefined }), method: "POST" });
   sp(g, ctx, closedKey, vars, { draftOk: true });
   return vmRecord(vr, await vmBox("9"), "closed");
+}
+
+/** "2.5" -> "two and a half", "3" -> "three" (the same-day notice's hours). */
+function hoursWords(h: number): string {
+  const whole = Math.floor(h);
+  const w = numberWords(whole).join(" ");
+  return h - whole >= 0.5 ? `${w} and a half` : w;
+}
+
+/** Close by for the same-day notice: the areas listed in Admin, or (none listed) the Kiryas Joel / local zone. */
+function sameDayCloseBy(quote: { zone: string; kind?: string }, s: { sameDayCloseAreas?: string }): boolean {
+  const list = String(s.sameDayCloseAreas ?? "").split(/\r?\n/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+  if (list.length) return list.includes(quote.zone.trim().toLowerCase());
+  return quote.kind === "local" || quote.zone === "kj";
 }
 
 /** The phone's booking cut-off now (Abraham, Nov 26, 2026, 11:51 PM): 15 minutes before candle lighting (Admin). */
@@ -3024,8 +3038,6 @@ const handlers: Record<string, Handler> = {
     }
     await clearSpan(ctx, date);
     await chooseDay(ctx, date);
-    // Same-day delivery notice (Abraham, Nov 27, 2026, 12:19 AM): right after today is chosen, before the items
-    if (date === localISO(calendarNow())) sp(vr, ctx, "same_day_notice");
     // No item yet (another day, from box 25 or welcome back): the categories (box 12a) for that day, never the bookings
     // menu (Hark's audit H1, Nov 24, 2026: callers heard it as "back to the first menu")
     return p ? back(vr, "qty", { p, d: date }) : back(vr, "cats");
@@ -4259,6 +4271,13 @@ const handlers: Record<string, Handler> = {
     if (quote.ok) {
       const cents = quote.kind ? deliveryFeeFor(quote.kind, settings, first?.eventDate ?? todayISO(), first?.offerNote ?? null) : quote.feeCents;
       sp(vr, ctx, "addr_saved_price", { town: townPhrase(d.town), price: spokenMoney(cents) });
+      // Same-day delivery notice (Abraham, Nov 27, 2026, 12:33 AM): right after the address is saved, when a day in the
+      // cart is today; the time by zone (close by / surrounding, Admin)
+      if ((await callOrders(ctx)).some((o) => o.order.eventDate === localISO(calendarNow()))) {
+        const close = sameDayCloseBy(quote, settings);
+        const [from, to] = String((close ? settings.sameDayHoursClose : settings.sameDayHoursFar) ?? (close ? "2.5-3.5" : "3.5-4.5")).split("-").map((x) => hoursWords(Number(x)));
+        sp(vr, ctx, "same_day_notice", { from, to });
+      }
     }
     return back(vr, "directions");
   },

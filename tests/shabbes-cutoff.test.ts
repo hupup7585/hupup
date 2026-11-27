@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 /* The phone's booking cut-off before Shabbes (Abraham, Nov 26, 2026, 11:51 PM): from 15 minutes before candle
    lighting no booking is finished and nothing is paid; a caller's cart is saved until 1 hour after the phone opens
@@ -19,6 +19,8 @@ import { getSettings } from "@/lib/settings";
 import { bookingCutoff, bookingLock, erevCandleLighting } from "@/lib/jewish-calendar";
 import { checkBookable } from "@/lib/availability";
 import { ensureSession } from "@/lib/ivr/session";
+const PINNED = process.env.HUP_CALENDAR_NOW; // the test setup's pinned day, put back after each test
+afterAll(() => void (process.env.HUP_CALENDAR_NOW = PINNED));
 
 const FROM = "+18455550615";
 const call = (sid: string, action: string, body: Record<string, string> = {}, q = "") => handleVoice({ action, query: new URLSearchParams(q), body: { CallSid: sid, ...body }, callSid: sid, from: FROM });
@@ -76,7 +78,7 @@ describe("Shabbes cut-off", () => {
     expect(redirect(await call(sid2, "resume-choice", { Digits: "1" }))).toBe("resume-items");
     const s2 = (await db.select().from(schema.callSessions).where(eq(schema.callSessions.callSid, sid2)))[0];
     expect(s2.data?.resumeLines?.map((l) => l.state)).toEqual(["free"]);
-    delete process.env.HUP_CALENDAR_NOW;
+    process.env.HUP_CALENDAR_NOW = PINNED;
   });
 
   it("the saved hold runs out: the items go back to stock", async () => {
@@ -94,6 +96,6 @@ describe("Shabbes cut-off", () => {
     const xml = await call("CAcut3", "book");
     expect(said(xml)).toContain("We are closed now for Shabbes");
     expect(xml).toContain("<Record");
-    delete process.env.HUP_CALENDAR_NOW;
+    process.env.HUP_CALENDAR_NOW = PINNED;
   });
 });

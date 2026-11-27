@@ -118,7 +118,7 @@ const FAMILIES: [RegExp, Spec][] = [
   [/^(deliveryFee|deliveryPromo)/, page("/admin/delivery-settings", "Fees and tax")],
   [/^(solaFee|book[A-Z]|gl[A-Z])/, page("/admin/bookkeeping", "Bookkeeping")],
   [/^(laserThirdSetHalfOn|offer[A-Z]|holiday[A-Z])/, page("/admin/offers", "Offers and discounts")],
-  [/^(erev|candle|reopen|phoneCutoff|shabbesSave|sameDayCutoff|close[A-Z]|calendar(Latitude|Longitude)|hours[A-Z])/, page("/admin/settings", "Hours and calendar")],
+  [/^(erev|candle|reopen|phoneCutoff|shabbesSave|sameDayCutoff|sameDayHours|sameDayCloseAreas|close[A-Z]|calendar(Latitude|Longitude)|hours[A-Z])/, page("/admin/settings", "Hours and calendar")],
 ];
 
 const TIMER = new Map(PHONE_TIMERS.map((t) => [t.key, t]));

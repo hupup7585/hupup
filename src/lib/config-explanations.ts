@@ -564,6 +564,21 @@ const OTHER: Record<string, Explanation> = {
     where: "The phone line, when a caller picks today's date on Friday or Erev Yom Tov.",
     ifChanged: "Same-day bookings on those days close earlier or later.",
   },
+  sameDayHoursClose: {
+    what: "How long a same-day delivery takes close by, in hours from-to (2.5-3.5 means about two and a half to three and a half hours).",
+    where: "The same-day delivery notice on the phone, right after a close-by address is saved.",
+    ifChanged: "Callers close by hear the new time.",
+  },
+  sameDayHoursFar: {
+    what: "How long a same-day delivery takes in the surrounding areas, in hours from-to (3.5-4.5 means about three and a half to four and a half hours).",
+    where: "The same-day delivery notice on the phone, right after an address in a surrounding area is saved.",
+    ifChanged: "Callers in the surrounding areas hear the new time.",
+  },
+  sameDayCloseAreas: {
+    what: "Which delivery map areas count as close by for the same-day notice, one area name per line, exactly as on the Delivery areas map. Empty means only the Kiryas Joel zone; every other area is a surrounding area.",
+    where: "The same-day delivery notice on the phone.",
+    ifChanged: "Callers in the listed areas hear the close-by time; everyone else hears the surrounding-area time.",
+  },
   phoneCutoffMinutes: {
     what: "How many minutes before candle lighting the phone stops taking bookings and payments, even for a caller who is in the middle of a booking.",
     where: "Every Erev Shabbes and Erev Yom Tov, on the phone line.",

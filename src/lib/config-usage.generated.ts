@@ -400,6 +400,21 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/settings/calendar-keys.ts",
   "lib/jewish-calendar.ts"
  ],
+ "sameDayHoursClose": [
+  "app/admin/(app)/settings/CalendarSettingsForm.tsx",
+  "app/admin/(app)/settings/calendar-keys.ts",
+  "lib/ivr/flow.ts"
+ ],
+ "sameDayHoursFar": [
+  "app/admin/(app)/settings/CalendarSettingsForm.tsx",
+  "app/admin/(app)/settings/calendar-keys.ts",
+  "lib/ivr/flow.ts"
+ ],
+ "sameDayCloseAreas": [
+  "app/admin/(app)/settings/CalendarSettingsForm.tsx",
+  "app/admin/(app)/settings/calendar-keys.ts",
+  "lib/ivr/flow.ts"
+ ],
  "phoneCutoffMinutes": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",

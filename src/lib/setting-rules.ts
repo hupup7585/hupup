@@ -47,6 +47,9 @@ export const calendarRules: Record<string, Rule> = {
   },
   sameDayCutoff: (v) => (/^([01]?\d|2[0-3]):[0-5]\d$/.test(v.trim()) ? null : "Same-day bookings: a time like 15:30 (3:30 PM)."),
   sameDayCutoffErev: (v) => (v.trim().toLowerCase() === "chatzos" || /^([01]?\d|2[0-3]):[0-5]\d$/.test(v.trim()) ? null : 'Same-day bookings on Friday and Erev Yom Tov: "chatzos" or a time like 11:30.'),
+  sameDayHoursClose: (v) => (/^\d+(\.5)?-\d+(\.5)?$/.test(v.trim()) ? null : "Same-day delivery time close by: hours from-to, like 2.5-3.5 (whole or half hours)."),
+  sameDayHoursFar: (v) => (/^\d+(\.5)?-\d+(\.5)?$/.test(v.trim()) ? null : "Same-day delivery time in the surrounding areas: hours from-to, like 3.5-4.5 (whole or half hours)."),
+  sameDayCloseAreas: (v) => (v.length > 2000 ? "Close-by areas: keep the list under 2,000 characters." : null),
   phoneCutoffMinutes: (v) => {
     const n = int(v);
     return Number.isNaN(n) || n < 0 || n > 120 ? "Phone booking cut-off: whole minutes before candle lighting, from 0 to 120." : null;

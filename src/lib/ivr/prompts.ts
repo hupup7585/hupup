@@ -674,7 +674,8 @@ export const PROMPTS = {
   // Abraham, Nov 27, 2026, 12:19 AM: same-day bookings. Draft wording (Abraham is confirming; Hark records): waits for
   // approval on the live line
   same_day_closed: { group: "Date & quantity", label: "Today asked after the same-day cut-off (draft, waiting for Abraham)", text: "Sorry, it is too late to book for today. Please pick another date.", pending: true },
-  same_day_notice: { group: "Date & quantity", label: "Same-day delivery notice (draft, waiting for Abraham)", text: "Please note, a same-day delivery may take longer, about two and a half to three and a half hours. If you need it sooner, please contact customer service, or after hours leave a message, and we will try our best.", pending: true },
+  // Nov 27, 2026, 12:33 AM: after the address is saved; {from} and {to} come from Admin by zone (close by / surrounding)
+  same_day_notice: { group: "Checkout", label: "Same-day delivery notice, after the address is saved (draft, waiting for Abraham)", text: "Please note, a same-day delivery may take longer, about {from} to {to} hours. If you need it sooner, please contact customer service, or after hours leave a message, and we will try our best.", vars: ["from", "to"], pending: true },
   date_closed: { group: "Date & quantity", label: "Chosen date is a closed day (no offer: the day before or after is closed too)", text: "Sorry, we are closed on {date} for {reason}. Let us pick another date.", vars: ["date", "reason"] },
   // Abraham, Nov 20, 2026: a closed day with the day before and the day after both open (then the date prompt and back line)
   // Box 17, closed day (Abraham, Nov 22, 2026): played as recorded pieces with the live parts between them

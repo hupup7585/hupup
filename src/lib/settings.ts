@@ -150,6 +150,12 @@ export const SETTING_DEFAULTS = {
   sameDayCutoff: "15:30",
   /** ...and on Friday and Erev Yom Tov: "chatzos" (halachic midday) or a time HH:MM */
   sameDayCutoffErev: "chatzos",
+  /** Abraham, Nov 27, 2026, 12:33 AM: same-day delivery takes about this many hours (from-to), close by ... */
+  sameDayHoursClose: "2.5-3.5",
+  /** ... and in the surrounding areas */
+  sameDayHoursFar: "3.5-4.5",
+  /** Map areas counted as close by for that notice, one per line; empty = the Kiryas Joel (local) zone only */
+  sameDayCloseAreas: "",
   phoneCutoffMinutes: "15",
   /** ...and a caller's cart at that moment is saved until this many minutes after Shabbes / Yom Tov ends */
   shabbesSaveMinutes: "60",
