@@ -223,6 +223,8 @@ export const orderServices = pgTable(
 );
 
 export type CallData = {
+  /** Stripe keypad card hand-offs on this call (phone pass 2 #3: the per-call limit, like Sola's) */
+  stripeHandoffs?: number;
   /** Product being added (between date & quantity prompts) */
   productId?: number;
   /** Pending date awaiting confirmation */

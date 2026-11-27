@@ -154,6 +154,22 @@ describe("the payment subaccount: Twilio <Pay> through Stripe", () => {
   it("after 3 tries no more retries: the hotline sends the link", async () => {
     expect(await sub("result", { Result: "too-many-failed-attempts" }, `o=${orderId}&n=3&t=${_payLegToken(orderId, "CApay")}`)).toBe('<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>');
   });
+  it("phone pass 2 #3: star at box 141 hands off to the Stripe keypad only up to the tries per call (3), then 'not valid' and the link menu", async () => {
+    const { saveSetting } = await import("@/lib/settings");
+    await saveSetting("phoneCardProvider" as never, "stripe" as never);
+    try {
+      for (let i = 0; i < 3; i++) {
+        expect(redirect(await mainCall("paylink-choice", { Digits: "*" }, `o=${orderId}`)), `hand-off ${i + 1}`).toBe(`pay-keypad?o=${orderId}`);
+        await mainCall("pay-keypad", {}, `o=${orderId}`);
+      }
+      expect(h.session.data.stripeHandoffs).toBe(3);
+      const x = await mainCall("paylink-choice", { Digits: "*" }, `o=${orderId}`);
+      expect(redirect(x)).not.toBe(`pay-keypad?o=${orderId}`);
+      expect(x).toContain("Sorry, that is not a valid selection.");
+    } finally {
+      await saveSetting("phoneCardProvider" as never, "sola" as never);
+    }
+  });
   it("last 4 only, from Twilio's masked number", () => {
     expect(payLast4("xxxx-xxxx-xxxx-4242")).toBe("4242");
     expect(payLast4("")).toBeNull();

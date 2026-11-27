@@ -5296,6 +5296,7 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "step", "Card payment stopped: the hold had run out and an item was booked by someone else meanwhile").catch(() => undefined);
       return back(vr, "goodbye"); // Hark's 2nd check, A3
     }
+    await updateSession(ctx.callSid, { data: { stripeHandoffs: Number(ctx.session?.data.stripeHandoffs ?? 0) + 1 } }, ctx.session); // phone pass 2 #3
     sp(vr, ctx, "pay_start", undefined, { draftOk: true });
     const dial = vr.dial({ action: url("pay-done", { o }), method: "POST", timeLimit: 900, answerOnBridge: true });
     dial.sip({ username: process.env.TWILIO_PAY_SIP_USERNAME, password: process.env.TWILIO_PAY_SIP_PASSWORD }, paySipUri(o, ctx.callSid));
@@ -6182,6 +6183,10 @@ async function cardPayRoute(ctx: Ctx, caller: string | null | undefined): Promis
   const payCfg = await getSettings();
   if (payCfg.phoneCardProvider === "stripe") {
     const mode = stripePhonePayMode(process.env, payCfg);
+    // Phone pass 2 #3: the same limits as Sola: the tries per call (each hand-off to the Stripe keypad, whose own
+    // retries are counted inside it) and the per-number block, so the line can't be used to try card after card
+    const handoffs = Number(ctx.session?.data.stripeHandoffs ?? 0);
+    if (handoffs >= phonePayLimits(payCfg).triesPerCall || (await isPhonePayBlocked(callerPhoneOf(ctx)))) return null;
     return keypadPayFor(caller, mode, process.env, payCfg.paymentTestNumbers) && PAY_PROMPTS.every((k) => mode !== "live" || !promptWaiting(ctx.prompts, k)) ? "pay-keypad" : null;
   }
   if (phonePayOffered(caller, payCfg) && !(await isPhonePayBlocked(callerPhoneOf(ctx))) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k)))) return "phonepay-go";
