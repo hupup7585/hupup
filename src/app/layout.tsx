@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { Poppins } from "next/font/google";
+import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import PhoneAutoFormat from "@/components/PhoneAutoFormat";
 import { isLiveSite } from "@/lib/seo";
 
+// Code audit L3 (Nov 24, 2026): Inter is self-hosted by Next (no blocking request to Google Fonts on every page)
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800", "900"], variable: "--font-inter", display: "swap", preload: false });
 const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-poppins", display: "swap" });
 
 export const metadata: Metadata = {
@@ -17,13 +19,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={poppins.variable}>
-      <head>
-        {/* Inter for the admin screens */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-      </head>
+    <html lang="en" className={`${poppins.variable} ${inter.variable}`}>
       <body className="font-sans antialiased">
         <PhoneAutoFormat />
         {children}

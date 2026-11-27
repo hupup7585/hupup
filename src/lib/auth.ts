@@ -216,13 +216,21 @@ export async function verifyLoginCode(rawPhone: string, code: string, trustDevic
     .orderBy(desc(loginCodes.createdAt))
     .limit(1);
   if (!latest) return { ok: false, error: "That code expired. Request a new one." };
-  if (latest.attempts >= MAX_ATTEMPTS) return { ok: false, error: "Too many attempts. Request a new code." };
-  await db.update(loginCodes).set({ attempts: latest.attempts + 1 }).where(eq(loginCodes.id, latest.id));
+  // Code audit L7 (Nov 24, 2026): the try is counted in one step that also checks the limit, so guesses sent at the
+  // same moment can never get past 5 tries
+  const counted = await db
+    .update(loginCodes)
+    .set({ attempts: sql`${loginCodes.attempts} + 1` })
+    .where(and(eq(loginCodes.id, latest.id), sql`${loginCodes.attempts} < ${MAX_ATTEMPTS}`, isNull(loginCodes.usedAt)))
+    .returning({ id: loginCodes.id });
+  if (!counted.length) return { ok: false, error: "Too many attempts. Request a new code." };
   if (!safeEqual(hmac(clean), latest.codeHash)) {
     await audit("login.code_failed", staff.userId, { role: staff.role });
     return { ok: false, error: "Incorrect code. Try again." };
   }
-  await db.update(loginCodes).set({ usedAt: new Date() }).where(eq(loginCodes.id, latest.id));
+  // The code works once, even if two correct tries arrive together
+  const used = await db.update(loginCodes).set({ usedAt: new Date() }).where(and(eq(loginCodes.id, latest.id), isNull(loginCodes.usedAt))).returning({ id: loginCodes.id });
+  if (!used.length) return { ok: false, error: "That code was already used. Request a new one." };
   await startSession(staff, via === "email" ? "email_code" : "sms_code", trustDevice);
   return { ok: true, role: staff.role };
 }
