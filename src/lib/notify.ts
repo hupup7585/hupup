@@ -40,7 +40,7 @@ export function emailEnvelope(to: string, env: Record<string, string | undefined
 
 export type EmailAttachment = { filename: string; content: string /* base64 */ };
 /** Where a sent email is kept in the Admin inbox (Abraham, Nov 20, 2026): code, catalog, or auto (the default). */
-export type SentKind = "code" | "catalog" | "auto";
+export type SentKind = "code" | "catalog" | "auto" | "backup";
 
 export async function sendEmail(to: string, subject: string, text: string, attachments: EmailAttachment[] = [], opts: { headers?: Record<string, string>; record?: boolean; promo?: boolean; noThanks?: boolean; bodyHtml?: string | null; kind?: SentKind; button?: { label: string; url: string } | null } = {}): Promise<SendResult> {
   // Item 7 (Nov 25, 2026): never the dev domain or a test link in a customer email

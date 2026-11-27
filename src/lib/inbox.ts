@@ -37,20 +37,38 @@ export const INBOX_CHUNK_BYTES = 3 * 1024 * 1024;
 const RAW_MAX_BYTES = 30 * 1024 * 1024;
 
 export type InboxEmail = typeof schema.inboxEmails.$inferSelect;
+/** inbox_raw.email_id while the last piece is being filed (no email row has this id). */
+const FILING = -1;
 
 /** One piece of an incoming email; the last piece to arrive puts the email together and files it. */
-export async function receiveRawPiece(uploadId: string, idx: number, parts: number, data: Buffer) {
+export async function receiveRawPiece(uploadId: string, idx: number, parts: number, data: Buffer, envelopeFrom: string | null = null) {
   if (!/^[A-Za-z0-9-]{8,80}$/.test(uploadId) || !Number.isInteger(idx) || !Number.isInteger(parts) || parts < 1 || parts > 12 || idx < 0 || idx >= parts) throw new Error("bad piece");
   if (!data.length || data.length > 4 * 1024 * 1024) throw new Error("bad size");
   await db.insert(schema.inboxRaw).values({ uploadId, parts }).onConflictDoNothing();
   await db.insert(schema.inboxRawChunks).values({ uploadId, idx, data }).onConflictDoNothing();
   const chunks = await db.select().from(schema.inboxRawChunks).where(eq(schema.inboxRawChunks.uploadId, uploadId)).orderBy(asc(schema.inboxRawChunks.idx));
   if (chunks.length < parts) return { complete: false as const };
-  const [raw] = await db.select().from(schema.inboxRaw).where(eq(schema.inboxRaw.uploadId, uploadId)).limit(1);
-  if (raw?.emailId) return { complete: true as const, emailId: raw.emailId, duplicate: true };
   const bytes = Buffer.concat(chunks.map((c) => c.data));
   if (bytes.length > RAW_MAX_BYTES) throw new Error("too big");
-  const email = await fileEmail(bytes, uploadId);
+  // Extra check E9 (Nov 27, 2026): the last piece claims the upload first (email_id -1 = being filed), so two last
+  // pieces at once, or a retry while it is being filed, never file the email twice or alert the Owner twice.
+  const claimed = await db
+    .update(schema.inboxRaw)
+    .set({ emailId: FILING })
+    .where(and(eq(schema.inboxRaw.uploadId, uploadId), isNull(schema.inboxRaw.emailId)))
+    .returning({ uploadId: schema.inboxRaw.uploadId });
+  if (!claimed.length) {
+    const [raw] = await db.select().from(schema.inboxRaw).where(eq(schema.inboxRaw.uploadId, uploadId)).limit(1);
+    return { complete: true as const, emailId: raw?.emailId ?? FILING, duplicate: true };
+  }
+  let email: InboxEmail;
+  try {
+    email = await fileEmail(bytes, uploadId, new Date(), envelopeFrom);
+  } catch (e) {
+    // not filed: free the claim so the worker's retry can try again
+    await db.update(schema.inboxRaw).set({ emailId: null }).where(and(eq(schema.inboxRaw.uploadId, uploadId), eq(schema.inboxRaw.emailId, FILING)));
+    throw e;
+  }
   await db.update(schema.inboxRaw).set({ emailId: email.id }).where(eq(schema.inboxRaw.uploadId, uploadId));
   return { complete: true as const, emailId: email.id, duplicate: false };
 }
@@ -70,11 +88,16 @@ async function storeFile(input: { emailId?: number | null; fileName: string; con
 }
 
 /** Read the email, keep it (and its attachments up to 18 MB), link the contact, tell Abraham, check for Catalog. */
-export async function fileEmail(bytes: Buffer, uploadId: string | null = null, now = new Date()): Promise<InboxEmail> {
+export async function fileEmail(bytes: Buffer, uploadId: string | null = null, now = new Date(), envelopeFrom: string | null = null): Promise<InboxEmail> {
   const mail = await PostalMime.parse(bytes);
   const messageId = mail.messageId?.trim() || null;
   if (messageId) {
     const [dupe] = await db.select().from(schema.inboxEmails).where(eq(schema.inboxEmails.messageId, messageId)).limit(1);
+    if (dupe) return dupe;
+  }
+  // A retry of the same upload (an earlier try saved the email, then failed on an attachment): the email is kept once
+  if (uploadId) {
+    const [dupe] = await db.select().from(schema.inboxEmails).where(eq(schema.inboxEmails.uploadId, uploadId)).limit(1);
     if (dupe) return dupe;
   }
   const from = (mail.from?.address ?? "").trim().toLowerCase() || "unknown";
@@ -111,8 +134,18 @@ export async function fileEmail(bytes: Buffer, uploadId: string | null = null, n
   // Every info@ email texted to the Owner's cell with the sender, subject and message (Abraham, Nov 17, 2026)
   await textOwnerAboutEmail(email).catch((e) => console.error("inbox text alert failed", e));
   // The info@ "Catalog" auto-reply (off until Abraham approves its wording)
-  await handleCatalogEmail(email.fromAddress, email.subject).catch((e) => console.error("catalog check failed", e));
+  // Extra check E5 (Nov 27, 2026): the From line can be written by anyone. When the email worker tells us the real
+  // (envelope) sender and it is a different address, no catalog is sent to the From line (the email is still kept).
+  if (catalogReplyAllowed(email.fromAddress, envelopeFrom)) await handleCatalogEmail(email.fromAddress, email.subject).catch((e) => console.error("catalog check failed", e));
+  else console.warn("[inbound email] catalog auto-reply skipped: the From line does not match the real sender");
   return email;
+}
+
+/** The Catalog auto-reply goes to the From line only when it is the real sender (or the worker did not say). */
+export function catalogReplyAllowed(fromAddress: string, envelopeFrom: string | null | undefined): boolean {
+  const env = (envelopeFrom ?? "").trim().toLowerCase();
+  if (!env) return true; // an older worker that does not pass the real sender: as before
+  return env === fromAddress.trim().toLowerCase();
 }
 
 export async function inboxUnreadCount(): Promise<number> {
@@ -383,12 +416,18 @@ async function textOwnerAboutEmail(e: { id?: number; fromName: string | null; fr
 }
 
 /** A sent email (booking, payment, catalog, alerts...) kept under Sent in the Admin inbox, with its files. */
-export async function recordSentEmail(input: { to: string; subject: string; body: string; attachments: { filename: string; content: string }[]; sent: boolean; error: string | null; kind?: "code" | "catalog" | "auto" }) {
+export async function recordSentEmail(input: { to: string; subject: string; body: string; attachments: { filename: string; content: string }[]; sent: boolean; error: string | null; kind?: "code" | "catalog" | "auto" | "backup" }) {
+  // Deep check 30 (Nov 27, 2026): the Sent copy never keeps a working sign-in code (the digits are hidden), and the
+  // weekly backup's Sent copy is kept without its file (all customer data stays only in the Owner's email)
+  const hide = (t: string) => (input.kind === "code" ? t.replace(/\b\d{4,8}\b/g, "••••••") : t);
+  const backup = input.kind === "backup";
+  const files = backup ? [] : input.attachments;
+  const body = hide(input.body) + (backup && input.attachments.length ? `\n\n(The backup file, ${input.attachments.map((a) => a.filename).join(", ")}, is not kept here.)` : "");
   const [row] = await db
     .insert(schema.inboxReplies)
-    .values({ emailId: null, toAddress: input.to, subject: input.subject, body: input.body, sent: input.sent, error: input.sent ? null : (input.error ?? "not sent"), userId: null, kind: input.kind ?? "auto" })
+    .values({ emailId: null, toAddress: input.to, subject: hide(input.subject), body, sent: input.sent, error: input.sent ? null : (input.error ?? "not sent"), userId: null, kind: backup ? "auto" : (input.kind ?? "auto") })
     .returning();
-  for (const a of input.attachments) {
+  for (const a of files) {
     const data = Buffer.from(a.content, "base64");
     const name = a.filename.toLowerCase();
     const type = name.endsWith(".pdf") ? "application/pdf" : name.endsWith(".png") ? "image/png" : /\.jpe?g$/.test(name) ? "image/jpeg" : "application/octet-stream";
@@ -404,16 +443,26 @@ export async function recordSentEmail(input: { to: string; subject: string; body
  */
 export async function sendScheduledEmails(now = new Date()) {
   const d = schema.inboxDrafts;
+  // Extra check G2 (Nov 27, 2026): nothing goes out on Shabbes or Yom Tov (Admin's calendar settings, like the phone);
+  // emails due then keep their time and go out on the first run after
+  const { bookingLock } = await import("@/lib/jewish-calendar");
+  const { getSettings } = await import("@/lib/settings");
+  if (bookingLock(now, (await getSettings()) as never).locked) return { due: 0, sent: 0, waiting: "Shabbes or Yom Tov" };
   const due = await db.select().from(d).where(and(isNull(d.discardedAt), isNull(d.sentReplyId), sql`${d.sendAt} IS NOT NULL AND ${d.sendAt} <= ${now}`));
   let sent = 0;
   for (const x of due) {
-    // Deep check Nov 27 (item 17): claimed first (its send time cleared), so two runs at the same moment never send it twice
-    const [claimed] = await db.update(d).set({ sendAt: null }).where(and(eq(d.id, x.id), isNull(d.sentReplyId), sql`${d.sendAt} IS NOT NULL`)).returning({ id: d.id });
+    // Deep check 17 (Nov 27, 2026): two runs at once could both send it. The draft is claimed first in one step (its
+    // send time taken off, only if still unsent and still at that time); a run that loses the claim skips it.
+    const [claimed] = await db
+      .update(d)
+      .set({ sendAt: null, sendError: "Sending now (if this stays, it may not have been sent: check Sent)" })
+      .where(and(eq(d.id, x.id), isNull(d.sentReplyId), isNull(d.discardedAt), sql`${d.sendAt} = ${x.sendAt}`))
+      .returning({ id: d.id });
     if (!claimed) continue;
     try {
       const r = await sendNewEmail({ to: x.toAddress, subject: x.subject, body: x.body, fileIds: x.fileIds ?? [], userId: x.userId, forwardOf: x.forwardOfEmailId, attachCatalog: x.attachCatalog, bodyHtml: x.bodyHtml });
       if (r.sent) {
-        await db.update(d).set({ sentReplyId: r.id, sendError: null }).where(eq(d.id, x.id));
+        await db.update(d).set({ sentReplyId: r.id, sendError: null, sendAt: x.sendAt }).where(eq(d.id, x.id));
         sent++;
       } else await db.update(d).set({ sendAt: null, sendError: r.error ?? "not sent" }).where(eq(d.id, x.id));
     } catch (e) {
