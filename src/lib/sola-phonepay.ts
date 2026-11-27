@@ -258,12 +258,12 @@ export async function matchPhonePay(orderId: number, attemptId: number, dueCents
   }
   if (found) {
     if (attemptId) await finishAttempt(attemptId, { matched: true, solaRef: found.refNum, last4: found.last4, cardType: found.cardType, note: "Paid" });
-    await markGroupPaid(orderId, found.amountCents, PHONEPAY_METHOD, found.refNum);
+    const counted = await markGroupPaid(orderId, found.amountCents, PHONEPAY_METHOD, found.refNum);
     const group = await getPaymentGroup(orderId);
     const ids = group?.orders.map((d) => d.order.id) ?? [orderId];
     const { recordPaymentResult, paymentReceivedNotices } = await import("@/lib/payment-result");
     await recordPaymentResult(ids, "approved", found.last4, found.refNum, found.at);
-    await paymentReceivedNotices(orderId, found.amountCents);
+    if (newlyCounted(counted)) await paymentReceivedNotices(orderId, found.amountCents);
     return { paid: true, reason: "found" };
   }
   if (attemptId) await finishAttempt(attemptId, { matched: false, note: reason });
@@ -341,6 +341,11 @@ export async function solaVoid(refNum: string, fetcher: typeof fetch = fetch, en
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
+}
+
+/** Deep check 06:00 M26: did this call count the payment (not only find it already counted)? Then the paid notice goes out. */
+function newlyCounted(rows: object[]): boolean {
+  return rows.some((r) => !("duplicate" in r && r.duplicate));
 }
 
 /** Make sure the payments subaccount's call to Sola is fully hung up (and anything it dialed). Best effort, quiet. */
@@ -441,9 +446,9 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
   if (c?.kind === "paid" && c.paid) {
     await db.update(schema.phonepayAttempts).set({ result: "paid" }).where(eq(schema.phonepayAttempts.id, attemptId));
     await finishAttempt(attemptId, { matched: true, solaRef: c.paid.refNum, last4: c.paid.last4, cardType: c.paid.cardType, note: `${voids.length ? "Paid; a second charge was voided" : "Paid"}${c.paid.invoice ? ` (Sola Invoice field: ${c.paid.invoice})` : ""}` });
-    await markGroupPaid(orderId, c.paid.amountCents, PHONEPAY_METHOD, c.paid.refNum);
+    const counted = await markGroupPaid(orderId, c.paid.amountCents, PHONEPAY_METHOD, c.paid.refNum);
     await recordPaymentResult(ids, "approved", c.paid.last4, c.paid.refNum, c.paid.at);
-    await paymentReceivedNotices(orderId, c.paid.amountCents);
+    if (newlyCounted(counted)) await paymentReceivedNotices(orderId, c.paid.amountCents);
     await voidUnclearAfterPaid(orderId, c.paid.refNum, mail, deps.fetcher);
     return { result: "paid" };
   }
