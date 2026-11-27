@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { recordingChunkAction, selectRecordingAction, startRecordingAction } from "../actions";
-import { confirmSlotAction, deleteSlotAction, markRecordedAction, renameSlotAction, unconfirmSlotAction } from "./actions";
+import { confirmSlotAction, deleteSlotAction, markRecordedAction, renameSlotAction, setNameSlotTextAction, unconfirmSlotAction } from "./actions";
 
 const CHUNK = 3 * 1024 * 1024;
 const STYLE: Record<string, string> = {
@@ -81,7 +81,23 @@ export default function SlotRow(props: { slotKey: string; label: string; text: s
           </span>
         )}
       </td>
-      <td className="td align-top font-mono text-sm" data-slot-text>{props.text}</td>
+      <td className="td align-top font-mono text-sm" data-slot-text>
+        {props.text}
+        {/^item:\d+(:plural)?$/.test(props.slotKey) && (
+          <button
+            type="button"
+            className="mt-1 block font-sans text-xs font-bold text-navy underline-offset-2 hover:underline"
+            data-edit-name-text
+            title="Change only what this name slot says on the phone. The rental's name on the website and in Admin stays the same. Leave it empty to go back to the rental's name."
+            onClick={() => {
+              const t = window.prompt("What this name slot says on the phone (empty = the rental's name)", props.text);
+              if (t !== null && t.trim() !== props.text) run(() => setNameSlotTextAction(props.slotKey, t));
+            }}
+          >
+            Edit text
+          </button>
+        )}
+      </td>
       <td className="td align-top">
         <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${STYLE[props.status]}`} data-slot-status>{props.statusWords}</span>
         {props.playing && <span className="mt-1 block text-xs text-[#13895C]">{props.latestUpload && props.latestUpload.id !== props.liveRecordingId ? "An older recording is playing on the line" : "Playing on the line"}</span>}

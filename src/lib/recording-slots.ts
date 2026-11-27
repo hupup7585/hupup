@@ -86,10 +86,15 @@ export function allSlots(items: { id: number; name: string }[] = [], texts: Reco
   // Each rental name twice (Abraham, Nov 19, 2026): for 1, and for 2 or more
   // The jumping balloon names are recorded with hyphens (Abraham's rule, Nov 27, 2026: "Soft-Hop"); only the slot text
   // here changes so it matches the recording; the rental's name on the website and in Admin stays as it is
-  const said = (name: string) => (balloonEntry(name) ? name.trim().replace(/\s+/g, "-") : name);
+  const said = (text: string, base: string) => (balloonEntry(base) ? text.trim().replace(/\s+/g, "-") : text);
+  // The Owner can set a name slot's text (Hark for Abraham, Nov 27, 2026: "6 laser guns" for "Only 6 laser guns"); it is
+  // kept with the slot's recording. A name that is the same for one and for two or more ("Only 6 laser guns") has one
+  // slot only: the phone already plays the "(one)" recording for both.
   for (const it of items) {
-    out.push({ key: `item:${it.id}`, kind: "item", group: "Rental names", label: `${it.name} (one)`, text: said(it.name) });
-    out.push({ key: `item:${it.id}:plural`, kind: "item", group: "Rental names", label: `${it.name} (two or more)`, text: said(pluralName(it.name)) });
+    const own = (k: string, fallback: string) => texts[k]?.trim() || fallback;
+    out.push({ key: `item:${it.id}`, kind: "item", group: "Rental names", label: `${it.name} (one)`, text: own(`item:${it.id}`, said(it.name, it.name)) });
+    if (pluralName(it.name) !== it.name.trim())
+      out.push({ key: `item:${it.id}:plural`, kind: "item", group: "Rental names", label: `${it.name} (two or more)`, text: own(`item:${it.id}:plural`, said(pluralName(it.name), it.name)) });
   }
   // Added in Admin (Nov 23, 2026)
   for (const c of custom) if (!out.some((o) => o.key === c.key)) out.push(c);

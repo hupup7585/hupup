@@ -113,3 +113,22 @@ export async function deleteSlotAction(key: string): Promise<R> {
   await db.insert(schema.auditLog).values({ userId: s.userId, action: "recording_slot.deleted", entityType: "recording_slot", entityId: key });
   return done("Deleted");
 }
+
+/**
+ * The text of a rental name slot (Hark for Abraham, Nov 27, 2026: "6 laser guns" for the item "Only 6 laser guns").
+ * Only the slot's text changes (what Hark records and Abraham confirms); the rental's name on the website, in Admin and
+ * in the phone's key logic stays as it is. A changed text goes back to "Waiting for Abraham". Owner only.
+ */
+export async function setNameSlotTextAction(key: string, text: string): Promise<R> {
+  const s = await requireOwner();
+  if (!/^item:\d+(:plural)?$/.test(key)) return { ok: false, message: "Only a rental name slot's text can be changed here." };
+  const t = text.trim().slice(0, 120);
+  const { hasContraction, NO_CONTRACTIONS_MESSAGE } = await import("@/lib/no-contractions");
+  if (t && hasContraction(t)) return { ok: false, message: NO_CONTRACTIONS_MESSAGE };
+  await db
+    .insert(schema.voicePrompts)
+    .values({ key, text: t || null, updatedBy: s.userId ?? null })
+    .onConflictDoUpdate({ target: schema.voicePrompts.key, set: { text: t || null, updatedAt: new Date(), updatedBy: s.userId ?? null } });
+  await db.insert(schema.auditLog).values({ userId: s.userId, action: "recording_slot.text", entityType: "recording_slot", entityId: key, after: { text: t || null } });
+  return done(t ? "Saved. The slot shows the new text; Abraham confirms it before Hark uploads." : "Saved. The slot shows the rental's name again.");
+}
