@@ -4,8 +4,6 @@ export function tryKey(secret: string, tryId: string | number): Promise<string>;
 export class SolaListen {
   constructor(state: unknown);
   resultAt: number;
-  key: string;
-  fetch(req: Request): Promise<Response>;
   onMessage(data: string): void;
   tick(): void;
 }
