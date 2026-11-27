@@ -158,10 +158,11 @@ export async function handleInboundSms(body: Record<string, string>): Promise<In
   const effects = { cancelAll: false, cancelPromos: false, sendStartConfirmation: false, sendReenrolled: false, sendPromoEnrolled: false, sendPromoConfirm: false, sendCatalogJoined: false };
   if (customer && keyword) {
     await db.transaction(async (tx) => {
-      const [row] = await tx.select().from(schema.customers).where(eq(schema.customers.id, customer.id)).for("update");
-      // Extra check J1/J3: the number counts, not one record. Every record with this phone is locked, a STOP on any of
-      // them counts for START and YES, and promotions count as on only while some record still has them on.
+      // Extra check J1/J3: the number counts, not one record. Every record with this phone is locked (always in id
+      // order, so two texts at once never lock in different orders), a STOP on any of them counts for START and YES,
+      // and promotions count as on only while some record still has them on.
       const all = await tx.select().from(schema.customers).where(eq(schema.customers.phone, from)).orderBy(schema.customers.id).for("update");
+      const [row] = all.some((x) => x.id === customer.id) ? all.filter((x) => x.id === customer.id) : await tx.select().from(schema.customers).where(eq(schema.customers.id, customer.id)).for("update");
       const c = { ...row, smsOptOut: all.some((x) => x.smsOptOut) || row.smsOptOut, marketingOptIn: all.some((x) => x.marketingOptIn) || row.marketingOptIn };
       const consent = (scope: string, action: string) =>
         tx.insert(schema.smsConsents).values({ customerId: c.id, phone: from, scope, action, source: "keyword", method: "keyword", keyword: text.trim().toUpperCase(), wording: text });

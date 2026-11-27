@@ -32,7 +32,9 @@ async function usernameTaken(v: string, exceptId: number | null) {
 function duplicateMessage(e: unknown): string | null {
   const x = e as { code?: string; detail?: string; constraint?: string; cause?: { code?: string; detail?: string; constraint?: string } };
   if ((x.code ?? x.cause?.code) !== "23505") return null;
-  const what = `${x.detail ?? x.cause?.detail ?? ""} ${x.constraint ?? x.cause?.constraint ?? ""}`;
+  // Only the column part of "Key (username)=(google1)" and the rule's name: never the value someone typed
+  const key = /Key \(([^)]*)\)/.exec(x.detail ?? x.cause?.detail ?? "")?.[1] ?? "";
+  const what = `${key} ${x.constraint ?? x.cause?.constraint ?? ""}`;
   if (/google/i.test(what)) return "That Google account is already saved on another staff member.";
   if (/username/i.test(what)) return "That username is already taken.";
   return "That phone number already has an account.";

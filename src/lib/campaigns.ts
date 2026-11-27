@@ -146,13 +146,14 @@ export async function sendCampaign(id: number, userId: number | null, now = new 
   const retry = new Map<string, (typeof rowsBefore)[number]>();
   for (const r of rowsBefore.filter((x) => x.status === "pending")) {
     const [m] = await db
-      .select({ id: schema.messages.id, status: schema.messages.status })
+      .select({ id: schema.messages.id, status: schema.messages.status, twilioSid: schema.messages.twilioSid })
       .from(schema.messages)
       .where(and(eq(schema.messages.contactPhone, r.phone), eq(schema.messages.event, `campaign:${id}`), eq(schema.messages.direction, "out")))
       .limit(1);
     if (!m) retry.set(r.phone, r);
     else {
-      const st = m.status === "held" ? "held" : ["blocked", "failed", "undelivered", "canceled"].includes(String(m.status)) ? "skipped" : "sent";
+      // "queued" with no Twilio id: saved, but never handed to Twilio before the stop (review follow-up): not "sent"
+      const st = m.status === "held" ? "held" : ["blocked", "failed", "undelivered", "canceled"].includes(String(m.status)) || (m.status === "queued" && !m.twilioSid) ? "skipped" : "sent";
       await db.update(schema.smsCampaignSends).set({ status: st, messageId: m.id }).where(eq(schema.smsCampaignSends.id, r.id));
     }
   }
