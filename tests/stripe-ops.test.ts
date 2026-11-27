@@ -141,6 +141,17 @@ describe("disputes", () => {
     expect((await order()).refundedCents).toBe(1000);
     expect((await refundsFor(orderId))[0].source).toBe("stripe_dashboard");
   });
+  it("deep check 16: newer Stripe events with no refunds list: only the part not recorded yet is added, once", async () => {
+    const recorded = (await refundsFor(orderId)).filter((r) => r.status !== "failed").reduce((s, r) => s + r.amountCents, 0);
+    const before = (await order()).refundedCents;
+    const ev = { type: "charge.refunded", data: { object: { id: "ch_test_1", amount_refunded: recorded + 700 } } };
+    await handleStripeEvent(ev);
+    await handleStripeEvent(ev);
+    expect((await order()).refundedCents).toBe(before + 700);
+    // nothing new at Stripe: nothing added
+    await handleStripeEvent({ type: "charge.refunded", data: { object: { id: "ch_test_1", amount_refunded: recorded + 700 } } });
+    expect((await order()).refundedCents).toBe(before + 700);
+  });
   it("nested params are encoded the way Stripe expects", () => {
     expect(formEncode({ evidence: { customer_name: "A B" }, submit: true })).toEqual(["evidence%5Bcustomer_name%5D=A%20B", "submit=true"]);
   });
