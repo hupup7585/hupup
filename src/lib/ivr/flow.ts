@@ -1168,6 +1168,10 @@ const money = (cents: number) => (cents / 100).toFixed(2);
 
 /** "{Qnt} {item}" (Abraham, Nov 19, 2026): the number, then the name (singular for 1, plural for 2 or more). */
 function itemPhrase(qty: number, name: string) {
+  // Hark's phone check (Nov 27, 2026, bug 6): an add-on named with its own count ("500 ocean balls") is said as named
+  // for one, as box 25 already does (it was "1 500 ocean balls"). Two or more such packs keep the count (new words for
+  // them would need Abraham's OK).
+  if (qty === 1 && /^\d/.test(name.trim())) return name;
   return `${qty} ${qty === 1 ? name : pluralName(name)}`;
 }
 
@@ -1208,6 +1212,11 @@ async function removeFromCart(ctx: Ctx, vr: VR, l: CartLine, n: number) {
     await updateSession(ctx.callSid, { orderId: null, outcome: "browsing", data: { dayOrderIds: [], day: undefined } }, ctx.session);
     sp(vr, ctx, "cart_empty");
     return back(vr, "book");
+  }
+  // Hark's phone check (Nov 27, 2026, bug 3): the last item of the day being shopped for is gone, so that day is no
+  // longer "the same day": the next item asks for its date (it was quietly put on the day just emptied)
+  if (!left && ctx.session?.data.day === l.date && !(await callOrders(ctx)).some((o) => o.order.eventDate === l.date)) {
+    await updateSession(ctx.callSid, { orderId: null, data: { day: undefined } }, ctx.session);
   }
   return back(vr, "cart", { u: 1 });
 }
@@ -2652,7 +2661,12 @@ const handlers: Record<string, Handler> = {
    */
   async "resume-choice"(ctx, vr) {
     const rd = ctx.body.Digits;
-    if (rd === "*") return back(vr, "menu"); // star: one step back, the main menu
+    if (rd === "*") {
+      // Hark's phone check (Nov 27, 2026, bug 4): star decides nothing, so the offer comes again the next time the caller
+      // goes into booking (the saved cart stayed held and blocked the caller's own items, with no welcome back)
+      await updateSession(ctx.callSid, { data: { resumeAsked: undefined } }, ctx.session);
+      return back(vr, "menu"); // star: one step back, the main menu
+    }
     if (rd === "2") {
       await releaseSavedCart(ctx); // a new order instead: the cart saved over Shabbes goes back to stock
       return back(vr, "book"); // 2: a new order
@@ -4070,7 +4084,7 @@ const handlers: Record<string, Handler> = {
     const street = findStreet(pick.street)?.spoken ?? pick.street;
     // The order name from the directory: last name, then first name (Nov 23, 2026); no name question
     const dirName = [pick.lastName, pick.firstName].filter(Boolean).join(", ");
-    await updateSession(ctx.callSid, { data: { lookupDone: true, ...(dirName ? { name: dirName, nameFromDirectory: true } : {}), house: pick.house, street: pick.street, unit: pick.unit ?? undefined, zip: pick.zip, town: pick.town, dirArea: pick.areaPrinted ?? undefined, dirPick: `${pick.house} ${street}${pick.unit ? `, unit ${pick.unit}` : ""}` } }, ctx.session);
+    await updateSession(ctx.callSid, { data: { lookupDone: true, ...(dirName ? { name: dirName, nameFromDirectory: true } : {}), house: pick.house, street: pick.street, unit: pick.unit ?? undefined, unitUnverified: undefined /* bug 8: the directory's own address */, zip: pick.zip, town: pick.town, dirArea: pick.areaPrinted ?? undefined, dirPick: `${pick.house} ${street}${pick.unit ? `, unit ${pick.unit}` : ""}` } }, ctx.session);
     await track(ctx.callSid, "step", `Address lookup: the caller confirmed an address${n > 1 ? ` (${n} on the number)` : ""}`);
     return back(vr, "addr-check", { dir: 1 });
   },
@@ -4105,7 +4119,9 @@ const handlers: Record<string, Handler> = {
     const units = await directoryHouseUnits({ house: d.house, street: d.street, zip: d.zip });
     // Hark's 2nd phone check, B7: a one-family house in the directory (no units there) never asks for a unit
     if (units === "none") {
-      await updateSession(ctx.callSid, { data: { unit: undefined } }, ctx.session);
+      // Hark's phone check (Nov 27, 2026, bug 8): a corrected address (a one-family house) drops an earlier
+      // "Unit not verified" flag, so staff are never asked to confirm a unit for a house that has none
+      await updateSession(ctx.callSid, { data: { unit: undefined, unitUnverified: undefined } }, ctx.session);
       return back(vr, "addr-check");
     }
     if (units === "units") return back(vr, "addr-unit");

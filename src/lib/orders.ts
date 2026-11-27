@@ -718,13 +718,34 @@ export async function markGroupPaid(orderId: number, cents: number, method: stri
   const ordered = all.some(open) || released.length ? [...all.filter(open), ...released] : [group.primary];
   let remaining = cents;
   const out = [];
+  const short: number[] = [];
   for (let i = 0; i < ordered.length; i++) {
     const o = ordered[i].order;
     const pay = i === ordered.length - 1 ? remaining : Math.min(remaining, dueOf(o));
     remaining -= pay;
-    if (pay <= 0 && i > 0) continue; // nothing left for a later day: it stays as it is
+    if (pay <= 0 && i > 0) {
+      // Hark's payment check (Nov 27, 2026, bug 3): the payment ran out before this day. A day still waiting for
+      // payment is never left looking paid or quietly released: it goes to Needs attention (its items stay held) and
+      // the Owner is emailed once below. A released day stays as it is.
+      if (o.status === "PENDING_PAYMENT" || o.status === "HOLD") short.push(o.id);
+      continue;
+    }
     const u = await markPaid(o.id, pay, method, ref);
     if (u) out.push(u);
+  }
+  if (short.length) {
+    const note = `The payment of $${(cents / 100).toFixed(2)} did not cover this day. `;
+    const moved = await db
+      .update(orders)
+      .set({ status: "NEEDS_ATTENTION", holdExpiresAt: null, updatedAt: new Date(), notes: sql`COALESCE(${orders.notes}, '') || ${note}` })
+      .where(and(inArray(orders.id, short), inArray(orders.status, ["PENDING_PAYMENT", "HOLD"])))
+      .returning();
+    const { explainStatus } = await import("@/lib/status-history");
+    for (const m of moved) await explainStatus(m.id, "NEEDS_ATTENTION", note.trim());
+    const owed = group.orders.filter((x) => x.order.status !== "CANCELLED" || released.some((r) => r.order.id === x.order.id)).reduce((t, x) => t + (x.order.totalCents ?? x.order.subtotalCents), 0);
+    const paidNow = group.orders.reduce((t, x) => t + x.order.paidCents, 0) + cents;
+    await underpaidAlert(group.primary.order.id, paidNow, owed, method, ref ?? null).catch((e) => console.error("[underpaid alert]", e));
+    out.push(...moved);
   }
   return out;
 }
