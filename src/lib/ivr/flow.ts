@@ -1764,8 +1764,12 @@ async function lineRingsNowFor(k: RingKey, settings: Awaited<ReturnType<typeof g
   const line = RING_KEY_LINE[k] ?? "office";
   if (!effectiveLine(hours, line).on) return false; // switched off: this line goes to its voicemail
   const inHours = line === "office" ? officeOpenNow(at, settings) : lineOpen(hours, line, at, settings);
-  if (opts.hoursOnly) return inHours && !isShabbosOrYomTov(iso); // bookings key 0: the line's own hours only (no after-hours ringing)
-  return lineRingsNow(k, at, settings, { officeOpen: inHours, shabbosOrYomTov: isShabbosOrYomTov(iso), candleLighting: erevCandleLighting(iso, settings) });
+  // Deep check 09:00 P16: Shabbes and Yom Tov by the clock (candle lighting to the end), not by the date, so a line's
+  // own Saturday-night (Motzei Shabbes) hours on the Hours page ring once Shabbes is out. The after-hours switch still
+  // never rings on a Shabbes or Yom Tov date outside the line's own hours (as before).
+  const locked = bookingLock(at, settings).locked;
+  if (opts.hoursOnly) return inHours && !locked; // bookings key 0: the line's own hours only (no after-hours ringing)
+  return lineRingsNow(k, at, settings, { officeOpen: inHours && !locked, shabbosOrYomTov: locked || (isShabbosOrYomTov(iso) && !inHours), candleLighting: erevCandleLighting(iso, settings) });
 }
 
 /**
