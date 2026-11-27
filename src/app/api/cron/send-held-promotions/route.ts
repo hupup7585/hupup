@@ -1,3 +1,4 @@
+import { cronAuthorized } from "@/lib/cron-auth";
 import { processHeldPromotions } from "@/lib/sms";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,6 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
+  if (!cronAuthorized(req.headers.get("authorization"), secret)) return new Response("Unauthorized", { status: 401 });
   return Response.json(await processHeldPromotions());
 }

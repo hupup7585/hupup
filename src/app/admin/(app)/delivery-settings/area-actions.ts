@@ -90,17 +90,32 @@ export async function saveLocalStreetsAction(form: FormData) {
 /** Address check with two backups (Abraham, Nov 27, 2026): the backups on or off, the re-check timing, the county towns. */
 export async function saveAddressCheckAction(form: FormData) {
   const owner = await requireOwner();
+  // Extra check F8 (Nov 27, 2026): a blank box keeps the saved value (it used to save 0); a number out of range is
+  // refused with a message and nothing is saved. The change is now in the activity log like other settings.
+  const s = (await getSettings()) as Record<string, unknown>;
+  const bad: string[] = [];
   const n = (k: string, d: number, min: number, max: number) => {
-    const v = Math.round(Number(form.get(k)));
-    return String(Number.isFinite(v) && v >= min && v <= max ? v : d);
+    const raw = String(form.get(k) ?? "").trim();
+    if (raw === "") return String(s[k] ?? d);
+    const v = Math.round(Number(raw));
+    if (Number.isFinite(v) && v >= min && v <= max) return String(v);
+    bad.push(`${raw} (allowed ${min} to ${max})`);
+    return String(s[k] ?? d);
   };
+  const early = n("addressRecheckEarlyMinutes", 15, 5, 120);
+  const earlyFor = n("addressRecheckEarlyForMinutes", 60, 0, 1440);
+  const later = n("addressRecheckLaterMinutes", 60, 15, 1440);
+  if (bad.length) redirect(`/admin/delivery-settings?${msgQuery(`Not saved: ${bad.join(", ")}. Nothing was changed.`)}#address-check`);
   const towns = [...new Set(String(form.get("zoneCountyPlaces") ?? "").split(/\r?\n/).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 500).join("\n");
   await saveSetting("geoBackupCensusOn", form.get("geoBackupCensusOn") === "on", owner.userId);
   await saveSetting("geoBackupOsmOn", form.get("geoBackupOsmOn") === "on", owner.userId);
-  await saveSetting("addressRecheckEarlyMinutes", n("addressRecheckEarlyMinutes", 15, 5, 120), owner.userId);
-  await saveSetting("addressRecheckEarlyForMinutes", n("addressRecheckEarlyForMinutes", 60, 0, 1440), owner.userId);
-  await saveSetting("addressRecheckLaterMinutes", n("addressRecheckLaterMinutes", 60, 15, 1440), owner.userId);
+  const after = { geoBackupCensusOn: form.get("geoBackupCensusOn") === "on", geoBackupOsmOn: form.get("geoBackupOsmOn") === "on", addressRecheckEarlyMinutes: early, addressRecheckEarlyForMinutes: earlyFor, addressRecheckLaterMinutes: later, zoneCountyPlaces: towns };
+  const before = Object.fromEntries(Object.keys(after).map((k) => [k, s[k]]));
+  await saveSetting("addressRecheckEarlyMinutes", early, owner.userId);
+  await saveSetting("addressRecheckEarlyForMinutes", earlyFor, owner.userId);
+  await saveSetting("addressRecheckLaterMinutes", later, owner.userId);
   await saveSetting("zoneCountyPlaces", towns, owner.userId);
+  await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.address_check", entityType: "settings", entityId: "address_check", before, after });
   revalidatePath("/admin/delivery-settings");
   redirect(`/admin/delivery-settings?${msgQuery("Saved.")}#address-check`);
 }

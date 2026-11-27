@@ -210,8 +210,18 @@ export async function mergeCustomers(keepId: number, otherIds: number[], userId:
     if (done.length) return { ok: false, message: "One of these records was already merged. Reload the page." };
     const rest = rows.filter((r) => Number(r.id) !== keepId);
     const moved: Record<string, number> = {};
+    const otherList = sql.join(others.map((i) => sql`${i}`), sql`, `);
     for (const t of CUSTOMER_TABLES) {
-      const r = await tx.execute(sql`UPDATE ${sql.identifier(t)} SET customer_id = ${keepId} WHERE customer_id IN (${sql.join(others.map((i) => sql`${i}`), sql`, `)})`);
+      // Extra check F1 (Nov 27, 2026): a campaign row is one per campaign and customer. When both records got the same
+      // campaign, the kept record's row stays and the other one stays on its merged record (nothing deleted), so the
+      // merge no longer stops with an error.
+      const r =
+        t === "sms_campaign_sends"
+          ? await tx.execute(sql`UPDATE sms_campaign_sends SET customer_id = ${keepId} WHERE id IN (
+              SELECT DISTINCT ON (campaign_id) id FROM sms_campaign_sends
+              WHERE customer_id IN (${otherList}) AND campaign_id NOT IN (SELECT campaign_id FROM sms_campaign_sends WHERE customer_id = ${keepId})
+              ORDER BY campaign_id, id)`)
+          : await tx.execute(sql`UPDATE ${sql.identifier(t)} SET customer_id = ${keepId} WHERE customer_id IN (${otherList})`);
       moved[t] = Number((r as { rowCount?: number; affectedRows?: number }).rowCount ?? (r as { affectedRows?: number }).affectedRows ?? 0);
     }
     const anyStop = rows.some((r) => r.sms_opt_out);

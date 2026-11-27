@@ -601,13 +601,13 @@ const OTHER: Record<string, Explanation> = {
   },
   sameDayHoursClose: {
     what: "How long a same-day delivery takes close by, in hours from-to (2.5-3.5 means about two and a half to three and a half hours).",
-    where: "The same-day delivery notice on the phone, right after a close-by address is saved.",
-    ifChanged: "Nothing today (deep check 31, Nov 27, 2026): since Nov 27 the same-day notice is one of the two approved versions by customer service hours, the same for every area, so this setting is not read. It is kept in case Abraham wants areas again.",
+    where: "The time spoken inside the two same-day notice recordings (phone, after the address; website pay page). Since Nov 27, 2026 both versions say the close-by and the surrounding-area time to every caller.",
+    ifChanged: "The phone and website do not pick a time by area; saving a new value marks the two same-day notice recordings \"Needs a new recording\" with a draft that has the new time (deep check 31).",
   },
   sameDayHoursFar: {
     what: "How long a same-day delivery takes in the surrounding areas, in hours from-to (3.5-4.5 means about three and a half to four and a half hours).",
-    where: "The same-day delivery notice on the phone, right after an address in a surrounding area is saved.",
-    ifChanged: "Nothing today (deep check 31, Nov 27, 2026): since Nov 27 the same-day notice is one of the two approved versions by customer service hours, the same for every area, so this setting is not read. It is kept in case Abraham wants areas again.",
+    where: "The time spoken inside the two same-day notice recordings (phone, after the address; website pay page). Since Nov 27, 2026 both versions say the close-by and the surrounding-area time to every caller.",
+    ifChanged: "The phone and website do not pick a time by area; saving a new value marks the two same-day notice recordings \"Needs a new recording\" with a draft that has the new time (deep check 31).",
   },
   sameDayCloseAreas: {
     what: "Which delivery map areas count as close by for the same-day notice, one area name per line, exactly as on the Delivery areas map. Empty means only the Kiryas Joel zone; every other area is a surrounding area.",

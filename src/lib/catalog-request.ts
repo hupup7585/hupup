@@ -17,7 +17,8 @@ export async function catalogEmailedToday(email: string, now = new Date()): Prom
   const rows = await db
     .select({ id: schema.auditLog.id })
     .from(schema.auditLog)
-    .where(and(eq(schema.auditLog.action, "catalog.website_request"), eq(schema.auditLog.entityId, email.toLowerCase()), gte(schema.auditLog.createdAt, new Date(now.getTime() - 24 * 3600_000))))
+    // Extra check E4 (Nov 27, 2026): only a catalog that really went out counts; a failed try can be asked for again
+    .where(and(eq(schema.auditLog.action, "catalog.website_request"), eq(schema.auditLog.entityId, email.toLowerCase()), gte(schema.auditLog.createdAt, new Date(now.getTime() - 24 * 3600_000)), sql`(${schema.auditLog.after}->>'sent') = 'true'`))
     .limit(1);
   return rows.length > 0;
 }

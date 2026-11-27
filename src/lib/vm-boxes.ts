@@ -49,7 +49,8 @@ export async function personalBoxForCaller(from: string | null | undefined): Pro
   const [u] = await db
     .select({ id: schema.adminUsers.id })
     .from(schema.adminUsers)
-    .where(and(eq(schema.adminUsers.phone, e), inArray(schema.adminUsers.role, [...PERSONAL_ROLES])))
+    // Extra check F3 (Nov 27, 2026): a deactivated staff member's phone no longer opens their box
+    .where(and(eq(schema.adminUsers.phone, e), inArray(schema.adminUsers.role, [...PERSONAL_ROLES]), eq(schema.adminUsers.active, true)))
     .limit(1);
   if (!u) return null;
   const [b] = await db.select().from(schema.voicemailBoxes).where(eq(schema.voicemailBoxes.ownerUserId, u.id)).limit(1);
@@ -59,7 +60,11 @@ export async function personalBoxForCaller(from: string | null | undefined): Pro
 export async function boxByNumber(n: string): Promise<Box | null> {
   await ensurePersonalBoxes();
   const [b] = await db.select().from(schema.voicemailBoxes).where(and(eq(schema.voicemailBoxes.boxNumber, n.trim()), isNotNull(schema.voicemailBoxes.ownerUserId))).limit(1);
-  return b ?? null;
+  if (!b) return null;
+  // Extra check F3 (Nov 27, 2026): the box of a deactivated staff member can't be opened by its number either
+  // (the caller hears the same "no such box" as for a wrong number); its messages stay for the Owner in Admin
+  const [owner] = await db.select({ active: schema.adminUsers.active }).from(schema.adminUsers).where(eq(schema.adminUsers.id, b.ownerUserId!)).limit(1);
+  return owner?.active ? b : null;
 }
 
 export async function getBox(id: number): Promise<Box | null> {
