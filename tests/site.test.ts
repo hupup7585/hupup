@@ -132,11 +132,11 @@ describe("delivery fee wording", () => {
     }
     const page = readFileSync("src/app/page.tsx", "utf8");
     // Hero card: "Delivery option available" as a line inside the card (Abraham: no corner circle)
-    expect(page).toMatch(/data-hero-delivery[^>]*>[\s\S]*?Delivery option available/);
+    expect(page).toMatch(/data-hero-delivery[^>]*>[\s\S]*?\{w\.heroDelivery\}/); // website W2: from Admin, starting "Delivery option available"
     expect(page).not.toContain("fee applies");
     expect(page).not.toMatch(/rounded-full bg-white px-1\.5/);
     expect(page).toContain("Delivery available for an additional fee"); // meta description
-    expect(page).toContain("{noLonelyWord(HOW_IT_WORKS_DELIVERY)}"); // How It Works (Abraham's approved sentence)
+    expect(page).toContain("{noLonelyWord(w.howItWorksDelivery)}"); // How It Works (Abraham's approved sentence)
   });
 });
 
@@ -152,7 +152,7 @@ describe("business name never splits across lines", () => {
     expect(parts).toContain("{keepName(title)}");
     const page = readFileSync("src/app/page.tsx", "utf8");
     expect(page).toContain("{keepName(INTRO_REST)}"); // hero subtitle: first sentence has no business name
-    expect(page).toContain("{keepName(FINAL_CTA_TEXT)}");
+    expect(page).toContain("{keepName(w.finalCtaText)}");
     expect(readFileSync("src/components/site/SiteFooterView.tsx", "utf8")).toContain("{BUSINESS_NAME_NB}");
   });
 });
@@ -216,7 +216,7 @@ describe("Why Choose layout and badge (Abram 10:25-10:30 PM)", () => {
     expect(noLonelyWord("Options for all types of events")).toBe("Options for all types of events");
     expect(noLonelyWord("Single")).toBe("Single");
     const page = readFileSync("src/app/page.tsx", "utf8");
-    expect(page).toContain("[text-wrap:balance]\">{whyLabel(w)}");
+    expect(page).toContain("[text-wrap:balance]\">{whyLabel(item)}");
     expect(page).toContain("grid auto-rows-fr gap-x-10 sm:grid-cols-2");
   });
   it("heading column is sized to the business name with a 64px gap", () => {
@@ -286,7 +286,7 @@ describe("Kiryas Joel box delivery line (Abram 10:46 PM)", () => {
     const box = saFile.slice(saFile.indexOf("data-sa-delivery-note"), saFile.indexOf("data-sa-delivery-note") + 600);
     expect(box).toContain("{noLonelyWord(SERVICE_AREA_DELIVERY_NOTE)}");
     const how = page.slice(page.indexOf('id="how-it-works"'), page.indexOf("<ServiceAreaC c={c} />"));
-    expect(how).toContain("{noLonelyWord(HOW_IT_WORKS_DELIVERY)}");
+    expect(how).toContain("{noLonelyWord(w.howItWorksDelivery)}");
     const { HOW_IT_WORKS_DELIVERY } = await import("@/lib/site-copy");
     expect(HOW_IT_WORKS_DELIVERY).toBe("We deliver our rentals right to your door.");
   });
@@ -512,7 +512,7 @@ describe("website Hours (Abraham's simple list)", () => {
     expect(keepTimesTogether("Winter: 2 hours after Shabbes - 11:00 PM")).toBe("Winter: 2 hours after Shabbes\u00A0-\u00A011:00\u00A0PM");
     for (const l of WEBSITE_HOURS) expect(keepTimesTogether(l).replace(/\u00A0/g, " ")).toBe(l);
     expect(hours).toContain("keepTimesTogether(line.slice(i + 2))");
-    expect(hours).toContain("{WEBSITE_HOURS_NOTE}");
+    expect(hours).toContain("{w.hoursNote}");
     // Abraham: left column centered against the card; the 24/7 box is white with a thin navy border and navy text, not yellow
     expect(hours).toMatch(/data-hours-grid className="[^"]*md:items-center/);
     const note = hours.match(/data-hours-note className="([^"]*)"/)![1];
@@ -547,7 +547,7 @@ describe("Service Area Kiryas Joel card (Abraham)", () => {
     expect(c).not.toContain("data-sa-badge");
     expect(c).not.toMatch(/rounded-full[^"]*bg-hu-yellow/);
     expect(c).toContain("<IconTile icon={Truck} tone=\"sky\" />");
-    expect(c).toContain("{noLonelyWord(SERVICE_AREA_DELIVERY_NOTE)}");
+    expect(c).toContain("{noLonelyWord(c.words.serviceAreaDeliveryNote)}");
   });
 });
 

@@ -1,6 +1,6 @@
 import { MapPin, Truck } from "lucide-react";
 import type { SiteContent } from "@/lib/site-content";
-import { DELIVERY_FEE_SHORT, SERVICE_AREA_DELIVERY_NOTE, SERVICE_AREA_MAP_URL, noLonelyWord } from "@/lib/site-copy";
+import { DELIVERY_FEE_SHORT, SERVICE_AREA_MAP_URL, noLonelyWord } from "@/lib/site-copy";
 import { CallButton, ICON_STROKE, IconTile, SectionTitle } from "./parts";
 
 /**
@@ -42,7 +42,7 @@ export default function ServiceAreaC({ c, badge }: { c: SiteContent; badge?: str
               </li>
               <li className="flex items-center gap-4 py-4">
                 <IconTile icon={Truck} tone="sky" />
-                <span className="text-lg font-bold">{noLonelyWord(SERVICE_AREA_DELIVERY_NOTE)}</span>
+                <span className="text-lg font-bold">{noLonelyWord(c.words.serviceAreaDeliveryNote)}</span>
               </li>
             </ul>
             <CallButton phone={c.phoneE164} className="mt-6 self-start lg:mt-auto" />

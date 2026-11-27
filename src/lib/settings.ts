@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME } from "@/lib/config";
 import { TIMER_DEFAULTS } from "@/lib/ivr/timers";
+import { SITE_WORD_DEFAULTS } from "@/lib/site-words";
 
 /** Admin-editable settings with defaults. Stored in app_settings (key -> jsonb). */
 export const SETTING_DEFAULTS = {
@@ -323,6 +324,8 @@ export const SETTING_DEFAULTS = {
   offersStacking: "best",
   /** Phone timing (Admin handoff Phase 3): every wait on the phone line, defaults equal to the old built-in values. */
   ...TIMER_DEFAULTS,
+  /** Website words (Admin handoff website Phase W2, Nov 27, 2026): the home page's words, starting as Abraham's approved text. */
+  ...SITE_WORD_DEFAULTS,
   disconnectSilenceMinutes: "3",
   disconnectCheckSeconds: "3",
 } as const;

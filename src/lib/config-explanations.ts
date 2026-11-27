@@ -679,6 +679,81 @@ const OTHER: Record<string, Explanation> = {
   hoursMotzeiSeason: { what: "Which Motzei Shabbes closing applies: summer while the clocks are on summer time.", where: "Saturday night calls.", ifChanged: "Switches between the winter and summer closing rule." },
   hoursCholHamoed: { what: "Office hours on Chol Hamoed.", where: "Website and live calls during Chol Hamoed.", ifChanged: "Chol Hamoed follows the new hours." },
   hoursChanukah: { what: "Office hours on Chanukah.", where: "Website and live calls during Chanukah.", ifChanged: "Chanukah follows the new hours." },
+  siteSlogan: {
+    what: "The big heading at the top of the home page (the slogan), shown in capital letters.",
+    where: "Every website visitor, first thing on the home page. It is also the page's one main heading for Google.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteIntro: {
+    what: "The line under the slogan at the top of the home page. The part up to the first \"!\" sits on its own line on computers.",
+    where: "Every website visitor, under the slogan.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteWhyList: {
+    what: "The items in \"Why Choose Hup Up Attractions\", one per line, in order (up to 6; each line keeps its picture in the same place).",
+    where: "Website visitors, in the Why Choose section.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteStep1Word: {
+    what: "The big word of step 1 in How It Works (now EXPLORE).",
+    where: "Website visitors, in How It Works.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteStep1Text: {
+    what: "The sentence under step 1 in How It Works.",
+    where: "Website visitors, in How It Works.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteStep2Word: {
+    what: "The big word of step 2 in How It Works (now CALL).",
+    where: "Website visitors, in How It Works.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteStep2Text: {
+    what: "The sentence under step 2 in How It Works.",
+    where: "Website visitors, in How It Works.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteStep3Word: {
+    what: "The big word of step 3 in How It Works (now CONFIRM).",
+    where: "Website visitors, in How It Works.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteStep3Text: {
+    what: "The sentence under step 3 in How It Works.",
+    where: "Website visitors, in How It Works.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteHowItWorksDelivery: {
+    what: "The delivery sentence with the truck picture under the three steps.",
+    where: "Website visitors, under How It Works.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteHeroDelivery: {
+    what: "The delivery line with the truck picture at the bottom of the Call to book card at the top of the home page.",
+    where: "Website visitors, at the top of the home page.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteServiceAreaDeliveryNote: {
+    what: "The delivery note in the Kiryas Joel box of the Service Area section.",
+    where: "Website visitors, in Service Area.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteFinalCtaTitle: {
+    what: "The heading of the yellow band with the big call button near the bottom of the home page.",
+    where: "Website visitors, near the bottom of the home page.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteFinalCtaText: {
+    what: "The sentence under that heading in the yellow band.",
+    where: "Website visitors, near the bottom of the home page.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
+  siteHoursNote: {
+    what: "The words in the box beside the hours, which also dials the hotline when tapped (now \"Book by phone 24 hours.\").",
+    where: "Website visitors, in Our Hours.",
+    ifChanged: "Visitors see the new words within about a minute of publishing. Customer words: publishing needs the Owner's \"I approve these exact words\". The starting words are Abraham's approved website text; Undo puts back the version before.",
+  },
   hoursWebsiteNote: {
     what: "The note shown under the hours on the website.",
     where: "Website visitors, in the hours section.",

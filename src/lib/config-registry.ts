@@ -3,6 +3,7 @@ import { CONFIG_USAGE } from "@/lib/config-usage.generated";
 import { CONFIG_EXPLANATIONS, type Explanation } from "@/lib/config-explanations";
 import { PHONE_TIMERS } from "@/lib/ivr/timers";
 import { rules, type Rule } from "@/lib/setting-rules";
+import { SITE_WORD_KEYS, checkSiteWords, type SiteWordKey } from "@/lib/site-words";
 
 /**
  * Admin handoff Phase 2 (Abraham, Nov 26, 2026), tightened after Hark's Phase 1-2 review (H1, H4, H5, H6, M1, M2, M7,
@@ -119,6 +120,27 @@ const EXACT: Record<string, Spec> = {
   phoneCardProvider: page("/admin/phone/phonepay", "Payments", { label: "Card payment service on the phone", type: "choice", choices: ["sola", "stripe"] }),
   solaListenOn: page("/admin/phone/phonepay", "Payments", { label: "Sola listening helper", type: "bool" }),
 };
+
+/** Website words (website Phase W2, Nov 27, 2026): edited here as customer words, checked by the website's own rules. */
+const SITE_WORD_LABELS: Record<SiteWordKey, string> = {
+  siteSlogan: "Home page: big heading (slogan)",
+  siteIntro: "Home page: line under the slogan",
+  siteWhyList: "Home page: Why Choose list (one item per line)",
+  siteStep1Word: "How It Works: step 1 word",
+  siteStep1Text: "How It Works: step 1 sentence",
+  siteStep2Word: "How It Works: step 2 word",
+  siteStep2Text: "How It Works: step 2 sentence",
+  siteStep3Word: "How It Works: step 3 word",
+  siteStep3Text: "How It Works: step 3 sentence",
+  siteHowItWorksDelivery: "How It Works: delivery sentence under the steps",
+  siteHeroDelivery: "Home page: delivery line in the Call to book card",
+  siteServiceAreaDeliveryNote: "Service Area: delivery note in the Kiryas Joel box",
+  siteFinalCtaTitle: "Home page: yellow call band heading",
+  siteFinalCtaText: "Home page: yellow call band sentence",
+  siteHoursNote: "Our Hours: the box beside the hours",
+};
+for (const k of SITE_WORD_KEYS)
+  EXACT[k] = { mode: "edit", label: SITE_WORD_LABELS[k], group: "Website: home page", type: k === "siteWhyList" ? "list" : "text", wording: true, rule: (v) => checkSiteWords(k, v) };
 
 const FAMILIES: [RegExp, Spec][] = [
   [/^timer[A-Z]/, { mode: "edit", group: "Phone: timing", type: "int" }], // limits filled in from timers.ts below

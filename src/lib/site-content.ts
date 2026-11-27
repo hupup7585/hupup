@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { config, publicEmail } from "@/lib/config";
 import { SERVICE_AREA } from "@/lib/site-copy";
 import { getSettings } from "@/lib/settings";
+import { siteWordsFrom, type SiteWords } from "@/lib/site-words";
 import { hoursLines, officeOpenNow, todayHours } from "@/lib/business-hours";
 
 async function officeHours(): Promise<SiteContent["officeHours"]> {
@@ -21,6 +22,8 @@ export type SiteContent = {
   phoneDisplay: string;
   phoneE164: string;
   categories: { id: number; name: string; description: string; slug: string }[];
+  /** The home page's words from Admin (website Phase W2): the published values, starting as Abraham's approved text. */
+  words: SiteWords;
 };
 
 /** Website content keys in app_settings (edited from /admin/website). */
@@ -64,5 +67,6 @@ export async function getSiteContent(): Promise<SiteContent> {
     phoneDisplay: config.hotlineDisplay,
     phoneE164: config.hotlineE164,
     categories: cats,
+    words: siteWordsFrom(await getSettings()),
   };
 }

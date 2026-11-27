@@ -3,7 +3,7 @@ import { customerServiceHours, websiteHoursLines, websiteOpeningHoursSpec } from
 import { CalendarCheck, ClipboardCheck, Headset, ListChecks, Mail, MapPin, PartyPopper, Phone, PhoneCall, Search, Store, Truck } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
 import { config } from "@/lib/config";
-import { BUSINESS_NAME_NB, CATALOG_LINE, keepName, whyLabel, whyRows, HOW_IT_WORKS_DELIVERY, WEBSITE_HOURS_NOTE, keepTimesTogether, noLonelyWord, FINAL_CTA_TEXT, FINAL_CTA_TITLE, INTRO, SLOGAN, STEPS, WHY, serviceAreaPlaces, SERVICE_AREA_MAP_URL } from "@/lib/site-copy";
+import { BUSINESS_NAME_NB, CATALOG_LINE, keepName, whyLabel, whyRows, keepTimesTogether, noLonelyWord, serviceAreaPlaces, SERVICE_AREA_MAP_URL } from "@/lib/site-copy";
 import { theme } from "@/lib/theme";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -39,13 +39,15 @@ export const metadata: Metadata = {
 
 const WHY_ICONS = [PartyPopper, ListChecks, PhoneCall, Headset, Truck, ClipboardCheck];
 const STEP_ICONS = [Search, PhoneCall, CalendarCheck];
-/** The hero subtitle split after its first sentence (wording unchanged). */
-const INTRO_FIRST = INTRO.slice(0, INTRO.indexOf("!") + 1);
-const INTRO_REST = INTRO.slice(INTRO.indexOf("!") + 1).trim();
 
 export default async function Home() {
   const c = await getSiteContent();
   const settings = await getSettings();
+  // The home page's words from Admin (website Phase W2): the published values, starting as Abraham's approved text
+  const w = c.words;
+  /** The line under the slogan, split after its first sentence (wording unchanged). */
+  const INTRO_FIRST = w.intro.slice(0, w.intro.indexOf("!") + 1);
+  const INTRO_REST = w.intro.slice(w.intro.indexOf("!") + 1).trim();
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
@@ -80,7 +82,7 @@ export default async function Home() {
           <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] items-center gap-10 px-4 pb-8 pt-10 sm:px-6 lg:grid-cols-[1.25fr_1fr] lg:gap-14 lg:pb-12 lg:pt-16">
             <div>
               <span className="hu-sticker -rotate-2">Reservations by phone</span>
-              <h1 className="mt-5 text-[2.15rem] min-[360px]:text-[2.5rem] font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-[4.1rem]">{SLOGAN}</h1>
+              <h1 className="mt-5 text-[2.15rem] min-[360px]:text-[2.5rem] font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-[4.1rem]">{w.slogan}</h1>
               {/* Abraham's exact wording, shown in uppercase; the first sentence stays on one line on desktop */}
               <p data-hero-subtitle className="mt-5 max-w-xl text-base font-semibold uppercase leading-relaxed min-[400px]:text-[17px] xl:max-w-none xl:text-base">
                 <span className="xl:block xl:whitespace-nowrap">{INTRO_FIRST}</span> {keepName(INTRO_REST)}
@@ -116,7 +118,7 @@ export default async function Home() {
                   <span className="grid w-12 shrink-0 place-items-center" aria-hidden>
                     <Truck className="h-6 w-6" strokeWidth={ICON_STROKE} />
                   </span>
-                  Delivery option available
+                  {w.heroDelivery}
                 </p>
               </div>
             </div>
@@ -192,18 +194,18 @@ export default async function Home() {
               </a>
             </div>
             <ul className="grid auto-rows-fr gap-x-10 sm:grid-cols-2">
-              {WHY.map((w, i) => (
-                <li key={w} className="flex w-full items-center gap-4 border-b-2 border-hu-deep/10 py-4 text-lg font-semibold">
+              {w.why.map((item, i) => (
+                <li key={item} className="flex w-full items-center gap-4 border-b-2 border-hu-deep/10 py-4 text-lg font-semibold">
                   <IconTile icon={WHY_ICONS[i]} tone="white" />
                   {(() => {
-                    const rows = whyRows(w);
+                    const rows = whyRows(item);
                     return rows ? (
                       <span data-why-rows className="min-w-0 flex-1">
                         <span className="block">{rows[0]}</span>{" "}
                         <span className="block">{rows[1]}</span>
                       </span>
                     ) : (
-                      <span className="min-w-0 flex-1 [text-wrap:balance]">{whyLabel(w)}</span>
+                      <span className="min-w-0 flex-1 [text-wrap:balance]">{whyLabel(item)}</span>
                     );
                   })()}
                 </li>
@@ -219,7 +221,7 @@ export default async function Home() {
             <ol className="relative mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
               <span className="absolute bottom-0 left-[2.2rem] top-0 w-1 rounded bg-hu-sky md:hidden" aria-hidden />
               <span className="absolute left-0 right-0 top-[2.2rem] hidden h-1 rounded bg-hu-sky md:block" aria-hidden />
-              {STEPS.map(([step, word, text], i) => {
+              {w.steps.map(([step, word, text], i) => {
                 const Icon = STEP_ICONS[i];
                 return (
                   <li key={step} className="relative flex gap-5 md:block">
@@ -239,7 +241,7 @@ export default async function Home() {
             <div className="mt-12 flex justify-center">
               <p data-delivery-note className="flex max-w-3xl items-start gap-4 rounded-3xl bg-hu-tint px-5 py-5 text-left text-lg font-semibold leading-relaxed sm:items-center sm:px-7 sm:text-xl">
                 <Truck className="mt-1 h-8 w-8 shrink-0 sm:mt-0" strokeWidth={ICON_STROKE} aria-hidden />
-                <span className="[text-wrap:pretty]">{noLonelyWord(HOW_IT_WORKS_DELIVERY)}</span>
+                <span className="[text-wrap:pretty]">{noLonelyWord(w.howItWorksDelivery)}</span>
               </p>
             </div>
           </div>
@@ -251,8 +253,8 @@ export default async function Home() {
         {/* FINAL CTA */}
         <section className="bg-hu-yellow">
           <div className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 sm:py-20">
-            <h2 className="text-3xl font-extrabold leading-tight sm:text-5xl">{FINAL_CTA_TITLE}</h2>
-            <p className="mx-auto mt-4 max-w-2xl text-lg font-medium sm:text-xl">{keepName(FINAL_CTA_TEXT)}</p>
+            <h2 className="text-3xl font-extrabold leading-tight sm:text-5xl">{w.finalCtaTitle}</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-lg font-medium sm:text-xl">{keepName(w.finalCtaText)}</p>
             <a href={`tel:${c.phoneE164}`} className="mt-8 inline-flex min-h-14 items-center gap-3 rounded-full bg-hu-deep px-9 py-4 text-lg font-bold tracking-wide text-white hover:bg-[#0d2f5a]">
               <Phone className="h-5 w-5" strokeWidth={ICON_STROKE} aria-hidden /> CALL NOW TO BOOK
             </a>
@@ -270,7 +272,7 @@ export default async function Home() {
               <SectionTitle kicker="When to reach us" title="Our Hours" />
               <a href={`tel:${c.phoneE164}`} data-hours-note className="mt-6 flex items-center gap-3 rounded-2xl border border-hu-deep bg-white p-4 text-lg font-bold text-hu-deep hover:underline">
                 <PhoneCall className="h-6 w-6 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
-                <span>{WEBSITE_HOURS_NOTE}</span>
+                <span>{w.hoursNote}</span>
               </a>
             </div>
             <ul data-hours-list className="divide-y-2 divide-hu-deep/10 rounded-2xl border-2 border-hu-deep/10 bg-white px-5 text-lg">
