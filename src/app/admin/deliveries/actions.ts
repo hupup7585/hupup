@@ -1,5 +1,6 @@
 "use server";
 
+import { isDbId } from "@/lib/db-id";
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
@@ -45,6 +46,7 @@ export async function sendTemplateAction(orderId: number, key: TemplateKey): Pro
 /** Delivered (delivery stop) or Picked up (pickup stop). Audited. */
 export async function markDoneAction(orderId: number, stop: "delivery" | "pickup"): Promise<DeliveryResult> {
   const staff = await requireStaff(["owner", "secretary", "delivery"]);
+  if (!isDbId(orderId)) return { ok: false, message: "Order not found." }; // deep check 0600 M56
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found." };
   // A Delivery login acts only on its own assigned stops (Abraham, Nov 12, 2026)
@@ -74,6 +76,7 @@ export async function uploadPhotoAction(form: FormData): Promise<DeliveryResult>
   const stop = form.get("stop") === "pickup" ? "pickup" : "delivery";
   const file = form.get("photo") as Blob | null;
   if (!orderId || !file) return { ok: false, message: "Choose a photo first." };
+  if (!isDbId(orderId)) return { ok: false, message: "Order not found." }; // deep check 0600 M56
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found." };
   if (staff.role === "delivery" && !isMyStop(full.order, stop, staff.userId)) return { ok: false, message: "This stop isn't assigned to you." };
@@ -91,6 +94,7 @@ export async function uploadPhotoAction(form: FormData): Promise<DeliveryResult>
 /** Out for delivery, Out for pickup, or Problem reported (with a note; the office is emailed). Audited. */
 export async function stageAction(orderId: number, stop: "delivery" | "pickup", stage: Stage, note?: string): Promise<DeliveryResult> {
   const staff = await requireStaff(["owner", "secretary", "delivery"]);
+  if (!isDbId(orderId)) return { ok: false, message: "Order not found." }; // deep check 0600 M56
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found." };
   if (staff.role === "delivery" && !isMyStop(full.order, stop, staff.userId)) return { ok: false, message: "This stop isn't assigned to you." };

@@ -18,7 +18,7 @@ describe("invoice printing and sharing", () => {
     const admin = readFileSync("src/app/admin/(app)/bookkeeping/invoice/[id]/page.tsx", "utf8");
     const pub = readFileSync("src/app/invoice/[id]/page.tsx", "utf8");
     for (const p of [admin, pub]) {
-      expect(p).toContain("<InvoiceDocument d={d} />");
+      expect(p).toMatch(/<InvoiceDocument d=\{d\}( h1)? \/>/);
       expect(p).toContain("<PrintButton />");
     }
     expect(pub).toContain("robots: { index: false, follow: false }");

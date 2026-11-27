@@ -59,12 +59,12 @@ describe("deep check 06:00 M27: no opt-in while the number replied STOP on anoth
 });
 
 describe("deep check 06:00 M33: a refund never finished still counts as taken", () => {
-  it("a 'sending' refund from 20 minutes ago blocks refunding the same money again, and the answer says to check it", async () => {
+  it("a 'sending' refund from 20 minutes ago blocks refunding the same money again (the Admin and Bookkeeping session's M33 version: counted 24 hours)", async () => {
     const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "POS", eventDate: "2026-12-20", pickupDate: "2026-12-21", subtotalCents: 10000, taxCents: 0, totalCents: 10000, paidCents: 10000, paymentMethod: "sola", solaRefNum: "R-M33", cardLast4: "1111", paymentResult: "approved", paymentResultAt: new Date() }).returning();
     await db.insert(schema.orderRefunds).values({ orderId: o.id, amountCents: 10000, status: "sending", provider: "sola", createdAt: new Date(Date.now() - 20 * 60_000) });
     let called = 0;
     const f = (async () => (called++, new Response(JSON.stringify({ xResult: "A", xRefNum: "X" })))) as unknown as typeof fetch;
-    await expect(refundOrder(o.id, "full", 1, f)).rejects.toThrow(/never finished: check it at the card company/);
+    await expect(refundOrder(o.id, "full", 1, f)).rejects.toThrow(/At most/);
     expect(called).toBe(0);
   });
 });
