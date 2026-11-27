@@ -6,6 +6,17 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { orderIdFromParam } from "@/lib/order-path";
+
+/**
+ * Deep check 06:00 (Nov 27): a linked booking is saved as its booking number (1031), never the bare id. Every reader
+ * turns it back with linkedOrderId, which takes 1000 off anything above 1000, so a bare id above 1000 (order 1031 saved
+ * as 1031) would be read as order 31. Booking numbers are always above 1000, so they read back right; rows saved with a
+ * bare id of 1000 or less (since B1) still read right too.
+ */
+const bookingNo = (v: string) => {
+  const id = orderIdFromParam(v);
+  return id ? 1000 + id : null;
+};
 import { db, schema } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";
 import { PRIORITIES, STATUSES, TaskError, canAccess, canCreate, getTask, rateFor, seesMoney, taskAudit, type Staff } from "@/lib/tasks";
@@ -52,7 +63,7 @@ function fields(f: FormData) {
   const status = s(f, "status") || "todo";
   if (!(STATUSES as readonly string[]).includes(status)) throw new TaskError("Choose a status.");
   assertNoCardNumber(title, s(f, "notes"));
-  return { title, notes: s(f, "notes") || null, dueDate: iso(s(f, "dueDate")), dueTime: time(s(f, "dueTime")), priority, status, orderId: orderIdFromParam(s(f, "orderId")) || null, projectId: num(f, "projectId") };
+  return { title, notes: s(f, "notes") || null, dueDate: iso(s(f, "dueDate")), dueTime: time(s(f, "dueTime")), priority, status, orderId: bookingNo(s(f, "orderId")), projectId: num(f, "projectId") };
 }
 
 export async function createTaskAction(f: FormData) {
@@ -178,7 +189,7 @@ export async function logHoursAction(f: FormData) {
 /* ---- projects and rates (Owner; Secretary may create projects) ---- */
 
 /** Booking numbers as people see them (1031) or the plain id; saved as the order id (deep check B1). */
-const orderList = (v: string) => [...new Set(v.split(/[\s,#]+/).filter(Boolean).map(orderIdFromParam).filter((n) => n > 0))];
+const orderList = (v: string) => [...new Set(v.split(/[\s,#]+/).filter(Boolean).map(orderIdFromParam).filter((n) => n > 0).map((id) => 1000 + id))];
 
 export async function saveProjectAction(f: FormData) {
   return run("/admin/tasks?view=projects", async (staff) => {

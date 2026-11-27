@@ -1,3 +1,4 @@
+import { linkedOrderId } from "@/lib/order-path";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
@@ -55,7 +56,7 @@ describe("CC: tasks and who can do what", () => {
     expect(to).toMatch(/^\/admin\/tasks\/\d+\?msg=Task%20added/);
     const id = Number(to.match(/tasks\/(\d+)/)![1]);
     const t = (await getTask(id))!;
-    expect(t).toMatchObject({ title: "Clean the castle bouncer", priority: "high", status: "todo", assignedTo: dovid, orderId: 1, dueDate: "2026-11-01" }); // booking 1001 is order id 1 (deep check B1)
+    expect(t).toMatchObject({ title: "Clean the castle bouncer", priority: "high", status: "todo", assignedTo: dovid, orderId: 1001, dueDate: "2026-11-01" }); // saved as booking number 1001 = order id 1 (deep check B1, 06:00 M5)
     expect(isOverdue(t, "2026-11-08")).toBe(true);
     await act(A.updateTaskAction, { id, title: "Clean the castle bouncer", status: "in_progress", priority: "normal", assignedTo: dovid, dueDate: "2026-11-01" });
     const hist = await db.select().from(schema.auditLog).where(eq(schema.auditLog.entityId, String(id)));
@@ -158,10 +159,14 @@ describe("DD: subtasks, month view, projects, labor, exports", () => {
 });
 
 describe("deep check B1, B5, B8 (Tasks)", () => {
-  it("B1: a booking number is saved as the order id; older rows that kept the typed number still link and count", async () => {
+  it("B1: a booking number links to its order; older rows that kept the typed number still link and count", async () => {
     await act(A.saveProjectAction, { name: "B1 project", orderIds: "#1001, 2" });
     const [p] = await db.select().from(schema.taskProjects).where(eq(schema.taskProjects.name, "B1 project"));
-    expect(p.orderIds).toEqual([1, 2]);
+    // deep check 06:00 M5: saved as booking numbers, so an order id above 1000 is never read back as another order
+    expect(p.orderIds).toEqual([1001, 1002]);
+    await act(A.saveProjectAction, { name: "M5 project", orderIds: "2031" });
+    const [m5] = await db.select().from(schema.taskProjects).where(eq(schema.taskProjects.name, "M5 project"));
+    expect(m5.orderIds.map(linkedOrderId)).toEqual([1031]);
     // an older project saved before the fix held the booking number itself
     await db.update(schema.taskProjects).set({ orderIds: [1001] }).where(eq(schema.taskProjects.id, p.id));
     const r = await projectProfit((await db.select().from(schema.taskProjects).where(eq(schema.taskProjects.id, p.id)))[0]);
