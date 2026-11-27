@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /* Owner-only API Keys page (Abraham, Nov 14, 2026). */
 
-const h = vi.hoisted(() => ({ emails: [] as { to: string; subject: string; text: string }[] }));
+const h = vi.hoisted(() => ({ emails: [] as { to: string; subject: string; text: string; kind?: string }[] }));
 vi.mock("@/lib/db", async () => {
   const { createMemoryDb } = await import("./helpers/memory-db");
   const m = await createMemoryDb();
@@ -10,7 +10,7 @@ vi.mock("@/lib/db", async () => {
 });
 vi.mock("@/lib/notify", async (orig) => ({
   ...(await orig<typeof import("@/lib/notify")>()),
-  sendEmail: async (to: string, subject: string, text: string) => (h.emails.push({ to, subject, text }), { sent: true }),
+  sendEmail: async (to: string, subject: string, text: string, _a?: unknown, opts?: { kind?: string }) => (h.emails.push({ to, subject, text, kind: opts?.kind }), { sent: true }),
 }));
 
 import { readFileSync } from "node:fs";
@@ -37,6 +37,7 @@ describe("API keys page", () => {
     expect(await k.pagePasswordSet()).toBe(false);
     await k.requestSetupCode(who);
     expect(h.emails.at(-1)!.to).toBe("owner@example.com");
+    expect(h.emails.at(-1)!.kind).toBe("code"); // deep check 06:00 M65: the Sent copy hides the code
     const set = await k.setPagePassword("correct horse battery", codeFrom(), who);
     expect(set.ok).toBe(true);
     expect(await k.pagePasswordSet()).toBe(true);

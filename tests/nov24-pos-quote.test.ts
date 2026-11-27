@@ -193,4 +193,12 @@ describe("cash or check taken at New booking (Hark's Admin list 1-3, Nov 26, 202
     expect(entries.reduce((s, e) => s + (e.taxCents ?? 0), 0)).toBe(q!.taxCents);
     expect(entries.some((e) => e.taxExempt)).toBe(false);
   });
+
+  it("deep check 06:00 M70: not priced, the order is put in Needs attention before the payment is recorded (never confirmed by it)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/app/admin/(app)/pos/actions.ts", "utf8");
+    const at = (t: string) => src.indexOf(t);
+    expect(at('status: "NEEDS_ATTENTION", notes: sql`COALESCE')).toBeGreaterThan(0);
+    expect(at('status: "NEEDS_ATTENTION", notes: sql`COALESCE')).toBeLessThan(at("await markPaid(r.orderId, paidCents, input.payment)"));
+  });
 });
