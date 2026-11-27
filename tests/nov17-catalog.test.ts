@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
 /* Catalog and answers (Abraham, Nov 17, 2026). In-memory database; R2 and texts are stand-ins. */
-const h = vi.hoisted(() => ({ stored: new Map<string, Uint8Array>() }));
+const h = vi.hoisted(() => ({ stored: new Map<string, Uint8Array>(), r2Down: false }));
 vi.mock("@/lib/db", async () => {
   const { createMemoryDb } = await import("./helpers/memory-db");
   const m = await createMemoryDb();
@@ -11,7 +11,7 @@ vi.mock("@/lib/db", async () => {
 vi.mock("@/lib/r2", async (orig) => ({
   ...(await orig<typeof import("@/lib/r2")>()),
   r2Put: async (key: string, data: Uint8Array) => void h.stored.set(key, data),
-  r2Get: async (key: string) => (h.stored.has(key) ? new Response(new Uint8Array(h.stored.get(key)!)) : new Response("no", { status: 404 })),
+  r2Get: async (key: string) => (h.r2Down ? Promise.reject(new Error("R2 not reachable")) : h.stored.has(key) ? new Response(new Uint8Array(h.stored.get(key)!)) : new Response("no", { status: 404 })),
 }));
 vi.mock("@/lib/auth", async (orig) => ({ ...(await orig<typeof import("@/lib/auth")>()), requireOwner: async () => ({ userId: 1, role: "owner", name: "Owner", phone: "+18457777585" }) }));
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
@@ -77,6 +77,22 @@ describe("catalog photos and Garbage", () => {
     bad.set("id", String(productId));
     bad.set("photo", new File([new TextEncoder().encode("%PDF-1.7")], "x.pdf"));
     expect((await uploadCatalogPhotoAction(bad)).ok).toBe(false);
+  });
+  it("deep check B6, B7: a refused text picture is never stored; storage not reachable is a 404, not a 500", async () => {
+    const before = h.stored.size;
+    const fd = new FormData();
+    fd.set("kind", "text");
+    fd.set("id", "3");
+    fd.set("photo", new File([jpeg], "x.jpg", { type: "image/jpeg" }));
+    expect(await uploadCatalogPhotoAction(fd)).toEqual({ ok: false, message: "Choose picture 1 or picture 2." });
+    expect(h.stored.size).toBe(before);
+    h.r2Down = true;
+    try {
+      const r = await catalogPhoto(new Request("https://x"), { params: Promise.resolve({ key: ["catalog", "products", "1-a.jpg"] }) });
+      expect(r.status).toBe(404);
+    } finally {
+      h.r2Down = false;
+    }
   });
   it("Garbage takes the item off everything; Restore brings it back", async () => {
     const fd = new FormData();

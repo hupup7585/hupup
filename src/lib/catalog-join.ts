@@ -43,12 +43,9 @@ async function stoppedWithoutStart(exec: Exec, phone: string, optedOut: boolean)
  */
 export async function catalogJoin(tx: Exec, c: { id: number; smsOptOut: boolean; marketingOptIn: boolean }, phone: string, text: string): Promise<{ result: "joined" | "already" | "stopped"; sendConfirmation: boolean }> {
   if (await stoppedWithoutStart(tx, phone, c.smsOptOut)) return { result: "stopped", sendConfirmation: false };
-  const [dup] = await tx
-    .select({ id: schema.smsConsents.id })
-    .from(schema.smsConsents)
-    .where(and(eq(schema.smsConsents.phone, phone), eq(schema.smsConsents.scope, "marketing"), eq(schema.smsConsents.source, CATALOG_JOIN_SOURCE), eq(schema.smsConsents.action, "opt_in")))
-    .limit(1);
-  if (dup || c.marketingOptIn) return { result: "already", sendConfirmation: false };
+  // Deep check C2: "already" only while the number is still signed up; after NOPROMO (or STOP and START) a new JOIN
+  // is a new sign-up with its own record, like the first one
+  if (c.marketingOptIn) return { result: "already", sendConfirmation: false };
   await tx.insert(schema.smsConsents).values({
     customerId: c.id,
     phone,
