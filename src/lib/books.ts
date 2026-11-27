@@ -367,9 +367,16 @@ export function agingBucket(due: string, today = todayISO()): "current" | "1-30"
 export function nextRecurring(date: string, frequency: string) {
   const d = new Date(`${date}T12:00:00Z`);
   if (frequency === "weekly") d.setUTCDate(d.getUTCDate() + 7);
-  else if (frequency === "quarterly") d.setUTCMonth(d.getUTCMonth() + 3);
-  else if (frequency === "yearly") d.setUTCFullYear(d.getUTCFullYear() + 1);
-  else d.setUTCMonth(d.getUTCMonth() + 1);
+  else {
+    // Deep check 06:00 M29: the 29th-31st go to the last day of a shorter month (Jan 31 -> Feb 28), never past it
+    // (Jan 31 -> Mar 3 skipped February); the same for quarterly and yearly (Feb 29 -> Feb 28)
+    const months = frequency === "quarterly" ? 3 : frequency === "yearly" ? 12 : 1;
+    const day = d.getUTCDate();
+    d.setUTCDate(1);
+    d.setUTCMonth(d.getUTCMonth() + months);
+    const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0, 12)).getUTCDate();
+    d.setUTCDate(Math.min(day, last));
+  }
   return d.toISOString().slice(0, 10);
 }
 

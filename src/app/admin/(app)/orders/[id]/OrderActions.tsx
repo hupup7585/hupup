@@ -90,7 +90,7 @@ export default function OrderActions(props: {
           <input name="deliveryAddress" defaultValue={props.deliveryAddress} className="input" />
         </div>
         <p className="text-sm text-muted">Delivery {DELIVERY_WINDOW} · pickup by {PICKUP_BY} (whole rental days)</p>
-        <div><label className="label">Notes</label><textarea name="notes" defaultValue={props.notes} rows={3} className="input" /></div>
+        <div><label className="label">Notes</label><textarea name="notes" defaultValue={props.notes} rows={3} className="input" /><input type="hidden" name="notesBefore" value={props.notes ?? ""} /></div>
         <button className="btn-dark w-full" disabled={pending}>Save</button>
       </form>
 

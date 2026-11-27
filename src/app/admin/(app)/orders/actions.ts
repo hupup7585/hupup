@@ -134,7 +134,16 @@ export async function updateDetailsAction(orderId: number, form: FormData): Prom
   const [before] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
   if (!before) return { ok: false, message: "Not saved. Order not found." };
   const deliveryAddress = String(form.get("deliveryAddress") || "").trim() || null;
-  const notes = String(form.get("notes") || "") || null;
+  // Deep check 06:00 M23: notes added by the system since the page was opened (a second payment's "refund it", the
+  // option chosen on the pay link, the caller's directions) are kept. Unchanged notes are not written back; edited
+  // notes keep whatever was added after the text the page showed.
+  const typed = String(form.get("notes") || "");
+  const shown = form.get("notesBefore");
+  const current = before.notes ?? "";
+  const notes =
+    shown === null ? typed || null
+    : typed === String(shown) ? before.notes
+    : (typed + (current.startsWith(String(shown)) ? current.slice(String(shown).length) : "")) || null;
   const moved = (before.deliveryAddress ?? null) !== deliveryAddress;
   // Audit H2 (Nov 24, 2026): a new address on an order nothing has been paid on is priced again (zone, delivery, tax,
   // total), so the next payment link charges the new amount. Paid or finished orders keep their price.
