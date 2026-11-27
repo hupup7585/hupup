@@ -74,7 +74,8 @@ export async function receiveRawPiece(uploadId: string, idx: number, parts: numb
 }
 
 async function storeFile(input: { emailId?: number | null; fileName: string; contentType: string; data: Buffer; userId?: number | null }) {
-  const tooBig = input.data.length > INBOX_FILE_MAX_BYTES;
+  // Deep check C1: past the 800 MB stop the file is listed but not kept, so bookings, calls and payments keep room
+  const tooBig = input.data.length > INBOX_FILE_MAX_BYTES || (await databaseBytes()) + input.data.length > ATTACHMENT_STORAGE_STOP_BYTES;
   const [f] = await db
     .insert(schema.inboxFiles)
     .values({ emailId: input.emailId ?? null, fileName: input.fileName.slice(0, 200) || "attachment", contentType: input.contentType || "application/octet-stream", sizeBytes: input.data.length, tooBig, complete: !tooBig, createdBy: input.userId ?? null })
@@ -85,6 +86,24 @@ async function storeFile(input: { emailId?: number | null; fileName: string; con
     }
   }
   return f;
+}
+
+/** The address a reply goes to: the email's Reply-To when it has a usable one (like Gmail), otherwise From. */
+export function replyToOf(mail: { replyTo?: { address?: string }[] | null }, from: string): string {
+  const r = (mail.replyTo ?? []).map((a) => (a.address ?? "").trim().toLowerCase()).find((a) => /^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]{2,}$/.test(a));
+  return r ?? from;
+}
+
+/** Deep check C5: Reply-To from the original email (kept in pieces), read when replying; From when there is none. */
+export async function replyAddressFor(e: { uploadId: string | null; fromAddress: string }): Promise<string> {
+  if (!e.uploadId) return e.fromAddress;
+  try {
+    const chunks = await db.select().from(schema.inboxRawChunks).where(eq(schema.inboxRawChunks.uploadId, e.uploadId)).orderBy(asc(schema.inboxRawChunks.idx));
+    if (!chunks.length) return e.fromAddress;
+    return replyToOf(await PostalMime.parse(Buffer.concat(chunks.map((c) => c.data))), e.fromAddress);
+  } catch {
+    return e.fromAddress;
+  }
 }
 
 /** Read the email, keep it (and its attachments up to 18 MB), link the contact, tell Abraham, check for Catalog. */
@@ -275,10 +294,11 @@ export async function sendReply(input: { emailId: number; body: string; fileIds:
   const subject = /^re:/i.test(e.subject ?? "") ? e.subject! : `Re: ${e.subject ?? ""}`.trim();
   const text = body + linkText; // the logo and signature are added to every email (src/lib/email-brand.ts)
   const headers = e.messageId ? { "In-Reply-To": e.messageId, References: e.messageId } : undefined;
-  const res = await sendEmail(e.fromAddress, subject, text, files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), { headers, record: false, bodyHtml: htmlWithLinks(input.bodyHtml, linkText) });
+  const to = await replyAddressFor(e); // deep check C5: the email's Reply-To, like Gmail
+  const res = await sendEmail(to, subject, text, files.map((f) => ({ filename: f.file.fileName, content: f.data.toString("base64") })), { headers, record: false, bodyHtml: htmlWithLinks(input.bodyHtml, linkText) });
   const [reply] = await db
     .insert(schema.inboxReplies)
-    .values({ emailId: e.id, toAddress: e.fromAddress, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })
+    .values({ emailId: e.id, toAddress: to, subject, body: text, sent: res.sent, error: res.sent ? null : (res.error ?? "not sent"), userId: input.userId })
     .returning();
   for (const id of [...files.map((f) => f.file.id), ...linked]) await db.update(schema.inboxFiles).set({ replyId: reply.id }).where(eq(schema.inboxFiles.id, id));
   if (!e.readAt) await setRead(e.id, true);
@@ -421,8 +441,13 @@ export async function recordSentEmail(input: { to: string; subject: string; body
   // weekly backup's Sent copy is kept without its file (all customer data stays only in the Owner's email)
   const hide = (t: string) => (input.kind === "code" ? t.replace(/\b\d{4,8}\b/g, "••••••") : t);
   const backup = input.kind === "backup";
-  const files = backup ? [] : input.attachments;
-  const body = hide(input.body) + (backup && input.attachments.length ? `\n\n(The backup file, ${input.attachments.map((a) => a.filename).join(", ")}, is not kept here.)` : "");
+  // Deep check C1: the catalog PDF is the same file in every catalog email, so its Sent copy is kept without it
+  const catalog = input.kind === "catalog";
+  const files = backup || catalog ? [] : input.attachments;
+  const body =
+    hide(input.body) +
+    (backup && input.attachments.length ? `\n\n(The backup file, ${input.attachments.map((a) => a.filename).join(", ")}, is not kept here.)` : "") +
+    (catalog && input.attachments.length ? `\n\n(The catalog file, ${input.attachments.map((a) => a.filename).join(", ")}, was attached. It is the same catalog in every catalog email, so it is not kept again here.)` : "");
   const [row] = await db
     .insert(schema.inboxReplies)
     .values({ emailId: null, toAddress: input.to, subject: hide(input.subject), body, sent: input.sent, error: input.sent ? null : (input.error ?? "not sent"), userId: null, kind: backup ? "auto" : (input.kind ?? "auto") })

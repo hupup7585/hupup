@@ -13,6 +13,13 @@ Never delete deployments, projects or data.
 - Each build takes about 2.5 to 3 minutes, and Hobby runs one build at a time, so extra builds also delay live fixes.
 - Every merge costs **two** deployments: the live branch and the preview branch.
 
+## Status right now (Nov 27, 04:05 ET)
+
+**Vercel is refusing every live and preview deploy ("rate limited").** The live site is still on `c4a7e20`
+(deployed 02:54 ET). Every merge since then is waiting, not live. Do not merge to the live branch until Vercel
+accepts deploys again; the first accepted deploy takes everything merged so far in one go. Keep working and testing
+on your own branch. (A session updating this note when the limit clears: change it to "OK".)
+
 ## What builds on Vercel
 
 Only two branches build. Everything else is skipped (vercel.json `git.deploymentEnabled`, plus the project's
@@ -40,14 +47,16 @@ Ignored Build Step as a backup):
    All four must pass. `npm run build` matters: `typecheck` alone missed the Nov 26 failure
    (`28d0783`: a route file exported `dueNow`, which Next.js does not allow in a route file).
    Do not put extra exports in `src/app/**/route.ts` or `page.tsx`; move helpers to `src/lib`.
-3. **Push the live branch and the preview branch in one go** (same commit), not one after the other with new commits.
-4. **Never force-push** the live or preview branch. If a push is rejected, fetch, merge, test again, push.
-5. **If Vercel says "rate limited"**: stop merging. Do not retry, do not push empty commits, do not create
+3. **No bookkeeping commits on the live branch.** Status notes such as "item 18 in progress by ..." in the deep check
+   list cost two deployments each. Keep them on your own branch and bring them along with your next real merge.
+4. **Push the live branch and the preview branch in one go** (same commit), not one after the other with new commits.
+5. **Never force-push** the live or preview branch. If a push is rejected, fetch, merge, test again, push.
+6. **If Vercel says "rate limited"**: stop merging. Do not retry, do not push empty commits, do not create
    deployments by hand. Tell Abraham. Capacity comes back as day-old deployments age out (rolling 24 hours).
-6. **If a deploy fails**: the site keeps serving the last good deployment. A GitHub issue labeled
-   `vercel-deploy-failed` opens automatically. Fix it in one commit, run rule 2, merge once.
-7. After your merge, check the deployment reached READY (Vercel `list_deployments` for the commit) and report it.
-8. Hobby cron jobs run at most once a day. The 5-minute jobs run from the free Cloudflare scheduler (`docs/cloudflare-scheduler.md`).
+7. **If a deploy fails**: the site keeps serving the last good deployment. One GitHub issue labeled
+   `vercel-deploy-failed` opens automatically (later failures are added to it as comments). Close it when deploys work again. Fix it in one commit, run rule 2, merge once.
+8. After your merge, check the deployment reached READY (Vercel `list_deployments` for the commit) and report it.
+9. Hobby cron jobs run at most once a day. The 5-minute jobs run from the free Cloudflare scheduler (`docs/cloudflare-scheduler.md`).
 
 ## Note on the build
 

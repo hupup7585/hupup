@@ -9,7 +9,8 @@ import DualDate, { HebrewDay } from "@/components/DualDate";
 import { PRIORITY_LABEL, STATUS_LABEL, canCreate, isOverdue, laborCents, minutesOf, projectProfit, seesMoney, staffList, visibleTasks, type Task } from "@/lib/tasks";
 import { createTaskAction, saveProjectAction, saveRateAction } from "./actions";
 import TaskLine from "./TaskLine";
-import { orderPath } from "@/lib/order-path";
+import { linkedOrderId, orderPath } from "@/lib/order-path";
+import { orderNumber } from "@/lib/order-number";
 
 type SP = { view?: string; status?: string; mine?: string; m?: string; msg?: string; err?: string; project?: string };
 
@@ -210,7 +211,7 @@ async function ProjectsView({ staff, projects }: { staff: Awaited<ReturnType<typ
                   <tr key={p.id}>
                     <td className="td"><Link className="font-bold text-navy underline" href={`/admin/tasks?project=${p.id}&status=all`}>{p.name}</Link>{p.status === "closed" && <span className="ml-2 text-xs text-muted">closed</span>}</td>
                     <td className="td">{c ? `${c.d}/${c.n} done` : "—"}</td>
-                    <td className="td">{p.orderIds.length ? p.orderIds.map((o) => <Link key={o} className="mr-1 underline" href={orderPath(o)}>{o}</Link>) : "—"}</td>
+                    <td className="td">{p.orderIds.length ? p.orderIds.map((o) => <Link key={o} className="mr-1 underline" href={orderPath(linkedOrderId(o))}>{orderNumber(linkedOrderId(o))}</Link>) : "—"}</td>
                     {money && (
                       <>
                         <td className="td">{formatMoney(profits[i].incomeCents)}</td>
@@ -224,7 +225,7 @@ async function ProjectsView({ staff, projects }: { staff: Awaited<ReturnType<typ
                         <input type="hidden" name="id" value={p.id} />
                         <input type="hidden" name="name" value={p.name} />
                         <input type="hidden" name="notes" value={p.notes ?? ""} />
-                        <input name="orderIds" defaultValue={p.orderIds.join(", ")} className="input w-28 py-1 text-xs" aria-label="Booking numbers" />
+                        <input name="orderIds" defaultValue={p.orderIds.map((o) => orderNumber(linkedOrderId(o))).join(", ")} className="input w-28 py-1 text-xs" aria-label="Booking numbers" />
                         <select name="status" defaultValue={p.status} className="input w-24 py-1 text-xs"><option value="open">Open</option><option value="closed">Closed</option></select>
                         <button className="text-xs font-bold text-navy">Save</button>
                       </form>

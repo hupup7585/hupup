@@ -2,12 +2,16 @@
 
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
+import { signUpsDisabledReason } from "@/app/text-alerts/actions";
 import { CATALOG_FORM_DRAFT, catalogEmailedToday, catalogIpLimitReached, requestIp, validCatalogEmail, websiteCatalogFormShown } from "@/lib/catalog-request";
 
 /** "Email me the catalog" on the website: the real catalog email (PDF attached), once per address per day. */
 export async function requestCatalogAction(_prev: { ok: boolean; message: string } | null, form: FormData): Promise<{ ok: boolean; message: string }> {
   if (!websiteCatalogFormShown()) return { ok: false, message: CATALOG_FORM_DRAFT.failed };
   if (String(form.get("website") ?? "")) return { ok: true, message: CATALOG_FORM_DRAFT.sent }; // a robot filled the hidden box
+  // Deep check C3: the preview site shares the live database: nothing is sent or recorded from it
+  const previewOff = await signUpsDisabledReason();
+  if (previewOff) return { ok: false, message: previewOff };
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   if (!validCatalogEmail(email)) return { ok: false, message: CATALOG_FORM_DRAFT.bad };
   if (await catalogEmailedToday(email)) return { ok: true, message: CATALOG_FORM_DRAFT.again };
@@ -51,6 +55,10 @@ export async function textCatalogAction(_prev: { ok: boolean; message: string } 
   // new consent record is written (the send itself is also checked under a lock)
   const { catalogTextedToday } = await import("@/lib/catalog-send");
   if (await catalogTextedToday(phone)) return { ok: true, message: CATALOG_FORM_DRAFT.textAgain };
+  // Deep check C3: the preview site shares the live database: its draft lines above still show for review, but no
+  // consent record is written and no text is sent from it
+  const previewOff = await signUpsDisabledReason();
+  if (previewOff) return { ok: false, message: previewOff };
   // One internet address: at most 10 catalog sends a day (robots), before any consent record or text
   const req = await requestIp();
   if (await catalogIpLimitReached(req.ip)) {

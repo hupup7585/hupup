@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOwner } from "@/lib/auth";
-import { getInboxEmail, repliesActive, setRead } from "@/lib/inbox";
+import { getInboxEmail, replyAddressFor, repliesActive, setRead } from "@/lib/inbox";
 import { htmlToText, inboxWhen, sizeLabel } from "@/lib/inbox-format";
 import EmailHtml from "@/components/admin/EmailHtml";
 import ReplyForm from "./ReplyForm";
@@ -140,7 +140,7 @@ export default async function InboxEmailPage({ params }: { params: Promise<{ id:
                 <li key={f.id}>
                   {f.tooBig ? (
                     <span className="text-muted">
-                      {f.fileName} ({sizeLabel(f.sizeBytes)}): over 18 MB, so it is only in the Gmail copy
+                      {f.fileName} ({sizeLabel(f.sizeBytes)}): {f.sizeBytes > 18 * 1024 * 1024 ? "over 18 MB" : "the database was nearly full"}, so it is only in the Gmail copy
                     </span>
                   ) : (
                     <a className="font-semibold underline" href={`/api/admin/inbox/file/${f.id}`} target="_blank" rel="noreferrer">
@@ -170,7 +170,7 @@ export default async function InboxEmailPage({ params }: { params: Promise<{ id:
       ))}
       {newer.length > 0 && <div className="mt-3">{newer.map(folded)}</div>}
       <div id="reply">
-        <ReplyForm emailId={email.id} to={email.fromAddress} active={repliesActive()} draftId={replyDraft?.id} initialBody={replyDraft?.body} />
+        <ReplyForm emailId={email.id} to={await replyAddressFor(email)} active={repliesActive()} draftId={replyDraft?.id} initialBody={replyDraft?.body} />
       </div>
     </MailShell>
   );

@@ -85,3 +85,11 @@ describe("the page", () => {
     expect(simple).toContain('autoComplete="off"');
   });
 });
+
+describe("deep check B3", () => {
+  it("adding staff with a Google account already saved on someone else says so in plain words (no database error)", async () => {
+    await db.update(schema.adminUsers).set({ googleEmail: "taken@gmail.com" }).where(eq(schema.adminUsers.id, sara));
+    const r = await createStaffAction({ name: "Dovid", phone: "845-415-0009", role: "delivery", googleEmail: "Taken@gmail.com" });
+    expect(r).toEqual({ ok: false, message: "That Google account is already saved on another staff member." });
+  });
+});
