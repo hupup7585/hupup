@@ -88,10 +88,13 @@ export default async function PayPage({ params, searchParams }: { params: Promis
     const link = paymentLink({ orderId: o.id, amountCents: due, prefill: prefillFor(full, group.orders, `#${orderNumber(o.id)}`) });
     if (link) redirect(link);
   }
+  // Same-day orders (Abraham, Nov 27, 2026, 12:47 AM): the same notice as the phone, by customer service hours
+  const sameDay = await (await import("@/lib/same-day-notice")).sameDayNoticeText(group.orders.map((d) => d.order.eventDate));
   return (
     <main className="min-h-screen bg-hu-tint px-4 py-10 font-display text-hu-deep">
       <div className="mx-auto max-w-md rounded-2xl border-2 border-hu-deep bg-white p-6">
         <h1 className="text-2xl font-extrabold">Review and pay for order #{orderNumber(id)}</h1>
+        {sameDay && <p className="mt-3 rounded-xl bg-hu-tint p-3 text-sm" data-same-day-notice>{sameDay}</p>}
         {group.orders.map((day) => (
           <section key={day.order.id} data-pay-day className="mt-4 border-t border-hu-deep/15 pt-3 first:border-t-0">
             <div className="text-sm">

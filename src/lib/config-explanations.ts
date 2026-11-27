@@ -579,6 +579,11 @@ const OTHER: Record<string, Explanation> = {
     where: "The same-day delivery notice on the phone.",
     ifChanged: "Callers in the listed areas hear the close-by time; everyone else hears the surrounding-area time.",
   },
+  addressTriesBeforeMenu: {
+    what: "How many times a caller's address can fail (street not found, or the map cannot find the house) before the phone takes them back to the menu where they choose how to find the address (by their phone number or by entering it). The count starts over when they choose again; there is no limit on rounds, and they are never sent to customer service for this.",
+    where: "The phone, during the delivery address steps.",
+    ifChanged: "Callers go back to the address menu after more or fewer failed tries.",
+  },
   phoneCutoffMinutes: {
     what: "How many minutes before candle lighting the phone stops taking bookings and payments, even for a caller who is in the middle of a booking.",
     where: "Every Erev Shabbes and Erev Yom Tov, on the phone line.",

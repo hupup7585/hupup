@@ -1,6 +1,6 @@
 import { MENU_COMBOS, PROMPTS, RETIRED_PROMPTS, promptRecordable, type PromptKey } from "@/lib/ivr/prompts";
 import { SCREENS } from "@/lib/ivr/screens";
-import { NOT_RECORDED, allSlots, pieces } from "@/lib/recording-slots";
+import { NOT_RECORDED, allSlots, pieces, KEPT_OLD_PIECES } from "@/lib/recording-slots";
 import { RECORDING_USAGE } from "@/lib/recording-usage.generated";
 
 /**
@@ -58,8 +58,10 @@ export function recordingLibrary(): LibraryEntry[] {
               ? "one"
               : "pieces";
     const asPieces = () => pieces(d.text).map((_, i) => `${key}#${i + 1}`);
-    const slotKeys =
-      kind === "one" || kind === "combined" ? [key] : kind === "pieces" ? asPieces() : kind === "shared" ? [...(d.parts ?? [])] : kind === "legacy" ? (d.parts ? [] : promptRecordable(key) ? [key] : asPieces()) : [];
+    const slotKeys = [
+      ...(kind === "one" || kind === "combined" ? [key] : kind === "pieces" ? asPieces() : kind === "shared" ? [...(d.parts ?? [])] : kind === "legacy" ? (d.parts ? [] : promptRecordable(key) ? [key] : asPieces()) : []),
+      ...(KEPT_OLD_PIECES[key] ?? []).map((x) => x.key),
+    ];
     const screens = screensOf.get(key) ?? (combo ? Object.entries(SCREENS).filter(([, s]) => s.combos.includes(combo)).map(([id]) => id) : []);
     const files = RECORDING_USAGE[key] ?? [];
     return { key, label: d.label, text: d.text, group: d.group, kind, slotKeys, screens, files, unused: kind !== "legacy" && !files.length && !screens.length && !(combo && combo in MENU_COMBOS) };

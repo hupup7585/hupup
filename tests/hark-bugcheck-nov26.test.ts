@@ -21,9 +21,12 @@ describe("Hark's bug check", () => {
   it("bug 8: a wrong key on the resumed balloon keeps key 9 (ocean balls) working", async () => {
     expect(redirect(await call("resume-added-choice", { Digits: "5" }, "d=2027-01-12&o=2027-01-12"))).toContain("o=2027-01-12");
   });
-  it("2nd check A4 (replaces bug 13): star on the payment link menu is not valid and box 141 plays again, never the empty cart", async () => {
+  it("Abraham, Nov 27, 12:47 AM (replaces A4): star on the payment link menu plays the card offer (box 140), never 'not valid' or the empty cart", async () => {
     const xml = await call("paylink-choice", { Digits: "*" }, "o=12");
-    expect(redirect(xml)).toBe("paylink?o=12");
+    expect(xml).toContain("If you would like to pay by credit or debit card, please stay on the line.");
+    expect(xml).toContain("phonepay-option?o=12");
+    expect(xml).not.toContain("not a valid");
+    expect(redirect(xml)).toBe("phonepay-go?o=12&c=1");
   });
   it("bug 12: a staff phone calling in is never rung itself; bug 22: the Terms line can play its recording", () => {
     const s = readFileSync("src/lib/ivr/flow.ts", "utf8");

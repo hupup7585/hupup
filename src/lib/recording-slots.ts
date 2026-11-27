@@ -46,6 +46,11 @@ export function pieces(text: string): string[] {
 }
 
 /** texts: the Admin text of each line where it was edited (the list always shows the text that plays). */
+/** Old pieces a line no longer plays, kept (not used) so their recordings stay in Admin. */
+export const KEPT_OLD_PIECES: Record<string, Slot[]> = {
+  consent_tx_thanks: [{ key: "consent_tx_thanks#2", kind: "piece", group: "Text message consent", label: "Box 49 after key 1: thank you, piece 2 (not used since Nov 27, 2026)", text: ". Message and data rates may apply." }],
+};
+
 export function allSlots(items: { id: number; name: string }[] = [], texts: Record<string, string | null | undefined> = {}, custom: Slot[] = []): Slot[] {
   const out: Slot[] = [];
   for (const [k, d] of Object.entries(PROMPTS) as [PromptKey, PromptDef][]) {
@@ -83,6 +88,8 @@ export function allSlots(items: { id: number; name: string }[] = [], texts: Reco
   for (const t of TOWN_PHRASES) out.push({ key: townSlotKey(t), kind: "word", group: "Town", label: `Town - ${t}`, text: t });
   // Keypad echo and the unit read-back (Abraham, Nov 22, 2026)
   for (const [w, label] of KEYPAD_WORDS) out.push({ key: `word:${w}`, kind: "word", group: "Letters A to Z", label, text: `${w}.` });
+  // Pieces a line no longer has, kept with their recordings (Box 49, Nov 27, 2026: the line now ends with the number)
+  for (const k of Object.values(KEPT_OLD_PIECES).flat()) out.push(k);
   // Each rental name twice (Abraham, Nov 19, 2026): for 1, and for 2 or more
   // The jumping balloon names are recorded with hyphens (Abraham's rule, Nov 27, 2026: "Soft-Hop"); only the slot text
   // here changes so it matches the recording; the rental's name on the website and in Admin stays as it is

@@ -26,7 +26,7 @@ describe("same-day notice by zone (Abraham, Nov 27, 2026, 12:33 AM)", () => {
   it("defaults: close by 2.5-3.5, surrounding 3.5-4.5, Kiryas Joel close by until areas are listed", async () => {
     const { SETTING_DEFAULTS } = await import("@/lib/settings");
     expect([SETTING_DEFAULTS.sameDayHoursClose, SETTING_DEFAULTS.sameDayHoursFar, SETTING_DEFAULTS.sameDayCloseAreas]).toEqual(["2.5-3.5", "3.5-4.5", ""]);
-    expect(PROMPTS.same_day_notice.text).toContain("about {from} to {to} hours");
+    expect(PROMPTS.same_day_notice_open.text).toContain("about two and a half to three and a half hours, and for surrounding areas it may take about three and a half to four and a half hours");
   });
 });
 
@@ -60,8 +60,8 @@ describe("same-day cut-off", () => {
       expect(said(ok)).toBe("");
     }
     process.env.HUP_CALENDAR_NOW = PINNED;
-    expect([PROMPTS.same_day_closed.pending, PROMPTS.same_day_notice.pending]).toEqual([true, true]);
+    expect(PROMPTS.same_day_closed.pending).toBe(true);
     const flow = readFileSync("src/lib/ivr/flow.ts", "utf8");
-    expect(flow).toContain('sp(vr, ctx, "same_day_notice", { from, to });');
+    expect(flow).toContain('sp(vr, ctx, csOpen ? "same_day_notice_open" : "same_day_notice_after");');
   });
 });

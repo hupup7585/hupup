@@ -402,17 +402,17 @@ export const CONFIG_USAGE: Record<string, string[]> = {
  ],
  "sameDayHoursClose": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/ivr/flow.ts"
+  "app/admin/(app)/settings/calendar-keys.ts"
  ],
  "sameDayHoursFar": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-keys.ts",
-  "lib/ivr/flow.ts"
+  "app/admin/(app)/settings/calendar-keys.ts"
  ],
  "sameDayCloseAreas": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
-  "app/admin/(app)/settings/calendar-keys.ts",
+  "app/admin/(app)/settings/calendar-keys.ts"
+ ],
+ "addressTriesBeforeMenu": [
   "lib/ivr/flow.ts"
  ],
  "phoneCutoffMinutes": [

@@ -949,7 +949,10 @@ export const RECORDING_USAGE: Record<string, string[]> = {
  "same_day_closed": [
   "lib/ivr/flow.ts"
  ],
- "same_day_notice": [
+ "same_day_notice_after": [
+  "lib/ivr/flow.ts"
+ ],
+ "same_day_notice_open": [
   "lib/ivr/flow.ts"
  ],
  "second_laser": [

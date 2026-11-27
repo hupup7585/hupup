@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-/* Same-day delivery notice by zone (Abraham, Nov 27, 2026, 12:33 AM): right after the address is saved, when a day in
-   the cart is today: close by (Kiryas Joel) 2.5 to 3.5 hours, surrounding areas 3.5 to 4.5 hours (Admin). */
-const h = vi.hoisted(() => ({ kind: "local" as "local" | "area", session: { callSid: "CAzone", fromNumber: "+18455550818", orderId: null as number | null, data: {} as Record<string, unknown>, status: "in_progress", outcome: "browsing" } }));
+/* Same-day delivery notice (Abraham, Nov 27, 2026, 12:47 AM): right after the address is saved, when a day in the cart
+   is today: one notice with both ranges; the after-hours version when customer service (key 4) is closed. */
+const h = vi.hoisted(() => ({ open: true, kind: "local" as "local" | "area", session: { callSid: "CAzone", fromNumber: "+18455550818", orderId: null as number | null, data: {} as Record<string, unknown>, status: "in_progress", outcome: "browsing" } }));
 vi.mock("@/lib/db", async () => {
   const { createMemoryDb } = await import("./helpers/memory-db");
   const m = await createMemoryDb();
@@ -13,8 +13,8 @@ vi.mock("@/lib/ivr/session", () => ({
   getSession: async () => h.session,
   updateSession: async (_s: string, patch: Record<string, unknown> & { data?: Record<string, unknown> }) => Object.assign(h.session, { ...patch, data: { ...h.session.data, ...(patch.data ?? {}) } }),
 }));
-// the draft notice approved for this test, so it plays
-vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({ same_day_notice: { approvedAt: new Date() } }) }));
+vi.mock("@/lib/ivr/prompts", async (orig) => ({ ...(await orig<typeof import("@/lib/ivr/prompts")>()), loadPromptOverrides: async () => ({}) }));
+vi.mock("@/lib/hours-schedule", async (orig) => ({ ...(await orig<typeof import("@/lib/hours-schedule")>()), lineOpen: () => h.open, effectiveLine: () => ({ on: true, schedule: {} }) }));
 vi.mock("@/lib/delivery-areas", async (orig) => ({ ...(await orig<typeof import("@/lib/delivery-areas")>()), deliveryQuote: async () => ({ ok: true, zone: h.kind === "local" ? "Kiryas Joel" : "Monroe", feeCents: 2000, kind: h.kind }) }));
 
 import { db, schema } from "@/lib/db";
@@ -35,15 +35,16 @@ async function cartFor(date: string) {
 }
 
 describe("same-day notice after the address", () => {
-  it("close by: two and a half to three and a half hours; surrounding: three and a half to four and a half", async () => {
+  // (Admin still keeps the ranges and the close-by areas for the website and records)
+  it("customer service open: the open version; closed: the after-hours version", async () => {
     process.env.PUBLIC_BASE_URL = "https://hupup.example";
     process.env.HUP_CALENDAR_NOW = new Date().toISOString(); // the test setup pins another day; today is real here
     await cartFor(todayISO());
-    h.kind = "local";
+    h.open = true;
     const x1 = await call("addr-price");
-    expect(said(x1)).toContain("about two and a half to three and a half hours");
-    h.kind = "area";
-    expect(said(await call("addr-price"))).toContain("about three and a half to four and a half hours");
+    expect(said(x1)).toContain("please call our customer service after the order was placed");
+    h.open = false;
+    expect(said(await call("addr-price"))).toContain("please leave a message for customer service after the order was placed");
   });
   it("no notice when no day in the cart is today", async () => {
     await cartFor(addDays(todayISO(), 5));

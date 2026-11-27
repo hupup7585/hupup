@@ -156,6 +156,8 @@ export const SETTING_DEFAULTS = {
   sameDayHoursFar: "3.5-4.5",
   /** Map areas counted as close by for that notice, one per line; empty = the Kiryas Joel (local) zone only */
   sameDayCloseAreas: "",
+  /** Abraham, Nov 27, 2026, 12:47 AM: failed address tries before the caller goes back to the address-method menu */
+  addressTriesBeforeMenu: "5",
   phoneCutoffMinutes: "15",
   /** ...and a caller's cart at that moment is saved until this many minutes after Shabbes / Yom Tov ends */
   shabbesSaveMinutes: "60",

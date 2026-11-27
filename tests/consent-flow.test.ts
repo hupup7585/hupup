@@ -161,7 +161,7 @@ describe("transactional consent step (before the payment link)", () => {
       orderId: 7,
     });
     expect(h.session.data.smsConsent).toBe("yes");
-    expect(xml).toContain("Thank you. You will get text updates about your reservation, to 8 4 5, 5 5 5, 0 1 0 0. Message and data rates may apply.");
+    expect(xml).toContain("Thank you. You will get text updates about your reservation, to 8 4 5, 5 5 5, 0 1 0 0.");
     expect(xml).toContain("/api/voice/finalize");
   });
   it("no key: no texts (recorded as declined, no answer), checkout continues", async () => {

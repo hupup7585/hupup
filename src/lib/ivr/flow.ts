@@ -70,7 +70,7 @@ import { pauseRecording, resumeRecording } from "@/lib/call-recording";
 /** Pay prompts that must all be approved before keypad payment goes live for every caller. */
 const PHONEPAY_PROMPTS = ["pay_hold_secure", "phonepay_paid", "phonepay_retry", "phonepay_retry_last", "phonepay_failed", "phonepay_unclear"] as const;
 const PAY_PROMPTS = ["pay_start", "pay_card_number", "pay_expiration", "pay_security_code", "pay_postal_code", "pay_processing", "pay_success", "pay_declined"] as const;
-import { numberWords, pluralName } from "@/lib/spoken-words";
+import { pluralName } from "@/lib/spoken-words";
 import { lastPhoneDate, normalizeSpokenAddress, normalizeSpokenEmail, normalizeSpokenName, parseDateInput } from "./parse";
 import { liveVoiceLink, nameVoiceLink, voicemailPlayLink } from "@/lib/signed-link";
 import { FIRST_TIME_ONLY, menuOrder, type MenuId } from "./menu-order";
@@ -749,18 +749,23 @@ async function hotlineClosed(ctx: Ctx, vr: VR, n = 0, over?: { locked: boolean; 
   return vmRecord(vr, await vmBox("9"), "closed");
 }
 
-/** "2.5" -> "two and a half", "3" -> "three" (the same-day notice's hours). */
-function hoursWords(h: number): string {
-  const whole = Math.floor(h);
-  const w = numberWords(whole).join(" ");
-  return h - whole >= 0.5 ? `${w} and a half` : w;
-}
-
-/** Close by for the same-day notice: the areas listed in Admin, or (none listed) the Kiryas Joel / local zone. */
-function sameDayCloseBy(quote: { zone: string; kind?: string }, s: { sameDayCloseAreas?: string }): boolean {
-  const list = String(s.sameDayCloseAreas ?? "").split(/\r?\n/).map((x) => x.trim().toLowerCase()).filter(Boolean);
-  if (list.length) return list.includes(quote.zone.trim().toLowerCase());
-  return quote.kind === "local" || quote.zone === "kj";
+/**
+ * Address tries (Abraham, Nov 27, 2026, 12:47 AM): each failed street search or map lookup counts. After the number of
+ * tries set in Admin (5), the caller goes back to the address-method menu (lookup by phone number or by hand) to choose
+ * again, never to customer service; the count starts over. Unlimited rounds. A failed lookup is never saved on the
+ * order as "address not found". Returns the redirect when the limit is reached, otherwise null.
+ */
+async function addressTryFailed(ctx: Ctx, vr: VR, why: string): Promise<VR | null> {
+  const s = await getSettings();
+  const limit = Math.max(1, Number(s.addressTriesBeforeMenu) || 5);
+  const n = Number(ctx.session?.data.addrFails ?? 0) + 1;
+  await track(ctx.callSid, "step", `Address try ${n} of ${limit} failed (${why})`).catch(() => undefined);
+  if (n < limit) {
+    await updateSession(ctx.callSid, { data: { addrFails: n } }, ctx.session);
+    return null;
+  }
+  await updateSession(ctx.callSid, { data: { addrFails: 0, lookupDone: undefined, street: undefined, house: undefined, unit: undefined, zip: undefined, town: undefined, address: undefined } }, ctx.session);
+  return directoryLookupOn() ? back(vr, "addr-lookup") : back(vr, "addr-house");
 }
 
 /** The phone's booking cut-off now (Abraham, Nov 26, 2026, 11:51 PM): 15 minutes before candle lighting (Admin). */
@@ -3840,6 +3845,8 @@ const handlers: Record<string, Handler> = {
 
   async "addr-lookup-choice"(ctx, vr) {
     const d = ctx.body.Digits ?? "";
+    // a method chosen again: the address tries start over (Abraham, Nov 27, 2026, 12:47 AM)
+    if (["1", "2", "3"].includes(d) && ctx.session?.data.addrFails) await updateSession(ctx.callSid, { data: { addrFails: 0 } }, ctx.session);
     if (d === "*") return ctx.session?.data.name && !ctx.session.data.nameFromDirectory ? back(vr, "ask", { f: "name" }) : back(vr, "cart"); // star: one step back
     if (d === "1") {
       await updateSession(ctx.callSid, { data: { dirPhone: toE164(ctx.from) ?? undefined } }, ctx.session);
@@ -4105,7 +4112,11 @@ const handlers: Record<string, Handler> = {
       await updateSession(ctx.callSid, { data: { streetMatches: matches.slice(0, 9) } }, ctx.session);
       return back(vr, "addr-street-pick");
     }
-    if (!matches.length && live("street_none")) return back(vr, "addr-street-none");
+    if (!matches.length && live("street_none")) {
+      const over = await addressTryFailed(ctx, vr, "street search: no match");
+      if (over) return over;
+      return back(vr, "addr-street-none");
+    }
     // The new lines are still waiting for Abraham's OK (live line): the whole name typed is used, as before
     await pick(exactStreet(typed, matches) ?? titleCase(typed));
     return back(vr, "addr-street-rb", { m: "k" });
@@ -4195,6 +4206,8 @@ const handlers: Record<string, Handler> = {
       // Street not found (Abraham, Nov 24, 2026): the house number, unit and zip are kept; only the street is asked again
       await updateSession(ctx.callSid, { data: { street: undefined, town: undefined, address: undefined, dirArea: undefined, dirPick: undefined } }, ctx.session);
       sp(vr, ctx, "addr_not_found");
+      const over = await addressTryFailed(ctx, vr, "address not found on the map");
+      if (over) return over;
       return back(vr, "addr-street");
     }
     if (!quote.ok) return back(vr, "addr-outside");
@@ -4271,12 +4284,11 @@ const handlers: Record<string, Handler> = {
     if (quote.ok) {
       const cents = quote.kind ? deliveryFeeFor(quote.kind, settings, first?.eventDate ?? todayISO(), first?.offerNote ?? null) : quote.feeCents;
       sp(vr, ctx, "addr_saved_price", { town: townPhrase(d.town), price: spokenMoney(cents) });
-      // Same-day delivery notice (Abraham, Nov 27, 2026, 12:33 AM): right after the address is saved, when a day in the
-      // cart is today; the time by zone (close by / surrounding, Admin)
+      // Same-day delivery notice (Abraham, Nov 27, 2026, 12:47 AM): right after the address is saved, when a day in the
+      // cart is today: one notice with both ranges; the after-hours version when customer service is closed
       if ((await callOrders(ctx)).some((o) => o.order.eventDate === localISO(calendarNow()))) {
-        const close = sameDayCloseBy(quote, settings);
-        const [from, to] = String((close ? settings.sameDayHoursClose : settings.sameDayHoursFar) ?? (close ? "2.5-3.5" : "3.5-4.5")).split("-").map((x) => hoursWords(Number(x)));
-        sp(vr, ctx, "same_day_notice", { from, to });
+        const csOpen = await lineRingsNowFor("4", settings, calendarNow(), { hoursOnly: true });
+        sp(vr, ctx, csOpen ? "same_day_notice_open" : "same_day_notice_after");
       }
     }
     return back(vr, "directions");
@@ -4518,6 +4530,8 @@ const handlers: Record<string, Handler> = {
       // then only the street is asked again (house number, unit and zip are kept), as in the address steps.
       await updateSession(ctx.callSid, { data: { street: undefined, town: undefined, address: undefined, dirArea: undefined, dirPick: undefined } }, ctx.session);
       sp(vr, ctx, "addr_not_found");
+      const over = await addressTryFailed(ctx, vr, "address not found on the map");
+      if (over) return over;
       return back(vr, "addr-street");
     }
     if (!quote.ok) {
@@ -4618,8 +4632,13 @@ const handlers: Record<string, Handler> = {
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "tx-which", { p: "pay", o }); // texting approved (Nov 15, 2026)
     if (d === "2") return back(vr, "catalog-email", { p: "pay", o });
-    // Hark's 2nd check, A4: after box 56 the cart is empty (the order waits for payment), so star is not valid here
-    // until Abraham decides where it goes
+    // Abraham (Nov 27, 2026, 12:47 AM): star goes back to the card payment offer (box 140: "If you would like to pay
+    // by credit or debit card, please stay on the line. To receive a payment link instead, press 0."); the order stays
+    if (d === "*") {
+      const g = keypad(vr, url("phonepay-option", { o }), { numDigits: 1, timeout: T(vr, "timerPhonePayOption") });
+      sp(g, ctx, "pay_card_line");
+      return back(vr, "phonepay-go", { o, c: 1 }); // no key: straight on to the payment line, as in box 140
+    }
     sp(vr, ctx, "not_valid");
     return back(vr, "paylink", { o });
   },

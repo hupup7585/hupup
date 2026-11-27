@@ -613,8 +613,8 @@ export const PROMPTS = {
   },
   consent_tx_thanks: {
     group: "Text message consent",
-    label: "Box 49 after key 1: thank you (the number is spoken between the two recordings)",
-    text: "Thank you. You will get text updates about your reservation, to {number}. Message and data rates may apply.",
+    label: "Box 49 after key 1: thank you (piece 1, then the number; Abraham, Nov 27, 2026: it ends with the number)",
+    text: "Thank you. You will get text updates about your reservation, to {number}.",
     vars: ["number"],
   },
   consent_marketing: {
@@ -674,8 +674,10 @@ export const PROMPTS = {
   // Abraham, Nov 27, 2026, 12:19 AM: same-day bookings. Draft wording (Abraham is confirming; Hark records): waits for
   // approval on the live line
   same_day_closed: { group: "Date & quantity", label: "Today asked after the same-day cut-off (draft, waiting for Abraham)", text: "Sorry, it is too late to book for today. Please pick another date.", pending: true },
-  // Nov 27, 2026, 12:33 AM: after the address is saved; {from} and {to} come from Admin by zone (close by / surrounding)
-  same_day_notice: { group: "Checkout", label: "Same-day delivery notice, after the address is saved (draft, waiting for Abraham)", text: "Please note, a same-day delivery may take longer, about {from} to {to} hours. If you need it sooner, please contact customer service, or after hours leave a message, and we will try our best.", vars: ["from", "to"], pending: true },
+  // Abraham's approved words (Nov 27, 2026, 12:47 AM): one notice naming both ranges, played right after the address is
+  // saved on a same-day booking; the after-hours version when customer service is closed (Admin hours)
+  same_day_notice_open: { group: "Checkout", label: "Same-day notice - open", text: "Please note, same-day delivery may take a little longer than usual, about two and a half to three and a half hours, and for surrounding areas it may take about three and a half to four and a half hours. If you need it sooner, please call our customer service after the order was placed, and we will do our best to help you." },
+  same_day_notice_after: { group: "Checkout", label: "Same-day notice - after hours", text: "Please note, same-day delivery may take a little longer than usual, about two and a half to three and a half hours, and for surrounding areas it may take about three and a half to four and a half hours. If you need it sooner, please leave a message for customer service after the order was placed, and we will do our best to help you." },
   date_closed: { group: "Date & quantity", label: "Chosen date is a closed day (no offer: the day before or after is closed too)", text: "Sorry, we are closed on {date} for {reason}. Let us pick another date.", vars: ["date", "reason"] },
   // Abraham, Nov 20, 2026: a closed day with the day before and the day after both open (then the date prompt and back line)
   // Box 17, closed day (Abraham, Nov 22, 2026): played as recorded pieces with the live parts between them
