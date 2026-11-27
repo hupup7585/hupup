@@ -24,9 +24,10 @@ function Section({ title, n, children }: { title: string; n: number; children: R
 const row = "flex flex-wrap items-baseline gap-x-3 px-4 py-2 text-sm hover:bg-[#EAF3FC] sm:flex-nowrap";
 
 /** Search everything (Abraham, Nov 15, 2026): orders, customers, emails (Owner), voicemails and calls. */
-export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
   const staff = await requireAdmin();
-  const { q = "" } = await searchParams;
+  const raw = (await searchParams).q;
+  const q = (Array.isArray(raw) ? raw[0] : raw) ?? ""; // extra check HQ9: ?q=a&q=b used to crash the page
   const r = await searchEverything(q, { owner: staff.role === "owner" });
   return (
     <div className="w-full">

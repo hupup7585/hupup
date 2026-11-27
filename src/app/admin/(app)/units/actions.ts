@@ -31,7 +31,7 @@ export async function addUnitAction(fd: FormData) {
       },
       { userId: staff.userId, role: staff.role },
     );
-    m = `Unit ${u.code} added.`;
+    m = `Unit ${u.code} added.${u.missingUnits.length ? ` Still without a unit of this item: ${u.missingUnits.slice(0, 10).join(", ")}${u.missingUnits.length > 10 ? "..." : ""}. Add more units or change those bookings.` : ""}`;
   } catch (e) {
     m = /unique|duplicate/i.test(String(e)) ? "That unit ID is already used." : (e as Error).message;
   }

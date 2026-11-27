@@ -22,8 +22,10 @@ export async function recheckOrderLines(tx: Tx, order: { id: number; eventDate: 
   await tx.delete(schema.orderItems).where(eq(schema.orderItems.orderId, order.id));
   const out: Line[] = [];
   for (const l of lines) {
-    const [p] = await tx.select({ quantity: schema.products.quantity, active: schema.products.active }).from(schema.products).where(eq(schema.products.id, l.productId)).limit(1);
-    const free = p?.active ? await checkBookable(l.productId, p.quantity, order.eventDate, tx, order.pickupDate) : 0;
+    // Extra check HQ6 (Nov 27, 2026): an item switched off or put in Garbage after it was booked stays on the orders that
+    // already have it ("Orders that already have them are not changed", Catalog): only its stock is checked here
+    const [p] = await tx.select({ quantity: schema.products.quantity }).from(schema.products).where(eq(schema.products.id, l.productId)).limit(1);
+    const free = p ? await checkBookable(l.productId, p.quantity, order.eventDate, tx, order.pickupDate) : 0;
     if (free >= l.qty) await tx.insert(schema.orderItems).values(l);
     else out.push(l);
   }

@@ -26,8 +26,20 @@ async function unlocked() {
   return w;
 }
 
+/**
+ * Extra check HQ5 (Nov 27, 2026): once a page password is set, changing it (the setup code and the new password) works
+ * only on an open page, so the emailed code alone can never replace the password.
+ */
+async function setupAllowed(w: Awaited<ReturnType<typeof who>>): Promise<boolean> {
+  const { pagePasswordSet } = await import("@/lib/api-keys");
+  if (!(await pagePasswordSet())) return true;
+  const token = (await cookies()).get(KEYS_COOKIE)?.value;
+  return isUnlocked(token, w.userId);
+}
+
 export async function setupCodeAction() {
   const w = await who();
+  if (!(await setupAllowed(w))) back({ m: "A page password is already set. Open the page with it first to change it." });
   let msg: Record<string, string>;
   try {
     msg = { step: "setup", m: `We emailed a 6-digit code to ${await requestSetupCode(w)}.` };
@@ -39,6 +51,7 @@ export async function setupCodeAction() {
 
 export async function setPasswordAction(form: FormData) {
   const w = await who();
+  if (!(await setupAllowed(w))) back({ m: "A page password is already set. Open the page with it first to change it." });
   const pw = String(form.get("pw") || "");
   if (pw !== String(form.get("pw2") || "")) back({ step: "setup", m: "The two passwords don't match." });
   const r = await setPagePassword(pw, String(form.get("code") || ""), w);

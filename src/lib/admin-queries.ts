@@ -46,7 +46,7 @@ export async function todaysRuns(today: string) {
     SELECT
       COUNT(*) FILTER (WHERE o.event_date = ${today}::date)::int AS deliveries,
       COUNT(*) FILTER (WHERE o.pickup_date = ${today}::date)::int AS pickups
-    FROM orders o WHERE o.status IN ('CONFIRMED','DELIVERED','PENDING_PAYMENT')
+    FROM orders o WHERE o.status IN ('CONFIRMED','DELIVERED','PENDING_PAYMENT','NEEDS_ATTENTION') -- HQ1: holds its items
        OR (o.status = 'PICKED_UP' AND o.pickup_date = ${today}::date)`);
   return r;
 }
@@ -174,7 +174,8 @@ export async function runsForDay(day: string) {
     -- Deep check A19 (Nov 27, 2026): an order delivered and picked up the same day is on the day twice (both runs)
     JOIN (VALUES ('delivery'), ('pickup')) AS k(kind)
       ON (k.kind = 'delivery' AND o.event_date = ${day}::date) OR (k.kind = 'pickup' AND o.pickup_date = ${day}::date)
-    WHERE (o.status IN ('PENDING_PAYMENT','CONFIRMED','DELIVERED','PICKED_UP'))
+    -- Extra check HQ1 (Nov 27, 2026): a "Needs attention" order holds its items (usually part-paid): it is on the day too
+    WHERE (o.status IN ('PENDING_PAYMENT','CONFIRMED','DELIVERED','PICKED_UP','NEEDS_ATTENTION'))
     ORDER BY k.kind, o.delivery_time NULLS LAST, o.id`);
 }
 

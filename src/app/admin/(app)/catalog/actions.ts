@@ -2,12 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, gt, ne } from "drizzle-orm";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { parseMoneyToCents } from "@/lib/money";
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
+/** Extra check HQ9: a whole sort number (a decimal or text used to crash the save). */
+const wholeSort = (fd: FormData) => {
+  const n = Number(fd.get("sortOrder") || 0);
+  return Number.isInteger(n) && Math.abs(n) < 1_000_000 ? n : 0;
+};
+const isUniqueViolation = (e: unknown) => {
+  const x = e as { code?: string; cause?: { code?: string } };
+  return (x.code ?? x.cause?.code) === "23505";
+};
 
 function done(msg: string, isError = false): never {
   revalidatePath("/admin", "layout");
@@ -22,7 +31,7 @@ export async function saveCategoryAction(fd: FormData) {
   if (!name) done("Category name is required", true);
   const digitRaw = s(fd, "ivrDigit");
   const ivrDigit = digitRaw ? Number(digitRaw) : null;
-  if (ivrDigit !== null && !(ivrDigit >= 1 && ivrDigit <= 8)) done("Phone key must be 1-8 (9 = cart, 0 = operator)", true);
+  if (ivrDigit !== null && !(Number.isInteger(ivrDigit) && ivrDigit >= 1 && ivrDigit <= 8)) done("Phone key must be 1-8 (9 = cart, 0 = operator)", true); // HQ9: whole numbers only
   if (ivrDigit !== null) {
     const clash = await db
       .select()
@@ -37,11 +46,22 @@ export async function saveCategoryAction(fd: FormData) {
     // The old category emoji field is no longer shown or edited (no emoji, Abraham); the stored value is kept
     // The photo is set by Upload photo (never by saving this form, so a new upload is not overwritten)
     ivrDigit,
-    sortOrder: Number(fd.get("sortOrder") || 0),
+    sortOrder: wholeSort(fd),
     active: fd.get("active") === "on",
   };
-  if (id) await db.update(schema.categories).set(values).where(eq(schema.categories.id, id));
-  else await db.insert(schema.categories).values(values);
+  // Extra check HQ7 (Nov 27, 2026): two saves at once with the same phone key: the second gets the usual message, not
+  // an error page; a double "Add category" doesn't make the category twice
+  try {
+    if (id) await db.update(schema.categories).set(values).where(eq(schema.categories.id, id));
+    else {
+      const [same] = await db.select({ id: schema.categories.id }).from(schema.categories).where(and(eq(schema.categories.name, name), gt(schema.categories.createdAt, new Date(Date.now() - 15_000)))).limit(1);
+      if (same) done("Category added");
+      await db.insert(schema.categories).values(values);
+    }
+  } catch (e) {
+    if (isUniqueViolation(e)) done(`Phone key ${ivrDigit} is already used by another category`, true);
+    throw e;
+  }
   done(id ? "Category saved" : "Category added");
 }
 
@@ -55,6 +75,8 @@ export async function saveProductAction(fd: FormData) {
   if (!name || priceCents === null || !Number.isInteger(quantity) || quantity < 0 || !categoryId) {
     done("Name, category, price and units owned are required", true);
   }
+  // Extra check HQ9: a price the database can hold (cents in a whole 32-bit number)
+  if (priceCents! < 0 || priceCents! > 100_000_000) done("That price is too big. Check the amount.", true);
   const values = {
     name,
     categoryId,
@@ -63,7 +85,7 @@ export async function saveProductAction(fd: FormData) {
     description: s(fd, "description"),
     spokenDescription: s(fd, "spokenDescription"),
     dimensions: s(fd, "dimensions").slice(0, 120),
-    sortOrder: Number(fd.get("sortOrder") || 0),
+    sortOrder: wholeSort(fd),
     sizeOrder: (() => {
       const n = Number(fd.get("sizeOrder"));
       return String(fd.get("sizeOrder") ?? "").trim() && Number.isInteger(n) && n >= 1 && n <= 99 ? n : null;
@@ -72,7 +94,15 @@ export async function saveProductAction(fd: FormData) {
   };
   const [was] = id ? await db.select({ priceCents: schema.products.priceCents, sizeOrder: schema.products.sizeOrder, categoryId: schema.products.categoryId }).from(schema.products).where(eq(schema.products.id, id)) : [];
   if (id) await db.update(schema.products).set(values).where(eq(schema.products.id, id));
-  else await db.insert(schema.products).values(values);
+  else {
+    // Extra check HQ7: a double "Add item" adds it once (a second identical item would shift every later phone key)
+    const [same] = await db.select({ id: schema.products.id }).from(schema.products).where(and(eq(schema.products.name, name), eq(schema.products.categoryId, categoryId), gt(schema.products.createdAt, new Date(Date.now() - 15_000)))).limit(1);
+    if (same) done("Item added");
+    await db.insert(schema.products).values(values);
+  }
+  // Extra check HQ2 (Nov 27, 2026): an item with equipment units takes its stock from its Available units, never from
+  // the "Units owned" box (a page opened before a unit was marked Damaged would make it bookable again)
+  if (id) await (await import("@/lib/units")).syncQuantity(id);
   // A price spoken inside recordings (ocean balls, Nov 27, 2026): changed = those recordings are flagged
   if (was && was.priceCents !== values.priceCents) {
     const [cat] = await db.select({ name: schema.categories.name }).from(schema.categories).where(eq(schema.categories.id, values.categoryId));

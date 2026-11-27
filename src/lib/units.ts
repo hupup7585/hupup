@@ -69,7 +69,16 @@ export async function addUnit(
   await db.insert(schema.unitStatusHistory).values({ unitId: u.id, fromStatus: null, toStatus: "available", reason: "Added", userId: who.userId });
   await db.insert(schema.auditLog).values({ userId: who.userId, action: "unit.added", entityType: "unit", entityId: String(u.id), after: { code, productId: input.productId } });
   await syncQuantity(input.productId);
-  return u;
+  // Extra check HQ3 (Nov 27, 2026): upcoming confirmed bookings of this item get a unit now (the stock now follows the
+  // units); the ones still without a unit are reported on the Units page, so an item with fewer units than bookings is seen
+  const open = await db
+    .selectDistinct({ id: schema.orders.id })
+    .from(schema.orders)
+    .innerJoin(schema.orderItems, eq(schema.orderItems.orderId, schema.orders.id))
+    .where(and(eq(schema.orderItems.productId, input.productId), eq(schema.orders.status, "CONFIRMED"), sql`coalesce(${schema.orders.pickupDate}, ${schema.orders.eventDate}) >= ${todayISO()}`));
+  const missing: string[] = [];
+  for (const o of open) missing.push(...(await assignUnits(o.id, { quiet: true })).missing);
+  return Object.assign(u, { missingUnits: [...new Set(missing)] });
 }
 
 /**
@@ -83,7 +92,10 @@ export async function setUnitStatus(unitId: number, status: UnitStatus, reason: 
   const [u] = await db.select().from(schema.equipmentUnits).where(eq(schema.equipmentUnits.id, unitId)).limit(1);
   if (!u) throw new Error("Unit not found.");
   if (u.status === status) return { conflicts: [] as string[] };
-  await db.update(schema.equipmentUnits).set({ status, updatedAt: new Date() }).where(eq(schema.equipmentUnits.id, unitId));
+  // Extra check HQ8 (Nov 27, 2026): the change happens only if the unit is still in the status that was read, so a double
+  // save moves its booked days once (never two units for one order-day)
+  const changed = await db.update(schema.equipmentUnits).set({ status, updatedAt: new Date() }).where(and(eq(schema.equipmentUnits.id, unitId), eq(schema.equipmentUnits.status, u.status))).returning({ id: schema.equipmentUnits.id });
+  if (!changed.length) return { conflicts: [] as string[] };
   await db.insert(schema.unitStatusHistory).values({ unitId, fromStatus: u.status, toStatus: status, reason: reason.trim() || null, userId: who.userId });
   await db.insert(schema.auditLog).values({ userId: who.userId, action: "unit.status", entityType: "unit", entityId: String(unitId), before: { status: u.status }, after: { status, reason } });
   await syncQuantity(u.productId);
