@@ -4407,7 +4407,7 @@ const handlers: Record<string, Handler> = {
       // Abraham, Nov 27, 2026, 1:15 AM: 1 item: the one price; 2 items: first and second item; 3 or more: first and
       // each additional item (the zone price, and the Admin "Each additional item" price)
       const { bookingItemCount, extraItemCents } = await import("@/lib/delivery-rule");
-      const count = bookingItemCount((await callOrders(ctx)).flatMap((o) => o.items.map((i) => ({ productId: i.productId, qty: i.qty }))));
+      const count = bookingItemCount((await callOrders(ctx)).flatMap((o) => o.items.map((i) => ({ productId: i.productId, qty: i.qty, day: o.order.id }))));
       const key = count <= 1 || cents <= 0 ? "addr_saved_price" : count === 2 ? "addr_saved_price_two" : "addr_saved_price_more";
       sp(vr, ctx, key, { town: townPhrase(d.town), price: spokenMoney(cents), extra: spokenMoney(extraItemCents(settings)) });
       // Same-day delivery notice (Abraham, Nov 27, 2026, 12:47 AM): right after the address is saved, when a day in the
@@ -4692,7 +4692,7 @@ const handlers: Record<string, Handler> = {
     const { bookingDeliveryCents, bookingItemCount } = await import("@/lib/delivery-rule");
     const firstDay = days[0].order;
     const firstItemCents = quote.kind ? deliveryFeeFor(quote.kind, settings, firstDay.eventDate, firstDay.offerNote) : quote.feeCents;
-    const bookingFee = bookingDeliveryCents(firstItemCents, bookingItemCount(days.flatMap((o) => o.items.map((i) => ({ productId: i.productId, qty: i.qty })))), settings);
+    const bookingFee = bookingDeliveryCents(firstItemCents, bookingItemCount(days.flatMap((o) => o.items.map((i) => ({ productId: i.productId, qty: i.qty, day: o.order.id })))), settings);
     const perDay = days.map((o, i) => ({ o, t: withServices(totalsWithFee(o.order.subtotalCents, quote.zone, i === 0 ? bookingFee : 0, settings), sumServices(svc.get(o.order.id) ?? [])) }));
     const primary = days[0].order;
     for (const { o, t } of perDay) {
