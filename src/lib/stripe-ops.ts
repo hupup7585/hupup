@@ -113,6 +113,16 @@ export async function handleStripeEvent(event: { type: string; data: { object: R
     const o = await orderForPayment(c.id, c.payment_intent);
     if (!o) return;
     for (const r of c.refunds?.data ?? []) await applyRefund(o, { amountCents: r.amount, refundId: r.id, provider: "stripe", source: "stripe_dashboard", userId: null, status: r.status });
+    return;
+  }
+  // Deep check Nov 27 (item 16): newer Stripe API versions leave the refunds out of the charge, so the refund's own
+  // notice records it (the same refund from either notice is recorded once)
+  if (event.type === "refund.created" || event.type === "refund.updated" || event.type === "charge.refund.updated") {
+    const r = event.data.object as unknown as { id: string; amount: number; status: string; charge: string | null; payment_intent: string | null };
+    if (!r?.id || !(r.status === "succeeded" || r.status === "pending")) return;
+    const o = await orderForPayment(r.charge ?? "", r.payment_intent);
+    if (!o) return;
+    await applyRefund(o, { amountCents: r.amount, refundId: r.id, provider: "stripe", source: "stripe_dashboard", userId: null, status: r.status });
   }
 }
 

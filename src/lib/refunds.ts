@@ -162,9 +162,9 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
   });
   if ("error" in reserved) throw new RefundError(reserved.error!);
   const amount = reserved.amount;
+  let r: { id: string; status: string };
   try {
-    const r = pay.provider === "stripe" ? await stripeRefund(pay.ref, amount, o, fetcher) : await solaRefund(pay.ref, amount, fetcher);
-    return applyRefund(o, { amountCents: amount, refundId: r.id, provider: pay.provider, source: "admin", userId, status: r.status, reservedId: reserved.id });
+    r = pay.provider === "stripe" ? await stripeRefund(pay.ref, amount, o, fetcher) : await solaRefund(pay.ref, amount, fetcher);
   } catch (e) {
     const reason = e instanceof RefundError ? e.message : plainReason(e instanceof StripeError || e instanceof Error ? e.message : String(e));
     await db.update(schema.orderRefunds).set({ status: "failed", error: reason.slice(0, 300) }).where(eq(schema.orderRefunds.id, reserved.id));
@@ -172,6 +172,9 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
     await alertOwner(o, amount, reason);
     throw new RefundError(reason);
   }
+  // Deep check Nov 27 (item 15a): the card company refunded it, so a problem while saving it here is never reported
+  // as "Nothing was refunded" (staff could refund again); it goes up as an ordinary error with the refund kept "sending"
+  return applyRefund(o, { amountCents: amount, refundId: r.id, provider: pay.provider, source: "admin", userId, status: r.status, reservedId: reserved.id });
 }
 
 export async function refundsFor(orderId: number) {
