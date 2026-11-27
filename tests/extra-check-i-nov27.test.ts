@@ -44,6 +44,12 @@ describe("I1: the voicemail box password lockout holds with several calls at onc
     // the right password is refused while locked, even from a call that read the box before the lock
     expect(await checkBoxPin(b, "1234")).toBe("locked");
   });
+  it("deep check 06:00 M20: a burst of 10 guesses with the right password last never opens the box", async () => {
+    const b = await box();
+    const results = await Promise.all(["1", "2", "3", "4", "5", "6", "7", "8", "9", "1234"].map((p) => checkBoxPin(b, p)));
+    expect(results).not.toContain("ok");
+    expect(results.at(-1)).toBe("locked");
+  });
   it("the Owner gets one lock email, not one per call", async () => {
     const b = await box();
     await Promise.all(["1", "2", "3", "4", "5", "6"].map((p) => checkBoxPin(b, p)));

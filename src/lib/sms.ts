@@ -26,6 +26,8 @@ export type SendInput = {
   log?: boolean;
   /** Test hook for the promotional quiet-hours check. */
   now?: Date;
+  /** Internal (extra check J4): the plain-text resend of a picture text that failed; its words are already final. */
+  mmsResend?: boolean;
 };
 
 export type SendResult = {
@@ -138,7 +140,8 @@ export async function promosThisYear(phone: string, now = new Date(), exec: Pick
         eq(schema.messages.kind, "marketing"),
         eq(schema.messages.direction, "out"),
         gte(schema.messages.createdAt, yearStart(now)),
-        sql`${schema.messages.status} not in ('blocked', 'canceled')`,
+        // Extra check J4: a promotion that never reached the customer (failed, e.g. a picture text resent as plain text) doesn't count
+        sql`${schema.messages.status} not in ('blocked', 'canceled', 'failed', 'undelivered')`,
       ),
     );
   return r?.n ?? 0;
@@ -341,13 +344,14 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   await refreshSmsCalendar();
   const kind = input.kind ?? "transactional";
   const log = input.log !== false;
-  if (kind === "marketing") input = { ...input, body: marketingBody(input.body) };
+  // Extra check J4: a plain-text resend after a failed picture text keeps the words already prepared (no second footer)
+  if (kind === "marketing" && !input.mmsResend) input = { ...input, body: marketingBody(input.body) };
   // Abraham, Nov 27, 2026 (item 5): the FIRST text a number ever gets from us carries STOP and HELP (the website's grey
   // lines say only "Message and data rates may apply."). Catalog, order and payment link texts to a number that never
   // got a text from us end with exactly " Reply STOP to stop, or HELP for help."; later texts do not.
-  const first = FIRST_TEXT_KINDS(kind, input.event) && !hasStopAndHelp(input.body) && (await neverTexted(to));
+  const first = !input.mmsResend && FIRST_TEXT_KINDS(kind, input.event) && !hasStopAndHelp(input.body) && (await neverTexted(to));
   if (first) input = { ...input, body: withFirstTextLine(input.body) };
-  else if (kind === "transactional") {
+  else if (kind === "transactional" && !input.mmsResend) {
     // The first text after a texting consent carries the full disclosure and the terms link (Abraham, Nov 24, 2026)
     const footer = (await needsConsentFooter(to)) ? await consentFooter() : null;
     input = { ...input, body: footer ? `${input.body.trim()} ${footer}` : withOrderStopLine(input.body, await needsOrderStopLine(to, input.now)) };
@@ -411,7 +415,7 @@ export async function sendMessage(input: SendInput): Promise<SendResult> {
   };
   const { blocked, held, messageId } = kind === "marketing" && typeof db.transaction === "function" ? await db.transaction((tx) => decideAndSave(tx as unknown as typeof db)) : await decideAndSave(db);
   if (blocked) return { sent: false, blocked, held, messageId, error: BLOCK_REASON[blocked] };
-  return deliver({ messageId, to, body: input.body, mediaUrls: input.mediaUrls, customer, logBody: log, retry: () => sendMessage({ ...input, mediaUrls: [] }) });
+  return deliver({ messageId, to, body: input.body, mediaUrls: input.mediaUrls, customer, logBody: log, retry: () => sendMessage({ ...input, mediaUrls: [], mmsResend: true }) });
 }
 
 async function deliver(m: { messageId?: number; to: string; body: string; mediaUrls?: string[]; customer: Customer | null; logBody: boolean; retry?: () => Promise<SendResult> }): Promise<SendResult> {
@@ -442,8 +446,17 @@ async function deliver(m: { messageId?: number; to: string; body: string; mediaU
     }
     await markFailed(messageId, err.code, err.message);
     if (String(err.code) === "21610" && m.customer) {
-      // Twilio says the recipient unsubscribed: mirror it.
-      await db.update(schema.customers).set({ smsOptOut: true }).where(eq(schema.customers.id, m.customer.id));
+      // Twilio says the recipient unsubscribed: mirror it, like a STOP (extra check J3): every record with the number,
+      // an opt-out record for each program, and nothing still waiting goes out
+      // Deep check 06:00 M13: the number the text went to (an order's own text number can differ from the customer's
+      // phone), never the customer's phone, which did not reply STOP
+      const phone = toE164(m.to) ?? m.to;
+      await db.update(schema.customers).set({ smsOptOut: true, marketingOptIn: false }).where(eq(schema.customers.phone, phone));
+      if (phone) {
+        for (const scope of ["transactional", "marketing"])
+          await db.insert(schema.smsConsents).values({ customerId: m.customer.id, phone, scope, action: "opt_out", source: "carrier", method: "carrier", wording: "Twilio error 21610: the number replied STOP to the carrier" });
+        await cancelQueuedMessages(phone).catch((e) => console.error("[21610] cancel waiting texts failed", e));
+      }
     }
     return { sent: false, messageId, error: err.message || "SMS failed" };
   }

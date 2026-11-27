@@ -49,7 +49,7 @@ export default function RoutingForm({
         </label>
       </div>
       <fieldset className="grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-4" data-after-hours-window>
-        <legend className="px-1 text-sm font-semibold">After-hours ringing times (only when the box above is ticked)</legend>
+        <legend className="px-1 text-sm font-semibold">After-hours ringing times, Eastern time (only when the box above is ticked)</legend>
         <label className="block">
           <span className="label">From</span>
           <input type="time" name="afterFrom" defaultValue={initial.afterFrom ?? ""} className="input" />

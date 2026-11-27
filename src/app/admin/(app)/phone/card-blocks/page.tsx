@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Card blocks · Hup Up Attractions", robots: { index: false } };
 
 /**
- * Numbers blocked from card payment by phone (Abraham, Nov 17, 2026), after too many declines in 24 hours. The Owner
+ * Numbers blocked from card payment by phone (Abraham, Nov 17, 2026), after too many calls with card tries in 24 hours
+ * (phone audit 8, Nov 24, 2026: the page says what is really counted). The Owner
  * and the secretary can unlock a number; until then that caller is offered the payment link instead.
  */
 export default async function CardBlocksPage() {
@@ -18,7 +19,7 @@ export default async function CardBlocksPage() {
     <div className="w-full" data-card-blocks>
       <h1 className="text-2xl font-black sm:text-3xl">Card blocks</h1>
       <p className="mb-5 mt-1 text-muted">
-        Phone numbers that can&rsquo;t pay by card on the phone after too many declines in 24 hours. These callers are offered the payment link instead. Unlock a number after
+        Phone numbers that can&rsquo;t pay by card on the phone after too many calls with card tries in 24 hours (several tries in the same call count as one call). These callers are offered the payment link instead. Unlock a number after
         you&rsquo;ve spoken with the customer.
       </p>
       <div className="card p-5">
@@ -29,7 +30,7 @@ export default async function CardBlocksPage() {
             <span>
               <b>{formatPhone(r.phone)}</b>
               <span className="block text-sm text-muted">
-                Blocked {dualDateTime(r.blockedAt)} · {r.declines} declines in 24 hours
+                Blocked {dualDateTime(r.blockedAt)} · {r.declines} calls with card tries in 24 hours
               </span>
             </span>
             <button className="btn-dark">Unlock</button>

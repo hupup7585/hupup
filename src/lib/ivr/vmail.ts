@@ -454,13 +454,13 @@ export function makeVmHandlers(h: VmHelpers): Record<string, (ctx: Ctx, vr: VR) 
         if (staff) {
           const audioSrc = v.audioOf ? ((await getMsg(v.audioOf)) ?? v) : v;
           const audio = await fetchRecordingAudio(audioSrc);
-          const att = audio ? [{ filename: `voicemail-${v.id}.mp3`, content: Buffer.from(await audio.arrayBuffer()) }] : [];
+          const att = audio ? [{ filename: `voicemail-${v.id}.mp3`, content: Buffer.from(await audio.arrayBuffer()).toString("base64") }] : [];
           if (note) {
             const n = await r2Get(note).catch(() => null);
-            if (n?.ok) att.unshift({ filename: "note.wav", content: Buffer.from(await n.arrayBuffer()) });
+            if (n?.ok) att.unshift({ filename: "note.wav", content: Buffer.from(await n.arrayBuffer()).toString("base64") }); // deep check 06:00 M14: base64, as every other attachment
           }
           const w = h.when(v.createdAt);
-          await sendEmail(staff.email, `${BUSINESS_NAME}: forwarded voicemail`, [`A voicemail was forwarded to you by phone.`, "", `Received: ${w.date}, at ${w.time}`, `From: ${v.fromNumber ?? "a withheld number"}`, note ? "A recorded note is attached first." : ""].filter(Boolean).join("\n"), att as never);
+          await sendEmail(staff.email, `${BUSINESS_NAME}: forwarded voicemail`, [`A voicemail was forwarded to you by phone.`, "", `Received: ${w.date}, at ${w.time}`, `From: ${v.fromNumber ?? "a withheld number"}`, note ? "A recorded note is attached first." : ""].filter(Boolean).join("\n"), att);
           await log(ctx, `Forwarded by email to ${staff.name}`, { boxId: b, voicemailId: v.id });
           if (note) await r2Delete(note).catch(() => null);
         }

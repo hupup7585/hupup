@@ -22,7 +22,10 @@ export async function POST(req: Request) {
     console.log(`[inbound email] piece ${q.get("i")} of ${q.get("n")} received${r.complete ? (r.duplicate ? ", already in the Admin inbox" : ", saved to the Admin inbox") : ""}`);
     return Response.json(r);
   } catch (e) {
-    console.error("[inbound email] failed:", (e as Error).message);
-    return new Response((e as Error).message, { status: 400 });
+    const msg = (e as Error).message;
+    console.error("[inbound email] failed:", msg);
+    // Deep check 06:00 M25: only a refused piece (bad piece, bad size, too big) is a 400, which the Worker never tries
+    // again; a server error (database, storage) is a 500, so the Worker tries again and the email is not lost
+    return new Response(msg, { status: ["bad piece", "bad size", "too big"].includes(msg) ? 400 : 500 });
   }
 }

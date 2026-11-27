@@ -6,6 +6,8 @@ import { dualDateTime } from "@/lib/dual-date";
 
 const fmt = (d: Date | null) => (d ? dualDateTime(d) : "never");
 
+export const metadata = { title: "Compliance · Hup Up Attractions", robots: { index: false } };
+
 /** SMS compliance monitoring (policy section 12). Review is Owner-only; any staff member can report an issue. */
 export default async function CompliancePage() {
   const session = await requireAdmin();

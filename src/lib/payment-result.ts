@@ -36,11 +36,11 @@ export async function confirmationText(orderId: number): Promise<string | null> 
   if (!group) return null;
   const num = orderNumber(orderId);
   const { messageText } = await import("@/lib/ivr/prompts");
-  const days = group.orders;
-  const before = group.primary;
+  // Deep check 06:00 M17 (item 24's missed path, box 148): only the days actually booked, as the automatic text
+  const days = payingDays(group.orders, group.primary);
   return days.length > 1
     ? messageText("msg_payment_received_days", { number: num, dates: days.map((d) => messageDate(d.order.eventDate)).join(" and ") })
-    : messageText("msg_payment_received", { number: num, date: messageDate(before.order.eventDate), pickup: messageDate(before.order.pickupDate) });
+    : messageText("msg_payment_received", { number: num, date: messageDate(days[0].order.eventDate), pickup: messageDate(days[0].order.pickupDate) });
 }
 
 export async function paymentReceivedNotices(orderId: number, cents: number, opts: { skipCustomerEmail?: boolean } = {}) {

@@ -249,19 +249,24 @@ export async function recordRecurringAction(f: FormData) {
     // Deep check A10 (Nov 27, 2026): never after it was stopped, and a double click records it once: the next date
     // moves on first, only if it is still the date read here
     if (!r.active) throw new BooksError("This recurring expense was stopped. Nothing was recorded.");
-    const next = nextRecurring(r.nextDate, r.frequency);
-    const [claimed] = await db
-      .update(schema.bookRecurring)
-      .set({ nextDate: next })
-      .where(and(eq(schema.bookRecurring.id, r.id), eq(schema.bookRecurring.nextDate, r.nextDate), eq(schema.bookRecurring.active, true)))
-      .returning({ id: schema.bookRecurring.id });
-    if (!claimed) throw new BooksError("This one was already recorded. Reload the page.");
-    if (s(f, "as") === "bill") {
-      const [b] = await db.insert(schema.bookBills).values({ vendor: r.vendor, category: r.category, billDate: r.nextDate, dueDate: r.nextDate, amountCents: r.amountCents, recurringId: r.id, createdBy: userId }).returning();
-      await bookAudit(userId, "bill_added", "book_bill", b.id, { fromRecurring: r.id });
-    } else {
-      await addEntry({ entryDate: r.nextDate <= todayISO() ? r.nextDate : todayISO(), kind: "expense", category: r.category, amountCents: r.amountCents, method: r.method, party: r.vendor, notes: `Recurring (${r.frequency})` }, userId);
-    }
+    const { recurringAnchorDay } = await import("@/lib/books");
+    const next = nextRecurring(r.nextDate, r.frequency, await recurringAnchorDay(r.id));
+    // Deep check 0600 M30: moving the date and recording the bill or expense are one step: if the entry can't be saved
+    // (for example a locked month), the date stays and nothing is skipped
+    await db.transaction(async (tx) => {
+      const [claimed] = await tx
+        .update(schema.bookRecurring)
+        .set({ nextDate: next })
+        .where(and(eq(schema.bookRecurring.id, r.id), eq(schema.bookRecurring.nextDate, r.nextDate), eq(schema.bookRecurring.active, true)))
+        .returning({ id: schema.bookRecurring.id });
+      if (!claimed) throw new BooksError("This one was already recorded. Reload the page.");
+      if (s(f, "as") === "bill") {
+        const [b] = await tx.insert(schema.bookBills).values({ vendor: r.vendor, category: r.category, billDate: r.nextDate, dueDate: r.nextDate, amountCents: r.amountCents, recurringId: r.id, createdBy: userId }).returning();
+        await bookAudit(userId, "bill_added", "book_bill", b.id, { fromRecurring: r.id }, tx);
+      } else {
+        await addEntry({ entryDate: r.nextDate <= todayISO() ? r.nextDate : todayISO(), kind: "expense", category: r.category, amountCents: r.amountCents, method: r.method, party: r.vendor, notes: `Recurring (${r.frequency})` }, userId, tx);
+      }
+    });
     await bookAudit(userId, "recurring_recorded", "book_recurring", r.id, { next });
     return `Recorded ${r.vendor}. Next one: ${next}.`;
   });
@@ -476,19 +481,27 @@ export async function categorizeLineAction(f: FormData) {
     const category = s(f, "category");
     if (!category) throw new BooksError("Choose a category.");
     const out = l.amountCents < 0;
-    const row = await addEntry(
-      {
-        entryDate: l.lineDate,
-        kind: out ? "expense" : "income",
-        category,
-        amountCents: Math.abs(l.amountCents),
-        method: l.account === "card" ? "card" : "bank",
-        party: l.description.slice(0, 120),
-        notes: `From ${l.account} statement${l.importName ? ` (${l.importName})` : ""}`,
-      },
-      userId,
-    );
-    await db.update(schema.bookBankLines).set({ status: "matched", matchedEntryIds: [row.id], matchNote: `Added to the books as number ${row.id} (${category})` }).where(eq(schema.bookBankLines.id, id));
+    // Deep check 0600 M31 (Nov 27, 2026): a double click added the line to the books twice. The line is claimed (still
+    // unmatched) and its entry added in one step; the second click finds it matched.
+    const row = await db.transaction(async (tx) => {
+      const [claimed] = await tx.update(schema.bookBankLines).set({ status: "matched" }).where(and(eq(schema.bookBankLines.id, id), eq(schema.bookBankLines.status, "unmatched"))).returning({ id: schema.bookBankLines.id });
+      if (!claimed) throw new BooksError("This line is already matched.");
+      const e = await addEntry(
+        {
+          entryDate: l.lineDate,
+          kind: out ? "expense" : "income",
+          category,
+          amountCents: Math.abs(l.amountCents),
+          method: l.account === "card" ? "card" : "bank",
+          party: l.description.slice(0, 120),
+          notes: `From ${l.account} statement${l.importName ? ` (${l.importName})` : ""}`,
+        },
+        userId,
+        tx,
+      );
+      await tx.update(schema.bookBankLines).set({ matchedEntryIds: [e.id], matchNote: `Added to the books as number ${e.id} (${category})` }).where(eq(schema.bookBankLines.id, id));
+      return e;
+    });
     await bookAudit(userId, "line_categorized", "book_bank_line", id, { entry: row.id, category });
     return `Added to the books as entry number ${row.id}.`;
   });
