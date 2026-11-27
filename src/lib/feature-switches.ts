@@ -53,7 +53,7 @@ export function featureSwitches(settings: Record<string, unknown> = SETTING_DEFA
     { id: "call_recording", label: "Call recording", state: yes("callRecording"), waitsFor: "Abraham's OK on the recording notice", settingKey: "callRecording" },
     { id: "google_voice", label: "Google voice for the changing parts (paid)", state: yes("googleLiveVoice"), waitsFor: "Costs money: stays off", settingKey: "googleLiveVoice" },
     { id: "sola_phonepay", label: "Card payment by phone (Sola)", state: yes("solaPhonePayOn"), waitsFor: "", settingKey: "solaPhonePayOn" },
-    { id: "sola_listen", label: "Sola listening helper", state: yes("solaListenOn"), waitsFor: "A passed test call", settingKey: "solaListenOn" },
+    { id: "sola_listen", label: "Sola listening helper", state: yes("solaListenOn"), waitsFor: process.env.SOLA_LISTEN_KEY && process.env.SOLA_LISTEN_KEY.length >= 24 ? "A passed test call" : "The helper key (SOLA_LISTEN_KEY in Vercel, LISTEN_KEY on Cloudflare), then a passed test call", settingKey: "solaListenOn" },
     { id: "delivery_promo", label: "Free delivery offer", state: yes("deliveryPromoOn"), waitsFor: "", settingKey: "deliveryPromoOn" },
     { id: "achird_whole_line", label: "Whole lines from recorded pieces", state: yes("achirdWholeLine"), waitsFor: "", settingKey: "achirdWholeLine" },
     { id: "laser_half", label: "Laser tag: every third set half price", state: yes("laserThirdSetHalfOn"), waitsFor: "", settingKey: "laserThirdSetHalfOn" },
