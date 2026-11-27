@@ -163,7 +163,7 @@ export default function PosForm(props: {
     });
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
+    <div className="grid gap-5 2xl:grid-cols-[1.3fr_1fr]">
       <div className="card min-w-0 p-5">
         <label className="label">Event (delivery) date — pickup is the next open day</label>
         {/* Coming days with Hebrew dates; closed days (Shabbes, Yom Tov, other closed days) can't be chosen. */}
@@ -178,11 +178,11 @@ export default function PosForm(props: {
               disabled={d.closed && !d.mutze}
               onClick={() => setDate(d.date)}
               title={d.closed ? `Closed: ${d.reason}` : d.names.join(", ") || d.hebrew}
-              className={`min-w-[5.5rem] shrink-0 rounded-lg border px-2 py-1.5 text-left text-xs ${d.date === date ? "border-navy bg-navy text-white" : d.mutze ? "border-navy bg-white hover:border-navy" : d.closed ? "border-line bg-bg text-muted line-through" : d.holidayWeek ? "border-[#CFE6FB] bg-[#EEF7FF] hover:border-navy" : "border-line bg-white hover:border-navy"}`}
+              className={`min-w-[5.5rem] shrink-0 rounded-lg border px-2 py-1.5 text-left text-xs ${d.date === date ? "border-navy bg-navy text-white" : d.mutze ? "border-line bg-white hover:border-navy" : d.closed ? "border-line bg-bg text-muted line-through" : d.holidayWeek ? "border-[#CFE6FB] bg-[#EEF7FF] hover:border-navy" : "border-line bg-white hover:border-navy"}`}
             >
               <span className="block font-bold">{englishDate(d.date, "short")}</span>
               <HebrewDay yi iso={d.date} className="block" />
-              <span className="block truncate">{d.mutze ? "Mutze Shabbes" : d.closed ? d.reason : d.closesAtLabel ? "Closes early" : d.names[0] ?? ""}</span>
+              <span className="block whitespace-normal break-words">{d.mutze ? d.names.filter((n) => !/^(Shabbes|שבת)/.test(n))[0] ?? "" : d.closed ? d.reason : d.closesAtLabel ? "Closes early" : d.names[0] ?? ""}</span>
             </button>
           ))}
         </div>

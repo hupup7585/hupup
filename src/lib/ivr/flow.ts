@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import twilio from "twilio";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, notLike, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { BUSINESS_NAME, config } from "@/lib/config";
 import { addDays, spokenLongDate, todayISO } from "@/lib/dates";
@@ -163,6 +163,9 @@ function sp(target: VR | Gather, ctx: { prompts: PromptOverrides }, key: PromptK
   }
   // Option B (Owner switch, off): Google speaks the line in Achird; otherwise the live voice (Puck)
   if (vars && googleLiveOn(ctx.prompts)) return void target.play(liveVoiceLink(spokenSpelling(promptText(ctx.prompts, key, vars))));
+  // Abraham's test calls, Nov 26, 2026, 8:41 PM: every line the computer voice reads is named in the call log, so
+  // Admin shows exactly which slots still have no recording on the line (approved and chosen with "Use this one")
+  liveLine(ctx.prompts, key);
   // Abraham, Nov 19, 2026: in a menu, a plain half-second pause after each option (Hark's recordings have it)
   if (isGather(target) && process.env.IVR_OPTION_PAUSES !== "off") return sayOptions(target, promptText(ctx.prompts, key, vars));
   say(target, promptText(ctx.prompts, key, vars));
@@ -175,6 +178,11 @@ const isGather = (t: VR | Gather): t is Gather => t.constructor?.name === "Gathe
  * shown in the call log for every step). Kept per request; handleVoice writes it to the call journey.
  */
 const VOICE_LOG = new WeakMap<PromptOverrides, string[]>();
+function liveLine(prompts: PromptOverrides, key: string) {
+  const list = VOICE_LOG.get(prompts) ?? [];
+  list.push(`${key}: computer voice (no recording on the line)`);
+  VOICE_LOG.set(prompts, list);
+}
 function logVoice(prompts: PromptOverrides, key: string, pieces: LinePiece[]) {
   const rec = pieces.filter((p) => "url" in p).length;
   const live = pieces.flatMap((p) => ("say" in p ? [`"${p.say.trim()}"`] : []));
@@ -1002,8 +1010,11 @@ async function attractionCategory(t: "1" | "2" | "3") {
 const LASER_KEYS: { key: number; line: PromptKey; match: (n: string) => boolean }[] = [
   { key: 1, line: "laser_item_1", match: (n) => /maze/i.test(n) && /\b6\b|six/i.test(n) },
   { key: 2, line: "laser_item_2", match: (n) => /maze/i.test(n) && /\b4\b|four/i.test(n) },
-  { key: 3, line: "laser_item_3", match: (n) => !/maze/i.test(n) && /^\s*(6|six)\b[^]*laser guns/i.test(n) },
-  { key: 4, line: "laser_item_4", match: (n) => !/maze/i.test(n) && /^\s*(4|four)\b[^]*laser guns/i.test(n) },
+  // Abraham's test calls, Nov 26, 2026, 8:41 PM: the live items are named "Only 6 laser guns" / "Only 4 laser guns";
+  // the old match wanted the name to start with the number, so they fell to keys 5 and 6 in the computer voice while
+  // the recorded keys 3 and 4 were skipped. Any guns-only item with 6 / 4 in its name now takes its recorded key.
+  { key: 3, line: "laser_item_3", match: (n) => !/maze/i.test(n) && /\b(6|six)\b/i.test(n) && /gun/i.test(n) },
+  { key: 4, line: "laser_item_4", match: (n) => !/maze/i.test(n) && /\b(4|four)\b/i.test(n) && /gun/i.test(n) },
 ];
 function laserList<T extends { name: string }>(items: T[]): { p: T; key: number; line: PromptKey | null }[] {
   const out: { p: T; key: number; line: PromptKey | null }[] = [];
@@ -1096,9 +1107,9 @@ async function laserSetOf(productId: number): Promise<{ maze: boolean; size: 6 |
 /** The extra set of a size: the extra pack with a maze on the booking, else the guns-only set of that size. */
 async function extraSetProduct(maze: boolean, size: 6 | 4) {
   const list = maze
-    ? (await addOnProducts(LASER_ADDONS_CATEGORY)).filter((x) => new RegExp(`\\b${size}\\s*-?\\s*pack`, "i").test(x.name))
+    ? (await addOnProducts(LASER_ADDONS_CATEGORY)).filter((x) => new RegExp(`\\b${size}\\b|${size === 6 ? "six" : "four"}`, "i").test(x.name) && /pack|gun/i.test(x.name))
     : (await db.select({ id: products.id, name: products.name, cat: categories.name }).from(products).innerJoin(categories, eq(categories.id, products.categoryId)).where(eq(products.active, true)).orderBy(asc(products.id))).filter(
-        (x) => x.cat !== LASER_ADDONS_CATEGORY && /laser/i.test(x.cat) && !/maze/i.test(x.name) && new RegExp(`^\\s*${size}\\s+laser guns`, "i").test(x.name),
+        (x) => x.cat !== LASER_ADDONS_CATEGORY && /laser/i.test(x.cat) && !/maze/i.test(x.name) && new RegExp(`\\b${size}\\b|${size === 6 ? "six" : "four"}`, "i").test(x.name) && /gun/i.test(x.name), // "Only 6 laser guns" (Nov 26, 2026)
       );
   return list[0] ? await getProduct(list[0].id) : null;
 }
@@ -1132,9 +1143,17 @@ async function laserSetOffer(ctx: Ctx, date: string, size: 6 | 4): Promise<{ key
   let prod: NonNullable<typeof same>;
   if (same && (await free(same))) [key, prod] = [`lset_${pre}_${ord}_${size}` as PromptKey, same];
   else if (other && (await free(other))) [key, prod] = [`lset_${pre}_${ord}_no${size}` as PromptKey, other];
-  else return null; // both sizes gone for that day: no offer
+  else {
+    await track(ctx.callSid, "step", `Laser key 9 offer not played: no free ${maze ? "extra gun pack" : "guns-only set"} found for ${date}`).catch(() => undefined);
+    return null; // both sizes gone for that day: no offer
+  }
   const spoken = /\$(\d+(?:\.\d\d)?)[^$]*$/.exec(promptText(ctx.prompts, key))?.[1];
-  if (!spoken || Math.round(Number(spoken) * 100) !== (await nextSetPrice(day.order.id, prod.id))) return null; // never a wrong price
+  const charge = await nextSetPrice(day.order.id, prod.id);
+  if (!spoken || Math.round(Number(spoken) * 100) !== charge) {
+    // never a wrong price: the line says one price and the booking would charge another (Catalog price differs)
+    await track(ctx.callSid, "step", `Laser key 9 offer not played: the line "${key}" says $${spoken ?? "?"} but ${prod.name} would charge $${(charge / 100).toFixed(2)}`).catch(() => undefined);
+    return null;
+  }
   return { key, productId: prod.id };
 }
 
@@ -5733,7 +5752,8 @@ export async function handleCallStatus(callSid: string, status: string) {
   const [last] = await db
     .select({ step: schema.callEvents.step, label: schema.callEvents.label })
     .from(schema.callEvents)
-    .where(and(eq(schema.callEvents.callSid, callSid), eq(schema.callEvents.kind, "step")))
+    // the voice notes ("Voice: ...", Nov 26, 2026) and skipped-offer notes are not places a caller can hang up
+    .where(and(eq(schema.callEvents.callSid, callSid), eq(schema.callEvents.kind, "step"), notLike(schema.callEvents.label, "Voice: %"), notLike(schema.callEvents.label, "Laser key 9 offer not played%")))
     .orderBy(desc(schema.callEvents.id))
     .limit(1)
     .catch(() => []); // journey logging must never break the hang-up handling

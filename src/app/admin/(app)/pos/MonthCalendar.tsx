@@ -118,7 +118,9 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
               const off = (d.closed && !d.mutze) || past;
               // Closed days get their own color and a "Closed" tag; past days stay grey
               const chosen = d.date === value;
-              const label = d.closed ? d.reason : d.closesAtLabel ? "Closes early" : d.names[0] ?? "";
+              // Abraham, Nov 26, 2026: a Saturday that staff can book looks like a normal day (Mutze Shabbes shows only
+              // in the panel below once it is clicked)
+              const label = d.mutze ? "" : d.closed ? d.reason : d.closesAtLabel ? "Closes early" : d.names[0] ?? "";
               const he = dualParts(d.date, "short").he;
               // Every Yom Tov / holiday name in English, with the day of Chanukah (Abraham, Nov 17, 2026)
               const holidays = dayHolidayNames(d.date);
@@ -134,11 +136,13 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
                   data-found={isFound || undefined}
                   data-closed={d.closed || undefined}
                   data-holiday-week={d.holidayWeek || undefined}
-                  className={`min-h-[4.25rem] min-w-0 overflow-hidden rounded-lg border p-1 text-left text-[11px] leading-tight sm:p-1.5 sm:text-xs ${
+                  className={`min-h-[4.25rem] min-w-0 whitespace-normal break-words rounded-lg border p-1 text-left text-[11px] leading-tight [hyphens:none] sm:p-1.5 sm:text-[11px] lg:text-xs ${
                     chosen
                       ? "border-navy bg-navy text-white"
                       : d.mutze && !past
-                        ? "border-navy bg-white hover:border-navy"
+                        ? d.holidayWeek
+                          ? "border-[#CFE6FB] bg-[#EEF7FF] hover:border-navy"
+                          : "border-line bg-white hover:border-navy"
                         : d.closed && !past
                         ? "cursor-not-allowed border-[#f5c2bd] bg-[#ffe6e4] text-[#b3261e]" // closed: its own light red color (Abraham)
                         : past
@@ -151,33 +155,24 @@ export default function MonthCalendar({ today, value, onPick, initialDays }: { t
                   {/* Day number with "Closed" next to it (Abraham, Nov 17, 2026: no crossed-out days) */}
                   <span className="flex flex-wrap items-center justify-between gap-1">
                     <span className="text-sm font-bold">{Number(d.date.slice(8))}</span>
-                    {d.mutze && !past ? (
-                      <span className="text-[10px] font-black leading-none text-navy sm:text-[11px]" data-mutze-tag>
-                        Mutze Shabbes
+                    {!d.mutze && d.closed && !past && (
+                      <span className="text-[10px] font-black leading-none sm:text-[11px]" data-closed-tag>
+                        Closed
                       </span>
-                    ) : (
-                      d.closed && !past && (
-                        <span className="text-[10px] font-black leading-none sm:text-[11px]" data-closed-tag>
-                          Closed
-                        </span>
-                      )
                     )}
                   </span>
                   {/* Hebrew date: the full date on wider screens, the day only on a phone (the months are in the heading) */}
-                  <bdi dir="rtl" lang="yi" className="block truncate" data-hebrew-day>
+                  <bdi dir="rtl" lang="yi" className="block" data-hebrew-day>
                     <span className="sm:hidden">{he.split(" ")[0]}</span>
                     <span className="hidden sm:inline">{he}</span>
                   </bdi>
-                  <bdi dir="rtl" lang="yi" className="hidden truncate opacity-80 sm:block" data-yiddish-day>
+                  <bdi dir="rtl" lang="yi" className="hidden opacity-80 sm:block" data-yiddish-day>
                     {DAY_YI[new Date(`${d.date}T12:00:00Z`).getUTCDay()]}
                   </bdi>
                   {!d.closed && d.closesAtLabel ? (
-                    <span className="block truncate">
-                      <span className="sm:hidden">Early</span>
-                      <span className="hidden sm:inline">Closes early</span>
-                    </span>
+                    <span className="block text-[9px] tracking-tight sm:text-[11px] sm:tracking-normal lg:text-xs">Closes early</span>
                   ) : (
-                    <span className="block break-words text-[10px] sm:truncate sm:text-xs">{label}</span>
+                    <span className="block text-[9px] tracking-tight sm:text-[11px] sm:tracking-normal lg:text-xs">{label}</span>
                   )}
                   {holidays.length > 0 && (
                     <>
