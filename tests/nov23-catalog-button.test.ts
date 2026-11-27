@@ -56,8 +56,8 @@ describe("View the catalog button", () => {
     expect(r.headers.get("content-type")).toBe("application/pdf");
     expect(r.headers.get("content-disposition")).toBe('inline; filename="Chanukah Catalog 2026.pdf"');
     expect(Buffer.from(await r.arrayBuffer()).subarray(0, 4).toString()).toBe("%PDF");
-    expect((await GET(new Request("https://x"), { params: Promise.resolve({ file: "999.pdf" }) })).status).toBe(404);
-    expect((await GET(new Request("https://x"), { params: Promise.resolve({ file: "../etc" }) })).status).toBe(404);
+    // Nov 27, 2026: any catalog link opens the current catalog (old numbers included); nothing else is ever served
+    expect((await GET(new Request("https://x"), { params: Promise.resolve({ file: "999.pdf" }) })).headers.get("content-disposition")).toBe('inline; filename="Chanukah Catalog 2026.pdf"');
   });
 
   it("the automatic catalog email and Compose > Add our catalog both carry the button and the attachment", async () => {

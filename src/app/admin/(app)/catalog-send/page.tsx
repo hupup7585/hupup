@@ -1,5 +1,5 @@
 import { requireOwner } from "@/lib/auth";
-import { currentCatalog } from "@/lib/catalog-pdf";
+import { catalogHistory, currentCatalog } from "@/lib/catalog-pdf";
 import { getSettings } from "@/lib/settings";
 import CatalogPdf from "../catalog/CatalogPdf";
 import PhotoUpload from "../catalog/PhotoUpload";
@@ -14,6 +14,8 @@ import { CATALOG_EMAIL_BODY_DEFAULT, CATALOG_EMAIL_SUBJECT_DEFAULT, parseCatalog
 export default async function CatalogSendPage() {
   await requireOwner();
   const pdf = await currentCatalog();
+  const history = await catalogHistory();
+  const stamp = (d: Date) => d.toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
   const settings = await getSettings();
   return (
     <div className="w-full">
@@ -30,6 +32,7 @@ export default async function CatalogSendPage() {
               }
             : null
         }
+        history={history.filter((h) => h.id !== pdf?.id).map((h) => ({ id: h.id, fileName: h.fileName, sizeMb: (h.sizeBytes / 1024 / 1024).toFixed(1), uploaded: stamp(h.createdAt) }))}
       />
       <section className="card mb-5 p-5">
         <h2 className="text-xl font-black">Catalog email</h2>
