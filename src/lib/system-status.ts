@@ -43,7 +43,7 @@ export async function blockers(env: Record<string, string | undefined> = process
     },
     {
       key: "keypad-pay",
-      area: "Pay by keypad during the call (Stripe)",
+      area: "Pay by keypad during the call (Stripe, backup only; the live choice is Sola PhonePay)",
       active: false,
       reason: phonePayConfigured(env)
         ? "Owner test calls only (Stripe test mode). Goes live for every caller after Abraham approves the pay prompts and a real test payment."

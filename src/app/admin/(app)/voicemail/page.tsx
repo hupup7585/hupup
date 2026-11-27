@@ -12,6 +12,8 @@ import { setVmPinAction, deleteVoicemailAction, purgeVoicemailAction, restoreVoi
 import { dualDateTime } from "@/lib/dual-date";
 import { CALL_OUT_LIVE_APPROVED, VM_ACCESS_LIVE_APPROVED, VM_LOCK_MINUTES, recentVmAccess, vmLockedUntil, vmPinSet } from "@/lib/vm-access";
 
+export const metadata = { title: "Voicemail · Hup Up Attractions", robots: { index: false } };
+
 export const dynamic = "force-dynamic";
 
 const TZ = process.env.BUSINESS_TIMEZONE || "America/New_York";

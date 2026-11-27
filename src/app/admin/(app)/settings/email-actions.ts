@@ -10,10 +10,15 @@ export async function saveEmailSignatureAction(_prev: { ok?: boolean; message?: 
   const text = String(form.get("signature") ?? "").replace(/\r\n/g, "\n").trim();
   if (text.length > 800) return { ok: false, message: "Please keep the signature under 800 characters." };
   if (/<[^>]+>/.test(text)) return { ok: false, message: "Plain text only (no tags)." };
-  const before = (await getSettings()).emailSignature;
-  await saveSetting("emailSignature", text, owner.userId);
-  await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.email_signature", entityType: "settings", entityId: "emailSignature", before: { text: before }, after: { text } });
-  return { ok: true, message: "Saved. Every email from now on ends with this signature." };
+  // Phone audit 30 (Nov 24, 2026): a failed save says so instead of failing quietly
+  try {
+    const before = (await getSettings()).emailSignature;
+    await saveSetting("emailSignature", text, owner.userId);
+    await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.email_signature", entityType: "settings", entityId: "emailSignature", before: { text: before }, after: { text } });
+    return { ok: true, message: "Saved. Every email from now on ends with this signature." };
+  } catch {
+    return { ok: false, message: "Not saved. Please try again." };
+  }
 }
 
 /** Batch 2 item 7 (Nov 25, 2026): the mailing address at the bottom of promotional emails (the law asks for one). */

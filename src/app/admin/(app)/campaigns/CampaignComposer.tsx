@@ -130,7 +130,9 @@ export default function CampaignComposer({ products, eligibleCount, baseUrl, fro
                 <p className="text-sm text-muted">Making the picture phone-ready...</p>
               ) : (
                 <div className="grid gap-2">
-                  <select className="input text-sm" defaultValue="" onChange={(e) => e.target.value && pickCatalog(i, Number(e.target.value))} aria-label={`Picture ${i + 1}: catalog photo`}>
+                  {/* Phone audit 25 (Nov 24, 2026): say why the list is empty */}
+                  {products.length === 0 && <p className="text-xs text-muted" data-no-catalog-photos>No rental has a photo yet, so there is no catalog photo to pick. Add photos in Catalog, or upload a picture below.</p>}
+                  <select className="input text-sm" defaultValue="" onChange={(e) => e.target.value && pickCatalog(i, Number(e.target.value))} aria-label={`Picture ${i + 1}: catalog photo`} disabled={products.length === 0}>
                     <option value="">Pick a catalog photo</option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -165,7 +167,7 @@ export default function CampaignComposer({ products, eligibleCount, baseUrl, fro
       </div>
 
       <p data-cost className="rounded-xl bg-bg p-3 text-sm">
-        Sends as <b>{cost.kind}</b>{cost.kind === "SMS" ? ` (${seg.segments} segment${seg.segments === 1 ? "" : "s"})` : ""} from {fromNumber}. Estimated cost: <b>{dollars(cost.perCustomer)}</b> per customer, about <b>{dollars(cost.total)}</b> for the {eligibleCount} customer{eligibleCount === 1 ? "" : "s"} who can get it now. This is an estimate from Twilio&rsquo;s list prices; the Twilio bill is exact.
+        Sends as <b>{cost.kind}</b>{cost.kind === "SMS" ? ` (${seg.segments} segment${seg.segments === 1 ? "" : "s"})` : ""} from {fromNumber}. Estimated cost: <b>{dollars(cost.perCustomer)}</b> per customer{eligibleCount > 0 ? <>, about <b>{dollars(cost.total)}</b> for the {eligibleCount} customer{eligibleCount === 1 ? "" : "s"} who can get it now.</> : ". No customers can get it now (nobody has signed up for offers yet)."} This is an estimate from Twilio&rsquo;s list prices; the Twilio bill is exact.
       </p>
 
       <button

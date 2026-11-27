@@ -44,9 +44,14 @@ export async function saveSalesTaxAction(_prev: State, form: FormData): Promise<
   const owner = await requireOwner();
   const v = String(form.get("salesTaxPercent") ?? "").replace(/[%\s]/g, "");
   if (!/^\d{1,2}(\.\d{1,4})?$/.test(v) || Number(v) > 25) return { ok: false, message: "Enter the rate as a percent, like 8.125." };
-  const before = (await getSettings()).salesTaxPercent;
-  await saveSetting("salesTaxPercent", v, owner.userId);
-  await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.sales_tax_updated", entityType: "settings", entityId: "sales_tax", before: { salesTaxPercent: before }, after: { salesTaxPercent: v } });
+  // Phone audit 30 (Nov 24, 2026): a failed save says so instead of failing quietly
+  try {
+    const before = (await getSettings()).salesTaxPercent;
+    await saveSetting("salesTaxPercent", v, owner.userId);
+    await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.sales_tax_updated", entityType: "settings", entityId: "sales_tax", before: { salesTaxPercent: before }, after: { salesTaxPercent: v } });
+  } catch {
+    return { ok: false, message: "Not saved. Please try again." };
+  }
   revalidatePath("/admin", "layout");
   return { ok: true, message: "Saved. New bookings use this rate." };
 }
