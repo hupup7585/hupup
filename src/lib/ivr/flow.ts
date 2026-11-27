@@ -865,7 +865,7 @@ async function staffLegEnded(callerSid: string, k: RingKey, i: number, legSid: s
   if (Number((r.rows[0] as { n?: number } | undefined)?.n ?? 0) > 0) return;
   const settings = await getSettings();
   const list = ringListFor(settings, k);
-  const steps = (list.mode === "simultaneous" ? 1 : list.targets.length) * ringAttempts(settings, k);
+  const steps = ringSteps(list, ringAttempts(settings, k), s.fromNumber);
   if (i + 1 < steps && (await lineRingsNowFor(k, settings)) && (await startStaffLegs(callerSid, k, i + 1, settings))) return;
   // nobody answered on any number or round: the caller leaves the queue to the extension's voicemail, as today
   await updateSession(callerSid, { data: { missed: "no_answer" } }); // read fresh (the leg list changed above)
@@ -1527,6 +1527,17 @@ export async function renewPaymentHold(ids: number[], minutes: number): Promise<
 }
 
 /** Ring one step of a key's list (one after another) or everyone at once. */
+/**
+ * Deep check 06:00 M47: how many ring steps a line has for this caller. A staff phone calling in is never rung itself
+ * (Hark's bug 12), so it is not counted either (before, the count included it and someone was rung an extra time).
+ */
+function ringSteps(list: ReturnType<typeof ringListFor>, attempts: number, from?: string | null): number {
+  if (list.mode === "simultaneous") return attempts;
+  const self = toE164(from);
+  const others = list.targets.filter((t) => toE164(t.phone) !== self);
+  return (others.length ? others : list.targets).length * attempts;
+}
+
 function dialTargets(vr: VR, list: ReturnType<typeof ringListFor>, k: RingKey, i: number, from?: string | null): VR {
   const simultaneous = list.mode === "simultaneous";
   // Hark's bug 12 (Nov 26, 2026): a staff phone calling in is never rung itself (it would be busy and waste a step)
@@ -5511,7 +5522,7 @@ const handlers: Record<string, Handler> = {
     const list = ringListFor(settings, k);
     const i = Number(ctx.query.get("i") ?? -1);
     const next = i + 1;
-    const steps = (list.mode === "simultaneous" ? 1 : list.targets.length) * ringAttempts(settings, k);
+    const steps = ringSteps(list, ringAttempts(settings, k), ctx.session?.fromNumber ?? ctx.from);
     // Customer service (Abraham, Nov 25, 2026, 4:14 PM): every call lasts its full ring time; a call that ends early
     // (rejected, key 2, busy, failed) is waited out with the same ringing, then a new call
     if (k === "4" && ctx.query.get("w") !== "1" && i >= 0 && list.targets.length) {

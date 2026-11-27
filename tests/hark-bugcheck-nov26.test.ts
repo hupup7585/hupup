@@ -43,4 +43,10 @@ describe("Hark's bug check", () => {
     expect(s).toContain("const others = list.targets.filter((t) => toE164(t.phone) !== self);");
     expect(s).toContain('sp(g, ctx, "terms_notice");');
   });
+  it("deep check 06:00 M47: the ring steps leave out the caller's own staff phone (both the direct ring and the hold-music ring)", () => {
+    const s = readFileSync("src/lib/ivr/flow.ts", "utf8");
+    expect(s).toContain("const steps = ringSteps(list, ringAttempts(settings, k), ctx.session?.fromNumber ?? ctx.from);");
+    expect(s).toContain("const steps = ringSteps(list, ringAttempts(settings, k), s.fromNumber);");
+    expect(s).not.toContain("const steps = (list.mode === \"simultaneous\" ? 1 : list.targets.length)");
+  });
 });
