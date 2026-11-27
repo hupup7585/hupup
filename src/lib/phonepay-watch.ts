@@ -171,6 +171,8 @@ const signFor = (scope: string, attemptId: number) => createHmac("sha256", signi
 const same = (a: string, b: string | null) => Boolean(b) && a.length === (b ?? "").length && timingSafeEqual(Buffer.from(a), Buffer.from(b ?? ""));
 /** Our signed addresses the helper calls: "hangup" (the result is in and Sola stopped talking) or "silence". */
 export const helperUrl = (attemptId: number, what: "hangup" | "silence") => `${config.baseUrl()}/api/voice-watch/sola-listen?a=${attemptId}&do=${what}&s=${signFor(`sola-listen-${what}`, attemptId)}`;
+/** This try's key for the helper's result notice (deep check Nov 27, item 18): only our site and the stream know it. */
+export const helperKey = (attemptId: number) => signFor("sola-listen-result", attemptId);
 export const verifyHelper = (attemptId: number, what: string, s: string | null) => (what === "hangup" || what === "silence") && attemptId > 0 && same(signFor(`sola-listen-${what}`, attemptId), s);
 
 /**
@@ -185,12 +187,13 @@ export function startSolaListen(vr: { start: () => { stream: (a: Record<string, 
   stream.parameter({ name: "solaTrack", value: solaTrack });
   stream.parameter({ name: "pauseMs", value: String(HELPER_PAUSE_MS) });
   stream.parameter({ name: "silenceSec", value: String(silenceSeconds(s)) });
+  stream.parameter({ name: "key", value: helperKey(attemptId) });
 }
 
 /** Tell the helper Sola's record shows the result; true = it is listening to this call and will hang up. */
 export async function tellHelper(attemptId: number, fetcher: typeof fetch = fetch): Promise<boolean> {
   try {
-    const r = await fetcher(`https://${LISTEN_HOST}/result/${attemptId}`, { method: "POST", signal: AbortSignal.timeout(3000) });
+    const r = await fetcher(`https://${LISTEN_HOST}/result/${attemptId}`, { method: "POST", headers: { "X-Listen-Key": helperKey(attemptId) }, signal: AbortSignal.timeout(3000) });
     const j = (await r.json().catch(() => ({}))) as { listening?: boolean };
     return r.ok && j.listening === true;
   } catch {

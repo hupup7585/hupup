@@ -8,6 +8,8 @@
  *    our site to check Sola's record once more (our site hangs up and plays box 147 when there is still no result).
  * No card digits are kept or sent anywhere: the audio is only measured for loudness, never stored or transcribed.
  * Our site's addresses (signed by our site) arrive in the stream's start message, so no secret lives here.
+ * The result notice must carry this try's key (deep check Nov 27, item 18): our site signs a key for each try and puts
+ * it in the stream's start message (from Twilio) and in its result notice, so nobody else can end a payment call early.
  */
 
 const VOICE_RMS = 700; // 16-bit loudness that counts as someone talking (phone audio)
@@ -35,11 +37,20 @@ export function frameRms(b64) {
   return Math.sqrt(sum / bin.length);
 }
 
+/** Same key, compared in constant time. An empty key never matches. */
+export function sameKey(a, b) {
+  if (!a || typeof b !== "string" || a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
 export class SolaListen {
   constructor(state) {
     this.state = state;
     this.ws = null;
     this.urls = null; // { hangup, silence } from our site (signed)
+    this.key = ""; // this try's key from our site (stream start message); the result notice must carry it
     this.solaTrack = "inbound";
     this.pauseMs = 500;
     this.silenceMs = 20000;
@@ -59,6 +70,8 @@ export class SolaListen {
       return new Response(null, { status: 101, webSocket: pair[0] });
     }
     if (url.pathname.startsWith("/result/")) {
+      // Only our site knows this try's key; without the stream's key nothing is accepted
+      if (!sameKey(this.key, req.headers.get("X-Listen-Key"))) return Response.json({ listening: false }, { status: 403 });
       // Sola's record shows approved or declined: hang up at the end of Sola's sentence
       if (!this.resultAt) this.resultAt = Date.now();
       return Response.json({ listening: Boolean(this.ws && this.urls) && !this.done });
@@ -93,6 +106,7 @@ export class SolaListen {
     if (m.event === "start") {
       const p = (m.start && m.start.customParameters) || {};
       this.urls = { hangup: p.hangup, silence: p.silence };
+      if (typeof p.key === "string" && p.key) this.key = p.key;
       this.solaTrack = p.solaTrack === "outbound" ? "outbound" : "inbound";
       this.pauseMs = Number(p.pauseMs) || 500;
       this.silenceMs = (Number(p.silenceSec) || 20) * 1000;

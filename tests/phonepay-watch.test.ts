@@ -342,3 +342,36 @@ describe("the helper itself (cloudflare/sola-listen-worker.js)", () => {
     }
   });
 });
+
+describe("deep check Nov 27, item 18: only our site can send the helper a result", () => {
+  it("the stream and our result notice carry this try's key; the helper refuses a notice without it", async () => {
+    const { startSolaListen, tellHelper, helperKey } = await import("@/lib/phonepay-watch");
+    const { SolaListen, sameKey } = await import("../cloudflare/sola-listen-worker.js");
+    const twilio = (await import("twilio")).default;
+    const vr = new twilio.twiml.VoiceResponse();
+    startSolaListen(vr as never, 12, "inbound", {});
+    const key = helperKey(12);
+    expect(key).toMatch(/^[0-9a-f]{32}$/);
+    expect(helperKey(13)).not.toBe(key);
+    expect(vr.toString()).toContain(`<Parameter name="key" value="${key}"/>`);
+
+    const d = new SolaListen({});
+    const post = (k?: string) => d.fetch(new Request("https://h/result/12", { method: "POST", headers: k ? { "X-Listen-Key": k } : {} }));
+    // before the stream starts nothing is accepted
+    expect((await post(key)).status).toBe(403);
+    d.onMessage(JSON.stringify({ event: "start", start: { customParameters: { hangup: "https://x/h", silence: "https://x/s", key } } }));
+    expect((await post()).status).toBe(403);
+    expect((await post("0".repeat(32))).status).toBe(403);
+    expect(d.resultAt).toBe(0);
+    const ok = await post(key);
+    expect(ok.status).toBe(200);
+    expect(d.resultAt).toBeGreaterThan(0);
+    expect(sameKey("", "")).toBe(false);
+
+    // our site sends the key in the header
+    let sent: string | null = null;
+    const fetcher = (async (_u: string, init?: RequestInit) => ((sent = new Headers(init?.headers).get("X-Listen-Key")), Response.json({ listening: true }))) as typeof fetch;
+    expect(await tellHelper(12, fetcher)).toBe(true);
+    expect(sent).toBe(key);
+  });
+});
