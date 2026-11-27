@@ -55,3 +55,19 @@ card form, and the server rejects any payment attempt. Right after Shabbes / Yom
     set, changes what callers hear.
 13. **Separate preview database (deep check 22):** needs Hark to create the free Neon project `hupup-preview` and set
     the Preview-only database settings in Vercel (steps were sent).
+
+## Storage clean-up that would delete data (deep check B6 and C1, Nov 27, 2026)
+
+The rule is never to delete live data, so these were not built. Both only free storage space.
+
+1. **Old catalog photos.** When a photo is replaced in Admin, the old file stays in Cloudflare storage. Should it be
+   removed?
+2. **The raw copy of each incoming info@ email.** Each email is kept twice: once filed in the Admin inbox (text and
+   attachments) and once as the original raw email. The raw copy is used to find the Reply-To address when replying.
+   Should the raw copy be removed after some time (for example 90 days)?
+
+## Cloudflare Workers to update (deep check C7, Nov 27, 2026)
+
+The info@ email Worker (`cloudflare/info-inbox-worker.js`) was fixed: a Gmail forward error no longer stops the Admin
+inbox copy, and a missing piece is logged. The new code takes effect once it is put on Cloudflare (free).
+

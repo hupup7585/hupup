@@ -6,6 +6,8 @@ import { linkPieceKey, verifyFileLink } from "@/lib/file-links";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const SAFE_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp", "text/plain", "text/csv", "application/zip", "audio/mpeg", "video/mp4", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]);
+
 /**
  * The 30-day download link for a file too big to attach (Abraham, Nov 18, 2026). Signed; after 30 days it stops
  * working. The file comes straight from R2, piece by piece, under its own name.
@@ -30,7 +32,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const name = f.fileName.replace(/["\\\r\n]/g, "_");
   return new Response(stream, {
     headers: {
-      "content-type": f.contentType || "application/octet-stream",
+      // Deep check C6: only plain file types keep their type; anything else downloads as a file, never runs on our site
+      "content-type": SAFE_TYPES.has(f.contentType) ? f.contentType : "application/octet-stream",
+      "x-content-type-options": "nosniff",
       "content-length": String(f.sizeBytes),
       "content-disposition": `attachment; filename="${name}"; filename*=UTF-8''${encodeURIComponent(f.fileName)}`,
       "x-robots-tag": "noindex",

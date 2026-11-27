@@ -1,4 +1,6 @@
 import { todayISO } from "@/lib/dates";
+import { linkedOrderId } from "@/lib/order-path";
+import { orderNumber } from "@/lib/order-number";
 import { asc, desc, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { PRIORITY_LABEL, STATUS_LABEL, isOverdue, laborCents, minutesOf, projectProfit, seesMoney, visibleTasks, type Staff } from "@/lib/tasks";
@@ -22,7 +24,7 @@ export async function buildTaskReport(report: TaskReport, staff: Staff): Promise
       {
         name: "Tasks",
         header: ["#", "Subtask of", "Title", "Deadline", "Yiddish day", "Time", "Status", "Overdue", "Priority", "Assigned to", "Booking", "Project", "Notes"],
-        rows: rows.map((t) => [t.id, t.parentId, t.title, t.dueDate, t.dueDate ? yiddishDay(t.dueDate) : "", t.dueTime, STATUS_LABEL[t.status], isOverdue(t) ? "yes" : "", PRIORITY_LABEL[t.priority], t.assignedTo ? who(t.assignedTo) : "Unassigned", t.orderId, t.projectId, t.notes]),
+        rows: rows.map((t) => [t.id, t.parentId, t.title, t.dueDate, t.dueDate ? yiddishDay(t.dueDate) : "", t.dueTime, STATUS_LABEL[t.status], isOverdue(t) ? "yes" : "", PRIORITY_LABEL[t.priority], t.assignedTo ? who(t.assignedTo) : "Unassigned", t.orderId ? orderNumber(linkedOrderId(t.orderId)) : "", t.projectId, t.notes]),
       },
     ];
   }
@@ -45,7 +47,7 @@ export async function buildTaskReport(report: TaskReport, staff: Staff): Promise
     {
       name: "Project profitability",
       header: ["Project", "Status", "Bookings", "Tasks", "Income", "Expenses", "Labor hours", "Labor cost", "Profit"],
-      rows: rows.map(({ p, r }) => [p.name, p.status, p.orderIds.join(" "), r.taskCount, r.incomeCents / 100, r.expensesCents / 100, Math.round((r.minutes / 60) * 100) / 100, r.laborCents / 100, r.profitCents / 100]),
+      rows: rows.map(({ p, r }) => [p.name, p.status, p.orderIds.map((o) => orderNumber(linkedOrderId(o))).join(" "), r.taskCount, r.incomeCents / 100, r.expensesCents / 100, Math.round((r.minutes / 60) * 100) / 100, r.laborCents / 100, r.profitCents / 100]),
     },
   ];
 }

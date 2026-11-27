@@ -55,7 +55,7 @@ describe("CC: tasks and who can do what", () => {
     expect(to).toMatch(/^\/admin\/tasks\/\d+\?msg=Task%20added/);
     const id = Number(to.match(/tasks\/(\d+)/)![1]);
     const t = (await getTask(id))!;
-    expect(t).toMatchObject({ title: "Clean the castle bouncer", priority: "high", status: "todo", assignedTo: dovid, orderId: 1001, dueDate: "2026-11-01" });
+    expect(t).toMatchObject({ title: "Clean the castle bouncer", priority: "high", status: "todo", assignedTo: dovid, orderId: 1, dueDate: "2026-11-01" }); // booking 1001 is order id 1 (deep check B1)
     expect(isOverdue(t, "2026-11-08")).toBe(true);
     await act(A.updateTaskAction, { id, title: "Clean the castle bouncer", status: "in_progress", priority: "normal", assignedTo: dovid, dueDate: "2026-11-01" });
     const hist = await db.select().from(schema.auditLog).where(eq(schema.auditLog.entityId, String(id)));
@@ -132,7 +132,7 @@ describe("DD: subtasks, month view, projects, labor, exports", () => {
     as("owner", null);
     await act(A.saveRateAction, { userId: dovid, rate: "30" }); // later rate doesn't change earlier entries
     // Income: the booking's paid amount (before tax) from the books; an expense tagged to the project
-    const [o] = await db.insert(schema.orders).values({ id: 1001, status: "CONFIRMED", channel: "PHONE", eventDate: "2026-12-07", pickupDate: "2026-12-08" }).returning();
+    const [o] = await db.insert(schema.orders).values({ id: 1, status: "CONFIRMED", channel: "PHONE", eventDate: "2026-12-07", pickupDate: "2026-12-08" }).returning();
     await addEntry({ entryDate: "2026-11-06", kind: "income", amountCents: 54063, taxCents: 4063, method: "check", checkNo: "501", orderId: o.id }, null);
     await addEntry({ entryDate: "2026-11-06", kind: "expense", amountCents: 2000, method: "cash", projectId: p.id, category: "Supplies" }, null);
     const r = await projectProfit((await db.select().from(schema.taskProjects))[0]);
@@ -154,5 +154,33 @@ describe("DD: subtasks, month view, projects, labor, exports", () => {
     expect((await buildTaskReport("projects", h.staff))[0].rows).toEqual([]);
     const route = readFileSync("src/app/api/admin/tasks/export/route.ts", "utf8");
     expect(route).toContain('report === "projects" && s.role !== "owner"');
+  });
+});
+
+describe("deep check B1, B5, B8 (Tasks)", () => {
+  it("B1: a booking number is saved as the order id; older rows that kept the typed number still link and count", async () => {
+    await act(A.saveProjectAction, { name: "B1 project", orderIds: "#1001, 2" });
+    const [p] = await db.select().from(schema.taskProjects).where(eq(schema.taskProjects.name, "B1 project"));
+    expect(p.orderIds).toEqual([1, 2]);
+    // an older project saved before the fix held the booking number itself
+    await db.update(schema.taskProjects).set({ orderIds: [1001] }).where(eq(schema.taskProjects.id, p.id));
+    const r = await projectProfit((await db.select().from(schema.taskProjects).where(eq(schema.taskProjects.id, p.id)))[0]);
+    expect(r.incomeCents).toBe(50000); // order id 1's paid amount before tax
+    const page = readFileSync("src/app/admin/tasks/[id]/page.tsx", "utf8");
+    expect(page).toContain("orderNumber(linkedOrderId(t.orderId))");
+  });
+
+  it("B5: two Start timer clicks at once start one timer", async () => {
+    const [t] = await db.insert(schema.tasks).values({ title: "B5 task", createdBy: null }).returning();
+    await Promise.all([act(A.startTimerAction, { taskId: t.id }), act(A.startTimerAction, { taskId: t.id })]);
+    const logs = (await db.select().from(schema.timeLogs).where(eq(schema.timeLogs.taskId, t.id))).filter((l) => l.minutes === null);
+    expect(logs).toHaveLength(1);
+  });
+
+  it("B8: a bad log number is 'not running', never a crash; the export file name uses the New York date", async () => {
+    expect(await act(A.stopTimerAction, { logId: "abc" })).toContain("err=");
+    const route = readFileSync("src/app/api/admin/tasks/export/route.ts", "utf8");
+    expect(route).toContain("${todayISO()}");
+    expect(route).not.toContain("toISOString");
   });
 });

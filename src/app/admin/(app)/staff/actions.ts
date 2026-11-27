@@ -45,6 +45,12 @@ export async function createStaffAction(form: { name: string; phone: string; rol
     const g = cleanGoogleEmail(form.googleEmail);
     if (g.error) return { ok: false, message: g.error };
     google = g.value;
+    // Deep check B3: a Google account already on another staff member gets a plain answer, not a database error
+    if (google) {
+      const { sql } = await import("drizzle-orm");
+      const [dup] = await db.select({ id: schema.adminUsers.id }).from(schema.adminUsers).where(sql`lower(${schema.adminUsers.googleEmail}) = ${google}`).limit(1);
+      if (dup) return { ok: false, message: "That Google account is already saved on another staff member." };
+    }
   }
   const [exists] = await db.select({ id: schema.adminUsers.id }).from(schema.adminUsers).where(eq(schema.adminUsers.phone, phone)).limit(1);
   if (exists) return { ok: false, message: "That phone number already has an account." };

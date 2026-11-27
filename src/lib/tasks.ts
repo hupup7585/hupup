@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { todayISO } from "@/lib/dates";
+import { linkedOrderId } from "@/lib/order-path";
 import type { Role } from "@/lib/db/schema";
 
 /**
@@ -96,7 +97,8 @@ async function projectTaskIds(projectId: number) {
  * minus expenses entered for the project, minus labor (hours x the rate at the time).
  */
 export async function projectProfit(p: typeof schema.taskProjects.$inferSelect) {
-  const orderIds = p.orderIds ?? [];
+  // Deep check B1: older projects saved the booking number (1031); the books use the order id (31)
+  const orderIds = [...new Set((p.orderIds ?? []).map(linkedOrderId).filter((n) => n > 0))];
   const tasks = await projectTaskIds(p.id);
   const income = orderIds.length
     ? Number(
