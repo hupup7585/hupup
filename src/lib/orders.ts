@@ -515,20 +515,14 @@ export async function recheckHolds(orderIds: number[]): Promise<{ orderId: numbe
     // Out of the count while checked (now() is the transaction's start time)
     await tx.update(orders).set({ holdExpiresAt: sql`now() - interval '1 second'` }).where(inArray(orders.id, ords.map((o) => o.id)));
     const taken: { orderId: number; productId: number; eventDate: string; qty: number }[] = [];
+    const { recheckOrderLines } = await import("@/lib/recheck-lines");
     for (const o of ords) {
-      let removed = false;
-      for (const l of lines.filter((x) => x.orderId === o.id).sort((a, b) => a.productId - b.productId)) {
-        const [p] = await tx.select({ quantity: products.quantity }).from(products).where(eq(products.id, l.productId));
-        const free = p ? await checkBookable(l.productId, p.quantity, o.eventDate, tx, o.pickupDate) : 0;
-        if (free < l.qty) {
-          taken.push({ orderId: o.id, productId: l.productId, eventDate: o.eventDate, qty: l.qty });
-          await tx.delete(orderItems).where(eq(orderItems.id, l.id));
-          removed = true;
-        }
-      }
-      if (removed) await recalcSubtotal(tx, o.id);
-      // Back in the count before the next day is checked
+      // Back in the count, then its items are put back one at a time, each checked with the ones before it counted
+      // (Hark's website list A1: two items sharing the maze or a laser pool never both pass when only one is free)
       await tx.update(orders).set({ holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES) }).where(eq(orders.id, o.id));
+      const gone = await recheckOrderLines(tx, o);
+      for (const l of gone) taken.push({ orderId: o.id, productId: l.productId, eventDate: o.eventDate, qty: l.qty });
+      if (gone.length) await recalcSubtotal(tx, o.id);
     }
     return taken;
   });

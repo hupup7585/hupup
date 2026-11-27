@@ -1,8 +1,9 @@
 import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { checkBookable, getUsage, pickupDateFor, usedOn, lastHeldDay } from "@/lib/availability";
-import { addDays } from "@/lib/dates";
+import { addDays, todayISO } from "@/lib/dates";
 import { nearbyDays, nearestSize } from "@/lib/alternatives";
+import { nextOpenDay } from "@/lib/jewish-calendar";
 import { getSettings, linkHoldMinutes } from "@/lib/settings";
 import { ensurePriced } from "@/lib/order-pricing";
 import { config } from "@/lib/config";
@@ -73,10 +74,17 @@ export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now
   // settings' defaults are the same 25 and 10, so nothing changes until the Owner changes them)
   const { linkHoldMinutes } = await import("@/lib/settings");
   const holdFor = { admin: await linkHoldMinutes("admin"), phone: await linkHoldMinutes("phone") };
+  // read before the transaction (one connection in tests; nothing outside it may wait on it)
+  const cal = await getSettings();
+  const { recheckOrderLines } = await import("@/lib/recheck-lines");
+  // Hark's website list A2 (Nov 26, 2026): an order staff cancelled in Admin is never brought back by the link
+  const { cancelledByStaff } = await import("@/lib/orders");
+  const staffCancelled = new Set<number>();
+  for (const id of orderIds) if (await cancelledByStaff(id)) staffCancelled.add(id);
   return db.transaction(async (tx) => {
     const rows = await tx.select().from(schema.orders).where(inArray(schema.orders.id, orderIds));
-    const ended = rows.filter((o) => holdEnded(o, now));
-    if (!ended.length) return { held: rows.map((o) => o.id), removed: 0 }; // still held: nothing to do
+    const ended = rows.filter((o) => holdEnded(o, now) && !staffCancelled.has(o.id));
+    if (!ended.length) return { held: rows.map((o) => o.id), removed: 0 }; // still held (or cancelled by staff): nothing to do
     const items = await tx.select().from(schema.orderItems).where(inArray(schema.orderItems.orderId, ended.map((o) => o.id)));
     const pids = [...new Set(items.map((i) => i.productId))].sort((a, b) => a - b);
     // Code audit L9 (Nov 24, 2026): items sharing one unit (the maze group) are locked as a whole group first, in id
@@ -84,19 +92,22 @@ export async function holdAgain(orderIds: number[], primaryId = orderIds[0], now
     for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
     for (const id of pids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
     const removed: { productId: number; qty: number; eventDate: string; name: string }[] = [];
+    const today = todayISO(now);
     for (const o of ended) {
-      for (const i of items.filter((x) => x.orderId === o.id)) {
-        const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, i.productId)).limit(1);
-        const free = p?.active ? await checkBookable(p.id, p.quantity, o.eventDate, tx, o.pickupDate) : 0;
-        if (free >= i.qty) continue;
+      // the order counts again first, so its items are checked together, one after another (Hark's website list A1:
+      // two items sharing the maze or a laser pool can't both pass when only one is free)
+      await tx.update(schema.orders).set({ status: "PENDING_PAYMENT", holdExpiresAt: inMinutes(holdFor[linkHoldKindOf(o)], now) }).where(eq(schema.orders.id, o.id));
+      // Hark's website list A3: a day that has passed, or a phone booking on a day we are closed, is never held again
+      const badDay = o.eventDate < today || (linkHoldKindOf(o) === "phone" && nextOpenDay(o.eventDate, cal) !== o.eventDate);
+      const gone = badDay ? items.filter((x) => x.orderId === o.id) : await recheckOrderLines(tx, o);
+      if (badDay) await tx.delete(schema.orderItems).where(eq(schema.orderItems.orderId, o.id));
+      for (const i of gone) {
+        const [p] = await tx.select({ name: schema.products.name }).from(schema.products).where(eq(schema.products.id, i.productId)).limit(1);
         removed.push({ productId: i.productId, qty: i.qty, eventDate: o.eventDate, name: p?.name ?? "Item" });
-        await tx.delete(schema.orderItems).where(eq(schema.orderItems.id, i.id));
       }
       await tx
         .update(schema.orders)
         .set({
-          status: "PENDING_PAYMENT",
-          holdExpiresAt: inMinutes(holdFor[linkHoldKindOf(o)], now),
           subtotalCents: sql`COALESCE((SELECT SUM(qty * unit_price_cents) FROM order_items WHERE order_id = ${o.id}), 0)`,
           totalCents: null, // re-priced below
           updatedAt: now,
@@ -183,7 +194,14 @@ export async function chooseLinkOption(primaryId: number, index: number, product
   const touched = new Set<number>();
   // The Admin hold settings (Hark's review H7, Nov 26, 2026): not fixed 25 and 10 minutes
   const holdFor = { phone: await linkHoldMinutes("phone"), admin: await linkHoldMinutes("admin") };
+  // Hark's website list A2 (Nov 26, 2026): an order staff cancelled in Admin is never brought back by the link
+  const { cancelledByStaff } = await import("@/lib/orders");
+  if (await cancelledByStaff(primaryId)) return false;
+  // Hark's website list A3: never a day that has passed
+  if (date < todayISO(now)) return false;
   const ok = await db.transaction(async (tx) => {
+    // the whole unit group (maze, laser pools) is locked, as for a phone booking
+    await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${productId}) ORDER BY id FOR UPDATE`);
     await tx.execute(sql`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`);
     const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, productId)).limit(1);
     const [primary] = await tx.select().from(schema.orders).where(eq(schema.orders.id, primaryId)).limit(1);
