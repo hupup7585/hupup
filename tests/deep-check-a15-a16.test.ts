@@ -30,3 +30,12 @@ describe("A15: New York dates", () => {
     }
   });
 });
+
+describe("A18: Tasks go back only to a Tasks page", () => {
+  it("other addresses fall back", async () => {
+    const { safeTasksBack } = await import("@/lib/safe-back");
+    expect(safeTasksBack("/admin/tasks?view=mine", "/admin/tasks")).toBe("/admin/tasks?view=mine");
+    expect(safeTasksBack("/admin/tasks/12", "/x")).toBe("/admin/tasks/12");
+    for (const bad of ["https://evil.example", "//evil.example", "/admin/tasks.evil", "/admin/orders", "/admin/tasks/\\evil", ""]) expect(safeTasksBack(bad, "/admin/tasks")).toBe("/admin/tasks");
+  });
+});

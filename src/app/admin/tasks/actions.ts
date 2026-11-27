@@ -1,6 +1,7 @@
 "use server";
 
 import { todayISO } from "@/lib/dates";
+import { safeTasksBack as safeBack } from "@/lib/safe-back";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
@@ -52,7 +53,7 @@ function fields(f: FormData) {
 }
 
 export async function createTaskAction(f: FormData) {
-  return run(s(f, "back") || "/admin/tasks", async (staff) => {
+  return run(safeBack(s(f, "back"), "/admin/tasks"), async (staff) => {
     if (!canCreate(staff)) throw new TaskError("Your account can't create tasks.");
     const v = fields(f);
     const [t] = await db.insert(schema.tasks).values({ ...v, assignedTo: await assignee(f), createdBy: staff.userId, doneAt: v.status === "done" ? new Date() : null }).returning();
@@ -88,7 +89,7 @@ export async function updateTaskAction(f: FormData) {
 /** Quick status change (list checkboxes, subtask checkboxes). */
 export async function setStatusAction(f: FormData) {
   const id = Number(s(f, "id"));
-  return run(s(f, "back") || `/admin/tasks/${id}`, async (staff) => {
+  return run(safeBack(s(f, "back"), `/admin/tasks/${id}`), async (staff) => {
     const t = await getTask(id);
     if (!t || !(await canAccess(staff, t))) throw new TaskError("You can't change this task.");
     const status = s(f, "status");
