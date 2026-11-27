@@ -27,3 +27,16 @@ describe("Sent copies", () => {
     expect(readFileSync("src/app/api/cron/release-holds/route.ts", "utf8")).toContain('{ kind: "backup" }');
   });
 });
+
+describe("deep check C1: email copies never fill the free database", () => {
+  it("a catalog email's Sent copy is kept without the catalog PDF (the same file every time)", async () => {
+    const before = (await db.select().from(schema.inboxFiles)).length;
+    const r = await recordSentEmail({ to: "sara@example.com", subject: "Hup Up Attractions catalog", body: "Here is our catalog", attachments: [{ filename: "Hup-Up-Catalog.pdf", content: Buffer.from("%PDF-1.7 big").toString("base64") }], sent: true, error: null, kind: "catalog" });
+    expect(r.body).toContain("Hup-Up-Catalog.pdf");
+    expect((await db.select().from(schema.inboxFiles)).length).toBe(before);
+  });
+  it("past the 800 MB stop, an attachment is listed but not kept", () => {
+    const src = readFileSync("src/lib/inbox.ts", "utf8").split("async function storeFile")[1].split("\n}\n")[0];
+    expect(src).toContain("(await databaseBytes()) + input.data.length > ATTACHMENT_STORAGE_STOP_BYTES");
+  });
+});

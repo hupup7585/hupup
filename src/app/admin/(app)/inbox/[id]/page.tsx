@@ -140,7 +140,7 @@ export default async function InboxEmailPage({ params }: { params: Promise<{ id:
                 <li key={f.id}>
                   {f.tooBig ? (
                     <span className="text-muted">
-                      {f.fileName} ({sizeLabel(f.sizeBytes)}): over 18 MB, so it is only in the Gmail copy
+                      {f.fileName} ({sizeLabel(f.sizeBytes)}): {f.sizeBytes > 18 * 1024 * 1024 ? "over 18 MB" : "the database was nearly full"}, so it is only in the Gmail copy
                     </span>
                   ) : (
                     <a className="font-semibold underline" href={`/api/admin/inbox/file/${f.id}`} target="_blank" rel="noreferrer">

@@ -56,7 +56,8 @@ export async function receiveRawPiece(uploadId: string, idx: number, parts: numb
 }
 
 async function storeFile(input: { emailId?: number | null; fileName: string; contentType: string; data: Buffer; userId?: number | null }) {
-  const tooBig = input.data.length > INBOX_FILE_MAX_BYTES;
+  // Deep check C1: past the 800 MB stop the file is listed but not kept, so bookings, calls and payments keep room
+  const tooBig = input.data.length > INBOX_FILE_MAX_BYTES || (await databaseBytes()) + input.data.length > ATTACHMENT_STORAGE_STOP_BYTES;
   const [f] = await db
     .insert(schema.inboxFiles)
     .values({ emailId: input.emailId ?? null, fileName: input.fileName.slice(0, 200) || "attachment", contentType: input.contentType || "application/octet-stream", sizeBytes: input.data.length, tooBig, complete: !tooBig, createdBy: input.userId ?? null })
@@ -388,8 +389,13 @@ export async function recordSentEmail(input: { to: string; subject: string; body
   // weekly backup's Sent copy is kept without its file (all customer data stays only in the Owner's email)
   const hide = (t: string) => (input.kind === "code" ? t.replace(/\b\d{4,8}\b/g, "••••••") : t);
   const backup = input.kind === "backup";
-  const files = backup ? [] : input.attachments;
-  const body = hide(input.body) + (backup && input.attachments.length ? `\n\n(The backup file, ${input.attachments.map((a) => a.filename).join(", ")}, is not kept here.)` : "");
+  // Deep check C1: the catalog PDF is the same file in every catalog email, so its Sent copy is kept without it
+  const catalog = input.kind === "catalog";
+  const files = backup || catalog ? [] : input.attachments;
+  const body =
+    hide(input.body) +
+    (backup && input.attachments.length ? `\n\n(The backup file, ${input.attachments.map((a) => a.filename).join(", ")}, is not kept here.)` : "") +
+    (catalog && input.attachments.length ? `\n\n(The catalog file, ${input.attachments.map((a) => a.filename).join(", ")}, was attached. It is the same catalog in every catalog email, so it is not kept again here.)` : "");
   const [row] = await db
     .insert(schema.inboxReplies)
     .values({ emailId: null, toAddress: input.to, subject: hide(input.subject), body, sent: input.sent, error: input.sent ? null : (input.error ?? "not sent"), userId: null, kind: backup ? "auto" : (input.kind ?? "auto") })
