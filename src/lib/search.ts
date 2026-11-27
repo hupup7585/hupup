@@ -54,7 +54,8 @@ export async function searchEverything(raw: string, opts: { owner: boolean }) {
       ? db
           .select()
           .from(schema.voicemails)
-          .where(and(isNull(schema.voicemails.deletedAt), or(digits ? phoneMatchSql(schema.voicemails.fromNumber, digits) : undefined, ilike(schema.voicemails.transcription, like))))
+          // Extra check N8: only messages the Voicemail page shows (not replaced or unfinished recordings)
+          .where(and(isNull(schema.voicemails.deletedAt), eq(schema.voicemails.state, "submitted"), or(digits ? phoneMatchSql(schema.voicemails.fromNumber, digits) : undefined, ilike(schema.voicemails.transcription, like))))
           .orderBy(desc(schema.voicemails.createdAt))
           .limit(10)
       : Promise.resolve([]),

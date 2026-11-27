@@ -36,6 +36,7 @@ export async function saveCustomerAction(form: FormData) {
 export async function setTestEntryAction(form: FormData) {
   const s = await requireOwner();
   const id = Number(form.get("id"));
+  if (!(await import("@/lib/db-id")).isDbId(id)) return; // extra check N6: a bad id is ignored, never an error page
   const isTest = form.get("isTest") === "1";
   const [before] = await db.select({ isTest: schema.customers.isTest }).from(schema.customers).where(eq(schema.customers.id, id)).limit(1);
   if (!before) return;

@@ -30,7 +30,7 @@ type Event = { at: Date; kind: string; text: string; href?: string };
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const staff = await requireStaff(["owner", "secretary"]);
   const id = Number((await params).id);
-  const [c] = Number.isInteger(id) ? await db.select(CUSTOMER_COLS).from(schema.customers).where(eq(schema.customers.id, id)).limit(1) : [];
+  const [c] = (await import("@/lib/db-id")).isDbId(id) ? await db.select(CUSTOMER_COLS).from(schema.customers).where(eq(schema.customers.id, id)).limit(1) : [];
   if (!c) notFound();
   const phone = c.phone ?? "";
   const orders = await db

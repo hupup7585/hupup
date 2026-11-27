@@ -55,3 +55,37 @@ describe("N4: calendar hours and same-day delivery times run forward", () => {
     expect(rules.sameDayHoursClose("2.5-3.5")).toBeNull();
   });
 });
+
+describe("N3, N6, N7, N8", () => {
+  it("N3: Activity filters by New York days and ignores a date that isn't real", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/app/admin/(app)/activity/page.tsx", "utf8");
+    expect(src).toContain("(a.created_at AT TIME ZONE ${TZ})::date >= ${sp.from}::date");
+    expect(src).toContain("sp.from && isValidISO(sp.from)");
+    expect(src).toContain("sp.to && isValidISO(sp.to)");
+  });
+  it("N6: a bad customer id is ignored by Mark as test, and the customer page uses the same id check", async () => {
+    const { setTestEntryAction } = await import("@/app/admin/(app)/customers/actions");
+    const f = new FormData();
+    f.set("id", "abc");
+    await expect(setTestEntryAction(f)).resolves.toBeUndefined();
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/app/admin/(app)/customers/[id]/page.tsx", "utf8")).toContain('(await import("@/lib/db-id")).isDbId(id)');
+  });
+  it("N7: the texting settings save records the forward number before and after", async () => {
+    const { db, schema } = await import("@/lib/db");
+    const { eq } = await import("drizzle-orm");
+    const { saveTextingAction } = await import("@/app/admin/(app)/settings/texting-actions");
+    const f = new FormData();
+    f.set("forwardOn", "on");
+    f.set("forwardPhone", "845-555-0199");
+    expect((await saveTextingAction(null, f)).ok).toBe(true);
+    const [row] = await db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "settings.customer_texts_updated"));
+    expect(JSON.stringify(row.after)).toContain("+18455550199");
+    expect(JSON.stringify(row.before)).toContain("smsForwardPhone");
+  });
+  it("N8: search lists only voicemails the Voicemail page shows", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/lib/search.ts", "utf8")).toContain('eq(schema.voicemails.state, "submitted")');
+  });
+});

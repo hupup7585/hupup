@@ -23,12 +23,15 @@ export async function saveTextingAction(_prev: { ok?: boolean; message?: string 
     const fwd = fwdRaw ? toE164(fwdRaw) : "";
     if (fwdRaw && !fwd) return { ok: false, message: "Not saved. The forward number must be a 10-digit phone number." };
     if (forwardOn && !fwd) return { ok: false, message: "Not saved. Enter the number to forward incoming texts to." };
-    const before = (await getSettings()).smsTestOnly;
+    // Extra check N7: every value on this form is in the audit log, before and after (the forward number gets copies
+    // of customers' incoming texts)
+    const cur = await getSettings();
+    const before = { smsTestOnly: cur.smsTestOnly, smsTestNumbers: cur.smsTestNumbers, smsForwardEnabled: cur.smsForwardEnabled, smsForwardPhone: cur.smsForwardPhone };
     await saveSetting("smsTestOnly", !everyone, owner.userId);
     await saveSetting("smsTestNumbers", tests.join("\n"), owner.userId);
     await saveSetting("smsForwardEnabled", forwardOn, owner.userId);
     await saveSetting("smsForwardPhone", fwd ?? "", owner.userId);
-    await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.customer_texts_updated", entityType: "settings", entityId: "sms_test_only", before: { smsTestOnly: before }, after: { smsTestOnly: !everyone } });
+    await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.customer_texts_updated", entityType: "settings", entityId: "sms_test_only", before, after: { smsTestOnly: !everyone, smsTestNumbers: tests.join("\n"), smsForwardEnabled: forwardOn, smsForwardPhone: fwd ?? "" } });
     revalidatePath("/admin", "layout");
     return { ok: true, message: "Saved" };
   } catch {

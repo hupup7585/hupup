@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireOwner } from "@/lib/auth";
 import DualDate from "@/components/DualDate";
+import { isValidISO } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +16,9 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   const conds = [sql`TRUE`];
   if (sp.who) conds.push(sql`u.name ILIKE ${`%${sp.who}%`}`);
   if (sp.what) conds.push(sql`(a.action ILIKE ${`%${sp.what}%`} OR a.entity_type ILIKE ${`%${sp.what}%`})`);
-  if (sp.from) conds.push(sql`a.created_at >= ${sp.from}::date`);
-  if (sp.to) conds.push(sql`a.created_at < (${sp.to}::date + 1)`);
+  // Extra check N3: New York days (not UTC), and a date that isn't a real date is ignored instead of an error page
+  if (sp.from && isValidISO(sp.from)) conds.push(sql`(a.created_at AT TIME ZONE ${TZ})::date >= ${sp.from}::date`);
+  if (sp.to && isValidISO(sp.to)) conds.push(sql`(a.created_at AT TIME ZONE ${TZ})::date <= ${sp.to}::date`);
   const rows = (
     await db.execute(sql`
       SELECT a.id, a.created_at::text, a.action, a.entity_type, a.entity_id, a.ip, a.before, a.after, u.name AS user_name, u.role
