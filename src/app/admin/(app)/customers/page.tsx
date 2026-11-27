@@ -44,9 +44,14 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-black sm:text-3xl">Customers</h1>
         {owner && (
-          <Link href="/admin/customers/directory" className="text-sm font-bold text-navy" data-directory-link>
-            Directory list
-          </Link>
+          <div className="flex gap-4">
+            <Link href="/admin/customers/duplicates" className="text-sm font-bold text-navy" data-duplicates-link>
+              Possible duplicates
+            </Link>
+            <Link href="/admin/customers/directory" className="text-sm font-bold text-navy" data-directory-link>
+              Directory list
+            </Link>
+          </div>
         )}
       </div>
       <form className="card mb-5 flex gap-2 p-4">
