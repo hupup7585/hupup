@@ -124,7 +124,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
                 // Every phone card try on this order: time and result, never card numbers (Abraham, Nov 15, 2026)
                 const tries = await db.select().from(schema.phonepayAttempts).where((await import("drizzle-orm")).eq(schema.phonepayAttempts.orderId, o.id)).orderBy(schema.phonepayAttempts.startedAt);
                 if (!tries.length) return null;
-                const label = (r: string | null) => (r === "paid" ? "Paid" : r === "wrong_amount_voided" ? "Wrong amount, voided" : r === "wrong_amount_not_voided" ? "Wrong amount, NOT voided (check Sola)" : r === "check_failed" ? "Sola could not be checked" : r === "declined" ? "Did not go through" : "In progress");
+                const label = (r: string | null) => (r === "paid" ? "Paid" : r === "wrong_amount_voided" ? "Wrong amount, voided" : r === "wrong_amount_not_voided" ? "Wrong amount, NOT voided (check Sola)" : r === "check_failed" ? "Sola could not be checked" : r === "check_failed_seen" ? "Sola could not be checked (looked at again by the next try)" : r === "declined" ? "Did not go through" : "In progress");
                 return (
                   <ul className="mt-1 text-xs text-muted" data-phone-card-tries>
                     {tries.map((t) => (

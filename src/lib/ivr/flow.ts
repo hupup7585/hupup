@@ -3745,7 +3745,10 @@ const handlers: Record<string, Handler> = {
       question(k, false);
       vr.play(tone);
       vr.record({ maxLength: T(vr, "timerSpokenMax"), timeout: T(vr, "timerSpokenSilence"), playBeep: false, finishOnKey: "#*9", trim: "trim-silence", action: url("stt-recorded", { f, n }), method: "POST" });
-      return vr;
+      // Extra check P1: nothing said after the tone: Twilio skips the action for an empty recording and runs the next
+      // step, so silence goes the same way as an empty answer (Abraham, Nov 24, 2026: "did not catch that", after 3
+      // tries box 41) instead of ending the call with no word
+      return back(vr, "heard", { f, n, empty: 1 });
     }
     // Say it, or press star to type it on the keypad (Abraham L). finishOnKey "" so star and # arrive as keys.
     // Pound ends a spoken answer and keeps what was said so far (Abraham, Nov 17, 2026): Twilio's partial results are
@@ -3782,6 +3785,8 @@ const handlers: Record<string, Handler> = {
     const spec = FIELDS[f];
     const raw = decodeMultitap(ctx.body.Digits || "", f === "email" ? "email" : "text");
     const value = raw ? (f === "email" ? spec.normalize(raw) : titleCase(raw)) : null;
+    // Extra check P2: no key at all (the keypad wait ran out): the usual no-key rule, never typing forever with the cart held
+    if (!value && !(ctx.body.Digits ?? "") && ctx.body.FinishedOnKey !== "#") return idleNoKey(vr, ctx, "type", { f, again: 1 });
     if (!value) {
       sp(vr, ctx, "field_unclear");
       return back(vr, "type", { f, again: 1 });
@@ -4229,6 +4234,8 @@ const handlers: Record<string, Handler> = {
     const raw = ctx.body.Digits ?? "";
     if (raw === "*") return back(vr, "addr-street");
     const typed = decodeMultitap(raw, "text");
+    // Extra check P2: no key at all: the usual no-key rule (never the street keypad forever with the cart held)
+    if (!raw && ctx.body.FinishedOnKey !== "#") return idleNoKey(vr, ctx, "addr-street-keys", { again: 1 });
     if (!typed.replace(/[^A-Za-z]/g, "")) {
       sp(vr, ctx, "field_unclear");
       return back(vr, "addr-street-keys", { again: 1 });

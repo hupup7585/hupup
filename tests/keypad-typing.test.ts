@@ -82,8 +82,23 @@ describe("typing in the call", () => {
     expect(h.session.data.heard).toBe("Yossi Friedman");
     expect(said(await call("type", {}, "f=email"))[0]).toMatch(/^Press 2 once for A/); // type_instructions for every typing step (Nov 24, 2026)
   });
-  it("nothing usable typed: try again (instructions not repeated)", async () => {
-    const xml = await call("typed", { Digits: "" }, "f=address");
+  it("nothing usable typed (only pound): try again (instructions not repeated)", async () => {
+    const xml = await call("typed", { Digits: "", FinishedOnKey: "#" }, "f=address");
     expect(redirect(xml)).toBe("type?f=address&again=1");
+  });
+  it("extra check P2: no key at all on a typing screen follows the no-key rule (never typing forever); star still goes back", async () => {
+    expect(redirect(await call("typed", {}, "f=name"))).toMatch(/^idle\?/);
+    expect(redirect(await call("typed", {}, "f=name"))).toContain("to=type");
+    expect(redirect(await call("addr-street-typed", {}))).toMatch(/^idle\?/);
+    expect(redirect(await call("addr-street-typed", { Digits: "", FinishedOnKey: "#" }))).toBe("addr-street-keys?again=1");
+    expect(redirect(await call("typed", { Digits: "*" }, "f=name"))).toBe("ask?f=name");
+    expect(redirect(await call("addr-street-typed", { Digits: "*" }))).toBe("addr-street");
+  });
+  it("extra check P1: silence after the tone (Twilio skips the action for an empty recording) goes the empty-answer way, never a hang-up", async () => {
+    const { readFileSync } = await import("node:fs");
+    const ask = readFileSync("src/lib/ivr/flow.ts", "utf8").split("  async ask(ctx, vr) {")[1].split("\n  },\n")[0];
+    expect(ask).toMatch(/vr\.record\(\{[^\n]*\}\);\n(\s*\/\/[^\n]*\n)*\s*return back\(vr, "heard", \{ f, n, empty: 1 \}\);/);
+    // that step: the did-not-catch retry, as for any empty answer
+    expect(redirect(await call("heard", {}, "f=name&empty=1"))).toBe("ask?f=name&n=1");
   });
 });

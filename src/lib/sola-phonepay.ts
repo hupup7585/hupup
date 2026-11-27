@@ -403,6 +403,14 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
       failed = (e as Error).message.slice(0, 200);
     }
   }
+  // Extra check Pay1: once a try has looked back over the earlier "could not be checked" tries, they are marked as
+  // seen, so the next try looks at its own time only (before, every later try saw the same old charges again, came out
+  // "unclear" every time, and the caller could be charged three times with nothing counted or voided)
+  if (c && unchecked.length)
+    await db
+      .update(schema.phonepayAttempts)
+      .set({ result: "check_failed_seen" })
+      .where(and(eq(schema.phonepayAttempts.orderId, orderId), eq(schema.phonepayAttempts.result, "check_failed"), gte(schema.phonepayAttempts.startedAt, new Date(started.getTime() - 60 * 60_000))));
   const mail = async (subject: string, text: string) => {
     const to = config.adminEmail();
     if (!to) return;
