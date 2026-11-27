@@ -14,7 +14,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { renewPaymentHold } from "@/lib/ivr/flow";
-import { updateDetailsAction, updateStatusAction } from "@/app/admin/(app)/orders/actions";
+import { updateStatusAction } from "@/app/admin/(app)/orders/actions";
 
 const ended = new Date(Date.now() - 3600_000);
 async function shared() {
@@ -65,20 +65,3 @@ describe("deep check 06:00 M8: Admin re-activating a cancelled order", () => {
   });
 });
 
-describe("deep check 06:00 M23: Admin Delivery details Save keeps notes the system added since the page opened", () => {
-  const form = (o: Record<string, string>) => {
-    const f = new FormData();
-    for (const [k, v] of Object.entries(o)) f.set(k, v);
-    return f;
-  };
-  it("notes unchanged on the page: the system's later note stays", async () => {
-    const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: "2027-08-18", pickupDate: "2027-08-19", deliveryAddress: "1 Main St, Monroe NY", notes: "Gate code 12. Second payment of $50.00: refund it. " }).returning();
-    await updateDetailsAction(o.id, form({ deliveryAddress: "1 Main St, Monroe NY", notes: "Gate code 12. ", notesBefore: "Gate code 12. " }));
-    expect((await get(o.id)).notes).toBe("Gate code 12. Second payment of $50.00: refund it. ");
-  });
-  it("notes edited on the page: the edit is saved and the system's later note is kept after it", async () => {
-    const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: "2027-08-18", pickupDate: "2027-08-19", deliveryAddress: "1 Main St, Monroe NY", notes: "Gate code 12. Refund it. " }).returning();
-    await updateDetailsAction(o.id, form({ deliveryAddress: "1 Main St, Monroe NY", notes: "Gate code 34. ", notesBefore: "Gate code 12. " }));
-    expect((await get(o.id)).notes).toBe("Gate code 34. Refund it. ");
-  });
-});

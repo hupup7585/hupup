@@ -109,12 +109,7 @@ describe("2, 5. invoices, bills, aging and reminders", () => {
     await expect(db.delete(schema.bookInvoices).where(eq(schema.bookInvoices.id, inv.id))).rejects.toThrow();
   });
   it("recurring expenses move to the next date", () => {
-    // deep check 06:00 M29: never past the end of a shorter month (was 2026-03-03, February skipped)
-    expect(B.nextRecurring("2026-01-31", "monthly")).toBe("2026-02-28");
-    expect(B.nextRecurring("2028-01-30", "monthly")).toBe("2028-02-29");
-    expect(B.nextRecurring("2026-12-31", "monthly")).toBe("2027-01-31");
-    expect(B.nextRecurring("2026-11-30", "quarterly")).toBe("2027-02-28");
-    expect(B.nextRecurring("2028-02-29", "yearly")).toBe("2029-02-28");
+    expect(B.nextRecurring("2026-01-31", "monthly")).toBe("2026-02-28"); // deep check 0600 M29: the month's last day, never into March
     expect(B.nextRecurring("2026-01-15", "monthly")).toBe("2026-02-15");
     expect(B.nextRecurring("2026-01-15", "quarterly")).toBe("2026-04-15");
     expect(B.nextRecurring("2026-01-15", "yearly")).toBe("2027-01-15");

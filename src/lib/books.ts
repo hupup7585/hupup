@@ -228,7 +228,7 @@ export async function recordBookingPayment(orderId: number, cents: number, metho
     const tipCents = overpayment ? 0 : cents - toTotal;
     await addEntry(
       {
-        entryDate: (await isLocked(date, db)) ? nextOpenDate(date) : date,
+        entryDate: await firstOpenDate(date, db),
         kind: "income",
         category: overpayment ? "Overpayment (refund due)" : "Bookings",
         ...(overpayment ? { notes: "Second payment on an order already paid in full: refund due." } : {}),
@@ -254,6 +254,16 @@ export async function recordBookingPayment(orderId: number, cents: number, metho
   }
 }
 const nextOpenDate = (d: string) => `${addDays(`${d.slice(0, 7)}-28`, 5).slice(0, 7)}-01`;
+
+/**
+ * The date itself when its month is open, else the 1st of the first open month after it. Deep check 0600 M35
+ * (Nov 27, 2026): it used to move one month only, so with two months locked the automatic entry was dropped.
+ */
+export async function firstOpenDate(date: string, exec: Pick<typeof db, "select"> = db): Promise<string> {
+  let d = date;
+  for (let i = 0; i < 120 && (await isLocked(d, exec)); i++) d = nextOpenDate(d);
+  return d;
+}
 
 /** Sales tax county from the delivery address (towns we serve). Unknown addresses are listed as "Orange (check)". */
 const COUNTY_TOWNS: Record<string, string[]> = {
@@ -364,20 +374,29 @@ export function agingBucket(due: string, today = todayISO()): "current" | "1-30"
 }
 
 /** Next date of a recurring expense. */
-export function nextRecurring(date: string, frequency: string) {
+export function nextRecurring(date: string, frequency: string, anchorDay?: number) {
   const d = new Date(`${date}T12:00:00Z`);
-  if (frequency === "weekly") d.setUTCDate(d.getUTCDate() + 7);
-  else {
-    // Deep check 06:00 M29: the 29th-31st go to the last day of a shorter month (Jan 31 -> Feb 28), never past it
-    // (Jan 31 -> Mar 3 skipped February); the same for quarterly and yearly (Feb 29 -> Feb 28)
-    const months = frequency === "quarterly" ? 3 : frequency === "yearly" ? 12 : 1;
-    const day = d.getUTCDate();
-    d.setUTCDate(1);
-    d.setUTCMonth(d.getUTCMonth() + months);
-    const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0, 12)).getUTCDate();
-    d.setUTCDate(Math.min(day, last));
+  if (frequency === "weekly") {
+    d.setUTCDate(d.getUTCDate() + 7);
+    return d.toISOString().slice(0, 10);
   }
-  return d.toISOString().slice(0, 10);
+  // Deep check 0600 M29 (Nov 27, 2026): monthly, quarterly and yearly keep their own day of the month (the day the
+  // expense was first set for), or the month's last day when the month is shorter: Jan 31, Feb 28, Mar 31 (it used to
+  // run over into the next month and drift: Jan 31, Mar 3)
+  const months = frequency === "quarterly" ? 3 : frequency === "yearly" ? 12 : 1;
+  const total = d.getUTCFullYear() * 12 + d.getUTCMonth() + months;
+  const y = Math.floor(total / 12);
+  const m = total % 12;
+  const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const day = Math.min(anchorDay && anchorDay >= 1 && anchorDay <= 31 ? anchorDay : d.getUTCDate(), last);
+  return `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** The day of the month a recurring expense was first set for (from its "added" record), for nextRecurring. */
+export async function recurringAnchorDay(recurringId: number): Promise<number | undefined> {
+  const [row] = (await db.execute(sql`SELECT after->>'nextDate' AS d FROM audit_log WHERE action = 'books.recurring_added' AND entity_id = ${String(recurringId)} ORDER BY id LIMIT 1`)).rows as { d: string | null }[];
+  const day = row?.d ? Number(String(row.d).slice(8, 10)) : NaN;
+  return Number.isFinite(day) && day > 0 ? day : undefined;
 }
 
 /**
@@ -519,7 +538,7 @@ export async function recordAutoMoneyOut(input: { kind: "refund" | "processor_fe
       if (o) orderTax = { taxExempt: o.taxCents === 0 && o.subtotalCents > 0, county: countyFor(o.deliveryAddress) };
     }
     await addEntry(
-      { entryDate: (await isLocked(date)) ? nextOpenDate(date) : date, kind: input.kind, category: input.category, amountCents: input.amountCents, ...(input.taxCents ? { taxCents: input.taxCents } : {}), ...orderTax, method: input.method, orderId: input.orderId ?? null, ref: input.ref, notes: input.notes ?? null, source: "auto" },
+      { entryDate: await firstOpenDate(date), kind: input.kind, category: input.category, amountCents: input.amountCents, ...(input.taxCents ? { taxCents: input.taxCents } : {}), ...orderTax, method: input.method, orderId: input.orderId ?? null, ref: input.ref, notes: input.notes ?? null, source: "auto" },
       null,
     );
   } catch (e) {

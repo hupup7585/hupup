@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { getOrderWithItems, setOrderStatus, orderNumber } from "@/lib/orders";
+import { getOrderWithItems, orderNumber } from "@/lib/orders";
 import { sendOrderText } from "@/lib/notify";
 import { BUSINESS_NAME } from "@/lib/config";
 import { DELIVERY_TEMPLATES, type TemplateKey } from "@/lib/delivery-templates";
@@ -53,7 +53,14 @@ export async function markDoneAction(orderId: number, stop: "delivery" | "pickup
   const ok = stop === "delivery" ? from === "CONFIRMED" : from === "DELIVERED";
   if (!ok) return { ok: false, message: stop === "delivery" ? "Only confirmed (paid) orders can be marked delivered." : "Mark it delivered first." };
   const to = stop === "delivery" ? "DELIVERED" : "PICKED_UP";
-  await setOrderStatus(orderId, to);
+  // Deep check 0600 M55 (Nov 27, 2026): not a stop more than a day ahead (the evening before is fine), and a double
+  // click records it once (the status changes only if it is still what it was)
+  const { todayISO, addDays } = await import("@/lib/dates");
+  const day = stop === "delivery" ? full.order.eventDate : full.order.pickupDate;
+  if (day > addDays(todayISO(), 1)) return { ok: false, message: `This ${stop} is for ${day}. It can be marked ${stop === "delivery" ? "delivered" : "picked up"} from the day before.` };
+  const { and, eq } = await import("drizzle-orm");
+  const [changed] = await db.update(schema.orders).set({ status: to, updatedAt: new Date() }).where(and(eq(schema.orders.id, orderId), eq(schema.orders.status, from))).returning({ id: schema.orders.id });
+  if (!changed) return { ok: false, message: `Already marked ${stop === "delivery" ? "delivered" : "picked up"}.` };
   await recordStage(orderId, stop, stop === "delivery" ? "delivered" : "picked_up", staff.userId, null, staff.name);
   await db.insert(schema.auditLog).values({ userId: staff.userId, action: `delivery.${to.toLowerCase()}`, entityType: "order", entityId: String(orderId), before: { status: from }, after: { status: to } });
   revalidatePath("/admin/deliveries");
