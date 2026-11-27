@@ -8,13 +8,16 @@ import { formatMoney } from "@/lib/money";
 import DualDate from "@/components/DualDate";
 import { PRIORITY_LABEL, STATUS_LABEL, canAccess, getTask, isOverdue, laborCents, minutesOf, seesMoney, staffList } from "@/lib/tasks";
 import { addSubtaskAction, logHoursAction, setStatusAction, startTimerAction, stopTimerAction, updateTaskAction } from "../actions";
-import { orderPath } from "@/lib/order-path";
+import { linkedOrderId, orderPath } from "@/lib/order-path";
+import { orderNumber } from "@/lib/order-number";
 
 const FIELD_LABEL: Record<string, string> = { title: "Title", notes: "Notes", dueDate: "Deadline", dueTime: "Time", priority: "Priority", status: "Status", assignedTo: "Assigned to", orderId: "Booking", projectId: "Project" };
 
 export default async function TaskPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ msg?: string; err?: string }> }) {
   const staff = await requireStaff(["owner", "secretary", "delivery"]);
-  const t = await getTask(Number((await params).id));
+  const id = Number((await params).id);
+  // Deep check B8: a bad task number is "not found", never a crash
+  const t = Number.isInteger(id) && id > 0 ? await getTask(id) : null;
   if (!t || !(await canAccess(staff, t))) notFound();
   if (t.parentId) redirect(`/admin/tasks/${t.parentId}`);
   const sp = await searchParams;
@@ -60,7 +63,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
               <label className="block text-sm"><span className="mb-1 block font-semibold text-muted">Assigned to</span>
                 <select name="assignedTo" defaultValue={t.assignedTo ?? ""} className="input"><option value="">Unassigned</option>{people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
               </label>
-              <label className="block text-sm"><span className="mb-1 block font-semibold text-muted">Booking #</span><input name="orderId" defaultValue={t.orderId ?? ""} inputMode="numeric" className="input" /></label>
+              <label className="block text-sm"><span className="mb-1 block font-semibold text-muted">Booking #</span><input name="orderId" defaultValue={t.orderId ? orderNumber(linkedOrderId(t.orderId)) : ""} inputMode="numeric" className="input" /></label>
               <label className="block text-sm"><span className="mb-1 block font-semibold text-muted">Project</span>
                 <select name="projectId" defaultValue={t.projectId ?? ""} className="input"><option value="">None</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
               </label>
@@ -68,7 +71,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
             </>
           )}
           {!edit && t.notes && <p className="text-sm sm:col-span-2">{t.notes}</p>}
-          {t.orderId && <p className="text-sm sm:col-span-2">Booking: <Link className="font-bold text-navy underline" href={orderPath(t.orderId)}>Booking number {1000 + Number(t.orderId)}</Link></p>}
+          {t.orderId && <p className="text-sm sm:col-span-2">Booking: <Link className="font-bold text-navy underline" href={orderPath(linkedOrderId(t.orderId))}>Booking number {orderNumber(linkedOrderId(t.orderId))}</Link></p>}
           <div><button className="btn-dark">Save</button></div>
         </form>
       </section>
