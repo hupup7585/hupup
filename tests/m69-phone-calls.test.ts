@@ -281,7 +281,7 @@ describe("item 27: the keypad card retry never starts a new card try after the S
   it("2, no key, or a forged link: no new try either", async () => {
     at("2027-01-15T15:00:00Z");
     const { sub, q, o } = await declined();
-    for (const body of [{ Digits: "2" }, {}, { Digits: "9" }]) expect(await sub("retry", body, q)).not.toContain("<Pay");
+    for (const body of [{ Digits: "2" }, {}, { Digits: "9" }] as Record<string, string>[]) expect(await sub("retry", body, q)).not.toContain("<Pay");
     expect(await sub("retry", { Digits: "1" }, `o=${o.id}&n=1&t=forged`)).not.toContain("<Pay");
   });
 });
