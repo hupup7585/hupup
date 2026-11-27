@@ -152,7 +152,8 @@ export async function recordConsentDetailed(input: RecordConsentInput, exec: Exe
   // Deep check 06:00 M27: a STOP on ANY record with this number counts (duplicate records), not only the first found
   const stopped =
     customer.smsOptOut ||
-    (input.action === "opt_in" && (await exec.select({ id: schema.customers.id }).from(schema.customers).where(and(eq(schema.customers.phone, input.phone), eq(schema.customers.smsOptOut, true))).limit(1)).length > 0);
+    (input.action === "opt_in" &&
+      (await exec.select({ phone: schema.customers.phone, optOut: schema.customers.smsOptOut }).from(schema.customers).where(and(eq(schema.customers.phone, input.phone), eq(schema.customers.smsOptOut, true))).limit(1)).some((r) => r.optOut === true && r.phone === input.phone));
   if (input.action === "opt_in" && stopped && !input.viaStartConfirmation) {
     throw new ConsentBlockedError("This customer replied STOP. They must text START and reply YES to receive order texts again; promotions need a new sign-up after that.");
   }
