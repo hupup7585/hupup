@@ -89,7 +89,7 @@ describe("key 1: booking by item", () => {
     expect(redirect(await call("qty", {}, `p=${medium}&d=${TUE}`))).toBe(`booked?p=${medium}&d=${TUE}`);
     const taken = await call("booked", {}, `p=${medium}&d=${TUE}`);
     expect(said(taken)).toEqual([
-      "We are sorry, the Medium Castle is no longer available for Tuesday, December first. To check the closest available jumping balloon on the same date, press 1. For the nearest available date, press 2.",
+      "Sorry, that item is not available on that day. To hear the closest sizes, press 1. To hear the nearest days for this item, press 2.", // Abraham, Nov 27, 2026, 12:01 AM
       "To go to your shopping cart, press 0.",
       "To go back, press star.",
     ]);

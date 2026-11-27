@@ -2,6 +2,7 @@ import { PIECE_ALIAS, PROMPTS, SHARED_PIECES, promptRecordable, type PromptDef, 
 import { LETTERS, TOWN_PHRASES, WORDS, numberWords, pluralName, townSlotKey } from "@/lib/spoken-words";
 import { STREETS, UNIT_CODES, ZIP_CODES, streetSlotKey, unitSlotKey } from "@/lib/streets";
 import { TYPE_CLIPS, typeSlotKey, type RentalKind } from "@/lib/box56";
+import { balloonEntry } from "@/lib/ivr/balloon-menu";
 export { LETTERS, WORDS, numberWords, ordinalWords, wordSlotsFor } from "@/lib/spoken-words";
 
 /**
@@ -83,9 +84,12 @@ export function allSlots(items: { id: number; name: string }[] = [], texts: Reco
   // Keypad echo and the unit read-back (Abraham, Nov 22, 2026)
   for (const [w, label] of KEYPAD_WORDS) out.push({ key: `word:${w}`, kind: "word", group: "Letters A to Z", label, text: `${w}.` });
   // Each rental name twice (Abraham, Nov 19, 2026): for 1, and for 2 or more
+  // The jumping balloon names are recorded with hyphens (Abraham's rule, Nov 27, 2026: "Soft-Hop"); only the slot text
+  // here changes so it matches the recording; the rental's name on the website and in Admin stays as it is
+  const said = (name: string) => (balloonEntry(name) ? name.trim().replace(/\s+/g, "-") : name);
   for (const it of items) {
-    out.push({ key: `item:${it.id}`, kind: "item", group: "Rental names", label: `${it.name} (one)`, text: it.name });
-    out.push({ key: `item:${it.id}:plural`, kind: "item", group: "Rental names", label: `${it.name} (two or more)`, text: pluralName(it.name) });
+    out.push({ key: `item:${it.id}`, kind: "item", group: "Rental names", label: `${it.name} (one)`, text: said(it.name) });
+    out.push({ key: `item:${it.id}:plural`, kind: "item", group: "Rental names", label: `${it.name} (two or more)`, text: said(pluralName(it.name)) });
   }
   // Added in Admin (Nov 23, 2026)
   for (const c of custom) if (!out.some((o) => o.key === c.key)) out.push(c);

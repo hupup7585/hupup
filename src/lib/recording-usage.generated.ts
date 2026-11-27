@@ -532,9 +532,10 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "lib/ivr/flow.ts",
   "lib/recording-slots.ts"
  ],
- "item_taken": [
+ "item_not_available": [
   "lib/ivr/flow.ts"
  ],
+ "item_taken": [],
  "just_booked": [
   "lib/ivr/flow.ts"
  ],
@@ -1472,8 +1473,5 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "lib/ivr/flow.ts",
   "lib/ivr/menu-editor.ts",
   "lib/recording-library.ts"
- ],
- "yomtov_cutoff_saved": [
-  "lib/ivr/flow.ts"
  ]
 };

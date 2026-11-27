@@ -366,29 +366,29 @@ export const PROMPTS = {
   box25_keep: { group: "Booking by item (key 1)", label: "Box 25: keep shopping (every item)", text: "To keep shopping, for same day, press 1. For another day, press 2." },
   // Jumping balloons list (Nov 19, 2026, replaces box 153): the opening, then one line per balloon, then the cart line
   // Jumping balloon list (Abraham, Nov 22, 2026): each balloon = 3 fixed recordings: name, full item number, "press N."
-  balloon_name_7201: { group: "Booking by item (key 1)", label: "Jumping balloons list: Soft Hop, name", text: "For the Soft Hop," },
+  balloon_name_7201: { group: "Booking by item (key 1)", label: "Jumping balloons list: Soft Hop, name", text: "For the Soft-Hop," },
   balloon_num_7201: { group: "Booking by item (key 1)", label: "Jumping balloons list: Soft Hop, item number", text: "item seven two zero one" },
-  balloon_name_7202: { group: "Booking by item (key 1)", label: "Jumping balloons list: Sunlight Spot, name", text: "For the Sunlight Spot," },
+  balloon_name_7202: { group: "Booking by item (key 1)", label: "Jumping balloons list: Sunlight Spot, name", text: "For the Sunlight-Spot," },
   balloon_num_7202: { group: "Booking by item (key 1)", label: "Jumping balloons list: Sunlight Spot, item number", text: "item seven two zero two" },
-  balloon_name_7203: { group: "Booking by item (key 1)", label: "Jumping balloons list: Blue Bounce, name", text: "For the Blue Bounce," },
+  balloon_name_7203: { group: "Booking by item (key 1)", label: "Jumping balloons list: Blue Bounce, name", text: "For the Blue-Bounce," },
   balloon_num_7203: { group: "Booking by item (key 1)", label: "Jumping balloons list: Blue Bounce, item number", text: "item seven two zero three" },
-  balloon_name_7204: { group: "Booking by item (key 1)", label: "Jumping balloons list: Ball Buster, name", text: "For the Ball Buster," },
+  balloon_name_7204: { group: "Booking by item (key 1)", label: "Jumping balloons list: Ball Buster, name", text: "For the Ball-Buster," },
   balloon_num_7204: { group: "Booking by item (key 1)", label: "Jumping balloons list: Ball Buster, item number", text: "item seven two zero four" },
-  balloon_name_7205: { group: "Booking by item (key 1)", label: "Jumping balloons list: Rising Joy, name", text: "For the Rising Joy," },
+  balloon_name_7205: { group: "Booking by item (key 1)", label: "Jumping balloons list: Rising Joy, name", text: "For the Rising-Joy," },
   balloon_num_7205: { group: "Booking by item (key 1)", label: "Jumping balloons list: Rising Joy, item number", text: "item seven two zero five" },
-  balloon_name_7206: { group: "Booking by item (key 1)", label: "Jumping balloons list: Family Fun, name", text: "For the Family Fun," },
+  balloon_name_7206: { group: "Booking by item (key 1)", label: "Jumping balloons list: Family Fun, name", text: "For the Family-Fun," },
   balloon_num_7206: { group: "Booking by item (key 1)", label: "Jumping balloons list: Family Fun, item number", text: "item seven two zero six" },
-  balloon_name_7207: { group: "Booking by item (key 1)", label: "Jumping balloons list: Adventure Zone, name", text: "For the Adventure Zone," },
+  balloon_name_7207: { group: "Booking by item (key 1)", label: "Jumping balloons list: Adventure Zone, name", text: "For the Adventure-Zone," },
   balloon_num_7207: { group: "Booking by item (key 1)", label: "Jumping balloons list: Adventure Zone, item number", text: "item seven two zero seven" },
-  balloon_name_7208: { group: "Booking by item (key 1)", label: "Jumping balloons list: Wide Slide, name", text: "For the Wide Slide," },
+  balloon_name_7208: { group: "Booking by item (key 1)", label: "Jumping balloons list: Wide Slide, name", text: "For the Wide-Slide," },
   balloon_num_7208: { group: "Booking by item (key 1)", label: "Jumping balloons list: Wide Slide, item number", text: "item seven two zero eight" },
-  balloon_name_7209: { group: "Booking by item (key 1)", label: "Jumping balloons list: Amusing Obstacle, name", text: "For the Amusing Obstacle," },
+  balloon_name_7209: { group: "Booking by item (key 1)", label: "Jumping balloons list: Amusing Obstacle, name", text: "For the Amusing-Obstacle," },
   balloon_num_7209: { group: "Booking by item (key 1)", label: "Jumping balloons list: Amusing Obstacle, item number", text: "item seven two zero nine" },
-  balloon_name_7210: { group: "Booking by item (key 1)", label: "Jumping balloons list: Mega Mountain, name", text: "For the Mega Mountain," },
+  balloon_name_7210: { group: "Booking by item (key 1)", label: "Jumping balloons list: Mega Mountain, name", text: "For the Mega-Mountain," },
   balloon_num_7210: { group: "Booking by item (key 1)", label: "Jumping balloons list: Mega Mountain, item number", text: "item seven two one zero" },
-  balloon_name_7211: { group: "Booking by item (key 1)", label: "Jumping balloons list: Wheel Thrill, name", text: "For the Wheel Thrill," },
+  balloon_name_7211: { group: "Booking by item (key 1)", label: "Jumping balloons list: Wheel Thrill, name", text: "For the Wheel-Thrill," },
   balloon_num_7211: { group: "Booking by item (key 1)", label: "Jumping balloons list: Wheel Thrill, item number", text: "item seven two one one" },
-  balloon_name_7212: { group: "Booking by item (key 1)", label: "Jumping balloons list: Bounce Blast, name", text: "For the Bounce Blast," },
+  balloon_name_7212: { group: "Booking by item (key 1)", label: "Jumping balloons list: Bounce Blast, name", text: "For the Bounce-Blast," },
   balloon_num_7212: { group: "Booking by item (key 1)", label: "Jumping balloons list: Bounce Blast, item number", text: "item seven two one two" },
   balloon_key_1: { group: "Booking by item (key 1)", label: "Jumping balloons list: press 1", text: "press 1." },
   balloon_key_2: { group: "Booking by item (key 1)", label: "Jumping balloons list: press 2", text: "press 2." },
@@ -424,7 +424,9 @@ export const PROMPTS = {
   // Item booked, whole system (Nov 19, 2026): replaces the bigger and smaller size screen
   // Item taken (Abraham, Nov 19, 2026, 10:25 PM): ONE prompt for the whole phone system, also when someone just booked the
   // last one while the caller was choosing. Then the shared cart line and the shared star line.
-  item_taken: { group: "Booking by item (key 1)", label: "Item taken (whole phone system)", text: "We are sorry, the {item} is no longer available for {date}. To check the closest available {category} on the same date, press 1. For the nearest available date, press 2.", vars: ["item", "date", "category"] },
+  // Abraham's approved line (Nov 27, 2026, 12:01 AM): one recording, no changing parts
+  item_not_available: { group: "Booking by item (key 1)", label: "Item taken (whole phone system, one recording)", text: "Sorry, that item is not available on that day. To hear the closest sizes, press 1. To hear the nearest days for this item, press 2." },
+  item_taken: { group: "Booking by item (key 1)", label: "Old item-taken line (replaced by item_not_available, Nov 27, 2026)", text: "We are sorry, the {item} is no longer available for {date}. To check the closest available {category} on the same date, press 1. For the nearest available date, press 2.", vars: ["item", "date", "category"] },
   // Key 2 on item taken: NOT APPROVED yet (draft for Abraham), on preview only; the live line goes to the date prompt
   // Item taken, nearest options (Abraham, Nov 25, 2026, 8:08 PM). Waiting for his OK on the wording: until then the
   // live voice says this exact text (the feature works now); recordings go in these slots
@@ -512,7 +514,7 @@ export const PROMPTS = {
   remove_enter: { group: "Cart", label: "Remove an item: how many to remove", text: "Using your keypad, please enter the amount you would like to remove." },
   removed: { group: "Cart", label: "Item removed", text: "Successfully removed from your cart: {qty} {item} for {date}.", vars: ["qty", "item", "date"] },
   cart_updated: { group: "Cart", label: "Item removed: the updated cart (then the cart from its date line)", text: "Here is your updated cart." },
-  cart_cleared: { group: "Cart", label: "Cart emptied (cart key 4: the cart was just cleared)", text: "Your cart has been cleared, and it is now empty. Let's start shopping." }, // Abraham, Nov 26, 2026, 11:32 PM
+  cart_cleared: { group: "Cart", label: "Cart emptied (cart key 4: the cart was just cleared)", text: "Your cart has been cleared. It is now empty. Let's start shopping." }, // Abraham, Nov 26, 2026, 11:32 PM; words Nov 27, 12:01 AM
   cart_expired: { group: "Cart", label: "Cart timed out", text: "Sorry, your cart timed out. Let us start again." },
 
   // Checkout
@@ -660,10 +662,10 @@ export const PROMPTS = {
   consent_marketing_no: { group: "Text message consent", label: "Said no to promotional texts", text: "No problem, you will not get promotional texts." },
   // No booking on Shabbes or Yom Tov (Abraham, Nov 14, 2026): the day and time booking opens again
   // The whole hotline on Shabbes and Yom Tov (Abraham, Nov 14, 2026, choice A): drafts for his OK; then the tone, general voicemail
-  // Abraham, Nov 26, 2026, 11:51 PM: the booking cut-off before Shabbes / Yom Tov. Draft wording (Abraham is confirming
-  // the exact text; Hark records it); the computer voice plays it until the recording is in.
-  shabbes_cutoff_saved: { group: "Welcome & main menu", label: "Shabbes cut-off, items saved (draft wording, Abraham confirming)", text: "We are sorry, we are not able to finish your booking right now, because Shabbes is starting soon. Your items are saved for you until {day}, at {time}. Please call us back after Shabbes to finish your booking.", vars: ["day", "time"] },
-  yomtov_cutoff_saved: { group: "Welcome & main menu", label: "Yom Tov cut-off, items saved (draft wording, Abraham confirming)", text: "We are sorry, we are not able to finish your booking right now, because Yom Tov is starting soon. Your items are saved for you until {day}, at {time}. Please call us back after Yom Tov to finish your booking.", vars: ["day", "time"] },
+  // Abraham, Nov 26, 2026, 11:51 PM (words approved Nov 27, 12:05 AM): the booking cut-off before Shabbes, in 3 parts:
+  // piece 1 (slot shabbes_cutoff_saved#1), the saved-until clock time from the number recordings (time only, no
+  // date), piece 2 (slot shabbes_cutoff_saved#2). It ends the call (no other goodbye after it).
+  shabbes_cutoff_saved: { group: "Welcome & main menu", label: "Shabbes cut-off, items saved (piece 1, the time, piece 2; ends the call)", text: "Shabbes is starting soon, so we cannot finish your booking right now. We will save your items until one hour after Shabbes, Saturday night, at {time} PM. Please call us back right after Shabbes to finish your order. Thank you for calling Hup Up Attractions, a good Shabbes.", vars: ["time"] },
   closed_shabbos_greeting: { group: "Welcome & main menu", label: "Whole hotline on Shabbes: closed greeting (approved Nov 16)", text: "Thank you for calling Hup Up Attractions. We are closed now for Shabbes, and we will be open again on {day} at {time}. Please leave your name, phone number, and a short message after the tone, and we will call you back after Shabbes. Good Shabbes!", vars: ["day", "time"] },
   closed_yomtov_greeting: { group: "Welcome & main menu", label: "Whole hotline on Yom Tov: closed greeting (approved Nov 16)", text: "Thank you for calling Hup Up Attractions. We are closed now for Yom Tov, and we will be open again on {day} at {time}. Please leave your name, phone number, and a short message after the tone, and we will call you back after Yom Tov. Good Yom Tov!", vars: ["day", "time"] },
   // Main menu key 7 (Abraham, Nov 26, 2026): the customer service hours with Friday, instead of the office hours
@@ -930,7 +932,7 @@ export const PROMPTS = {
 
 /** Old lines no longer played anywhere (kept so nothing is lost; shown as "Not used"). */
 // Hark's audit items 12 and 14 (Nov 24, 2026): lines no step plays any more were still shown as Live
-export const RETIRED_PROMPTS = new Set<string>(["book_note", "book_corporate", "box153", "no_input", "idle_warning", "only_some_left", "day_choice", "addr_rb_again", "type_email_symbols", "email_unclear", "thanks_order", "consent_unclear", "attraction_menu_back", "menu_category", "menu_empty", "retry_spoken", "addr_readback", "resume_added", "instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard", "cart_expired", "addr_unit_skip", "ask_directions", "directions_saved", "addr_price", "addr_saved", "vma_charge_amount", "vma_charge_readback", "vma_charge_bad", "address_outside_area", "phonepay_approved_join", "phonepay_back", "ocean_balls", "cart_add_balls", "instr_laser", "automated_only", "nearest_date", "laser_second_set", "second_laser", "laser_third_set", "laser_packs", "whole_hours", "whole_pay_approved_text", "whole_pay_approved_optin"]);
+export const RETIRED_PROMPTS = new Set<string>(["book_note", "book_corporate", "box153", "no_input", "idle_warning", "only_some_left", "day_choice", "item_taken", "addr_rb_again", "type_email_symbols", "email_unclear", "thanks_order", "consent_unclear", "attraction_menu_back", "menu_category", "menu_empty", "retry_spoken", "addr_readback", "resume_added", "instr_intro", "menu_cart", "menu_operator", "menu_speech", "menu_repeat", "category_intro", "back_to_menu", "book_intro", "date_prompt", "date_confirm_day", "sold_out", "sold_out_options_cart", "sold_out_options", "after_add", "cart_summary", "consent_marketing_sent", "consent_marketing_yes", "consent_marketing_no", "transfer_failed", "menu_voicemail", "voicemail_offer", "voicemail_prompt", "voicemail_thanks", "voicemail_none", "catalog_text_which", "catalog_text_enter", "catalog_text_heard", "phonepay_link_option", "phone_confirm", "phone_enter", "phone_bad", "ask_email", "ask_email_required", "email_skip", "link_sent", "link_emailed", "link_emailed_consented", "link_call_back", "promo_enter", "promo_heard", "cart_expired", "addr_unit_skip", "ask_directions", "directions_saved", "addr_price", "addr_saved", "vma_charge_amount", "vma_charge_readback", "vma_charge_bad", "address_outside_area", "phonepay_approved_join", "phonepay_back", "ocean_balls", "cart_add_balls", "instr_laser", "automated_only", "nearest_date", "laser_second_set", "second_laser", "laser_third_set", "laser_packs", "whole_hours", "whole_pay_approved_text", "whole_pay_approved_optin"]);
 
 /** The extension (or part of the call) each group of lines belongs to, for the Admin filter. New groups fall into "Other". */
 export const PROMPT_AREAS: Record<string, string> = {

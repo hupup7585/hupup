@@ -53,8 +53,8 @@ describe("Shabbes cut-off", () => {
     process.env.HUP_CALENDAR_NOW = new Date(candles.getTime() - 14 * 60_000).toISOString();
     const xml = await call(sid, "cart");
     const until = new Date(bookingLock(candles, (await getSettings()) as never).opensAt!.getTime() + 60 * 60_000);
-    expect(said(xml)).toContain("Your items are saved for you until Saturday, January sixteenth, at");
-    expect(said(xml)).toContain("Thank you for calling Hup Up Attractions");
+    const clock = until.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }).replace(/\s*PM$/, "");
+    expect(said(xml)).toBe(`Shabbes is starting soon, so we cannot finish your booking right now. We will save your items until one hour after Shabbes, Saturday night, at ${clock} PM. Please call us back right after Shabbes to finish your order. Thank you for calling Hup Up Attractions, a good Shabbes.`);
     expect(xml).toContain("<Hangup/>");
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, holdId));
     expect([o.status, o.holdExpiresAt?.getTime()]).toEqual(["HOLD", until.getTime()]);

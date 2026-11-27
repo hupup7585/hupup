@@ -779,14 +779,14 @@ async function shabbesStop(ctx: Ctx, vr: VR, where: string): Promise<VR | null> 
     await db.update(orders).set({ status: "HOLD", holdExpiresAt: until, updatedAt: now }).where(inArray(orders.id, saved.map((o) => o.id)));
     await updateSession(ctx.callSid, { data: { shabbesSaved: until.toISOString() } }, ctx.session);
     await track(ctx.callSid, "step", `${cut.reason ?? "Shabbes"} cut-off at ${where}: ${saved.length} rental day(s) saved until ${until.toLocaleString("en-US", { timeZone: "America/New_York" })}`).catch(() => undefined);
-    const vars = {
-      day: spokenDate(localISO(until)),
-      time: until.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }),
-    };
-    sp(vr, ctx, cut.reason === "Yom Tov" ? "yomtov_cutoff_saved" : "shabbes_cutoff_saved", vars);
-    sp(vr, ctx, "goodbye_thanks_calling");
-    vr.hangup();
-    return vr;
+    // Yom Tov: no words yet (Abraham will give them); the cart is saved the same way and the closed message plays
+    if (cut.reason !== "Yom Tov") {
+      // the clock time only, no date ("6:30"; "PM" is in piece 2)
+      const time = until.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }).replace(/\s*[AP]M$/i, "");
+      sp(vr, ctx, "shabbes_cutoff_saved", { time }); // its last words are the goodbye: no other goodbye after it
+      vr.hangup();
+      return vr;
+    }
   }
   await track(ctx.callSid, "step", `Booking closed (${cut.reason ?? "Shabbes"} cut-off): stopped at ${where}`).catch(() => undefined);
   const closed = await hotlineClosed(ctx, vr, 0, { locked: true, reason: cut.reason, opensAt: cut.opensAt });
@@ -3033,7 +3033,7 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     if (!p) return back(vr, "menu");
     const g = keypad(vr, url("taken-choice", { p: p.id, d: date }));
-    sp(g, ctx, "item_taken", { item: p.name, date: spokenDate(date), category: await singularCategory(p.categoryId) });
+    sp(g, ctx, "item_not_available"); // Abraham's approved line (Nov 27, 2026, 12:01 AM): 1 closest sizes, 2 nearest days
     menuRun(g, ctx, "cart_key", ["cart_key", "star"]);
     return bookNoInput(vr, ctx, "booked", { p: p.id, d: date });
   },

@@ -116,7 +116,7 @@ describe("the cart (Nov 19 and 22, 2026)", () => {
   it("key 4: the cart cleared line once (Abraham, Nov 26, 11:32 PM; not cart_empty), 0 items, then the bookings menu", async () => {
     await freshCart();
     const r = await call("cart-choice", { Digits: "4" });
-    expect(said(r)).toEqual(["Your cart has been cleared, and it is now empty. Let's start shopping."]);
+    expect(said(r)).toEqual(["Your cart has been cleared. It is now empty. Let's start shopping."]);
     expect(redirect(r)).toBe("book");
     expect(h.session.data.dayOrderIds).toEqual([]);
     expect(cat).toBeGreaterThan(0);
