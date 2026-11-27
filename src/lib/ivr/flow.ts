@@ -5151,6 +5151,22 @@ const handlers: Record<string, Handler> = {
     if (group.paid) return back(vr, "pay-approved", { o });
     // Hark's 2nd check, A2: the hold ran out during payment and nothing was paid: never "approved", no new try
     if (group.due <= 0) {
+      // Extra check HS2 (Nov 27, 2026): the hold ran out (or staff cancelled the order) while the caller was on Sola's
+      // line. The card may still have been charged: this try is checked in Sola first, so the money is recorded (the
+      // late-payment rules re-check the items, set Needs attention when needed and email the Owner and the customer),
+      // a wrong amount is voided, and the try is closed. "Approved" plays only when every day is confirmed; otherwise
+      // the same goodbye as before (no new words).
+      if (a) {
+        if (ctx.body.DialCallSid) await db.update(schema.phonepayAttempts).set({ payLegSid: ctx.body.DialCallSid }).where(eq(schema.phonepayAttempts.id, a));
+        const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1);
+        if (attempt && !attempt.result) {
+          await endMainPayLeg(attempt.payLegSid);
+          const r = await checkPhonePayTry(o, a, attempt.amountCents);
+          await track(ctx.callSid, "step", `Card payment try ${attempt.tryNumber ?? "?"} after the hold ran out: ${r.result}`, { attempt: a }).catch(() => undefined);
+          const after = await getPaymentGroup(o);
+          if (r.result === "paid" && after?.paid && after.orders.every((d) => d.order.status === "CONFIRMED")) return back(vr, "pay-approved", { o });
+        }
+      }
       await track(ctx.callSid, "step", "Payment step reached after the hold ran out (nothing paid): unpaid goodbye").catch(() => undefined);
       return back(vr, "goodbye");
     }

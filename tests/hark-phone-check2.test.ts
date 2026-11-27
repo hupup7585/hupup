@@ -48,6 +48,50 @@ describe("A2: paid means paid", () => {
   });
 });
 
+describe("extra check HS2: the hold ran out while the caller was on Sola's line", () => {
+  const solaWith = (rows: Record<string, string>[]) =>
+    vi.fn(async (_u: string, init: { body: string }) => new Response(JSON.stringify({ xResult: "S", xReportData: JSON.parse(init.body).xCommand === "Report:Approved" ? rows : [] })));
+  const nowEastern = () => new Date().toLocaleString("sv-SE", { timeZone: "America/New_York" }).replace("T", " ");
+  it("an approved card is still checked and recorded (never a silent hang-up with the money unseen); the try is closed", async () => {
+    process.env.SOLA_API_KEY = "test-key";
+    const id = await order("2027-03-02", "PENDING_PAYMENT", new Date(Date.now() + 600_000));
+    const { startAttempt } = await import("@/lib/sola-phonepay");
+    const att = await startAttempt(id, SID, 17841, "order");
+    // the hold ran out and the tidy-up released it while the caller was keying the card
+    await db.update(schema.orders).set({ status: "CANCELLED", holdExpiresAt: null, notes: "Expired hold released. " }).where(eq(schema.orders.id, id));
+    vi.stubGlobal("fetch", solaWith([{ xRefNum: "HS2PAID", xAmount: "178.41", xEnteredDate: nowEastern(), xInvoice: "8455550192" }]));
+    try {
+      const x = await call("phonepay-done", { DialCallStatus: "completed" }, `o=${id}&a=${att.id}`);
+      const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
+      expect(o.paidCents).toBe(17841); // the money is recorded on the order
+      const [a2] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, att.id));
+      expect(a2.result).toBe("paid");
+      expect(a2.endedAt).not.toBeNull();
+      // "approved" only when every day is confirmed; otherwise the same goodbye as before
+      const r = redirect(x);
+      if (o.status === "CONFIRMED") expect(r).toBe(`pay-approved?o=${id}`);
+      else expect(r).toBe("goodbye");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it("nothing charged: the unpaid goodbye as before, and the try is closed (it no longer blocks other callers)", async () => {
+    process.env.SOLA_API_KEY = "test-key";
+    const id = await order("2027-03-09", "PENDING_PAYMENT", new Date(Date.now() + 600_000));
+    const { startAttempt } = await import("@/lib/sola-phonepay");
+    const att = await startAttempt(id, SID, 17841, "order");
+    await db.update(schema.orders).set({ status: "CANCELLED", holdExpiresAt: null }).where(eq(schema.orders.id, id));
+    vi.stubGlobal("fetch", solaWith([]));
+    try {
+      expect(redirect(await call("phonepay-done", {}, `o=${id}&a=${att.id}`))).toBe("goodbye");
+      const [a2] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, att.id));
+      expect(a2.endedAt).not.toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("A3: a hold that ran out is renewed only while its item is still free", () => {
   it("someone else booked the last unit meanwhile: not renewed", async () => {
     const a = await order("2027-02-16", "PENDING_PAYMENT", new Date(Date.now() - 60_000)); // ran out
