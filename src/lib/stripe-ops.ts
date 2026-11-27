@@ -119,7 +119,9 @@ export async function handleStripeEvent(event: { type: string; data: { object: R
     // being sent), and only the part not recorded yet is added.
     if (!list.length && (c.amount_refunded ?? 0) > 0) {
       const { sql } = await import("drizzle-orm");
-      const rec = (await db.execute(sql`SELECT COALESCE(SUM(amount_cents), 0)::int AS c FROM order_refunds WHERE order_id = ${o.id} AND provider = 'stripe' AND status <> 'failed'`)).rows[0] as { c: number };
+      // Deep check 06:00 M11: every day of a booking paid together carries the same payment id; refunds recorded on
+      // any of those days count (one day's refund was otherwise added again on another day)
+      const rec = (await db.execute(sql`SELECT COALESCE(SUM(amount_cents), 0)::int AS c FROM order_refunds WHERE order_id IN (SELECT id FROM orders WHERE id = ${o.id} OR (stripe_payment_id IS NOT NULL AND stripe_payment_id = ${o.stripePaymentId ?? null})) AND provider = 'stripe' AND status <> 'failed'`)).rows[0] as { c: number };
       const missing = (c.amount_refunded ?? 0) - Number(rec?.c ?? 0);
       if (missing > 0) await applyRefund(o, { amountCents: missing, refundId: `stripe-charge:${c.id}:${c.amount_refunded}`, provider: "stripe", source: "stripe_dashboard", userId: null, status: "succeeded" });
     }
@@ -134,7 +136,7 @@ export async function handleStripeEvent(event: { type: string; data: { object: R
     if (!o) return;
     // a charge.refunded notice with no list already recorded this charge's refunds by its total (fallback): not again
     const { sql } = await import("drizzle-orm");
-    if ((await db.execute(sql`SELECT 1 FROM order_refunds WHERE order_id = ${o.id} AND stripe_refund_id LIKE ${`stripe-charge:${r.charge ?? ""}:%`} LIMIT 1`)).rows.length) return;
+    if ((await db.execute(sql`SELECT 1 FROM order_refunds WHERE order_id IN (SELECT id FROM orders WHERE id = ${o.id} OR (stripe_payment_id IS NOT NULL AND stripe_payment_id = ${o.stripePaymentId ?? null})) AND (stripe_refund_id = ${r.id} OR stripe_refund_id LIKE ${`stripe-charge:${r.charge ?? ""}:%`}) LIMIT 1`)).rows.length) return;
     await applyRefund(o, { amountCents: r.amount, refundId: r.id, provider: "stripe", source: "stripe_dashboard", userId: null, status: r.status });
   }
 }
