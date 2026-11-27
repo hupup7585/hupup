@@ -24,7 +24,7 @@ export function defaultLinks(): RecordingLink[] {
     { source: "product:Ocean balls:2", label: "Price of 500 ocean balls", slots: ["ocean_500", "ocean_balls"] },
     { source: "product:Ocean balls:3", label: "Price of 700 ocean balls", slots: ["ocean_700", "ocean_balls"] },
     { source: "setting:phoneLinkHoldMinutes", label: "Payment link hold on the phone (minutes)", slots: tenMinuteLines() },
-    { source: "setting:hoursSchedules", label: "Customer service hours (Hours page)", slots: ["key7_cs_hours"] },
+    { source: "setting:hoursSchedules", label: "Customer service hours (Hours page)", slots: ["key7_cs_hours", "book_r3c"] }, // HP5: book_r3c speaks them too
     { source: "setting:sameDayHoursClose", label: "Same-day delivery time close by (hours)", slots: ["same_day_notice_open", "same_day_notice_after"] },
     { source: "setting:sameDayHoursFar", label: "Same-day delivery time in the surrounding areas (hours)", slots: ["same_day_notice_open", "same_day_notice_after"] },
   ];
@@ -157,10 +157,12 @@ async function draftWithNewValue(slot: string, source: string, from: string, to:
 }
 
 /** A new recording was put on the line ("Use this one"): its flag is cleared. */
-export async function clearRecordingFlag(slot: string, userId: number | null = null) {
+export async function clearRecordingFlag(slot: string, userId: number | null = null, recordedAt: Date | null = null) {
   const s = (await getSettings()) as Record<string, unknown>;
   const flags = recordingFlags(s as never);
-  const left = flags.filter((f) => f.slot !== slot);
+  // Extra check HP6 (Nov 27, 2026): a recording made before the value changed still says the old value, so choosing it
+  // keeps the flag; only a recording made after the change clears it (no date given: cleared, as before)
+  const left = flags.filter((f) => f.slot !== slot || (recordedAt !== null && Date.parse(f.at) > recordedAt.getTime()));
   if (left.length !== flags.length) await saveSetting("recordingFlags" as never, JSON.stringify(left) as never, userId, "New recording put on the line");
 }
 
