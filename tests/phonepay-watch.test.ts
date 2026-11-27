@@ -42,6 +42,16 @@ describe("watching Sola while the call to Sola is up", () => {
     expect(watchDecision(a, [txn({ approved: false })], new Date(start.getTime() + 40_000))).toBe("declined");
     expect(watchDecision(a, [txn({})], new Date(start.getTime() + 40_000))).toBe("approved");
   });
+  it("deep check 06:00 M38: another caller's charge of the same amount never cuts this call short", () => {
+    const now = new Date(start.getTime() + 40_000);
+    const mineA = { ...a, callerPhone: "+18455550111" };
+    // the same amount from another caller at the same time: not certain, so this line is not cut
+    expect(watchDecision(mineA, [txn({ approved: false })], now, new Set(), false)).toBe("declined");
+    expect(watchDecision(mineA, [txn({ approved: false })], now, new Set(), true)).toBe("wait");
+    // a charge carrying this caller's own phone is certain even then; another caller's phone next to it is left out
+    expect(watchDecision(mineA, [txn({ refNum: "R2", invoice: "8455550222" }), txn({ invoice: "8455550111", approved: false })], now, new Set(), true)).toBe("declined");
+    expect(watchDecision(mineA, [txn({ invoice: "8455550111" })], now, new Set(), true)).toBe("approved");
+  });
   it("other amounts, our order numbers, older charges and used refs are ignored; no 4-minute timer (Nov 18, 2026)", () => {
     const now = new Date(start.getTime() + 40_000);
     expect(watchDecision(a, [txn({ amountCents: 999 }), txn({ invoice: "1042" }), txn({ at: new Date(start.getTime() - 5 * 60_000) })], now)).toBe("wait");
@@ -381,5 +391,20 @@ describe("deep check Nov 27, item 18: the helper needs its key", () => {
     expect(urls).toEqual([]);
     expect(await tellHelper(7, fetcher, { SOLA_LISTEN_KEY: SECRET })).toBe(true);
     expect(urls).toEqual([`https://hupup-sola-listen.hupup-attractions.workers.dev/result/7/${listenKey(7, { SOLA_LISTEN_KEY: SECRET })}`]);
+  });
+});
+
+describe("deep check 06:00 M38: two callers paying the same amount at once", () => {
+  it("found only for a different known phone, not ended, within 15 minutes", async () => {
+    const { sameAmountElsewhere } = await import("@/lib/phonepay-watch");
+    const t0 = new Date("2026-11-27T15:00:00Z");
+    const [me] = await db.insert(schema.phonepayAttempts).values({ callSid: "CAm38a", amountCents: 7777, startedAt: t0, callerPhone: "+18455550301" }).returning();
+    expect(await sameAmountElsewhere(me)).toBe(false);
+    await db.insert(schema.phonepayAttempts).values({ callSid: "CAm38same", amountCents: 7777, startedAt: t0, callerPhone: "+18455550301" }); // my own earlier try
+    expect(await sameAmountElsewhere(me)).toBe(false);
+    const [other] = await db.insert(schema.phonepayAttempts).values({ callSid: "CAm38b", amountCents: 7777, startedAt: new Date(t0.getTime() + 60_000), callerPhone: "+18455550302" }).returning();
+    expect(await sameAmountElsewhere(me)).toBe(true);
+    await db.update(schema.phonepayAttempts).set({ endedAt: new Date() }).where(eq(schema.phonepayAttempts.id, other.id));
+    expect(await sameAmountElsewhere(me)).toBe(false);
   });
 });
