@@ -3,6 +3,7 @@ import { schema } from "@/lib/db";
 import { checkBookable } from "@/lib/availability";
 import type { db } from "@/lib/db";
 
+
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Line = typeof schema.orderItems.$inferSelect;
 
@@ -27,4 +28,24 @@ export async function recheckOrderLines(tx: Tx, order: { id: number; eventDate: 
     else out.push(l);
   }
   return out;
+}
+
+class DoesNotFit extends Error {}
+
+/**
+ * Does this order fit as a whole (shared units and laser pools counted)? Runs the line-by-line check inside the
+ * caller's transaction and undoes it, so nothing changes; throws only through `withFitCheck`.
+ */
+export async function assertOrderFits(tx: Tx, order: { id: number; eventDate: string; pickupDate: string }) {
+  if ((await recheckOrderLines(tx, order)).length) throw new DoesNotFit();
+}
+
+/** Runs `fn` in a transaction; false (and nothing changed) when `assertOrderFits` found the order no longer fits. */
+export async function withFitCheck(dbx: typeof db, fn: (tx: Tx) => Promise<boolean>): Promise<boolean> {
+  try {
+    return await dbx.transaction(fn);
+  } catch (e) {
+    if (e instanceof DoesNotFit) return false;
+    throw e;
+  }
 }

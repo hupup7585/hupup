@@ -28,6 +28,19 @@ export async function updateStatusAction(orderId: number, status: OrderStatus, r
   if (status === "CANCELLED" && !why) return { ok: false, message: "Please write the reason for cancelling." };
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found" };
+  // Hark's Admin list 5 (Nov 26, 2026): a delivered order is out with the customer; it can't be cancelled
+  if (status === "CANCELLED" && full.order.status === "DELIVERED") return { ok: false, message: "This order was already delivered, so it can't be cancelled. If it needs a refund or a change, handle it on the order (payments) and write a note." };
+  // Hark's Admin list 4: "Needs staff attention" becomes Confirmed only after the whole order is checked again, locked
+  if (full.order.status === "NEEDS_ATTENTION" && (status === "CONFIRMED" || status === "DELIVERED")) {
+    const { confirmAttentionOrder } = await import("@/lib/late-payment");
+    if (!(await confirmAttentionOrder(orderId))) return { ok: false, message: "Some items on this order are no longer free for its dates. Change the items or the date first, or cancel and refund." };
+    if (status === "CONFIRMED") {
+      await (await import("@/lib/status-history")).explainStatus(orderId, "CONFIRMED", why || "Confirmed by staff after checking the items are free again", staff.userId);
+      await db.insert(schema.auditLog).values({ userId: staff.userId, action: "order.status", entityType: "order", entityId: String(orderId), before: { status: full.order.status }, after: { status, reason: why || null } });
+      revalidatePath("/admin", "layout");
+      return { ok: true, message: "Status updated" };
+    }
+  }
   const wasOccupying =
     OCCUPYING.includes(full.order.status) &&
     !(["HOLD", "PENDING_PAYMENT"].includes(full.order.status) && full.order.holdExpiresAt && full.order.holdExpiresAt < new Date());
@@ -72,6 +85,9 @@ export async function recordPaymentAction(orderId: number, amount: string, metho
 
 export async function sendPayLinkAction(orderId: number): Promise<ActionResult> {
   const session = await requireAdmin();
+  // Hark's Admin list 7 (Nov 26, 2026): no payment link for a cancelled order
+  const [st] = await db.select({ status: schema.orders.status }).from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
+  if (st?.status === "CANCELLED") return { ok: false, message: "This order is cancelled, so no payment link can be sent. Book it again first if the customer still wants it." };
   if (!(await ensurePriced(orderId))) return { ok: false, message: (await pricingProblem(orderId)) ?? "This order could not be priced." };
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found" };

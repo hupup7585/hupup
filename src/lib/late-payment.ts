@@ -322,13 +322,22 @@ export async function attentionItemsFree(orderId: number, exec: Pick<typeof db, 
 
 /** Staff confirm a "Needs staff attention" order once its items are free again (checked here, with the stock locked). */
 export async function confirmAttentionOrder(orderId: number): Promise<boolean> {
-  return db.transaction(async (tx) => {
+  const { assertOrderFits, withFitCheck } = await import("@/lib/recheck-lines");
+  const ok = await withFitCheck(db, async (tx) => {
     const [o] = await tx.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
     if (!o || o.status !== "NEEDS_ATTENTION") return false;
     const items = await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
-    for (const id of [...new Set(items.map((i) => i.productId))].sort((a, b) => a - b)) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
-    if (!(await attentionItemsFree(orderId, tx))) return false;
-    await tx.update(schema.orders).set({ status: "CONFIRMED", updatedAt: new Date() }).where(eq(schema.orders.id, orderId));
+    // the items and their shared groups locked in id order, like a phone booking
+    for (const id of [...new Set(items.map((i) => i.productId))].sort((a, b) => a - b)) {
+      await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
+      await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+    }
+    // Hark's Admin list 4 and 12 (Nov 26, 2026): the whole order is checked (the maze group and laser pools too)
+    await assertOrderFits(tx, o);
+    await tx.update(schema.orders).set({ status: "CONFIRMED", holdExpiresAt: null, updatedAt: new Date() }).where(eq(schema.orders.id, orderId));
     return true;
   });
+  // Admin list 12: a confirmed order gets its units (as New booking does)
+  if (ok) await (await import("@/lib/units")).assignUnits(orderId, { quiet: true }).catch(() => undefined);
+  return ok;
 }
