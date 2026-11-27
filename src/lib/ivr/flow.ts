@@ -5047,6 +5047,9 @@ const handlers: Record<string, Handler> = {
     const group = o ? await getPaymentGroup(o) : null;
     if (!group) return back(vr, "promo-consent");
     if (!group.paid) return back(vr, "goodbye"); // Hark's 2nd check, A2: "approved" only after a real payment
+    // Deep check 09:00 P3: a late payment whose items were taken (Needs attention) is paid but not booked: never "your
+    // booking is confirmed"; the Owner was emailed to call the customer (late payment rule, Abraham, Nov 13, 2026)
+    if (group.orders.some((x) => x.order.status === "NEEDS_ATTENTION")) return back(vr, "goodbye");
     const number = spokenDigits(orderNumber(o));
     const g = keypad(vr, url("pay-approved-choice", { o }), { numDigits: 1, timeout: T(vr, "timerPaidWait") });
     sp(g, ctx, "phonepay_approved", { number });
@@ -5151,6 +5154,19 @@ const handlers: Record<string, Handler> = {
     if (group.paid) return back(vr, "pay-approved", { o });
     // Hark's 2nd check, A2: the hold ran out during payment and nothing was paid: never "approved", no new try
     if (group.due <= 0) {
+      // Deep check 09:00 P3: the hold ran out (released) while the caller was on the Sola line. The charge of this try is
+      // still looked for: found = a late payment (confirmed when the items are still free, else Needs attention and
+      // the Owner told), never a charge left unseen. Only a booking that is now paid hears the approved lines.
+      if (a) {
+        const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, a)).limit(1);
+        if (attempt && !attempt.result && attempt.amountCents > 0) {
+          if (ctx.body.DialCallSid) await db.update(schema.phonepayAttempts).set({ payLegSid: ctx.body.DialCallSid }).where(eq(schema.phonepayAttempts.id, a));
+          await endMainPayLeg(ctx.body.DialCallSid ?? attempt.payLegSid);
+          const r = await checkPhonePayTry(o, a, attempt.amountCents);
+          await track(ctx.callSid, "step", `Card payment try ${attempt.tryNumber} after the hold ran out: ${r.result}`, { attempt: a }).catch(() => undefined);
+          if (r.result === "paid") return back(vr, "pay-approved", { o }); // it checks paid and booked (not Needs attention)
+        }
+      }
       await track(ctx.callSid, "step", "Payment step reached after the hold ran out (nothing paid): unpaid goodbye").catch(() => undefined);
       return back(vr, "goodbye");
     }
