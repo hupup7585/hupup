@@ -38,9 +38,13 @@ card form, and the server rejects any payment attempt. Right after Shabbes / Yom
 2. **Overpayments in Bookkeeping.** A second charge on an order already paid in full is now booked as
    "Overpayment (refund due)" (not a tip, not a taxable sale), and refunding it gives back no sales tax. Say if your
    accountant wants it shown another way.
-3. **Same-day area settings.** "Same-day delivery time close by", "surrounding areas" and "Close-by areas" in
-   Hours and calendar are not used since the Nov 27 same-day notice (two versions by customer service hours). They
-   are kept and labelled "Not used now". Remove them, or use areas again?
+3. **"Close-by areas" for the same-day notice.** Since the Nov 27 same-day notice (two versions by customer service
+   hours) this list is not read; it is kept and labelled "Not used now". Remove it, or use areas again? (The two
+   same-day hours settings still matter: changing one marks the same-day notice recordings for a new recording.)
+4. **Item types (Catalog > Item types).** New booking and the laser gun stock follow the types you set there. The
+   phone line, the prices and the offers still work them out from the names until they are connected (phone/payments
+   session). Until then, if you set a type that differs from an item's name, New booking and the phone can disagree, so
+   please leave the list as it is until that is done.
 
 ## Phone, payments, texts and delivery (phone/payments session, Nov 27, 2026)
 
