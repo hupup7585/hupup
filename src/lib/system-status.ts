@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
+import { sttActive as sttActiveNow } from "@/lib/speech-to-text";
 import { NEW_EMAIL_LIVE } from "@/lib/config";
 import { SMS_TERMS_V2_LIVE } from "@/lib/sms-terms-v2";
 import { PAY_ENV_NAMES, phonePayConfigured } from "@/lib/phone-pay";
@@ -74,8 +75,9 @@ export async function blockers(env: Record<string, string | undefined> = process
     {
       key: "speech-text",
       area: "Spoken answers typed up and read back (speech to text)",
-      active: false,
-      reason: "Has a per-use charge; waiting for Abraham's yes on the price per call.",
+      // Deep check 31 (Nov 27, 2026): turned on by Abraham on Nov 17 (STT_LIVE_APPROVED); live once its Google key is set
+      active: sttActiveNow(env),
+      reason: "Turned on by Abraham on Nov 17, 2026 (about $0.024 a minute after the first 60 free minutes a month). Needs GOOGLE_STT_API_KEY (or GOOGLE_TTS_API_KEY) and GOOGLE_TTS_API_KEY in Vercel.",
       where: "/admin/phone/prompts",
     },
     {
