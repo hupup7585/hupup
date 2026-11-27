@@ -88,7 +88,9 @@ export async function applyRefund(o: Ord, input: { amountCents: number; refundId
 export async function refundTaxShare(orderId: number, amountCents: number): Promise<number> {
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
   if (!o) return 0;
-  const tax = (o.taxCents ?? 0) + (o.servicesTaxCents ?? 0);
+  // Deep check 06:00 (Nov 27): taxCents already includes the services' tax (servicesTaxCents is the part of it the
+  // services added), so adding it again gave back too much tax on orders with services
+  const tax = o.taxCents ?? 0;
   const total = o.totalCents ?? o.subtotalCents;
   if (tax <= 0 || total <= 0) return 0;
   const r = (await db.execute(sql`SELECT COALESCE(SUM(tax_cents) FILTER (WHERE kind = 'refund'), 0)::int AS t, COALESCE(SUM(CASE WHEN kind = 'refund' THEN -amount_cents ELSE amount_cents END), 0)::int AS net FROM book_entries WHERE order_id = ${orderId} AND ((kind = 'income' AND source = 'auto') OR kind = 'refund')`)).rows[0] as { t: number; net: number };
