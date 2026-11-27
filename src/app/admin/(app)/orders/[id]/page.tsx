@@ -171,7 +171,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   status={refundStatus(o)}
                   ready={ready}
                   notReadyReason={ready ? null : notReady}
-                  refunds={refunds.map((r) => ({ id: r.id, when: inboxWhen(r.createdAt), amount: formatMoney(r.amountCents), by: who(r), result: r.status === "failed" ? "Failed" : r.status === "pending" ? "Pending" : "Refunded", refundId: r.stripeRefundId, error: r.error }))}
+                  refunds={refunds.map((r) => ({ id: r.id, when: inboxWhen(r.createdAt), amount: formatMoney(r.amountCents), by: who(r), result: r.status === "failed" ? "Failed" : r.status === "pending" ? "Pending" : r.status === "sending" ? "Sending" : "Refunded", refundId: r.stripeRefundId, error: r.error }))}
                 />
                 {disputes.length > 0 && (
                   <StripePanel

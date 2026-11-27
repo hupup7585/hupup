@@ -479,14 +479,14 @@ export async function autoMatch(feePercent: string, feeCents: string) {
  * An automatic money-out line (Stripe refund or Stripe fee). Kept once per reference; a locked month moves it to the
  * next open month (as booking payments do). Never throws into the payment flow.
  */
-export async function recordAutoMoneyOut(input: { kind: "refund" | "processor_fee"; amountCents: number; category: string; method: string; orderId?: number | null; ref: string; date?: string; notes?: string }) {
+export async function recordAutoMoneyOut(input: { kind: "refund" | "processor_fee"; amountCents: number; taxCents?: number; category: string; method: string; orderId?: number | null; ref: string; date?: string; notes?: string }) {
   try {
     if (input.amountCents <= 0) return;
     const [dupe] = await db.select({ id: schema.bookEntries.id }).from(schema.bookEntries).where(and(eq(schema.bookEntries.ref, input.ref), eq(schema.bookEntries.kind, input.kind), eq(schema.bookEntries.source, "auto")));
     if (dupe) return;
     const date = input.date ?? todayISO();
     await addEntry(
-      { entryDate: (await isLocked(date)) ? nextOpenDate(date) : date, kind: input.kind, category: input.category, amountCents: input.amountCents, method: input.method, orderId: input.orderId ?? null, ref: input.ref, notes: input.notes ?? null, source: "auto" },
+      { entryDate: (await isLocked(date)) ? nextOpenDate(date) : date, kind: input.kind, category: input.category, amountCents: input.amountCents, ...(input.taxCents ? { taxCents: input.taxCents } : {}), method: input.method, orderId: input.orderId ?? null, ref: input.ref, notes: input.notes ?? null, source: "auto" },
       null,
     );
   } catch (e) {

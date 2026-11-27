@@ -43,7 +43,8 @@ async function recordVoidOnOrders(ref: string): Promise<number[]> {
   for (const id of ids) {
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
     if (!o) continue;
-    const cents = paidOn.filter((p) => p.orderId === id).reduce((n, p) => n + p.cents, 0) || Math.max(0, o.paidCents - o.refundedCents);
+    // Deep check A14 (Nov 27, 2026): never more than what is still not refunded on the order
+    const cents = Math.min(paidOn.filter((p) => p.orderId === id).reduce((n, p) => n + p.cents, 0) || Infinity, Math.max(0, o.paidCents - o.refundedCents));
     if (cents > 0) await applyRefund(o, { amountCents: cents, refundId: `sola-void:${ref}:${id}`, provider: "sola", source: "admin", userId: null });
   }
   return ids;

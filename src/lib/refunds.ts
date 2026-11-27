@@ -56,17 +56,36 @@ export function refundsSandbox(provider: Provider, env: Record<string, string | 
 }
 
 /** Records one refund on the order (and in the books as money out). Shared with refunds made in Stripe's dashboard. */
-export async function applyRefund(o: Ord, input: { amountCents: number; refundId: string; provider: Provider; source: "admin" | "stripe_dashboard"; userId: number | null; status?: string }) {
+export async function applyRefund(o: Ord, input: { amountCents: number; refundId: string; provider: Provider; source: "admin" | "stripe_dashboard"; userId: number | null; status?: string; reservedId?: number }) {
   const [exists] = await db.select().from(schema.orderRefunds).where(eq(schema.orderRefunds.stripeRefundId, input.refundId)).limit(1);
   if (exists) return exists;
   const status = input.status ?? "succeeded";
-  const [row] = await db.insert(schema.orderRefunds).values({ orderId: o.id, amountCents: input.amountCents, stripeRefundId: input.refundId, status, source: input.source, provider: input.provider, userId: input.userId }).returning();
+  const values = { orderId: o.id, amountCents: input.amountCents, stripeRefundId: input.refundId, status, source: input.source, provider: input.provider, userId: input.userId };
+  // A refund sent from Admin already has its row (reserved before the card company was asked, deep check A7)
+  const [row] = input.reservedId
+    ? await db.update(schema.orderRefunds).set(values).where(eq(schema.orderRefunds.id, input.reservedId)).returning()
+    : await db.insert(schema.orderRefunds).values(values).returning();
   if (status === "succeeded" || status === "pending") {
     await db.update(schema.orders).set({ refundedCents: sql`${schema.orders.refundedCents} + ${input.amountCents}`, updatedAt: new Date() }).where(eq(schema.orders.id, o.id));
-    await recordAutoMoneyOut({ kind: "refund", amountCents: input.amountCents, category: "Refunds", method: input.provider, orderId: o.id, ref: input.refundId, notes: `${input.provider === "stripe" ? "Stripe" : "Sola"} refund, order #${orderNumber(o.id)}` });
+    // Deep check A4 (Nov 27, 2026): the refund gives back its share of the sales tax, so tax collected goes down
+    await recordAutoMoneyOut({ kind: "refund", amountCents: input.amountCents, taxCents: await refundTaxShare(o.id, input.amountCents), category: "Refunds", method: input.provider, orderId: o.id, ref: input.refundId, notes: `${input.provider === "stripe" ? "Stripe" : "Sola"} refund, order #${orderNumber(o.id)}` });
   }
   await db.insert(schema.auditLog).values({ userId: input.userId, action: "payment.refunded", entityType: "order", entityId: String(o.id), after: { amountCents: input.amountCents, refundId: input.refundId, provider: input.provider, source: input.source, status } });
   return row;
+}
+
+/**
+ * The sales tax inside a refund (deep check A4): the order's tax (rentals and services) in the same share as the
+ * refund is of the order total, never more than the tax not yet given back on earlier refunds of this order.
+ */
+export async function refundTaxShare(orderId: number, amountCents: number): Promise<number> {
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
+  if (!o) return 0;
+  const tax = (o.taxCents ?? 0) + (o.servicesTaxCents ?? 0);
+  const total = o.totalCents ?? o.subtotalCents;
+  if (tax <= 0 || total <= 0) return 0;
+  const given = (await db.execute(sql`SELECT COALESCE(SUM(tax_cents), 0)::int AS t FROM book_entries WHERE order_id = ${orderId} AND kind = 'refund'`)).rows[0] as { t: number };
+  return Math.max(0, Math.min(Math.round((amountCents * tax) / total), tax - Number(given?.t ?? 0)));
 }
 
 /** Plain words for the reasons cards companies give. */
@@ -122,18 +141,30 @@ export async function refundOrder(orderId: number, amountCents: number | "full",
   if (!o) throw new RefundError("Order not found.");
   const pay = await paymentRef(o);
   if (!pay) throw new RefundError("This order has no card payment to refund (only Stripe phone payments and Sola website payments can be refunded here).");
-  const left = refundable(o);
-  const amount = amountCents === "full" ? left : amountCents;
-  if (!Number.isInteger(amount) || amount <= 0) throw new RefundError("Enter an amount to refund.");
-  if (amount > left) throw new RefundError(`At most ${money(left)} can be refunded on this order.`);
   if (!LIVE_REFUNDS_APPROVED && !refundsSandbox(pay.provider))
     throw new RefundError(pay.provider === "stripe" && !stripeKey("refunds") ? "Not active yet: STRIPE_REFUNDS_KEY isn't in Vercel." : "Live refunds are off until Abraham approves them. Use the sandbox (test) keys for now.");
+  // Deep check A7 (Nov 27, 2026): two Refund clicks at once could both pass the "at most" check and refund twice. The
+  // order is locked, refunds still being sent (the last 10 minutes) count as taken, and this refund's row is saved as
+  // "sending" before the card company is asked; the row then gets the result.
+  const reserved = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM orders WHERE id = ${o.id} FOR UPDATE`);
+    const [cur] = await tx.select().from(schema.orders).where(eq(schema.orders.id, o.id));
+    const sending = (await tx.execute(sql`SELECT COALESCE(SUM(amount_cents), 0)::int AS c FROM order_refunds WHERE order_id = ${o.id} AND status = 'sending' AND created_at > now() - interval '10 minutes'`)).rows[0] as { c: number };
+    const left = Math.max(0, refundable(cur) - Number(sending?.c ?? 0));
+    const amount = amountCents === "full" ? left : amountCents;
+    if (!Number.isInteger(amount) || amount <= 0) return { error: left <= 0 && amountCents === "full" ? `At most ${money(0)} can be refunded on this order.` : "Enter an amount to refund." };
+    if (amount > left) return { error: `At most ${money(left)} can be refunded on this order.` };
+    const [row] = await tx.insert(schema.orderRefunds).values({ orderId: o.id, amountCents: amount, status: "sending", provider: pay.provider, userId }).returning();
+    return { id: row.id, amount };
+  });
+  if ("error" in reserved) throw new RefundError(reserved.error!);
+  const amount = reserved.amount;
   try {
     const r = pay.provider === "stripe" ? await stripeRefund(pay.ref, amount, o, fetcher) : await solaRefund(pay.ref, amount, fetcher);
-    return applyRefund(o, { amountCents: amount, refundId: r.id, provider: pay.provider, source: "admin", userId, status: r.status });
+    return applyRefund(o, { amountCents: amount, refundId: r.id, provider: pay.provider, source: "admin", userId, status: r.status, reservedId: reserved.id });
   } catch (e) {
     const reason = e instanceof RefundError ? e.message : plainReason(e instanceof StripeError || e instanceof Error ? e.message : String(e));
-    await db.insert(schema.orderRefunds).values({ orderId: o.id, amountCents: amount, status: "failed", error: reason.slice(0, 300), provider: pay.provider, userId });
+    await db.update(schema.orderRefunds).set({ status: "failed", error: reason.slice(0, 300) }).where(eq(schema.orderRefunds.id, reserved.id));
     await db.insert(schema.auditLog).values({ userId, action: "payment.refund_failed", entityType: "order", entityId: String(o.id), after: { amountCents: amount, provider: pay.provider, reason } });
     await alertOwner(o, amount, reason);
     throw new RefundError(reason);
