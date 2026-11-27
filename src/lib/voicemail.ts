@@ -329,13 +329,26 @@ export async function notifyVoicemail(id: number): Promise<{ sent: number }> {
   const stamp = alertDateTime(v.createdAt).replace(/[^0-9A-Za-z]+/g, "-").replace(/-+$/, "");
   const attachments = mp3?.length ? [{ filename: `voicemail-${stamp}-${(v.fromNumber || "unknown").replace(/\D/g, "")}.mp3`, content: mp3.toString("base64") }] : [];
   let sent = 0;
-  for (const to of box.notifyEmail) if ((await sendEmail(to, alert.subject, alert.email, attachments)).sent) sent++;
-  // Text alerts start by themselves once Twilio approves texting. The MP3 rides along as an MMS only when the Owner
-  // has turned that on (it costs more per message) and the file is small enough for carriers; the link is always there.
-  if (textingActive()) {
-    const mms = Boolean((await getSettings()).voicemailMms) && Boolean(mp3?.length) && mp3!.length <= MMS_AUDIO_MAX_BYTES;
-    for (const to of box.notifySms) if ((await sendSms(to, alert.text, { kind: "system", event: "owner_alert", ...(mms ? { mediaUrls: [playLink] } : {}) })).sent) sent++;
+  let tried = 0;
+  try {
+    for (const to of box.notifyEmail) {
+      tried++;
+      if ((await sendEmail(to, alert.subject, alert.email, attachments)).sent) sent++;
+    }
+    // Text alerts start by themselves once Twilio approves texting. The MP3 rides along as an MMS only when the Owner
+    // has turned that on (it costs more per message) and the file is small enough for carriers; the link is always there.
+    if (textingActive()) {
+      const mms = Boolean((await getSettings()).voicemailMms) && Boolean(mp3?.length) && mp3!.length <= MMS_AUDIO_MAX_BYTES;
+      for (const to of box.notifySms) {
+        tried++;
+        if ((await sendSms(to, alert.text, { kind: "system", event: "owner_alert", ...(mms ? { mediaUrls: [playLink] } : {}) })).sent) sent++;
+      }
+    }
+  } catch (e) {
+    console.error("voicemail alert: sending failed", e);
   }
+  // Deep check B4: nothing went out (email or texting down): free the claim, so the scheduled job tries again
+  if (tried > 0 && sent === 0) await db.update(schema.voicemails).set({ notifiedAt: null }).where(eq(schema.voicemails.id, v.id));
   return { sent };
 }
 
