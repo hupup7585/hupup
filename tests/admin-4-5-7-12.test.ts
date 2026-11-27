@@ -13,6 +13,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
+import { addDays, todayISO } from "@/lib/dates";
 import { recordPaymentAction, sendPayLinkAction, updateDetailsAction, updateStatusAction } from "@/app/admin/(app)/orders/actions";
 
 let maze = 0, guns = 0;
@@ -66,7 +67,8 @@ describe("Admin status safety", () => {
     expect(await statusOf(d)).toBe("PICKED_UP");
   });
   it("deep check A2: delivered, moved back to Confirmed, then Cancel: still refused", async () => {
-    const d = await mk("CONFIRMED", maze, "2027-07-10");
+    const d = await mk("CONFIRMED", maze, "2026-11-20"); // a past event day: Delivered is refused before the event (extra check HD2)
+    await db.update(schema.orders).set({ pickupDate: "2026-11-21" }).where(eq(schema.orders.id, d)); // a one-day rental (never holding today's stock)
     expect((await updateStatusAction(d, "DELIVERED")).ok).toBe(true);
     expect((await updateStatusAction(d, "CONFIRMED")).ok).toBe(true);
     const r = await updateStatusAction(d, "CANCELLED", "customer asked");
@@ -89,8 +91,9 @@ describe("deep check 0600 M8 and M57", () => {
     expect((await updateStatusAction(ok.id, "CONFIRMED")).ok).toBe(true);
   });
   it("M57: brought back straight to Delivered: its units are booked", async () => {
+    const day57 = new Date(`${todayISO()}T12:00:00Z`).getUTCDay() === 6 ? addDays(todayISO(), 1) : todayISO(); // never Shabbes
     await db.insert(schema.equipmentUnits).values({ productId: guns, code: "G-1", status: "available" as const });
-    const [o] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "POS", eventDate: "2030-09-10", pickupDate: "2030-09-11", subtotalCents: 40000 }).returning();
+    const [o] = await db.insert(schema.orders).values({ status: "CANCELLED", channel: "POS", eventDate: day57, pickupDate: addDays(day57, 1), subtotalCents: 40000 }).returning(); // today (or Sunday): Delivered is refused more than a day before the event (extra check HD2)
     await db.insert(schema.orderItems).values({ orderId: o.id, productId: guns, qty: 1, unitPriceCents: 40000 });
     expect((await updateStatusAction(o.id, "DELIVERED")).ok).toBe(true);
     expect((await db.select().from(schema.unitBookings).where(eq(schema.unitBookings.orderId, o.id))).length).toBeGreaterThan(0);

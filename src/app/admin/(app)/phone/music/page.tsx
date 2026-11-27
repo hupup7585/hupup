@@ -55,7 +55,7 @@ export default async function MusicPage({ searchParams }: { searchParams?: Promi
       <section className="card mb-5 p-5" id="places">
         <h2 className="text-xl font-black">Where each song plays</h2>
         {saved && <p role="status" className="mt-2 rounded-lg bg-mint/15 p-2 text-sm font-semibold text-[#13895C]">{saved}</p>}
-        <p className="mb-3 mt-1 text-sm text-muted">Tick the songs for each place; they play in the order shown. No song ticked: no music there.</p>
+        <p className="mb-3 mt-1 text-sm text-muted">Tick the songs for each place; they play in the order shown. No song ticked: no music there, except while callers wait for staff, where the song "2 Phone Holding Music" plays when it is uploaded.</p>
         <form action={savePlacesAction} className="grid gap-5 sm:grid-cols-2" data-music-places>
           {(Object.keys(MUSIC_PLACES) as MusicPlace[]).map((place) => (
             <fieldset key={place}>

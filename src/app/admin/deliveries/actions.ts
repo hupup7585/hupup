@@ -8,7 +8,7 @@ import { getOrderWithItems, orderNumber } from "@/lib/orders";
 import { sendOrderText } from "@/lib/notify";
 import { BUSINESS_NAME } from "@/lib/config";
 import { DELIVERY_TEMPLATES, type TemplateKey } from "@/lib/delivery-templates";
-import { isCurrentStop } from "@/lib/delivery-stops";
+import { NOT_CURRENT_STOP, isCurrentStop, isCurrentStopFor } from "@/lib/delivery-stops";
 import { hasAnyStop, isMyStop } from "@/lib/drivers";
 import { recordStage, type Stage } from "@/lib/delivery-stages";
 
@@ -80,6 +80,7 @@ export async function uploadPhotoAction(form: FormData): Promise<DeliveryResult>
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found." };
   if (staff.role === "delivery" && !isMyStop(full.order, stop, staff.userId)) return { ok: false, message: "This stop isn't assigned to you." };
+  if (staff.role === "delivery" && !isCurrentStopFor(full.order, stop)) return { ok: false, message: NOT_CURRENT_STOP }; // Extra check HD3
   try {
     const { saveDeliveryPhoto } = await import("@/lib/delivery-photos");
     const p = await saveDeliveryPhoto(orderId, stop, new Uint8Array(await file.arrayBuffer()), { userId: staff.userId, name: staff.name });
@@ -99,6 +100,17 @@ export async function stageAction(orderId: number, stop: "delivery" | "pickup", 
   if (!full) return { ok: false, message: "Order not found." };
   if (staff.role === "delivery" && !isMyStop(full.order, stop, staff.userId)) return { ok: false, message: "This stop isn't assigned to you." };
   if (stage === "delivered" || stage === "picked_up") return markDoneAction(orderId, stop);
+  // Extra check H3 (Nov 27, 2026): a stage only fits the order's state: out for delivery while confirmed, out for
+  // pickup once delivered, a problem on a confirmed, delivered or picked-up order (never a cancelled or unpaid one);
+  // and, like Delivered (M55), never for a stop more than a day ahead
+  const st = full.order.status;
+  const fits = stage === "out_for_delivery" ? st === "CONFIRMED" : stage === "out_for_pickup" ? st === "DELIVERED" : ["CONFIRMED", "DELIVERED", "PICKED_UP"].includes(st);
+  if (!fits) return { ok: false, message: stage === "out_for_pickup" ? "Mark it delivered first." : stage === "problem" ? "This order isn't confirmed, so there is no stop to report on." : "Only confirmed (paid) orders can be marked out for delivery." };
+  if (stage !== "problem") {
+    const { todayISO, addDays } = await import("@/lib/dates");
+    const day = stop === "delivery" ? full.order.eventDate : full.order.pickupDate;
+    if (day > addDays(todayISO(), 1)) return { ok: false, message: `This ${stop} is for ${day}. It can be marked from the day before.` };
+  }
   try {
     await recordStage(orderId, stop, stage, staff.userId, note, staff.name);
   } catch (e) {

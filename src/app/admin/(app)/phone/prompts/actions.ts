@@ -30,6 +30,8 @@ export async function approveDraftAction(versionId: number): Promise<{ ok: boole
   try {
     const r = await approveDraft(versionId, s.userId);
     revalidatePath("/admin/phone/prompts");
+    // Extra check HP7 (Nov 27, 2026): an uploaded recording on this line keeps playing the old words; say so
+    if (r.hasUpload) return { ok: true, message: "Approved. Your uploaded recording on this line still plays (with the old words) until you upload a new one or switch the line back to the Google voice." };
     return { ok: true, message: r.recorded ? "Approved and live, with a new Google voice recording." : "Approved and live now (live Google voice)." };
   } catch (e) {
     return { ok: false, message: e instanceof PromptError ? e.message : "Something went wrong. Nothing changed." };
@@ -105,7 +107,10 @@ export async function selectRecordingAction(key: string, id: number): Promise<R>
     return { ok: false, message: (e as Error).message };
   }
   await log(s.userId, "voice_prompt.recording_used", key, { recordingId: id });
-  await (await import("@/lib/recording-flags")).clearRecordingFlag(key, s.userId); // a new recording: no longer flagged
+  // a recording made after the value changed: no longer flagged (an older one keeps the flag, extra check HP6)
+  const { getRecording } = await import("@/lib/prompt-recordings");
+  const chosen = await getRecording(id);
+  await (await import("@/lib/recording-flags")).clearRecordingFlag(key, s.userId, chosen?.createdAt ?? null);
   revalidatePath("/admin/phone/prompts");
   revalidatePath("/admin/phone/prompts/slots");
   return { ok: true, message: "Callers hear this recording now." };

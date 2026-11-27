@@ -1,3 +1,4 @@
+import { idParam } from "@/lib/id-param";
 import { eq } from "drizzle-orm";
 import { currentStaff } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
@@ -11,7 +12,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const staff = await currentStaff();
   if (!staff) return new Response("Unauthorized", { status: 401 });
   if (staff.role !== "owner" && staff.role !== "secretary") return new Response("Forbidden", { status: 403 });
-  const [f] = await db.select().from(schema.messageFiles).where(eq(schema.messageFiles.id, Number((await params).id))).limit(1);
+  const [f] = await db.select().from(schema.messageFiles).where(eq(schema.messageFiles.id, idParam((await params).id) ?? 0)).limit(1);
   if (!f) return new Response("Not found", { status: 404 });
   const r = await r2Get(f.storageKey);
   if (!r.ok || !r.body) return new Response("File not available", { status: 502 });

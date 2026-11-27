@@ -94,12 +94,11 @@ export async function uploadCatalogPhotoAction(fd: FormData): Promise<{ ok: bool
   if (!id || !file || typeof file === "string") return { ok: false, message: "Choose a photo first." };
   // Deep check B6: checked before anything is stored, so a refused picture never takes up storage
   if (kind === "text" && id !== 1 && id !== 2) return { ok: false, message: "Choose picture 1 or picture 2." };
-  // Deep check 0600 M69 (B6 leftover): a photo for an item or category that no longer exists is never stored
+  // Deep check 06:00 M69 (B6 leftover): the item or category must exist before its photo is stored
   if (kind !== "text") {
     const table = kind === "categories" ? schema.categories : schema.products;
-    const { isDbId } = await import("@/lib/db-id");
-    const [there] = isDbId(id) ? await db.select({ id: table.id }).from(table).where(eq(table.id, id)).limit(1) : [];
-    if (!there) return { ok: false, message: kind === "categories" ? "That category no longer exists. Reload the page." : "That item no longer exists. Reload the page." };
+    const [found] = await db.select({ id: table.id }).from(table).where(eq(table.id, id)).limit(1);
+    if (!found) return { ok: false, message: "That item was not found. Reload the page and try again." };
   }
   const data = new Uint8Array(await file.arrayBuffer());
   const { photoKind } = await import("@/lib/delivery-photos");
