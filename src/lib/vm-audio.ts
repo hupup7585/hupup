@@ -106,7 +106,9 @@ export function verifyR2AudioLink(key: string, exp: string | null, sig: string |
   const e = Number(exp);
   if (!key.startsWith("voicemail/") || key.includes("..") || !sig || !Number.isFinite(e) || e * 1000 < now) return false;
   const want = sign(key, e);
-  return want.length === sig.length && timingSafeEqual(Buffer.from(want), Buffer.from(sig));
+  const a = Buffer.from(want);
+  const b = Buffer.from(sig);
+  return a.length === b.length && timingSafeEqual(a, b); // byte lengths (deep check 29: a multibyte sig threw)
 }
 
 /** A recording made on the call (greeting, name, note) copied to R2 under its own key. */

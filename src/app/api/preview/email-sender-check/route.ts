@@ -11,6 +11,10 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   if (process.env.VERCEL_ENV !== "preview") return new Response("Not found", { status: 404 });
+  // Deep check Nov 27 (item 20): signed in as the Owner too, not only behind Vercel's preview protection (it can send
+  // a branded email to any address)
+  const { currentStaff } = await import("@/lib/auth");
+  if ((await currentStaff())?.role !== "owner") return new Response("Not found", { status: 404 });
   if (!process.env.RESEND_API_KEY) return Response.json({ verified: false, reason: "RESEND_API_KEY is not set on preview" });
   const owner = new URL(req.url).searchParams.get("send") === "owner";
   // Abraham, Nov 17, 2026: the test email with the logo and signature, to hupupattractions@gmail.com

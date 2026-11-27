@@ -15,7 +15,7 @@ async function weeklyBackupEmail(now = new Date()) {
   const b = await buildBackup(now);
   const fits = b.gz.length <= 8 * 1024 * 1024;
   const text = `Your weekly backup of Hup Up Attractions: ${b.tables} tables, ${b.rows} rows.\n\n${fits ? "It is attached. Keep it somewhere safe." : "It is too big to attach this week. Download it here:"}\n${config.baseUrl()}/api/admin/backup\n\nKeys, passwords and sign-in codes are never in the backup.`;
-  const r = await sendEmail(to, "Hup Up Attractions: weekly backup", text, fits ? [{ filename: backupFileName(now), content: b.gz.toString("base64") }] : []);
+  const r = await sendEmail(to, "Hup Up Attractions: weekly backup", text, fits ? [{ filename: backupFileName(now), content: b.gz.toString("base64") }] : [], { record: false }); // deep check 30: the full backup is not copied into the Inbox tables every week
   if (!r?.sent) throw new Error("The backup email could not be sent.");
   return { sent: true, bytes: b.gz.length, tables: b.tables, rows: b.rows };
 }
