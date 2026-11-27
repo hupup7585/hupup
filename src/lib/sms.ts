@@ -433,6 +433,9 @@ async function deliver(m: { messageId?: number; to: string; body: string; mediaU
 
   const statusCallback = `${config.baseUrl()}/api/sms/status`;
   try {
+    // Deep check 06:00 M58: a held text (claimed "sending") is marked just before it is handed to Twilio, so a run cut
+    // off after this point is never sent again (its result is unknown); one cut off before it is held again (G4)
+    if (messageId) await db.update(schema.messages).set({ status: "submitting" }).where(and(eq(schema.messages.id, messageId), eq(schema.messages.status, "sending")));
     const msg = await client.messages.create({ to, body: m.body, ...senderParams(), statusCallback, ...(m.mediaUrls?.length ? { mediaUrl: m.mediaUrls } : {}) });
     if (messageId) await db.update(schema.messages).set({ twilioSid: msg.sid, status: msg.status || "queued" }).where(eq(schema.messages.id, messageId));
     return { sent: true, sid: msg.sid, messageId };
@@ -481,6 +484,18 @@ export const STUCK_SENDING_MS = 15 * 60_000;
 
 export async function processHeldPromotions(now = new Date()): Promise<{ sent: number; canceled: number; rescheduled: number }> {
   await refreshSmsCalendar(true);
+  // Deep check 06:00 M58: cut off while being handed to Twilio: Twilio may have sent it, so it is never sent again
+  await db
+    .update(schema.messages)
+    .set({ status: "failed", errorMessage: "Cut off while being handed to Twilio: the result is unknown, so it was not sent again (check Twilio's log)." })
+    .where(
+      and(
+        eq(schema.messages.status, "submitting"),
+        isNull(schema.messages.twilioSid),
+        inArray(schema.messages.kind, ["marketing", "system"]),
+        lte(schema.messages.sendAfter, new Date(now.getTime() - STUCK_SENDING_MS)),
+      ),
+    );
   // Extra check G4 (Nov 27, 2026): a held text claimed by a run that was cut off (time limit) is "sending" with no
   // Twilio id; 15 minutes after it was claimed it is held again, so it goes out instead of waiting forever
   await db

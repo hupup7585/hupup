@@ -124,3 +124,19 @@ describe("deep check 06:00 M71: an error after the voicemail alert was claimed",
     expect(notify).toContain("throw e;");
   });
 });
+
+describe("deep check 06:00 M58: a held text cut off while being handed to Twilio", () => {
+  it("is marked failed (result unknown) and never sent again", async () => {
+    const { processHeldPromotions, STUCK_SENDING_MS } = await import("@/lib/sms");
+    const now = new Date();
+    const [m] = await db
+      .insert(schema.messages)
+      .values({ direction: "out", toNumber: "+18455550611", contactPhone: "+18455550611", body: "z", kind: "system", event: "owner_alert", status: "submitting", sendAfter: new Date(now.getTime() - STUCK_SENDING_MS - 60_000) })
+      .returning();
+    await processHeldPromotions(now).catch(() => null);
+    const [row] = await db.select().from(schema.messages).where(eq(schema.messages.id, m.id));
+    expect(row.status).toBe("failed");
+    expect(row.errorMessage).toContain("not sent again");
+    expect(readFileSync("src/lib/sms.ts", "utf8")).toContain('set({ status: "submitting" }).where(and(eq(schema.messages.id, messageId), eq(schema.messages.status, "sending")))');
+  });
+});
