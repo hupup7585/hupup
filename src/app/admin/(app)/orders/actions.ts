@@ -96,6 +96,16 @@ export async function recordPaymentAction(orderId: number, amount: string, metho
   const cents = parseMoneyToCents(amount);
   if (!cents) return { ok: false, message: "Enter an amount" };
   if (!RECORD_METHODS.includes(method as (typeof RECORD_METHODS)[number])) return { ok: false, message: "Choose how it was paid: cash, check, card (Sola) or other." };
+  // Deep check 0600 M54 (Nov 27, 2026): a double click counted the cash twice. The order is locked while a payment of
+  // the same amount and way recorded by hand in the last 15 seconds is looked for; the first click claims it.
+  const claimed = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`);
+    const recent = await tx.execute(sql`SELECT 1 FROM audit_log WHERE action = 'order.payment_claim' AND entity_type = 'order' AND entity_id = ${String(orderId)} AND after->>'cents' = ${String(cents)} AND after->>'method' = ${method} AND created_at > now() - interval '15 seconds' LIMIT 1`);
+    if (recent.rows.length) return false;
+    await tx.insert(schema.auditLog).values({ userId: staff.userId, action: "order.payment_claim", entityType: "order", entityId: String(orderId), after: { cents: String(cents), method } });
+    return true;
+  });
+  if (!claimed) return { ok: false, message: "This payment was just recorded (the button was pressed twice). If there really was a second payment of the same amount, wait 15 seconds and record it again." };
   const r = await markPaid(orderId, cents, method);
   // Code audit M6: every payment recorded by hand is in the audit log (who, how much, how); confirmed only when paid in full
   if (r) await db.insert(schema.auditLog).values({ userId: staff.userId, action: "order.payment_recorded", entityType: "order", entityId: String(orderId), after: { cents, method, status: r.status } });
@@ -140,7 +150,20 @@ export async function updateDetailsAction(orderId: number, form: FormData): Prom
   const [before] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
   if (!before) return { ok: false, message: "Not saved. Order not found." };
   const deliveryAddress = String(form.get("deliveryAddress") || "").trim() || null;
-  const notes = String(form.get("notes") || "") || null;
+  // Deep check 0600 M23 (Nov 27, 2026): the notes box was saved back as it was when the page opened, erasing notes the
+  // system added since (for example "refund it"). Untouched: the notes stay as they are now. Changed by staff while the
+  // system also added a note: the staff text is kept and the system's addition is put back after it.
+  const typed = String(form.get("notes") ?? "");
+  const opened = form.has("notesBefore") ? String(form.get("notesBefore") ?? "") : null;
+  const nowNotes = before.notes ?? "";
+  let notes: string | null;
+  if (opened === null) notes = typed || null; // an old open page without the field: as before
+  else if (typed === opened) notes = before.notes;
+  else if (nowNotes === opened) notes = typed || null;
+  else {
+    const added = nowNotes.startsWith(opened) ? nowNotes.slice(opened.length).trim() : nowNotes.trim();
+    notes = [typed.trim(), added].filter(Boolean).join("\n") || null;
+  }
   const moved = (before.deliveryAddress ?? null) !== deliveryAddress;
   // Audit H2 (Nov 24, 2026): a new address on an order nothing has been paid on is priced again (zone, delivery, tax,
   // total), so the next payment link charges the new amount. Paid or finished orders keep their price.

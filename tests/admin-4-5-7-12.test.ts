@@ -13,7 +13,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { sendPayLinkAction, updateStatusAction } from "@/app/admin/(app)/orders/actions";
+import { recordPaymentAction, sendPayLinkAction, updateDetailsAction, updateStatusAction } from "@/app/admin/(app)/orders/actions";
 
 let maze = 0, guns = 0;
 beforeAll(async () => {
@@ -94,5 +94,34 @@ describe("deep check 0600 M8 and M57", () => {
     await db.insert(schema.orderItems).values({ orderId: o.id, productId: guns, qty: 1, unitPriceCents: 40000 });
     expect((await updateStatusAction(o.id, "DELIVERED")).ok).toBe(true);
     expect((await db.select().from(schema.unitBookings).where(eq(schema.unitBookings.orderId, o.id))).length).toBeGreaterThan(0);
+  });
+});
+
+describe("deep check 0600 M54 and M23", () => {
+  it("M54: a double click on Record payment counts the cash once", async () => {
+    const [o] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "POS", eventDate: "2027-10-10", pickupDate: "2027-10-11", subtotalCents: 10000, totalCents: 10000 }).returning();
+    const r = await Promise.all([recordPaymentAction(o.id, "40.00", "cash"), recordPaymentAction(o.id, "40.00", "cash")]);
+    expect(r.filter((x) => x.ok)).toHaveLength(1);
+    expect(r.find((x) => !x.ok)?.message).toMatch(/pressed twice/);
+    expect((await db.select().from(schema.orders).where(eq(schema.orders.id, o.id)))[0].paidCents).toBe(4000);
+    // a different amount right after is a real second payment
+    expect((await recordPaymentAction(o.id, "60.00", "cash")).ok).toBe(true);
+  });
+  it("M23: Save keeps a note the system added after the page opened", async () => {
+    const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "POS", eventDate: "2027-11-10", pickupDate: "2027-11-11", subtotalCents: 1, notes: "Gate code 12. " }).returning();
+    await db.update(schema.orders).set({ notes: "Gate code 12. Second payment of $5.00 on an order already paid in full: refund it. " }).where(eq(schema.orders.id, o.id));
+    const f = (notes: string) => {
+      const x = new FormData();
+      x.set("deliveryAddress", "");
+      x.set("notes", notes);
+      x.set("notesBefore", "Gate code 12. ");
+      return x;
+    };
+    await updateDetailsAction(o.id, f("Gate code 12. "));
+    expect((await db.select().from(schema.orders).where(eq(schema.orders.id, o.id)))[0].notes).toMatch(/refund it/);
+    await updateDetailsAction(o.id, f("Gate code 34."));
+    const n = (await db.select().from(schema.orders).where(eq(schema.orders.id, o.id)))[0].notes!;
+    expect(n).toMatch(/^Gate code 34\./);
+    expect(n).toMatch(/refund it/);
   });
 });
