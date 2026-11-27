@@ -22,9 +22,9 @@ describe("the short jobs", () => {
     expect(r.status).toBe(200);
     expect(await r.json()).toMatchObject({ released: { ok: true, result: 2 } });
   });
-  it("the Worker runs every 5 minutes (as each live build sets it), Workers only: no storage of its own, no routes on the domain", () => {
+  it("the Worker runs every 3 hours, Workers only: no R2, no storage, no routes on the domain", () => {
     const toml = readFileSync("cloudflare/wrangler.scheduler.toml", "utf8");
-    expect(toml).toContain('crons = ["*/5 * * * *"]'); // deep check 06:00 M60
+    expect(toml).toContain('crons = ["0 */3 * * *"]');
     expect(toml).not.toMatch(/r2_buckets|kv_namespaces|d1_databases|^\s*routes?\s*=/m);
     const worker = readFileSync("cloudflare/scheduler-worker.js", "utf8");
     expect(worker).toContain("/api/cron/frequent");

@@ -98,6 +98,15 @@ describe("customer service: three full 25-second calls", () => {
     await saveSetting("ringTargets4", "Sara | +18455550123 | 25");
     await saveSetting("ringAttempts4", "3");
   });
+  it("deep check 06:00 M47: a staff phone calling in: the rounds count only the others (nobody is rung an extra time)", async () => {
+    // line 5 lists the caller's own phone and Moshe, one round each: only Moshe is rung, once, then voicemail
+    await saveSetting("ringTargets5", "Me | +18455550146 | 20\nMoshe | +18455550124 | 20");
+    await saveSetting("ringAttempts5", "1");
+    const first = await call("ring", {}, { k: "5" });
+    expect(first).toContain("+18455550124");
+    expect(first).not.toContain("<Number>+18455550146");
+    expect(redirect(await call("operator-done", { DialCallStatus: "no-answer" }, { i: "0", k: "5" }))).toBe("voicemail?x=5");
+  });
   it("other lines are unchanged: an early end moves on right away", async () => {
     await saveSetting("ringTargets5", "Moshe | +18455550124 | 25");
     await call("ring", {}, { k: "5" });

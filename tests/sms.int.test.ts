@@ -150,7 +150,7 @@ describe.skipIf(!hasDb)("SMS: inbound, keywords, status, sending", async () => {
   it("logs outbound texts and updates delivery status from Twilio callbacks, including failures", async () => {
     const r = await sendMessage({ to: phone, body: "Order 1001 confirmed", event: "booking_confirmation", userId: 7 });
     expect(r.sent).toBe(true);
-    expect(sent[0].statusCallback).toBe("https://hupupattractions.com/api/sms/status");
+    expect(sent[0].statusCallback).toMatch(/^https:\/\/hupupattractions\.com\/api\/sms\/status(\?m=\d+)?$/);
     await status.POST(signed("/api/sms/status", { MessageSid: r.sid!, MessageStatus: "undelivered", ErrorCode: "30003" }, "hupup.vercel.app"));
     const [m] = await db.select().from(schema.messages).where(eq(schema.messages.id, r.messageId!));
     expect(m.status).toBe("undelivered");

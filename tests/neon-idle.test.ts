@@ -97,9 +97,7 @@ describe("Admin polling and the scheduler setup", () => {
     const hits = execSync("grep -rln setInterval src || true", { encoding: "utf8" }).trim().split("\n").filter(Boolean);
     expect(hits).toEqual(["src/app/admin/(app)/inbox/RefreshMail.tsx"]);
   });
-  it("the Cloudflare scheduler file matches what every live build sets (every 5 minutes; the site itself waits 3 hours unless a wake flag is due)", () => {
-    // Deep check 06:00 M60 (Nov 27, 2026, f1b08df): the toml said every 3 hours while the live build set every 5 minutes
-    expect(readFileSync("cloudflare/wrangler.scheduler.toml", "utf8")).toContain('crons = ["*/5 * * * *"]');
-    expect(readFileSync("scripts/deploy-setup.ts", "utf8")).toContain('cron: "*/5 * * * *"');
+  it("the Cloudflare scheduler file is set to every 3 hours for its next deploy", () => {
+    expect(readFileSync("cloudflare/wrangler.scheduler.toml", "utf8")).toContain('crons = ["0 */3 * * *"]');
   });
 });

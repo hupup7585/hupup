@@ -8,11 +8,9 @@ compatibility_date = "2026-11-01"
 workers_dev = true
 
 [triggers]
-# Every 5 minutes (Abraham, Nov 27, 2026, 2:14-2:22 AM ET, f1b08df): the live build sets this same schedule
-# (scripts/deploy-setup.ts); the site does the 3-hourly jobs every 3 hours and wakes sooner only for held texts and
-# address re-checks (small R2 flags). Deep check 06:00 M60: this file said every 3 hours, so a manual deploy with it
-# would have delayed held texts and address re-checks by up to 3 hours.
-crons = ["*/5 * * * *"]
+# Every 3 hours (Neon free plan, Abraham, Nov 26, 2026, 1:28 PM ET): the site does the jobs every 3 hours anyway;
+# a 5-minute schedule only made extra calls. Takes effect the next time this Worker is deployed.
+crons = ["0 */3 * * *"]
 
 [vars]
 SITE_URL = "https://hupupattractions.com"

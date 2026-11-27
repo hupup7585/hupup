@@ -74,10 +74,10 @@ export function buildSendDigits(template: string, v: { pin: string; amountCents:
 /** Check a template before saving (Admin). Returns an error or null. */
 export function digitsTemplateError(template: string): string | null {
   try {
-    // Deep check 06:00 M61: checked with the longest values a call can bring (the real PIN length or 8 digits, the
-    // highest custom amount $99,999.99, a 6-digit order number), so a saved pattern can never grow past 120 on a call
-    const pinLen = Math.max(8, (process.env.SOLA_PHONEPAY_PIN ?? "").replace(/\D/g, "").length);
-    buildSendDigits(template, { pin: "9".repeat(pinLen), amountCents: 9_999_999, orderNumber: "999999" });
+    buildSendDigits(template, { pin: "1234", amountCents: 23000, orderNumber: "1438" });
+    // Deep check 0600 M61: also with the longest values a real call can use (a 12-digit PIN, $99,999.00, a 7-digit
+    // order number), so a template that only fits short sample values is refused here, not in the middle of a call
+    buildSendDigits(template, { pin: "9".repeat(12), amountCents: 9_999_900, orderNumber: "9999999" });
     return null;
   } catch (e) {
     return (e as Error).message;

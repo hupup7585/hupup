@@ -431,7 +431,10 @@ async function deliver(m: { messageId?: number; to: string; body: string; mediaU
     return { sent: true, dev: true, messageId };
   }
 
-  const statusCallback = `${config.baseUrl()}/api/sms/status`;
+  // Deep check 0600 M58: our message number rides on the status address, so Twilio's first status notice ties its
+  // message id to our row even if this run is cut off right after Twilio accepted the text (it is then never re-held
+  // and sent a second time)
+  const statusCallback = `${config.baseUrl()}/api/sms/status${messageId ? `?m=${messageId}` : ""}`;
   try {
     // Deep check 06:00 M58: a held text (claimed "sending") is marked just before it is handed to Twilio, so a run cut
     // off after this point is never sent again (its result is unknown); one cut off before it is held again (G4)
