@@ -35,6 +35,17 @@ describe("JOIN reply to the catalog text", () => {
     await text("+18455550301", "JOIN", "SMj2");
     expect(await joins("+18455550301")).toHaveLength(1);
   });
+  it("deep check C2: JOIN, NOPROMO, then JOIN again = signed up again with a second record", async () => {
+    await gotCatalog("+18455550304");
+    await text("+18455550304", "JOIN", "SMj8");
+    await text("+18455550304", "NOPROMO", "SMj9");
+    let [c] = await db.select().from(schema.customers).where(eq(schema.customers.phone, "+18455550304"));
+    expect(c.marketingOptIn).toBe(false);
+    await text("+18455550304", "JOIN", "SMj10");
+    [c] = await db.select().from(schema.customers).where(eq(schema.customers.phone, "+18455550304"));
+    expect(c.marketingOptIn).toBe(true);
+    expect(await joins("+18455550304")).toHaveLength(2);
+  });
   it("STOP then JOIN = no record", async () => {
     await gotCatalog("+18455550302");
     await text("+18455550302", "STOP", "SMj3");
