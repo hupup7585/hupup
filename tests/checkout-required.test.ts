@@ -48,9 +48,9 @@ describe("required details", () => {
 describe("Box 34 delivery instructions (Abraham, Nov 21 and 24, 2026)", () => {
   it("the menu word for word: 1 records, pound or silence skips, star back to the address, wrong key not valid", async () => {
     const menu = await call("directions");
-    expect(said(menu)).toEqual(["To add any special delivery instructions, press 1. To skip, press pound. To go back, press star.", "Almost done!"]); // no key: "Almost done!", then box 56 (Nov 25, 2026, 12:08)
-    expect(redirect(menu)).toBe("finalize"); // silence: skip; box 56 (Box 35 is after payment, Nov 25, 2026, 11:51)
-    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("finalize");
+    expect(said(menu)).toEqual(["To add any special delivery instructions, press 1. To skip, press pound. To go back, press star."]);
+    expect(redirect(menu)).toBe("sms-consent"); // silence: skip; Box 49 next, then "Almost done!" and box 56 (Abraham, Nov 27, 2026, 1:06 AM)
+    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("sms-consent");
     expect(redirect(await call("directions-choice", { Digits: "*" }))).toBe("addr-readback");
     expect(redirect(await call("directions-choice", { Digits: "1" }))).toBe("directions-record");
     const bad = await call("directions-choice", { Digits: "5" });
@@ -59,7 +59,8 @@ describe("Box 34 delivery instructions (Abraham, Nov 21 and 24, 2026)", () => {
   });
   it("after key 1: the message line, the shared pound line, the tone, a recording (not transcribed) ending on pound", async () => {
     const rec = await call("directions-record");
-    expect(said(rec)).toEqual(["Please leave a clear and detailed message with all your delivery instructions after the tone.", "When you are done, press pound.", "Almost done!"]); // nothing recorded: on to box 56
+    expect(said(rec)).toEqual(["Please leave a clear and detailed message with all your delivery instructions after the tone.", "When you are done, press pound."]); // nothing recorded: on to Box 49 (Nov 27, 2026)
+    expect(redirect(rec)).toBe("sms-consent");
     expect(rec).toMatch(/tone\.wav<\/Play><Record [^>]*finishOnKey="#"/);
     expect(rec).not.toContain("transcribe=");
   });
@@ -70,6 +71,6 @@ describe("no email in the booking (Abraham, Nov 17, 2026)", () => {
     const src = (await import("node:fs")).readFileSync("src/lib/ivr/flow.ts", "utf8");
     expect(src).not.toContain('back(vr, "ask", { f: "email" })');
     expect(src).not.toContain("emailRequired: 1");
-    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("finalize"); // Box 35 never plays before payment
+    expect(redirect(await call("directions-choice", { Digits: "#" }))).toBe("sms-consent"); // Box 49, then box 56; Box 35 never plays before payment
   });
 });

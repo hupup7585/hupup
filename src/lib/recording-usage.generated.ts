@@ -26,6 +26,12 @@ export const RECORDING_USAGE: Record<string, string[]> = {
  "addr_saved_price": [
   "lib/ivr/flow.ts"
  ],
+ "addr_saved_price_more": [
+  "lib/ivr/flow.ts"
+ ],
+ "addr_saved_price_two": [
+  "lib/ivr/flow.ts"
+ ],
  "addr_street": [
   "lib/ivr/flow.ts"
  ],

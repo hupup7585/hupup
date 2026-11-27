@@ -280,6 +280,11 @@ const OTHER: Record<string, Explanation> = {
     where: "Customers booking an address in a nearby town: phone order total, payment link, receipt and New booking.",
     ifChanged: "New orders use the new fee; orders already placed keep theirs.",
   },
+  deliveryExtraItemCents: {
+    what: "Delivery is charged once per booking, not per day: the zone price for the first item, plus this amount for each additional item in the same booking (the same in every zone), in cents. 500 means $5.00. Examples: Kiryas Joel, 3 items for 2 days = $10 + $5 + $5 = $20; anywhere else in Orange County, 3 items = $20 + $5 + $5 = $30.",
+    where: "The delivery charge on the phone, New booking, the payment page and the payment total.",
+    ifChanged: "New orders use the new amount; orders already placed keep theirs.",
+  },
   deliveryFeeOutsideCents: {
     what: "The delivery fee for the rest of Orange County, outside the colored map areas, in cents. 2000 means $20.00.",
     where: "Customers booking an address farther out in Orange County.",

@@ -61,14 +61,15 @@ export async function saveZonePricesAction(form: FormData) {
   const kj = toCents(form.get("kj"));
   const area = toCents(form.get("area"));
   const outside = toCents(form.get("outside"));
-  if (kj === null || area === null || outside === null) return back("Enter each price as dollars, like 10 or 15.00.");
+  const extra = toCents(form.get("extra") ?? "5.00");
+  if (kj === null || area === null || outside === null || extra === null) return back("Enter each price as dollars, like 10 or 15.00.");
   const promoOn = form.get("promoOn") === "on";
   const start = isoDate(form.get("promoStart"));
   const end = isoDate(form.get("promoEnd"));
   if (start && end && end < start) return back("The promo end date is before its start date.");
   const s = await getSettings();
-  const before = { deliveryFeeKjCents: s.deliveryFeeKjCents, deliveryFeeAreaCents: s.deliveryFeeAreaCents, deliveryFeeOutsideCents: s.deliveryFeeOutsideCents, deliveryPromoOn: s.deliveryPromoOn, deliveryPromoStart: s.deliveryPromoStart, deliveryPromoEnd: s.deliveryPromoEnd };
-  const after = { deliveryFeeKjCents: kj, deliveryFeeAreaCents: area, deliveryFeeOutsideCents: outside, deliveryPromoOn: promoOn, deliveryPromoStart: start, deliveryPromoEnd: end };
+  const before = { deliveryFeeKjCents: s.deliveryFeeKjCents, deliveryFeeAreaCents: s.deliveryFeeAreaCents, deliveryFeeOutsideCents: s.deliveryFeeOutsideCents, deliveryPromoOn: s.deliveryPromoOn, deliveryPromoStart: s.deliveryPromoStart, deliveryPromoEnd: s.deliveryPromoEnd, deliveryExtraItemCents: s.deliveryExtraItemCents };
+  const after = { deliveryFeeKjCents: kj, deliveryFeeAreaCents: area, deliveryFeeOutsideCents: outside, deliveryPromoOn: promoOn, deliveryPromoStart: start, deliveryPromoEnd: end, deliveryExtraItemCents: extra };
   for (const [k, v] of Object.entries(after)) await saveSetting(k as keyof typeof after, v as never, owner.userId);
   await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.delivery_zone_prices_updated", entityType: "settings", entityId: "delivery_zone_prices", before, after });
   revalidatePath("/admin", "layout");

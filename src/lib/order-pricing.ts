@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { priceOrder } from "@/lib/pricing";
@@ -13,9 +13,15 @@ import { priceOrder } from "@/lib/pricing";
  * Delivery and sales tax on a rentals total (Nov 24, 2026: one place, used by saved orders and the booking screen's
  * live total, so the screen, the payment link, the text and the order page match to the cent). Null = no price.
  */
-export async function totalsFor(subtotalCents: number, offerNote: string | null, address: string | null | undefined, eventDate: string, s: Awaited<ReturnType<typeof getSettings>>) {
+export async function totalsFor(subtotalCents: number, offerNote: string | null, address: string | null | undefined, eventDate: string, s: Awaited<ReturnType<typeof getSettings>>, itemCount = 1) {
   let t = await priceOrder(subtotalCents, address, s, undefined, eventDate);
   if (!t) return null;
+  // Abraham, Nov 27, 2026, 1:06 AM: the zone price is for the first item; each more item adds the Admin amount
+  {
+    const { bookingDeliveryCents } = await import("@/lib/delivery-rule");
+    const { totalsWithFee } = await import("@/lib/pricing");
+    if (itemCount > 1) t = totalsWithFee(subtotalCents, t.zone, bookingDeliveryCents(t.deliveryFeeCents, itemCount, s), s);
+  }
   // A free 4th Sunday pays its own delivery ($20 / $30 / $40)
   const { OFFER_NOTES } = await import("@/lib/offers");
   if (offerNote === OFFER_NOTES.fourthSunday) {
@@ -23,7 +29,8 @@ export async function totalsFor(subtotalCents: number, offerNote: string | null,
     const { deliveryFeeFor } = await import("@/lib/offer-delivery");
     const { totalsWithFee } = await import("@/lib/pricing");
     const q = await deliveryQuote(address, s, undefined, eventDate);
-    if (q.ok && q.kind) t = totalsWithFee(subtotalCents, q.zone, deliveryFeeFor(q.kind, s, eventDate, offerNote), s);
+    const { bookingDeliveryCents } = await import("@/lib/delivery-rule");
+    if (q.ok && q.kind) t = totalsWithFee(subtotalCents, q.zone, bookingDeliveryCents(deliveryFeeFor(q.kind, s, eventDate, offerNote), itemCount, s), s);
   }
   return t;
 }
@@ -49,8 +56,17 @@ export async function ensurePriced(orderId: number): Promise<boolean> {
   const { refreshOrderTotals } = await import("@/lib/orders");
   await refreshOrderTotals(orderId);
   const [fresh] = await db.select({ subtotalCents: schema.orders.subtotalCents, offerNote: schema.orders.offerNote }).from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
-  const t = await totalsFor(fresh.subtotalCents, fresh.offerNote, o.deliveryAddress, o.eventDate, s);
-  if (!t) return false; // outside every zone, or not found: never guessed (pricingProblem says which)
+  // One delivery charge per booking (Abraham, Nov 27, 2026, 1:06 AM): a booking of several days (one payment group)
+  // has it on its first day, counting every item of the booking; the other days have no delivery charge
+  const { bookingItemCount } = await import("@/lib/delivery-rule");
+  const group = o.paymentGroupId ? await db.select().from(schema.orders).where(eq(schema.orders.paymentGroupId, o.paymentGroupId)) : [o];
+  const live = group.filter((g) => g.status !== "CANCELLED").sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.id - b.id);
+  const first = (live[0] ?? o).id === o.id;
+  const groupLines = await db.select({ productId: schema.orderItems.productId, qty: schema.orderItems.qty }).from(schema.orderItems).where(inArray(schema.orderItems.orderId, (live.length ? live : [o]).map((g) => g.id)));
+  const t0 = await totalsFor(fresh.subtotalCents, fresh.offerNote, o.deliveryAddress, o.eventDate, s, bookingItemCount(groupLines));
+  if (!t0) return false; // outside every zone, or not found: never guessed (pricingProblem says which)
+  const { totalsWithFee } = await import("@/lib/pricing");
+  const t = first ? t0 : totalsWithFee(fresh.subtotalCents, t0.zone, 0, s);
   // Custom-amount services staff added (Nov 26, 2026) count in the total and the sales tax
   const { serviceSumsFor, withServices } = await import("@/lib/order-services");
   const w = withServices(t, await serviceSumsFor(orderId));
@@ -134,7 +150,8 @@ export async function quoteBooking(input: { items: { productId: number; qty: num
     ? await bestOfferFor(db, { id: 0, customerId, eventDate: input.eventDate, pickupDate, spanDays: 0 }, lines, await offerSwitches(db), () => discountForPhone(db as never, input.phone, todayISO()))
     : { discountCents: 0, note: null };
   const subtotalCents = itemsCents - offer.discountCents;
-  const t = lines.length ? await totalsFor(subtotalCents, offer.note, input.address, input.eventDate, s) : null;
+  const { bookingItemCount } = await import("@/lib/delivery-rule");
+  const t = lines.length ? await totalsFor(subtotalCents, offer.note, input.address, input.eventDate, s, bookingItemCount(known)) : null;
   return {
     itemsCents,
     offerCents: offer.discountCents,

@@ -17,6 +17,8 @@ export const SETTING_DEFAULTS = {
   supportPhone: "",
   /* Checkout pricing (Abram's decisions; editable in admin). Lists are one place per line. */
   deliveryFeeKjCents: "1000",
+  /** Abraham, Nov 27, 2026, 1:06 AM: delivery is the zone price for the first item plus this for each more item */
+  deliveryExtraItemCents: "500",
   deliveryFeeAreaCents: "1500",
   /** Anywhere else in Orange County (outside every colored area on the map), Owner-editable (Abraham, Nov 17, 2026). */
   deliveryFeeOutsideCents: "2000",

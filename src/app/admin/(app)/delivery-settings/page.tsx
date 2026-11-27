@@ -33,6 +33,13 @@ export default async function DeliverySettingsPage({ searchParams }: { searchPar
             <label className="block"><span className="label">Nearby towns ($)</span><input name="area" defaultValue={(Number(settings.deliveryFeeAreaCents) / 100).toFixed(2)} inputMode="decimal" className="input" /></label>
             <label className="block"><span className="label">Anywhere else in Orange County ($)</span><input name="outside" defaultValue={(Number(settings.deliveryFeeOutsideCents) / 100).toFixed(2)} inputMode="decimal" className="input" /></label>
           </div>
+          <label className="block max-w-xs" data-extra-item>
+            <span className="label">Each additional item ($)</span>
+            <input name="extra" defaultValue={(Number(settings.deliveryExtraItemCents ?? 500) / 100).toFixed(2)} inputMode="decimal" className="input" />
+            <span className="mt-1 block text-xs text-muted">
+              Delivery is charged once per booking, not per day. The zone price above is for the first item; each additional item in the same booking adds this amount (the same in every zone). Examples: Kiryas Joel, 3 items for 2 days = $10 + $5 + $5 = $20. Anywhere else in Orange County, 3 items = $20 + $5 + $5 = $30.
+            </span>
+          </label>
           <h3 className="mt-2 font-bold">Free delivery promo</h3>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="promoOn" defaultChecked={Boolean(settings.deliveryPromoOn)} /> On: Kiryas Joel delivery free, nearby towns {usd(PROMO_CENTS.area)}. Anywhere else in Orange County stays {usd(zoneFee("outside", { ...settings, deliveryPromoOn: false }))}.</label>
           <div className="grid gap-3 sm:grid-cols-2">

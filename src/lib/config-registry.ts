@@ -116,7 +116,7 @@ const FAMILIES: [RegExp, Spec][] = [
   [/^(ring[A-Z][A-Za-z]*\d|operator(Targets|Mode|AcceptPrompt))$/, page("/admin/phone/settings", "Phone: ringing")],
   [/^(solaPhonePay|phonePay)/, page("/admin/phone/phonepay", "Payments")],
   [/^music[A-Z]/, page("/admin/phone/music", "Phone: music")],
-  [/^(deliveryFee|deliveryPromo)/, page("/admin/delivery-settings", "Fees and tax")],
+  [/^(deliveryFee|deliveryPromo|deliveryExtraItem)/, page("/admin/delivery-settings", "Fees and tax")],
   [/^(solaFee|book[A-Z]|gl[A-Z])/, page("/admin/bookkeeping", "Bookkeeping")],
   [/^(laserThirdSetHalfOn|offer[A-Z]|holiday[A-Z])/, page("/admin/offers", "Offers and discounts")],
   [/^(erev|candle|reopen|phoneCutoff|shabbesSave|sameDayCutoff|sameDayHours|sameDayCloseAreas|close[A-Z]|calendar(Latitude|Longitude)|hours[A-Z])/, page("/admin/settings", "Hours and calendar")],

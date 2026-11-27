@@ -43,7 +43,8 @@ describe("free delivery promo counts by the delivery date", () => {
     expect(zoneFee("local", on, "2026-12-11")).toBe(1000);
     expect(zoneFee("area", on, "2026-11-30")).toBe(1500);
     expect(readFileSync("src/lib/order-pricing.ts", "utf8")).toContain("priceOrder(subtotalCents, address, s, undefined, eventDate)");
-    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toContain("deliveryFeeFor(quote.kind, settings, o.order.eventDate, o.order.offerNote)");
+    // one delivery charge per booking (Abraham, Nov 27, 2026, 1:06 AM): the first day's delivery date decides the promo
+    expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toContain("deliveryFeeFor(quote.kind, settings, firstDay.eventDate, firstDay.offerNote)");
   });
 });
 

@@ -768,6 +768,12 @@ async function addressTryFailed(ctx: Ctx, vr: VR, why: string): Promise<VR | nul
   return directoryLookupOn() ? back(vr, "addr-lookup") : back(vr, "addr-house");
 }
 
+/** "Almost done!" then box 56 (the order total), right after Box 49 (Nov 25 and 27, 2026). */
+function toFinalize(vr: VR, ctx: Ctx) {
+  sp(vr, ctx, "almost_done");
+  return back(vr, "finalize");
+}
+
 /** The phone's booking cut-off now (Abraham, Nov 26, 2026, 11:51 PM): 15 minutes before candle lighting (Admin). */
 async function phoneCutoff() {
   const st = await getSettings();
@@ -3769,17 +3775,13 @@ const handlers: Record<string, Handler> = {
   directions(ctx, vr) {
     const g = keypad(vr, url("directions-choice"), { timeout: T(vr, "timerNoKey") });
     sp(g, ctx, "box34_menu");
-    sp(vr, ctx, "almost_done"); // Nov 25, 2026, 12:08: "Almost done!" then box 56, no pause
-    return back(vr, "finalize"); // silence: skip; box 56 next (Box 35 moved after payment, Nov 25, 2026, 11:51)
+    return back(vr, "sms-consent"); // silence: skip; Box 49 next, then "Almost done!" and box 56 (Abraham, Nov 27, 2026, 1:06 AM)
   },
 
   "directions-choice"(ctx, vr) {
     const d = ctx.body.Digits;
     if (d === "1") return back(vr, "directions-record");
-    if (d === "#" || !d) {
-      sp(vr, ctx, "almost_done"); // then box 56, no pause (Nov 25, 2026, 12:08)
-      return back(vr, "finalize");
-    }
+    if (d === "#" || !d) return back(vr, "sms-consent"); // Box 49, then "Almost done!" and box 56 (Nov 27, 2026)
     if (d === "*") return back(vr, "addr-readback");
     sp(vr, ctx, "not_valid");
     return back(vr, "directions");
@@ -3792,8 +3794,7 @@ const handlers: Record<string, Handler> = {
     sp(vr, ctx, "pound_done");
     vr.play(`${config.baseUrl()}/audio/tone.wav`);
     vr.record({ maxLength: T(vr, "timerDirectionsMax"), timeout: T(vr, "timerDirectionsSilence"), playBeep: false, finishOnKey: "#", trim: "trim-silence", action: url("directions-recorded", { o }), method: "POST", recordingStatusCallback: url("directions-rec-status", { o }), recordingStatusCallbackMethod: "POST" });
-    sp(vr, ctx, "almost_done");
-    return back(vr, "finalize"); // nothing recorded: on with checkout
+    return back(vr, "sms-consent"); // nothing recorded: on with checkout (Box 49 next, Nov 27, 2026)
   },
 
   /** Pound (or the caller hung up): the message is saved with the booking; then the thank-you and straight to box 56. */
@@ -3808,8 +3809,7 @@ const handlers: Record<string, Handler> = {
       await track(ctx.callSid, "step", `Box 34: delivery instructions recorded (${secs} seconds)`);
       sp(vr, ctx, "box34_thanks");
     }
-    sp(vr, ctx, "almost_done"); // after the thank-you (Nov 25, 2026, 12:08)
-    return back(vr, "finalize"); // Nov 24, 2026, 20:59: box 56 right after, no pause
+    return back(vr, "sms-consent"); // Box 49 (Nov 27, 2026), then "Almost done!" and box 56
   },
 
   /** Twilio: the recording file is ready (also after a hang-up mid-message): kept on the booking. */
@@ -4283,7 +4283,12 @@ const handlers: Record<string, Handler> = {
     const quote = await deliveryQuote(d.address, settings, fetch, first?.eventDate ?? new Date());
     if (quote.ok) {
       const cents = quote.kind ? deliveryFeeFor(quote.kind, settings, first?.eventDate ?? todayISO(), first?.offerNote ?? null) : quote.feeCents;
-      sp(vr, ctx, "addr_saved_price", { town: townPhrase(d.town), price: spokenMoney(cents) });
+      // Abraham, Nov 27, 2026, 1:15 AM: 1 item: the one price; 2 items: first and second item; 3 or more: first and
+      // each additional item (the zone price, and the Admin "Each additional item" price)
+      const { bookingItemCount, extraItemCents } = await import("@/lib/delivery-rule");
+      const count = bookingItemCount((await callOrders(ctx)).flatMap((o) => o.items.map((i) => ({ productId: i.productId, qty: i.qty }))));
+      const key = count <= 1 || cents <= 0 ? "addr_saved_price" : count === 2 ? "addr_saved_price_two" : "addr_saved_price_more";
+      sp(vr, ctx, key, { town: townPhrase(d.town), price: spokenMoney(cents), extra: spokenMoney(extraItemCents(settings)) });
       // Same-day delivery notice (Abraham, Nov 27, 2026, 12:47 AM): right after the address is saved, when a day in the
       // cart is today: one notice with both ranges; the after-hours version when customer service is closed
       if ((await callOrders(ctx)).some((o) => o.order.eventDate === localISO(calendarNow()))) {
@@ -4459,18 +4464,20 @@ const handlers: Record<string, Handler> = {
    * number already agreed or replied STOP. The number is not confirmed again here.
    */
   async "sms-consent"(ctx, vr) {
-    const phone = ctx.session?.data.phone;
-    if (!phone) return back(vr, "phone");
+    // Abraham, Nov 27, 2026, 1:06 AM: Box 49 in every booking right after Box 34, for the calling number
+    const phone = ctx.session?.data.phone ?? toE164(ctx.session?.fromNumber ?? ctx.from) ?? undefined;
+    if (!phone) return toFinalize(vr, ctx);
+    if (!ctx.session?.data.phone) await updateSession(ctx.callSid, { data: { phone } }, ctx.session);
     if (!ctx.query.get("n")) {
       const customer = await customerByPhone(phone);
       if (customer?.smsOptOut) {
         sp(vr, ctx, "consent_stopped"); // Nov 25, 2026: the opt-out line, as in the other two places
         await updateSession(ctx.callSid, { data: { smsConsent: "stopped" } }, ctx.session);
-        return back(vr, "finalize");
+        return toFinalize(vr, ctx);
       }
       if ((await consentState(phone)).transactional?.action === "opt_in") {
         await updateSession(ctx.callSid, { data: { smsConsent: "existing" } }, ctx.session);
-        return back(vr, "finalize");
+        return toFinalize(vr, ctx);
       }
     }
     const g = keypad(vr, url("sms-consent-answer", { n: ctx.query.get("n") ?? undefined }), { timeout: T(vr, "timerCheckoutAnswer") });
@@ -4479,25 +4486,25 @@ const handlers: Record<string, Handler> = {
   },
 
   async "sms-consent-answer"(ctx, vr) {
-    const phone = ctx.session?.data.phone;
-    if (!phone) return back(vr, "phone");
+    const phone = ctx.session?.data.phone ?? toE164(ctx.session?.fromNumber ?? ctx.from) ?? undefined;
+    if (!phone) return toFinalize(vr, ctx);
     const d = ctx.query.get("none") ? "" : ctx.body.Digits ?? "";
-    if (d === "*") return back(vr, "phone"); // star: one step back (Nov 20, 2026)
+    if (d === "*") return back(vr, "directions"); // star: one step back, Box 34
     if (d === "1") {
       await recordPhoneConsent(ctx, "transactional", "opt_in", phone);
       await updateSession(ctx.callSid, { data: { smsConsent: "yes" } }, ctx.session);
       sp(vr, ctx, "consent_tx_thanks", { number: spokenPhone(phone) });
-      return back(vr, "finalize");
+      return toFinalize(vr, ctx);
     }
-    // Another key (wrong key): the shared line and the question once more; then, like no key, no texts
+    // Another key (wrong key): the shared line, then Box 49 again (Nov 27, 2026); no key = no texts
     const n = Number(ctx.query.get("n") || 0);
-    if (d && n < 1) {
+    if (d) {
       sp(vr, ctx, "not_valid");
       return back(vr, "sms-consent", { n: n + 1 });
     }
     await recordPhoneConsent(ctx, "transactional", "declined", phone);
     await updateSession(ctx.callSid, { data: { smsConsent: "no" } }, ctx.session);
-    return back(vr, "finalize");
+    return toFinalize(vr, ctx);
   },
 
   async finalize(ctx, vr) {
@@ -4559,7 +4566,13 @@ const handlers: Record<string, Handler> = {
     // Custom-amount services staff may have added to a held order (Nov 26, 2026) count in its total and tax
     const { servicesByOrder, sumServices, withServices } = await import("@/lib/order-services");
     const svc = await servicesByOrder(days.map((o) => o.order.id));
-    const perDay = days.map((o) => ({ o, t: withServices(totalsWithFee(o.order.subtotalCents, quote.zone, quote.kind ? deliveryFeeFor(quote.kind, settings, o.order.eventDate, o.order.offerNote) : quote.feeCents, settings), sumServices(svc.get(o.order.id) ?? [])) }));
+    // Abraham, Nov 27, 2026, 1:06 AM: ONE delivery charge per booking (not per day): the first item's zone price plus
+    // the Admin "Each additional item" price for each more item; it is on the first day, the other days have none
+    const { bookingDeliveryCents, bookingItemCount } = await import("@/lib/delivery-rule");
+    const firstDay = days[0].order;
+    const firstItemCents = quote.kind ? deliveryFeeFor(quote.kind, settings, firstDay.eventDate, firstDay.offerNote) : quote.feeCents;
+    const bookingFee = bookingDeliveryCents(firstItemCents, bookingItemCount(days.flatMap((o) => o.items.map((i) => ({ productId: i.productId, qty: i.qty })))), settings);
+    const perDay = days.map((o, i) => ({ o, t: withServices(totalsWithFee(o.order.subtotalCents, quote.zone, i === 0 ? bookingFee : 0, settings), sumServices(svc.get(o.order.id) ?? [])) }));
     const primary = days[0].order;
     for (const { o, t } of perDay) {
       await db

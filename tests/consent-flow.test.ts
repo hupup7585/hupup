@@ -170,13 +170,17 @@ describe("transactional consent step (before the payment link)", () => {
     expect(h.session.data.smsConsent).toBe("no");
     expect(xml).toContain("/api/voice/finalize");
   });
-  it("a wrong key: the shared line and the question once more; then like no key", async () => {
+  it("a wrong key: the shared line, then Box 49 again (every time, Nov 27, 2026); no key: no texts, on to box 56", async () => {
     let xml = await call("sms-consent-answer", { Digits: "2" });
     expect(h.recorded).toHaveLength(0);
     expect(xml).toContain(PROMPTS.not_valid.text);
     expect(xml).toContain("/api/voice/sms-consent?n=1");
     xml = await call("sms-consent-answer", { Digits: "2" }, "n=1");
+    expect(h.recorded).toHaveLength(0);
+    expect(xml).toContain("/api/voice/sms-consent?n=2");
+    xml = await call("sms-consent-answer", {}, "none=1");
     expect(h.recorded[0]).toMatchObject({ action: "declined" });
+    expect(xml).toContain("Almost done!");
     expect(xml).toContain("/api/voice/finalize");
   });
   it("already opted in: not asked again", async () => {

@@ -196,15 +196,15 @@ exports[`baseline: every phone step as it plays today > date-confirm 1`] = `"<?x
 
 exports[`baseline: every phone step as it plays today > date-heard 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/idle?to=date</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > directions 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/directions-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To add any special delivery instructions, press 1. To skip, press pound. To go back, press star.</Say></Gather><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Almost done!</Say><Redirect method="POST">https://hupup.example/api/voice/finalize</Redirect></Response>"`;
+exports[`baseline: every phone step as it plays today > directions 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" finishOnKey="" action="https://hupup.example/api/voice/directions-choice" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To add any special delivery instructions, press 1. To skip, press pound. To go back, press star.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/sms-consent</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > directions-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Almost done!</Say><Redirect method="POST">https://hupup.example/api/voice/finalize</Redirect></Response>"`;
+exports[`baseline: every phone step as it plays today > directions-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/sms-consent</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > directions-rec-status 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response/>"`;
 
-exports[`baseline: every phone step as it plays today > directions-record 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Please leave a clear and detailed message with all your delivery instructions after the tone.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">When you are done, press pound.</Say><Play>https://hupup.example/audio/tone.wav</Play><Record maxLength="180" timeout="10" playBeep="false" finishOnKey="#" trim="trim-silence" action="https://hupup.example/api/voice/directions-recorded?o=0" method="POST" recordingStatusCallback="https://hupup.example/api/voice/directions-rec-status?o=0" recordingStatusCallbackMethod="POST"/><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Almost done!</Say><Redirect method="POST">https://hupup.example/api/voice/finalize</Redirect></Response>"`;
+exports[`baseline: every phone step as it plays today > directions-record 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Please leave a clear and detailed message with all your delivery instructions after the tone.</Say><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">When you are done, press pound.</Say><Play>https://hupup.example/audio/tone.wav</Play><Record maxLength="180" timeout="10" playBeep="false" finishOnKey="#" trim="trim-silence" action="https://hupup.example/api/voice/directions-recorded?o=0" method="POST" recordingStatusCallback="https://hupup.example/api/voice/directions-rec-status?o=0" recordingStatusCallbackMethod="POST"/><Redirect method="POST">https://hupup.example/api/voice/sms-consent</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > directions-recorded 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Almost done!</Say><Redirect method="POST">https://hupup.example/api/voice/finalize</Redirect></Response>"`;
+exports[`baseline: every phone step as it plays today > directions-recorded 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/sms-consent</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > disconnect-key 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
 
@@ -358,9 +358,9 @@ exports[`baseline: every phone step as it plays today > ring 1`] = `"<?xml versi
 
 exports[`baseline: every phone step as it plays today > second-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/added-second?p=null&amp;d=null</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > sms-consent 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/phone</Redirect></Response>"`;
+exports[`baseline: every phone step as it plays today > sms-consent 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="8" finishOnKey="" action="https://hupup.example/api/voice/sms-consent-answer" method="POST"><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">To receive text updates to your phone number, about your reservation, press 1.</Say></Gather><Redirect method="POST">https://hupup.example/api/voice/sms-consent-answer?none=1</Redirect></Response>"`;
 
-exports[`baseline: every phone step as it plays today > sms-consent-answer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/phone</Redirect></Response>"`;
+exports[`baseline: every phone step as it plays today > sms-consent-answer 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Google.en-US-Chirp3-HD-Puck" language="en-US">Almost done!</Say><Redirect method="POST">https://hupup.example/api/voice/finalize</Redirect></Response>"`;
 
 exports[`baseline: every phone step as it plays today > soldout-choice 1`] = `"<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">https://hupup.example/api/voice/menu</Redirect></Response>"`;
 

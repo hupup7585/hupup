@@ -36,6 +36,11 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "lib/delivery-areas.ts",
   "lib/pricing.ts"
  ],
+ "deliveryExtraItemCents": [
+  "app/admin/(app)/delivery-settings/area-actions.ts",
+  "app/admin/(app)/delivery-settings/page.tsx",
+  "lib/delivery-rule.ts"
+ ],
  "deliveryFeeAreaCents": [
   "app/admin/(app)/delivery-settings/area-actions.ts",
   "app/admin/(app)/delivery-settings/page.tsx",

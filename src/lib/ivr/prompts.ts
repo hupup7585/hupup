@@ -37,6 +37,13 @@ export const SHARED_PIECES: { key: string; group: string; label: string; text: s
 export const PIECE_ALIAS: Record<string, string> = {
   "closed_day_intro#2": "piece:for",
   "box18_book#2": "piece:for",
+  // The address-saved line for 2 and 3+ items (Abraham, Nov 27, 2026, 1:15 AM): the same opening pieces as the 1-item
+  // line; "for the first item, and" is one recording for both
+  "addr_saved_price_two#1": "addr_saved_price#1",
+  "addr_saved_price_two#2": "addr_saved_price#2",
+  "addr_saved_price_more#1": "addr_saved_price#1",
+  "addr_saved_price_more#2": "addr_saved_price#2",
+  "addr_saved_price_more#3": "addr_saved_price_two#3",
 };
 
 /**
@@ -571,6 +578,8 @@ export const PROMPTS = {
   // Box 35 (Abraham, Nov 25, 2026, 11:51): after a paid phone card payment, right after box 148 (no star on this screen)
   box35_receipt: { group: "Pay by card (Sola PhonePay)", label: "Box 35: receipt by email, after the payment is approved (1 = the email steps, pound = skip)", text: "To receive a receipt by email, press 1. To skip, press pound." },
   // Menu 2 (Abraham, Nov 24, 2026, 20:56): one line right after the address is confirmed; town and price are live parts
+  addr_saved_price_two: { group: "Checkout", label: "Menu 2: address saved, exactly 2 items (first item and second item prices)", text: "Your delivery address has been saved, delivery to {town} is {price} for the first item, and {extra} for the second item.", vars: ["town", "price", "extra"] },
+  addr_saved_price_more: { group: "Checkout", label: "Menu 2: address saved, 3 or more items (first item and each additional item)", text: "Your delivery address has been saved, delivery to {town} is {price} for the first item, and {extra} for each additional item.", vars: ["town", "price", "extra"] },
   addr_saved_price: { group: "Checkout", label: "Menu 2: address saved, delivery to {town} is {price}", text: "Your delivery address has been saved, delivery to {town} is {price}.", vars: ["town", "price"] },
   ask_directions: { group: "Checkout", label: "Ask for delivery directions (optional)", text: "Is there anything our delivery team should know, like a gate code, where to park, or where to set up? Please say it now.", pending: true },
   directions_saved: { group: "Checkout", label: "Delivery directions saved", text: "Thank you, we saved that for our delivery team.", pending: true },
