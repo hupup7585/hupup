@@ -16,6 +16,7 @@ export const SENSITIVE_SWITCHES = {
   googleLiveVoice: { label: "the paid Google voice", phrase: "TURN ON GOOGLE VOICE" },
   solaPhonePayOn: { label: "card payments on the phone (PhonePay)", phrase: "TURN ON PHONEPAY" },
   stripeProvider: { label: "Stripe as the phone card provider", phrase: "USE STRIPE" },
+  liveRefundsOn: { label: "live refunds (real money back to cards)", phrase: "TURN ON LIVE REFUNDS" },
 } as const;
 export type SensitiveSwitch = keyof typeof SENSITIVE_SWITCHES;
 
