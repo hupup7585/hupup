@@ -77,3 +77,15 @@ describe("deep check 0600 M55: Delivered on the driver screen", () => {
     expect(logs).toHaveLength(1);
   });
 });
+
+describe("deep check 0600 M56: crafted bad ids", () => {
+  it("letters or 11+ digits are 'not found', never a database error", async () => {
+    const { isDbId } = await import("@/lib/db-id");
+    const { orderIdFromParam } = await import("@/lib/order-path");
+    expect([isDbId(1), isDbId(0), isDbId(NaN), isDbId(99999999999), isDbId(1.5)]).toEqual([true, false, false, false, false]);
+    expect(orderIdFromParam("99999999999")).toBe(0);
+    expect(orderIdFromParam("1031")).toBe(31);
+    expect((await markDoneAction(Number("abc"), "delivery")).message).toBe("Order not found.");
+    expect((await stageAction(99999999999, "delivery", "on_the_way" as never)).message).toBe("Order not found.");
+  });
+});

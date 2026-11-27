@@ -139,6 +139,9 @@ export async function docFromBooking(orderId: number, kind: DocKind, userId: num
       issueDate: todayISO(),
       termsDays,
       lines,
+      // Deep check 0600 M28 (Nov 27, 2026): the booking's offer discount comes off the invoice too (its total was higher
+      // than the order's)
+      discountCents: o.offerDiscountCents ?? 0,
       taxCents: o.taxCents,
       taxExempt: o.taxCents === 0 && o.subtotalCents > 0,
     },

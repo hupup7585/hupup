@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, desc, eq, gt, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { config, BUSINESS_NAME, OWNER_FULL_NAME } from "@/lib/config";
 import { sendEmail, sendSms } from "@/lib/notify";
@@ -252,28 +252,35 @@ export async function passwordLogin(rawPhone: string, password: string, trustDev
     await audit("login.password_locked", u.id, {});
     return { ok: false, error: `${generic} Too many tries: try again later or use a texted code.` };
   }
-  // Deep check M21 (Nov 27, 2026): a try is used up in the database BEFORE the password is compared, and the count is
-  // not reset when the lock starts, so a burst of guesses can never get more than the allowed tries, and a right
-  // password inside a burst gets exactly the same answer as a wrong one once the tries are used up
-  const tooMany = `${generic} Too many tries: try again later or use a texted code.`;
-  const now = new Date();
-  const [used] = await db
+  // Deep check 06:00 M21: a try is used up BEFORE the password is compared (a lock that has run out starts the count
+  // again). In a burst of guesses only the first 5 are compared at all; every later one gets the same "Too many tries"
+  // answer whatever it is, so the answers never tell which guess was right. A right password resets the count.
+  const [c] = await db
     .update(adminUsers)
-    .set({ failedLogins: sql`CASE WHEN ${adminUsers.lockedUntil} IS NOT NULL THEN 1 ELSE ${adminUsers.failedLogins} + 1 END`, lockedUntil: null })
-    .where(and(eq(adminUsers.id, u.id), or(isNull(adminUsers.lockedUntil), lte(adminUsers.lockedUntil, now)), or(isNotNull(adminUsers.lockedUntil), sql`${adminUsers.failedLogins} < ${MAX_PASSWORD_FAILURES}`)))
-    .returning({ failures: adminUsers.failedLogins });
-  if (!used) {
-    await audit("login.password_locked", u.id, {});
-    return { ok: false, error: tooMany };
+    .set({
+      failedLogins: sql`CASE WHEN ${adminUsers.lockedUntil} IS NOT NULL AND ${adminUsers.lockedUntil} <= now() THEN 1 ELSE ${adminUsers.failedLogins} + 1 END`,
+      lockedUntil: sql`CASE WHEN ${adminUsers.lockedUntil} <= now() THEN NULL ELSE ${adminUsers.lockedUntil} END`,
+    })
+    .where(eq(adminUsers.id, u.id))
+    .returning({ failures: adminUsers.failedLogins, lockedUntil: adminUsers.lockedUntil });
+  const failures = c?.failures ?? u.failedLogins + 1;
+  if ((c?.lockedUntil && c.lockedUntil > new Date()) || failures > MAX_PASSWORD_FAILURES) {
+    await audit("login.password_locked", u.id, { failures });
+    return { ok: false, error: `${generic} Too many tries: try again later or use a texted code.` };
   }
   if (!(await bcrypt.compare(password, u.passwordHash))) {
-    const failures = used.failures;
+    // Deep check B2: counted in the database in one step (above), so guesses sent at the same moment all count
     const lock = failures >= MAX_PASSWORD_FAILURES ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null;
     if (lock) await db.update(adminUsers).set({ lockedUntil: lock }).where(eq(adminUsers.id, u.id));
     await audit(lock ? "login.locked" : "login.password_failed", u.id, { failures });
-    return { ok: false, error: lock ? tooMany : generic };
+    return { ok: false, error: lock ? `${generic} Too many tries: try again later or use a texted code.` : generic };
   }
-  await db.update(adminUsers).set({ failedLogins: 0 }).where(eq(adminUsers.id, u.id));
+  // Deep check B2: a right password never gets in once guesses checked at the same time have locked the account
+  const [fresh] = await db.select({ lockedUntil: adminUsers.lockedUntil }).from(adminUsers).where(eq(adminUsers.id, u.id)).limit(1);
+  if (fresh?.lockedUntil && fresh.lockedUntil > new Date()) {
+    await audit("login.password_locked", u.id, {});
+    return { ok: false, error: `${generic} Too many tries: try again later or use a texted code.` };
+  }
   await startSession({ userId: u.id, role: u.role, name: u.name, phone: u.phone }, "password", trustDevice);
   return { ok: true, role: u.role };
 }

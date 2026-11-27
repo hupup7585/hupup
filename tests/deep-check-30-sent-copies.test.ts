@@ -40,3 +40,13 @@ describe("deep check C1: email copies never fill the free database", () => {
     expect(src).toContain("(await databaseBytes()) + input.data.length > ATTACHMENT_STORAGE_STOP_BYTES");
   });
 });
+
+describe("deep check 0600 M36 + M65", () => {
+  it("M65: the API Keys code email is sent as a code email (its Sent copy hides the code)", () => {
+    expect(readFileSync("src/lib/api-keys.ts", "utf8")).toMatch(/API Keys code: \$\{code\}`[\s\S]{0,300}\{ kind: "code" \}\);/);
+  });
+  it("M36: the backup file is named by the New York date", async () => {
+    const { backupFileName } = await import("@/lib/backup");
+    expect(backupFileName(new Date("2026-11-29T03:30:00Z"))).toBe("hupup-backup-2026-11-28.json.gz"); // 10:30 PM Saturday in New York
+  });
+});

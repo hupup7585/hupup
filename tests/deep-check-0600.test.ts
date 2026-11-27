@@ -46,3 +46,14 @@ describe("deep check 06:00 M3: a refund on a tax-exempt order", () => {
     expect(r.county).toBe("Orange");
   });
 });
+
+describe("deep check 06:00 M27: no opt-in while the number replied STOP on another record", () => {
+  it("record A replied STOP, record B (same phone) did not: a marketing opt-in is refused", async () => {
+    const phone = "+18455550627";
+    await db.insert(schema.customers).values([{ phone, name: "B", smsOptOut: false }, { phone, name: "A", smsOptOut: true }]);
+    const { recordConsent } = await import("@/lib/sms-consent");
+    await expect(recordConsent({ phone, scope: "marketing", action: "opt_in", source: "phone", method: "keypad", wording: "test" } as never)).rejects.toThrow(/replied STOP/);
+    const rows = await db.select().from(schema.smsConsents).where(eq(schema.smsConsents.phone, phone));
+    expect(rows).toHaveLength(0);
+  });
+});

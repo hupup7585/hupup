@@ -78,22 +78,19 @@ export async function checkBoxPin(box: Box, pin: string, now = new Date()): Prom
   // several calls guessing at the same moment share the same 3 tries (before, each call got its own 3)
   const b = schema.voicemailBoxes;
   const open = and(eq(b.id, box.id), or(isNull(b.lockedUntil), lte(b.lockedUntil, now)));
-  const [fresh] = await db.select({ lockedUntil: b.lockedUntil }).from(b).where(eq(b.id, box.id)).limit(1);
-  if (fresh?.lockedUntil && fresh.lockedUntil > now) return "locked";
-  // Deep check M20 (Nov 27, 2026): a try is used up BEFORE the password is compared, so a burst of guesses at the same
-  // moment can never get more than the 3 tries (before, a right guess could slip in while the others were counted)
-  const [used] = await db
+  // Deep check 06:00 M20: a try is used up BEFORE the password is compared, so in a burst of guesses only the first 3
+  // are compared at all; the rest are "locked" whatever they are (the right one hidden among many could get in before)
+  const [r] = await db
     .update(b)
     .set({ wrongTries: sql`CASE WHEN ${b.lockedUntil} IS NOT NULL THEN 1 ELSE ${b.wrongTries} + 1 END`, lockedUntil: null })
-    .where(and(open, or(isNotNull(b.lockedUntil), sql`${b.wrongTries} < ${VM_PIN_TRIES}`)))
+    .where(open)
     .returning({ tries: b.wrongTries });
-  if (!used) return "locked";
+  if (!r || r.tries > VM_PIN_TRIES) return "locked";
   const ok = box.pinHash ? await bcrypt.compare(pin, box.pinHash) : pin === VM_DEFAULT_PIN;
   if (ok) {
-    await db.update(b).set({ wrongTries: 0 }).where(eq(b.id, box.id));
-    return "ok";
+    const [done] = await db.update(b).set({ wrongTries: 0, lockedUntil: null }).where(open).returning({ id: b.id });
+    return done ? "ok" : "locked"; // locked by another call's wrong tries meanwhile
   }
-  const r = used;
   if (r.tries < VM_PIN_TRIES) return "wrong";
   const until = new Date(now.getTime() + VM_LOCK_MINUTES * 60_000);
   // Only the call that sets the lock emails the Owner
