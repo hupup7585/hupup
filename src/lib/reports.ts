@@ -64,7 +64,7 @@ export const REPORTS: Record<string, Report> = {
     file: "hupup-customers",
     roles: ["owner", "secretary"],
     build: async (p) => {
-      const like = p.q ? likeContains(p.q) : null; // Extra check K9: % and _ searched as typed
+      const like = p.q ? likeContains(p.q) : null; // Extra check HD9: % and _ searched as typed
       const list = await rows<{ name: string | null; phone: string; email: string | null; address: string | null; marketing_opt_in: boolean; sms_opt_out: boolean; orders: number; last_event: string | null; created_at: string }>(sql`
         SELECT c.name, c.phone, c.email, c.address, c.marketing_opt_in, c.sms_opt_out, c.created_at::text,
                (SELECT COUNT(*)::int FROM orders o WHERE o.customer_id = c.id AND o.status <> 'CANCELLED') AS orders,
@@ -88,7 +88,7 @@ export const REPORTS: Record<string, Report> = {
     roles: ["owner", "secretary"],
     build: async (p) => {
       const from = p.from || todayISO(); // New York date (deep check A15: never the next day after 7-8 PM)
-      // Extra check K9 (Nov 27, 2026): at most one year in one file
+      // Extra check HD9 (Nov 27, 2026): at most one year in one file
       const asked = p.to || addDays(from, 6);
       const to = asked > addDays(from, 366) ? addDays(from, 366) : asked;
       const list = await rows<{ day: string; kind: string; id: number; status: string; delivery_time: string | null; name: string | null; phone: string | null; address: string | null; items: string | null }>(sql`
@@ -157,7 +157,7 @@ export const REPORTS: Record<string, Report> = {
 };
 
 export function reportFor(key: string, role: Role): { report: Report } | { error: string; status: number } {
-  // Extra check K8 (Nov 27, 2026): only our own report names ("constructor" and the like used to crash)
+  // Extra check HD8 (Nov 27, 2026): only our own report names ("constructor" and the like used to crash)
   const report = Object.hasOwn(REPORTS, key) ? REPORTS[key] : undefined;
   if (!report) return { error: "Unknown report", status: 404 };
   if (!report.roles.includes(role)) return { error: "You don't have access to this report", status: 403 };

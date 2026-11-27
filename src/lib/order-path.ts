@@ -6,7 +6,7 @@ export function orderIdFromParam(param: string | number | null | undefined): num
   const n = Number(String(param ?? "").replace(/[^\d]/g, ""));
   if (!Number.isInteger(n) || n <= 0) return 0;
   const id = n > 1000 ? n - 1000 : n;
-  return id < 2 ** 31 ? id : 0; // Extra check K7: a number too big for the database is "not found", not a crash
+  return id < 2 ** 31 ? id : 0; // Extra check HD7: a number too big for the database is "not found", not a crash
 }
 
 /** A linked booking saved by Tasks or Projects: older rows hold the typed booking number (1031), newer the id (31). */

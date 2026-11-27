@@ -49,7 +49,7 @@ export async function markDoneAction(orderId: number, stop: "delivery" | "pickup
   if (!full) return { ok: false, message: "Order not found." };
   // A Delivery login acts only on its own assigned stops (Abraham, Nov 12, 2026)
   if (staff.role === "delivery" && !isMyStop(full.order, stop, staff.userId)) return { ok: false, message: "This stop isn't assigned to you." };
-  if (staff.role === "delivery" && !isCurrentStopFor(full.order, stop)) return { ok: false, message: NOT_CURRENT_STOP }; // Extra check K3
+  if (staff.role === "delivery" && !isCurrentStopFor(full.order, stop)) return { ok: false, message: NOT_CURRENT_STOP }; // Extra check HD3
   const from = full.order.status;
   const ok = stop === "delivery" ? from === "CONFIRMED" : from === "DELIVERED";
   if (!ok) return { ok: false, message: stop === "delivery" ? "Only confirmed (paid) orders can be marked delivered." : "Mark it delivered first." };
@@ -71,7 +71,7 @@ export async function uploadPhotoAction(form: FormData): Promise<DeliveryResult>
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found." };
   if (staff.role === "delivery" && !isMyStop(full.order, stop, staff.userId)) return { ok: false, message: "This stop isn't assigned to you." };
-  if (staff.role === "delivery" && !isCurrentStopFor(full.order, stop)) return { ok: false, message: NOT_CURRENT_STOP }; // Extra check K3
+  if (staff.role === "delivery" && !isCurrentStopFor(full.order, stop)) return { ok: false, message: NOT_CURRENT_STOP }; // Extra check HD3
   try {
     const { saveDeliveryPhoto } = await import("@/lib/delivery-photos");
     const p = await saveDeliveryPhoto(orderId, stop, new Uint8Array(await file.arrayBuffer()), { userId: staff.userId, name: staff.name });
@@ -89,7 +89,7 @@ export async function stageAction(orderId: number, stop: "delivery" | "pickup", 
   const full = await getOrderWithItems(orderId);
   if (!full) return { ok: false, message: "Order not found." };
   if (staff.role === "delivery" && !isMyStop(full.order, stop, staff.userId)) return { ok: false, message: "This stop isn't assigned to you." };
-  if (staff.role === "delivery" && !isCurrentStopFor(full.order, stop)) return { ok: false, message: NOT_CURRENT_STOP }; // Extra check K3
+  if (staff.role === "delivery" && !isCurrentStopFor(full.order, stop)) return { ok: false, message: NOT_CURRENT_STOP }; // Extra check HD3
   if (stage === "delivered" || stage === "picked_up") return markDoneAction(orderId, stop);
   try {
     await recordStage(orderId, stop, stage, staff.userId, note, staff.name);

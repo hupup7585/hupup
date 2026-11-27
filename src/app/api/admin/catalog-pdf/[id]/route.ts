@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const s = await currentStaff();
   if (!s || s.role !== "owner") return new Response("Unauthorized", { status: 401 });
-  const id = idParam((await ctx.params).id) ?? 0; // Extra check K7: a bad id is "not found", not a crash
+  const id = idParam((await ctx.params).id) ?? 0; // Extra check HD7: a bad id is "not found", not a crash
   const [f] = await db.select().from(schema.catalogFiles).where(eq(schema.catalogFiles.id, id)).limit(1);
   const data = f?.complete ? await catalogPdfBytes(id) : null;
   if (!f || !data) return new Response("Not found", { status: 404 });

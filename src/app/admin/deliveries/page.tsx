@@ -189,7 +189,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
                   )}
                   <div className="mt-0.5 text-sm text-muted">{its.map((i) => `${i.qty} × ${i.name}`).join(", ")}</div>
                   {(() => {
-                    // Extra check K1: a Delivery login sees the delivery directions only, never money lines
+                    // Extra check HD1: a Delivery login sees the delivery directions only, never money lines
                     const note = staff.role === "delivery" ? driverNotes(o.notes) : o.notes;
                     return note ? <div className="mt-1 text-sm">Note: {note}</div> : null;
                   })()}

@@ -66,7 +66,7 @@ describe("Admin status safety", () => {
     expect(await statusOf(d)).toBe("PICKED_UP");
   });
   it("deep check A2: delivered, moved back to Confirmed, then Cancel: still refused", async () => {
-    const d = await mk("CONFIRMED", maze, "2026-11-20"); // a past event day: Delivered is refused before the event day (extra check K2)
+    const d = await mk("CONFIRMED", maze, "2026-11-20"); // a past event day: Delivered is refused before the event day (extra check HD2)
     expect((await updateStatusAction(d, "DELIVERED")).ok).toBe(true);
     expect((await updateStatusAction(d, "CONFIRMED")).ok).toBe(true);
     const r = await updateStatusAction(d, "CANCELLED", "customer asked");

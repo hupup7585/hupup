@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
-/* Extra check K (Nov 27, 2026): delivery role, orders, Admin download routes. In-memory database. */
+/* Extra check HD (Nov 27, 2026): delivery role, orders, Admin download routes. In-memory database. */
 const h = vi.hoisted(() => ({ staff: { userId: null as number | null, role: "owner", name: "Owner" } }));
 vi.mock("@/lib/db", async () => {
   const { createMemoryDb } = await import("./helpers/memory-db");
@@ -37,7 +37,7 @@ const mk = async (status: string, eventDate: string) => {
 };
 const statusOf = async (id: number) => (await db.select().from(schema.orders).where(eq(schema.orders.id, id)))[0].status;
 
-describe("K1: drivers see no money lines", () => {
+describe("HD1: drivers see no money lines", () => {
   it("money sentences are left out; directions stay", () => {
     const n = "Back door, ring twice. Second payment of $221.65 (sola, 123) on an order already paid in full: refund it. Paid $50.00 of $120.00. Gate code 4411.";
     expect(driverNotes(n)).toBe("Back door, ring twice. Gate code 4411.");
@@ -46,7 +46,7 @@ describe("K1: drivers see no money lines", () => {
   });
 });
 
-describe("K2: Admin status buttons keep the delivery order", () => {
+describe("HD2: Admin status buttons keep the delivery order", () => {
   it("Picked up only after Delivered; Delivered only when confirmed and on or after the event day", async () => {
     const { updateStatusAction } = await import("@/app/admin/(app)/orders/actions");
     const future = await mk("CONFIRMED", addDays(todayISO(), 7));
@@ -64,7 +64,7 @@ describe("K2: Admin status buttons keep the delivery order", () => {
   });
 });
 
-describe("K3: a driver acts only on today's stops", () => {
+describe("HD3: a driver acts only on today's stops", () => {
   it("the stop's own day, today or yesterday", () => {
     const t = todayISO();
     expect(isCurrentStopFor({ eventDate: t, pickupDate: addDays(t, 1) }, "delivery")).toBe(true);
@@ -87,7 +87,7 @@ describe("K3: a driver acts only on today's stops", () => {
   });
 });
 
-describe("K5 + H6: Save drivers", () => {
+describe("HD5 + H6: Save drivers", () => {
   it("a deactivated driver stays on a stop that wasn't changed; a just-deactivated choice is skipped without a crash", async () => {
     const [gone] = await db.insert(schema.adminUsers).values({ name: "Gone", phone: "+18455551302", role: "delivery", active: false }).returning();
     const [ok] = await db.insert(schema.adminUsers).values({ name: "Ok", phone: "+18455551303", role: "delivery" }).returning();
@@ -110,7 +110,7 @@ describe("K5 + H6: Save drivers", () => {
   });
 });
 
-describe("K7, H8, H9: bad addresses and filters", () => {
+describe("HD7, H8, H9: bad addresses and filters", () => {
   it("ids, order numbers, filters and search text", async () => {
     expect(idParam("abc")).toBeNull();
     expect(idParam("99999999999")).toBeNull();

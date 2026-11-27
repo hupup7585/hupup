@@ -1,5 +1,5 @@
 /**
- * Extra check K7 (Nov 27, 2026): an id from an address. A positive whole number that fits the database's integer, or
+ * Extra check HD7 (Nov 27, 2026): an id from an address. A positive whole number that fits the database's integer, or
  * null (the route answers "Not found" instead of a database error).
  */
 export function idParam(v: string | number | null | undefined): number | null {
