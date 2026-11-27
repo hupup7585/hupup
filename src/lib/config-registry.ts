@@ -59,6 +59,7 @@ const EXACT: Record<string, Spec> = {
   staffPromoMode: { mode: "edit", label: "Staff promo sign-up box: Preview mark", group: "Texts and promotions", type: "choice", choices: ["owner_preview", "live"] },
   liveRefundsOn: page("/admin/bookkeeping?tab=settings", "Payments", { label: "Live refunds (real money back to cards)", type: "bool" }),
   invoiceEmailOn: page("/admin/bookkeeping?tab=settings", "Payments", { label: "Email invoices to customers", type: "bool" }),
+  itemTypes: page("/admin/catalog/types", "Catalog", { label: "Item types (what each category and laser item is)", type: "json" }),
   disconnectCheckSeconds: { mode: "edit", label: "Disconnect check: seconds to wait for a key", group: "Phone: after payment", type: "int", min: 1, max: 15 },
 
   // Locked

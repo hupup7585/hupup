@@ -294,6 +294,8 @@ export const SETTING_DEFAULTS = {
   liveRefundsOn: false,
   invoiceEmailOn: true,
   staffPromoMode: "owner_preview",
+  /** Admin handoff Phase 4 (Nov 27, 2026): explicit item types from Catalog > Item types (JSON); empty = from the names. */
+  itemTypes: "",
   /** Abraham, Nov 26, 2026, 8:34 PM: staff may book Mutze Shabbes every week (not the phone, not the website) */
   staffMutzeEveryWeek: true,
   /** Abraham, Nov 26, 2026: at most this many promo texts per customer per calendar year (the wording says 5) */

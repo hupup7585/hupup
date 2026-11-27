@@ -959,6 +959,13 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/orders/[id]/page.tsx",
   "lib/feature-switches.ts"
  ],
+ "itemTypes": [
+  "app/admin/(app)/catalog/types/actions.ts",
+  "app/admin/(app)/catalog/types/page.tsx",
+  "app/admin/(app)/pos/PosForm.tsx",
+  "app/admin/(app)/pos/page.tsx",
+  "lib/item-types.ts"
+ ],
  "staffMutzeEveryWeek": [
   "lib/staff-mutze.ts"
  ],

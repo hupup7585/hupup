@@ -305,6 +305,11 @@ const OTHER: Record<string, Explanation> = {
     where: "Staff with Bookkeeping, on an invoice page. The customer gets the email with the invoice link.",
     ifChanged: "Off: the button says emailing invoices is turned off; the customer link can still be copied and sent by hand.",
   },
+  itemTypes: {
+    what: "What each category and laser tag item is (laser tag, laser add-on packs, paddle boats, ocean balls, jumping balloons; and for laser items: a maze with 6 or 4 guns, or a 6 or 4 gun set). Until Nov 27, 2026 this was worked out only from words in the names. Anything not set here is still worked out from the name, exactly as before.",
+    where: "Staff on New booking (mazes, add-on packs, ocean balls under a balloon). The phone and the prices still work it out from the names until they are connected to this list.",
+    ifChanged: "New booking treats the item as the type chosen. Renaming an item no longer changes what it is once its type is set here.",
+  },
   deliveryPromoOn: {
     what: "Turns on the free-delivery offer: Kiryas Joel free and the nearby towns $10.00 between the start and end dates below. The farther area keeps its price.",
     where: "Customers booking during the offer dates: the delivery line on their order total.",
