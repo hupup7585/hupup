@@ -14,6 +14,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/lib/notify", () => ({ sendOrderText: async () => ({ texted: true, emailed: false, message: "" }), sendSms: async () => ({ sent: true }), sendEmail: async (to: string, subject: string, text: string) => (h.emails.push({ to, subject, text }), { sent: true }) }));
 
 import { eq } from "drizzle-orm";
+import { todayISO } from "@/lib/dates";
 import { db, schema } from "@/lib/db";
 import { STAGE_LABEL, stageOf, stagesFor } from "@/lib/delivery-stages";
 import { markDoneAction, stageAction } from "@/app/admin/deliveries/actions";
@@ -26,7 +27,7 @@ beforeEach(async () => {
     const [a, b] = await db.insert(schema.adminUsers).values([{ name: "Moshe", role: "delivery", phone: "+18455550401" }, { name: "Dovid", role: "delivery", phone: "+18455550402" }]).returning();
     moshe = a.id;
     dovid = b.id;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     const [o] = await db.insert(schema.orders).values({ status: "CONFIRMED", channel: "PHONE", eventDate: today, pickupDate: today, deliveryDriverId: moshe, pickupDriverId: moshe, deliveryAddress: "12 Forest Road, Monroe" }).returning();
     orderId = o.id;
   }

@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
+import { lockStock } from "@/lib/stock-lock";
 import { db, schema } from "@/lib/db";
 import { addDays } from "@/lib/dates";
 import { checkBookable, pickupDateFor } from "@/lib/availability";
@@ -73,13 +74,9 @@ async function reserveInTx(
   const pickupDate = opts.pickupDate ?? addDays(opts.eventDate, 1);
   // Items that share one unit (the maze): lock the whole group first, in id order, so two callers can't take it at the
   // same moment (and never lock the group in two different orders)
-  await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${opts.productId}) ORDER BY id FOR UPDATE`);
-  // Laser items share their gun packs (Nov 24, 2026): lock every laser item, in id order, so two callers can never both
-  // take the last six-pack
-  await tx.execute(sql`
-    SELECT p.id FROM products p JOIN categories c ON c.id = p.category_id
-    WHERE c.name ~* 'laser' AND EXISTS (SELECT 1 FROM products q JOIN categories qc ON qc.id = q.category_id WHERE q.id = ${opts.productId} AND qc.name ~* 'laser')
-    ORDER BY p.id FOR UPDATE OF p`);
+  // Laser items share their gun packs (Nov 24, 2026): every laser item is locked too, so two callers can never both
+  // take the last six-pack. K2 (deep check 06:00 M48): all of it in one statement, in id order, like every other path
+  await lockStock(tx, [opts.productId]);
   const locked = await tx.execute(
     sql`SELECT id, quantity, price_cents, active FROM products WHERE id = ${opts.productId} FOR UPDATE`,
   );
@@ -306,6 +303,9 @@ export async function createOrderWithItems(opts: {
   }
   try {
     return await db.transaction(async (tx) => {
+      // K2 (deep check 06:00 M48): every item of the booking locked up front, in one id-ordered statement, so a later
+      // item never takes a lower-numbered lock after a higher one (two bookings at once could deadlock)
+      await lockStock(tx, items.map((it) => it.productId));
       let orderId: number | null = null;
       for (const it of items) {
         const r = await reserveInTx(tx, {
@@ -554,10 +554,7 @@ export async function recheckHolds(orderIds: number[]): Promise<{ orderId: numbe
     const ords = (await tx.select().from(orders).where(and(inArray(orders.id, orderIds), eq(orders.status, "HOLD")))).sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.id - b.id);
     if (!ords.length) return [];
     const lines = await tx.select().from(orderItems).where(inArray(orderItems.orderId, ords.map((o) => o.id)));
-    for (const pid of [...new Set(lines.map((l) => l.productId))].sort((a, b) => a - b)) {
-      await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${pid}) ORDER BY id FOR UPDATE`);
-      await tx.execute(sql`SELECT id FROM products WHERE id = ${pid} FOR UPDATE`);
-    }
+    await lockStock(tx, lines.map((l) => l.productId)); // K2: items, groups and laser pools, one id-ordered step
     // Out of the count while checked (now() is the transaction's start time)
     await tx.update(orders).set({ holdExpiresAt: sql`now() - interval '1 second'` }).where(inArray(orders.id, ords.map((o) => o.id)));
     const taken: { orderId: number; productId: number; eventDate: string; qty: number }[] = [];

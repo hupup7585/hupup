@@ -136,7 +136,9 @@ export async function bestOfferFor(
   // A customer discount (Abraham, Nov 18, 2026) is one more choice: never combined, the bigger saving applies
   const { discountCents, discountNote } = await import("@/lib/customer-discounts");
   const cd = await customerDiscount();
-  if (cd) options.push({ discountCents: discountCents(cd, full.reduce((t, l) => t + l.qty * l.unitPriceCents, 0)), note: discountNote(cd) });
+  // Extra check K3 / deep check 06:00 M49: "dollars or percent off the rentals" (Admin Discounts): worked out on the
+  // rental lines only, never on extras such as ocean balls
+  if (cd) options.push({ discountCents: discountCents(cd, full.filter(isRental).reduce((t, l) => t + l.qty * l.unitPriceCents, 0)), note: discountNote(cd) });
   if (on(s.offerFourthSundayOn)) options.push({ discountCents: await fourthSundayDiscount(exec, { id: o.id, customerId: o.customerId, eventDate: o.eventDate }, full), note: OFFER_NOTES.fourthSunday });
   // How offers combine (Admin handoff, Abraham, Nov 26, 2026): "best" (the default, as always) = only the biggest
   // saving; "add" = the customer discount and the 4th Sunday both apply, on top of the laser half price, never more
