@@ -71,3 +71,10 @@ The rule is never to delete live data, so these were not built. Both only free s
 The info@ email Worker (`cloudflare/info-inbox-worker.js`) was fixed: a Gmail forward error no longer stops the Admin
 inbox copy, and a missing piece is logged. The new code takes effect once it is put on Cloudflare (free).
 
+## Opt-out words with a space (extra check J5, Nov 27, 2026)
+
+When someone texts "Opt out" or "Stop all" (with a space), the app records the opt-out but sends no confirmation,
+expecting Twilio to send it (as Twilio does for STOP). If Twilio does not answer these with a space, the customer gets
+no confirmation. One test text of "Opt out" from a test phone will show which it is; then the app can send the one
+confirmation itself when Twilio doesn't. Nothing was changed, so a customer never gets two confirmations.
+
