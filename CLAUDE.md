@@ -1,13 +1,13 @@
 # Working rules for this repo
 
-- **Always redeploy on Vercel after any change.** The Vercel project `hupup` is connected to this GitHub repo, so every push deploys automatically. After pushing, confirm a new deployment started and reached READY (Vercel MCP `list_deployments` / `get_deployment`). If none started, read the Vercel status on the commit: if it says "rate limited", do not trigger one by hand (see `docs/vercel-rules.md`); only if Vercel never answered, trigger one with `create_deployment` from the pushed commit. Report the deployment URL and status.
+- **Deploys (Abraham, Nov 27, 2026, 10:08 AM ET):** only the main phone session merges to the live branch, once every 2 hours, and confirms the deploy reached READY (Vercel `list_deployments` / `get_deployment`). Every other session pushes only to its own branch with tests and build passing and posts `ready to merge: <branch>, <items>`. Never create deployments by hand. Details: `docs/vercel-rules.md`.
 - Vercel account is on the Hobby plan: cron jobs can run at most once a day.
 - Business name is always "Hup Up Attractions".
 - Before pushing: `npm run typecheck` and `npm test` (and `npm run build` before any merge to the live branch).
-- **Read `docs/vercel-rules.md` before you push or merge.** Hobby allows 100 deployments a day and we hit it on Nov 27: batch merges to the live branch (about once every 30 minutes at most), only the live and preview branches build on Vercel, never force-push.
+- **Read `docs/vercel-rules.md` before you push.** Hobby allows 100 deployments a day and we hit it on Nov 27. Only the live and preview branches build on Vercel; never force-push.
 
 ## Go-live rule (Abraham, standing)
-- Every piece that passes its tests goes live right away (push to the live branch `claude/nifty-mendel-7hlzdb` and keep the preview branch `claude/nifty-mendel-7hlzdb-website` in sync), no waiting for approval. Send Abraham a screenshot afterwards for anything visual.
+- Every piece that passes its tests goes live with the next 2-hourly merge by the main phone session (live branch `claude/nifty-mendel-7hlzdb`, preview branch `claude/nifty-mendel-7hlzdb-website` kept in sync), no waiting for approval. Other sessions do not push to those two branches. Send Abraham a screenshot afterwards for anything visual.
 - Only two things still wait for Abraham's OK: new or changed customer-facing wording he hasn't approved (website, phone prompts, customer texts and emails), and switching the public email to info@hupupattractions.com (`NEW_EMAIL_LIVE` in `src/lib/config.ts`).
 - Work through the open to-do list without pausing between items.
 - Never buy usage credits, upgrade a plan, or turn on anything that costs money.
