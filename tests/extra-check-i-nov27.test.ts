@@ -105,3 +105,36 @@ describe("I2: Admin 'Delete for good' with forwarded copies", () => {
     expect(await purgeVoicemail(one.id)).toBe(false); // already deleted for good
   });
 });
+
+describe("I3: a repeated recording callback keeps the staff message's number", () => {
+  it("the second vm-rec-done for the same recording goes to the review with the same message id", async () => {
+    const { makeVmHandlers } = await import("@/lib/ivr/vmail");
+    const twilio = (await import("twilio")).default;
+    const went: Record<string, unknown>[] = [];
+    const h = {
+      sp: () => undefined,
+      say: () => undefined,
+      back: (vr: never, _a: string, p: Record<string, unknown> = {}) => (went.push(p), vr),
+      url: () => "https://example.test/",
+      backLine: () => undefined,
+      when: () => ({ date: "", time: "" }),
+      update: async () => undefined,
+      timer: () => 5,
+    };
+    const handlers = makeVmHandlers(h as never);
+    const [to] = await db.insert(schema.voicemailBoxes).values({ name: "Secretary" }).returning();
+    const ctx = {
+      callSid: "CA-i3",
+      from: null,
+      query: new URLSearchParams({ to: String(to.id), k: "send" }),
+      body: { RecordingUrl: "https://api.twilio.com/x/Recordings/REi3", RecordingSid: "RE-i3", RecordingDuration: "4" },
+      session: { data: { vmMine: to.id } },
+      prompts: {},
+    };
+    await handlers["vm-rec-done"](ctx as never, new twilio.twiml.VoiceResponse());
+    await handlers["vm-rec-done"](ctx as never, new twilio.twiml.VoiceResponse());
+    expect(went).toHaveLength(2);
+    expect(went[0].id).toBeTruthy();
+    expect(went[1].id).toBe(went[0].id);
+  });
+});
