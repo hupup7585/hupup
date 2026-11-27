@@ -1,15 +1,9 @@
+import { csvCell as cell } from "@/lib/csv-cell";
 import { currentStaff } from "@/lib/auth";
 import { listOrders } from "@/lib/admin-queries";
 import { orderNumber } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
-
-function cell(v: unknown) {
-  const s = v === null || v === undefined ? "" : String(v);
-  // Guard against spreadsheet formula injection and escape quotes.
-  const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
-  return `"${safe.replace(/"/g, '""')}"`;
-}
 
 export async function GET(req: Request) {
   const staff = await currentStaff();

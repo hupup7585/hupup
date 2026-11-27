@@ -1,3 +1,4 @@
+import { todayISO } from "@/lib/dates";
 import { asc, desc, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { PRIORITY_LABEL, STATUS_LABEL, isOverdue, laborCents, minutesOf, projectProfit, seesMoney, visibleTasks, type Staff } from "@/lib/tasks";
@@ -32,7 +33,8 @@ export async function buildTaskReport(report: TaskReport, staff: Staff): Promise
       {
         name: "Time logs",
         header: ["Date", "Person", "Task", "Hours", ...(money ? ["Rate", "Labor cost"] : []), "Note"],
-        rows: logs.map((l) => [l.startedAt.toISOString().slice(0, 10), who(l.userId), titles.get(l.taskId) ?? `#${l.taskId}`, Math.round((minutesOf(l) / 60) * 100) / 100, ...(money ? [l.rateCents / 100, laborCents(l) / 100] : []), l.note]),
+        rows: logs.map((l) => [todayISO(l.startedAt), // New York date (deep check A15)
+           who(l.userId), titles.get(l.taskId) ?? `#${l.taskId}`, Math.round((minutesOf(l) / 60) * 100) / 100, ...(money ? [l.rateCents / 100, laborCents(l) / 100] : []), l.note]),
       },
     ];
   }

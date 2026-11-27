@@ -1,14 +1,9 @@
+import { csvCell } from "@/lib/csv-cell";
 import { currentStaff } from "@/lib/auth";
 import { TASK_REPORTS, buildTaskReport, type TaskReport } from "@/lib/tasks-reports";
 import { XLSX_MIME, buildXlsx, type Cell } from "@/lib/xlsx";
 
 export const dynamic = "force-dynamic";
-
-function csvCell(v: Cell) {
-  const s = v === null || v === undefined ? "" : v instanceof Date ? v.toISOString() : String(v);
-  const safe = /^[=+\-@]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s) ? `'${s}` : s;
-  return `"${safe.replace(/"/g, '""')}"`;
-}
 
 /** GET /api/admin/tasks/export?report=tasks|time|projects&format=csv|xlsx (projects: Owner only). */
 export async function GET(req: Request) {

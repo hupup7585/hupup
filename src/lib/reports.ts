@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import type { Role } from "@/lib/db/schema";
 import { listOrders, kpis, channelSplit, leaderboard, recentCalls } from "@/lib/admin-queries";
 import { orderNumber } from "@/lib/orders";
-import { addDays, daysBetween } from "@/lib/dates";
+import { addDays, daysBetween, todayISO } from "@/lib/dates";
 import type { Sheet } from "@/lib/xlsx";
 
 /**
@@ -86,7 +86,7 @@ export const REPORTS: Record<string, Report> = {
     file: "hupup-deliveries",
     roles: ["owner", "secretary"],
     build: async (p) => {
-      const from = p.from || new Date().toISOString().slice(0, 10);
+      const from = p.from || todayISO(); // New York date (deep check A15: never the next day after 7-8 PM)
       const to = p.to || addDays(from, 6);
       const list = await rows<{ day: string; kind: string; id: number; status: string; delivery_time: string | null; name: string | null; phone: string | null; address: string | null; items: string | null }>(sql`
         SELECT d.day::text, d.kind, o.id, o.status, o.delivery_time, c.name, c.phone, o.delivery_address AS address,
@@ -127,7 +127,7 @@ export const REPORTS: Record<string, Report> = {
     file: "hupup-dashboard",
     roles: ["owner"],
     build: async (p) => {
-      const to = p.to || new Date().toISOString().slice(0, 10);
+      const to = p.to || todayISO();
       const from = p.from || addDays(to, -29);
       const [k, ch, top] = await Promise.all([kpis(from, to), channelSplit(from, to), leaderboard(from, to, 50)]);
       return [

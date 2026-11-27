@@ -1,15 +1,9 @@
+import { csvCell } from "@/lib/csv-cell";
 import { currentStaff } from "@/lib/auth";
 import { reportFor, type ReportParams } from "@/lib/reports";
 import { XLSX_MIME, buildXlsx, type Cell } from "@/lib/xlsx";
 
 export const dynamic = "force-dynamic";
-
-/** CSV fallback: formula-injection guard and quote escaping. */
-function csvCell(v: Cell) {
-  const s = v === null || v === undefined ? "" : v instanceof Date ? v.toISOString() : String(v);
-  const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
-  return `"${safe.replace(/"/g, '""')}"`;
-}
 
 /** GET /api/admin/export/<report>?format=xlsx|csv&q=&status=&from=&to= */
 export async function GET(req: Request, ctx: { params: Promise<{ report: string }> }) {

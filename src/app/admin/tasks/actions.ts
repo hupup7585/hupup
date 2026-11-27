@@ -1,5 +1,6 @@
 "use server";
 
+import { todayISO } from "@/lib/dates";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
@@ -148,7 +149,7 @@ export async function logHoursAction(f: FormData) {
     if (!t || !(await canAccess(staff, t))) throw new TaskError("You can't log time on this task.");
     const hours = Number(s(f, "hours"));
     if (!(hours > 0 && hours <= 24)) throw new TaskError("Enter the hours worked (up to 24).");
-    const day = iso(s(f, "date")) ?? new Date().toISOString().slice(0, 10);
+    const day = iso(s(f, "date")) ?? todayISO(); // New York date (deep check A15)
     // The Owner may log for someone else; everyone else logs their own time
     const userId = staff.role === "owner" && num(f, "userId") ? num(f, "userId") : staff.userId;
     const [l] = await db
