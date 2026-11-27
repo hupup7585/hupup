@@ -178,7 +178,14 @@ function reasonFor(k: Set<Kind>, names: string[], alt: string[] = names): string
 
 function fullClosed(iso: string, s: CalendarSettings): { closed: boolean; reason: string | null } {
   const o = overrides(s).get(iso);
-  if (o) return { closed: !o.open, reason: o.open ? null : o.note || "Closed by the owner" };
+  if (o && !o.open) return { closed: true, reason: o.note || "Closed by the owner" };
+  // Extra check N1: an "Open" entry never opens Shabbes or Yom Tov (Hark C1: that closing is protected); it can only
+  // open a day the other closing rules would close (Chanukah, Chol Hamoed, fasts...)
+  if (yes(s.calendarEnabled) && shabbosOrYomTov(iso)) {
+    const { kinds: k, names } = kinds(iso);
+    return { closed: true, reason: reasonFor(k, names) };
+  }
+  if (o) return { closed: false, reason: null };
   if (!yes(s.calendarEnabled)) return { closed: false, reason: null };
   const { kinds: k, names } = kinds(iso);
   const closed =
@@ -229,7 +236,8 @@ export function dayInfo(iso: string, s: CalendarSettings = calendarDefaults()): 
   let reopensAt: Date | null = null;
   const z = zmanim(iso, s);
   const tomorrow = addDaysISO(iso, 1);
-  if (!today.closed && yes(s.calendarEnabled) && !overrides(s).get(iso)?.open && shabbosOrYomTov(tomorrow) && !fullClosed(iso, { ...s, calendarOverrides: "" }).closed) {
+  // Extra check N1: an "Open" entry on an Erev day (for a note or hours) keeps the early close before Shabbes / Yom Tov
+  if (!today.closed && yes(s.calendarEnabled) && shabbosOrYomTov(tomorrow) && !fullClosed(iso, { ...s, calendarOverrides: "" }).closed) {
     const isShabbos = weekday(tomorrow) === 6 && !kinds(tomorrow).kinds.has("yomtov");
     const mode = isShabbos ? s.erevShabbosClose : s.erevYomTovClose;
     closesAt = mode === "candles" ? new Date(z.sunset().getTime() - candleMinutes(s.candleLightingMinutes) * 60_000) : z.chatzot();

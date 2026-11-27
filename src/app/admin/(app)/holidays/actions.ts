@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireOwner } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { getSettings, saveSetting } from "@/lib/settings";
-import { formatOverrides, parseOverrides, type DayOverride } from "@/lib/jewish-calendar";
+import { formatOverrides, isShabbosOrYomTov, parseOverrides, type DayOverride } from "@/lib/jewish-calendar";
 import { rowFor, type HolidayRow } from "./data";
 import { normalizeHours } from "./hours";
 
@@ -23,6 +23,8 @@ export async function saveHolidayRowsAction(rows: RowInput[]): Promise<{ ok: boo
       map.delete(r.date);
       continue;
     }
+    // Extra check N1: Shabbes and Yom Tov always stay closed (Hark C1); an Open entry there would not take effect
+    if (r.choice === "open" && isShabbosOrYomTov(r.date)) return { ok: false, message: `${r.date} is Shabbes or Yom Tov: it always stays closed. Choose Default or Closed.` };
     let hours: string | null = null;
     if (r.choice === "open" && r.hours.trim()) {
       hours = normalizeHours(r.hours);

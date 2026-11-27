@@ -338,7 +338,10 @@ export function parseWindows(text: string, allowChatzos = false, allowSeason = f
     const [from, to] = r.split("-");
     out.push({ from, to });
   }
-  return out.sort((a, b) => a.from.localeCompare(b.from));
+  out.sort((a, b) => a.from.localeCompare(b.from));
+  // Extra check N5: windows may not overlap ("11:00-14:00, 13:00-16:00" was spoken and shown twice over)
+  for (let i = 1; i < out.length; i++) if (/^\d/.test(out[i - 1].to) && out[i].from < out[i - 1].to) return null;
+  return out;
 }
 function norm(input: string): string | null {
   const parts = input.toLowerCase().replace(/\s+/g, "").replace(/–|—|to/g, "-").split("-").filter(Boolean);
@@ -353,7 +356,12 @@ function norm(input: string): string | null {
     if (r[3] === "am" && h === 12) h = 0;
     return h * 60 + m;
   };
-  const a = toMin(parts[0]), b = toMin(parts[1]);
+  // Extra check N2: "1-4 pm" is 1 PM to 4 PM: a first time without AM/PM takes the second's when that keeps it earlier
+  // ("11-2 pm" stays 11 AM to 2 PM)
+  const suffix = parts[1].match(/(am|pm)$/)?.[1];
+  const shared = suffix && !/(am|pm)$/.test(parts[0]) ? toMin(parts[0] + suffix) : null;
+  const b = toMin(parts[1]);
+  const a = shared !== null && b !== null && shared < b ? shared : toMin(parts[0]);
   if (a === null || b === null || b <= a) return null;
   const f = (x: number) => `${String(Math.floor(x / 60)).padStart(2, "0")}:${String(x % 60).padStart(2, "0")}`;
   return `${f(a)}-${f(b)}`;
@@ -365,8 +373,23 @@ export const formatWindows = (ws: Win[]) => (ws.length ? ws.map((w) => `${w.from
 export function parseDateOverrides(text: string): { list: DateOverride[]; error: string | null } {
   const list: DateOverride[] = [];
   for (const raw of text.split("\n").map((l) => l.trim()).filter(Boolean)) {
-    const r = /^(\d{4}-\d{2}-\d{2})(?:\s+(?:to|-)\s+(\d{4}-\d{2}-\d{2}))?\s+(closed|[0-9].*?)(?:\s+([A-Za-z].*))?$/i.exec(raw);
-    if (!r) return { list, error: `This date line is not clear: "${raw}". Example: 2026-12-24 closed Day off` };
+    const r0 = /^(\d{4}-\d{2}-\d{2})(?:\s+(?:to|-)\s+(\d{4}-\d{2}-\d{2}))?\s+(closed|[0-9].*?)(?:\s+([A-Za-z].*))?$/i.exec(raw);
+    if (!r0) return { list, error: `This date line is not clear: "${raw}". Example: 2026-12-24 closed Day off` };
+    // Extra check N2: the hours are the longest run of words that reads as hours ("1-4 pm Chanukah party": hours
+    // "1-4 pm", note "Chanukah party"); before, "pm" went into the note and the hours became 1 AM to 4 AM
+    const r = [...r0];
+    if (!/^closed$/i.test(r[3])) {
+      const words = `${r[3]}${r[4] ? ` ${r[4]}` : ""}`.split(/\s+/);
+      for (let n = words.length; n >= 1; n--) {
+        const hours = words.slice(0, n).join(" ");
+        const note = words.slice(n).join(" ");
+        if ((!note || /^[A-Za-z]/.test(note)) && parseWindows(hours, true)) {
+          r[3] = hours;
+          r[4] = note || (undefined as unknown as string);
+          break;
+        }
+      }
+    }
     const to = r[2] ?? r[1];
     if (to < r[1]) return { list, error: `The end date comes before the start date: "${raw}".` };
     if (/^closed$/i.test(r[3])) list.push({ from: r[1], to, closed: true, windows: [], note: r[4]?.trim() });

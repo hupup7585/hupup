@@ -22,7 +22,10 @@ export const rules = {
   timeOrBlank: ((v) => (!v.trim() || /^([01]?\d|2[0-3]):[0-5]\d$/.test(v.trim()) ? null : "Use a 24-hour time like 08:00, or leave it blank.")) as Rule,
   span: ((v) => {
     const m = v.trim().match(/^(([01]?\d|2[0-3]):[0-5]\d)-(([01]?\d|2[0-3]):[0-5]\d)$/);
-    return m ? null : "Use a 24-hour span like 10:30-19:00.";
+    if (!m) return "Use a 24-hour span like 10:30-19:00.";
+    // Extra check N4: the closing time comes after the opening time (the website showed "7:00 PM to 10:30 AM")
+    const mins = (t: string) => Number(t.split(":")[0]) * 60 + Number(t.split(":")[1]);
+    return mins(m[3]) > mins(m[1]) ? null : "The closing time must be after the opening time, like 10:30-19:00.";
   }) as Rule,
   isoDateOrBlank: ((v) => (!v.trim() || (/^\d{4}-\d{2}-\d{2}$/.test(v.trim()) && !Number.isNaN(Date.parse(v.trim()))) ? null : "Use a date like 2027-01-31, or leave it blank.")) as Rule,
   centsOrBlank: ((v) => (!v.trim() || /^\d+$/.test(v.trim()) ? null : "Enter an amount in cents (for example 50000 for $500.00), or leave it blank.")) as Rule,
@@ -47,8 +50,9 @@ export const calendarRules: Record<string, Rule> = {
   },
   sameDayCutoff: (v) => (/^([01]?\d|2[0-3]):[0-5]\d$/.test(v.trim()) ? null : "Same-day bookings: a time like 15:30 (3:30 PM)."),
   sameDayCutoffErev: (v) => (v.trim().toLowerCase() === "chatzos" || /^([01]?\d|2[0-3]):[0-5]\d$/.test(v.trim()) ? null : 'Same-day bookings on Friday and Erev Yom Tov: "chatzos" or a time like 11:30.'),
-  sameDayHoursClose: (v) => (/^\d+(\.5)?-\d+(\.5)?$/.test(v.trim()) ? null : "Same-day delivery time close by: hours from-to, like 2.5-3.5 (whole or half hours)."),
-  sameDayHoursFar: (v) => (/^\d+(\.5)?-\d+(\.5)?$/.test(v.trim()) ? null : "Same-day delivery time in the surrounding areas: hours from-to, like 3.5-4.5 (whole or half hours)."),
+  // Extra check N4: the "from" hours must be fewer than the "to" hours (4.5-2 was spoken as the delivery time)
+  sameDayHoursClose: (v) => (/^\d+(\.5)?-\d+(\.5)?$/.test(v.trim()) && fromBeforeTo(v) ? null : "Same-day delivery time close by: hours from-to, like 2.5-3.5 (whole or half hours, the first smaller)."),
+  sameDayHoursFar: (v) => (/^\d+(\.5)?-\d+(\.5)?$/.test(v.trim()) && fromBeforeTo(v) ? null : "Same-day delivery time in the surrounding areas: hours from-to, like 3.5-4.5 (whole or half hours, the first smaller)."),
   sameDayCloseAreas: (v) => (v.length > 2000 ? "Close-by areas: keep the list under 2,000 characters." : null),
   phoneCutoffMinutes: (v) => {
     const n = int(v);
@@ -99,3 +103,10 @@ export function checkCalendarValues(values: Record<string, string>): string | nu
   }
   return null;
 }
+
+/** "2.5-3.5": the first number is smaller than the second (extra check N4). */
+function fromBeforeTo(v: string): boolean {
+  const [a, b] = v.trim().split("-").map(Number);
+  return a < b;
+}
+
