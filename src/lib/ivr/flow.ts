@@ -817,18 +817,27 @@ async function startStaffLegs(callerSid: string, k: RingKey, i: number, settings
     }
   }
   if (!legs.length) return false;
-  if (s) await updateSession(callerSid, { data: { staffLegs: legs, staffBridged: undefined, ringStart: Date.now() } }, s);
+  // Deep check 06:00 M42: written in one database step on the session as it is now (not the copy read before the
+  // calls were placed), so a leg ending or anything else saved meanwhile is never written back over
+  if (s)
+    await db.execute(sql`
+      UPDATE call_sessions SET data = (COALESCE(data, '{}'::jsonb) - 'staffBridged') || jsonb_build_object('staffLegs', ${JSON.stringify(legs)}::jsonb, 'ringStart', ${Date.now()}::bigint)
+      WHERE call_sid = ${callerSid}`);
   return true;
 }
 
 /** The staff member takes the call: joined to the waiting caller; every other ringing staff phone stops. */
 async function bridgeStaff(vr: VR, callerSid: string, legSid: string): Promise<VR> {
-  const s = await getSession(callerSid);
-  if (!s || s.data?.staffBridged) {
+  // Deep check 06:00 M43: the call is claimed in one database step, so when two staff press 1 at the same moment one
+  // gets the caller and only the other is hung up (before, both could claim it and hang each other up)
+  const r = await db.execute(sql`
+    UPDATE call_sessions SET data = jsonb_set(COALESCE(data, '{}'::jsonb), '{staffBridged}', to_jsonb(${legSid}::text))
+    WHERE call_sid = ${callerSid} AND COALESCE(data->>'staffBridged', '') = ''
+    RETURNING call_sid`);
+  if (!r.rows.length) {
     vr.hangup(); // someone else already took it, or the caller is gone
     return vr;
   }
-  await updateSession(callerSid, { data: { staffBridged: legSid } }, s);
   await endStaffLegs(callerSid, legSid).catch(() => undefined);
   vr.dial().queue(staffQueueName(callerSid));
   return vr;

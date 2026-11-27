@@ -43,6 +43,8 @@ beforeAll(async () => {
   await saveSetting("ringTargets0" as never, "Office | +18455550101 | 20" as never);
   await saveSetting("ringMode0" as never, "sequential" as never);
   await saveSetting("ringAttempts0" as never, "1" as never);
+  // the caller's session row (the staff legs and who took the call are saved on it in one database step)
+  await db.insert(schema.callSessions).values({ callSid: "CAhold", fromNumber: "+18455550616" });
 });
 
 describe("hold music while staff are rung", () => {
@@ -66,3 +68,24 @@ describe("hold music while staff are rung", () => {
     expect(h.updated.some((u) => u.sid === "CAhold" && String(u.body.url).includes("/voicemail?x=0"))).toBe(true);
   });
 });
+
+describe("deep check 06:00 M42, M43", () => {
+  it("two staff pressing 1 at the same moment: one gets the caller, only the other is hung up", async () => {
+    const { eq } = await import("drizzle-orm");
+    await db.update(schema.callSessions).set({ data: {} }).where(eq(schema.callSessions.callSid, "CAhold"));
+    h.session.data = {};
+    const [a, b] = await Promise.all([
+      call("staff-leg-accept", { Digits: "1" }, "c=CAhold&k=0", "CAstaffA"),
+      call("staff-leg-accept", { Digits: "1" }, "c=CAhold&k=0", "CAstaffB"),
+    ]);
+    expect([a, b].filter((x) => x.includes("<Queue>staff-CAhold</Queue>"))).toHaveLength(1);
+    expect([a, b].filter((x) => x.includes("<Hangup/>"))).toHaveLength(1);
+  });
+  it("a new ring round is saved on the session as it is now (one database step), never from an older copy", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/lib/ivr/flow.ts", "utf8").split("async function startStaffLegs")[1].split("\n}\n")[0];
+    expect(src).toContain("jsonb_build_object('staffLegs'");
+    expect(src).not.toContain("updateSession(callerSid, { data: { staffLegs");
+  });
+});
+
