@@ -112,3 +112,25 @@ describe("A17: locking a reopened month", () => {
     expect(await B.isLocked("2026-03-15")).toBe(true);
   });
 });
+
+describe("A13: a second charge on a paid order", () => {
+  it("is an overpayment to refund (no tip, not a sale); after a refund the money is owed again", async () => {
+    const [o] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2026-09-10", pickupDate: "2026-09-11", subtotalCents: 10000, deliveryFeeCents: 1000, taxCents: 894, totalCents: 11894, deliveryAddress: "12 Forest Rd, Monroe, NY 10950" }).returning();
+    await B.recordBookingPayment(o.id, 11894, "sola", "P1", "2026-09-01");
+    await B.recordBookingPayment(o.id, 11894, "sola", "P2", "2026-09-01");
+    const rows = (await db.select().from(schema.bookEntries).where(eq(schema.bookEntries.orderId, o.id))).sort((a, b) => a.id - b.id);
+    expect(rows[1]).toMatchObject({ category: "Overpayment (refund due)", tipCents: 0, taxCents: 0 });
+    const R = await import("@/lib/books-reports");
+    const tax = await R.salesTaxSummary("2026-09-01", "2026-09-30");
+    expect(tax.taxableCents).toBe(11000);
+    // the overpayment refunded: no tax given back
+    const { refundTaxShare } = await import("@/lib/refunds");
+    expect(await refundTaxShare(o.id, 11894)).toBe(0);
+    await B.addEntry({ entryDate: "2026-09-02", kind: "refund", category: "Refunds", amountCents: 11894, method: "sola", orderId: o.id }, null);
+    await B.addEntry({ entryDate: "2026-09-02", kind: "refund", category: "Refunds", amountCents: 11894, taxCents: 894, method: "sola", orderId: o.id }, null);
+    // everything refunded, then paid again: a normal booking payment, not an overpayment
+    await B.recordBookingPayment(o.id, 11894, "sola", "P3", "2026-09-03");
+    const last = (await db.select().from(schema.bookEntries).where(eq(schema.bookEntries.orderId, o.id))).sort((a, b) => b.id - a.id)[0];
+    expect(last).toMatchObject({ category: "Bookings", taxCents: 894, tipCents: 0 });
+  });
+});

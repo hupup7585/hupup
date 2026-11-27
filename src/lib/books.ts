@@ -207,10 +207,13 @@ export async function recordBookingPayment(orderId: number, cents: number, metho
     const total = o.totalCents ?? o.subtotalCents;
     const prior = Number(
       (
-        await db.execute(sql`SELECT coalesce(sum(amount_cents), 0)::int AS n FROM book_entries WHERE order_id = ${orderId} AND kind = 'income' AND source = 'auto'`)
+        // Deep check A13 (Nov 27, 2026): money refunded on this order is no longer received, so it is owed again
+        await db.execute(sql`SELECT coalesce(sum(CASE WHEN kind = 'refund' THEN -amount_cents ELSE amount_cents END), 0)::int AS n FROM book_entries WHERE order_id = ${orderId} AND ((kind = 'income' AND source = 'auto') OR kind = 'refund')`)
       ).rows[0]?.n ?? 0,
     );
     const owed = Math.max(0, total - prior);
+    // A second charge on an order already paid in full is an overpayment to refund (the Owner is emailed), never a tip
+    const overpayment = total > 0 && owed === 0;
     const toTotal = Math.min(cents, owed);
     const share = total > 0 ? toTotal / total : 0;
     const deliveryCents = Math.round(o.deliveryFeeCents * share);
@@ -218,12 +221,13 @@ export async function recordBookingPayment(orderId: number, cents: number, metho
     // Custom-amount services (Nov 26, 2026): their own part of the payment, never counted as rental income
     const servicesCents = Math.round(o.servicesCents * share);
     const rentalCents = toTotal - deliveryCents - taxCents - servicesCents;
-    const tipCents = cents - toTotal;
+    const tipCents = overpayment ? 0 : cents - toTotal;
     await addEntry(
       {
         entryDate: (await isLocked(date)) ? nextOpenDate(date) : date,
         kind: "income",
-        category: "Bookings",
+        category: overpayment ? "Overpayment (refund due)" : "Bookings",
+        ...(overpayment ? { notes: "Second payment on an order already paid in full: refund due." } : {}),
         amountCents: cents,
         rentalCents,
         deliveryCents,

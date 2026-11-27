@@ -84,8 +84,11 @@ export async function refundTaxShare(orderId: number, amountCents: number): Prom
   const tax = (o.taxCents ?? 0) + (o.servicesTaxCents ?? 0);
   const total = o.totalCents ?? o.subtotalCents;
   if (tax <= 0 || total <= 0) return 0;
-  const given = (await db.execute(sql`SELECT COALESCE(SUM(tax_cents), 0)::int AS t FROM book_entries WHERE order_id = ${orderId} AND kind = 'refund'`)).rows[0] as { t: number };
-  return Math.max(0, Math.min(Math.round((amountCents * tax) / total), tax - Number(given?.t ?? 0)));
+  const r = (await db.execute(sql`SELECT COALESCE(SUM(tax_cents) FILTER (WHERE kind = 'refund'), 0)::int AS t, COALESCE(SUM(CASE WHEN kind = 'refund' THEN -amount_cents ELSE amount_cents END), 0)::int AS net FROM book_entries WHERE order_id = ${orderId} AND ((kind = 'income' AND source = 'auto') OR kind = 'refund')`)).rows[0] as { t: number; net: number };
+  // Money paid above the total (an overpayment) is given back first, with no tax in it
+  const excess = Math.max(0, Number(r?.net ?? 0) - total);
+  const portion = Math.max(0, amountCents - excess);
+  return Math.max(0, Math.min(Math.round((portion * tax) / total), tax - Number(r?.t ?? 0)));
 }
 
 /** Plain words for the reasons cards companies give. */

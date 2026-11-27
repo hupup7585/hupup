@@ -173,7 +173,8 @@ export async function payablesAging(today = todayISO()) {
 
 /** Sales tax for a period: taxable and tax-exempt sales, tax collected by county. */
 export async function salesTaxSummary(from: string, to: string) {
-  const entries = (await entriesBetween(from, to)).filter((e) => ["income", "deposit", "cancellation_fee", "refund"].includes(e.kind));
+  // Deep check A13: a second charge on a paid order (refund due) is not a sale
+  const entries = (await entriesBetween(from, to)).filter((e) => ["income", "deposit", "cancellation_fee", "refund"].includes(e.kind) && e.category !== "Overpayment (refund due)");
   const ids = [...new Set(entries.filter((e) => e.orderId && !e.county).map((e) => e.orderId!))];
   const addr = ids.length ? new Map((await db.select({ id: schema.orders.id, a: schema.orders.deliveryAddress }).from(schema.orders).where(inArray(schema.orders.id, ids))).map((o) => [o.id, o.a])) : new Map();
   const by = new Map<string, { county: string; taxableCents: number; taxCents: number; exemptCents: number }>();
