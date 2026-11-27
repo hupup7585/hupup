@@ -848,15 +848,18 @@ async function endStaffLegs(callerSid: string, keep?: string) {
 async function staffLegEnded(callerSid: string, k: RingKey, i: number, legSid: string) {
   const s = await getSession(callerSid);
   if (!s || s.data?.staffBridged || s.status === "completed") return;
-  const left = (s.data?.staffLegs ?? []).filter((x) => x !== legSid);
-  await updateSession(callerSid, { data: { staffLegs: left } }, s);
-  if (left.length) return;
+  // Deep check Nov 27 (item 25): the leg is taken out of the list in one database step, so two legs ending at the
+  // same moment both come off (a read-then-write could put the other one back, and the next round never started)
+  const r = await db.execute(sql`
+    UPDATE call_sessions SET data = jsonb_set(data, '{staffLegs}', COALESCE((SELECT jsonb_agg(x) FROM jsonb_array_elements(COALESCE(data->'staffLegs', '[]'::jsonb)) x WHERE x <> to_jsonb(${legSid}::text)), '[]'::jsonb))
+    WHERE call_sid = ${callerSid} RETURNING jsonb_array_length(data->'staffLegs') AS n`);
+  if (Number((r.rows[0] as { n?: number } | undefined)?.n ?? 0) > 0) return;
   const settings = await getSettings();
   const list = ringListFor(settings, k);
   const steps = (list.mode === "simultaneous" ? 1 : list.targets.length) * ringAttempts(settings, k);
   if (i + 1 < steps && (await lineRingsNowFor(k, settings)) && (await startStaffLegs(callerSid, k, i + 1, settings))) return;
   // nobody answered on any number or round: the caller leaves the queue to the extension's voicemail, as today
-  await updateSession(callerSid, { data: { missed: "no_answer" } }, s);
+  await updateSession(callerSid, { data: { missed: "no_answer" } }); // read fresh (the leg list changed above)
   const { getTwilio } = await import("@/lib/twilio-client");
   await getTwilio()?.calls(callerSid).update({ url: url("voicemail", { x: k }), method: "POST" }).catch((e) => console.error("[staff hold] voicemail", e));
 }
@@ -908,8 +911,11 @@ async function shabbesStop(ctx: Ctx, vr: VR, where: string): Promise<VR | null> 
 }
 
 /** Steps the cut-off never interrupts: the call's start, voicemail, ringing staff, and a payment already going on. */
+// Deep check Nov 27 (item 13): staff-* (the hold-music wait for staff, its queue exit and the staff legs) are cut-off free
+// like ring and operator: a caller already waiting for customer service is never hung up mid-wait, and no Record
+// lands inside a queue wait URL
 const CUTOFF_FREE = new Set(["music", "incoming", "record-start", "call-recording", "closed-key", "goodbye", "ring", "hours", "operator", "operator-done", "whisper", "whisper-accept", "phonepay-done", "pay-done", "disconnect-key", "cart-hold-release", "receipt-email", "receipt-email-choice"]);
-const cutoffFree = (action: string) => CUTOFF_FREE.has(action) || /^(vm|vma|voicemail|pay-leg|pay-approved|pay-confirm-how|promo-)/.test(action);
+const cutoffFree = (action: string) => CUTOFF_FREE.has(action) || /^(vm|vma|voicemail|pay-leg|pay-approved|pay-confirm-how|promo-|staff-)/.test(action);
 
 /** Item lists with 10 or more items: seconds to wait for a second key after the first (Abraham, Nov 17, 2026). */
 export const MULTI_KEY_WAIT_SECONDS = 2;
@@ -1018,12 +1024,7 @@ function resumeActive(ctx: Ctx, env: Record<string, string | undefined> = proces
 async function releaseSavedCart(ctx: Ctx) {
   const from = toE164(ctx.session?.fromNumber ?? ctx.from);
   if (!from) return;
-  const [last] = await db
-    .select({ data: schema.callSessions.data })
-    .from(schema.callSessions)
-    .where(and(eq(schema.callSessions.fromNumber, from), sql`${schema.callSessions.callSid} <> ${ctx.callSid}`))
-    .orderBy(desc(schema.callSessions.startedAt))
-    .limit(1);
+  const last = await cartSession(ctx, from);
   if (!last?.data?.shabbesSaved) return;
   for (const id of last.data.cartLeft ?? []) await cancelHold(id);
 }
@@ -1036,12 +1037,7 @@ async function releaseSavedCart(ctx: Ctx) {
 async function unfinishedCart(ctx: Ctx): Promise<{ productId: number; name: string; qty: number; date: string; pickup: string; span: number | null }[]> {
   const from = toE164(ctx.session?.fromNumber ?? ctx.from);
   if (!from) return [];
-  const [last] = await db
-    .select({ callSid: schema.callSessions.callSid, data: schema.callSessions.data })
-    .from(schema.callSessions)
-    .where(and(eq(schema.callSessions.fromNumber, from), sql`${schema.callSessions.callSid} <> ${ctx.callSid}`))
-    .orderBy(desc(schema.callSessions.startedAt))
-    .limit(1);
+  const last = await cartSession(ctx, from);
   const left = (last?.data?.cartLeft ?? []).filter((n) => Number.isInteger(n));
   if (!last || !left.length) return [];
   // that call placed an order (paid or waiting for payment): no welcome back
@@ -1056,7 +1052,34 @@ async function unfinishedCart(ctx: Ctx): Promise<{ productId: number; name: stri
     // released carts, and carts the Shabbes cut-off saved that are still held (Abraham, Nov 26, 2026, 11:51 PM)
     .where(and(inArray(orders.id, left), sql`(${orders.status} = 'CANCELLED' OR (${orders.status} = 'HOLD' AND ${orders.holdExpiresAt} > now()))`));
   const today = todayISO();
-  return rows.filter((r) => !r.paid && r.date >= today).map(({ paid: _p, ...r }) => r).sort((a, b) => a.date.localeCompare(b.date));
+  // Deep check Nov 27 (item 8): a day that can no longer be booked (closed, or today after the same-day cut-off) is
+  // left out, like a day that has passed
+  const cal = await getSettings();
+  return rows
+    .filter((r) => !r.paid && r.date >= today && checkEventDate(r.date, cal).ok && sameDayOpen(r.date, calendarNow(), cal as never))
+    .map(({ paid: _p, ...r }) => r)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * The call whose cart "welcome back" looks at: this number's last other call. Deep check Nov 27 (item 6): when that
+ * call ended with no cart (for example a call on Shabbes that heard the closed greeting), a cart the Shabbes cut-off
+ * saved and that is still held is used instead, so it is offered (or given back to stock) after reopening.
+ */
+async function cartSession(ctx: Ctx, from: string) {
+  const others = and(eq(schema.callSessions.fromNumber, from), sql`${schema.callSessions.callSid} <> ${ctx.callSid}`);
+  const [last] = await db.select({ callSid: schema.callSessions.callSid, data: schema.callSessions.data }).from(schema.callSessions).where(others).orderBy(desc(schema.callSessions.startedAt)).limit(1);
+  if (!last || (last.data?.cartLeft ?? []).length || last.data?.shabbesSaved) return last;
+  const [saved] = await db
+    .select({ callSid: schema.callSessions.callSid, data: schema.callSessions.data })
+    .from(schema.callSessions)
+    .where(and(others, sql`${schema.callSessions.data}->>'shabbesSaved' IS NOT NULL AND (${schema.callSessions.data}->>'shabbesSaved')::timestamptz > now()`))
+    .orderBy(desc(schema.callSessions.startedAt))
+    .limit(1);
+  const ids = (saved?.data?.cartLeft ?? []).filter((n) => Number.isInteger(n));
+  if (!saved || !ids.length) return last;
+  const [held] = await db.select({ id: orders.id }).from(orders).where(and(inArray(orders.id, ids), eq(orders.status, "HOLD"), sql`${orders.holdExpiresAt} > now()`)).limit(1);
+  return held ? saved : last;
 }
 
 
@@ -3013,7 +3036,7 @@ const handlers: Record<string, Handler> = {
     if (!chk.ok) {
       await track(ctx.callSid, "date_closed", `Asked for ${spokenDate(r.date)}: closed`, { date: r.date, reason: chk.day.reasonEn ?? chk.day.reason ?? null });
       // Abraham, Nov 20, 2026: the day before and the day after both open, and the item known: get it the day before
-      if (p && closedDayOffer(r.date, today, cal as never, (iso) => dayInfo(iso, cal).closed)) return back(vr, "closed-offer", { p, d: r.date });
+      if (p && closedDayOffer(r.date, today, cal as never, closedForOffer(cal))) return back(vr, "closed-offer", { p, d: r.date });
       sp(vr, ctx, "date_closed", { date: spokenDate(r.date), reason: chk.day.reasonEn ?? chk.day.reason ?? "a holiday" }); // Ashkenazi English names (Abraham)
       return back(vr, "date", { p, a });
     }
@@ -3039,7 +3062,7 @@ const handlers: Record<string, Handler> = {
     const date = ctx.query.get("d")!;
     const prod = await getProduct(Number(p));
     const cal = await getSettings();
-    const offer = prod ? closedDayOffer(date, todayISO(), cal as never, (iso) => dayInfo(iso, cal).closed) : null;
+    const offer = prod ? closedDayOffer(date, todayISO(), cal as never, closedForOffer(cal)) : null;
     if (!prod || !offer) return back(vr, "date", { p });
     const day = dayInfo(date, cal);
     // Box 17 (Nov 22, 2026): recorded pieces with the live parts between them; 1 books it, 2 another date, star back
@@ -3062,7 +3085,7 @@ const handlers: Record<string, Handler> = {
       return back(vr, "closed-offer", { p, d: date });
     }
     const cal = await getSettings();
-    const offer = closedDayOffer(date, todayISO(), cal as never, (iso) => dayInfo(iso, cal).closed);
+    const offer = closedDayOffer(date, todayISO(), cal as never, closedForOffer(cal));
     if (!offer) return back(vr, "date", { p });
     const spans = { ...(ctx.session?.data.spanDays ?? {}), [offer.before]: { after: offer.after, days: offer.spanDays } };
     await updateSession(ctx.callSid, { data: { spanDays: spans } }, ctx.session);
@@ -4375,7 +4398,10 @@ const handlers: Record<string, Handler> = {
     const first = (await callOrders(ctx))[0]?.order;
     const quote = await deliveryQuote(d.address, settings, fetch, first?.eventDate ?? new Date());
     if (quote.ok) {
-      const cents = quote.kind ? deliveryFeeFor(quote.kind, settings, first?.eventDate ?? todayISO(), first?.offerNote ?? null) : quote.feeCents;
+      // Deep check Nov 27 (item 10): the customer is attached only at checkout, so the offer (a free 4th Sunday pays
+      // twice the delivery) is worked out here for this caller's number, nothing saved, so the spoken price matches box 56
+      const note = first ? await offerNoteForCaller(first.id, first.offerNote ?? null, d.phone || toE164(ctx.from), settings) : null;
+      const cents = quote.kind ? deliveryFeeFor(quote.kind, settings, first?.eventDate ?? todayISO(), note) : quote.feeCents;
       // Abraham, Nov 27, 2026, 1:15 AM: 1 item: the one price; 2 items: first and second item; 3 or more: first and
       // each additional item (the zone price, and the Admin "Each additional item" price)
       const { bookingItemCount, extraItemCents } = await import("@/lib/delivery-rule");
@@ -5370,7 +5396,8 @@ const handlers: Record<string, Handler> = {
     const k = (RING_KEYS as readonly string[]).includes(ctx.query.get("k") ?? "") ? (ctx.query.get("k") as RingKey) : "0";
     // Safety: never wait longer than every round of ringing plus a minute (then the voicemail path, as today)
     const list = ringListFor(settings, k);
-    const perRound = Math.max(20, ...list.targets.map((t) => t.ringSeconds));
+    // Deep check Nov 27 (item 26): each round also counts the staff member's announcement and press-1 waits
+    const perRound = Math.max(20, ...list.targets.map((t) => t.ringSeconds)) + Number(settings.timerStaffAccept ?? 8) + Number(settings.timerStaffAcceptAgain ?? 6) + 10;
     const most = perRound * (list.mode === "simultaneous" ? 1 : Math.max(1, list.targets.length)) * ringAttempts(settings, k) + 60;
     if (Number(ctx.body.QueueTime ?? 0) > most) {
       vr.leave();
@@ -6225,4 +6252,39 @@ export async function handleCallStatus(callSid: string, status: string) {
     },
     s,
   );
+}
+
+class OfferNoteOnly extends Error {
+  constructor(readonly note: string | null) {
+    super("offer note only");
+  }
+}
+/**
+ * The offer note this HOLD order would get once the caller's customer record is on it (checkout attaches it). Worked
+ * out inside a transaction that is always undone. No customer with this number yet: the order's own note.
+ */
+async function offerNoteForCaller(orderId: number, current: string | null, phone: string | null | undefined, settings: Awaited<ReturnType<typeof getSettings>>): Promise<string | null> {
+  if (!phone) return current;
+  const [c] = await db.select({ id: schema.customers.id }).from(schema.customers).where(eq(schema.customers.phone, phone)).limit(1);
+  if (!c) return current;
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(orders).set({ customerId: c.id }).where(and(eq(orders.id, orderId), eq(orders.status, "HOLD")));
+      const { bestOffer } = await import("@/lib/offers");
+      const r = await bestOffer(tx as never, orderId, settings as never);
+      throw new OfferNoteOnly(r.note);
+    });
+  } catch (e) {
+    if (e instanceof OfferNoteOnly) return e.note;
+    console.error("[addr-price offer]", e);
+  }
+  return current;
+}
+
+/**
+ * Deep check Nov 27 (item 5): the closed-day offer's "day before" is never today after the same-day cut-off (3:30 PM,
+ * chatzos on Friday and Erev Yom Tov), the same as picking today on the date step.
+ */
+function closedForOffer(cal: Awaited<ReturnType<typeof getSettings>>) {
+  return (iso: string) => dayInfo(iso, cal).closed || (iso === todayISO() && !sameDayOpen(iso, calendarNow(), cal as never));
 }

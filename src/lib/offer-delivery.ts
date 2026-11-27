@@ -1,5 +1,5 @@
 import { zoneFee, type ZonePrices } from "@/lib/delivery-areas";
-import { OFFER_NOTES } from "@/lib/offers";
+import { hasFourthSunday } from "@/lib/offers";
 
 /**
  * The 4th Sunday's delivery (Abraham, Nov 27, 2026, 1:36 AM): exactly twice the zone's regular delivery price from
@@ -15,6 +15,6 @@ export function fourthSundayDeliveryCents(kind: "local" | "area" | "outside", s:
  * 4th Sunday, which pays twice the zone's regular price.
  */
 export function deliveryFeeFor(kind: "local" | "area" | "outside", s: ZonePrices, eventDate: string, offerNote?: string | null): number {
-  if (offerNote === OFFER_NOTES.fourthSunday) return fourthSundayDeliveryCents(kind, s);
+  if (hasFourthSunday(offerNote)) return fourthSundayDeliveryCents(kind, s);
   return zoneFee(kind, s, eventDate);
 }

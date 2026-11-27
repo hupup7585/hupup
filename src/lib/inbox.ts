@@ -407,6 +407,9 @@ export async function sendScheduledEmails(now = new Date()) {
   const due = await db.select().from(d).where(and(isNull(d.discardedAt), isNull(d.sentReplyId), sql`${d.sendAt} IS NOT NULL AND ${d.sendAt} <= ${now}`));
   let sent = 0;
   for (const x of due) {
+    // Deep check Nov 27 (item 17): claimed first (its send time cleared), so two runs at the same moment never send it twice
+    const [claimed] = await db.update(d).set({ sendAt: null }).where(and(eq(d.id, x.id), isNull(d.sentReplyId), sql`${d.sendAt} IS NOT NULL`)).returning({ id: d.id });
+    if (!claimed) continue;
     try {
       const r = await sendNewEmail({ to: x.toAddress, subject: x.subject, body: x.body, fileIds: x.fileIds ?? [], userId: x.userId, forwardOf: x.forwardOfEmailId, attachCatalog: x.attachCatalog, bodyHtml: x.bodyHtml });
       if (r.sent) {

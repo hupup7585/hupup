@@ -4,6 +4,7 @@ import { getSettings } from "@/lib/settings";
 import { NEW_EMAIL_LIVE } from "@/lib/config";
 import { SMS_TERMS_V2_LIVE } from "@/lib/sms-terms-v2";
 import { PAY_ENV_NAMES, phonePayConfigured } from "@/lib/phone-pay";
+import { sttActive } from "@/lib/speech-to-text";
 
 /**
  * Abraham EE: "Everything should work and run real." This lists every feature that can't run for real yet because of
@@ -74,8 +75,9 @@ export async function blockers(env: Record<string, string | undefined> = process
     {
       key: "speech-text",
       area: "Spoken answers typed up and read back (speech to text)",
-      active: false,
-      reason: "Has a per-use charge; waiting for Abraham's yes on the price per call.",
+      // Deep check Nov 27 (item 31): shows what the phone really does (Abraham turned it on Nov 17, 2026)
+      active: sttActive(env),
+      reason: "Needs a Google Speech-to-Text key (GOOGLE_STT_API_KEY, or GOOGLE_TTS_API_KEY with the Speech API allowed) and GOOGLE_TTS_API_KEY in Vercel.",
       where: "/admin/phone/prompts",
     },
     {

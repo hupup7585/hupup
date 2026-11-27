@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { schema } from "@/lib/db";
 import { recordConsentDetailed, type Exec } from "@/lib/sms-consent";
 import { REENROLL_WINDOW_HOURS, START_CONFIRMATION_SMS, START_CONFIRMATION_VERSION } from "@/lib/sms-consent-copy";
@@ -59,7 +59,8 @@ export async function handleYes(
   const pending = await activePending(tx, phone, now);
   if (!pending) return { confirmed: false, reason: "no_active_confirmation" };
   // Lift the block first (same transaction) so the new consent can be recorded; promotions stay off.
-  await tx.update(schema.customers).set({ smsOptOut: false }).where(eq(schema.customers.id, customer.id));
+  // every record with this number (deep check item 14: STOP is checked for the number, so its lifting is too)
+  await tx.update(schema.customers).set({ smsOptOut: false }).where(customer.phone ? or(eq(schema.customers.id, customer.id), eq(schema.customers.phone, customer.phone)) : eq(schema.customers.id, customer.id));
   const { consentId } = await recordConsentDetailed(
     {
       phone,

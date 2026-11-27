@@ -433,7 +433,8 @@ export async function releaseExpired(): Promise<number> {
   const res = await db
     .update(orders)
     .set({ status: "CANCELLED", updatedAt: new Date(), notes: sql`COALESCE(${orders.notes}, '') || 'Expired hold released. '` })
-    .where(and(inArray(orders.status, ["HOLD", "PENDING_PAYMENT"]), lt(orders.holdExpiresAt, new Date())))
+    // Deep check Nov 27 (item 7): an order with money on it is never cancelled by the clock (staff decide)
+    .where(and(inArray(orders.status, ["HOLD", "PENDING_PAYMENT"]), lt(orders.holdExpiresAt, new Date()), eq(orders.paidCents, 0)))
     .returning({ id: orders.id });
   if (res.length) {
     const { explainStatus } = await import("@/lib/status-history");
@@ -506,10 +507,18 @@ export async function markPaid(orderId: number, cents: number, method: string, r
       notes:
         late || shortNote
           ? sql`COALESCE(${orders.notes}, '') || ${(late ? (stillFree && !short ? "Payment arrived after the hold ended; the items were still free, confirmed. " : stillFree ? "Payment arrived after the hold ended. " : "Payment arrived after the hold ended; the items were taken, needs staff attention. ") : "") + shortNote}`
-          : o.notes,
+          : sql`${orders.notes}`,
     })
-    .where(eq(orders.id, orderId))
+    // Deep check Nov 27 (A3): only while no later payment was added on top of this one; a later payment works the
+    // status out from the larger amount, so an earlier "short" result can never land last and undo its "paid in full"
+    .where(and(eq(orders.id, orderId), eq(orders.paidCents, paid)))
     .returning();
+  if (!updated) {
+    const [now] = await db.select().from(orders).where(eq(orders.id, orderId));
+    const { recordBookingPayment } = await import("@/lib/books");
+    await recordBookingPayment(orderId, cents, method, ref);
+    return now ?? null;
+  }
   if (late) await handleLatePayment(orderId, cents, method, stillFree);
   // Custom-amount services on the order now were paid for: they no longer change (Nov 26, 2026)
   await (await import("@/lib/order-services")).lockServices(orderId);

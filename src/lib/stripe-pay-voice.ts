@@ -188,7 +188,18 @@ export async function handlePayVoice(action: string, query: URLSearchParams, bod
   }
 
   if (action === "retry") {
-    if (body.Digits === "1") return (await payTwiml(vr, orderId, sid, tries + 1, prompts)).toString();
+    if (body.Digits === "1") {
+      // Deep check Nov 27 (item 27): no new card try once the Shabbes / Yom Tov cut-off has started (back to the
+      // hotline call, which plays its cut-off)
+      const { bookingCutoff } = await import("@/lib/jewish-calendar");
+      const { calendarNow } = await import("@/lib/clock");
+      const st = await (await import("@/lib/settings")).getSettings();
+      if (bookingCutoff(calendarNow(), st as never, Number(st.phoneCutoffMinutes ?? 15)).cut) {
+        vr.hangup();
+        return vr.toString();
+      }
+      return (await payTwiml(vr, orderId, sid, tries + 1, prompts)).toString();
+    }
     vr.hangup(); // 2, or no key: the hotline emails the payment link
     return vr.toString();
   }

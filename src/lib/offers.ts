@@ -26,6 +26,9 @@ export async function offerSwitches(exec: Exec): Promise<OfferSettings> {
 /** Delivery on a free 4th Sunday (Abraham, Nov 17, 2026). */
 export const OFFER_NOTES = { thuSun: "Thursday to Sunday: 1.5 times the rental", fourthSunday: "4th Sunday free", friMutze: "Friday and Mutze Shabbes: one and a half days" } as const;
 
+/** Is the free 4th Sunday part of this offer note (alone, or added to a customer discount: "... + 4th Sunday free")? */
+export const hasFourthSunday = (note: string | null | undefined) => Boolean(note && note.split(" + ").includes(OFFER_NOTES.fourthSunday));
+
 const RENTAL = /balloon|bounce|jump|inflatable|laser|paddle|boat/i;
 const ADDONS = /^laser tag add-ons$/i;
 

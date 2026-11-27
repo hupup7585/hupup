@@ -274,15 +274,25 @@ export async function hasTransactionalConsent(phone: string): Promise<boolean> {
  *  - order/service texts need order/service consent;
  *  - promotional texts need promotional consent and the 8 AM - 9 PM window.
  */
+/** Did any customer record with this phone number reply STOP? */
+async function numberOptedOut(to: string, exec: Pick<typeof db, "select"> = db): Promise<boolean> {
+  if (!to) return false;
+  const rows = await exec.select({ phone: schema.customers.phone, optOut: schema.customers.smsOptOut }).from(schema.customers).where(and(eq(schema.customers.phone, to), eq(schema.customers.smsOptOut, true))).limit(1);
+  return rows.some((r) => r.optOut === true && r.phone === to);
+}
+
 export async function checkEligibility(input: { to: string; kind: MessageKind; event?: string | null; customer: Customer | null; now?: Date; heldRecheck?: boolean; exec?: Pick<typeof db, "select"> }): Promise<Blocked | null> {
   const { to, kind, customer } = input;
+  // Deep check Nov 27 (item 14): STOP counts for the number, whichever customer record it was saved on (two records
+  // with the same phone could let a text through to a number that replied STOP)
+  const stopped = async () => Boolean(customer?.smsOptOut) || (await numberOptedOut(to, input.exec));
   if (kind === "system") {
     const rule = input.event ? SYSTEM_EVENTS[input.event] : undefined;
     if (!rule) return "not_allowed";
-    if (customer?.smsOptOut && !rule.afterStop) return "opted_out";
+    if (!rule.afterStop && (await stopped())) return "opted_out";
     return null;
   }
-  if (customer?.smsOptOut) return "opted_out";
+  if (await stopped()) return "opted_out";
   if (kind === "transactional") return (await hasTransactionalConsent(to)) ? null : "no_transactional_consent";
   if (!customer?.marketingOptIn) return "no_marketing_consent";
   if (!input.heldRecheck && (await promosThisYear(to, input.now, input.exec)) >= (await yearlyLimit(input.exec))) return "yearly_limit";
@@ -424,6 +434,12 @@ async function deliver(m: { messageId?: number; to: string; body: string; mediaU
  * if the customer opted out or lost consent it is canceled (never sent); if it is still outside the window it is
  * moved to the next window.
  */
+/** A held text is taken by one run only (Deep check Nov 27, item 17): held -> sending, or false when another run has it. */
+async function claimHeld(id: number): Promise<boolean> {
+  const [claimed] = await db.update(schema.messages).set({ status: "sending" }).where(and(eq(schema.messages.id, id), eq(schema.messages.status, "held"))).returning({ id: schema.messages.id });
+  return Boolean(claimed);
+}
+
 export async function processHeldPromotions(now = new Date()): Promise<{ sent: number; canceled: number; rescheduled: number }> {
   const due = await db
     .select()
@@ -440,7 +456,7 @@ export async function processHeldPromotions(now = new Date()): Promise<{ sent: n
       if (lock.locked) {
         await db.update(schema.messages).set({ sendAfter: lock.opensAt }).where(eq(schema.messages.id, m.id));
         out.rescheduled++;
-      } else if ((await deliver({ messageId: m.id, to, body: m.body, mediaUrls: m.mediaUrls ?? [], customer, logBody: true })).sent) out.sent++;
+      } else if ((await claimHeld(m.id)) && (await deliver({ messageId: m.id, to, body: m.body, mediaUrls: m.mediaUrls ?? [], customer, logBody: true })).sent) out.sent++;
       continue;
     }
     let blocked = await checkEligibility({ to, kind: "marketing", customer, now, heldRecheck: true });
@@ -453,6 +469,8 @@ export async function processHeldPromotions(now = new Date()): Promise<{ sent: n
       await db.update(schema.messages).set({ status: "canceled", errorMessage: `Canceled before sending: ${BLOCK_REASON[blocked]}` }).where(eq(schema.messages.id, m.id));
       out.canceled++;
     } else {
+      // Deep check Nov 27 (item 17): claimed first, so two runs at the same moment never send the same text twice
+      if (!(await claimHeld(m.id))) continue;
       const r = await deliver({ messageId: m.id, to, body: m.body, mediaUrls: m.mediaUrls ?? [], customer, logBody: true });
       if (r.sent) out.sent++;
     }
