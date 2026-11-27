@@ -355,3 +355,22 @@ export function bookingCutoff(at: Date = new Date(), s: CalendarSettings = calen
   }
   return { cut: false, reason: null, opensAt: null };
 }
+
+/**
+ * Same-day bookings (Abraham, Nov 27, 2026, 12:19 AM): today can be booked only before the cut-off: 3:30 PM on regular
+ * days, chatzos on Friday and Erev Yom Tov (both from Admin). Other dates are not affected.
+ */
+export function sameDayOpen(iso: string, at: Date, s: CalendarSettings & { sameDayCutoff?: string; sameDayCutoffErev?: string } = calendarDefaults()): boolean {
+  if (iso !== localISO(at)) return true;
+  const erev = weekday(iso) === 5 || erevCandleLighting(iso, s) !== null;
+  const raw = String((erev ? s.sameDayCutoffErev : s.sameDayCutoff) ?? (erev ? "chatzos" : "15:30")).trim().toLowerCase();
+  let cut: Date | null;
+  if (raw === "chatzos") cut = zmanim(iso, s).chatzot();
+  else {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(raw) ?? /^(\d{1,2}):(\d{2})$/.exec(erev ? "12:00" : "15:30")!;
+    const mins = Number(m[1]) * 60 + Number(m[2]);
+    const nowMins = Number(at.toLocaleString("en-US", { hour: "numeric", hour12: false, timeZone: "America/New_York" })) % 24 * 60 + Number(at.toLocaleString("en-US", { minute: "numeric", timeZone: "America/New_York" }));
+    return nowMins < mins;
+  }
+  return cut ? at.getTime() < cut.getTime() : true;
+}

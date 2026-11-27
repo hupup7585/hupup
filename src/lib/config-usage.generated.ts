@@ -390,6 +390,16 @@ export const CONFIG_USAGE: Record<string, string[]> = {
   "app/admin/(app)/settings/calendar-keys.ts",
   "lib/jewish-calendar.ts"
  ],
+ "sameDayCutoff": [
+  "app/admin/(app)/settings/CalendarSettingsForm.tsx",
+  "app/admin/(app)/settings/calendar-keys.ts",
+  "lib/jewish-calendar.ts"
+ ],
+ "sameDayCutoffErev": [
+  "app/admin/(app)/settings/CalendarSettingsForm.tsx",
+  "app/admin/(app)/settings/calendar-keys.ts",
+  "lib/jewish-calendar.ts"
+ ],
  "phoneCutoffMinutes": [
   "app/admin/(app)/settings/CalendarSettingsForm.tsx",
   "app/admin/(app)/settings/calendar-keys.ts",

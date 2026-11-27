@@ -946,6 +946,12 @@ export const RECORDING_USAGE: Record<string, string[]> = {
   "lib/ivr/flow.ts"
  ],
  "retry_spoken": [],
+ "same_day_closed": [
+  "lib/ivr/flow.ts"
+ ],
+ "same_day_notice": [
+  "lib/ivr/flow.ts"
+ ],
  "second_laser": [
   "lib/ivr/flow.ts"
  ],

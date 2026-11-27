@@ -2,7 +2,8 @@ import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { addDays, todayISO } from "@/lib/dates";
 import { checkBookable } from "@/lib/availability";
-import { checkEventDate } from "@/lib/jewish-calendar";
+import { checkEventDate, localISO, sameDayOpen } from "@/lib/jewish-calendar";
+import { calendarNow } from "@/lib/clock";
 import { getSettings } from "@/lib/settings";
 
 /*
@@ -25,6 +26,9 @@ export async function categoryProducts(categoryId: number) {
 export async function itemFreeOn(p: { id: number; quantity: number }, date: string, cal: Cal): Promise<boolean> {
   if (date < todayISO()) return false;
   if (!checkEventDate(date, cal).ok) return false;
+  // Same-day cut-off (Abraham, Nov 27, 2026, 12:19 AM): today is never offered after it
+  const now = calendarNow();
+  if (date === localISO(now) && !sameDayOpen(date, now, cal as never)) return false;
   return (await checkBookable(p.id, p.quantity, date)) > 0;
 }
 

@@ -554,6 +554,16 @@ const OTHER: Record<string, Explanation> = {
     where: "Callers and customers on the day before Yom Tov.",
     ifChanged: "Changes the closing time on those days.",
   },
+  sameDayCutoff: {
+    what: "The latest time someone can book for the same day, on regular days (for example 15:30 is 3:30 PM). After that time, today is not offered as a date.",
+    where: "The phone line, when a caller picks today's date.",
+    ifChanged: "Same-day bookings close earlier or later in the day.",
+  },
+  sameDayCutoffErev: {
+    what: 'The latest time someone can book for the same day on Friday and Erev Yom Tov: "chatzos" (halachic midday, worked out every day) or a time like 11:30.',
+    where: "The phone line, when a caller picks today's date on Friday or Erev Yom Tov.",
+    ifChanged: "Same-day bookings on those days close earlier or later.",
+  },
   phoneCutoffMinutes: {
     what: "How many minutes before candle lighting the phone stops taking bookings and payments, even for a caller who is in the middle of a booking.",
     where: "Every Erev Shabbes and Erev Yom Tov, on the phone line.",

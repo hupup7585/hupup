@@ -82,7 +82,7 @@ import { CATALOG_ENDINGS, spellOut, spokenEmail, spokenLetters, validDomain, val
 import { boxById, boxForKey, finalizeCallRecordings, mainBox, recordingFinished, saveRecording, saveTranscription, setRecordingState } from "@/lib/voicemail";
 import { RING_KEYS, extensionName, lineRingsNow, ringAttempts, ringListFor, staffAnnouncement, type RingKey } from "./routing";
 import { calendarNow } from "@/lib/clock";
-import { bookingCutoff, bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO } from "@/lib/jewish-calendar";
+import { bookingCutoff, bookingLock, erevCandleLighting, isShabbosOrYomTov, localISO, sameDayOpen } from "@/lib/jewish-calendar";
 import { matchBlock, parseBlockList } from "./caller-filter";
 import { MENU_COMBOS, PROMPTS, clipUrls, composeClips, composeMixed, fill, textPieces, type LinePiece, googleLiveOn, liveClips, loadPromptOverrides, promptAudio, promptText, promptWaiting, type PromptKey, type PromptOverrides } from "./prompts";
 import { messageDate } from "@/lib/dual-date";
@@ -405,7 +405,7 @@ function openDayNear(date: string, dir: 1 | -1, cal: Awaited<ReturnType<typeof g
   for (let i = 1; i <= 10; i++) {
     const x = addDays(date, dir * i);
     if (x < today || x > last) return null;
-    if (checkEventDate(x, cal).ok) return x;
+    if (checkEventDate(x, cal).ok && sameDayOpen(x, calendarNow(), cal as never)) return x;
   }
   return null;
 }
@@ -2899,6 +2899,13 @@ const handlers: Record<string, Handler> = {
       sp(vr, ctx, "date_closed", { date: spokenDate(r.date), reason: chk.day.reasonEn ?? chk.day.reason ?? "a holiday" }); // Ashkenazi English names (Abraham)
       return back(vr, "date", { p, a });
     }
+    // Same-day cut-off (Abraham, Nov 27, 2026, 12:19 AM): after 3:30 PM (chatzos on Friday and Erev Yom Tov) today is
+    // treated like a closed day: the line, then the date step again for another date
+    if (!sameDayOpen(r.date, calendarNow(), cal as never)) {
+      await track(ctx.callSid, "date_closed", `Asked for today (${spokenDate(r.date)}) after the same-day cut-off`, { date: r.date, reason: "same-day cut-off" });
+      sp(vr, ctx, "same_day_closed");
+      return back(vr, "date", { p, a });
+    }
     await track(ctx.callSid, "date_asked", `Asked about ${spokenDate(r.date)}`, { date: r.date, key: digits });
     return back(vr, "date-ask", { p, d: r.date, a });
   },
@@ -3017,6 +3024,8 @@ const handlers: Record<string, Handler> = {
     }
     await clearSpan(ctx, date);
     await chooseDay(ctx, date);
+    // Same-day delivery notice (Abraham, Nov 27, 2026, 12:19 AM): right after today is chosen, before the items
+    if (date === localISO(calendarNow())) sp(vr, ctx, "same_day_notice");
     // No item yet (another day, from box 25 or welcome back): the categories (box 12a) for that day, never the bookings
     // menu (Hark's audit H1, Nov 24, 2026: callers heard it as "back to the first menu")
     return p ? back(vr, "qty", { p, d: date }) : back(vr, "cats");

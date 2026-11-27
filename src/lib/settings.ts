@@ -146,6 +146,10 @@ export const SETTING_DEFAULTS = {
   erevYomTovClose: "chatzos",
   /** Minutes before sunset for candle lighting (used only when a "candles" close is chosen) */
   /** Abraham, Nov 26, 2026, 11:51 PM: the phone stops new bookings and payment this many minutes before candle lighting */
+  /** Abraham, Nov 27, 2026, 12:19 AM: the latest time to book for the same day (regular days, HH:MM, 24-hour) */
+  sameDayCutoff: "15:30",
+  /** ...and on Friday and Erev Yom Tov: "chatzos" (halachic midday) or a time HH:MM */
+  sameDayCutoffErev: "chatzos",
   phoneCutoffMinutes: "15",
   /** ...and a caller's cart at that moment is saved until this many minutes after Shabbes / Yom Tov ends */
   shabbesSaveMinutes: "60",

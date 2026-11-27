@@ -49,6 +49,16 @@ export default function CalendarSettingsForm({ initial }: { initial: Record<stri
           <input className="input" inputMode="numeric" value={v.candleLightingMinutes} onChange={(e) => set("candleLightingMinutes", e.target.value)} />
         </label>
         <label className="block">
+          <span className="label">Same-day bookings until (regular days)</span>
+          <input className="input" value={v.sameDayCutoff} onChange={(e) => set("sameDayCutoff", e.target.value)} />
+          <span className="mt-1 block text-xs text-muted">A time like 15:30 (3:30 PM). After it, today is not offered on the phone.</span>
+        </label>
+        <label className="block">
+          <span className="label">Same-day bookings until (Friday and Erev Yom Tov)</span>
+          <input className="input" value={v.sameDayCutoffErev} onChange={(e) => set("sameDayCutoffErev", e.target.value)} />
+          <span className="mt-1 block text-xs text-muted">&ldquo;chatzos&rdquo; (halachic midday) or a time like 11:30.</span>
+        </label>
+        <label className="block">
           <span className="label">Phone stops bookings (minutes before candle lighting)</span>
           <input className="input" inputMode="numeric" value={v.phoneCutoffMinutes} onChange={(e) => set("phoneCutoffMinutes", e.target.value)} />
           <span className="mt-1 block text-xs text-muted">From this time no one can finish a booking or pay on the phone, even in the middle of a call.</span>

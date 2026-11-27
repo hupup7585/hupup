@@ -45,6 +45,8 @@ export const calendarRules: Record<string, Rule> = {
     const n = int(t);
     return Number.isNaN(n) || n < REOPEN_MIN || n > REOPEN_MAX ? `Reopen after Shabbes and Yom Tov: enter "tzeis" (nightfall) or whole minutes after sunset from ${REOPEN_MIN} to ${REOPEN_MAX} (72 is Rabbeinu Tam).` : null;
   },
+  sameDayCutoff: (v) => (/^([01]?\d|2[0-3]):[0-5]\d$/.test(v.trim()) ? null : "Same-day bookings: a time like 15:30 (3:30 PM)."),
+  sameDayCutoffErev: (v) => (v.trim().toLowerCase() === "chatzos" || /^([01]?\d|2[0-3]):[0-5]\d$/.test(v.trim()) ? null : 'Same-day bookings on Friday and Erev Yom Tov: "chatzos" or a time like 11:30.'),
   phoneCutoffMinutes: (v) => {
     const n = int(v);
     return Number.isNaN(n) || n < 0 || n > 120 ? "Phone booking cut-off: whole minutes before candle lighting, from 0 to 120." : null;

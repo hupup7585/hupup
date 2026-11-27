@@ -671,6 +671,10 @@ export const PROMPTS = {
   // Main menu key 7 (Abraham, Nov 26, 2026): the customer service hours with Friday, instead of the office hours
   key7_cs_hours: { group: "Welcome & main menu", label: "Main menu key 7: customer service hours with Friday", text: "Our customer service is open Sunday through Thursday, from 11 AM to 2 PM, and at night from 7:30 PM to 10:30 PM. Friday, from 10:30 AM till chatzos." },
   office_closed: { group: "Welcome & main menu", label: "Office closed (after the greeting, only when the office is closed; also key 7)", text: "Our office is closed right now, but you can still book anytime using our automated system." },
+  // Abraham, Nov 27, 2026, 12:19 AM: same-day bookings. Draft wording (Abraham is confirming; Hark records): waits for
+  // approval on the live line
+  same_day_closed: { group: "Date & quantity", label: "Today asked after the same-day cut-off (draft, waiting for Abraham)", text: "Sorry, it is too late to book for today. Please pick another date.", pending: true },
+  same_day_notice: { group: "Date & quantity", label: "Same-day delivery notice (draft, waiting for Abraham)", text: "Please note, a same-day delivery may take longer, about two and a half to three and a half hours. If you need it sooner, please contact customer service, or after hours leave a message, and we will try our best.", pending: true },
   date_closed: { group: "Date & quantity", label: "Chosen date is a closed day (no offer: the day before or after is closed too)", text: "Sorry, we are closed on {date} for {reason}. Let us pick another date.", vars: ["date", "reason"] },
   // Abraham, Nov 20, 2026: a closed day with the day before and the day after both open (then the date prompt and back line)
   // Box 17, closed day (Abraham, Nov 22, 2026): played as recorded pieces with the live parts between them
