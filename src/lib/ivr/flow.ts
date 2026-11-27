@@ -6066,7 +6066,8 @@ function callerPhoneOf(ctx: { session?: { fromNumber?: string | null } | null; f
   return toE164(ctx.session?.fromNumber ?? ctx.from ?? "") || null;
 }
 
-const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music", "pay-leg", "pay-leg-status", "staff-leg", "staff-leg-accept", "staff-leg-status"]); // music: wait music pieces, not a step of the caller's journey
+// Deep check 0600 M41: "pay-leg-wait" is our separate call to Sola too (it saved a fake hotline call, in progress forever)
+const STAFF_LEG_ACTIONS = new Set(["whisper", "whisper-accept", "music", "pay-leg", "pay-leg-wait", "pay-leg-status", "staff-leg", "staff-leg-accept", "staff-leg-status"]); // music: wait music pieces, not a step of the caller's journey
 
 /** What a key set in Admin does (Nov 26, 2026). */
 async function ownKey(ctx: Ctx, vr: VR, screen: string, k: KeyDef) {
