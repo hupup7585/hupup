@@ -459,15 +459,18 @@ export async function markPaid(orderId: number, cents: number, method: string, r
     if (ref && cur.solaRefNum === ref) {
       // Deep check Nov 27 #7: this payment's amount was saved but the rest (status, Books) did not finish (an error in
       // between). The repeat notice finishes it, without adding the amount again; a finished order is a duplicate.
-      const unfinished = (cur.status === "PENDING_PAYMENT" || cur.status === "HOLD" || cur.status === "CANCELLED") && cur.paidCents >= cents;
+      // Only a try that stopped at least a minute ago: a copy arriving at the same moment as the first is a duplicate
+      const stale = !cur.updatedAt || cur.updatedAt.getTime() < Date.now() - 60_000;
+      const unfinished = stale && (cur.status === "PENDING_PAYMENT" || cur.status === "HOLD" || cur.status === "CANCELLED") && cur.paidCents >= cents;
       return unfinished ? { o: { ...cur, paidCents: cur.paidCents - cents }, dupe: false } : { o: cur, dupe: true };
     }
-    await tx.update(orders).set({ paidCents: sql`${orders.paidCents} + ${cents}`, solaRefNum: ref ?? cur.solaRefNum }).where(eq(orders.id, orderId));
+    await tx.update(orders).set({ paidCents: sql`${orders.paidCents} + ${cents}`, solaRefNum: ref ?? cur.solaRefNum, updatedAt: new Date() }).where(eq(orders.id, orderId));
     return { o: cur, dupe: false };
   });
   const o = counted.o;
   if (!o) return null;
-  if (counted.dupe) return o; // duplicate webhook
+  // duplicate webhook: marked, so the caller sends no second "paid" notice (deep check Nov 27 #17)
+  if (counted.dupe) return { ...o, duplicate: true as const };
   const paid = o.paidCents + cents;
   // Hark's backend list 2: money on an order that was already paid in full (a second charge). It is recorded, the
   // booking stays as it is, the Owner is emailed to refund it, and the customer gets no new "paid" notice.

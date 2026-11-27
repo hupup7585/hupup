@@ -19,7 +19,7 @@ async function halfwayOrder(gid?: number) {
   // the state a failure leaves: the amount and reference saved, still waiting for payment, nothing in Books
   const [o] = await db
     .insert(schema.orders)
-    .values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-09-15", pickupDate: "2027-09-16", subtotalCents: 15000, totalCents: 15000, paidCents: 15000, solaRefNum: "HALF1", paymentGroupId: gid ?? null, holdExpiresAt: new Date(Date.now() + 600_000) })
+    .values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-09-15", pickupDate: "2027-09-16", subtotalCents: 15000, totalCents: 15000, paidCents: 15000, solaRefNum: "HALF1", paymentGroupId: gid ?? null, updatedAt: new Date(Date.now() - 5 * 60_000), holdExpiresAt: new Date(Date.now() + 600_000) })
     .returning();
   return o.id;
 }
@@ -36,6 +36,15 @@ describe("payment that stopped halfway", () => {
     o = await get(id);
     expect([o.status, o.paidCents]).toEqual(["CONFIRMED", 15000]);
     expect((await books(id)).filter((b) => b.ref === "HALF1")).toHaveLength(1);
+  });
+  it("a copy arriving at the same moment as the first (saved seconds ago, not finished yet) is a duplicate", async () => {
+    const [o] = await db
+      .insert(schema.orders)
+      .values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-09-15", pickupDate: "2027-09-16", subtotalCents: 7000, totalCents: 7000, paidCents: 7000, solaRefNum: "NOW1", updatedAt: new Date(), holdExpiresAt: new Date(Date.now() + 600_000) })
+      .returning();
+    const r = await markPaid(o.id, 7000, "sola", "NOW1");
+    expect((r as { duplicate?: boolean }).duplicate).toBe(true);
+    expect((await books(o.id))).toHaveLength(0);
   });
   it("a finished payment repeated is still a duplicate", async () => {
     const [o] = await db.insert(schema.orders).values({ status: "PENDING_PAYMENT", channel: "PHONE", eventDate: "2027-09-15", pickupDate: "2027-09-16", subtotalCents: 9000, totalCents: 9000, holdExpiresAt: new Date(Date.now() + 600_000) }).returning();

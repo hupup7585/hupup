@@ -94,6 +94,9 @@ async function handle(req: Request): Promise<Response> {
   // The "paid" notice only when the booking is now confirmed (Audit C1: never for less than the total)
   // Hark's backend list 2 (Nov 26, 2026): money on an order that was already paid in full sends the customer nothing
   // (the Owner is emailed to refund it)
-  if ((!group.paid || resumed) && fresh && updated.some((u) => u.status === "CONFIRMED")) await paymentReceivedNotices(orderId, cents);
+  // Deep check Nov 27 #17: only the notice that actually counted the payment sends it (a copy arriving at the same moment
+  // finds the payment already counted and sends nothing)
+  const counted = updated.filter((u) => !("duplicate" in u && u.duplicate));
+  if ((!group.paid || resumed) && fresh && counted.some((u) => u.status === "CONFIRMED")) await paymentReceivedNotices(orderId, cents);
   return new Response("ok");
 }
