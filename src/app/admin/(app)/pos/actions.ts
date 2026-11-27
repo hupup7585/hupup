@@ -110,7 +110,9 @@ export async function createBookingAction(input: {
   if (!dateCheck.ok) return { ok: false, message: dateCheck.message ?? "We're closed on that day." };
   const items = Object.entries(input.items)
     .map(([id, qty]) => ({ productId: Number(id), qty: Number(qty) }))
-    .filter((i) => i.qty > 0);
+    .filter((i) => i.qty !== 0);
+  // Code audit L8: whole numbers 1 to 99 only (1.5 or "abc" used to crash with a raw error)
+  if (items.some((i) => !Number.isInteger(i.qty) || i.qty < 1 || i.qty > 99 || !Number.isInteger(i.productId))) return { ok: false, message: "Each quantity must be a whole number from 1 to 99." };
   if (!items.length) return { ok: false, message: "Add at least one item." };
   if (!input.name.trim()) return { ok: false, message: "Enter the customer's name." };
   if (termsActive() && !TERMS_VIA.includes(input.termsVia as (typeof TERMS_VIA)[number])) return { ok: false, message: "Choose how the customer accepted the Terms and Conditions." };

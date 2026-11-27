@@ -28,7 +28,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
+  // Code audit L4: no secret set = nobody can run it (like the frequent job)
+  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
     return new Response("Unauthorized", { status: 401 });
   }
   // Plan step 3 (Abraham, Nov 15, 2026): every job is logged, retried up to 3 times, and the Owner is emailed if it still fails

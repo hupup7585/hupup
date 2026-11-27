@@ -1,6 +1,7 @@
 import { paymentResultLabel } from "@/lib/payment-result";
 import { Download } from "lucide-react";
 import Link from "next/link";
+import { requireAdmin } from "@/lib/auth";
 import { abandonedCartCount, listOrders } from "@/lib/admin-queries";
 import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
@@ -16,6 +17,7 @@ export default async function OrdersPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; from?: string; to?: string }>;
 }) {
+  await requireAdmin(); // Code audit M9: each page checks the sign-in itself, not only the layout
   const sp = await searchParams;
   const status = sp.status || "ALL";
   const list = await listOrders({ q: sp.q, status, from: sp.from, to: sp.to });

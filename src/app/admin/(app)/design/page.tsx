@@ -1,6 +1,7 @@
 import { Camera, CheckCircle2, Clock, MapPin, MessageSquareText, Phone, Plus } from "lucide-react";
 import { Badge, Field, PageHeader, Section, type Tone } from "@/components/staff/ui";
 import PrintButton from "@/components/staff/PrintButton";
+import { requireAdmin } from "@/lib/auth";
 
 export const metadata = { title: "Staff screens (preview) · Hup Up Attractions" };
 
@@ -27,7 +28,8 @@ const SAMPLE_STOPS: { time: string; kind: string; customer: string; address: str
   { time: "1:00 PM", kind: "Pickup", customer: "Sample Customer D", address: "88 Demo Ave, Kiryas Joel", items: "2 × Inflatable Maze", status: ["scheduled", "Scheduled"] },
 ];
 
-export default function DesignPreview() {
+export default async function DesignPreview() {
+  await requireAdmin(); // Code audit M9
   return (
     <div className="w-full space-y-8">
       <PageHeader

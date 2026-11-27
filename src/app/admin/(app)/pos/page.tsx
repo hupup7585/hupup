@@ -1,6 +1,7 @@
 import { bookingLock } from "@/lib/jewish-calendar";
 import { calendarNow } from "@/lib/clock";
 import { getSettings } from "@/lib/settings";
+import { requireAdmin } from "@/lib/auth";
 import { asc, eq } from "drizzle-orm";
 import { webConsentCopy } from "@/lib/sms-terms-v2";
 import { smsNumberDisplay } from "@/lib/sms-number";
@@ -13,6 +14,7 @@ import PosForm from "./PosForm";
 const MONTH_CALENDAR_LIVE_APPROVED = true; // approved by Abraham, Nov 17, 2026
 
 export default async function PosPage({ searchParams }: { searchParams: Promise<{ date?: string; product?: string }> }) {
+  await requireAdmin(); // Code audit M9
   const sp = await searchParams;
   const [cats, prods] = await Promise.all([
     db.select().from(schema.categories).orderBy(asc(schema.categories.sortOrder), asc(schema.categories.id)),
