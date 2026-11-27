@@ -34,9 +34,11 @@ async function run(back: string, fn: (staff: Staff) => Promise<string | { msg: s
   redirect(`${to}${to.includes("?") ? "&" : "?"}msg=${encodeURIComponent(msg)}`);
 }
 
-async function assignee(f: FormData) {
+async function assignee(f: FormData, current: number | null = null) {
   const id = num(f, "assignedTo");
   if (!id) return null;
+  // Extra check F5 (Nov 27, 2026): a task kept on its (now deactivated) person stays assigned when it is saved
+  if (current && id === current) return id;
   const [u] = await db.select().from(schema.adminUsers).where(and(eq(schema.adminUsers.id, id), eq(schema.adminUsers.active, true)));
   if (!u) throw new TaskError("Choose an active staff member.");
   return id;
@@ -75,7 +77,7 @@ export async function updateTaskAction(f: FormData) {
       if (!(STATUSES as readonly string[]).includes(status)) throw new TaskError("Choose a status.");
       patch = { status };
     } else {
-      patch = { ...fields(f), assignedTo: await assignee(f) };
+      patch = { ...fields(f), assignedTo: await assignee(f, t.assignedTo) };
     }
     patch.updatedAt = new Date();
     if (patch.status) patch.doneAt = patch.status === "done" ? (t.doneAt ?? new Date()) : null;
@@ -122,15 +124,16 @@ export async function startTimerAction(f: FormData) {
   return run(`/admin/tasks/${taskId}`, async (staff) => {
     const t = await getTask(taskId);
     if (!t || !(await canAccess(staff, t))) throw new TaskError("You can't log time on this task.");
-    const rateCents = await rateFor(staff.userId);
-    // Deep check B5: the task is locked while the running timer is checked, so a double click starts one timer
+    // Extra check F4 (Nov 27, 2026): the check and the start happen under a lock on this task and person, so two clicks
+    // at once start one timer (a second one used to run forever and count labor without end)
+    const rate = await rateFor(staff.userId);
     const l = await db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT id FROM tasks WHERE id = ${taskId} FOR UPDATE`);
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`timer:${taskId}:${staff.userId ?? 0}`}))`);
       const running = await tx.select().from(schema.timeLogs).where(and(eq(schema.timeLogs.taskId, taskId), staff.userId ? eq(schema.timeLogs.userId, staff.userId) : isNull(schema.timeLogs.userId), isNull(schema.timeLogs.endedAt), isNull(schema.timeLogs.minutes)));
-      if (running.length) throw new TaskError("Your timer is already running on this task.");
-      const [row] = await tx.insert(schema.timeLogs).values({ taskId, userId: staff.userId, startedAt: new Date(), rateCents }).returning();
-      return row;
+      if (running.length) return null;
+      return (await tx.insert(schema.timeLogs).values({ taskId, userId: staff.userId, startedAt: new Date(), rateCents: rate }).returning())[0];
     });
+    if (!l) throw new TaskError("Your timer is already running on this task.");
     await taskAudit(staff.userId, taskId, "timer_started", { log: l.id });
     return "Timer started.";
   });
@@ -145,7 +148,9 @@ export async function stopTimerAction(f: FormData) {
     if (staff.role !== "owner" && l.userId !== staff.userId) throw new TaskError("You can only stop your own timer.");
     const ended = new Date();
     const minutes = Math.max(1, Math.round((ended.getTime() - l.startedAt.getTime()) / 60_000));
-    await db.update(schema.timeLogs).set({ endedAt: ended, minutes }).where(eq(schema.timeLogs.id, id));
+    // Extra check F4: only a timer still running is stopped, so a double Stop logs it once
+    const stopped = await db.update(schema.timeLogs).set({ endedAt: ended, minutes }).where(and(eq(schema.timeLogs.id, id), isNull(schema.timeLogs.endedAt), isNull(schema.timeLogs.minutes))).returning({ id: schema.timeLogs.id });
+    if (!stopped.length) throw new TaskError("That timer isn't running.");
     await taskAudit(staff.userId, l.taskId, "timer_stopped", { log: id, minutes });
     return `Logged ${minutes} minutes.`;
   });

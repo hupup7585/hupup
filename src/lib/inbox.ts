@@ -37,20 +37,38 @@ export const INBOX_CHUNK_BYTES = 3 * 1024 * 1024;
 const RAW_MAX_BYTES = 30 * 1024 * 1024;
 
 export type InboxEmail = typeof schema.inboxEmails.$inferSelect;
+/** inbox_raw.email_id while the last piece is being filed (no email row has this id). */
+const FILING = -1;
 
 /** One piece of an incoming email; the last piece to arrive puts the email together and files it. */
-export async function receiveRawPiece(uploadId: string, idx: number, parts: number, data: Buffer) {
+export async function receiveRawPiece(uploadId: string, idx: number, parts: number, data: Buffer, envelopeFrom: string | null = null) {
   if (!/^[A-Za-z0-9-]{8,80}$/.test(uploadId) || !Number.isInteger(idx) || !Number.isInteger(parts) || parts < 1 || parts > 12 || idx < 0 || idx >= parts) throw new Error("bad piece");
   if (!data.length || data.length > 4 * 1024 * 1024) throw new Error("bad size");
   await db.insert(schema.inboxRaw).values({ uploadId, parts }).onConflictDoNothing();
   await db.insert(schema.inboxRawChunks).values({ uploadId, idx, data }).onConflictDoNothing();
   const chunks = await db.select().from(schema.inboxRawChunks).where(eq(schema.inboxRawChunks.uploadId, uploadId)).orderBy(asc(schema.inboxRawChunks.idx));
   if (chunks.length < parts) return { complete: false as const };
-  const [raw] = await db.select().from(schema.inboxRaw).where(eq(schema.inboxRaw.uploadId, uploadId)).limit(1);
-  if (raw?.emailId) return { complete: true as const, emailId: raw.emailId, duplicate: true };
   const bytes = Buffer.concat(chunks.map((c) => c.data));
   if (bytes.length > RAW_MAX_BYTES) throw new Error("too big");
-  const email = await fileEmail(bytes, uploadId);
+  // Extra check E9 (Nov 27, 2026): the last piece claims the upload first (email_id -1 = being filed), so two last
+  // pieces at once, or a retry while it is being filed, never file the email twice or alert the Owner twice.
+  const claimed = await db
+    .update(schema.inboxRaw)
+    .set({ emailId: FILING })
+    .where(and(eq(schema.inboxRaw.uploadId, uploadId), isNull(schema.inboxRaw.emailId)))
+    .returning({ uploadId: schema.inboxRaw.uploadId });
+  if (!claimed.length) {
+    const [raw] = await db.select().from(schema.inboxRaw).where(eq(schema.inboxRaw.uploadId, uploadId)).limit(1);
+    return { complete: true as const, emailId: raw?.emailId ?? FILING, duplicate: true };
+  }
+  let email: InboxEmail;
+  try {
+    email = await fileEmail(bytes, uploadId, new Date(), envelopeFrom);
+  } catch (e) {
+    // not filed: free the claim so the worker's retry can try again
+    await db.update(schema.inboxRaw).set({ emailId: null }).where(and(eq(schema.inboxRaw.uploadId, uploadId), eq(schema.inboxRaw.emailId, FILING)));
+    throw e;
+  }
   await db.update(schema.inboxRaw).set({ emailId: email.id }).where(eq(schema.inboxRaw.uploadId, uploadId));
   return { complete: true as const, emailId: email.id, duplicate: false };
 }
@@ -89,11 +107,16 @@ export async function replyAddressFor(e: { uploadId: string | null; fromAddress:
 }
 
 /** Read the email, keep it (and its attachments up to 18 MB), link the contact, tell Abraham, check for Catalog. */
-export async function fileEmail(bytes: Buffer, uploadId: string | null = null, now = new Date()): Promise<InboxEmail> {
+export async function fileEmail(bytes: Buffer, uploadId: string | null = null, now = new Date(), envelopeFrom: string | null = null): Promise<InboxEmail> {
   const mail = await PostalMime.parse(bytes);
   const messageId = mail.messageId?.trim() || null;
   if (messageId) {
     const [dupe] = await db.select().from(schema.inboxEmails).where(eq(schema.inboxEmails.messageId, messageId)).limit(1);
+    if (dupe) return dupe;
+  }
+  // A retry of the same upload (an earlier try saved the email, then failed on an attachment): the email is kept once
+  if (uploadId) {
+    const [dupe] = await db.select().from(schema.inboxEmails).where(eq(schema.inboxEmails.uploadId, uploadId)).limit(1);
     if (dupe) return dupe;
   }
   const from = (mail.from?.address ?? "").trim().toLowerCase() || "unknown";
@@ -130,8 +153,18 @@ export async function fileEmail(bytes: Buffer, uploadId: string | null = null, n
   // Every info@ email texted to the Owner's cell with the sender, subject and message (Abraham, Nov 17, 2026)
   await textOwnerAboutEmail(email).catch((e) => console.error("inbox text alert failed", e));
   // The info@ "Catalog" auto-reply (off until Abraham approves its wording)
-  await handleCatalogEmail(replyToOf(mail, email.fromAddress), email.subject).catch((e) => console.error("catalog check failed", e));
+  // Extra check E5 (Nov 27, 2026): the From line can be written by anyone. When the email worker tells us the real
+  // (envelope) sender and it is a different address, no catalog is sent to the From line (the email is still kept).
+  if (catalogReplyAllowed(email.fromAddress, envelopeFrom)) await handleCatalogEmail(email.fromAddress, email.subject).catch((e) => console.error("catalog check failed", e));
+  else console.warn("[inbound email] catalog auto-reply skipped: the From line does not match the real sender");
   return email;
+}
+
+/** The Catalog auto-reply goes to the From line only when it is the real sender (or the worker did not say). */
+export function catalogReplyAllowed(fromAddress: string, envelopeFrom: string | null | undefined): boolean {
+  const env = (envelopeFrom ?? "").trim().toLowerCase();
+  if (!env) return true; // an older worker that does not pass the real sender: as before
+  return env === fromAddress.trim().toLowerCase();
 }
 
 export async function inboxUnreadCount(): Promise<number> {
@@ -435,6 +468,11 @@ export async function recordSentEmail(input: { to: string; subject: string; body
  */
 export async function sendScheduledEmails(now = new Date()) {
   const d = schema.inboxDrafts;
+  // Extra check G2 (Nov 27, 2026): nothing goes out on Shabbes or Yom Tov (Admin's calendar settings, like the phone);
+  // emails due then keep their time and go out on the first run after
+  const { bookingLock } = await import("@/lib/jewish-calendar");
+  const { getSettings } = await import("@/lib/settings");
+  if (bookingLock(now, (await getSettings()) as never).locked) return { due: 0, sent: 0, waiting: "Shabbes or Yom Tov" };
   const due = await db.select().from(d).where(and(isNull(d.discardedAt), isNull(d.sentReplyId), sql`${d.sendAt} IS NOT NULL AND ${d.sendAt} <= ${now}`));
   let sent = 0;
   for (const x of due) {

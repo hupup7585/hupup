@@ -36,7 +36,9 @@ export default {
             try {
               const res = await fetch(`${env.SITE_URL}/api/email/inbound-raw?id=${id}&i=${i}&n=${parts}`, {
                 method: "POST",
-                headers: { "x-inbound-secret": env.INBOUND_EMAIL_SECRET, "content-type": "application/octet-stream" },
+                // x-envelope-from: the real sender Cloudflare received the mail from (the From line inside an email can
+                // be anything); the site sends the Catalog auto-reply only when the two match (extra check E5)
+                headers: { "x-inbound-secret": env.INBOUND_EMAIL_SECRET, "x-envelope-from": String(message.from || ""), "content-type": "application/octet-stream" },
                 body,
               });
               ok = res.ok;

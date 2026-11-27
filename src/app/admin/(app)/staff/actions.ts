@@ -63,10 +63,20 @@ export async function createStaffAction(form: { name: string; phone: string; rol
   } catch (e) {
     return { ok: false, message: (e as Error).message };
   }
-  const [u] = await db
-    .insert(schema.adminUsers)
-    .values({ name, phone, role: form.role, email: form.email?.trim() || null, username: un.value, passwordHash, passwordSetAt: passwordHash ? new Date() : null, googleEmail: google })
-    .returning({ id: schema.adminUsers.id });
+  // Extra check F10 (Nov 27, 2026): two clicks at once both pass the checks above; the second hits the database's
+  // one-account-per-phone (or username) rule and now gets the same message instead of an error page
+  let u: { id: number };
+  try {
+    [u] = await db
+      .insert(schema.adminUsers)
+      .values({ name, phone, role: form.role, email: form.email?.trim() || null, username: un.value, passwordHash, passwordSetAt: passwordHash ? new Date() : null, googleEmail: google })
+      .returning({ id: schema.adminUsers.id });
+  } catch (e) {
+    const code = (e as { code?: string; cause?: { code?: string } }).code ?? (e as { cause?: { code?: string } }).cause?.code;
+    if (code !== "23505") throw e;
+    const detail = String((e as { detail?: string; cause?: { detail?: string } }).detail ?? (e as { cause?: { detail?: string } }).cause?.detail ?? "");
+    return { ok: false, message: /username/i.test(detail) ? "That username is already taken." : "That phone number already has an account." };
+  }
   await log(owner.userId, "staff.created", u.id, { name, role: form.role, password: Boolean(passwordHash) });
   revalidatePath("/admin/staff");
   return { ok: true, message: `Added ${name} (${form.role}).` };

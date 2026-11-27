@@ -27,11 +27,21 @@ export async function saveOffersAction(fd: FormData) {
 export async function saveHolidayRentalsAction(fd: FormData) {
   const owner = await requireOwner();
   const s = await getSettings();
+  // Extra check F8 (Nov 27, 2026): a blank box keeps the saved value (it used to save 0); a number out of range is
+  // refused with a message and nothing is saved (it used to be swapped for the default while saying "saved")
+  const cur = s as Record<string, unknown>;
+  const bad: string[] = [];
   const num = (k: string, min: number, max: number, d: string) => {
-    const v = Number(fd.get(k));
-    return Number.isFinite(v) && v >= min && v <= max ? String(v) : d;
+    const raw = String(fd.get(k) ?? "").trim();
+    if (raw === "") return String(cur[k] ?? d);
+    const v = Number(raw);
+    if (Number.isFinite(v) && v >= min && v <= max) return String(v);
+    bad.push(`${raw} (allowed ${min} to ${max})`);
+    return String(cur[k] ?? d);
   };
-  const time = String(fd.get("holidaySundayPickup") ?? "");
+  const timeRaw = String(fd.get("holidaySundayPickup") ?? "").trim();
+  const time = timeRaw === "" ? String(cur.holidaySundayPickup ?? "09:00") : timeRaw;
+  if (!/^\d{2}:\d{2}$/.test(time)) bad.push(`${timeRaw} (a time like 09:00)`);
   const after = {
     holidayPerDayChanukah: fd.get("holidayPerDayChanukah") === "on",
     holidayPerDayCholHamoed: fd.get("holidayPerDayCholHamoed") === "on",
@@ -42,6 +52,7 @@ export async function saveHolidayRentalsAction(fd: FormData) {
     holidayFridayMutzeDays: num("holidayFridayMutzeDays", 1, 3, "1.5"),
     holidayMutzeAloneDays: num("holidayMutzeAloneDays", 0.5, 3, "1"),
   };
+  if (bad.length) redirect(`/admin/offers?${msgQuery(`Not saved: ${bad.join(", ")}. Nothing was changed.`)}`);
   const before = Object.fromEntries(Object.keys(after).map((k) => [k, (s as Record<string, unknown>)[k]]));
   for (const [k, v] of Object.entries(after)) await saveSetting(k as keyof typeof after, v as never, owner.userId);
   await db.insert(schema.auditLog).values({ userId: owner.userId, action: "settings.holiday_rentals", entityType: "settings", entityId: "holiday_rentals", before, after });

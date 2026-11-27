@@ -37,7 +37,7 @@ describe("daily jobs", () => {
     expect(await runJob("broken job", async () => { throw new Error("database down"); }, { waitMs: 1 })).toBeNull();
     const [r] = await recentJobRuns(1);
     expect(r).toMatchObject({ ok: false, attempts: 3, error: "database down" });
-    expect(h.emails[0]).toMatchObject({ to: "owner@example.com", subject: 'Hup Up Attractions: the daily job "broken job" failed' });
+    expect(h.emails[0]).toMatchObject({ to: "owner@example.com", subject: 'Hup Up Attractions: the job "broken job" failed' });
   });
 });
 

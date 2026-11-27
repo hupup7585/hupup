@@ -21,7 +21,12 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
   if (!t || !(await canAccess(staff, t))) notFound();
   if (t.parentId) redirect(`/admin/tasks/${t.parentId}`);
   const sp = await searchParams;
-  const people = await staffList();
+  const people: { id: number; name: string | null; role: string }[] = await staffList();
+  // Extra check F5 (Nov 27, 2026): a task kept on a deactivated person shows that person (marked), so saving keeps them
+  if (t.assignedTo && !people.some((p) => p.id === t.assignedTo)) {
+    const [gone] = await db.select({ id: schema.adminUsers.id, name: schema.adminUsers.name, role: schema.adminUsers.role }).from(schema.adminUsers).where(eq(schema.adminUsers.id, t.assignedTo)).limit(1);
+    if (gone) people.push({ ...gone, name: `${gone.name ?? "Staff"} (deactivated)` });
+  }
   const names = new Map(people.map((p) => [p.id, p.name]));
   const projects = await db.select().from(schema.taskProjects).orderBy(desc(schema.taskProjects.id));
   const subs = await db.select().from(schema.tasks).where(eq(schema.tasks.parentId, t.id)).orderBy(asc(schema.tasks.dueDate), asc(schema.tasks.id));

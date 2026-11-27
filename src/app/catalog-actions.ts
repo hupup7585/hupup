@@ -54,6 +54,10 @@ export async function textCatalogAction(_prev: { ok: boolean; message: string } 
     await db.insert(schema.auditLog).values({ action: "catalog.website_text_request", entityType: "phone", entityId: phone, after: { replied: false, reason: "opted_out" } });
     return { ok: false, message: draftOk ? CATALOG_TEXT_DRAFT.stopped : CATALOG_FORM_DRAFT.failed };
   }
+  // Extra check E7 (Nov 27, 2026): a number that already got the catalog today gets the "already sent" line before any
+  // new consent record is written (the send itself is also checked under a lock)
+  const { catalogTextedToday } = await import("@/lib/catalog-send");
+  if (await catalogTextedToday(phone)) return { ok: true, message: CATALOG_FORM_DRAFT.textAgain };
   // One internet address: at most 10 catalog sends a day (robots), before any consent record or text
   const req = await requestIp();
   if (await catalogIpLimitReached(req.ip)) {

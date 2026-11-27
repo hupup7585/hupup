@@ -1,3 +1,4 @@
+import { cronAuthorized } from "@/lib/cron-auth";
 import { releaseExpired } from "@/lib/orders";
 import { notifyStragglers } from "@/lib/voicemail";
 import { processHeldPromotions } from "@/lib/sms";
@@ -27,7 +28,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
+  if (!cronAuthorized(req.headers.get("authorization"), secret)) return new Response("Unauthorized", { status: 401 });
   // Address re-checks (Abraham, Nov 27, 2026): every 15 minutes for the first hour, then hourly. A small file on our
   // free Cloudflare storage says when the next one is due, so the database wakes only then (Neon free plan)
   const { recheckDue, runAddressChecks } = await import("@/lib/address-checks");
@@ -35,8 +36,18 @@ export async function GET(req: Request) {
     // Held offer texts and staff alerts (Abraham, Nov 27, 2026, option B): sent when their time has come, oldest first
     const { wakeDue } = await import("@/lib/wake-flags");
     const out: Record<string, unknown> = {};
-    if (await wakeDue("held-texts")) out.heldTexts = await runJob("Held texts (when due)", () => processHeldPromotions());
-    if (await recheckDue()) out.addressChecks = await runJob("Address re-checks (when due)", () => runAddressChecks());
+    // Extra check G5 (Nov 27, 2026): a job that failed moves its timer an hour ahead, so it is not tried (and the
+    // database woken) again every 5 minutes; the 3-hourly run is the safety net as before
+    const { armWake } = await import("@/lib/wake-flags");
+    const inAnHour = () => new Date(Date.now() + 3600_000);
+    if (await wakeDue("held-texts")) {
+      out.heldTexts = await runJob("Held texts (when due)", () => processHeldPromotions());
+      if (out.heldTexts === null) await armWake("held-texts", inAnHour());
+    }
+    if (await recheckDue()) {
+      out.addressChecks = await runJob("Address re-checks (when due)", () => runAddressChecks());
+      if (out.addressChecks === null) await armWake("address-rechecks", inAnHour());
+    }
     if (Object.keys(out).length) return Response.json(out);
     return Response.json({ skipped: "not due: the jobs run every 3 hours, without waking the database in between" });
   }
@@ -48,5 +59,8 @@ export async function GET(req: Request) {
   const heldPromotions = await runJob("Held promotional texts (every 3 hours)", () => processHeldPromotions());
   // Schedule send in the Admin Inbox (Abraham, Nov 19, 2026)
   const scheduledEmails = await runJob("Scheduled emails (every 3 hours)", () => sendScheduledEmails());
-  return Response.json({ released, voicemailAlerts, heldPromotions, scheduledEmails, addressChecks });
+  // Extra check G7 (Nov 27, 2026): the JOIN invitation also runs here, in the daytime runs; the daily run is at 4-5 AM,
+  // outside promo hours, so it could never send one. Still switched off until Abraham picks the wording.
+  const joinInvites = await runJob("JOIN invitations (every 3 hours)", async () => (await import("@/lib/join-invite")).sendJoinInvites());
+  return Response.json({ released, voicemailAlerts, heldPromotions, scheduledEmails, addressChecks, joinInvites });
 }

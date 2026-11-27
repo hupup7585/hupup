@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, lt, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { promosPerYear } from "@/lib/promo-limit";
 import { marketingBody, promosThisYear, sendMessage } from "@/lib/sms";
@@ -114,17 +114,35 @@ export async function cancelCampaign(id: number, userId: number | null) {
  * Send an approved campaign to every eligible customer, once each. Customers at the yearly limit, who replied STOP
  * or NO PROMO, or who never signed up are skipped. Outside 8 AM - 9 PM their text waits for the next window.
  */
+/** A campaign stopped partway ("sending") can be sent again after this long. */
+export const CAMPAIGN_RESUME_AFTER_MS = 10 * 60_000;
+
 export async function sendCampaign(id: number, userId: number | null, now = new Date()) {
   if (!campaignsCanSend()) throw new Error(`${CAMPAIGNS_NOT_ACTIVE}.`);
+  // Extra check F6 (Nov 27, 2026): the length is checked before the campaign is claimed, and it is claimed as
+  // "sending" (not "sent"), so an error partway leaves it able to finish: after 10 minutes Send works again and only
+  // the customers who didn't get it yet are texted (each customer's row is claimed once).
+  const [pre] = await db.select().from(schema.smsCampaigns).where(eq(schema.smsCampaigns.id, id)).limit(1);
+  if (pre) {
+    const m = await campaignMessage(pre);
+    if (m.text.length > PROMO_MAX_CHARS) throw new Error(`Too long to send (${m.text.length} characters; the most is ${PROMO_MAX_CHARS}).`);
+  }
   // Claim the campaign so two clicks can't send it twice.
-  const [c] = await db.update(schema.smsCampaigns).set({ status: "sent", sentBy: userId, sentAt: now }).where(and(eq(schema.smsCampaigns.id, id), eq(schema.smsCampaigns.status, "approved"))).returning();
+  const stale = new Date(Date.now() - CAMPAIGN_RESUME_AFTER_MS);
+  const [c] = await db
+    .update(schema.smsCampaigns)
+    .set({ status: "sending", sentBy: userId, sentAt: now })
+    .where(and(eq(schema.smsCampaigns.id, id), or(eq(schema.smsCampaigns.status, "approved"), and(eq(schema.smsCampaigns.status, "sending"), lt(schema.smsCampaigns.sentAt, stale)))))
+    .returning();
   if (!c) throw new Error("Only an approved campaign that hasn't been sent can be sent.");
   const msg = await campaignMessage(c);
-  if (msg.text.length > PROMO_MAX_CHARS) throw new Error(`Too long to send (${msg.text.length} characters; the most is ${PROMO_MAX_CHARS}).`);
   const list = await promoSignups(now);
-  const eligible = eligibleOf(list);
+  // Extra check F2 (Nov 27, 2026): one text per phone number, even when two customer records share it
+  const eligible = [...new Map(eligibleOf(list).map((x) => [x.phone, x])).values()];
+  const already = new Set((await db.select({ phone: schema.smsCampaignSends.phone }).from(schema.smsCampaignSends).where(eq(schema.smsCampaignSends.campaignId, id))).map((r) => r.phone));
   let sent = 0, held = 0, skipped = 0;
   for (const s of eligible) {
+    if (already.has(s.phone)) continue; // this number already got (or is getting) this campaign
     const [claim] = await db.insert(schema.smsCampaignSends).values({ campaignId: id, customerId: s.customerId, phone: s.phone, status: "pending" }).onConflictDoNothing().returning();
     if (!claim) continue; // already sent this campaign to this customer
     const r = await sendMessage({ to: s.phone, body: msg.offer, mediaUrls: msg.mediaUrls, kind: "marketing", event: `campaign:${id}`, customerId: s.customerId, userId, now });
@@ -143,7 +161,11 @@ export async function sendCampaign(id: number, userId: number | null, now = new 
       .returning();
     if (row) skipped++;
   }
-  const [done] = await db.update(schema.smsCampaigns).set({ eligibleCount: eligible.length, sentCount: sent, heldCount: held, skippedCount: skipped }).where(eq(schema.smsCampaigns.id, id)).returning();
+  // The counts come from the saved rows, so a campaign finished after a stop still shows every customer
+  const rows = await db.select({ status: schema.smsCampaignSends.status }).from(schema.smsCampaignSends).where(eq(schema.smsCampaignSends.campaignId, id));
+  const n = (st: string) => rows.filter((r) => r.status === st).length;
+  if (rows.length) [sent, held, skipped] = [n("sent"), n("held"), n("skipped")];
+  const [done] = await db.update(schema.smsCampaigns).set({ status: "sent", eligibleCount: eligible.length, sentCount: sent, heldCount: held, skippedCount: skipped }).where(eq(schema.smsCampaigns.id, id)).returning();
   await audit(userId, "campaign.sent", id, { eligible: eligible.length, sent, held, skipped });
   return done;
 }
