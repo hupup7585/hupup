@@ -135,6 +135,9 @@ describe("connect timing (Abraham, Nov 25, 2026): Sola is called before the hold
     expect(waiting).toContain('<Pause length="1"/>');
     expect(waiting).not.toContain("<Queue");
     expect(waiting).toContain(`pay-leg-wait?a=${a.id}&amp;n=1`);
+    // deep check 06:00 M41: the call to Sola is never saved as a hotline call
+    const { eq: eq41 } = await import("drizzle-orm");
+    expect(await db.select().from(schema.callEvents).where(eq41(schema.callEvents.callSid, "CAsola"))).toHaveLength(0);
     // the line finished: the next music request marks it done and plays music
     const next = await call("music", {}, `place=pay&a=${a.id}`);
     expect(next).toContain("/api/music/");
