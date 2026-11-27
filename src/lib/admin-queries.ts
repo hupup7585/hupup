@@ -164,14 +164,16 @@ export async function runsForDay(day: string) {
     id: number; kind: "delivery" | "pickup"; status: OrderStatus; delivery_time: string | null;
     customer_name: string | null; customer_phone: string | null; delivery_address: string | null; items: string | null;
   }>(sql`
-    SELECT o.id, CASE WHEN o.event_date = ${day}::date THEN 'delivery' ELSE 'pickup' END AS kind, o.status,
+    SELECT o.id, k.kind, o.status,
            o.delivery_time, c.name AS customer_name, c.phone AS customer_phone, o.delivery_address,
            (SELECT string_agg(oi.qty || ' × ' || p.name, ', ' ORDER BY oi.id) FROM order_items oi
               JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) AS items
     FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
-    WHERE (o.event_date = ${day}::date OR o.pickup_date = ${day}::date)
-      AND (o.status IN ('PENDING_PAYMENT','CONFIRMED','DELIVERED','PICKED_UP'))
-    ORDER BY kind, o.delivery_time NULLS LAST, o.id`);
+    -- Deep check A19 (Nov 27, 2026): an order delivered and picked up the same day is on the day twice (both runs)
+    JOIN (VALUES ('delivery'), ('pickup')) AS k(kind)
+      ON (k.kind = 'delivery' AND o.event_date = ${day}::date) OR (k.kind = 'pickup' AND o.pickup_date = ${day}::date)
+    WHERE (o.status IN ('PENDING_PAYMENT','CONFIRMED','DELIVERED','PICKED_UP'))
+    ORDER BY k.kind, o.delivery_time NULLS LAST, o.id`);
 }
 
 export async function recentCalls(limit = 100, q?: string) {
