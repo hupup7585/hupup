@@ -63,6 +63,9 @@ describe("extra check J: text messages", () => {
   it("J3: a carrier block (21610) is recorded like a STOP: every record, an opt-out record, waiting texts canceled", () => {
     const src = readFileSync("src/lib/sms.ts", "utf8").split('String(err.code) === "21610"')[1].slice(0, 1200);
     expect(src).toContain("eq(schema.customers.phone, phone)");
+    // deep check 06:00 M13: the number the text went to, never the order customer's own phone
+    expect(src).toContain("const phone = toE164(m.to) ?? m.to;");
+    expect(src).not.toContain("m.customer.phone");
     expect(src).toContain('action: "opt_out"');
     expect(src).toContain("cancelQueuedMessages(phone)");
   });

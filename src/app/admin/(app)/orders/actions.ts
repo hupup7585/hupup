@@ -7,7 +7,7 @@ import { eq, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/db/schema";
-import { checkBookable } from "@/lib/availability";
+import { recheckOrderLines } from "@/lib/recheck-lines";
 import { getOrderWithItems, markPaid, minutesFromNow, orderNumber, PAYMENT_HOLD_MINUTES, setOrderStatus } from "@/lib/orders";
 import { payPageLink } from "@/lib/rental-terms";
 import { sendOrderText } from "@/lib/notify";
@@ -15,6 +15,8 @@ import { parseMoneyToCents } from "@/lib/money";
 import { BUSINESS_NAME } from "@/lib/config";
 import { dualDate, messageDate } from "@/lib/dual-date";
 import { linkHoldMinutes } from "@/lib/settings";
+
+class NoLongerFree extends Error {}
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -57,17 +59,21 @@ export async function updateStatusAction(orderId: number, status: OrderStatus, r
     // pickup day, and the check and the change in one locked step (the items and their shared groups locked in id
     // order, like a phone booking), so two staff can never both re-book the last unit.
     const ids = [...new Set(full.items.map((i) => i.productId))].sort((x, y) => x - y);
-    const problem = await db.transaction(async (tx) => {
-      for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
-      for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
-      for (const it of full.items) {
-        const [p] = await tx.select().from(schema.products).where(eq(schema.products.id, it.productId));
-        const free = await checkBookable(it.productId, p.quantity, full.order.eventDate, tx as never, full.order.pickupDate);
-        if (free < it.qty) return `${it.name} is no longer available for ${dualDate(full.order.eventDate)} (${free} free).`;
-      }
-      await tx.update(schema.orders).set({ status, updatedAt: new Date(), ...(status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}) }).where(eq(schema.orders.id, orderId));
-      return null;
-    });
+    // Deep check 06:00 M8: the order is checked as ONE (recheckOrderLines), so two lines sharing a unit (maze group,
+    // laser gun pools, the same item twice) can never both pass when only one is free; a misfit undoes everything.
+    let problem: string | null = null;
+    try {
+      await db.transaction(async (tx) => {
+        for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE stock_group = (SELECT stock_group FROM products WHERE id = ${id}) ORDER BY id FOR UPDATE`);
+        for (const id of ids) await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+        await tx.update(schema.orders).set({ status, updatedAt: new Date(), ...(status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}) }).where(eq(schema.orders.id, orderId));
+        const out = await recheckOrderLines(tx as never, full.order);
+        if (out.length) throw new NoLongerFree(`${out.map((l) => full.items.find((i) => i.productId === l.productId)?.name ?? "An item").join(", ")} ${out.length === 1 ? "is" : "are"} no longer available for ${dualDate(full.order.eventDate)}.`);
+      });
+    } catch (e) {
+      if (!(e instanceof NoLongerFree)) throw e;
+      problem = e.message;
+    }
     if (problem) return { ok: false, message: problem };
   }
   await setOrderStatus(orderId, status, status === "CONFIRMED" || status === "DELIVERED" ? { holdExpiresAt: null } : {}, { reason: why || "Changed by staff in Admin", userId: staff.userId });

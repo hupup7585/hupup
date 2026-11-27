@@ -1501,12 +1501,14 @@ export function staffCallerId(from: string | null | undefined, env: Record<strin
 export async function renewPaymentHold(ids: number[], minutes: number): Promise<number[]> {
   if (!ids.length) return [];
   const rows = await db.select({ id: orders.id, status: orders.status, holdExpiresAt: orders.holdExpiresAt }).from(orders).where(inArray(orders.id, ids));
-  const { itemsStillFree } = await import("@/lib/late-payment");
+  // Deep check 06:00 M7: an ended hold is checked as one whole order, locked (shared units and laser pools counted),
+  // the same check as a late payment; each line alone could pass when only one unit was free
+  const { claimIfStillFree } = await import("@/lib/late-payment");
   const ok: number[] = [];
   const taken: number[] = [];
   for (const r of rows) {
     if (r.status !== "PENDING_PAYMENT") continue;
-    if (r.holdExpiresAt && r.holdExpiresAt < new Date() && !(await itemsStillFree(r.id))) taken.push(r.id);
+    if (r.holdExpiresAt && r.holdExpiresAt < new Date() && !(await claimIfStillFree(r.id))) taken.push(r.id);
     else ok.push(r.id);
   }
   if (ok.length) await db.update(orders).set({ holdExpiresAt: minutesFromNow(minutes), updatedAt: new Date() }).where(inArray(orders.id, ok));
@@ -4741,14 +4743,10 @@ const handlers: Record<string, Handler> = {
     // Admin, and then only on his own test calls until he opens it to everyone and approves its lines.
     // Card payment plan (Abraham, Nov 15, 2026): straight to the card, no payment link in this flow. The Owner picks
     // Sola PhonePay (the default) or Stripe in Admin; callers not offered a card get the payment link, as before.
-    const payCfg = await getSettings();
-    if (payCfg.phoneCardProvider === "stripe") {
-      if (keypadPayFor(caller, stripePhonePayMode(process.env, payCfg), process.env, payCfg.paymentTestNumbers) && PAY_PROMPTS.every((k) => stripePhonePayMode(process.env, payCfg) !== "live" || !promptWaiting(ctx.prompts, k)))
-        return back(vr, "pay-keypad", { o: primary.id });
-    } else if (phonePayOffered(caller, payCfg) && !(await isPhonePayBlocked(callerPhoneOf(ctx))) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k)))) {
-      // Abraham, Nov 24, 2026: box 140 first (5 seconds), then the hold line and the payment line (phonepay-go)
-      return back(vr, "phonepay-go", { o: primary.id, n: 1 });
-    }
+    const route = await cardPayRoute(ctx, caller);
+    if (route === "pay-keypad") return back(vr, "pay-keypad", { o: primary.id });
+    // Abraham, Nov 24, 2026: box 140 first (5 seconds), then the hold line and the payment line (phonepay-go)
+    if (route === "phonepay-go") return back(vr, "phonepay-go", { o: primary.id, n: 1 });
     // Card on the phone not offered to this caller: the payment link, by text or email (box 141)
     return back(vr, "paylink", { o: primary.id });
   },
@@ -4772,7 +4770,11 @@ const handlers: Record<string, Handler> = {
     if (d === "2") return back(vr, "catalog-email", { p: "pay", o });
     // Abraham (Nov 27, 2026, 12:47 AM): star goes back to the card payment offer (box 140: "If you would like to pay
     // by credit or debit card, please stay on the line. To receive a payment link instead, press 0."); the order stays
-    if (d === "*") {
+    // Deep check 06:00 M6: only when a card payment on the phone is offered to this caller (the same rule as checkout);
+    // with phone cards off, Stripe chosen or Owner-test only, star never dials Sola
+    const route = d === "*" ? await cardPayRoute(ctx, ctx.session?.fromNumber ?? ctx.from) : null;
+    if (route === "pay-keypad") return back(vr, "pay-keypad", { o });
+    if (route === "phonepay-go") {
       const g = keypad(vr, url("phonepay-option", { o }), { numDigits: 1, timeout: T(vr, "timerPhonePayOption") });
       sp(g, ctx, "pay_card_line");
       return back(vr, "phonepay-go", { o, c: 1 }); // no key: straight on to the payment line, as in box 140
@@ -6108,6 +6110,20 @@ export const handlerNames = () => Object.keys(handlers);
  * Hark's 2nd phone check, B11: a database or server problem in the set-up of a step (settings, prompts, session) gets
  * our own tech_error line and a hang-up, never Twilio's "An application error has occurred".
  */
+/**
+ * Where a card payment on the phone goes for this caller (Abraham, Nov 15, 2026 card plan): Stripe's keypad, Sola
+ * PhonePay, or null (not offered: the payment link). One rule for checkout and the star key on box 141 (deep check M6).
+ */
+async function cardPayRoute(ctx: Ctx, caller: string | null | undefined): Promise<"pay-keypad" | "phonepay-go" | null> {
+  const payCfg = await getSettings();
+  if (payCfg.phoneCardProvider === "stripe") {
+    const mode = stripePhonePayMode(process.env, payCfg);
+    return keypadPayFor(caller, mode, process.env, payCfg.paymentTestNumbers) && PAY_PROMPTS.every((k) => mode !== "live" || !promptWaiting(ctx.prompts, k)) ? "pay-keypad" : null;
+  }
+  if (phonePayOffered(caller, payCfg) && !(await isPhonePayBlocked(callerPhoneOf(ctx))) && (payCfg.solaPhonePayOwnerOnly || PHONEPAY_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k)))) return "phonepay-go";
+  return null;
+}
+
 export async function handleVoice(raw: Omit<Ctx, "session" | "prompts"> & { editorOverride?: Editor }): Promise<string> {
   try {
     return await handleVoiceInner(raw);

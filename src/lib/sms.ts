@@ -448,8 +448,10 @@ async function deliver(m: { messageId?: number; to: string; body: string; mediaU
     if (String(err.code) === "21610" && m.customer) {
       // Twilio says the recipient unsubscribed: mirror it, like a STOP (extra check J3): every record with the number,
       // an opt-out record for each program, and nothing still waiting goes out
-      const phone = m.customer.phone;
-      await db.update(schema.customers).set({ smsOptOut: true, marketingOptIn: false }).where(phone ? eq(schema.customers.phone, phone) : eq(schema.customers.id, m.customer.id));
+      // Deep check 06:00 M13: the number the text went to (an order's own text number can differ from the customer's
+      // phone), never the customer's phone, which did not reply STOP
+      const phone = toE164(m.to) ?? m.to;
+      await db.update(schema.customers).set({ smsOptOut: true, marketingOptIn: false }).where(eq(schema.customers.phone, phone));
       if (phone) {
         for (const scope of ["transactional", "marketing"])
           await db.insert(schema.smsConsents).values({ customerId: m.customer.id, phone, scope, action: "opt_out", source: "carrier", method: "carrier", wording: "Twilio error 21610: the number replied STOP to the carrier" });

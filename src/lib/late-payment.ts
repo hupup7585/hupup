@@ -308,18 +308,6 @@ export const LATE_EMAIL = {
     `Thank you, we received your payment for order #${num}. Your hold ended just before it went through, so our team needs to check your booking. Please call customer service at (845) 777-7585, extension 3, and we will take care of it. If it is not available anymore, we will give you another option to book.\n\nHup Up Attractions`,
 };
 
-/** Are this order's items free on every day it needs (an ended hold isn't counted, so its own row is left out)? */
-export async function itemsStillFree(orderId: number): Promise<boolean> {
-  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1);
-  if (!o) return false;
-  const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
-  for (const i of items) {
-    const [p] = await db.select().from(schema.products).where(eq(schema.products.id, i.productId)).limit(1);
-    if (!p || (await checkBookable(p.id, p.quantity, o.eventDate, db, o.pickupDate)) < i.qty) return false;
-  }
-  return true;
-}
-
 /**
  * A late payment's stock check (deep check Nov 27 #4), the same as "Check availability again" (A1): the whole order is
  * checked as one in a locked transaction (stock group, then product, in id order), so two items sharing one unit (maze,

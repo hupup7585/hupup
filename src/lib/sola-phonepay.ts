@@ -233,7 +233,15 @@ export const paymentSourceLabel = (m: string | null | undefined) =>
 export async function matchPhonePay(orderId: number, attemptId: number, dueCents: number, deps: { fetcher?: typeof fetch; waitMs?: number; now?: () => Date } = {}): Promise<{ paid: boolean; reason: string }> {
   const { getPaymentGroup, markGroupPaid, orderNumber } = await import("@/lib/orders");
   const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
-  const from = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
+  const started = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
+  // Deep check 06:00 M10: an earlier try of this order whose charge Sola could not be checked (check_failed) may have
+  // gone through. Its time is looked at too, so that charge is found (paid once) or, with a second charge, both are
+  // set aside as unclear (Owner emailed, voided after a later payment); never left unseen and never voided.
+  const unchecked = await db
+    .select({ startedAt: schema.phonepayAttempts.startedAt })
+    .from(schema.phonepayAttempts)
+    .where(and(eq(schema.phonepayAttempts.orderId, orderId), eq(schema.phonepayAttempts.result, "check_failed"), gte(schema.phonepayAttempts.startedAt, new Date(started.getTime() - 60 * 60_000))));
+  const from = new Date(Math.min(started.getTime(), ...unchecked.map((u) => u.startedAt.getTime())));
   const num = orderNumber(orderId);
   let reason = "not_found";
   let found: SolaTxn | null = null;
@@ -363,7 +371,15 @@ export async function checkPhonePayTry(orderId: number, attemptId: number, dueCe
   const { getPaymentGroup, markGroupPaid, orderNumber } = await import("@/lib/orders");
   const { recordPaymentResult, paymentReceivedNotices } = await import("@/lib/payment-result");
   const [attempt] = await db.select().from(schema.phonepayAttempts).where(eq(schema.phonepayAttempts.id, attemptId)).limit(1);
-  const from = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
+  const started = attempt?.startedAt ?? new Date(Date.now() - 15 * 60_000);
+  // Deep check 06:00 M10: an earlier try of this order whose charge Sola could not be checked (check_failed) may have
+  // gone through. Its time is looked at too, so that charge is found (paid once) or, with a second charge, both are
+  // set aside as unclear (Owner emailed, voided after a later payment); never left unseen and never voided.
+  const unchecked = await db
+    .select({ startedAt: schema.phonepayAttempts.startedAt })
+    .from(schema.phonepayAttempts)
+    .where(and(eq(schema.phonepayAttempts.orderId, orderId), eq(schema.phonepayAttempts.result, "check_failed"), gte(schema.phonepayAttempts.startedAt, new Date(started.getTime() - 60 * 60_000))));
+  const from = new Date(Math.min(started.getTime(), ...unchecked.map((u) => u.startedAt.getTime())));
   const num = orderNumber(orderId);
   const group = await getPaymentGroup(orderId);
   const ids = group?.orders.map((d) => d.order.id) ?? [orderId];
