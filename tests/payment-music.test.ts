@@ -166,3 +166,11 @@ describe("connect timing (Abraham, Nov 25, 2026): Sola is called before the hold
   });
 });
 
+
+describe("deep check 06:00 M41", () => {
+  it("the call to Sola waiting to join (pay-leg-wait) is never logged as a hotline caller's call", async () => {
+    const { readFileSync } = await import("node:fs");
+    const line = readFileSync("src/lib/ivr/flow.ts", "utf8").split("\n").find((l) => l.startsWith("const STAFF_LEG_ACTIONS"))!;
+    for (const a of ["pay-leg", "pay-leg-wait", "pay-leg-status"]) expect(line).toContain(`"${a}"`);
+  });
+});
