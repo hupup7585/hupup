@@ -228,7 +228,7 @@ export async function recordBookingPayment(orderId: number, cents: number, metho
     const tipCents = overpayment ? 0 : cents - toTotal;
     await addEntry(
       {
-        entryDate: (await isLocked(date, db)) ? nextOpenDate(date) : date,
+        entryDate: await firstOpenDate(date, db),
         kind: "income",
         category: overpayment ? "Overpayment (refund due)" : "Bookings",
         ...(overpayment ? { notes: "Second payment on an order already paid in full: refund due." } : {}),
@@ -254,6 +254,16 @@ export async function recordBookingPayment(orderId: number, cents: number, metho
   }
 }
 const nextOpenDate = (d: string) => `${addDays(`${d.slice(0, 7)}-28`, 5).slice(0, 7)}-01`;
+
+/**
+ * The date itself when its month is open, else the 1st of the first open month after it. Deep check 0600 M35
+ * (Nov 27, 2026): it used to move one month only, so with two months locked the automatic entry was dropped.
+ */
+export async function firstOpenDate(date: string, exec: Pick<typeof db, "select"> = db): Promise<string> {
+  let d = date;
+  for (let i = 0; i < 120 && (await isLocked(d, exec)); i++) d = nextOpenDate(d);
+  return d;
+}
 
 /** Sales tax county from the delivery address (towns we serve). Unknown addresses are listed as "Orange (check)". */
 const COUNTY_TOWNS: Record<string, string[]> = {
@@ -528,7 +538,7 @@ export async function recordAutoMoneyOut(input: { kind: "refund" | "processor_fe
       if (o) orderTax = { taxExempt: o.taxCents === 0 && o.subtotalCents > 0, county: countyFor(o.deliveryAddress) };
     }
     await addEntry(
-      { entryDate: (await isLocked(date)) ? nextOpenDate(date) : date, kind: input.kind, category: input.category, amountCents: input.amountCents, ...(input.taxCents ? { taxCents: input.taxCents } : {}), ...orderTax, method: input.method, orderId: input.orderId ?? null, ref: input.ref, notes: input.notes ?? null, source: "auto" },
+      { entryDate: await firstOpenDate(date), kind: input.kind, category: input.category, amountCents: input.amountCents, ...(input.taxCents ? { taxCents: input.taxCents } : {}), ...orderTax, method: input.method, orderId: input.orderId ?? null, ref: input.ref, notes: input.notes ?? null, source: "auto" },
       null,
     );
   } catch (e) {

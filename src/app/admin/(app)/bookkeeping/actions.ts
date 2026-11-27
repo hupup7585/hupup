@@ -481,19 +481,27 @@ export async function categorizeLineAction(f: FormData) {
     const category = s(f, "category");
     if (!category) throw new BooksError("Choose a category.");
     const out = l.amountCents < 0;
-    const row = await addEntry(
-      {
-        entryDate: l.lineDate,
-        kind: out ? "expense" : "income",
-        category,
-        amountCents: Math.abs(l.amountCents),
-        method: l.account === "card" ? "card" : "bank",
-        party: l.description.slice(0, 120),
-        notes: `From ${l.account} statement${l.importName ? ` (${l.importName})` : ""}`,
-      },
-      userId,
-    );
-    await db.update(schema.bookBankLines).set({ status: "matched", matchedEntryIds: [row.id], matchNote: `Added to the books as number ${row.id} (${category})` }).where(eq(schema.bookBankLines.id, id));
+    // Deep check 0600 M31 (Nov 27, 2026): a double click added the line to the books twice. The line is claimed (still
+    // unmatched) and its entry added in one step; the second click finds it matched.
+    const row = await db.transaction(async (tx) => {
+      const [claimed] = await tx.update(schema.bookBankLines).set({ status: "matched" }).where(and(eq(schema.bookBankLines.id, id), eq(schema.bookBankLines.status, "unmatched"))).returning({ id: schema.bookBankLines.id });
+      if (!claimed) throw new BooksError("This line is already matched.");
+      const e = await addEntry(
+        {
+          entryDate: l.lineDate,
+          kind: out ? "expense" : "income",
+          category,
+          amountCents: Math.abs(l.amountCents),
+          method: l.account === "card" ? "card" : "bank",
+          party: l.description.slice(0, 120),
+          notes: `From ${l.account} statement${l.importName ? ` (${l.importName})` : ""}`,
+        },
+        userId,
+        tx,
+      );
+      await tx.update(schema.bookBankLines).set({ matchedEntryIds: [e.id], matchNote: `Added to the books as number ${e.id} (${category})` }).where(eq(schema.bookBankLines.id, id));
+      return e;
+    });
     await bookAudit(userId, "line_categorized", "book_bank_line", id, { entry: row.id, category });
     return `Added to the books as entry number ${row.id}.`;
   });
