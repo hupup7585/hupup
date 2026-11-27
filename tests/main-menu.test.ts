@@ -313,7 +313,9 @@ describe("Terms switch for going live (Abraham: /terms stays on preview until fi
   it("live while draft: no /terms page or links, no hotline Terms step, no Terms box, no staff Terms question", async () => {
     const { readFileSync } = await import("node:fs");
     expect(readFileSync("src/app/terms/page.tsx", "utf8")).toContain("if (!termsActive()) notFound();");
-    expect(readFileSync("src/components/site/SiteFooter.tsx", "utf8")).toContain('{termsActive() && <a href="/terms"');
+    // Nov 27, 2026: the footer markup is in SiteFooterView (client-safe, also on the error page); SiteFooter passes termsActive()
+    expect(readFileSync("src/components/site/SiteFooter.tsx", "utf8")).toContain("termsLink={termsActive()}");
+    expect(readFileSync("src/components/site/SiteFooterView.tsx", "utf8")).toContain('{termsLink && <a href="/terms"');
     expect(readFileSync("src/app/sitemap.ts", "utf8")).toContain('...(termsActive() ? ["/terms"] : [])');
     expect(readFileSync("src/lib/ivr/flow.ts", "utf8")).toContain('if (termsActive() && !data.termsAccepted) return back(vr, "terms");');
     expect(readFileSync("src/app/pay/[orderId]/page.tsx", "utf8")).toContain("if (!termsActive() && o.status === \"PENDING_PAYMENT\" && due > 0) {");

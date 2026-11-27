@@ -133,7 +133,7 @@ describe("website enrollment and SMS Terms page", () => {
       expect(page).toContain(part);
   });
   it("footer links to SMS Terms and the sign-up page", () => {
-    const f = readFileSync("src/components/site/SiteFooter.tsx", "utf8");
+    const f = readFileSync("src/components/site/SiteFooterView.tsx", "utf8");
     expect(f).toContain('href="/sms-terms"');
     expect(f).toContain('href="/text-alerts"');
   });
