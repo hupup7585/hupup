@@ -4,9 +4,14 @@ import { NAV } from "./SiteHeader";
 import { Mail, Phone } from "lucide-react";
 import { ICON_STROKE, Wordmark } from "./parts";
 
+/** The year in New York now (deep check 0600 M36): UTC turned the year about 5 hours early on Dec 31. */
+export function footerYear(at: Date = new Date()): number {
+  return Number(at.toLocaleString("en-US", { timeZone: "America/New_York", year: "numeric" }));
+}
+
 /** The footer itself, with no server-only imports, so the error page can show it even when the database is down. */
 export default function SiteFooterView({ c, termsLink }: { c: Pick<SiteContent, "logoUrl" | "categories" | "phoneDisplay" | "phoneE164" | "email">; termsLink: boolean }) {
-  const year = new Date().getFullYear();
+  const year = footerYear(); // deep check 0600 M36: the New York year (UTC showed next year on Dec 31 evening)
   return (
     <footer className="bg-hu-deep text-white">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
