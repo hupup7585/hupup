@@ -813,6 +813,40 @@ type ResumeLine = NonNullable<CallSession["data"]["resumeLines"]>[number];
 
 const RESUME_PROMPTS = ["resume_offer"] as const;
 
+/**
+ * One old-cart item into the cart (its hold moves into the day's cart order with the same pickup and span, if there is
+ * one). Marks the line "added" in `lines` and saves it on the call.
+ */
+async function addResumeLine(ctx: Ctx, lines: ResumeLine[], i: number) {
+  const l = lines[i];
+  const session = ctx.session ?? (await ensureSession(ctx.callSid, ctx.from));
+  const day = (await callOrders(ctx)).find(
+    (o) => o.order.eventDate === l.d && (!l.pk || o.order.pickupDate === l.pk) && (o.order.spanDays ?? null) === (l.span ?? null),
+  );
+  let cartOrder = l.holdId!;
+  // Hark's bug check, bug 2: never move an order onto itself and then cancel it (the resumed item would vanish)
+  if (day && day.order.id !== l.holdId) {
+    await db.update(orderItems).set({ orderId: day.order.id }).where(eq(orderItems.orderId, l.holdId!));
+    await cancelHold(l.holdId!);
+    await refreshOrderTotals(day.order.id);
+    cartOrder = day.order.id;
+  }
+  await db.update(orders).set({ holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES) }).where(eq(orders.id, cartOrder));
+  lines[i] = { ...l, state: "added" };
+  const ids = [...new Set([...(session.data?.dayOrderIds ?? []), cartOrder])];
+  await updateSession(ctx.callSid, { orderId: cartOrder, outcome: "carted", data: { day: l.d, dayOrderIds: ids, resumeLines: lines, lastAdded: { name: l.name, qty: l.qty, date: l.d } } }, session);
+  await track(ctx.callSid, "item_added", `Added ${itemPhrase(l.qty, l.name)} for ${spokenDate(l.d)} from the last call`, { item: l.name, productId: l.p, qty: l.qty, date: l.d, orderId: cartOrder });
+}
+
+/**
+ * Hark's bug 4 (Nov 26, 2026): the caller leaves the old-cart screens with a key (cart, keep shopping, another day,
+ * star). Every old item that is still free goes into the cart first, so none is dropped; the cart lists them.
+ */
+async function addRemainingResume(ctx: Ctx) {
+  const lines = [...(ctx.session?.data.resumeLines ?? [])];
+  for (let i = 0; i < lines.length; i++) if (lines[i].state === "free" && lines[i].holdId) await addResumeLine(ctx, lines, i);
+}
+
 /** Unfinished-cart offer: once Abraham approves its two lines; on preview it runs for his test. */
 function resumeActive(ctx: Ctx, env: Record<string, string | undefined> = process.env) {
   return env.VERCEL_ENV !== "production" || RESUME_PROMPTS.every((k) => !promptWaiting(ctx.prompts, k));
@@ -823,7 +857,7 @@ function resumeActive(ctx: Ctx, env: Record<string, string | undefined> = proces
  * cart (the caller hung up with it). Not when that call ended with an empty cart (nothing added, everything removed,
  * or the cart cleared), never for a paid order, and only items whose dates have not passed.
  */
-async function unfinishedCart(ctx: Ctx): Promise<{ productId: number; name: string; qty: number; date: string }[]> {
+async function unfinishedCart(ctx: Ctx): Promise<{ productId: number; name: string; qty: number; date: string; pickup: string; span: number | null }[]> {
   const from = toE164(ctx.session?.fromNumber ?? ctx.from);
   if (!from) return [];
   const [last] = await db
@@ -838,7 +872,7 @@ async function unfinishedCart(ctx: Ctx): Promise<{ productId: number; name: stri
   const [placed] = await db.select({ id: orders.id }).from(orders).where(and(eq(orders.callSid, last.callSid), sql`${orders.status} <> 'CANCELLED'`)).limit(1);
   if (placed) return [];
   const rows = await db
-    .select({ productId: orderItems.productId, qty: orderItems.qty, date: orders.eventDate, name: products.name, paid: orders.paidCents })
+    .select({ productId: orderItems.productId, qty: orderItems.qty, date: orders.eventDate, pickup: orders.pickupDate, span: orders.spanDays, name: products.name, paid: orders.paidCents })
     .from(orderItems)
     .innerJoin(orders, eq(orders.id, orderItems.orderId))
     .innerJoin(products, eq(products.id, orderItems.productId))
@@ -2417,9 +2451,18 @@ const handlers: Record<string, Handler> = {
     const lines: ResumeLine[] = [];
     for (const l of (await unfinishedCart(ctx)).filter((x) => x.date >= todayISO())) {
       // each item its own hold, outside the cart, until the caller adds it
-      const r = await reserveItem({ orderId: null, productId: l.productId, qty: l.qty, eventDate: l.date, channel: "PHONE", status: "HOLD", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid });
-      lines.push({ p: l.productId, name: l.name, qty: l.qty, d: l.date, holdId: r.ok ? r.orderId : null, state: r.ok ? "free" : "taken" });
+      // Hark's bug 6: the line keeps its pickup day and its closed-day span (box 17: 1.5 days) from the last call
+      const r = await reserveItem({ orderId: null, productId: l.productId, qty: l.qty, eventDate: l.date, channel: "PHONE", status: "HOLD", holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES), callSid: ctx.callSid, pickupDate: l.pickup });
+      if (r.ok && l.span) {
+        await db.update(orders).set({ spanDays: l.span }).where(eq(orders.id, r.orderId));
+        await refreshOrderTotals(r.orderId);
+      }
+      lines.push({ p: l.productId, name: l.name, qty: l.qty, d: l.date, holdId: r.ok ? r.orderId : null, state: r.ok ? "free" : "taken", pk: l.pickup, span: l.span });
     }
+    // later items for a spanned day on this call keep the same pickup and span (keptPickup / dayOrder)
+    const spans = { ...(ctx.session?.data.spanDays ?? {}) };
+    for (const l of lines) if (l.state === "free" && l.span && l.pk && !spans[l.d]) spans[l.d] = { after: l.pk, days: l.span };
+    if (Object.keys(spans).length) await updateSession(ctx.callSid, { data: { spanDays: spans } }, ctx.session);
     await track(ctx.callSid, "step", `Unfinished cart checked again: ${lines.filter((l) => l.state === "free").length} free, ${lines.filter((l) => l.state === "taken").length} no longer free`, { lines });
     await updateSession(ctx.callSid, { data: { resumeLines: lines } }, ctx.session);
     return back(vr, "resume-items");
@@ -2435,22 +2478,7 @@ const handlers: Record<string, Handler> = {
     const i = lines.findIndex((l) => l.state === "free");
     if (i >= 0) {
       const l = lines[i];
-      // its hold moves into the cart (the day's cart order if there is one)
-      const session = ctx.session ?? (await ensureSession(ctx.callSid, ctx.from));
-      const day = (await callOrders(ctx)).find((o) => o.order.eventDate === l.d);
-      let cartOrder = l.holdId!;
-      // Hark's bug check, bug 2: never move an order onto itself and then cancel it (the resumed item would vanish)
-      if (day && day.order.id !== l.holdId) {
-        await db.update(orderItems).set({ orderId: day.order.id }).where(eq(orderItems.orderId, l.holdId!));
-        await cancelHold(l.holdId!);
-        await refreshOrderTotals(day.order.id);
-        cartOrder = day.order.id;
-      }
-      await db.update(orders).set({ holdExpiresAt: minutesFromNow(PHONE_HOLD_MINUTES) }).where(eq(orders.id, cartOrder));
-      lines[i] = { ...l, state: "added" };
-      const ids = [...new Set([...(session.data?.dayOrderIds ?? []), cartOrder])];
-      await updateSession(ctx.callSid, { orderId: cartOrder, outcome: "carted", data: { day: l.d, dayOrderIds: ids, resumeLines: lines, lastAdded: { name: l.name, qty: l.qty, date: l.d } } }, session);
-      await track(ctx.callSid, "item_added", `Added ${itemPhrase(l.qty, l.name)} for ${spokenDate(l.d)} from the last call`, { item: l.name, productId: l.p, qty: l.qty, date: l.d, orderId: cartOrder });
+      await addResumeLine(ctx, lines, i);
       // Nov 19, 2026: a jumping balloon gets the ocean balls question first, then the old-cart added line
       const prod = await getProduct(l.p);
       if (prod && (await isBounceHouse(prod.categoryId)) && !ctx.session?.data.oceanOffered) {
@@ -2491,6 +2519,7 @@ const handlers: Record<string, Handler> = {
 
   async "resume-added-choice"(ctx, vr) {
     const k = ctx.body.Digits;
+    if (k && ["*", "0", "1", "2"].includes(k)) await addRemainingResume(ctx); // Hark's bug 4: no old item is dropped
     if (k === "*") return back(vr, "book"); // star: one step back, the bookings menu
     if (k === "0") return back(vr, "cart");
     if (k === "1") return back(vr, "cats"); // keep shopping, the same day: the categories menu (box 12a)

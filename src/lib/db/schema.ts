@@ -231,7 +231,7 @@ export type CallData = {
   /** Unfinished cart from the last call: offered once, and the taken items still waiting for their options */
   resumeAsked?: number;
   /** Each item from the last call, checked again: held for the caller (not in the cart) until added by key */
-  resumeLines?: { p: number; name: string; qty: number; d: string; holdId: number | null; state: "free" | "taken" | "added" | "done" }[];
+  resumeLines?: { p: number; name: string; qty: number; d: string; holdId: number | null; state: "free" | "taken" | "added" | "done"; pk?: string; span?: number | null }[];
   /** Optional directions for the driver, said after the address (Abraham, Nov 15, 2026) */
   directions?: string;
   email?: string;
