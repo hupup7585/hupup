@@ -1,0 +1,267 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`website baseline (W1) > catalog card, consent boxes, SMS words shown on the website 1`] = `
+{
+  "catalog": {
+    "CATALOG_EMAIL_BUTTON": "Email me the catalog",
+    "CATALOG_FORM_DRAFT": {
+      "again": "We already sent the catalog to this email today. Please check your inbox.",
+      "bad": "Please enter a valid email address.",
+      "badPhone": "Please enter a 10-digit phone number.",
+      "failed": "Sorry, we could not send it right now. Please call us at (845) 777-7585.",
+      "phonePlaceholder": "Your cell phone number",
+      "placeholder": "Your email address",
+      "sent": "Sent! Please check your email.",
+      "textAgain": "We already texted the catalog to this number today.",
+      "textSent": "Sent! Please check your texts.",
+    },
+    "CATALOG_TEXT_BUTTON": "Text me the catalog",
+    "CATALOG_TEXT_CONSENT": "Yes, text the Hup Up Attractions catalog to this number.",
+    "CATALOG_TEXT_CONSENT_VERSION": "catalog-web-2026-11-27",
+    "CATALOG_TEXT_DRAFT": {
+      "noConsent": "Please tick the box to get the catalog by text.",
+      "stopped": "This number replied STOP to our texts, so we cannot text it. To get our texts again, text START to (845) 415-7585.",
+    },
+    "CATALOG_TEXT_FINE_PRINT": "Message and data rates may apply.",
+  },
+  "consent": {
+    "OPT_OUT_KEYWORDS": [
+      "STOP",
+      "UNSUBSCRIBE",
+      "CANCEL",
+      "END",
+      "QUIT",
+      "OPT OUT",
+      "REVOKE",
+    ],
+    "PROMO_BENEFITS": [
+      "New item notices",
+      "Promos and special offers",
+      "Our catalog before each season",
+    ],
+    "PROMO_BENEFITS_NOTE": "All in our occasional promotional texts. Message frequency varies.",
+    "PROMO_ENDING_V2": "Reply NOPROMO to stop promos, STOP to stop all texts.",
+    "PROMO_HEADING": "STAY INFORMED",
+    "PROMO_OPENING": "Hup Up Attractions: Reply STOP to opt out.",
+    "PROMO_PREFIX_V2": "Hup Up Attractions:",
+    "PROMO_TITLE": "And much more",
+    "PROVIDER_DISCLOSURE": "Customer phone numbers and messaging consent information may be processed by service providers, such as messaging and technology providers, solely as necessary to deliver and operate the requested messaging program. Customer information will not be shared with third parties for their own marketing purposes.",
+    "STAFF_CONSENT_VERSION": "staff-2026-11-05",
+    "STAFF_DISCLOSURE": {
+      "marketing": "Would you like to receive promotional text messages from Hup Up Attractions at {phone}? If you agree, you also authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages. Consent is not a condition of purchase. Message and data rates may apply. Message frequency varies. You can reply STOP to opt out, or HELP for help, at any time. Do you agree? Please answer yes or no.",
+      "transactional": "May Hup Up Attractions text you at {phone} about your reservations, orders, payments, deliveries, pickups, and customer service? If you agree, you also authorize Hup Up Attractions to share your phone number with service providers only as necessary to deliver these messages. Message frequency varies. Message and data rates may apply. You can reply STOP to opt out, or HELP for help, at any time. Do you agree? Please answer yes or no.",
+    },
+    "START_CONFIRMATION_SMS": "Hup Up Attractions: To receive order and service texts again (reservations, orders, payments, deliveries, pickups), reply YES. Msg frequency varies. Msg & data rates may apply. Reply HELP for help. Promotional texts require a separate sign-up.",
+    "START_CONFIRMATION_VERSION": "start-confirm-2026-11-05",
+    "WEB_CONSENT_MARKETING": "I agree to receive promotional text messages from Hup Up Attractions and authorize Hup Up Attractions to share my phone number with service providers only as necessary to deliver these messages. Consent is not a condition of purchase. Message and data rates may apply. Message frequency varies. Reply STOP to opt out or HELP for help.",
+    "WEB_CONSENT_TRANSACTIONAL": "I agree to receive transactional text messages from Hup Up Attractions regarding my reservations, orders, payments, deliveries, pickups, and customer service, and authorize Hup Up Attractions to share my phone number with service providers only as necessary to deliver these messages. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help.",
+    "WEB_CONSENT_VERSION": "web-2026-11-05",
+  },
+  "examples": [
+    "Your order is confirmed.",
+    "Your delivery is on the way.",
+    "Here is your delivery confirmation photo.",
+    "Your pickup is scheduled.",
+    "A seasonal offer is available.",
+  ],
+  "notActive": "Not active yet: waiting for Twilio A2P approval",
+  "privacyV2": "Mobile phone numbers and SMS opt-in consent information will never be sold, rented, or shared with third parties or affiliates for their own marketing or promotional purposes. Service providers, such as Twilio, may process the information only to operate the messaging service.",
+  "serviceTypes": [
+    "Reservation confirmations and reminders",
+    "Order changes, such as cancellations, rescheduling, and quantity changes",
+    "Payment links, receipts, and payment confirmations",
+    "Delivery updates, such as estimated arrival times and delays",
+    "Delivery completion notices",
+    "Pickup reminders and pickup confirmations",
+    "Replies to your questions",
+    "Verification codes, where applicable",
+  ],
+  "webConsent": {
+    "marketing": "Text me a confirmation to join Hup Up Attractions promotional texts: seasonal offers, discount codes, and rental deals, up to 5 per calendar year. I am signed up only when I reply YES to that confirmation text within 24 hours. Consent is not a condition of purchase. Message and data rates may apply. Reply NOPROMO to stop promos, STOP to stop all texts, or HELP for help. See our SMS Terms and Privacy Policy.",
+    "transactional": "I agree to receive transactional text messages from Hup Up Attractions, including picture messages such as delivery confirmation photos, regarding my reservations, orders, payments, deliveries, pickups, and customer service, and authorize Hup Up Attractions to share my phone number with service providers only as necessary to deliver these messages. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help.",
+    "version": "web-2026-11-10-v3-6yr",
+  },
+}
+`;
+
+exports[`website baseline (W1) > every public page's title, description and canonical address 1`] = `
+{
+  "/": {
+    "canonical": "/",
+    "description": "Planning a party in Kiryas Joel (Town of Palm Tree) or Monroe, NY? Hup Up Attractions rents Jumping Balloons (bounce houses), laser tag, inflatable mazes and paddle boats across Orange County, NY. Delivery available for an additional fee. Call (845) 777-7585 to book.",
+    "openGraph": {
+      "description": "Friendly party rentals for birthdays, schools and celebrations in Kiryas Joel and Orange County, NY. Call (845) 777-7585 to book.",
+      "siteName": "Hup Up Attractions",
+      "title": "Hup Up Attractions | Bounce House, Laser Tag & Paddle Boat Rentals",
+      "type": "website",
+    },
+    "title": "Bounce House & Party Rentals in Kiryas Joel, NY | Hup Up Attractions",
+  },
+  "/paid": {
+    "canonical": undefined,
+    "description": "Your Hup Up Attractions payment is being confirmed.",
+    "openGraph": undefined,
+    "title": "Thank You | Hup Up Attractions",
+  },
+  "/pay": {
+    "canonical": undefined,
+    "description": undefined,
+    "openGraph": undefined,
+    "title": "Review and pay | Hup Up Attractions",
+  },
+  "/privacy": {
+    "canonical": "/privacy",
+    "description": "How Hup Up Attractions collects, uses and protects your information when you book a party rental by phone or sign up for our texts.",
+    "openGraph": undefined,
+    "title": "Privacy Policy | Hup Up Attractions",
+  },
+  "/sms-terms": {
+    "canonical": "/sms-terms",
+    "description": "How Hup Up Attractions text messages work: order and service texts, promotional texts, message frequency, and how to reply STOP or HELP.",
+    "openGraph": undefined,
+    "title": "SMS Terms | Hup Up Attractions",
+  },
+  "/terms": {
+    "canonical": "/terms",
+    "description": "The rental terms for bounce houses, laser tag, inflatable mazes and paddle boats from Hup Up Attractions: booking, delivery, safety and payment.",
+    "openGraph": undefined,
+    "title": "Terms and Conditions | Hup Up Attractions",
+  },
+  "/text-alerts": {
+    "canonical": "/text-alerts",
+    "description": "Join the Hup Up Attractions text list for new rental items, seasonal promos and order updates for your party in Kiryas Joel and Orange County, NY. Message frequency varies. Reply STOP to opt out.",
+    "openGraph": undefined,
+    "title": "Get Text Updates and Party Rental Deals | Hup Up Attractions",
+  },
+  "/unsubscribe": {
+    "canonical": undefined,
+    "description": undefined,
+    "openGraph": undefined,
+    "title": "Unsubscribe | Hup Up Attractions",
+  },
+}
+`;
+
+exports[`website baseline (W1) > home page words (site-copy) 1`] = `
+{
+  "BUSINESS_NAME_NB": "Hup Up Attractions",
+  "CATALOG_LINE": {
+    "after": " with the subject Catalog, and we'll send it right back.",
+    "before": "Want our catalog? Email ",
+    "email": "info@hupupattractions.com",
+  },
+  "DELIVERY_FEE_NOTE": "Delivery available. Call for pricing.",
+  "DELIVERY_FEE_SHORT": "Delivery fee applies, call for pricing.",
+  "FINAL_CTA_TEXT": "Contact Hup Up Attractions today to explore our rental options and reserve your attraction.",
+  "FINAL_CTA_TITLE": "READY TO MAKE YOUR EVENT SPECIAL?",
+  "HOW_IT_WORKS_DELIVERY": "We deliver our rentals right to your door.",
+  "INTRO": "Make your next event unforgettable with our exciting rentals! Affordable and suitable for any party, gathering, celebration & occasion, or just because.",
+  "SERVICE_AREA": {
+    "also": [
+      "Monroe",
+      "Blooming Grove",
+      "Woodbury and Highland Mills",
+      "Chester",
+      "Harriman",
+      "Washingtonville",
+    ],
+    "alsoTitle": "We also deliver to these nearby towns:",
+    "main": "Kiryas Joel",
+    "mainLabel": "Main service area:",
+    "mainSub": "Town of Palm Tree, Orange County, NY",
+    "officialName": "Town of Palm Tree",
+    "region": "Orange County, NY",
+  },
+  "SERVICE_AREA_DELIVERY_NOTE": "Delivery available for an additional fee.",
+  "SERVICE_AREA_MAP_URL": "https://www.google.com/maps/search/?api=1&query=Kiryas%20Joel%2C%20NY",
+  "SLOGAN": "BRINGING SOMETHING SPECIAL TO EVERY OCCASION",
+  "STEPS": [
+    [
+      "STEP 1",
+      "EXPLORE",
+      "Browse our rental categories.",
+    ],
+    [
+      "STEP 2",
+      "CALL",
+      "Call us to discuss rental options, availability, and pricing.",
+    ],
+    [
+      "STEP 3",
+      "CONFIRM",
+      "Complete your reservation over the phone with our team.",
+    ],
+  ],
+  "WEBSITE_HOURS_NOTE": "Book by phone 24 hours.",
+  "WHY": [
+    "Exciting attraction rentals",
+    "Options for all types of events",
+    "Convenient phone reservations",
+    "Friendly customer service",
+    "Delivery option available",
+    "Simple booking process",
+  ],
+  "WHY_FORCED_LINES": {
+    "Delivery option available": [
+      "Delivery",
+      "option available",
+    ],
+  },
+  "WHY_LINE_BREAKS": {
+    "Options for all types of events": [
+      "Options for",
+      "all types of events",
+    ],
+  },
+}
+`;
+
+exports[`website baseline (W1) > pay link, error page and unsubscribe words 1`] = `
+{
+  "error": {
+    "ERROR_PAGE_BUTTON": "Back to homepage",
+    "ERROR_PAGE_HEADING": "We apologize, this page is temporarily unavailable.",
+    "ERROR_PAGE_LINE_BEFORE_PHONE": "Please try again in a few minutes. For immediate assistance, please call us at",
+    "ERROR_PAGE_PHONE": "(845) 777-7585",
+    "ERROR_PAGE_PHONE_TEL": "+18457777585",
+    "ERROR_PAGE_TEXT": "We apologize, this page is temporarily unavailable. Please try again in a few minutes. For immediate assistance, please call us at (845) 777-7585.",
+  },
+  "label": {
+    "PAY_AGREE_LABEL": "I agree to the Terms and Conditions",
+    "PAY_SMS_HELP_LINE": "Message and data rates may apply.",
+  },
+  "link": {
+    "cardNote": [
+      "This link holds your booking for 1 minutes. Once you open it, you get 4 more minutes to pay.",
+      "This link holds your booking for 2 minutes. Once you open it, you get 4 more minutes to pay.",
+      "This link holds your booking for 10 minutes. Once you open it, you get 4 more minutes to pay.",
+    ],
+    "checkButton": "Check availability again",
+    "expiredBody": [
+      "Your item was back into stock so other customers could book. Tap below to check if it's still free for your date.",
+      "Your items were back into stock so other customers could book. Tap below to check if they are still free for your date.",
+      "Your items were back into stock so other customers could book. Tap below to check if they are still free for your date.",
+    ],
+    "expiredTitle": "This payment link has expired",
+    "gone": [
+      "This item is no longer available for your date.",
+      "These items are no longer available for your date.",
+      "These items are no longer available for your date.",
+    ],
+    "goneCall": "Please call us at (845) 777-7585, to choose another option or another day.",
+    "heldAgain": [
+      "It's still available! We are holding it for you for the next 1 minutes.",
+      "It's still available! We are holding it for you for the next 2 minutes.",
+      "It's still available! We are holding it for you for the next 10 minutes.",
+    ],
+    "optionsIntro": "Here are the nearest options that are free for you right now. Tap one to hold it for you:",
+  },
+  "unsubscribe": {
+    "ask": "Press the button to stop promotional emails from Hup Up Attractions. Booking and payment emails will still reach you.",
+    "bad": "This link is not valid.",
+    "button": "Unsubscribe",
+    "done": "You are unsubscribed from Hup Up Attractions promotional emails.",
+    "title": "Unsubscribe from promotional emails",
+  },
+}
+`;
