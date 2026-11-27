@@ -96,3 +96,4 @@ describe("invoices, quotes and credit notes", () => {
     expect(readFileSync("src/app/admin/(app)/bookkeeping/statement/page.tsx", "utf8")).toContain("await requireBooks()");
   });
 });
+

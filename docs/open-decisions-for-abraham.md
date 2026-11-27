@@ -111,6 +111,12 @@ confirmation itself when Twilio doesn't. Nothing was changed, so a customer neve
 20. **Slot file check (phone audit 16, Hark):** the "Address step 1 - house number" slot holds a file named "22 Address
     step 2 - house number.mp3". Please listen in Admin and re-upload if it is the wrong recording.
 
+## Invoice page description (deep check 06:00, Nov 27, 2026)
+
+The customer's invoice page (opened from the invoice link) now has its heading. It still has no page description
+(the short text a phone may show under a shared link). The page is hidden from Google, so this only matters for link
+previews. Suggested wording, not used until approved: "Your invoice from Hup Up Attractions. View or print it here."
+
 ## Vercel free plan (Vercel check, Nov 27, 2026)
 
 21. **Preview builds on every merge.** Each merge to the live branch also builds the preview branch, even when both
